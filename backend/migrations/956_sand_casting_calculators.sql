@@ -608,10 +608,10 @@ BEGIN
   SELECT id INTO v_id FROM public.calculators WHERE name = $q$Sand Casting - Hot box coremaking$q$ AND user_id IS NULL AND retired_at IS NULL;
   IF v_id IS NULL THEN
     INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, $q$Sand Casting - Hot box coremaking$q$, 'process', 'single', false, true, true, $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box and stripped. Cure and strip times are estimates (D143) until the plant's hot-box times are known.$q$)
+    VALUES (NULL, $q$Sand Casting - Hot box coremaking$q$, 'process', 'single', false, true, true, $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed.$q$)
     RETURNING id INTO v_id;
   ELSE
-    UPDATE public.calculators SET calc_category = 'process', description = $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box and stripped. Cure and strip times are estimates (D143) until the plant's hot-box times are known.$q$, updated_at = now() WHERE id = v_id;
+    UPDATE public.calculators SET calc_category = 'process', description = $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed.$q$, updated_at = now() WHERE id = v_id;
   END IF;
 
   DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
@@ -621,9 +621,20 @@ BEGIN
     (v_id, $q$Core Sand$q$, $q$Core Sand (kg)$q$, $q$number$q$, $q$kg$q$, NULL, NULL, NULL, NULL, 1, true),
     (v_id, $q$Blowing Rate$q$, $q$Blowing Rate (kg/min)$q$, $q$number$q$, $q$kg/min$q$, NULL, NULL, NULL, NULL, 2, true),
     (v_id, $q$Blow Time$q$, $q$Blow Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Core Sand} / {Blowing Rate} * 60$q$, 3, false),
-    (v_id, $q$Cure Time (estimate)$q$, $q$Cure Time (estimate) (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q$30$q$, 4, false),
-    (v_id, $q$Strip and Handling (estimate)$q$, $q$Strip and Handling (estimate) (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q$10$q$, 5, false),
-    (v_id, $q$Cycle Time$q$, $q$Cycle Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Blow Time} + {Cure Time (estimate)} + {Strip and Handling (estimate)}$q$, 6, false);
+    (v_id, $q$Core Section$q$, $q$Core Section (mm)$q$, $q$number$q$, $q$mm$q$, NULL, NULL, NULL, NULL, 4, true),
+    (v_id, $q$Sand Density$q$, $q$Sand Density (kg/m³)$q$, $q$number$q$, $q$kg/m³$q$, NULL, NULL, NULL, NULL, 5, true),
+    (v_id, $q$Sand Specific Heat$q$, $q$Sand Specific Heat (J/(kg·K))$q$, $q$number$q$, $q$J/(kg·K)$q$, NULL, NULL, NULL, NULL, 6, true),
+    (v_id, $q$Sand Conductivity$q$, $q$Sand Conductivity (W/(m·K))$q$, $q$number$q$, $q$W/(m·K)$q$, NULL, NULL, NULL, NULL, 7, true),
+    (v_id, $q$Initial Sand Temperature$q$, $q$Initial Sand Temperature (°C)$q$, $q$number$q$, $q$°C$q$, NULL, NULL, NULL, NULL, 8, true),
+    (v_id, $q$Corebox Temperature$q$, $q$Corebox Temperature (°C)$q$, $q$number$q$, $q$°C$q$, NULL, NULL, NULL, NULL, 9, true),
+    (v_id, $q$Cure Temperature$q$, $q$Cure Temperature (°C)$q$, $q$number$q$, $q$°C$q$, NULL, NULL, NULL, NULL, 10, true),
+    (v_id, $q$Required Cured Depth$q$, $q$Required Cured Depth (mm)$q$, $q$number$q$, $q$mm$q$, NULL, NULL, NULL, NULL, 11, true),
+    (v_id, $q$Strip and Handling$q$, $q$Strip and Handling (s)$q$, $q$number$q$, $q$s$q$, NULL, NULL, NULL, NULL, 12, true),
+    (v_id, $q$Thermal Diffusivity$q$, $q$Thermal Diffusivity (m²/s)$q$, $q$calculated$q$, $q$m²/s$q$, NULL, NULL, NULL, $q${Sand Conductivity} / ({Sand Density} * {Sand Specific Heat})$q$, 13, false),
+    (v_id, $q$Cured Depth$q$, $q$Cured Depth (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$min({Required Cured Depth}, {Core Section} / 2)$q$, 14, false),
+    (v_id, $q$Temperature Ratio$q$, $q$Temperature Ratio$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q$({Corebox Temperature} - {Cure Temperature}) / ({Corebox Temperature} - {Initial Sand Temperature})$q$, 15, false),
+    (v_id, $q$Cure Time$q$, $q$Cure Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q$({Cured Depth} / 1000) ^ 2 / (4 * {Thermal Diffusivity} * ERFINV({Temperature Ratio}) ^ 2)$q$, 16, false),
+    (v_id, $q$Cycle Time$q$, $q$Cycle Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Blow Time} + {Cure Time} + {Strip and Handling}$q$, 17, false);
 
   UPDATE public.process_calculator_mappings
   SET calculator_id = v_id, calculator_name = $q$Sand Casting - Hot box coremaking$q$
@@ -683,7 +694,7 @@ BEGIN
     ($q$Sand Casting - Visual inspection$q$, 8, 1),
     ($q$Sand Casting - Core sand$q$, 5, 0),
     ($q$Sand Casting - Coremaking$q$, 3, 6),
-    ($q$Sand Casting - Hot box coremaking$q$, 6, 1),
+    ($q$Sand Casting - Hot box coremaking$q$, 17, 1),
     ($q$Sand Casting - Core box$q$, 8, 0)
   ) AS e(name, field_count, mapping_count)
   LEFT JOIN public.calculators c ON c.name = e.name AND c.user_id IS NULL AND c.retired_at IS NULL

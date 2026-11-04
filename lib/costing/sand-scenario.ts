@@ -6,6 +6,20 @@ export const SAND_SCENARIO_KEYS = {
   coreProcess: 'sandCoreProcess',
   energyPrice: 'energyPriceUsdPerKwh',
   cavities: 'cavityCount',
+  hotBoxCoreboxTemp: 'hotBoxCoreboxTempC',
+  hotBoxCureTemp: 'hotBoxCureTempC',
+  hotBoxCuredDepth: 'hotBoxCuredDepthMm',
+} as const;
+
+/**
+ * What the hot box physics needs from the plant (backend sand-cores.ts): no dataset holds these three settings, so none is assumed; without them the hot box
+ * core is not costed and the route says what to set. The ranges are published guidance shown beside the fields, never applied for the user
+ * (US patents 5,365,995 and 5,368,087: core box 230-260 C, 10-40 s cure, a skin of 1/4 to 1/2 inch on massive cores).
+ */
+export const HOT_BOX_GUIDANCE = {
+  coreboxTemp: 'The core box set point. Published range 230-260 C.',
+  cureTemp: "The temperature at which the binder cures: from the resin's datasheet.",
+  curedDepth: "The depth of core that must be cured before it is stripped (mm), the plant's strip criterion. Published: a few mm for fast cycles; 6-13 mm on massive cores takes minutes.",
 } as const;
 
 export const SAND_MOULDING_PROCESSES = [

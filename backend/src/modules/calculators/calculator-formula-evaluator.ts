@@ -1,4 +1,4 @@
-import { evaluate } from 'mathjs';
+import { erf, evaluate } from 'mathjs';
 
 /**
  * Shared mathjs-based formula evaluator, extracted from
@@ -22,6 +22,26 @@ interface CalculatorFormulaRow {
   formula_name?: string | null;
   formula_expression?: string | null;
   execution_order?: number | null;
+}
+
+/**
+ * The inverse error function: the x with erf(x) = y, for y strictly between -1 and 1. Newton's method on mathjs's erf, from a closed-form start
+ * (Winitzki's approximation, within 2e-3), to machine precision in a few steps. Used by heat-conduction formulas, e.g. the time for a depth of sand
+ * to reach a temperature: t = d^2 / (4 alpha erfinv(theta)^2).
+ */
+export function erfInverse(y: number): number {
+  if (!Number.isFinite(y) || y <= -1 || y >= 1) throw new Error('ERFINV requires a value strictly between -1 and 1');
+  if (y === 0) return 0;
+  const a = 0.147;
+  const ln = Math.log(1 - y * y);
+  const t = 2 / (Math.PI * a) + ln / 2;
+  let x = Math.sign(y) * Math.sqrt(Math.sqrt(t * t - ln / a) - t);
+  for (let i = 0; i < 8; i++) {
+    const step = ((erf(x) as number) - y) / ((2 / Math.sqrt(Math.PI)) * Math.exp(-x * x));
+    x -= step;
+    if (Math.abs(step) < 1e-15) break;
+  }
+  return x;
 }
 
 interface EvaluatorLogger {
@@ -97,6 +117,8 @@ export function evaluateCalculatorFormulas(
     // (CEIL({Machining Time})) threw "Undefined function CEIL" — mathjs has
     // no built-in CEIL (only lowercase ceil, not exposed to formula scope).
     CEIL: (value: number) => Math.ceil(value),
+    // The inverse of erf (see erfInverse): heat-conduction formulas solve the error-function solution for time or depth.
+    ERFINV: (value: number) => erfInverse(value),
   };
   Object.assign(scope, customFunctions);
 

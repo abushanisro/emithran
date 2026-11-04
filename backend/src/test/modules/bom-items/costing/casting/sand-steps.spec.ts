@@ -9,7 +9,7 @@ import {
   selectAndCost,
   type SandRouteContext,
 } from '../../../../../modules/bom-items/costing/casting/sand/sand-steps';
-import { realSandReference, sandMachines, sandMaterial } from './sand-test-data';
+import { realSandReference, sandMachines, sandMaterial, HOT_BOX } from './sand-test-data';
 
 const ref = realSandReference();
 const spec = loadSandCastingCalculatorSpec();
@@ -20,7 +20,7 @@ const col = (k: string) => iron.columns[k]!;
 const ctx: SandRouteContext = {
   ref, spec, calculators, material: iron,
   part: { netKg: 8, modulusMm: 10, dimsMm: [300, 200, 100], wallNominalMm: 12 },
-  cavities: 1, coresPerCasting: 0, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null,
+  cavities: 1, coresPerCasting: 0, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null, hotBox: HOT_BOX,
 };
 
 const horizontal = sandMachines('machines_horizontal_automatic.csv', 'sand_casting_horizontal_automatic');

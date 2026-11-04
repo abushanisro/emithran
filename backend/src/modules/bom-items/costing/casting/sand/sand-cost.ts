@@ -17,6 +17,10 @@ export const SAND_SCENARIO_KEYS = {
   coreProcess: 'sandCoreProcess',
   energyPrice: 'energyPriceUsdPerKwh',
   cavities: 'cavityCount',
+  // The plant's hot box settings: the core box temperature, the binder's cure temperature and the depth of core cured before it is stripped.
+  hotBoxCoreboxTemp: 'hotBoxCoreboxTempC',
+  hotBoxCureTemp: 'hotBoxCureTempC',
+  hotBoxCuredDepth: 'hotBoxCuredDepthMm',
 } as const;
 
 /**
@@ -44,6 +48,11 @@ export function sandScenario(input: {
       mouldingClass,
       chosenCoreProcess: typeof o[SAND_SCENARIO_KEYS.coreProcess] === 'string' ? (o[SAND_SCENARIO_KEYS.coreProcess] as string) : null,
       energyPricePerKwh: positive(o[SAND_SCENARIO_KEYS.energyPrice]),
+      hotBox: {
+        coreboxTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCoreboxTemp]),
+        cureTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCureTemp]),
+        curedDepthMm: positive(o[SAND_SCENARIO_KEYS.hotBoxCuredDepth]),
+      },
       lifetimeVolume: lifetime,
     },
   };

@@ -2,7 +2,7 @@ import { loadSandCastingCalculatorSpec, sandCastingCalculatorsByName } from '../
 import { coreboxTooling, coreLine, makeCoreStep, sandCores, type CoreRegion } from '../../../../../modules/bom-items/costing/casting/sand/sand-cores';
 import type { SandRouteContext } from '../../../../../modules/bom-items/costing/casting/sand/sand-steps';
 import { resolveSandReference } from '../../../../../modules/bom-items/costing/casting/sand/sand-reference';
-import { realSandReference, sandMachines, sandMaterial, sandRows, stagedLookups, stagedVariables } from './sand-test-data';
+import { realSandReference, sandMachines, sandMaterial, sandRows, stagedLookups, stagedVariables, HOT_BOX } from './sand-test-data';
 
 const ref = realSandReference();
 const spec = loadSandCastingCalculatorSpec();
@@ -10,7 +10,7 @@ const iron = sandMaterial('ASTM Grade 20 Gray Iron');
 const ctx: SandRouteContext = {
   ref, spec, calculators: sandCastingCalculatorsByName(), material: iron,
   part: { netKg: 8, modulusMm: 10, dimsMm: [300, 200, 100], wallNominalMm: 12 },
-  cavities: 1, coresPerCasting: 1, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null,
+  cavities: 1, coresPerCasting: 1, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null, hotBox: HOT_BOX,
 };
 const spec$ = (m: { specs: Readonly<Record<string, unknown>> }, k: string) => Number(m.specs[k]);
 const v = (k: string) => ref.number(k)!;
@@ -62,12 +62,69 @@ describe('makeCoreStep', () => {
     expect(out.ok && out.sec).toBeCloseTo(spec$(m, 'base_cycle_time_s'), 9);
   });
 
-  it('hot box is timed from the sand: blow time at the plant\'s blowing rate plus the cure and strip estimates the calculator names', () => {
+  // The 200 x 100 x 60 mm core is 2.112 kg of sand ((1.2e6 + 2 x 1.2e6 / 200 x 10) mm3 x 1600 kg/m3): blown in 2.112 / 300 x 60 = 0.4224 s, stripped in the
+  // handling table's 10 s band (up to 5 kg). Its smallest side is 60 mm, so with a strip criterion of 3 mm (half the side is 30) 3 mm is cured: with the box at
+  // 245 C, the binder curing at 150 C and the sand at 20 C that is 52.28 s (the hand-worked table in docs/design/sand-casting-hotbox-gating.md).
+  it('hot box is timed by physics: the blow from the sand, the cure by conduction into the sand, the strip from the handling table', () => {
     const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
-    const fields = spec.calculators.find((c) => c.name === 'Sand Casting - Hot box coremaking')!.fields;
-    const estimate = (name: string) => Number(fields.find((f) => f.name === name)!.formula);
     const out = makeCoreStep(ctx, m, core);
-    expect(out.ok && out.sec).toBeCloseTo((core.kg / v('coreBoxSandBlowingRate')) * 60 + estimate('Cure Time (estimate)') + estimate('Strip and Handling (estimate)'), 9);
+    expect(core.kg).toBeCloseTo(2.112, 3);
+    expect(out.ok && out.sec).toBeCloseTo(0.4224 + 52.28 + 10, 1);
+    expect(out.ok && out.run.outputs['Cure Time']).toBeCloseTo(52.28, 1);
+  });
+
+  it('the cure time follows the plant\'s settings: a hotter box, a lower cure temperature or a shallower strip depth cure sooner', () => {
+    const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
+    const cure = (hotBox: Partial<typeof HOT_BOX>) => {
+      const out = makeCoreStep({ ...ctx, hotBox: { ...HOT_BOX, ...hotBox } }, m, core);
+      return out.ok ? out.run.outputs['Cure Time']! : NaN;
+    };
+    const base = cure({});
+    expect(cure({ coreboxTempC: 260 })).toBeLessThan(base);
+    expect(cure({ cureTempC: 120 })).toBeLessThan(base);
+    expect(cure({ curedDepthMm: 2 })).toBeCloseTo(23.2, 1);
+    // depth is quadratic: doubling it quadruples the time
+    expect(cure({ curedDepthMm: 6 }) / cure({ curedDepthMm: 3 })).toBeCloseTo(4, 9);
+  });
+
+  it('a core cured right through (thinner than twice the strip depth) is cured to its middle: a 4 mm side needs 2 mm, whatever the criterion', () => {
+    const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
+    const thin = { ...core, region: { ...core.region, sizeMm: [200, 100, 4] as [number, number, number] } };
+    const out = makeCoreStep({ ...ctx, hotBox: { ...HOT_BOX, curedDepthMm: 10 } }, m, thin);
+    expect(out.ok && out.run.outputs['Cured Depth']).toBe(2);
+  });
+
+  it('the strip time is the handling table\'s band for the core: a 25 kg core (beyond hands) takes the table\'s forklift band', () => {
+    const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
+    const out = makeCoreStep(ctx, m, { ...core, kg: 25 });
+    // cycle = blow (25 / 300 x 60 s) + cure + strip, so the strip is what is left
+    expect(out.ok && out.sec - (25 / v('coreBoxSandBlowingRate')) * 60 - out.run.outputs['Cure Time']!).toBeCloseTo(540, 6);
+  });
+
+  it('without the plant\'s settings the hot box is not costed and says what to set, never a default', () => {
+    const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
+    const none = { coreboxTempC: null, cureTempC: null, curedDepthMm: null };
+    const out = makeCoreStep({ ...ctx, hotBox: none }, m, core);
+    expect(out).toEqual({ ok: false, reasons: [expect.stringMatching(/^hot box: set the core box temperature .*the binder's cure temperature .*the depth of core cured before stripping/)] });
+    const one = makeCoreStep({ ...ctx, hotBox: { ...HOT_BOX, cureTempC: null } }, m, core);
+    expect(one).toEqual({ ok: false, reasons: ["hot box: set the binder's cure temperature (Cost Guide: hot box cure temperature)"] });
+  });
+
+  it('settings that cannot cure anything are refused with the reason: the box must be hotter than the cure temperature, which must be above the sand\'s', () => {
+    const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
+    for (const hotBox of [{ ...HOT_BOX, cureTempC: 245 }, { ...HOT_BOX, cureTempC: 250 }, { ...HOT_BOX, cureTempC: 20 }, { ...HOT_BOX, cureTempC: 10 }]) {
+      const out = makeCoreStep({ ...ctx, hotBox }, m, core);
+      expect(out).toEqual({ ok: false, reasons: [expect.stringContaining('must be hotter than the binder')] });
+    }
+  });
+
+  it('with the hot box unusable another process makes the core, and the line says why, so the choice is not silent', () => {
+    const line = coreLine({
+      ctx: { ...ctx, hotBox: { coreboxTempC: null, cureTempC: null, curedDepthMm: null } }, core, machinesByClass: byClass, batchSize: 250, costContext,
+    });
+    expect(line.process).not.toBe('Hot Box');
+    expect(line.step.warnings.join(' ')).toMatch(/Hot box could not make a core: hot box: set the core box temperature/);
+    expect(line.step.warnings.join(' ')).toContain(`${line.process} is used instead`);
   });
 
   it('refuses a core over the process weight limit, one that does not fit the machine\'s core box, and a machine with no cycle time', () => {

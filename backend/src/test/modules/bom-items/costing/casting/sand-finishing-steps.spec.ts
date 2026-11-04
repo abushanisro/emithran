@@ -8,7 +8,7 @@ import {
   shakeoutStep,
   type SandFinishContext,
 } from '../../../../../modules/bom-items/costing/casting/sand/sand-finishing-steps';
-import { realSandReference, sandMachines, sandMaterial, sandRows } from './sand-test-data';
+import { realSandReference, sandMachines, sandMaterial, sandRows, HOT_BOX } from './sand-test-data';
 
 const ref = realSandReference();
 const iron = sandMaterial('ASTM Grade 20 Gray Iron');
@@ -17,7 +17,7 @@ const spec$ = (m: { specs: Readonly<Record<string, unknown>> }, k: string) => Nu
 const ctx: SandFinishContext = {
   ref, spec: loadSandCastingCalculatorSpec(), calculators: sandCastingCalculatorsByName(), material: iron,
   part: { netKg: 8, modulusMm: 10, dimsMm: [300, 200, 100], wallNominalMm: 12 },
-  cavities: 1, coresPerCasting: 0, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null,
+  cavities: 1, coresPerCasting: 0, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null, hotBox: HOT_BOX,
   surfaceAreaMm2: 250000,
   gates: { ingateAreaMm2: 300, ingateWidthMm: 30, riserContactMm2: 900, riserDiameterMm: 45 },
   partingLine: { value: 900, source: 'measured parting line' },

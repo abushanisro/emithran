@@ -15,7 +15,7 @@ import { designGating, type GatingSystem } from './sand-gating';
 import { machineValue, type SandMachine } from './sand-machines';
 import type { SandReference } from './sand-reference';
 import { valuesProvider } from './sand-seeds';
-import { cavitiesPerMould, coolStep, meltStep, mouldStep, pourStep, runStep, selectAndCost, type CostedStep, type SandMaterial, type SandRouteContext } from './sand-steps';
+import { cavitiesPerMould, coolStep, meltStep, mouldStep, pourStep, runStep, selectAndCost, type CostedStep, type HotBoxSettings, type SandMaterial, type SandRouteContext } from './sand-steps';
 
 export const METAL_PER_CASTING = 'Sand Casting - Metal per casting';
 export const MATERIAL_COST = 'Sand Casting - Material cost';
@@ -56,6 +56,8 @@ export interface SandScenario {
   chosenCoreProcess: string | null;
   /** USD per kWh for melting: the user's, no default. */
   energyPricePerKwh: number | null;
+  /** The plant's hot box settings; each null until the user sets it (no default is assumed). */
+  hotBox: HotBoxSettings;
   /** Parts made over the tooling's life: core boxes are shared by these. Null: the tooling is not costed (and said so), never spread over an assumed volume. */
   lifetimeVolume: number | null;
 }
@@ -139,7 +141,7 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   const base: SandRouteContext = {
     ref, spec: input.spec, calculators: input.calculators, material: input.material,
     part: { netKg, modulusMm: modulus, dimsMm: part.dimsMm, wallNominalMm: thickness },
-    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh,
+    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh, hotBox: scenario.hotBox,
   };
   const { system: gating, missing: gatingMissing } = designGating({
     netKg, volumeMm3: part.volumeMm3, modulusMm: modulus, densityKgM3: density, materialName: input.material.name,

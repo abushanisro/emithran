@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { SAND_CORE_PROCESSES, SAND_MOULDING_PROCESSES, SAND_SCENARIO_KEYS, choiceOf, parseCavities, parsePositive } from '@/lib/costing/sand-scenario';
+import { HOT_BOX_GUIDANCE, SAND_CORE_PROCESSES, SAND_MOULDING_PROCESSES, SAND_SCENARIO_KEYS, choiceOf, parseCavities, parsePositive } from '@/lib/costing/sand-scenario';
 
 describe('sand scenario fields', () => {
   it('a positive number is read, an empty field clears the choice, anything else is refused without changing it', () => {
@@ -25,7 +25,7 @@ describe('sand scenario fields', () => {
   });
 
   it('uses the backend\'s keys and process names (a name it does not know is ignored there)', () => {
-    expect(SAND_SCENARIO_KEYS).toEqual({ mouldingProcess: 'sandMouldingProcess', coreProcess: 'sandCoreProcess', energyPrice: 'energyPriceUsdPerKwh', cavities: 'cavityCount' });
+    expect(SAND_SCENARIO_KEYS).toEqual({ mouldingProcess: 'sandMouldingProcess', coreProcess: 'sandCoreProcess', energyPrice: 'energyPriceUsdPerKwh', cavities: 'cavityCount', hotBoxCoreboxTemp: 'hotBoxCoreboxTempC', hotBoxCureTemp: 'hotBoxCureTempC', hotBoxCuredDepth: 'hotBoxCuredDepthMm' });
     expect(SAND_MOULDING_PROCESSES).toHaveLength(5);
     expect(SAND_CORE_PROCESSES).toEqual(['Hot Box', 'CO2 Cured', 'No Bake', 'Oil Core', 'Shell']);
   });
@@ -39,5 +39,20 @@ describe('sand scenario fields', () => {
     };
     expect([...SAND_MOULDING_PROCESSES]).toEqual(namesIn('sand-route.ts', 'MOULDING_PROCESSES'));
     expect([...SAND_CORE_PROCESSES]).toEqual(namesIn('sand-cores.ts', 'CORE_PROCESSES'));
+  });
+
+  it('the hot box settings are keys the backend reads (sand-cost.ts), and temperatures and a depth are positive numbers', () => {
+    const backend = readFileSync(join(__dirname, '../../../backend/src/modules/bom-items/costing/casting/sand/sand-cost.ts'), 'utf8');
+    for (const key of [SAND_SCENARIO_KEYS.hotBoxCoreboxTemp, SAND_SCENARIO_KEYS.hotBoxCureTemp, SAND_SCENARIO_KEYS.hotBoxCuredDepth]) {
+      expect(backend).toContain(`'${key}'`);
+    }
+    expect(parsePositive('245')).toBe(245);
+    expect(parsePositive('6.35')).toBe(6.35);
+    expect(parsePositive('-5')).toBe('invalid');
+  });
+
+  it('the published ranges are shown as guidance text; none is a number the engine could take as a default', () => {
+    expect(HOT_BOX_GUIDANCE.coreboxTemp).toMatch(/230-260/);
+    expect(Object.values(HOT_BOX_GUIDANCE).every((t) => typeof t === 'string')).toBe(true);
   });
 });

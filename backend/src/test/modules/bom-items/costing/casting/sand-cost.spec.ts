@@ -6,7 +6,7 @@ import { buildSandRoute } from '../../../../../modules/bom-items/costing/casting
 import { buildCastingCostSummary } from '../../../../../modules/bom-items/costing/casting/casting-cost-summary';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { allSandMachines, realSandReference, sandMaterial } from './sand-test-data';
+import { HOT_BOX, allSandMachines, realSandReference, sandMaterial } from './sand-test-data';
 
 // The casting worker's own result for a synthetic hollow box (backend/test/fixtures/casting/README.md).
 const hollowBox = JSON.parse(readFileSync(join(__dirname, '../../../../../../test/fixtures/casting/hollow-box.result.json'), 'utf8'));
@@ -192,13 +192,13 @@ describe('SandCostService.dfm: the design-for-casting checks of the item\'s anal
 
 describe('sandRouteToLocal', () => {
   it('leaves a USD route as it is', () => {
-    const route = buildSandRoute({ ref: realSandReference(), spec: loadSandCastingCalculatorSpec(), calculators, material: iron, part: { volumeMm3: volume, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12, partingLineMm: 900, abovePartingMm: null, cores: [] }, machinesByClass: machines, scenario: { batchSize: 250, cavities: null, mouldingClass: 'sand_casting_manual_std_moldmaking', chosenCoreProcess: null, energyPricePerKwh: 0.1, lifetimeVolume: 1e4 }, costContext }).route!;
+    const route = buildSandRoute({ ref: realSandReference(), spec: loadSandCastingCalculatorSpec(), calculators, material: iron, part: { volumeMm3: volume, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12, partingLineMm: 900, abovePartingMm: null, cores: [] }, machinesByClass: machines, scenario: { batchSize: 250, cavities: null, mouldingClass: 'sand_casting_manual_std_moldmaking', chosenCoreProcess: null, energyPricePerKwh: 0.1, hotBox: HOT_BOX, lifetimeVolume: 1e4 }, costContext }).route!;
     expect(sandRouteToLocal(route, 1)).toBe(route);
   });
 });
 
 describe('the cost summary of a sand casting', () => {
-  const route = buildSandRoute({ ref: realSandReference(), spec: loadSandCastingCalculatorSpec(), calculators, material: iron, part: { volumeMm3: volume, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12, partingLineMm: 900, abovePartingMm: null, cores: [{ volumeMm3: 1.2e6, sizeMm: [200, 100, 60] }] }, machinesByClass: machines, scenario: { batchSize: 250, cavities: null, mouldingClass: 'sand_casting_manual_std_moldmaking', chosenCoreProcess: null, energyPricePerKwh: 0.1, lifetimeVolume: 1e4 }, costContext }).route!;
+  const route = buildSandRoute({ ref: realSandReference(), spec: loadSandCastingCalculatorSpec(), calculators, material: iron, part: { volumeMm3: volume, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12, partingLineMm: 900, abovePartingMm: null, cores: [{ volumeMm3: 1.2e6, sizeMm: [200, 100, 60] }] }, machinesByClass: machines, scenario: { batchSize: 250, cavities: null, mouldingClass: 'sand_casting_manual_std_moldmaking', chosenCoreProcess: null, energyPricePerKwh: 0.1, hotBox: HOT_BOX, lifetimeVolume: 1e4 }, costContext }).route!;
   const base = { family: 'sand_cast', process: 'sand_casting' as const, hpdc: null, materialGrade: 'ASTM Grade 20 Gray Iron', materialCostPerKg: 0.6, materialDensityKgM3: 7100, materialSource: 'db' as const, partVolumeMm3: volume, batchSize: 250, warnings: [] as string[], ratesSource: 'test' };
 
   it('prices the route: its lines in order, its metal, no "no cost engine yet"', () => {

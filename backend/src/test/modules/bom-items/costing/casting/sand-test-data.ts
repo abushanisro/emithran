@@ -77,3 +77,9 @@ export const allSandMachines = (): Record<string, SandMachine[]> => {
   };
   return Object.fromEntries(Object.entries(files).map(([cls, file]) => [cls, sandMachines(file, cls, () => ({ ratePerHr: 12.5, assumedDefaults: ['payback_period_years'] }))]));
 };
+
+/**
+ * The plant's hot box settings the tests use: core box 245 C (literature 230-260 C), a binder that cures at 150 C and 3 mm of core cured before it is
+ * stripped. Illustrative values for tests only: no dataset holds them, and the application assumes none (they are set in the Cost Guide).
+ */
+export const HOT_BOX: { coreboxTempC: number; cureTempC: number; curedDepthMm: number } = { coreboxTempC: 245, cureTempC: 150, curedDepthMm: 3 };
