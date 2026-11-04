@@ -21,7 +21,12 @@ import {
   toGlbShape,
   type SandGatingLayout,
 } from "@/lib/casting/gating-layout";
-import { DRAFT_COLORS, draftFaceColors } from "@/lib/casting/draft-overlay";
+import {
+  OVERLAYS,
+  OVERLAY_COLORS,
+  overlayFaceColors,
+  type OverlayKind,
+} from "@/lib/casting/face-overlay";
 
 const SEVERITY_CLASS: Record<DfmFinding["severity"], string> = {
   Critical: "bg-red-500/15 text-red-600 border-red-500/30",
@@ -61,7 +66,7 @@ export function SandCastingFeaturesPanel({
   const [showCores, setShowCores] = useState(true);
   const [showParting, setShowParting] = useState(true);
   const [showGating, setShowGating] = useState(true);
-  const [showDraft, setShowDraft] = useState(false);
+  const [overlay, setOverlay] = useState<OverlayKind | "">("");
   const [selectedFaces, setSelectedFaces] = useState<number[] | null>(null);
 
   if (!ready || !part) {
@@ -123,10 +128,17 @@ export function SandCastingFeaturesPanel({
   const selected = part.features.find((f) => f.id === selectedId) ?? null;
   const highlighted =
     selected ?? (selectedFaces ? { id: "faces", faces: selectedFaces, edges: [] } : null);
-  // The draft overlay: each measured face coloured by what the design check found; nothing until the checks are read.
+  // An overlay: each measured face coloured by what the design check found about it (draft angle, thin wall); nothing until the checks are read.
+  const measuredBy: Record<OverlayKind, number[]> = {
+    draft: part.draftFaces,
+    wall: part.wallFaces,
+  };
+  const overlays = (Object.keys(OVERLAYS) as OverlayKind[]).filter(
+    (k) => measuredBy[k].length > 0,
+  );
   const faceColors =
-    showDraft && dfm.data?.result
-      ? draftFaceColors(dfm.data.result.findings, part.draftFaces)
+    overlay && dfm.data?.result
+      ? overlayFaceColors(overlay, dfm.data.result.findings, measuredBy[overlay])
       : null;
   const selectedRow = selected
     ? { feature: selected, label: selected.id, parent: selected.parent }
@@ -181,28 +193,46 @@ export function SandCastingFeaturesPanel({
             Parting line
           </label>
         )}
-        {part.draftFaces.length > 0 && dfm.data?.result && (
+        {overlays.length > 0 && dfm.data?.result && (
           <label
             className="flex items-center gap-1"
-            title="Each face coloured by the design check of its draft angle along the draw axis: red Critical (no taper or an undercut), amber Major, green fine."
+            title={
+              overlay
+                ? OVERLAYS[overlay].title
+                : "Colour the model face by face by a design check: draft angle or thin walls."
+            }
           >
-            <input
-              type="checkbox"
-              checked={showDraft}
+            Overlay
+            <select
+              value={overlay}
               onChange={(e) => {
-                setShowDraft(e.target.checked);
+                setOverlay(e.target.value as OverlayKind | "");
               }}
-            />
-            Draft
-            {showDraft && (
+              className="rounded border border-border bg-background px-1 py-0.5"
+            >
+              <option value="">off</option>
+              {overlays.map((k) => (
+                <option key={k} value={k}>
+                  {OVERLAYS[k].label}
+                </option>
+              ))}
+            </select>
+            {overlay && (
               <span className="flex items-center gap-1 text-[9px]">
-                {(["Critical", "Major", "ok"] as const).map((k) => (
+                {(overlay === "draft"
+                  ? (["Critical", "Major", "ok"] as const)
+                  : (["Major", "ok"] as const)
+                ).map((k) => (
                   <span key={k} className="flex items-center gap-0.5">
                     <i
                       className="inline-block h-2 w-2 rounded-sm"
-                      style={{ background: DRAFT_COLORS[k] }}
+                      style={{ background: OVERLAY_COLORS[k] }}
                     />
-                    {k === "ok" ? "fine" : k.toLowerCase()}
+                    {k === "ok"
+                      ? "fine"
+                      : k === "Major" && overlay === "wall"
+                        ? "too thin"
+                        : k.toLowerCase()}
                   </span>
                 ))}
               </span>
