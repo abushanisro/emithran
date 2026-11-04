@@ -14,20 +14,21 @@ import {
   useSandDfm,
 } from "@/lib/api/hooks/useCastingAnalyses";
 import { analysisState, isReady } from "@/lib/casting/analysis-view";
-import { castingFeatureProperties, groupCastingFeatures } from "@/lib/casting/features";
-import { castingPartView } from "@/lib/casting/result-view";
-import {
-  gatingSolids,
-  toGlbShape,
-  type SandGatingLayout,
-} from "@/lib/casting/gating-layout";
-import { gatingWhenOpen, mouldSolids, type FlaskSize } from "@/lib/casting/mould-layout";
 import {
   OVERLAYS,
   OVERLAY_COLORS,
   overlayFaceColors,
   type OverlayKind,
 } from "@/lib/casting/face-overlay";
+import { castingFeatureProperties, groupCastingFeatures } from "@/lib/casting/features";
+import {
+  gatingSolids,
+  toGlbShape,
+  type SandGatingLayout,
+} from "@/lib/casting/gating-layout";
+import { gatingWhenOpen, mouldSolids, type FlaskSize } from "@/lib/casting/mould-layout";
+import { processStages, type StageLine } from "@/lib/casting/process-stages";
+import { castingPartView } from "@/lib/casting/result-view";
 import { THICKNESS_RAMP_CSS, thicknessMap } from "@/lib/casting/thickness-map";
 
 /** What colours the mesh: a design check (draft, thin walls) or the measured wall thickness itself. */
@@ -49,6 +50,8 @@ export function SandCastingFeaturesPanel({
   fallback,
   gating = null,
   flask = null,
+  routeLines = null,
+  mouldingProcess = null,
 }: {
   itemId: string;
   fallback: ReactNode;
@@ -56,6 +59,10 @@ export function SandCastingFeaturesPanel({
   gating?: SandGatingLayout | null;
   /** The moulding machine's flask from the cost summary: the mould (cope and drag) is drawn around the part in it. */
   flask?: FlaskSize | null;
+  /** The route's lines (process and cycle time), for the stages of making the casting. */
+  routeLines?: readonly StageLine[] | null;
+  /** The moulding process the route costs (its line is the "make the mould" stage). */
+  mouldingProcess?: string | null;
 }) {
   const list = useCastingAnalyses(itemId);
   const direction = useDrawDirection(itemId);
@@ -77,6 +84,7 @@ export function SandCastingFeaturesPanel({
   const [showMould, setShowMould] = useState(false);
   const [mouldOpen, setMouldOpen] = useState(0);
   const [section, setSection] = useState(false);
+  const [stageKey, setStageKey] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<ViewOverlay | "">("");
   const [selectedFaces, setSelectedFaces] = useState<number[] | null>(null);
 
@@ -130,6 +138,8 @@ export function SandCastingFeaturesPanel({
       ? gatingSolids(gating, part.box.min, part.box.max, part.drawAxis, part.partingHeight)
       : [];
   // The mould: the machine's flask split at the parting plane; opening it lifts the cope, and the sprue and risers with it.
+  const stages = processStages(routeLines, mouldingProcess);
+  const stage = stages.find((s) => s.key === stageKey) ?? null;
   const mould =
     flask && part.box && part.drawAxis
       ? mouldSolids({
@@ -200,6 +210,46 @@ export function SandCastingFeaturesPanel({
           </div>
         )}
       </div>
+      {stages.some((s) => s.lines.length > 0) && (
+        <div className="space-y-1 rounded border border-border/60 p-1.5">
+          <div className="flex flex-wrap gap-1">
+            {stages.map((s, i) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => {
+                  setStageKey(s.key);
+                  setShowMould(s.view.mould);
+                  setMouldOpen(s.view.open);
+                  setShowCores(s.view.cores);
+                  setShowGating(s.view.gating);
+                  setSection(s.view.section);
+                }}
+                className={`rounded border px-1.5 py-0.5 ${stageKey === s.key ? "border-brand-500 bg-brand-500/10 text-foreground" : "border-border text-muted-foreground hover:bg-muted/50"}`}
+              >
+                {i + 1}. {s.label}
+              </button>
+            ))}
+          </div>
+          {stage && (
+            <div className="space-y-0.5">
+              <p className="leading-tight text-foreground">{stage.what}</p>
+              {stage.lines.length > 0 ? (
+                <p className="leading-tight text-muted-foreground">
+                  {stage.lines.map((l) => `${l.process}: ${Math.round(l.cycleTimeMin * 1000) / 1000} min`).join(" · ")}
+                </p>
+              ) : (
+                <p className="leading-tight text-muted-foreground">
+                  The route has no costed step for this stage.
+                </p>
+              )}
+              <p className="leading-tight text-muted-foreground/70">
+                Shows the mould and the parts in it, not the flow or the freezing of the metal: nothing computes those.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex gap-3 text-muted-foreground">
         {part.coresGlb && (
           <label className="flex items-center gap-1">
