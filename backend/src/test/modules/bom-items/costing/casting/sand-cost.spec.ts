@@ -4,7 +4,12 @@ import { SandCostService, type SandCostRequest } from '../../../../../modules/bo
 import { SandMachineService } from '../../../../../modules/bom-items/costing/casting/sand/sand-machine.service';
 import { buildSandRoute } from '../../../../../modules/bom-items/costing/casting/sand/sand-route';
 import { buildCastingCostSummary } from '../../../../../modules/bom-items/costing/casting/casting-cost-summary';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { allSandMachines, realSandReference, sandMaterial } from './sand-test-data';
+
+// The casting worker's own result for a synthetic hollow box (backend/test/fixtures/casting/README.md).
+const hollowBox = JSON.parse(readFileSync(join(__dirname, '../../../../../../test/fixtures/casting/hollow-box.result.json'), 'utf8'));
 
 const iron = sandMaterial('ASTM Grade 20 Gray Iron');
 
@@ -62,11 +67,11 @@ const calculators = sandCastingCalculatorsByName();
 const costContext = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
 const volume = (8 / iron.columns['density_kg_m3']!) * 1e9;
 const request = (over: Partial<SandCostRequest> = {}): SandCostRequest => ({
-  client: {} as never, accessToken: 't', location: 'USA', grade: 'ASTM Grade 20 Gray Iron',
+  client: {} as never, accessToken: 't', location: 'USA', grade: 'ASTM Grade 20 Gray Iron', bomItemId: 'item-1', sourcePath: 'path/part.step',
   measurements: { volumeMm3: volume, surfaceAreaMm2: 250000, bboxMm: [300, 200, 100], footprintMm: [300, 200], drawDepthMm: 100, wallNominalMm: 12, partingPerimeterMm: 900, rawCores: [] },
   overrides: { sandMouldingProcess: 'Manual Std Moldmaking' }, batchSize: 250, annualVolume: 2000, productionLifeYears: 5, usdToLocal: 1, costContext, ...over,
 });
-function service(opts: { material?: Record<string, unknown> | null; calcs?: typeof calculators; ref?: ReturnType<typeof realSandReference> | null } = {}) {
+function service(opts: { material?: Record<string, unknown> | null; calcs?: typeof calculators; ref?: ReturnType<typeof realSandReference> | null; analysis?: unknown } = {}) {
   const material = opts.material === undefined ? { name: 'ASTM Grade 20 Gray Iron', grade: 'x', material_type: 'Gray Iron', ...Object.fromEntries(Object.entries(iron.columns)) } : opts.material;
   const client = { from: () => { const c: any = { select: () => c, eq: () => c, or: () => c, limit: async () => ({ data: material ? [material] : [], error: null }) }; return c; } };
   const ref = opts.ref === undefined ? realSandReference() : opts.ref;
@@ -74,6 +79,7 @@ function service(opts: { material?: Record<string, unknown> | null; calcs?: type
     { get: async () => (ref ? { reference: ref, missing: [] } : { reference: null, missing: ['Sand casting reference data is not staged'] }) } as never,
     { getMachinesByClass: async () => machines } as unknown as SandMachineService,
     { loadSandCastingCalculators: async () => opts.calcs ?? calculators } as never,
+    { latestResult: async () => (opts.analysis === undefined ? null : { result: opts.analysis, workerVersion: '0.12.0' }) } as never,
   );
   return { svc, client };
 }
@@ -106,6 +112,38 @@ describe('SandCostService.price', () => {
     expect((await run({ calcs: {} })).missing[0]).toMatch(/run migration 956/);
     expect((await run({ ref: null })).missing[0]).toMatch(/not staged/);
     expect((await run({}, { measurements: { ...request().measurements, volumeMm3: null } })).missing).toEqual(['the part volume']);
+  });
+});
+
+describe('SandCostService.price measures the part by the casting analysis when there is one', () => {
+  const run = (opts: Parameters<typeof service>[0], over: Partial<SandCostRequest> = {}) => {
+    const { svc, client } = service(opts);
+    return svc.price(request({ client: client as never, ...over }));
+  };
+
+  it('without an analysis the cad-engine measures, and the route says so', async () => {
+    const r = await run({});
+    expect(r.measuredBy).toBe('cad-engine');
+    expect(r.warnings.join(' ')).toMatch(/Measured by the cad-engine; request a casting analysis/);
+  });
+
+  it("with the worker's result the exact solid is costed: its volume, its true core, its measured height above the parting line", async () => {
+    const r = await run({ analysis: hollowBox });
+    expect(r.missing).toEqual([]);
+    expect(r.measuredBy).toBe('casting analysis');
+    expect(r.warnings.join(' ')).toMatch(/Measured by the casting analysis \(worker 0\.12\.0\)/);
+    expect(r.warnings.join(' ')).not.toMatch(/Height above the parting line not measured|Parting line not measured|Cores not measured/);
+    // 216 000 mm³ of gray iron, not the 8 kg of the cad-engine's numbers in this test
+    expect(r.route!.material.netKg).toBeCloseTo((216000 * 1e-9) * iron.columns['density_kg_m3']!, 3);
+    expect(r.route!.coresMade).toBe(1);
+    expect(r.route!.lines.map((l) => l.process).some((p) => /coremaking$/.test(p))).toBe(true);
+  });
+
+  it('an analysis that cannot be used (an assembly) falls back to the cad-engine and says why', async () => {
+    const r = await run({ analysis: { ...hollowBox, parts: [hollowBox.parts[0], hollowBox.parts[0]] } });
+    expect(r.measuredBy).toBe('cad-engine');
+    expect(r.warnings.join(' ')).toMatch(/The casting analysis could not be used \(the analysis has 2 distinct parts/);
+    expect(r.route).not.toBeNull();
   });
 });
 

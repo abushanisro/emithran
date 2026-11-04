@@ -4064,6 +4064,7 @@ export class BOMItemsService {
         const bbox = [(item as any).maxLength, (item as any).maxWidth, (item as any).maxHeight].map((v) => Number(v ?? 0));
         sandResult = await this.sandCostService.price({
           client, accessToken, location, grade,
+          bomItemId: id, sourcePath: ((item as any).file3dPath ?? (item as any).file_3d_path ?? null) as string | null,
           measurements: {
             volumeMm3: ((item.volume ?? 0) as number) || null,
             surfaceAreaMm2: Number((item as any).surfaceArea ?? (item as any).surface_area ?? 0) || null,

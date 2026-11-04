@@ -37,6 +37,8 @@ export interface CastingAnalysisRow {
   bom_item_id: string;
   requested_by: string;
   input_sha256: string;
+  /** The BOM item's 3D file path when the analysis was asked for (null for rows made before it existed). */
+  source_path: string | null;
   worker_version: string;
   schema_version: number;
   config_hash: string;

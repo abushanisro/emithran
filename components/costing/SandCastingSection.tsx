@@ -19,6 +19,7 @@ interface SandCastingBreakdown {
   coresMade: number;
   coresLeftSolid: number;
   complete: boolean;
+  measuredBy: 'casting analysis' | 'cad-engine';
 }
 
 interface Props {
@@ -112,8 +113,10 @@ export function SandCastingSection({ overrides, route, onChange }: Props) {
       {route && (
         <div className="pt-1 border-t border-border/50 mt-1 space-y-0.5">
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Costed with</span><span className="font-medium text-right">{route.mouldingProcess} · {route.mouldingMachine}</span></div>
+          <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Measured by</span><span className="font-medium">{route.measuredBy === 'casting analysis' ? 'casting analysis (exact solid)' : 'cad-engine'}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cavities</span><span className="font-medium">{route.cavities}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cores</span><span className="font-medium">{route.coresMade}{route.coresLeftSolid > 0 ? ` (+${route.coresLeftSolid} left solid, machined later)` : ''}</span></div>
+          {route.measuredBy === 'cad-engine' && <p className="text-[10px] text-muted-foreground/70 leading-tight">Request a casting analysis for the exact cores, parting line and wall.</p>}
           {!route.complete && <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">Incomplete: a step no machine can do is shown as a gap and left out of the total.</p>}
         </div>
       )}

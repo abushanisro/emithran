@@ -70,7 +70,7 @@ export class SandCastingService {
       "casting analysis: queue and read analyses after an RLS check of the BOM item",
     );
 
-    const result = await this.queueOrReuse(admin, input, key);
+    const result = await this.queueOrReuse(admin, input, { ...key, source_path: item.file_3d_path });
     if (!result.reused || result.created) {
       await this.audit.recordBestEffort({
         action: "casting_analysis.requested",
@@ -88,12 +88,18 @@ export class SandCastingService {
     input: CastingRequest,
     key: Pick<
       CastingAnalysisRow,
-      "input_sha256" | "worker_version" | "schema_version" | "config_hash"
+      "input_sha256" | "worker_version" | "schema_version" | "config_hash" | "source_path"
     >,
   ): Promise<{ analysis: CastingAnalysisRow; reused: boolean; created: boolean }> {
     const existing = await this.find(admin, input.bomItemId, key);
-    if (existing && existing.status !== "failed")
+    if (existing && existing.status !== "failed") {
+      // The same bytes under a new path (the file was uploaded again): the analysis now belongs to that path.
+      if (existing.source_path !== key.source_path) {
+        const moved = await admin.from("casting_analyses").update({ source_path: key.source_path }).eq("id", existing.id).select("*").single();
+        if (!moved.error) return { analysis: moved.data as CastingAnalysisRow, reused: true, created: false };
+      }
       return { analysis: existing, reused: true, created: false };
+    }
     // A failed analysis asked for again is a request to retry it.
     if (existing)
       return {
@@ -151,6 +157,28 @@ export class SandCastingService {
     if (error) throw new Error(`Could not read the casting analysis: ${error.message}`);
     if (!data) throw new NotFoundException(`Casting analysis ${id} not found`);
     return data as CastingAnalysisRow;
+  }
+
+  /**
+   * The result of the newest finished analysis of the BOM item's current file made by the worker this backend was built for, or null. The file is
+   * identified by its path when the analysis was asked for (a replaced file has a new path), so no file is read to find it. Read as the user.
+   */
+  async latestResult(bomItemId: string, sourcePath: string | null, token: string): Promise<{ result: unknown; workerVersion: string } | null> {
+    if (!sourcePath) return null;
+    const { data, error } = await this.database
+      .getUserClient(token)
+      .from("casting_analyses")
+      .select("result, worker_version")
+      .eq("bom_item_id", bomItemId)
+      .eq("source_path", sourcePath)
+      .eq("worker_version", CASTING_WORKER_VERSION)
+      .eq("schema_version", CASTING_SCHEMA_VERSION)
+      .in("status", ["succeeded", "partial"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    const row = data[0] as { result: unknown; worker_version: string };
+    return row.result == null ? null : { result: row.result, workerVersion: row.worker_version };
   }
 
   /** The analyses of one BOM item, newest first. An empty list means "not requested", never "passed". */
