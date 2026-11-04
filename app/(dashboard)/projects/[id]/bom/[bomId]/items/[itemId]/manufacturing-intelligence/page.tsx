@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
+import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
 import { useCastingAnalyses, useRequestCastingAnalysis } from '@/lib/api/hooks/useCastingAnalyses';
 import { analysisState, requestFailure } from '@/lib/casting/analysis-view';
 import { GcdToleranceTab } from '@/components/features/manufacturing-intelligence/GcdToleranceTab';
@@ -7153,11 +7154,25 @@ function PartDetailTab({
       </Section>
 
       {isCastingFamily(fg?.classification?.family) ? (
-        <DieCastingFeatureTreePanel
-          fg={fg ?? null}
-          selectedKey={selectedMachiningFeatureKey ?? null}
-          {...(onMachiningFeatureSelect ? { onSelect: onMachiningFeatureSelect } : {})}
-        />
+        (item.familyClassification ?? fg?.classification?.family) === 'sand_cast' ? (
+          // A sand-cast part's features come from its casting analysis (the worker's exact solid); the cad-engine's stay as the labelled fallback.
+          <SandCastingFeaturesPanel
+            itemId={item.id}
+            fallback={(
+              <DieCastingFeatureTreePanel
+                fg={fg ?? null}
+                selectedKey={selectedMachiningFeatureKey ?? null}
+                {...(onMachiningFeatureSelect ? { onSelect: onMachiningFeatureSelect } : {})}
+              />
+            )}
+          />
+        ) : (
+          <DieCastingFeatureTreePanel
+            fg={fg ?? null}
+            selectedKey={selectedMachiningFeatureKey ?? null}
+            {...(onMachiningFeatureSelect ? { onSelect: onMachiningFeatureSelect } : {})}
+          />
+        )
       ) : machiningFeatures ? (
         <MachiningFeatureTreePanel
           machiningFeatures={machiningFeatures}
