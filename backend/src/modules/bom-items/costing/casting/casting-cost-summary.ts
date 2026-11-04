@@ -13,6 +13,7 @@
 // engine yet and is a named, uncosted line -- never priced as something else.
 
 import type { CalculatorRunDto, CostSummaryDto, DieCastingProcessChoiceDto, DieToolingDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
+import type { SandRoute } from './sand/sand-route';
 import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
 import { castingSeed, runView } from './casting-calculator-seeds';
 import type { DieToolingResult } from './die-tooling';
@@ -46,7 +47,7 @@ export function castingProcessOfFamily(family: string): CastingProcess | null {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
-function unmodelledCastingLine(process: CastingProcess): ProcessLineCost {
+function unmodelledCastingLine(process: CastingProcess, reason?: string): ProcessLineCost {
   const label = PROCESS_LABEL[process];
   return {
     process: label,
@@ -55,7 +56,7 @@ function unmodelledCastingLine(process: CastingProcess): ProcessLineCost {
     machineClass: process, machineName: null, commodityCode: null, labourRate: null,
     physicsGap: {
       gapType: 'unsupported_operation', process: label, machineClass: process,
-      reason: `${label} has no cost engine yet: the line is shown, not priced.`,
+      reason: reason ?? `${label} has no cost engine yet: the line is shown, not priced.`,
     },
   };
 }
@@ -96,6 +97,8 @@ export function buildCastingCostSummary(input: {
   meltedKg?: number | null;
   /** Calculator runs behind other values of this summary (trim force, ...). */
   calculatorRuns?: Record<string, CalculatorRunDto>;
+  /** Sand casting (sand-cost.service.ts): the route in the location's currency, or what keeps it from being built. */
+  sand?: { route: SandRoute | null; missing: string[] } | null;
 }): CostSummaryDto {
   const warnings = [...input.warnings];
   const calculatorRuns: Record<string, CalculatorRunDto> = { ...(input.hpdc?.calculatorRuns ?? {}), ...(input.calculatorRuns ?? {}) };
@@ -134,13 +137,25 @@ export function buildCastingCostSummary(input: {
     chargedKg = netKg;
     if (netKg === 0) warnings.push('Part weight not derived (no part volume or no material density on file): material not costed.');
   }
+  const sand = input.process === 'sand_casting' ? input.sand?.route ?? null : null;
+  if (sand) {
+    // The sand route knows the metal it buys (melt loss, remelt allowance, scrap): its net weight and cost replace the generic ones.
+    netKg = sand.material.netKg;
+    chargedKg = sand.material.pouredKg;
+  }
   const meltedKg = dc ? input.meltedKg ?? null : null;
   if (dc && meltedKg != null && netKg > 0) {
     warnings.push(`${isHpdc ? 'Overflow and runner' : 'Gating and riser'} metal (${r3(meltedKg - netKg)} kg per part) returns to the furnace and is remelted in-house: not charged.`);
   }
   if (isHpdc) warnings.push('Biscuit metal not in the shot: memory/Die Casting gives the plunger diameter but no biscuit thickness.');
-  const materialCost = chargedKg * input.materialCostPerKg;
-  const grossKg = meltedKg ?? netKg;
+  const materialCost = sand ? sand.material.costUsd ?? 0 : chargedKg * input.materialCostPerKg;
+  const grossKg = sand ? sand.material.pouredKg : meltedKg ?? netKg;
+  if (sand && sand.material.costUsd == null) warnings.push('The metal is not costed: a furnace loss factor or a calculator input is missing.');
+  if (sand) {
+    const [metalRun, costRun] = sand.material.runs;
+    if (metalRun) calculatorRuns['Sand metal per casting'] = runView('Sand Casting - Metal per casting', 'Poured Weight', metalRun);
+    if (costRun) calculatorRuns['Sand material cost'] = runView('Sand Casting - Material cost', 'Material Cost', costRun);
+  }
   if (input.dieTooling) Object.assign(calculatorRuns, input.dieTooling.runs);
   if (input.cores?.corebox) calculatorRuns['Corebox'] = input.cores.corebox.run;
 
@@ -148,6 +163,15 @@ export function buildCastingCostSummary(input: {
   if (input.process === 'die_casting' && input.hpdc) {
     processLines = input.hpdc.processLines;
     warnings.push(...input.hpdc.warnings);
+  } else if (input.process === 'sand_casting' && input.sand) {
+    if (sand) {
+      processLines = sand.lines;
+      if (!sand.complete) warnings.push('The sand route is incomplete: a step no machine can do is shown as a named gap, and the total excludes it.');
+    } else {
+      const why = input.sand.missing.length ? input.sand.missing.join('; ') : 'the sand route could not be built';
+      processLines = [unmodelledCastingLine(input.process, `Sand Casting cannot be costed: ${why}`)];
+      warnings.push(`Sand Casting cannot be costed: ${why}`);
+    }
   } else {
     processLines = [unmodelledCastingLine(input.process)];
     warnings.push(`${PROCESS_LABEL[input.process]} has no cost engine yet: the line is shown, not priced.`);
@@ -162,10 +186,14 @@ export function buildCastingCostSummary(input: {
   if (input.finishing?.trim) processLines = [...processLines, input.finishing.trim];
   if (input.finishing?.grinding) processLines = [...processLines, input.finishing.grinding];
   if (input.finishing?.cleaning) processLines = [...processLines, input.finishing.cleaning];
+  // The sand route ends with its visual inspection, which stays last: machining goes before it, as on a die-cast route.
+  const sandInspection = sand && processLines.length > 0 && processLines[processLines.length - 1]!.process === 'Visual Inspection' ? processLines[processLines.length - 1]! : null;
+  if (sandInspection) processLines = processLines.slice(0, -1);
   if (input.secondaryMachining) {
     processLines = [...processLines, ...input.secondaryMachining.lines];
     warnings.push(...input.secondaryMachining.warnings);
   }
+  if (sandInspection) processLines = [...processLines, sandInspection];
   if (input.finishing?.inspection) processLines = [...processLines, input.finishing.inspection];
   if (input.finishing) warnings.push(...input.finishing.warnings);
   if (input.dieTooling) warnings.push(...input.dieTooling.warnings);
@@ -196,6 +224,14 @@ export function buildCastingCostSummary(input: {
         boxes: input.cores.corebox.boxes, detail: input.cores.corebox.detail,
         costUsd: Math.round(input.cores.corebox.costUsd * 100) / 100,
         perPartUsd: input.cores.corebox.perPartUsd != null ? Math.round(input.cores.corebox.perPartUsd * 10000) / 10000 : null,
+      },
+    } : {}),
+    ...(sand && sand.tooling.items.length ? {
+      coreboxTooling: {
+        boxes: sand.tooling.items.reduce((n, t) => n + t.boxes, 0),
+        detail: sand.tooling.items.map((t, i) => `core ${i + 1}: ${t.material}, ${t.boxes} box${t.boxes > 1 ? 'es' : ''}`).join('; '),
+        costUsd: Math.round(sand.tooling.items.reduce((c, t) => c + t.toolingCostUsd, 0) * 100) / 100,
+        perPartUsd: sand.tooling.perPartUsd,
       },
     } : {}),
     ...(cav ? {

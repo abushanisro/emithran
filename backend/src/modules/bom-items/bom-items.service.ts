@@ -117,6 +117,7 @@ import { MaterialResolutionService } from './services/material-resolution.servic
 import { MachineDiscoveryService } from './services/machine-discovery.service';
 import { billetFallback } from './costing/sheet-metal/machine/blank-stock-candidates';
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
+import { SandCostService, type SandCostResult } from './costing/casting/sand/sand-cost.service';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
@@ -244,6 +245,7 @@ export class BOMItemsService {
     private readonly secondaryProcessService: SecondaryProcessService,
     private readonly plasticReferenceService: PlasticReferenceService,
     private readonly castingReferenceService: CastingReferenceService,
+    private readonly sandCostService: SandCostService,
     private readonly featureToleranceService: FeatureToleranceService,
     private readonly smCatalogOperations: SheetMetalCatalogOperationsService,
     private readonly hydroformingReference: HydroformingReferenceService,
@@ -3815,6 +3817,8 @@ export class BOMItemsService {
         dieTooling: DieToolingResult | null; cores: CoreRouteResult | null; warnings: string[];
       };
       let processChoice: DieCastingProcessChoiceDto | null = null;
+      // Sand casting: the route (sand-cost.service.ts), or what keeps it from being built.
+      let sandResult: SandCostResult | null = null;
       // Die casting: what the metal calculators of the summary need.
       let metal: {
         calculators: ReferenceCalculators; alloy: { name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
@@ -4053,8 +4057,29 @@ export class BOMItemsService {
         route = { line: chosen.line, secondaryMachining: chosen.secondaryMachining, dieTooling: chosen.dieTooling, cores: chosen.cores, warnings: chosen.warnings };
         if (finishing) finishing = { ...finishing, melting: chosen.melting, grinding: chosen.grinding };
         metal = { calculators: castingCalcs, alloy: alloyRef, meltedKg: chosen.meltedKg, calculatorRuns: t.forceRun ? { 'Trim Force': t.forceRun } : {} };
+      } else if (castingProcess === 'sand_casting') {
+        // Sand casting: the route from the sand reference data, the HR Rates machines and the sand calculators; machining after casting is
+        // assessed for the process as for the others.
+        const m = await priceMachiningAfter(undefined);
+        const bbox = [(item as any).maxLength, (item as any).maxWidth, (item as any).maxHeight].map((v) => Number(v ?? 0));
+        sandResult = await this.sandCostService.price({
+          client, accessToken, location, grade,
+          measurements: {
+            volumeMm3: ((item.volume ?? 0) as number) || null,
+            surfaceAreaMm2: Number((item as any).surfaceArea ?? (item as any).surface_area ?? 0) || null,
+            bboxMm: bbox,
+            footprintMm,
+            drawDepthMm: Number(summary.castingPullExtentMm ?? 0) || null,
+            wallNominalMm: geometry.wallNominalMm,
+            partingPerimeterMm: (summary.castingPartingPerimeterMm as number | null) ?? null,
+            rawCores: summary.castingCores as unknown,
+          },
+          overrides: item.scenarioOverrides, batchSize, annualVolume: annualVolume ?? null, productionLifeYears: productionLifeYears ?? null,
+          usdToLocal, costContext: zeroCtx,
+        });
+        route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...sandResult.warnings] };
       } else {
-        // Sand / investment casting: no casting engine yet (a named, uncosted
+        // Investment casting: no casting engine yet (a named, uncosted
         // line); machining after casting is still assessed for the process.
         const m = await priceMachiningAfter(undefined);
         route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: m.warnings };
@@ -4078,6 +4103,7 @@ export class BOMItemsService {
           dieTooling: route.dieTooling,
           cores: route.cores,
           processChoice,
+          sand: sandResult,
           ...(metal ? { calculators: metal.calculators, alloy: metal.alloy, meltedKg: metal.meltedKg, calculatorRuns: metal.calculatorRuns } : {}),
         }),
         ...currencyMeta,
