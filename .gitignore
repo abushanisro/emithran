@@ -91,7 +91,7 @@ petrus-demo/
 /supabase/
 
 # Proprietary costing reference data (machine and labour rates, material prices). Kept locally for the
-# backend/migrations/scripts/gen_*.js generators; never committed.
+# tests (the generators that used it were retired); never committed.
 /memory/
 
 # Scratch output of casting-worker/check.sh

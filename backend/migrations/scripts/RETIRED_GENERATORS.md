@@ -1,26 +1,21 @@
-# Retired generators
+# Retired migration generators
 
-Their committed migrations stay and are already applied. Only the scripts that
-produced them were removed; git history keeps them.
+Every script that generated or checked a migration was removed on 2026-11-05; git history keeps them
+(`git log --diff-filter=D -- backend/migrations/scripts`). The committed migrations stay, and they are already applied.
 
-Removed 2026-09-29. They read the memory/Injection JSON files that commit 7fd2705
-replaced with memory/Plastic Modeling CSVs, and what they produced is now
-produced elsewhere:
+Why they were removed:
 
-| Generator | Migration | Superseded by |
-| --- | --- | --- |
-| gen_619_seed_material_cure_time.js | 619_seed_material_cure_time.sql | 835_raw_materials_reference_cure_time.sql (cure time from the staged 2026-Plastic materials, joined by name instead of copied row UUIDs) |
-| gen_637_seed_im_reference_data.js | 637_seed_im_reference_data.sql | 823_stage_memory_domains (variables and processes, source_version 2026-Plastic) |
-| gen_651 … gen_688 (_seed_im_lookup_*) | 651 … 688 | 823_stage_memory_domains (all 40 Plastic lookup tables) |
+- Since migration 936 no migration writes reference rows (`REFERENCE_DATA.json`, checked by
+  `src/common/migrations/reference-data.spec.ts`): rates, lookups and process knowledge ship in versioned data packages,
+  not in migrations. A generator that produces such a migration has nothing left to produce.
+- They read `memory/` (private reference data that is never committed), so they could not run for anyone without it, and
+  the migrations they wrote are the record of what was seeded.
+- The one thing the repository still needs from this folder is `lib/memory-machine-seed.js` (`readCsv`), which the
+  unit tests use to read the real reference CSVs.
 
-No code reads the im_reference_data variable, process or lookup_table rows that
-these migrations wrote. The only im_reference_data rows still read are the
-machine rows, which come from migration 648 (mhr.service name lookup).
+The calculator migrations (956, 958, 959, 964 sand casting; the die-casting, machining and heat-treatment ones) are not here:
+they are generated from calculator specs by `backend/scripts/generate-*-calculators-migration.ts`, which stay, and a test
+checks each committed migration equals what its spec generates.
 
-Every other generator that read a deleted JSON file now reads the CSV through
-`lib/memory-csv.js`. Each one was checked by regenerating its migration and
-comparing it with the committed file: the output is equal, apart from blank
-keys that are now absent (a CSV cannot tell blank from null) and the source path
-in comments. The exceptions are recorded in each generator's header:
-gen_594, whose committed output came from a draft that 595–599 later corrected,
-and gen_809, whose output now rebrands the vendor name (migration 837).
+An earlier retirement (2026-09-29) removed the injection-moulding generators that read JSON files since replaced by the
+Plastic Modeling CSVs; their migrations (619, 637, 651 to 688) were superseded by 823 and 835.
