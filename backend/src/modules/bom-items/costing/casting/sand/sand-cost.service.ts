@@ -11,6 +11,8 @@ import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal,
 import { SandMachineService } from './sand-machine.service';
 import { SandReferenceService } from './sand-reference.service';
 import { SAND_CASTING_SOURCE_VERSION } from './sand-reference';
+import { overridesMap } from './sand-variable-overrides';
+import { SandVariableOverridesService } from './sand-variable-overrides.service';
 import { buildSandRoute, MOULDING_PROCESSES, type SandRoute } from './sand-route';
 import type { SandMaterial } from './sand-steps';
 import { CORE_PROCESSES } from './sand-cores';
@@ -134,13 +136,19 @@ export class SandCostService {
       this.getMaterial(req.client, req.grade),
     ]);
     if (!reference) return none(...refMissing);
+    // The part's own values for plant variables, laid over the shared reference for this one calculation.
+    const partOverrides = overridesMap(await SandVariableOverridesService.rows(req.client, req.bomItemId));
+    const ref = reference.withOverrides(partOverrides);
+    if (partOverrides.size > 0) {
+      warnings.push(`Calculated with ${partOverrides.size} plant variable${partOverrides.size === 1 ? '' : 's'} set for this part: ${[...partOverrides.keys()].join(', ')}.`);
+    }
     if (!material) return none(`"${req.grade ?? '(no material)'}" is not a sand-casting material in Raw Materials (material group ${SAND_MATERIAL_GROUP})`);
     const spec = loadSandCastingCalculatorSpec();
     const absent = spec.calculators.filter((c) => !calculators[c.name]).map((c) => c.name);
     if (absent.length) return none(`the sand calculators are not in the database (run migration 956): ${absent.slice(0, 3).join(', ')}${absent.length > 3 ? ', ...' : ''}`);
     const { scenario, warnings: scenarioWarnings } = sandScenario({ overrides: req.overrides, batchSize: req.batchSize, annualVolume: req.annualVolume, productionLifeYears: req.productionLifeYears });
     warnings.push(...scenarioWarnings);
-    const { route, missing } = buildSandRoute({ ref: reference, spec, calculators, material, part, machinesByClass: machines, scenario, costContext: req.costContext });
+    const { route, missing } = buildSandRoute({ ref, spec, calculators, material, part, machinesByClass: machines, scenario, costContext: req.costContext });
     if (!route) return none(...missing);
     return { measuredBy, route: sandRouteToLocal(route, req.usdToLocal), missing: [], warnings: [...warnings, ...route.warnings] };
   }

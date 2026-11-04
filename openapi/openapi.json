@@ -7798,6 +7798,27 @@
         ],
         "type": "object"
       },
+      "SetSandVariableOverrideDto": {
+        "properties": {
+          "reason": {
+            "description": "Why this part differs from the plant value. Required, and kept in the audit trail.",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          },
+          "value": {
+            "description": "The part's own value: a number for a numeric plant variable, text for an enum.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "reason"
+        ],
+        "type": "object"
+      },
       "SheetMetalLookupDto": {
         "properties": {
           "params": {
@@ -14275,6 +14296,117 @@
         "summary": "Design-for-casting checks of the item's sand casting analysis (severity, measured value, threshold, the rule's note, the faces); rules the analysis cannot measure are listed as not evaluated",
         "tags": [
           "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/sand-variable-overrides": {
+      "get": {
+        "operationId": "SandVariableOverridesController_list_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's own sand-casting variable values, each with the plant value, the reason, who and when.",
+        "tags": [
+          "Sand casting"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/sand-variable-overrides/{variable}": {
+      "delete": {
+        "operationId": "SandVariableOverridesController_clear_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "variable",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return one variable to the plant value for this part. Audited.",
+        "tags": [
+          "Sand casting"
+        ]
+      },
+      "put": {
+        "operationId": "SandVariableOverridesController_set_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "variable",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSandVariableOverrideDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set one plant variable for this part (with the reason). The cost is recalculated with it. Audited.",
+        "tags": [
+          "Sand casting"
         ]
       }
     },

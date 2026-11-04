@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { SandGatingLayout } from '@/lib/casting/gating-layout';
+import type { CalculatorRun } from '@/lib/costing/sand-calculations';
 import { apiClient } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
@@ -881,6 +882,8 @@ export interface CostSummaryDto {
   coreboxTooling?: { boxes: number; costUsd: number; perPartUsd: number | null; detail: string };
   /** Which die-casting process (HPDC / GDC) this summary prices, with the other for comparison. */
   dieCastingProcess?: DieCastingProcessChoiceDto;
+  /** Calculators behind values that are not route lines (sand: metal per casting, material cost), keyed by calculator key. */
+  calculatorRuns?: Record<string, CalculatorRun>;
 }
 
 /** Mirrors the backend's MachineChoiceDto (cost-breakdown.dto.ts). */

@@ -33,7 +33,11 @@ export function seedsFor(calc: DomainSpecCalculator, providers: SeedProviders): 
 export function variableProvider(ref: SandReference): SeedProvider {
   return (name) => {
     const value = ref.number(name);
-    return value == null ? null : { value, source: `Sand casting variable ${name}${ref.unit(name) ? ` (${ref.unit(name)})` : ''}` };
+    const unit = ref.unit(name) ? ` (${ref.unit(name)})` : '';
+    const source = ref.overridden(name)
+      ? `Your value for sand casting variable ${name}${unit}: the plant value is ${ref.plantValue(name) ?? 'none'}`
+      : `Sand casting variable ${name}${unit}`;
+    return value == null ? null : { value, source };
   };
 }
 

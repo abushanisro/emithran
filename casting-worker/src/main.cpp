@@ -44,7 +44,7 @@
 namespace {
 
 constexpr int kSchemaVersion = 1;
-constexpr const char* kWorkerVersion = "0.15.0";
+constexpr const char* kWorkerVersion = "0.16.0";
 
 int fail(const char* code, int exit_code) {
   std::cout << "{\"error\":\"" << code << "\"}\n";
@@ -156,6 +156,19 @@ void write_casting(JsonWriter& json, const std::optional<CastingProperties>& c) 
   json.end_array().key("cores_glb");
   if (c->cores_glb) {
     json.value(*c->cores_glb);
+  } else {
+    json.null();
+  }
+  json.key("undercuts");
+  if (c->undercuts) {
+    json.begin_object().key("axes").begin_array();
+    for (const UndercutAxis& a : c->undercuts->axes) {
+      const char axis[2] = {a.axis, '\0'};
+      json.begin_object().key("axis").value(axis).key("area_mm2").value(a.area).key("faces").begin_array();
+      for (const UndercutFace& f : a.faces) json.begin_object().key("face").value(f.face).key("share").value(f.share).end_object();
+      json.end_array().end_object();
+    }
+    json.end_array().end_object();
   } else {
     json.null();
   }
@@ -469,6 +482,13 @@ int main(int argc, char** argv) {
         find_draft(labels.at(p.id), p, *p.casting);
       } catch (const Standard_Failure&) {
         p.problems.push_back("failed:draft");
+      }
+    }
+    if (p.casting) {
+      try {
+        find_undercuts(labels.at(p.id), p, *p.casting);
+      } catch (const Standard_Failure&) {
+        p.problems.push_back("failed:undercuts");
       }
     }
     try {

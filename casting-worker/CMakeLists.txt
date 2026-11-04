@@ -8,7 +8,7 @@ find_package(OpenCASCADE 8.0.1 EXACT REQUIRED CONFIG)
 
 add_compile_options(-Wall -Wextra -Werror)
 
-add_executable(geometry-worker src/main.cpp src/assembly.cpp src/properties.cpp src/mesh.cpp src/casting.cpp src/draft.cpp src/features.cpp src/parting.cpp src/cores.cpp)
+add_executable(geometry-worker src/main.cpp src/assembly.cpp src/properties.cpp src/mesh.cpp src/casting.cpp src/draft.cpp src/undercuts.cpp src/features.cpp src/parting.cpp src/cores.cpp)
 target_include_directories(geometry-worker PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(geometry-worker PRIVATE TKDESTEP TKDEGLTF TKRWMesh TKMesh TKXCAF TKLCAF TKCAF TKShHealing TKBO TKOffset TKFillet TKBool
     TKTopAlgo TKGeomBase TKG3d TKBRep TKXSBase TKernel TKMath)

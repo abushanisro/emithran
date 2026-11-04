@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { ConfidenceLevel, PhysicsGap, LookupTableRow, CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 
 // Narrower than ProcessLineCost -- lets non-process callers (e.g. a material
@@ -137,7 +137,11 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
  * migrated onto the Manufacturing Physics Calculator pipeline (no trace, no
  * gap, no confidence at all) — never a fabricated placeholder.
  */
-export function CalculationTracePanel({ line }: { line: CalculationTraceLine }) {
+export function CalculationTracePanel({ line, renderInput }: {
+  line: CalculationTraceLine;
+  /** Extra controls under an input (for example, to set the part's own value); nothing when it returns null. */
+  renderInput?: (step: CalculationTraceStep) => ReactNode;
+}) {
   const [showSteps, setShowSteps] = useState(false);
   const trace = line.calculationTrace ?? [];
   if (!trace.length && !line.physicsGap && !line.confidence) return null;
@@ -191,6 +195,7 @@ export function CalculationTracePanel({ line }: { line: CalculationTraceLine }) 
                       {step.source}
                     </div>
                   )}
+                  {renderInput?.(step)}
                 </div>
               ))}
             </div>

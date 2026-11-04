@@ -40,7 +40,44 @@ export class SandReference {
   constructor(
     private readonly variables: ReadonlyMap<string, SandVariable>,
     private readonly tables: ReadonlyMap<string, readonly Row[]>,
+    /** The plant value of each variable a part's own value replaces (see withOverrides); empty for the shared reference. */
+    private readonly plantValues: ReadonlyMap<string, string | null> = new Map(),
   ) {}
+
+  /**
+   * This reference with one part's own values laid over the plant variables (sand_variable_overrides). A new object: the shared reference
+   * is never changed. A name that is not a plant variable is ignored here (the writer refuses it; a variable renamed since is simply no longer read).
+   */
+  withOverrides(values: ReadonlyMap<string, string>): SandReference {
+    if (values.size === 0) return this;
+    const variables = new Map(this.variables);
+    const plant = new Map<string, string | null>();
+    for (const [name, value] of values) {
+      const original = this.variables.get(name);
+      if (!original) continue;
+      plant.set(name, original.value);
+      variables.set(name, { ...original, value });
+    }
+    return new SandReference(variables, this.tables, plant);
+  }
+
+  /**
+   * The plant value of a variable: undefined when it is not a variable, null when it has no value. On a reference with a part's own
+   * values laid over it, still the plant value, not the part's.
+   */
+  plantOrSharedValue(name: string): string | null | undefined {
+    if (this.plantValues.has(name)) return this.plantValues.get(name) ?? null;
+    const v = this.variables.get(name);
+    return v === undefined ? undefined : v.value;
+  }
+
+  /** True when a part's own value replaces the plant value of this variable; `plantValue` is what it replaced. */
+  overridden(name: string): boolean {
+    return this.plantValues.has(name);
+  }
+  plantValue(name: string): string | null {
+    return this.plantValues.get(name) ?? null;
+  }
 
   /** A variable as a number; null when absent or not numeric (an enum such as `autoCoreboxCalcMode` is text, see `text`). */
   number(name: string): number | null {
