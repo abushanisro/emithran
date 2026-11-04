@@ -14,6 +14,8 @@ export interface CastingPartView {
   features: CastingWorkerFeature[];
   partingPoints: Xyz[] | null;
   drawAxis: "x" | "y" | "z" | null;
+  /** Whether the worker chose the axis ("auto") or measured along the one it was given ("requested"). */
+  drawAxisSource: "auto" | "requested" | null;
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -36,6 +38,7 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
     casting?: {
       cores_glb?: unknown;
       draw_axis?: unknown;
+      draw_axis_source?: unknown;
       parting?: { points?: unknown } | null;
     } | null;
   };
@@ -61,6 +64,7 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
   );
   const points = p.casting?.parting?.points;
   const axis = p.casting?.draw_axis;
+  const source = p.casting?.draw_axis_source;
   return {
     glb: str(p.glb),
     coresGlb: str(p.casting?.cores_glb),
@@ -69,5 +73,6 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
     partingPoints:
       Array.isArray(points) && points.length > 2 ? points.filter(isXyz) : null,
     drawAxis: axis === "x" || axis === "y" || axis === "z" ? axis : null,
+    drawAxisSource: source === "auto" || source === "requested" ? source : null,
   };
 }
