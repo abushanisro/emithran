@@ -3,11 +3,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { CastingPartViewer } from "@/components/features/casting-viewer/CastingPartViewer";
+import { DrawDirectionControl } from "@/components/features/casting-viewer/DrawDirectionControl";
 import type { DfmFinding, SandDfmView } from "@/lib/api/casting-analyses";
 import {
   useCastingAnalyses,
   useCastingAnalysisDetail,
   useCastingMeshUrl,
+  useDrawDirection,
   useRequestCastingAnalysis,
   useSandDfm,
 } from "@/lib/api/hooks/useCastingAnalyses";
@@ -34,6 +36,7 @@ export function SandCastingFeaturesPanel({
   fallback: ReactNode;
 }) {
   const list = useCastingAnalyses(itemId);
+  const direction = useDrawDirection(itemId);
   const request = useRequestCastingAnalysis(itemId);
   const ready = list.data?.find((a) => isReady(a.status));
   const detail = useCastingAnalysisDetail(ready?.id);
@@ -65,6 +68,15 @@ export function SandCastingFeaturesPanel({
             The features below are the cad-engine&apos;s, not the exact ones of the
             casting analysis.
           </div>
+          {direction.data?.axis && (
+            <div className="mt-1">
+              <DrawDirectionControl
+                itemId={itemId}
+                direction={direction.data}
+                autoAxis={null}
+              />
+            </div>
+          )}
           {state.requestLabel && (
             <button
               type="button"
@@ -136,9 +148,18 @@ export function SandCastingFeaturesPanel({
           </label>
         )}
         {part.drawAxis && (
-          <span className="ml-auto">Draw axis: {part.drawAxis.toUpperCase()}</span>
+          <span className="ml-auto">
+            Draw axis: {part.drawAxis.toUpperCase()}
+            {part.drawAxisSource === "requested" ? " (fixed)" : ""}
+          </span>
         )}
       </div>
+
+      <DrawDirectionControl
+        itemId={itemId}
+        direction={direction.data}
+        autoAxis={part.drawAxisSource === "auto" ? part.drawAxis : null}
+      />
 
       <Group title="Casting features (exact, from the casting analysis)">
         {groups.length === 0 && (

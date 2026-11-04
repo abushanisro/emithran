@@ -341,6 +341,7 @@ export const CASTING_RESULT_SCHEMA = {
       "additionalProperties": false,
       "required": [
         "draw_axis",
+        "draw_axis_source",
         "draw_depth_mm",
         "projected_area_mm2",
         "parting_line_mm",
@@ -359,6 +360,13 @@ export const CASTING_RESULT_SCHEMA = {
             "z"
           ],
           "description": "The mould opens along this axis of the part"
+        },
+        "draw_axis_source": {
+          "enum": [
+            "auto",
+            "requested"
+          ],
+          "description": "auto: chosen by the worker (fewest hidden regions, then shallowest); requested: given with --draw-axis, and the measurements are along it"
         },
         "draw_depth_mm": {
           "type": "number",

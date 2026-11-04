@@ -8,10 +8,15 @@ export type CastingAnalysisStatus =
   | "partial"
   | "failed";
 
+/** The draw direction an analysis was run with: chosen by the worker (auto) or fixed by an engineer. */
+export type DrawDirection = "auto" | "x" | "y" | "z";
+export type DrawAxis = Exclude<DrawDirection, "auto">;
+
 export interface CastingAnalysisSummary {
   id: string;
   bomItemId: string;
   status: CastingAnalysisStatus;
+  drawDirection: DrawDirection;
   workerVersion: string;
   schemaVersion: number;
   attempts: number;
@@ -59,6 +64,36 @@ export interface SandDfmView {
   } | null;
   reasons: string[];
 }
+
+/** GET /bom-items/:id/draw-direction: the engineer's axis with the reason, who and when, or none (the worker chooses). */
+export interface CastingDrawDirection {
+  axis: DrawAxis | null;
+  reason: string | null;
+  setBy: string | null;
+  setAt: string | null;
+}
+
+export const drawDirectionApi = {
+  get(bomItemId: string): Promise<CastingDrawDirection> {
+    return apiClient.get<CastingDrawDirection>(
+      `/bom-items/${encodeURIComponent(bomItemId)}/draw-direction`,
+    );
+  },
+  /** Fixes the axis (with the reason) and asks for the analysis along it. */
+  set(
+    bomItemId: string,
+    body: { axis: DrawAxis; reason: string },
+  ): Promise<{ drawDirection: CastingDrawDirection; analysis: CastingAnalysisSummary }> {
+    return apiClient.put(
+      `/bom-items/${encodeURIComponent(bomItemId)}/draw-direction`,
+      body,
+    );
+  },
+  /** Returns the part to the automatic draw direction. */
+  clear(bomItemId: string): Promise<void> {
+    return apiClient.delete(`/bom-items/${encodeURIComponent(bomItemId)}/draw-direction`);
+  },
+};
 
 export const castingAnalysesApi = {
   /** The analyses of one BOM item, newest first. An empty list means not requested. */

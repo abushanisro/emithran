@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   CASTING_SCHEMA_VERSION,
   CASTING_WORKER_VERSION,
+  type CastingAnalysisConfig,
   type CastingAnalysisRow,
 } from "./casting-analysis.types";
 import { CastingAnalysisRunner } from "./casting-analysis-runner";
@@ -28,6 +29,7 @@ const claimed = (over: Partial<CastingAnalysisRow> = {}): CastingAnalysisRow => 
   worker_version: CASTING_WORKER_VERSION,
   schema_version: CASTING_SCHEMA_VERSION,
   config_hash: "h",
+  config: { drawDirection: "auto" },
   status: "running",
   attempts: 1,
   error_code: null,
@@ -55,7 +57,9 @@ class TestRunner extends CastingAnalysisRunner {
     result: resultJson(),
     parts: new Map(),
   });
-  protected runWorker(): Promise<HostOutput> {
+  configs: CastingAnalysisConfig[] = [];
+  protected runWorker(_bytes: Buffer, config: CastingAnalysisConfig): Promise<HostOutput> {
+    this.configs.push(config);
     return this.answer();
   }
 }
@@ -244,5 +248,40 @@ describe("CastingAnalysisRunner", () => {
     );
     await expect(off.tick()).resolves.toBeUndefined();
     expect(t.queue).toHaveLength(1);
+  });
+});
+
+describe("CastingAnalysisRunner: the engineer's draw direction", () => {
+  const casting = (axis: string, source: string) => ({ parts: [{ casting: { draw_axis: axis, draw_axis_source: source } }, { casting: null }] });
+
+  it("runs the worker with the configuration of the row, and stores the result when the worker measured along the asked axis", async () => {
+    const t = setup([claimed({ config: { drawDirection: "y" } })]);
+    t.runner.answer = async () => ({ result: resultJson(casting("y", "requested")), parts: new Map() });
+    await t.runner.tick();
+    expect(t.runner.configs).toEqual([{ drawDirection: "y" }]);
+    expect(t.updates[0].patch).toMatchObject({ status: "succeeded" });
+  });
+
+  it("an automatic analysis is run automatic and must say the worker chose", async () => {
+    const t = setup([claimed()]);
+    t.runner.answer = async () => ({ result: resultJson(casting("x", "auto")), parts: new Map() });
+    await t.runner.tick();
+    expect(t.runner.configs).toEqual([{ drawDirection: "auto" }]);
+    expect(t.updates[0].patch).toMatchObject({ status: "succeeded" });
+  });
+
+  it("a result along another axis than asked is refused for good, never stored as the answer", async () => {
+    const t = setup([claimed({ config: { drawDirection: "y" } })]);
+    t.runner.answer = async () => ({ result: resultJson(casting("x", "auto")), parts: new Map() });
+    await t.runner.tick();
+    expect(t.updates[0].patch).toMatchObject({ status: "failed", error_code: "draw_direction_mismatch" });
+    expect(t.stored).toEqual([]);
+  });
+
+  it("a configuration this backend does not know is refused without running the worker", async () => {
+    const t = setup([claimed({ config: { drawDirection: "w" } as never })]);
+    await t.runner.tick();
+    expect(t.runner.configs).toEqual([]);
+    expect(t.updates[0].patch).toMatchObject({ status: "failed", error_code: "invalid_config" });
   });
 });
