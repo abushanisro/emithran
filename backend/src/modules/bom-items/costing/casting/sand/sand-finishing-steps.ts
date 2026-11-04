@@ -1,6 +1,6 @@
 // The sand-casting route steps after the metal is poured: shakeout, degating, cleaning, grinding and inspection. Same method as the
 // moulding-side steps (sand-steps.ts): each seeds its calculator from the declared source of every input, checks the machine against what
-// the step needs, and names every reason it cannot be done. Port of petrus-demo's domain::casting steps (D122, D128-D130, D146).
+// the step needs, and names every reason it cannot be done. Ported from the retired petrus-demo prototype (its design records, D-numbers, are archived outside the repo) (D122, D128-D130, D146).
 import { machineText, machineValue, type SandMachine } from './sand-machines';
 import { runStep, type SandRouteContext, type StepOutcome } from './sand-steps';
 import type { SandReference } from './sand-reference';

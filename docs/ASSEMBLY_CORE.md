@@ -1,6 +1,6 @@
 # Assembly core
 
-How an uploaded ZIP / STEP assembly becomes BOM items. Modeled on Petrus (`petrus-demo/`): the code that parses CAD is a small
+How an uploaded ZIP / STEP assembly becomes BOM items. Modeled on Petrus (the retired `petrus-demo/` prototype): the code that parses CAD is a small
 separate process; everything around it is supervised, bounded and verified.
 
 ```

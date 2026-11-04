@@ -14,6 +14,6 @@ ad048534c8867ebd1522bea4adea5d58ef0b404f1954200ee0688806afe9004a  ./src/parting.
 95be3daa9757bc7875aa4b086059516b6ae1e0cb5453a0d831553b79cae28cf3  ./src/properties.cpp
 3fd69f066e2fa85b3cae784596abf344c61052214ce4ebf37a73fa04ebc2c189  ./tests/expected.json
 68ea618cca5badb7d34c3cc21ce62abbfe2c9cfe895bc7fee444ad3439137b23  ./tests/unit_tests.cpp
-d771c2b0f56f0084a4c4a41c7dbe05f95cdb0b66900cabbbc74ac62868161201  ./tools/editor-headers.sh
+345f7a91717dbf885880b79879070fd0ae396f6c79cee9fa1834f6dd3baaf62f  ./tools/editor-headers.sh
 fde1207e08da331196176090875d3d1368c59c984d5287cc25222dfe03cc5f16  ./tools/make_samples.cpp
 ef39a2ce30aafb1c24f4c49049b2ef2548a80b246c849d51eb58a9564290bc1d  ./src/undercuts.cpp

@@ -1,7 +1,7 @@
 // The gating system and risers of a sand casting, designed from the plant's gating ratio and the casting's metal by the calculators
 // "Sand Casting - Risers" and "Sand Casting - Gating system" (formulas in the database, inputs seeded from each input's declared source).
 // The choke area depends on the pouring time, which depends on the metal poured, gating included: the design is repeated until the
-// gating weight settles. Port of petrus-demo's domain::casting::gating (D146), with the solidification shrinkage read from the data.
+// gating weight settles. Ported from the retired petrus-demo prototype (its design records, D-numbers, are archived outside the repo) (D146), with the solidification shrinkage read from the data.
 //
 // Nothing is substituted: a selector that finds no row, or a missing input, returns what is missing and no design.
 import type { ReferenceCalcRun, ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';

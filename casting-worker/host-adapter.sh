@@ -1,7 +1,7 @@
 #!/bin/sh
 # Between core's cad-worker-host and this worker. The host runs its worker as
 #     <worker> --deadline-ms N <out-dir> <input>...
-# and this worker (petrus-demo's, copied unchanged) takes
+# and this worker (the prototype's, copied unchanged) takes
 #     geometry-worker --deadline-ms N [--draw-axis x|y|z] <input>... <out-dir>
 # so the arguments are reordered here, in the image, rather than in either program. Exit code, output files and signals pass through (exec).
 #

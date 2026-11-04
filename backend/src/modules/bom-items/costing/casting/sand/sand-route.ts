@@ -1,6 +1,6 @@
 // The route of a sand casting, built from the steps: melting, one line per core, moulding, pouring, cooling, shakeout, degating, cleaning,
 // grinding and inspection, each on the cheapest capable machine, then the metal bought and the core-box tooling. Pure: the caller loads the
-// reference data, the machines and the part's measurements. Port of petrus-demo's domain::casting::route (D122, D127, D143, D146).
+// reference data, the machines and the part's measurements. Ported from the retired petrus-demo prototype (its design records, D-numbers, are archived outside the repo) (D122, D127, D143, D146).
 //
 // For every moulding machine that can hold the part a whole route is built; the cheapest complete one is the route (the moulding process
 // follows from it, unless the user chose one). Nothing is substituted: what the data or the measurements lack is named, and a step no machine
