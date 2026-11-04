@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
+import { SandBalancePanel } from '@/components/costing/SandBalancePanel';
 import { SandCalculationsPanel } from '@/components/costing/SandCalculationsPanel';
 import { calculationEntries } from '@/lib/costing/sand-calculations';
 import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
@@ -6179,6 +6180,17 @@ function CostGuidePanel({
 
             {isSandCast && (
               <Section title="Sand Casting Calculations">
+                {cgpCostSummary && (
+                  <div className="pb-2">
+                    <SandBalancePanel
+                      runs={cgpCostSummary.calculatorRuns}
+                      materialCost={cgpCostSummary.materialCost}
+                      processLines={cgpCostSummary.processLines}
+                      toolingPerPart={cgpCostSummary.coreboxTooling?.perPartUsd ?? null}
+                      totalCost={cgpCostSummary.totalCost}
+                    />
+                  </div>
+                )}
                 <SandCalculationsPanel bomItemId={item.id} entries={calculationEntries(cgpCostSummary?.processLines, cgpCostSummary?.calculatorRuns)} />
               </Section>
             )}
