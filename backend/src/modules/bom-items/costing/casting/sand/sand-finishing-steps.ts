@@ -64,6 +64,11 @@ export function shakeoutStep(ctx: SandFinishContext, m: SandMachine): StepOutcom
       lookup: valuesProvider({ 'tblManualShakeoutTime.Shakeout Time (min)': { value: minutes, source: `tblManualShakeoutTime for a ${ctx.part.netKg.toFixed(2)} kg part` } }),
     }));
   }
+  // An automatic shakeout takes parts only up to the plant's maximum length (maxAutoShakeoutLength); longer ones are shaken out by hand.
+  const maxLength = ctx.ref.number('maxAutoShakeoutLength');
+  if (maxLength == null) return fail('sand variable maxAutoShakeoutLength');
+  const longest = Math.max(...ctx.part.dimsMm);
+  if (longest > maxLength) return fail(`shakes out parts up to ${maxLength} mm automatically (maxAutoShakeoutLength), the part is ${longest.toFixed(0)} mm long`);
   const minutes = interpolate(points(ctx.ref, 'tblShakeoutTime', 'Rough Mass (kg)', 'Shakeout Time (min)'), rough);
   if (minutes == null) return fail('tblShakeoutTime is not staged');
   return done(runStep(ctx, SHAKEOUT, m, { cavities: { value: ctx.cavities, source: 'cavities that fit the flask (layoutNumCav, sand borders)' } }, {
