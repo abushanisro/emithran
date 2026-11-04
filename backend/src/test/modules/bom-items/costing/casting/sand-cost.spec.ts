@@ -237,6 +237,14 @@ describe('the cost summary of a sand casting', () => {
     }
   });
 
+  it("sends the moulding machine's flask, for the viewer to draw the mould", () => {
+    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
+    expect(s.sandCasting!.flask).toEqual(route.flask);
+    expect(route.flask.lengthMm).toBeGreaterThan(0);
+    expect(route.flask.widthMm).toBeGreaterThan(0);
+    expect(route.flask.heightMm).toBeGreaterThan(0);
+  });
+
   it('sends the designed gating and risers (sizes only) for the viewer to draw, as the route designed them', () => {
     const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
     const g = route.gating;

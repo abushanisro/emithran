@@ -7180,6 +7180,7 @@ function PartDetailTab({
           <SandCastingFeaturesPanel
             itemId={item.id}
             gating={cost?.sandCasting?.gating ?? null}
+            flask={cost?.sandCasting?.flask ?? null}
             fallback={(
               <DieCastingFeatureTreePanel
                 fg={fg ?? null}

@@ -21,6 +21,7 @@ import {
   toGlbShape,
   type SandGatingLayout,
 } from "@/lib/casting/gating-layout";
+import { gatingWhenOpen, mouldSolids, type FlaskSize } from "@/lib/casting/mould-layout";
 import {
   OVERLAYS,
   OVERLAY_COLORS,
@@ -47,11 +48,14 @@ export function SandCastingFeaturesPanel({
   itemId,
   fallback,
   gating = null,
+  flask = null,
 }: {
   itemId: string;
   fallback: ReactNode;
   /** The designed gating system and risers from the cost summary: drawn around the part as a schematic. */
   gating?: SandGatingLayout | null;
+  /** The moulding machine's flask from the cost summary: the mould (cope and drag) is drawn around the part in it. */
+  flask?: FlaskSize | null;
 }) {
   const list = useCastingAnalyses(itemId);
   const direction = useDrawDirection(itemId);
@@ -70,6 +74,9 @@ export function SandCastingFeaturesPanel({
   const [showCores, setShowCores] = useState(true);
   const [showParting, setShowParting] = useState(true);
   const [showGating, setShowGating] = useState(true);
+  const [showMould, setShowMould] = useState(false);
+  const [mouldOpen, setMouldOpen] = useState(0);
+  const [section, setSection] = useState(false);
   const [overlay, setOverlay] = useState<ViewOverlay | "">("");
   const [selectedFaces, setSelectedFaces] = useState<number[] | null>(null);
 
@@ -118,16 +125,29 @@ export function SandCastingFeaturesPanel({
 
   const groups = groupCastingFeatures(part.features);
   // The designed system is laid out in the part's own coordinates (its box, draw axis and parting height from the same analysis), then into the viewer's frame.
-  const gatingShapes =
+  const gatingPart =
     gating && part.box && part.drawAxis
-      ? gatingSolids(
-          gating,
-          part.box.min,
-          part.box.max,
-          part.drawAxis,
-          part.partingHeight,
-        ).map(toGlbShape)
+      ? gatingSolids(gating, part.box.min, part.box.max, part.drawAxis, part.partingHeight)
       : [];
+  // The mould: the machine's flask split at the parting plane; opening it lifts the cope, and the sprue and risers with it.
+  const mould =
+    flask && part.box && part.drawAxis
+      ? mouldSolids({
+          flask,
+          partMin: part.box.min,
+          partMax: part.box.max,
+          gating: gatingPart,
+          drawAxis: part.drawAxis,
+          partingHeight: part.partingHeight,
+          open: showMould ? mouldOpen : 0,
+        })
+      : null;
+  const gatingShapes = (
+    mould && part.drawAxis && showMould
+      ? gatingWhenOpen(gatingPart, part.drawAxis, mould.shiftMm)
+      : gatingPart
+  ).map(toGlbShape);
+  const mouldShapes = mould ? [mould.cope, mould.drag, mould.partingPlane].map(toGlbShape) : [];
   // A feature picked in the tree, or the faces of a design finding picked in the list (a finding about faces, such as a draft angle, has no feature).
   const selected = part.features.find((f) => f.id === selectedId) ?? null;
   const highlighted =
@@ -167,6 +187,9 @@ export function SandCastingFeaturesPanel({
             showParting={showParting}
             gating={gatingShapes}
             showGating={showGating}
+            mould={mouldShapes}
+            showMould={showMould}
+            section={section}
             faceColors={faceColors}
           />
         ) : (
@@ -260,6 +283,54 @@ export function SandCastingFeaturesPanel({
               </span>
             )}
           </label>
+        )}
+        {mould && (
+          <>
+            <label
+              className="flex items-center gap-1"
+              title="The sand the casting is made in: the machine's flask, split at the parting plane into the cope (above) and the drag (below). Placed around the part and its gating as a drawing convention."
+            >
+              <input
+                type="checkbox"
+                checked={showMould}
+                onChange={(e) => {
+                  setShowMould(e.target.checked);
+                }}
+              />
+              Mould (cope / drag)
+            </label>
+            {showMould && (
+              <>
+                <label className="flex items-center gap-1" title="Open the mould: the cope, with the sprue and risers, lifts away along the draw axis.">
+                  Open
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(mouldOpen * 100)}
+                    onChange={(e) => {
+                      setMouldOpen(Number(e.target.value) / 100);
+                    }}
+                  />
+                </label>
+                <label className="flex items-center gap-1" title="Cut the mould in half so the part inside shows.">
+                  <input
+                    type="checkbox"
+                    checked={section}
+                    onChange={(e) => {
+                      setSection(e.target.checked);
+                    }}
+                  />
+                  Section
+                </label>
+                {!mould.fits && (
+                  <span className="text-amber-600" title="The part with its gating is larger than the flask of the moulding machine across the draw axis.">
+                    Does not fit the flask
+                  </span>
+                )}
+              </>
+            )}
+          </>
         )}
         {gatingShapes.length > 0 && (
           <label

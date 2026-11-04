@@ -23,6 +23,8 @@ const PARTING_COLOR = "#2563eb";
 const CORE_COLOR = "#f59e0b";
 const GATING_COLOR = "#8b5cf6";
 const RISER_COLOR = "#ec4899";
+const COPE_COLOR = "#d6b98c";
+const DRAG_COLOR = "#b99868";
 /** A part's GLB is a few hundred KB; a file far beyond that is not one the worker made. */
 const MAX_GLB_BYTES = 40 * 1024 * 1024;
 
@@ -50,6 +52,11 @@ interface CastingPartViewerProps {
   /** The designed gating system and risers, already in the GLB frame (toGlbShape): a schematic placement, not part of the part. */
   gating?: readonly GlbShape[];
   showGating?: boolean;
+  /** The mould (cope, drag, parting plane) in the GLB frame: the sand the casting is made in, translucent, around the part. */
+  mould?: readonly GlbShape[];
+  showMould?: boolean;
+  /** Cut the mould in half across its length so the part inside shows. */
+  section?: boolean;
   /** Face number (the result's numbering) to colour: the draft overlay. Applied only when the loaded model matches `glbFaces`. */
   faceColors?: ReadonlyMap<number, string> | null;
 }
@@ -68,6 +75,9 @@ export function CastingPartViewer({
   showParting = true,
   gating = [],
   showGating = true,
+  mould = [],
+  showMould = false,
+  section = false,
   faceColors = null,
 }: CastingPartViewerProps) {
   const part = useGlb(partUrl);
@@ -115,7 +125,11 @@ export function CastingPartViewer({
         />
       )}
       {part.scene && (
-        <Canvas dpr={[1, 2]} camera={{ fov: 45 }} gl={{ antialias: true, alpha: true }}>
+        <Canvas dpr={[1, 2]} camera={{ fov: 45 }} gl={{ antialias: true, alpha: true }}
+          onCreated={({ gl }) => {
+            gl.localClippingEnabled = true;
+          }}
+        >
           <ambientLight intensity={0.7} />
           <directionalLight position={[1, 1, 0.5]} intensity={1.1} />
           <directionalLight position={[-1, -1, -0.5]} intensity={0.4} />
@@ -129,6 +143,7 @@ export function CastingPartViewer({
           <Lines positions={edges} color={EDGE_COLOR} />
           {showParting && <Lines positions={parting} color={PARTING_COLOR} />}
           {showGating && <GatingSolids shapes={gating} />}
+          {showMould && <SandMould shapes={mould} section={section} />}
           <CameraRig bounds={bounds} nonce={nonce} />
           <OrbitControls makeDefault enableDamping />
         </Canvas>
@@ -330,6 +345,34 @@ function Body({
       <primitive object={scene} />
       {overlays.map((o) => (
         <primitive key={o.uuid} object={o} />
+      ))}
+    </>
+  );
+}
+
+/** The mould: cope and drag as translucent sand boxes, the parting plane as a thin plate; cut in half across x when `section` is on. */
+function SandMould({ shapes, section }: { shapes: readonly GlbShape[]; section: boolean }) {
+  const boxes = useMemo(() => shapes.filter((s) => s.kind === "box"), [shapes]);
+  const plane = useMemo(() => {
+    if (boxes.length === 0) return null;
+    const cx = boxes.reduce((sum, b) => sum + b.center[0], 0) / boxes.length;
+    // Keeps the points with x at or below the middle of the mould.
+    return new THREE.Plane(new THREE.Vector3(-1, 0, 0), cx);
+  }, [boxes]);
+  return (
+    <>
+      {boxes.map((shape) => (
+        <mesh key={shape.name} position={shape.center} name={shape.name} renderOrder={-1}>
+          <boxGeometry args={shape.size} />
+          <meshStandardMaterial
+            color={shape.name === "Parting plane" ? PARTING_COLOR : shape.name === "Drag" ? DRAG_COLOR : COPE_COLOR}
+            transparent
+            opacity={shape.name === "Parting plane" ? 0.5 : 0.28}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+            clippingPlanes={section && plane ? [plane] : []}
+          />
+        </mesh>
       ))}
     </>
   );

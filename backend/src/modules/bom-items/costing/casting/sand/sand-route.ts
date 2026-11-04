@@ -11,8 +11,8 @@ import type { ReferenceCalcRun, ReferenceCalculatorDef } from '../../shared/calc
 import type { CostContext } from '../casting-finishing';
 import { coreboxTooling, coreLine, sandCores, type CoreboxTooling, type CoreRegion } from './sand-cores';
 import { cleanStep, degateStep, finishStep, inspectStep, shakeoutStep, type SandFinishContext } from './sand-finishing-steps';
-import { designGating, type GatingSystem } from './sand-gating';
 import { referenceYieldNote } from './sand-yield';
+import { designGating, type GatingSystem, type SandFlask } from './sand-gating';
 import { ingateVelocityNote, RISER_EFFICIENCY_NOTE } from './sand-velocity';
 import { machineValue, type SandMachine } from './sand-machines';
 import type { SandReference } from './sand-reference';
@@ -83,6 +83,8 @@ export interface SandRoute {
   /** Route lines in order, costs per good part in USD (scrap paid for by the good ones). */
   lines: ProcessLineCost[];
   gating: GatingSystem;
+  /** The flask of the moulding machine (from the machine's specs), to draw the mould around the part. */
+  flask: SandFlask;
   coresMade: number;
   coresLeftSolid: number;
   material: { netKg: number; pouredKg: number; yieldPct: number; costUsd: number | null; runs: ReferenceCalcRun[] };
@@ -291,7 +293,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
   return {
     missing: [],
     route: {
-      mouldingProcess, mouldingMachine: mould.name, cavities, lines: scaled, gating,
+      mouldingProcess, mouldingMachine: mould.name, cavities, lines: scaled, gating, flask: flaskOf(mould),
       coresMade: cored.cores.length, coresLeftSolid: cored.thin,
       material: { netKg: r4(netKg), pouredKg: r4(pouredKg), yieldPct: r2((100 * netKg) / pouredKg), costUsd: materialCost != null ? r2(materialCost) : null, runs },
       tooling: { perPartUsd: r4(toolingPerPart), items },
@@ -319,3 +321,12 @@ export function buildSandRoute(input: SandRouteInput): { route: SandRoute | null
   return { route: null, missing: reasons.length ? reasons.slice(0, 8) : ['no moulding machines of the sand process classes'] };
 }
 
+
+/** The flask of a moulding machine; every machine that reached a route has one (cavitiesPerMould refuses a machine without flask length, width and height). */
+function flaskOf(mould: SandMachine): SandFlask {
+  return {
+    lengthMm: machineValue(mould, 'flask_length_mm') ?? 0,
+    widthMm: machineValue(mould, 'flask_width_mm') ?? 0,
+    heightMm: machineValue(mould, 'flask_height_mm') ?? 0,
+  };
+}

@@ -656,6 +656,8 @@ export interface SandCastingBreakdown {
   measuredBy: 'casting analysis' | 'cad-engine';
   /** The designed gating system and risers, to draw around the part. */
   gating: SandGatingLayout;
+  /** The moulding machine's flask (mm), to draw the mould (cope above the parting plane, drag below) around the part. */
+  flask: { lengthMm: number; widthMm: number; heightMm: number };
 }
 
 export interface MachineChoiceDto {
