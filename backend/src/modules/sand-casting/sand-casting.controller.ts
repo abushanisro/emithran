@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from "@nestjs/swagger";
-import { IsUUID } from "class-validator";
+import { IsString, IsUUID, MaxLength } from "class-validator";
 import type { Response } from "express";
 
 import { AccessToken } from "../../common/decorators/access-token.decorator";
@@ -28,6 +28,13 @@ export class RequestCastingAnalysisDto {
   })
   @IsUUID()
   bomItemId!: string;
+}
+
+export class CastingMeshQuery {
+  @ApiProperty({ description: "A 3D file the analysis's result lists, e.g. parts/0-1-1-1.glb (its part mesh) or parts/0-1-1-1-cores.glb (its cores)." })
+  @IsString()
+  @MaxLength(255)
+  name!: string;
 }
 
 export class CastingAnalysesQuery {
@@ -90,6 +97,16 @@ export class SandCastingController {
   })
   async list(@Query() query: CastingAnalysesQuery, @AccessToken() token: string) {
     return (await this.casting.listForItem(query.bomItemId, token)).map(view);
+  }
+
+  @OrgRole("viewer")
+  @Get(":id/meshes")
+  @ApiOperation({
+    summary:
+      "A short-lived signed URL for one 3D file of an analysis (its part mesh or its cores), for the viewer. Only a file the analysis's result lists.",
+  })
+  async mesh(@Param("id", ParseUUIDPipe) id: string, @Query() query: CastingMeshQuery, @AccessToken() token: string) {
+    return this.casting.meshUrl(id, query.name, token);
   }
 
   @OrgRole("viewer")
