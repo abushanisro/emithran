@@ -12,12 +12,11 @@ export interface SandVariableOverride {
   setAt: string;
 }
 
-const base = (bomItemId: string) =>
-  `/bom-items/${encodeURIComponent(bomItemId)}/sand-variable-overrides`;
-
 export const sandVariableOverridesApi = {
   list(bomItemId: string): Promise<{ overrides: SandVariableOverride[] }> {
-    return apiClient.get<{ overrides: SandVariableOverride[] }>(base(bomItemId));
+    return apiClient.get<{ overrides: SandVariableOverride[] }>(
+      `/bom-items/${encodeURIComponent(bomItemId)}/sand-variable-overrides`,
+    );
   },
   /** Sets one variable for this part (with the reason). The cost is calculated with it from then on. */
   set(
@@ -25,10 +24,15 @@ export const sandVariableOverridesApi = {
     variable: string,
     body: { value: string; reason: string },
   ): Promise<{ overrides: SandVariableOverride[] }> {
-    return apiClient.put(`${base(bomItemId)}/${encodeURIComponent(variable)}`, body);
+    return apiClient.put(
+      `/bom-items/${encodeURIComponent(bomItemId)}/sand-variable-overrides/${encodeURIComponent(variable)}`,
+      body,
+    );
   },
   /** Returns one variable to the plant value. */
   clear(bomItemId: string, variable: string): Promise<{ overrides: SandVariableOverride[] }> {
-    return apiClient.delete(`${base(bomItemId)}/${encodeURIComponent(variable)}`);
+    return apiClient.delete(
+      `/bom-items/${encodeURIComponent(bomItemId)}/sand-variable-overrides/${encodeURIComponent(variable)}`,
+    );
   },
 };
