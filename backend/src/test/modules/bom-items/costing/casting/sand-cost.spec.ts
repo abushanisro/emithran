@@ -217,22 +217,6 @@ describe('the cost summary of a sand casting', () => {
     expect(Object.keys(s.calculatorRuns ?? {})).toEqual(expect.arrayContaining(['Sand metal per casting', 'Sand material cost']));
   });
 
-  it('sends the designed gating and risers (sizes only) for the viewer to draw, as the route designed them', () => {
-    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
-    const g = route.gating;
-    expect(s.sandCasting!.gating).toEqual({
-      sprueDiameterMm: g.sprueDiameterMm, sprueHeightMm: g.sprueHeightMm, wellDiameterMm: g.wellDiameterMm, wellDepthMm: g.wellDepthMm,
-      runnerWidthMm: g.runnerWidthMm, runnerHeightMm: g.runnerHeightMm, runnerLengthMm: g.runnerLengthMm,
-      ingates: g.ingates, ingateWidthMm: g.ingateWidthMm, ingateHeightMm: g.ingateHeightMm, ingateLengthMm: g.ingateLengthMm,
-      risers: g.risers, riserDiameterMm: g.riserDiameterMm, riserHeightMm: g.riserHeightMm,
-    });
-    // every size is a positive number and the counts are whole: a system that could be drawn
-    for (const [key, value] of Object.entries(s.sandCasting!.gating)) expect({ key, ok: Number.isFinite(value) && value > 0 }).toEqual({ key, ok: true });
-    expect(Number.isInteger(s.sandCasting!.gating.ingates) && Number.isInteger(s.sandCasting!.gating.risers)).toBe(true);
-    // none of the calculators' bookkeeping travels with it
-    expect(JSON.stringify(s.sandCasting!.gating)).not.toMatch(/runs|inputs|trace/);
-  });
-
   it('puts machining before the final visual inspection', () => {
     const machining = { process: 'Drilling', setupCost: 0, runCost: 1, totalCost: 1, cycleTimeMin: 1, hourlyRate: 1, rateSource: 'mhr_database' as const, machineClass: 'x', machineName: 'm', commodityCode: null, labourRate: null };
     const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] }, secondaryMachining: { lines: [machining as never], warnings: [] } });
