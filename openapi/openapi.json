@@ -7752,6 +7752,30 @@
         "properties": {},
         "type": "object"
       },
+      "SetDrawDirectionDto": {
+        "properties": {
+          "axis": {
+            "description": "The axis along which the mould opens. To return to the automatic choice, remove the draw direction.",
+            "enum": [
+              "x",
+              "y",
+              "z"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why the engineer overrides the automatic choice. Required, and kept in the audit trail.",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "axis",
+          "reason"
+        ],
+        "type": "object"
+      },
       "SetExchangeRateDto": {
         "properties": {
           "confirm": {
@@ -13337,6 +13361,99 @@
         "summary": "Compute per-occurrence DFM risk scores from stored feature_graph_v2 metrics",
         "tags": [
           "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/draw-direction": {
+      "delete": {
+        "operationId": "BomItemDrawDirectionController_clear_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return the part to the automatic draw direction (and ask for that analysis). Audited.",
+        "tags": [
+          "Casting analyses"
+        ]
+      },
+      "get": {
+        "operationId": "BomItemDrawDirectionController_get_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's draw direction: the engineer's axis with the reason, who and when, or none (the worker chooses).",
+        "tags": [
+          "Casting analyses"
+        ]
+      },
+      "put": {
+        "operationId": "BomItemDrawDirectionController_set_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDrawDirectionDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fix the draw axis of the part (with the reason) and ask for the casting analysis along it. Audited.",
+        "tags": [
+          "Casting analyses"
         ]
       }
     },

@@ -17,12 +17,23 @@ import {
   CASTING_SCHEMA_VERSION,
   CASTING_SOURCE_BUCKET,
   CASTING_WORKER_VERSION,
-  DEFAULT_CASTING_CONFIG,
+  configForAxis,
   configHash,
+  type CastingAnalysisConfig,
   type CastingAnalysisRow,
+  type DrawAxis,
+  isDrawAxis,
 } from "./casting-analysis.types";
 
 type AdminClient = ReturnType<DatabaseService["getPrivilegedClient"]>;
+
+/** The item's draw direction as stored: no axis means the worker chooses. */
+export interface DrawDirectionView {
+  axis: DrawAxis | null;
+  reason: string | null;
+  setBy: string | null;
+  setAt: string | null;
+}
 
 export interface CastingRequest {
   bomItemId: string;
@@ -64,15 +75,16 @@ export class SandCastingService {
         message: "The stored 3D file of this BOM item could not be read.",
       });
 
+    // What the analysis is run with: the engineer's draw direction for this item if there is one, else the automatic choice.
+    const config = configForAxis((await this.drawDirection(input.bomItemId, input.token)).axis);
     const key = {
       input_sha256: createHash("sha256").update(bytes).digest("hex"),
       worker_version: CASTING_WORKER_VERSION,
       schema_version: CASTING_SCHEMA_VERSION,
-      config_hash: configHash(DEFAULT_CASTING_CONFIG),
+      config_hash: configHash(config),
+      config,
     };
-    const admin = this.database.getPrivilegedClient(
-      "casting analysis: queue and read analyses after an RLS check of the BOM item",
-    );
+    const admin = this.admin();
 
     const result = await this.queueOrReuse(admin, input, { ...key, source_path: item.file_3d_path });
     if (!result.reused || result.created) {
@@ -81,7 +93,7 @@ export class SandCastingService {
         targetType: "casting_analysis",
         targetId: result.analysis.id,
         organizationId: input.organizationId,
-        meta: { bomItemId: input.bomItemId, reused: result.reused },
+        meta: { bomItemId: input.bomItemId, reused: result.reused, drawDirection: config.drawDirection },
       });
     }
     return { analysis: result.analysis, reused: result.reused };
@@ -92,7 +104,7 @@ export class SandCastingService {
     input: CastingRequest,
     key: Pick<
       CastingAnalysisRow,
-      "input_sha256" | "worker_version" | "schema_version" | "config_hash" | "source_path"
+      "input_sha256" | "worker_version" | "schema_version" | "config_hash" | "config" | "source_path"
     >,
   ): Promise<{ analysis: CastingAnalysisRow; reused: boolean; created: boolean }> {
     const existing = await this.find(admin, input.bomItemId, key);
@@ -169,6 +181,8 @@ export class SandCastingService {
    */
   async latestResult(bomItemId: string, sourcePath: string | null, token: string): Promise<{ result: unknown; workerVersion: string } | null> {
     if (!sourcePath) return null;
+    // The analysis the item's draw direction asks for: with an override, only an analysis along that axis answers it (never the automatic one).
+    const config = configForAxis((await this.drawDirection(bomItemId, token)).axis);
     const { data, error } = await this.database
       .getUserClient(token)
       .from("casting_analyses")
@@ -177,6 +191,7 @@ export class SandCastingService {
       .eq("source_path", sourcePath)
       .eq("worker_version", CASTING_WORKER_VERSION)
       .eq("schema_version", CASTING_SCHEMA_VERSION)
+      .eq("config_hash", configHash(config))
       .in("status", ["succeeded", "partial"])
       .order("created_at", { ascending: false })
       .limit(1);
@@ -196,6 +211,83 @@ export class SandCastingService {
     const key = meshKey(analysis.output_prefix, name);
     if (!(await this.objects.exists(CASTING_SOURCE_BUCKET, key))) throw notFound();
     return { name, url: await this.objects.signedGetUrl(CASTING_SOURCE_BUCKET, key, MESH_URL_SECONDS), expiresInSeconds: MESH_URL_SECONDS };
+  }
+
+  /** The service-role client, only used after the BOM item was read as the user (row-level security decides whether it is theirs). */
+  private admin(): AdminClient {
+    return this.database.getPrivilegedClient(
+      "casting analysis: queue and read analyses and store the draw-direction override after an RLS check of the BOM item",
+    );
+  }
+
+  /** The item's draw direction: the engineer's override with its reason, or none (automatic). Read as the user. */
+  async drawDirection(bomItemId: string, token: string): Promise<DrawDirectionView> {
+    const { data, error } = await this.database
+      .getUserClient(token)
+      .from("casting_draw_directions")
+      .select("axis, reason, set_by, set_at")
+      .eq("bom_item_id", bomItemId)
+      .maybeSingle();
+    if (error) throw new Error(`Could not read the draw direction: ${error.message}`);
+    const row = data as { axis: unknown; reason: string; set_by: string; set_at: string } | null;
+    // An axis this backend does not know is no override: the part stays automatic rather than being run with a guess.
+    if (!row || !isDrawAxis(row.axis)) return { axis: null, reason: null, setBy: null, setAt: null };
+    return { axis: row.axis, reason: row.reason, setBy: row.set_by, setAt: row.set_at };
+  }
+
+  /**
+   * Fixes the draw axis of a BOM item (an engineer's choice, with the reason, who and when) and asks for the analysis along it. The
+   * automatic analysis stays. Audited.
+   */
+  async setDrawDirection(
+    input: CastingRequest,
+    axis: DrawAxis,
+    reason: string,
+  ): Promise<{ drawDirection: DrawDirectionView; analysis: CastingAnalysisRow; reused: boolean }> {
+    await this.readItem(input.bomItemId, input.token); // not found for another organization's item
+    const previous = await this.drawDirection(input.bomItemId, input.token);
+    const { error } = await this.admin()
+      .from("casting_draw_directions")
+      .upsert(
+        {
+          bom_item_id: input.bomItemId,
+          organization_id: input.organizationId,
+          axis,
+          reason: reason.trim(),
+          set_by: input.userId,
+          set_at: new Date().toISOString(),
+        },
+        { onConflict: "bom_item_id" },
+      );
+    if (error) throw new Error(`Could not store the draw direction: ${error.message}`);
+    await this.audit.recordBestEffort({
+      action: "casting_draw_direction.set",
+      targetType: "bom_item",
+      targetId: input.bomItemId,
+      organizationId: input.organizationId,
+      meta: { axis, reason: reason.trim(), previousAxis: previous.axis },
+    });
+    const requested = await this.request(input);
+    return { drawDirection: await this.drawDirection(input.bomItemId, input.token), ...requested };
+  }
+
+  /** Returns the part to the automatic draw direction. Audited. */
+  async clearDrawDirection(input: CastingRequest): Promise<{ drawDirection: DrawDirectionView; analysis: CastingAnalysisRow; reused: boolean }> {
+    await this.readItem(input.bomItemId, input.token);
+    const previous = await this.drawDirection(input.bomItemId, input.token);
+    const { error } = await this.admin().from("casting_draw_directions").delete().eq("bom_item_id", input.bomItemId);
+    if (error) throw new Error(`Could not remove the draw direction: ${error.message}`);
+    if (previous.axis) {
+      await this.audit.recordBestEffort({
+        action: "casting_draw_direction.cleared",
+        targetType: "bom_item",
+        targetId: input.bomItemId,
+        organizationId: input.organizationId,
+        meta: { previousAxis: previous.axis, previousReason: previous.reason },
+      });
+    }
+    const requested = await this.request(input);
+    return { drawDirection: await this.drawDirection(input.bomItemId, input.token), ...requested };
   }
 
   /** The analyses of one BOM item, newest first. An empty list means "not requested", never "passed". */
