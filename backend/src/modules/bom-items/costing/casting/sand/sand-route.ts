@@ -86,6 +86,8 @@ export interface SandRoute {
   coresLeftSolid: number;
   material: { netKg: number; pouredKg: number; yieldPct: number; costUsd: number | null; runs: ReferenceCalcRun[] };
   tooling: { perPartUsd: number; items: CoreboxTooling[] };
+  /** The core sand calculator run of each core (the sand of the core and its prints), for the trace. */
+  coreSandRuns: ReferenceCalcRun[];
   /** Material + process lines + tooling per part (USD); null while a line is a gap. */
   totalUsd: number | null;
   complete: boolean;
@@ -290,6 +292,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
       coresMade: cored.cores.length, coresLeftSolid: cored.thin,
       material: { netKg: r4(netKg), pouredKg: r4(pouredKg), yieldPct: r2((100 * netKg) / pouredKg), costUsd: materialCost != null ? r2(materialCost) : null, runs },
       tooling: { perPartUsd: r4(toolingPerPart), items },
+      coreSandRuns: cored.cores.map((c) => c.run),
       totalUsd, complete, warnings,
     },
   };

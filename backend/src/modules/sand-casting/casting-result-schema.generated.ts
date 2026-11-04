@@ -351,7 +351,8 @@ export const CASTING_RESULT_SCHEMA = {
         "wall_mm",
         "cores",
         "cores_glb",
-        "draft"
+        "draft",
+        "undercuts"
       ],
       "properties": {
         "draw_axis": {
@@ -568,6 +569,69 @@ export const CASTING_RESULT_SCHEMA = {
             "string",
             "null"
           ]
+        },
+        "undercuts": {
+          "description": "The faces that cannot be withdrawn from the sand along each axis of the part (S5): from a point of the face, neither the line out along +axis nor the one along -axis is free of other metal (a face leaning the wrong way by more than 0.5 degrees does not count in that direction). A face is listed when a fifth or more of its sample points cannot be withdrawn. Independent of the chosen draw axis and of the parting line; an axis with no faces is a direction that needs no core for the part's own shape",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "axes"
+          ],
+          "properties": {
+            "axes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "axis",
+                  "area_mm2",
+                  "faces"
+                ],
+                "properties": {
+                  "axis": {
+                    "enum": [
+                      "x",
+                      "y",
+                      "z"
+                    ]
+                  },
+                  "area_mm2": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Area of the listed faces"
+                  },
+                  "faces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "face",
+                        "share"
+                      ],
+                      "properties": {
+                        "face": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The face, numbered as the features, the draft and glb_faces number them"
+                        },
+                        "share": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "Share of the face's sample points that cannot be withdrawn"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         },
         "draft": {
           "description": "Draft angle of every face along the draw axis (S4): asin(n.d) above the parting plane, asin(-n.d) below it, so 0 is parallel to the draw axis and negative is an undercut; a curved face is sampled and reports its smallest and largest angle. Null when there is no parting line (the halves are defined by it)",

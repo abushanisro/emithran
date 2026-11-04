@@ -106,6 +106,22 @@ draft_case hollow-box "-90..-90:2,0..0:8,90..90:2" "the two ends of the closed c
 draft_case taper-3 "3..3:1,90..90:2" "a cone leaning 3 degrees from the axis: the side is exactly 3, drafted"
 draft_case taper-04 "0.4..0.4:1,90..90:2" "the same at 0.4 degrees, under the 0.5 degree limit of the published rules"
 
+echo "== undercuts (S5): the faces that cannot be withdrawn along each axis, worked by hand from the geometry"
+# A point is an undercut when it cannot be withdrawn up or down the axis (the way it faces, and metal in the line out). Expected: the number of undercut
+# faces along x, y and z.
+undercut_case() { # <sample stem> <expected "x,y,z" face counts> <why>
+    got="$(node -e '
+        const u = JSON.parse(require("fs").readFileSync(process.argv[1])).parts[0].casting.undercuts;
+        console.log(u ? u.axes.map((a) => a.faces.length).join(",") : "null");
+    ' "$WORK/results/$1/result.json")"
+    [ "$got" = "$2" ] && pass "undercuts $1: $got ($3)" || fail "undercuts $1: got '$got', expected '$2' ($3)"
+}
+undercut_case box "0,0,0" "a plain block needs no core along any axis"
+undercut_case cylinder "0,0,0" "a cylinder is free along its axis and across it"
+undercut_case plate-with-hole "1,1,0" "a hole through along z: free along z, but across it the bore's wall is hidden from both sides"
+undercut_case hollow-box "6,6,6" "a closed cavity: its six faces cannot be withdrawn along any axis"
+undercut_case slot-block "0,5,5" "a slot open at one end along x: free along x, but along y and z its five faces are hidden"
+
 echo "== wall thickness by face (S6): the thinnest wall measured from each face, worked by hand from the geometry"
 # From a point of a face the distance through the metal along the inward normal to the next surface; per face, the smallest. Expected: the faces grouped by that thickness (mm), with their count.
 wall_case() { # <sample stem> <expected groups> <why>

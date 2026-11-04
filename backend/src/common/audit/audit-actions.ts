@@ -12,6 +12,9 @@ export const AUDIT_ACTIONS = {
   // an engineer fixed (or released) the draw axis of a sand-cast part; the reason is the engineer's own words
   'casting_draw_direction.set': ['axis', 'reason', 'previousAxis'],
   'casting_draw_direction.cleared': ['previousAxis', 'previousReason'],
+  // an engineer set (or released) one plant variable for one sand-cast part; the reason is the engineer's own words
+  'sand_variable_override.set': ['variable', 'value', 'reason', 'previousValue', 'plantValue'],
+  'sand_variable_override.cleared': ['variable', 'previousValue', 'previousReason'],
   'casting_analysis.failed': ['errorCode'],
   'file.deleted': ['fileType'],
   'bom.deleted': ['name'],

@@ -8,6 +8,7 @@ org:member      DELETE /api/v1/bom-items/:bomItemId/process-specifications  Proc
 org:member      DELETE /api/v1/bom-items/:id  BOMItemsController.remove
 org:member      DELETE /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.clear
 org:admin       DELETE /api/v1/bom-items/:id/force  BOMItemsController.forceRemove
+org:member      DELETE /api/v1/bom-items/:id/sand-variable-overrides/:variable  SandVariableOverridesController.clear
 org:member      DELETE /api/v1/boms/:id  BOMsController.remove
 org:admin       DELETE /api/v1/calculators/:id  CalculatorsController.remove
 org:admin       DELETE /api/v1/calculators/:id/fields/:fieldId  CalculatorsController.removeField
@@ -95,6 +96,7 @@ org:viewer      GET /api/v1/bom-items/:id/nre  BOMItemsController.getNre
 org:viewer      GET /api/v1/bom-items/:id/pmi-records  BOMItemsController.getPmiRecords
 org:viewer      GET /api/v1/bom-items/:id/route-comparison  BOMItemsController.getRouteComparison
 org:viewer      GET /api/v1/bom-items/:id/sand-dfm  BOMItemsController.getSandDfm
+org:viewer      GET /api/v1/bom-items/:id/sand-variable-overrides  SandVariableOverridesController.list
 org:viewer      GET /api/v1/bom-items/:id/secondary-processes  BOMItemsController.getSecondaryProcesses
 org:viewer      GET /api/v1/bom-items/:id/true-nest  BOMItemsController.getTrueNest
 org:viewer      GET /api/v1/bom-items/analysis-version  BOMItemsController.getAnalysisVersion
@@ -412,6 +414,7 @@ org:member      PUT /api/v1/bom-items/:bomItemId/process-specifications  Process
 org:member      PUT /api/v1/bom-items/:id  BOMItemsController.update
 org:member      PUT /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.set
 org:member      PUT /api/v1/bom-items/:id/feature-tolerances/:featureKey  BOMItemsController.setFeatureTolerances
+org:member      PUT /api/v1/bom-items/:id/sand-variable-overrides/:variable  SandVariableOverridesController.set
 org:member      PUT /api/v1/bom-items/:id/tolerance-policy  BOMItemsController.setTolerancePolicy
 org:member      PUT /api/v1/boms/:id  BOMsController.update
 org:admin       PUT /api/v1/calculators/:id  CalculatorsController.update

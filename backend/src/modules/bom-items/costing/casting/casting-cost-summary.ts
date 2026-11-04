@@ -14,7 +14,8 @@
 
 import type { CalculatorRunDto, CostSummaryDto, DieCastingProcessChoiceDto, DieToolingDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import type { SandRoute } from './sand/sand-route';
-import { gatingLayout } from './sand/sand-gating';
+import { gatingLayout, GATING_CALCULATOR, RISERS_CALCULATOR } from './sand/sand-gating';
+import { CORE_BOX, CORE_SAND } from './sand/sand-cores';
 import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
 import { castingSeed, runView } from './casting-calculator-seeds';
 import type { DieToolingResult } from './die-tooling';
@@ -156,6 +157,10 @@ export function buildCastingCostSummary(input: {
     const [metalRun, costRun] = sand.material.runs;
     if (metalRun) calculatorRuns['Sand metal per casting'] = runView('Sand Casting - Metal per casting', 'Poured Weight', metalRun);
     if (costRun) calculatorRuns['Sand material cost'] = runView('Sand Casting - Material cost', 'Material Cost', costRun);
+    calculatorRuns['Sand risers'] = runView(RISERS_CALCULATOR, 'Riser Weight', sand.gating.runs.risers);
+    calculatorRuns['Sand gating system'] = runView(GATING_CALCULATOR, 'Gating Weight', sand.gating.runs.gating);
+    sand.coreSandRuns.forEach((run, i) => { calculatorRuns[`Sand core sand ${i + 1}`] = runView(CORE_SAND, 'Core Sand', run); });
+    sand.tooling.items.forEach((t, i) => { calculatorRuns[`Sand core box ${i + 1}`] = runView(CORE_BOX, 'Cost per Part', t.run); });
   }
   if (input.dieTooling) Object.assign(calculatorRuns, input.dieTooling.runs);
   if (input.cores?.corebox) calculatorRuns['Corebox'] = input.cores.corebox.run;

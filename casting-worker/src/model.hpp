@@ -79,6 +79,22 @@ struct DraftAnalysis {
   int unmeasured = 0;             // faces without a usable normal
 };
 
+// The faces of the part that cannot be withdrawn from the sand along one axis (undercuts.cpp): `share` is the part of the face's sample points that cannot.
+struct UndercutFace {
+  int face;  // TopExp::MapShapes order - 1, as the features and the draft number faces
+  double share;
+};
+
+struct UndercutAxis {
+  char axis;  // 'x', 'y' or 'z'
+  std::vector<UndercutFace> faces;
+  double area = 0;  // mm2 of those faces
+};
+
+struct UndercutAnalysis {
+  std::vector<UndercutAxis> axes;  // x, y, z
+};
+
 // What casting cost needs from the geometry (roadmap M4, D126), along one of the part's own axes.
 struct CastingProperties {
   char draw_axis = 'z';         // the mould opens along this axis: fewest hidden regions, then shallowest (or the one asked for)
@@ -89,6 +105,7 @@ struct CastingProperties {
   // edges, from the ray grid)
   double parting_line = 0;
   std::optional<PartingLine> parting;
+  std::optional<UndercutAnalysis> undercuts;  // along each axis of the part; independent of the chosen draw axis and of the parting line
   std::optional<DraftAnalysis> draft;  // along the draw axis, relative to the parting plane (needs the parting line)
   std::vector<std::array<double, 2>> covered;  // centres of the grid cells the part covers (across the axis; not written)
   std::array<double, 2> footprint{};  // extents across the draw axis, larger first
@@ -168,6 +185,8 @@ void build_cores(const TDF_Label& part, PartProperties& p, const std::string& ou
 // `forced_axis` is 0, 1 or 2 to measure along that axis only (an engineer's choice), -1 to choose the best.
 // Fills `c.draft` from the part's faces; nothing without a parting line. Throws Standard_Failure on an OCCT error.
 void find_draft(const TDF_Label& part, const PartProperties& p, CastingProperties& c);
+// Fills `c.undercuts`: the faces that cannot be withdrawn along each axis (undercuts.cpp). Throws Standard_Failure on an OCCT error.
+void find_undercuts(const TDF_Label& part, const PartProperties& p, CastingProperties& c);
 
 CastingProperties measure_casting(const TDF_Label& part, const PartProperties& p, int forced_axis = -1);
 // The exact parting line along the measured draw axis (parting.cpp); throws Standard_Failure on an OCCT error.

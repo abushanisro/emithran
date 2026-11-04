@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
+import { SandCalculationsPanel } from '@/components/costing/SandCalculationsPanel';
+import { calculationEntries } from '@/lib/costing/sand-calculations';
 import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
 import { useCastingAnalyses, useRequestCastingAnalysis } from '@/lib/api/hooks/useCastingAnalyses';
 import { analysisState, requestFailure } from '@/lib/casting/analysis-view';
@@ -6172,6 +6174,12 @@ function CostGuidePanel({
                     error: requestCastingAnalysis.isError ? requestFailure(requestCastingAnalysis.error) : null,
                   }}
                 />
+              </Section>
+            )}
+
+            {isSandCast && (
+              <Section title="Sand Casting Calculations">
+                <SandCalculationsPanel bomItemId={item.id} entries={calculationEntries(cgpCostSummary?.processLines, cgpCostSummary?.calculatorRuns)} />
               </Section>
             )}
 
