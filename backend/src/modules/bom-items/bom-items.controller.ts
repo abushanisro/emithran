@@ -398,6 +398,13 @@ export class BOMItemsController {
     return this.featureToleranceService.getMachiningNeed(id, token);
   }
 
+  @OrgRole('viewer')
+  @Get(':id/sand-dfm')
+  @ApiOperation({ summary: "Design-for-casting checks of the item's sand casting analysis (severity, measured value, threshold, the rule's note, the faces); rules the analysis cannot measure are listed as not evaluated" })
+  async getSandDfm(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.bomItemsService.getSandDfm(id, user.id, token);
+  }
+
   @Put(':id/tolerance-policy')
   @ApiOperation({ summary: 'Set the Tolerance Policy for Auto categories: assume_achieved | uniform {values} | cad {replaceBelow}' })
   async setTolerancePolicy(@Param('id') id: string, @Body() policy: unknown, @AccessToken() token: string) {

@@ -5,10 +5,12 @@ import { CalculatorCatalogService } from '../../../services/calculator-catalog.s
 import type { CostContext } from '../casting-finishing';
 import { loadSandCastingCalculatorSpec } from './calculators/sand-casting-calculator-spec';
 import { measurementsFromCastingResult } from '../../../../sand-casting/casting-measurements';
+import { evaluateSandDfm, type DfmResult } from '../../../../sand-casting/sand-dfm';
 import { SandCastingService } from '../../../../sand-casting/sand-casting.service';
 import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal, sandScenario, type SandMeasurements } from './sand-cost';
 import { SandMachineService } from './sand-machine.service';
 import { SandReferenceService } from './sand-reference.service';
+import { SAND_CASTING_SOURCE_VERSION } from './sand-reference';
 import { buildSandRoute, MOULDING_PROCESSES, type SandRoute } from './sand-route';
 import type { SandMaterial } from './sand-steps';
 import { CORE_PROCESSES } from './sand-cores';
@@ -21,6 +23,13 @@ const ROUTE_CLASSES = [
   'sand_casting_melting', 'sand_casting_pour', 'sand_casting_cooling', 'sand_casting_shakeout', 'sand_casting_degating',
   'sand_casting_cleaning', 'sand_casting_finishing', 'sand_casting_visual_inspection',
 ];
+
+export interface SandDfmView {
+  status: 'ok' | 'no_analysis' | 'unavailable';
+  result: DfmResult | null;
+  /** Why there is no result, or what limits it. */
+  reasons: string[];
+}
 
 export interface SandCostRequest {
   client: DbClient;
@@ -75,6 +84,26 @@ export class SandCostService {
       .limit(2);
     if (error || !data || data.length !== 1) return null;
     return sandMaterialFromRow(data[0] as Record<string, any>);
+  }
+
+  /**
+   * The design-for-casting checks of the item's casting analysis (sand-dfm.ts), against the part's sand material type. Without an analysis of the
+   * current file there is nothing to judge: that is said, never shown as a pass.
+   */
+  async dfm(req: { bomItemId: string; sourcePath: string | null; grade: string | null; client: DbClient; accessToken: string }): Promise<SandDfmView> {
+    const analysis = await this.analyses.latestResult(req.bomItemId, req.sourcePath, req.accessToken);
+    if (!analysis) return { status: 'no_analysis', result: null, reasons: ['There is no casting analysis of the current file: request one.'] };
+    const { reference, missing } = await this.reference.get();
+    if (!reference) return { status: 'unavailable', result: null, reasons: missing };
+    const material = await this.getMaterial(req.client, req.grade);
+    const out = evaluateSandDfm(analysis.result, material?.materialType ?? null, {
+      severity: reference.table('manufacturabilitySeverity'),
+      adviceRules: reference.table('adviceRules'),
+      version: SAND_CASTING_SOURCE_VERSION,
+    });
+    if ('reason' in out) return { status: 'unavailable', result: null, reasons: [out.reason] };
+    const reasons = material ? [] : [`"${req.grade ?? '(no material)'}" is not a sand-casting material in Raw Materials: rules that depend on the material are not evaluated`];
+    return { status: 'ok', result: out, reasons };
   }
 
   async price(req: SandCostRequest): Promise<SandCostResult> {
