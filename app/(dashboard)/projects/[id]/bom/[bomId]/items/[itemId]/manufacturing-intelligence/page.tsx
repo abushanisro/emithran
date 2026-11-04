@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
+import { useCastingAnalyses, useRequestCastingAnalysis } from '@/lib/api/hooks/useCastingAnalyses';
+import { analysisState, requestFailure } from '@/lib/casting/analysis-view';
 import { GcdToleranceTab } from '@/components/features/manufacturing-intelligence/GcdToleranceTab';
 import { MachineChoicePanel } from '@/components/features/manufacturing-intelligence/MachineChoicePanel';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
@@ -5525,6 +5527,10 @@ function CostGuidePanel({
   const { data: materialCandidates } = useMaterialIntelligence(item.id);
   const updateBOMItem = useUpdateBOMItem();
   const patchScenarioOverrides = usePatchScenarioOverrides();
+  // A sand-cast part's casting analysis: only read (and polled) for sand casting.
+  const isSandCast = cgpCostSummary?.family === 'sand_cast';
+  const castingAnalyses = useCastingAnalyses(isSandCast ? item.id : undefined);
+  const requestCastingAnalysis = useRequestCastingAnalysis(isSandCast ? item.id : undefined);
   const isCastingProcess = isCastingProcessGroup(selectedProcessGroup);
   // limit 1000 is the key the Edit Process Cost dialog reads: one shared request, not nine pages.
   const { data: processCatalog } = useProcessCalculatorMappings({ limit: 1000 });
@@ -6141,12 +6147,18 @@ function CostGuidePanel({
               </Section>
             )}
 
-            {cgpCostSummary?.family === 'sand_cast' && (
+            {isSandCast && (
               <Section title="Sand Casting">
                 <SandCastingSection
                   overrides={item.scenarioOverrides}
-                  route={cgpCostSummary.sandCasting}
+                  route={cgpCostSummary?.sandCasting}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                  analysis={{
+                    state: analysisState(castingAnalyses.data, Date.now()),
+                    onRequest: () => { requestCastingAnalysis.mutate(); },
+                    requesting: requestCastingAnalysis.isPending,
+                    error: requestCastingAnalysis.isError ? requestFailure(requestCastingAnalysis.error) : null,
+                  }}
                 />
               </Section>
             )}

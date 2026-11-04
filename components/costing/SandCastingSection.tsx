@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import type { AnalysisState } from '@/lib/casting/analysis-view';
 import {
   SAND_CORE_PROCESSES,
   SAND_MOULDING_PROCESSES,
@@ -29,6 +30,8 @@ interface Props {
   route: SandCastingBreakdown | undefined;
   /** Writes one scenario key; null clears it. */
   onChange: (patch: Record<string, string | number | null>) => void;
+  /** The part's casting analysis: its state, and the action that asks for one. */
+  analysis: { state: AnalysisState; onRequest: () => void; requesting: boolean; error: string | null };
 }
 
 const rowClass = 'flex items-center gap-2 py-0.5';
@@ -67,7 +70,7 @@ function NumberField({ label, value, placeholder, parse, onCommit, title }: {
 }
 
 /** The Cost Guide choices of a sand casting, and what the route decided. Every choice is optional; unset means the engine decides or, for the energy price and the tooling life, charges nothing. */
-export function SandCastingSection({ overrides, route, onChange }: Props) {
+export function SandCastingSection({ overrides, route, onChange, analysis }: Props) {
   const text = (key: string) => (typeof overrides?.[key] === 'string' ? overrides[key] : '');
   const number = (key: string) => (typeof overrides?.[key] === 'number' ? overrides[key] : null);
   return (
@@ -110,13 +113,30 @@ export function SandCastingSection({ overrides, route, onChange }: Props) {
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.energyPrice]: v }); }}
         title="Electricity price for melting. It is not in the reference data, so nothing is assumed: until you set it, melting energy is not charged."
       />
+      <div className="pt-1 border-t border-border/50 mt-1 space-y-0.5" title="The casting worker measures the exact solid: cores, parting line and wall. Until one is done, the cad-engine's measurements are used.">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-muted-foreground">Casting analysis</span>
+          <span className={`font-medium ${analysis.state.kind === 'failed' ? 'text-red-600 dark:text-red-400' : ''}`}>{analysis.state.label}</span>
+        </div>
+        {analysis.state.detail && <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">{analysis.state.detail}</p>}
+        {analysis.error && <p className="text-[10px] text-red-600 dark:text-red-400 leading-tight">{analysis.error}</p>}
+        {analysis.state.requestLabel && (
+          <button
+            type="button"
+            className="w-full text-xs border border-border rounded px-2 py-1 bg-background hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            disabled={analysis.requesting}
+            onClick={analysis.onRequest}
+          >
+            {analysis.requesting ? 'Requesting…' : analysis.state.requestLabel}
+          </button>
+        )}
+      </div>
       {route && (
         <div className="pt-1 border-t border-border/50 mt-1 space-y-0.5">
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Costed with</span><span className="font-medium text-right">{route.mouldingProcess} · {route.mouldingMachine}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Measured by</span><span className="font-medium">{route.measuredBy === 'casting analysis' ? 'casting analysis (exact solid)' : 'cad-engine'}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cavities</span><span className="font-medium">{route.cavities}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cores</span><span className="font-medium">{route.coresMade}{route.coresLeftSolid > 0 ? ` (+${route.coresLeftSolid} left solid, machined later)` : ''}</span></div>
-          {route.measuredBy === 'cad-engine' && <p className="text-[10px] text-muted-foreground/70 leading-tight">Request a casting analysis for the exact cores, parting line and wall.</p>}
           {!route.complete && <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">Incomplete: a step no machine can do is shown as a gap and left out of the total.</p>}
         </div>
       )}
