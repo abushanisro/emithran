@@ -34,6 +34,7 @@ const row = (over: Partial<CastingAnalysisRow> = {}): CastingAnalysisRow => ({
   worker_version: CASTING_WORKER_VERSION,
   schema_version: CASTING_SCHEMA_VERSION,
   config_hash: configHash(DEFAULT_CASTING_CONFIG),
+  config: DEFAULT_CASTING_CONFIG,
   status: "queued",
   attempts: 0,
   error_code: null,
@@ -57,6 +58,8 @@ function setup(
     item?: { id: string; file_3d_path: string | null } | null;
     bytes?: Buffer | null;
     raceOnInsert?: boolean;
+    /** The item's draw-direction override as the user's client reads it (null: none, automatic). */
+    direction?: { axis: string; reason: string; set_by: string; set_at: string } | null;
   } = {},
 ) {
   const {
@@ -65,14 +68,32 @@ function setup(
     item = { id: "item-1", file_3d_path: "path/part.step" },
     bytes = BYTES,
     raceOnInsert = false,
+    direction = null,
   } = options;
   let current = own;
+  let storedDirection = direction;
   const calls = {
     inserts: [] as Record<string, unknown>[],
     updates: [] as Record<string, unknown>[],
+    upserts: [] as Record<string, unknown>[],
+    deletes: 0,
+  };
+  const directionsAdmin = {
+    upsert: async (values: Record<string, unknown>) => {
+      calls.upserts.push(values);
+      storedDirection = { axis: String(values.axis), reason: String(values.reason), set_by: String(values.set_by), set_at: String(values.set_at) };
+      return { error: null };
+    },
+    delete: () => ({
+      eq: async () => {
+        calls.deletes += 1;
+        storedDirection = null;
+        return { error: null };
+      },
+    }),
   };
   const admin = {
-    from: () => ({
+    from: (table: string) => table === "casting_draw_directions" ? directionsAdmin : ({
       select: () => {
         const chain: Record<string, unknown> = {};
         chain.eq = (column: string) =>
@@ -124,9 +145,9 @@ function setup(
     }),
   };
   const userClient = {
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: item, error: null }) }),
+        eq: () => ({ maybeSingle: async () => ({ data: table === "casting_draw_directions" ? storedDirection : item, error: null }) }),
       }),
     }),
   };
@@ -162,7 +183,7 @@ describe("SandCastingService.request", () => {
     expect(audit.recordBestEffort).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "casting_analysis.requested",
-        meta: { bomItemId: "item-1", reused: false },
+        meta: { bomItemId: "item-1", reused: false, drawDirection: "auto" },
       }),
     );
   });
@@ -241,7 +262,7 @@ describe("SandCastingService: the file's path, and finding a result by it", () =
     expect(analysis.source_path).toBe("path/part.step");
   });
 
-  function latest(rows: unknown[] | null, error: { message: string } | null = null) {
+  function latest(rows: unknown[] | null, error: { message: string } | null = null, direction: { axis: string; reason: string; set_by: string; set_at: string } | null = null) {
     const filters: Record<string, unknown> = {};
     const chain: any = {
       select: () => chain,
@@ -250,7 +271,8 @@ describe("SandCastingService: the file's path, and finding a result by it", () =
       order: () => chain,
       limit: async () => ({ data: rows, error }),
     };
-    const service = new SandCastingService({ getUserClient: () => ({ from: () => chain }) } as never, {} as never, {} as never, {} as never);
+    const directions = { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: direction, error: null }) }) }) };
+    const service = new SandCastingService({ getUserClient: () => ({ from: (t: string) => (t === "casting_draw_directions" ? directions : chain) }) } as never, {} as never, {} as never, {} as never);
     return { service, filters };
   }
 
@@ -297,5 +319,86 @@ describe("SandCastingService.meshUrl", () => {
     }
     await expect(build({ analysis: { output_prefix: null } }).service.meshUrl("ca-1", "parts/p.glb", "t")).rejects.toBeInstanceOf(NotFoundException);
     await expect(build({ exists: false }).service.meshUrl("ca-1", "parts/p.glb", "t")).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe("SandCastingService: the engineer's draw direction", () => {
+  const set = { axis: "y", reason: "the pattern is split along the long side", set_by: "u", set_at: "2026-11-04T10:00:00.000Z" };
+
+  it("without an override the analysis is the automatic one; with one, the analysis along that axis (a different key, so the automatic one is kept)", async () => {
+    const auto = setup();
+    await auto.service.request(input);
+    expect(auto.calls.inserts[0]).toMatchObject({ config: { drawDirection: "auto" }, config_hash: configHash({ drawDirection: "auto" }) });
+    const fixed = setup({ direction: set });
+    await fixed.service.request(input);
+    expect(fixed.calls.inserts[0]).toMatchObject({ config: { drawDirection: "y" }, config_hash: configHash({ drawDirection: "y" }) });
+    expect(configHash({ drawDirection: "y" })).not.toBe(configHash({ drawDirection: "auto" }));
+  });
+
+  it("setting it stores axis, trimmed reason, user and organization, audits the change with the previous axis, and asks for the analysis along it", async () => {
+    const { service, calls, audit } = setup();
+    const out = await service.setDrawDirection(input, "z", "  foundry splits it flat  ");
+    expect(calls.upserts).toEqual([expect.objectContaining({ bom_item_id: "item-1", organization_id: "org-1", axis: "z", reason: "foundry splits it flat", set_by: "user-1" })]);
+    expect(audit.recordBestEffort).toHaveBeenCalledWith(expect.objectContaining({ action: "casting_draw_direction.set", targetId: "item-1", meta: { axis: "z", reason: "foundry splits it flat", previousAxis: null } }));
+    expect(calls.inserts[0]).toMatchObject({ config: { drawDirection: "z" } });
+    expect(out.drawDirection).toMatchObject({ axis: "z", reason: "foundry splits it flat", setBy: "user-1" });
+    expect(out.analysis.config).toEqual({ drawDirection: "z" });
+  });
+
+  it("changing it records the axis it replaced", async () => {
+    const { service, audit } = setup({ direction: set });
+    await service.setDrawDirection(input, "x", "second thoughts");
+    expect(audit.recordBestEffort).toHaveBeenCalledWith(expect.objectContaining({ action: "casting_draw_direction.set", meta: { axis: "x", reason: "second thoughts", previousAxis: "y" } }));
+  });
+
+  it("clearing it removes the override, audits what was removed, and asks for the automatic analysis", async () => {
+    const { service, calls, audit } = setup({ direction: set });
+    const out = await service.clearDrawDirection(input);
+    expect(calls.deletes).toBe(1);
+    expect(audit.recordBestEffort).toHaveBeenCalledWith(expect.objectContaining({ action: "casting_draw_direction.cleared", meta: { previousAxis: "y", previousReason: set.reason } }));
+    expect(out.drawDirection).toEqual({ axis: null, reason: null, setBy: null, setAt: null });
+    expect(calls.inserts[0]).toMatchObject({ config: { drawDirection: "auto" } });
+  });
+
+  it("clearing when there is none changes and audits nothing but the request", async () => {
+    const { service, audit } = setup();
+    await service.clearDrawDirection(input);
+    expect(audit.recordBestEffort).not.toHaveBeenCalledWith(expect.objectContaining({ action: "casting_draw_direction.cleared" }));
+  });
+
+  it("an item the user cannot see (another organization) is not found, and nothing is stored", async () => {
+    const { service, calls } = setup({ item: null });
+    await expect(service.setDrawDirection(input, "x", "reason")).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.clearDrawDirection(input)).rejects.toBeInstanceOf(NotFoundException);
+    expect(calls.upserts).toEqual([]);
+    expect(calls.deletes).toBe(0);
+  });
+
+  it("a stored axis this backend does not know is no override", async () => {
+    const { service } = setup({ direction: { ...set, axis: "w" } });
+    expect(await service.drawDirection("item-1", "t")).toEqual({ axis: null, reason: null, setBy: null, setAt: null });
+  });
+
+  function latest(rows: unknown[], _error: null, direction: typeof set | null) {
+    const filters: Record<string, unknown> = {};
+    const chain: any = {
+      select: () => chain,
+      eq: (c: string, v: unknown) => ((filters[c] = v), chain),
+      in: () => chain,
+      order: () => chain,
+      limit: async () => ({ data: rows, error: null }),
+    };
+    const directions = { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: direction, error: null }) }) }) };
+    const service = new SandCastingService({ getUserClient: () => ({ from: (t: string) => (t === "casting_draw_directions" ? directions : chain) }) } as never, {} as never, {} as never, {} as never);
+    return { service, filters };
+  }
+
+  it("the result used for the item is the one along its draw direction: the automatic analysis does not answer an override", async () => {
+    const auto = latest([{ result: { r: 1 }, worker_version: CASTING_WORKER_VERSION }], null, null);
+    await auto.service.latestResult("item-1", "p", "t");
+    expect(auto.filters).toMatchObject({ config_hash: configHash({ drawDirection: "auto" }) });
+    const fixed = latest([{ result: { r: 1 }, worker_version: CASTING_WORKER_VERSION }], null, set);
+    await fixed.service.latestResult("item-1", "p", "t");
+    expect(fixed.filters).toMatchObject({ config_hash: configHash({ drawDirection: "y" }) });
   });
 });

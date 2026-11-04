@@ -30,5 +30,5 @@ $CONTAINER exec "$ID-host" cad-worker-host health >/dev/null 2>&1 && echo "PASS 
 
 echo "== the backend's client, in a container with the socket volume and the worker's group (as the backend runs)"
 $CONTAINER run --rm --network none --user 1000:1000 --group-add 10005 -v "$ID-sock:/run/casting-worker" -v "$PWD/backend:/app:ro" -v "$PWD/$WORK/samples:/samples:ro" \
-    -w /app docker.io/library/node:24-slim sh -c 'node -r ts-node/register/transpile-only -r tsconfig-paths/register scripts/casting-worker-e2e.ts /run/casting-worker/worker.sock /samples/holes.step /samples/corrupt.step'
+    -w /app docker.io/library/node:24-slim sh -c 'node -r ts-node/register/transpile-only -r tsconfig-paths/register scripts/casting-worker-e2e.ts /run/casting-worker/worker.sock /samples/holes.step /samples/corrupt.step /samples/hollow-box.step'
 echo "== casting worker e2e: all checks passed"
