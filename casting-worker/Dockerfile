@@ -48,7 +48,7 @@ COPY --from=occt /opt/occt/LICENSE_LGPL_21.txt /opt/occt/OCCT_LGPL_EXCEPTION.txt
 COPY --from=build /opt/worker/bin/geometry-worker /usr/local/bin/geometry-worker
 COPY --from=host-build /src/target/release/cad-worker-host /usr/local/bin/cad-worker-host
 # The host calls its worker as `--deadline-ms N <out-dir> <input>...`; this worker takes the output folder last: the adapter reorders (host-adapter.sh).
-COPY host-adapter.sh /usr/local/bin/casting-worker-host-adapter
+COPY --chmod=0555 host-adapter.sh /usr/local/bin/casting-worker-host-adapter
 COPY result.schema.json /usr/share/casting-worker/result.schema.json
 # util-linux provides prlimit (the host refuses to run the worker without it). The worker's group and user (10005) are the ones the
 # assembly core uses; the backend joins group 10005 only to reach the socket (mode 0660).
