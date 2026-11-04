@@ -1,5 +1,5 @@
 {
-  "_comment": "One list of the memory/ reference folders staged into machining_reference_data under their own source_version. Read by the staging generators (backend/migrations/scripts), the backend (processes/reference-domains.ts) and, through GET /processes/reference-domains, the Process page. Add a folder here, re-run the generator; nothing else hardcodes the list.",
+  "_comment": "One list of the memory/ reference folders staged into machining_reference_data under their own source_version. Read by the backend (processes/reference-domains.ts) and, through GET /processes/reference-domains, the Process page. The staging generators that also read it were retired (backend/migrations/scripts/RETIRED_GENERATORS.md); nothing else hardcodes the list.",
   "domains": [
     {
       "key": "secondary_process",
