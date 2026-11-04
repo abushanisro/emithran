@@ -8,7 +8,10 @@ export const AUDIT_ACTIONS = {
   'upload.created': ['fileName', 'sizeBytes', 'duplicate'],
   'upload.completed': ['fileName', 'parts', 'items', 'durationMs'],
   'upload.failed': ['fileName', 'errorCode'],
-  'casting_analysis.requested': ['bomItemId', 'reused'],
+  'casting_analysis.requested': ['bomItemId', 'reused', 'drawDirection'],
+  // an engineer fixed (or released) the draw axis of a sand-cast part; the reason is the engineer's own words
+  'casting_draw_direction.set': ['axis', 'reason', 'previousAxis'],
+  'casting_draw_direction.cleared': ['previousAxis', 'previousReason'],
   'casting_analysis.failed': ['errorCode'],
   'file.deleted': ['fileType'],
   'bom.deleted': ['name'],
