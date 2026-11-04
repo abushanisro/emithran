@@ -1,5 +1,5 @@
 // Compares the casting worker's results with casting-worker/tests/expected.json (hand-worked answers) and its
-// result.schema.json. A TypeScript port of the check the worker had in petrus-demo (`emithran-checks worker-results`),
+// result.schema.json. A TypeScript port of the check the worker had in the retired petrus-demo prototype (`emithran-checks worker-results`),
 // same rules, so the worker's own golden file is used unchanged. Pure functions: files are read by the caller.
 import Ajv2020 from "ajv8/dist/2020";
 

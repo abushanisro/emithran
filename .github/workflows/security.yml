@@ -61,7 +61,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD":/w:ro -v trivy-cache:/root/.cache "$TRIVY_IMAGE" fs /w \
             --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
-            --skip-dirs /w/node_modules,/w/backend/node_modules,/w/petrus-demo,/w/memory \
+            --skip-dirs /w/node_modules,/w/backend/node_modules,/w/memory \
             --ignorefile /w/.trivyignore.yaml
 
   containers:
@@ -77,7 +77,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD":/w:ro -v trivy-cache:/root/.cache "$TRIVY_IMAGE" config /w \
             --severity HIGH,CRITICAL --exit-code 1 \
-            --skip-dirs /w/node_modules,/w/backend/node_modules,/w/petrus-demo,/w/memory \
+            --skip-dirs /w/node_modules,/w/backend/node_modules,/w/memory \
             --skip-files /w/cad-engine/Dockerfile.dev,/w/ecad-engine/Dockerfile.dev
       # The base images are read from the Dockerfiles and the compose file, so there is no second list to forget to update.
       - name: Pinned base images

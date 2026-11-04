@@ -5,8 +5,8 @@
 set -eu
 cd "$(dirname "$0")/.."
 CONTAINER="${CONTAINER:-docker}"
-$CONTAINER build -q --target occt -t petrus-occt-build:8.0.1 . >/dev/null   # cached after the first build
-container="$($CONTAINER create petrus-occt-build:8.0.1)"
+$CONTAINER build -q --target occt -t casting-occt-build:8.0.1 . >/dev/null   # cached after the first build
+container="$($CONTAINER create casting-occt-build:8.0.1)"
 trap '$CONTAINER rm "$container" >/dev/null' EXIT
 rm -rf .occt && mkdir -p .occt
 $CONTAINER cp "$container:/opt/occt/include" .occt/include

@@ -27,7 +27,6 @@ logs
 backend
 cad-engine
 ecad-engine
-petrus-demo
 memory
 database
 supabase

@@ -1,7 +1,7 @@
 // The sand-casting route steps that need the mould: moulding (cavities, flask), melting, pouring and cooling. Each step seeds its
 // calculator from the declared source of every input (sand-seeds.ts), checks the machine against what the step needs, and returns the
 // time and the calculator run, or the reasons it cannot be done. selectAndCost() picks the cheapest capable machine and costs the line
-// with the shared casting line builder. Port of petrus-demo's domain::casting route steps (D122, D128-D130).
+// with the shared casting line builder. Ported from the retired petrus-demo prototype (its design records, D-numbers, are archived outside the repo) (D122, D128-D130).
 //
 // Nothing is substituted: a missing input, an unstaged table or a machine without a rate is named in the reasons.
 import type { MachineChoiceDto } from '../../../dto/cost-breakdown.dto';

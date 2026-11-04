@@ -1,9 +1,9 @@
 // Cores of a sand casting. The geometry worker finds regions of air enclosed between metal along the draw axis; each is a sand core,
 // made on a coremaking machine and held in the mould by core prints. Core boxes are tooling, amortised over the lifetime volume.
 // The numbers come from the calculators "Core sand", "Coremaking", "Hot box coremaking" and "Core box"; the rules on which machine can make
-// a core stay here. Port of petrus-demo's domain::casting::cores (D127, D143).
+// a core stay here. Ported from the retired petrus-demo prototype (its design records, D-numbers, are archived outside the repo): cores (D127, D143).
 //
-// Left out, as in petrus-demo: isocure (no cycle time in the data) and manual coremaking (its mixing rate alone gives seconds for a core;
+// Left out, as in the prototype: isocure (no cycle time in the data) and manual coremaking (its mixing rate alone gives seconds for a core;
 // the curing time that dominates is not modelled). Hot box has no cycle time in the data: its calculator times the blow from the sand, the cure
 // from heat conduction into the sand (the plant's box temperature, binder cure temperature and strip depth, set in the Cost Guide; none assumed)
 // and the strip from the handling table.

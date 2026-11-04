@@ -281,7 +281,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      # The worker's sources must still be what was copied from petrus-demo (Dockerfile is the one edited file).
+      # The worker's sources must still be what PROVENANCE.sha256 records (Dockerfile is the one file not covered).
       - run: grep -v ' \./Dockerfile$' PROVENANCE.sha256 | shasum -a 256 -c -
         working-directory: casting-worker
       - run: npm ci --legacy-peer-deps --no-audit --no-fund
