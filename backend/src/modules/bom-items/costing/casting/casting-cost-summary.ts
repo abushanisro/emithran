@@ -98,7 +98,7 @@ export function buildCastingCostSummary(input: {
   /** Calculator runs behind other values of this summary (trim force, ...). */
   calculatorRuns?: Record<string, CalculatorRunDto>;
   /** Sand casting (sand-cost.service.ts): the route in the location's currency, or what keeps it from being built. */
-  sand?: { route: SandRoute | null; missing: string[] } | null;
+  sand?: { route: SandRoute | null; missing: string[]; measuredBy?: 'casting analysis' | 'cad-engine' } | null;
 }): CostSummaryDto {
   const warnings = [...input.warnings];
   const calculatorRuns: Record<string, CalculatorRunDto> = { ...(input.hpdc?.calculatorRuns ?? {}), ...(input.calculatorRuns ?? {}) };
@@ -226,7 +226,7 @@ export function buildCastingCostSummary(input: {
         perPartUsd: input.cores.corebox.perPartUsd != null ? Math.round(input.cores.corebox.perPartUsd * 10000) / 10000 : null,
       },
     } : {}),
-    ...(sand ? { sandCasting: { mouldingProcess: sand.mouldingProcess, mouldingMachine: sand.mouldingMachine, cavities: sand.cavities, coresMade: sand.coresMade, coresLeftSolid: sand.coresLeftSolid, complete: sand.complete } } : {}),
+    ...(sand ? { sandCasting: { mouldingProcess: sand.mouldingProcess, mouldingMachine: sand.mouldingMachine, cavities: sand.cavities, coresMade: sand.coresMade, coresLeftSolid: sand.coresLeftSolid, complete: sand.complete, measuredBy: input.sand?.measuredBy ?? 'cad-engine' } } : {}),
     ...(sand && sand.tooling.items.length ? {
       coreboxTooling: {
         boxes: sand.tooling.items.reduce((n, t) => n + t.boxes, 0),

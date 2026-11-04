@@ -9,5 +9,6 @@ import { SandCastingService } from "./sand-casting.service";
   imports: [DatabaseModule],
   controllers: [SandCastingController],
   providers: [SandCastingService, CastingAnalysisRunner],
+  exports: [SandCastingService],
 })
 export class SandCastingModule {}

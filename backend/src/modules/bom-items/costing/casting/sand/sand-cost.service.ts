@@ -4,6 +4,8 @@ import { escapeLikePattern, quoteFilterValue } from '../../../../../common/db/po
 import { CalculatorCatalogService } from '../../../services/calculator-catalog.service';
 import type { CostContext } from '../casting-finishing';
 import { loadSandCastingCalculatorSpec } from './calculators/sand-casting-calculator-spec';
+import { measurementsFromCastingResult } from '../../../../sand-casting/casting-measurements';
+import { SandCastingService } from '../../../../sand-casting/sand-casting.service';
 import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal, sandScenario, type SandMeasurements } from './sand-cost';
 import { SandMachineService } from './sand-machine.service';
 import { SandReferenceService } from './sand-reference.service';
@@ -25,7 +27,11 @@ export interface SandCostRequest {
   accessToken: string;
   location: string;
   grade: string | null;
+  /** The cad-engine's casting measurements: used when the BOM item has no casting analysis (or it cannot be used). */
   measurements: SandMeasurements;
+  /** The BOM item and its current 3D file path: a casting analysis of that file, when there is one, measures the part instead. */
+  bomItemId: string;
+  sourcePath: string | null;
   overrides: Record<string, unknown> | null | undefined;
   batchSize: number;
   annualVolume: number | null;
@@ -36,6 +42,8 @@ export interface SandCostRequest {
 }
 
 export interface SandCostResult {
+  /** Where the measurements came from: the casting worker's analysis of the exact solid, or the cad-engine's. */
+  measuredBy: 'casting analysis' | 'cad-engine';
   /** The route in the location's currency; null when it cannot be built (see `missing`). */
   route: SandRoute | null;
   missing: string[];
@@ -52,6 +60,7 @@ export class SandCostService {
     private readonly reference: SandReferenceService,
     private readonly machines: SandMachineService,
     private readonly catalog: CalculatorCatalogService,
+    private readonly analyses: SandCastingService,
   ) {}
 
   /** The sand material whose name or grade equals the BOM item's material grade, case-insensitively; null when the grade is not a sand material. */
@@ -70,8 +79,23 @@ export class SandCostService {
 
   async price(req: SandCostRequest): Promise<SandCostResult> {
     const warnings: string[] = [];
-    const none = (...missing: string[]): SandCostResult => ({ route: null, missing, warnings });
-    const { part, warnings: partWarnings, missing: partMissing } = sandPart(req.measurements);
+    let measuredBy: SandCostResult['measuredBy'] = 'cad-engine';
+    const none = (...missing: string[]): SandCostResult => ({ measuredBy, route: null, missing, warnings });
+    // The casting analysis (the C++ worker, on the exact solid) measures the part when there is one for the current file; otherwise the cad-engine does.
+    let measurements = req.measurements;
+    const analysis = await this.analyses.latestResult(req.bomItemId, req.sourcePath, req.accessToken);
+    if (analysis) {
+      const fromAnalysis = measurementsFromCastingResult(analysis.result);
+      if (fromAnalysis.measurements) {
+        measurements = fromAnalysis.measurements;
+        measuredBy = 'casting analysis';
+        warnings.push(`Measured by the casting analysis (worker ${analysis.workerVersion}) on the exact solid.`);
+      } else {
+        warnings.push(`The casting analysis could not be used (${fromAnalysis.missing.join('; ')}): the cad-engine's measurements are used.`);
+      }
+    }
+    if (measuredBy === 'cad-engine') warnings.push('Measured by the cad-engine; request a casting analysis for the exact cores, parting line and wall.');
+    const { part, warnings: partWarnings, missing: partMissing } = sandPart(measurements);
     warnings.push(...partWarnings);
     if (!part) return none(...partMissing);
     const [{ reference, missing: refMissing }, calculators, machines, material] = await Promise.all([
@@ -89,6 +113,6 @@ export class SandCostService {
     warnings.push(...scenarioWarnings);
     const { route, missing } = buildSandRoute({ ref: reference, spec, calculators, material, part, machinesByClass: machines, scenario, costContext: req.costContext });
     if (!route) return none(...missing);
-    return { route: sandRouteToLocal(route, req.usdToLocal), missing: [], warnings: [...warnings, ...route.warnings] };
+    return { measuredBy, route: sandRouteToLocal(route, req.usdToLocal), missing: [], warnings: [...warnings, ...route.warnings] };
   }
 }

@@ -631,6 +631,8 @@ export interface SandCastingBreakdown {
   coresLeftSolid: number;
   /** False while a step no machine can do is a gap. */
   complete: boolean;
+  /** Where the part was measured: the casting worker's analysis of the exact solid, or the cad-engine. */
+  measuredBy: 'casting analysis' | 'cad-engine';
 }
 
 export interface MachineChoiceDto {

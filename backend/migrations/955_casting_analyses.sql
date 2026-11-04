@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.casting_analyses (
   bom_item_id     uuid NOT NULL REFERENCES public.bom_items(id) ON DELETE CASCADE,
   requested_by    uuid NOT NULL,
   input_sha256    text NOT NULL,
+  source_path     text,             -- the BOM item's 3D file path when it was asked for: a replaced file has a new path, so its old analysis is not used for it
   worker_version  text NOT NULL,
   schema_version  integer NOT NULL,
   config_hash     text NOT NULL,

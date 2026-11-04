@@ -30,6 +30,7 @@ const row = (over: Partial<CastingAnalysisRow> = {}): CastingAnalysisRow => ({
   bom_item_id: "item-1",
   requested_by: "user-1",
   input_sha256: SHA,
+  source_path: "path/part.step",
   worker_version: CASTING_WORKER_VERSION,
   schema_version: CASTING_SCHEMA_VERSION,
   config_hash: configHash(DEFAULT_CASTING_CONFIG),
@@ -153,6 +154,7 @@ describe("SandCastingService.request", () => {
       bom_item_id: "item-1",
       requested_by: "user-1",
       input_sha256: SHA,
+      source_path: "path/part.step",
       worker_version: CASTING_WORKER_VERSION,
       schema_version: CASTING_SCHEMA_VERSION,
     });
@@ -227,6 +229,42 @@ describe("SandCastingService.request", () => {
     await expect(setup({ bytes: null }).service.request(input)).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+});
+
+describe("SandCastingService: the file's path, and finding a result by it", () => {
+  it("the same bytes uploaded again under a new path move the existing analysis to that path", async () => {
+    const { service, calls } = setup({ own: row({ status: "succeeded", source_path: "old/path.step" }) });
+    const { analysis, reused } = await service.request(input);
+    expect(reused).toBe(true);
+    expect(calls.updates[0]).toEqual({ source_path: "path/part.step" });
+    expect(analysis.source_path).toBe("path/part.step");
+  });
+
+  function latest(rows: unknown[] | null, error: { message: string } | null = null) {
+    const filters: Record<string, unknown> = {};
+    const chain: any = {
+      select: () => chain,
+      eq: (c: string, v: unknown) => ((filters[c] = v), chain),
+      in: (c: string, v: unknown) => ((filters[c] = v), chain),
+      order: () => chain,
+      limit: async () => ({ data: rows, error }),
+    };
+    const service = new SandCastingService({ getUserClient: () => ({ from: () => chain }) } as never, {} as never, {} as never, {} as never);
+    return { service, filters };
+  }
+
+  it("returns the newest finished result of the item's current file for the worker this backend was built for", async () => {
+    const { service, filters } = latest([{ result: { schema_version: 1 }, worker_version: CASTING_WORKER_VERSION }]);
+    expect(await service.latestResult("item-1", "path/part.step", "t")).toEqual({ result: { schema_version: 1 }, workerVersion: CASTING_WORKER_VERSION });
+    expect(filters).toMatchObject({ bom_item_id: "item-1", source_path: "path/part.step", worker_version: CASTING_WORKER_VERSION, schema_version: CASTING_SCHEMA_VERSION, status: ["succeeded", "partial"] });
+  });
+
+  it("is null without a path, without a row, with no result stored, or on a read error", async () => {
+    expect(await latest([]).service.latestResult("item-1", null, "t")).toBeNull();
+    expect(await latest([]).service.latestResult("item-1", "p", "t")).toBeNull();
+    expect(await latest([{ result: null, worker_version: "x" }]).service.latestResult("item-1", "p", "t")).toBeNull();
+    expect(await latest(null, { message: "down" }).service.latestResult("item-1", "p", "t")).toBeNull();
   });
 });
 
