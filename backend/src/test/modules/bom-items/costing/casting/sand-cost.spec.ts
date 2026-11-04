@@ -225,6 +225,18 @@ describe('the cost summary of a sand casting', () => {
     expect(Object.keys(s.calculatorRuns ?? {})).toEqual(expect.arrayContaining(['Sand metal per casting', 'Sand material cost']));
   });
 
+  it('traces every calculator the route ran: gating, risers, each core sand and each core box, with inputs and formulas', () => {
+    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
+    const runs = s.calculatorRuns ?? {};
+    expect(Object.keys(runs)).toEqual(expect.arrayContaining(['Sand risers', 'Sand gating system', 'Sand core sand 1']));
+    expect(Object.keys(runs).filter((k) => k.startsWith('Sand core sand '))).toHaveLength(route.coreSandRuns.length);
+    expect(Object.keys(runs).filter((k) => k.startsWith('Sand core box '))).toHaveLength(route.tooling.items.length);
+    for (const key of ['Sand risers', 'Sand gating system']) {
+      expect(runs[key]!.trace.some((t) => t.kind === 'input')).toBe(true);
+      expect(runs[key]!.trace.some((t) => t.kind === 'calculated' && t.formula)).toBe(true);
+    }
+  });
+
   it('sends the designed gating and risers (sizes only) for the viewer to draw, as the route designed them', () => {
     const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
     const g = route.gating;
