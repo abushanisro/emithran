@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { fetchSessionStatus, sendSessionHeartbeat, signOutForInactivity } from '@/lib/auth/session-idle/browser';
-import { SessionIdleController, type IdleSnapshot } from '@/lib/auth/session-idle/controller';
+import { SessionIdleController, type IdleSnapshot, type ServerResult } from '@/lib/auth/session-idle/controller';
 import { SESSION_IDLE_TIMEOUT_EVENT } from '@/lib/auth/session-idle/policy';
 import { protectedJobCount, subscribeProtectedJobs } from '@/lib/auth/session-idle/protected-jobs';
 import { browserIdleStorage } from '@/lib/auth/session-idle/shared-state';
@@ -60,48 +60,63 @@ export function SessionIdleProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!sessionId) return;
-    const controller = new SessionIdleController(sessionId, {
-      now: Date.now,
-      storage: browserIdleStorage(),
-      status: fetchSessionStatus,
-      beat: sendSessionHeartbeat,
-      onExpire: signOutForInactivity,
-      localJobCount: protectedJobCount,
+    /** Starts the countdown for this session; returns what stops it. `first` is the status answer already fetched. */
+    const startController = (id: string, first: ServerResult): (() => void) => {
+      const controller = new SessionIdleController(id, {
+        now: Date.now,
+        storage: browserIdleStorage(),
+        status: () => Promise.resolve(first),
+        beat: sendSessionHeartbeat,
+        onExpire: signOutForInactivity,
+        localJobCount: protectedJobCount,
+      });
+      controllerRef.current = controller;
+
+      // Re-render only when the shown second (or phase) changes.
+      let shown = '';
+      const publish = (next: IdleSnapshot) => {
+        const key = `${next.phase}|${Math.ceil(next.remainingMs / 1000)}|${String(next.jobRunning)}`;
+        if (key !== shown) {
+          shown = key;
+          setSnapshot(next);
+        }
+      };
+      const tick = () => { publish(controller.tick()); };
+
+      publish(controller.start());
+      const interval = window.setInterval(tick, 1_000);
+      const onActivity = () => { controller.recordActivity(); };
+      for (const e of ACTIVITY_EVENTS) window.addEventListener(e, onActivity, { passive: true, capture: true });
+      // A tab coming back from the background, or a laptop waking, checks at once.
+      const onVisible = () => {
+        if (document.visibilityState === 'visible') tick();
+      };
+      document.addEventListener('visibilitychange', onVisible);
+      const onServerIdle = () => { controller.serverReportedIdle(); };
+      window.addEventListener(SESSION_IDLE_TIMEOUT_EVENT, onServerIdle);
+      const unsubscribeJobs = subscribeProtectedJobs(tick);
+
+      return () => {
+        window.clearInterval(interval);
+        for (const e of ACTIVITY_EVENTS) window.removeEventListener(e, onActivity, { capture: true });
+        document.removeEventListener('visibilitychange', onVisible);
+        window.removeEventListener(SESSION_IDLE_TIMEOUT_EVENT, onServerIdle);
+        unsubscribeJobs();
+        controller.stop();
+        controllerRef.current = null;
+      };
+    };
+    let cancelled = false;
+    let stop: (() => void) | null = null;
+    // Ask the server first: when it does not end idle sessions there is nothing to count down or sign out. An answer that cannot be
+    // read changes nothing: the timeout runs as before.
+    void fetchSessionStatus().then((first) => {
+      if (cancelled || (first.ok && first.enforced === false)) return;
+      stop = startController(sessionId, first);
     });
-    controllerRef.current = controller;
-
-    // Re-render only when the shown second (or phase) changes.
-    let shown = '';
-    const publish = (next: IdleSnapshot) => {
-      const key = `${next.phase}|${Math.ceil(next.remainingMs / 1000)}|${String(next.jobRunning)}`;
-      if (key !== shown) {
-        shown = key;
-        setSnapshot(next);
-      }
-    };
-    const tick = () => { publish(controller.tick()); };
-
-    publish(controller.start());
-    const interval = window.setInterval(tick, 1_000);
-    const onActivity = () => { controller.recordActivity(); };
-    for (const e of ACTIVITY_EVENTS) window.addEventListener(e, onActivity, { passive: true, capture: true });
-    // A tab coming back from the background, or a laptop waking, checks at once.
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') tick();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    const onServerIdle = () => { controller.serverReportedIdle(); };
-    window.addEventListener(SESSION_IDLE_TIMEOUT_EVENT, onServerIdle);
-    const unsubscribeJobs = subscribeProtectedJobs(tick);
-
     return () => {
-      window.clearInterval(interval);
-      for (const e of ACTIVITY_EVENTS) window.removeEventListener(e, onActivity, { capture: true });
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener(SESSION_IDLE_TIMEOUT_EVENT, onServerIdle);
-      unsubscribeJobs();
-      controller.stop();
-      controllerRef.current = null;
+      cancelled = true;
+      stop?.();
     };
   }, [sessionId]);
 

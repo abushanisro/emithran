@@ -33,6 +33,9 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
+import { applyBlockReason } from '@/lib/analysis/analysis-status';
+import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
+import { useRefreshAnalysis } from '@/lib/api/hooks/useRefreshAnalysis';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import {
   resolveStoredProcessLines,
@@ -2511,6 +2514,8 @@ function RouteComparisonCard({
   // removed Candidate Routes panel used, so "Apply Route" here now actually
   // commits the change server-side instead of only updating local UI state.
   const applyRoute = useApplyRoute(item.id);
+  const analysisStatus = useAnalysisStatus(item.id);
+  const applyBlock = applyBlockReason({ status: analysisStatus.data, loading: analysisStatus.isPending, refreshing: false });
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
@@ -2821,7 +2826,8 @@ function RouteComparisonCard({
                       onAppliedRouteChange(route.routeId);
                       setSelectedRouteId(null);
                     }}
-                    disabled={applyRoute.isPending}
+                    disabled={applyRoute.isPending || applyBlock != null}
+                    title={applyBlock ?? undefined}
                     className="text-xs px-3 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 font-medium transition-colors disabled:opacity-50"
                   >
                     {applyRoute.isPending ? 'Applying…' : 'Apply Route'}
@@ -4710,9 +4716,11 @@ function CostGuidePanel({
   batchSizeAuto, setBatchSizeAuto, resolvedInputs,
   applyScenario,
   onManualClick, selectedManualRoute, onSelectHighlight,
-  dfmScores,
+  dfmScores, refreshing,
 }: {
   item: BOMItem; fg: FeatureGraph | null; summary: FeatureGraphSummary | null;
+  /** A Refresh Analysis is running: Apply waits for it. */
+  refreshing: boolean;
   // Real per-occurrence DFM risk from dfm-scoring.service.ts (the single DFM
   // authority, see P0.3) — threaded through so ManufacturingFeaturesTab can
   // present the backend's own UNDERSIZED_HOLE/CRACK_RISK findings instead of
@@ -4754,6 +4762,9 @@ function CostGuidePanel({
   const [tab, setTab] = useState<LeftTab>('scenario');
   const [leftAppliedRouteId, setLeftAppliedRouteId] = useState<string | null>(null);
   const applyRoute = useApplyRoute(item.id);
+  // Apply routes the part from its analysis: it waits until the analyses the part needs are finished (the backend refuses it otherwise).
+  const analysisStatus = useAnalysisStatus(item.id);
+  const applyBlock = applyBlockReason({ status: analysisStatus.data, loading: analysisStatus.isPending, refreshing });
   const [productLine, setProductLine] = useState('');
   const [matPickerOpen, setMatPickerOpen] = useState(false);
   // Apply Scenario confirmation + progress — the apply-route/apply-custom-route
@@ -6275,7 +6286,8 @@ function CostGuidePanel({
         <div className="flex gap-1.5">
           <button
             onClick={() => { setConfirmApplyOpen(true); }}
-            disabled={isApplying}
+            disabled={isApplying || applyBlock != null}
+            title={applyBlock ?? undefined}
             className="flex-1 text-xs bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded px-2 py-1 font-medium transition-colors flex items-center justify-center gap-1.5"
           >
             {isApplying ? 'Applying…' : 'Apply'}
@@ -6283,6 +6295,7 @@ function CostGuidePanel({
           <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">Copy</button>
           <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">New</button>
         </div>
+        {applyBlock && <p role="status" className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">{applyBlock}</p>}
       </div>
 
       {/* Confirm before committing — apply-route/apply-custom-route re-runs the
@@ -9476,7 +9489,7 @@ export default function ManufacturingIntelligencePage() {
     }
     return routeApplied;
   };
-  const [refreshing, setRefreshing] = useState(false);
+  const { refresh: handleRefreshAnalysis, refreshing } = useRefreshAnalysis(itemId, item?.file2dPath);
   // Applies the real machine picked per step in the Workflow Builder, after
   // applyRoute/applyCustomRoute create the process_cost_records rows — see
   // ManualRouteOption.machineOverrides / applyScenario above. Uses the DRAFT
@@ -10228,54 +10241,6 @@ export default function ManufacturingIntelligencePage() {
     }
   };
 
-  const handleRefreshAnalysis = async () => {
-    if (!item?.file3dPath || refreshing) return;
-    setRefreshing(true);
-    try {
-      // retry: false — a re-analysis is a long, non-idempotent job; when the
-      // CAD engine is down the server now answers 503 with the reason, and
-      // retrying would only repeat the whole attempt before showing it.
-      await apiClient.post(`/bom-items/${itemId}/reanalyze`, {}, { timeout: 150_000, retry: false });
-      // Also re-run 2D drawing-intelligence extraction (title block, thread
-      // callouts, etc. — cad-engine/drawing_analyzer.py) when a PDF drawing
-      // exists, so one "Refresh Analysis" click refreshes everything this
-      // part knows about itself, not just the 3D geometry. Vector-PDF only;
-      // non-fatal — a drawing-parse failure must never block the geometry
-      // refresh that already succeeded above.
-      if (item.file2dPath?.toLowerCase().endsWith('.pdf')) {
-        try {
-          await apiClient.post(`/bom-items/${itemId}/drawing-analyses`, {}, { timeout: 60_000 });
-          // P0.6: analyze-drawing rewrites bom_items.drawing_intelligence, which
-          // gdt-analysis reads directly — without this, a re-parsed drawing's
-          // new tolerance callouts/general-tolerance block kept showing the
-          // PRE-reanalysis GD&T severity/inspection recommendation in the same
-          // session (10-min staleTime, no window-focus refetch). Same defect
-          // shape as the dfm-scores cache gap fixed in P0.5, just on this
-          // endpoint's own dependency (drawing_intelligence, not featureGraph).
-          void queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'gdt-analysis'] });
-        } catch (e: unknown) {
-          toast.error(`Drawing analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
-        }
-      }
-      void queryClient.invalidateQueries({ queryKey: ['bom-items', 'detail', itemId] });
-      void queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'dfm-scores'] });
-      // Reanalyze rewrites featureGraph (geometry, bend lengths, etc.) but
-      // cost-summary/route-comparison are SEPARATE queries computed from that
-      // same featureGraph — without invalidating them too, every derived
-      // number (machine selection, tonnage, cycle times, pricing) kept
-      // showing the pre-reanalyze result until an unrelated full page reload
-      // happened to refetch them. Matches the same invalidation pair already
-      // used by handleApplyRoute/handleCostOverride elsewhere on this page.
-      void queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'cost-summary'] });
-      void queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'route-comparison'] });
-      toast.success('Analysis refreshed');
-    } catch (e: unknown) {
-      toast.error(`Refresh failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   useEffect(() => {
     if (!item?.file3dPath) return;
     let cancelled = false;
@@ -10719,7 +10684,7 @@ export default function ManufacturingIntelligencePage() {
     applyScenario,
     onManualClick: () => { setRouteDialogOpen(true); },
     selectedManualRoute, onSelectHighlight,
-    dfmScores,
+    dfmScores, refreshing,
   };
   const analysisProps = {
     projectId,

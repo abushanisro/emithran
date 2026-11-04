@@ -20,6 +20,11 @@ export const SESSION_IDLE_POLICY = {
   jobGraceMs: 2 * 60_000,
 } as const;
 
+/** Whether idle sessions are ended at all. On unless SESSION_IDLE_TIMEOUT_ENABLED is explicitly 'false'. */
+export function idleTimeoutEnabled(): boolean {
+  return process.env.SESSION_IDLE_TIMEOUT_ENABLED !== 'false';
+}
+
 export type SessionIdlePolicy = { [K in keyof typeof SESSION_IDLE_POLICY]: number };
 
 export interface SessionActivityTimes {

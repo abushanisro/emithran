@@ -12978,6 +12978,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/analysis-status": {
+      "get": {
+        "operationId": "BOMItemsController_getAnalysisStatus_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analysis status"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Whether the item's required analyses (CAD features, and the casting analysis for a sand-cast part) are finished and current; what to run when not",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/cad-analyses": {
       "post": {
         "operationId": "BOMItemsController_analyzeBOMItemCAD_v1",

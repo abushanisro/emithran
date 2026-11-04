@@ -36,4 +36,21 @@ describe('SessionController', () => {
     expect(service.assertActive).not.toHaveBeenCalled();
     expect(service.recordActivity).not.toHaveBeenCalled();
   });
+
+  describe('with the inactivity timeout switched off', () => {
+    const previous = process.env.SESSION_IDLE_TIMEOUT_ENABLED;
+    beforeEach(() => { process.env.SESSION_IDLE_TIMEOUT_ENABLED = 'false'; });
+    afterEach(() => {
+      if (previous === undefined) delete process.env.SESSION_IDLE_TIMEOUT_ENABLED; else process.env.SESSION_IDLE_TIMEOUT_ENABLED = previous;
+    });
+
+    it('reports not enforced with no deadline, so the browser starts no countdown, and counts no activity', async () => {
+      const service = makeService();
+      const controller = new SessionController(service);
+      await expect(controller.status('s1', 'u1')).resolves.toMatchObject({ enforced: false, deadline: null });
+      await expect(controller.activity({ kind: 'user' }, 's1', 'u1')).resolves.toMatchObject({ enforced: false, deadline: null });
+      expect(service.assertActive).not.toHaveBeenCalled();
+      expect(service.recordActivity).not.toHaveBeenCalled();
+    });
+  });
 });

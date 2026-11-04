@@ -22,6 +22,7 @@ import {
   Patch,
   InternalServerErrorException,
   ServiceUnavailableException,
+  ConflictException,
   UseGuards,
   ParseUUIDPipe,
   ParseEnumPipe,
@@ -37,6 +38,8 @@ import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { BOMItemsService } from './bom-items.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
+import { AnalysisStatusService } from './services/analysis-status.service';
+import { currentFeatureGraphVersion, MISSING_ANALYSIS_TEXT, type AnalysisStatus } from './analysis-status';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
@@ -115,6 +118,7 @@ export class BOMItemsController {
     private readonly pmiReviewService: PmiReviewService,
     private readonly materialResolutionService: MaterialResolutionService,
     private readonly audit: AuditService,
+    private readonly analysisStatusService: AnalysisStatusService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -264,9 +268,17 @@ export class BOMItemsController {
   @ApiResponse({ status: 200, description: 'Current analysis version' })
   getAnalysisVersion(): { version: number; cad_engine_version: string } {
     return {
-      version: parseInt(process.env.FEATURE_GRAPH_VERSION ?? '4', 10),
+      version: currentFeatureGraphVersion(),
       cad_engine_version: process.env.CAD_ENGINE_VERSION ?? 'geo_v5',
     };
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/analysis-status')
+  @ApiOperation({ summary: "Whether the item's required analyses (CAD features, and the casting analysis for a sand-cast part) are finished and current; what to run when not" })
+  @ApiResponse({ status: 200, description: 'Analysis status' })
+  async getAnalysisStatus(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<AnalysisStatus> {
+    return this.analysisStatusService.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
   }
 
   @OrgRole('viewer')
@@ -1715,6 +1727,20 @@ export class BOMItemsController {
   // replaced it are apply-route and apply-custom-route, which refuse to
   // persist an operation whose costing data is missing (findRouteDataGaps).
 
+  /**
+   * An apply writes a route from the part's analysis: refuse it until every analysis the part needs is finished and current. A route
+   * computed without the CAD features rests on a bounding box and a guess, and is not the part's.
+   */
+  private async requireAnalysis(id: string, user: User, token: string): Promise<void> {
+    const status = await this.analysisStatusService.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
+    if (status.ready) return;
+    throw new ConflictException({
+      code: 'analysis_not_ready',
+      message: `This part is not analysed yet: ${status.missing.map((m) => MISSING_ANALYSIS_TEXT[m]).join(', then ')}.`,
+      missing: status.missing,
+    });
+  }
+
   // ── Apply a selected manufacturing route → write process_cost_records ─────────
   @Post(':id/route-applications')
   @ApiOperation({
@@ -1732,6 +1758,7 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ): Promise<ApplyRouteResult> {
     return this.audit.auditedRowChange('bom_items', id, 'cost.applied', async () => {
+    await this.requireAnalysis(id, user, token);
     // Required and validated by the DTO — no substitution here. This was
     // `dto.location ?? 'USA'`, which priced and PERSISTED an apply at USA
     // rates whenever the caller stated no location.
@@ -1855,6 +1882,7 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ): Promise<ApplyCustomRouteResult> {
     return this.audit.auditedRowChange('bom_items', id, 'cost.applied', async () => {
+    await this.requireAnalysis(id, user, token);
     // Required and validated by the DTO — no substitution here. This was
     // `dto.location ?? 'USA'`, which priced and PERSISTED an apply at USA
     // rates whenever the caller stated no location.

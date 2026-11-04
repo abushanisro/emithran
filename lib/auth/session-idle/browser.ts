@@ -8,7 +8,7 @@ import type { ServerResult } from './controller';
 /** The backend's response envelope, as far as these calls read it. */
 type SessionResponse = {
   error?: { code?: string };
-  data?: { policy?: unknown };
+  data?: { policy?: unknown; enforced?: boolean };
 } | null;
 
 const NOTICE_KEY = 'emithran.sessionIdle.signedOutNotice';
@@ -29,7 +29,7 @@ async function call(method: 'GET' | 'POST', path: string, body?: unknown): Promi
     const json = (await res.json().catch(() => null)) as SessionResponse;
     if (res.status === 401 && isSessionIdleBody(json)) return { ok: false, idle: true };
     if (!res.ok) return { ok: false, idle: false };
-    return { ok: true, policy: json?.data?.policy };
+    return { ok: true, policy: json?.data?.policy, enforced: json?.data?.enforced };
   } catch {
     return { ok: false, idle: false };
   }

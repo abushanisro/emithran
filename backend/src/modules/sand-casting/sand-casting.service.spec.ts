@@ -402,3 +402,33 @@ describe("SandCastingService: the engineer's draw direction", () => {
     expect(fixed.filters).toMatchObject({ config_hash: configHash({ drawDirection: "y" }) });
   });
 });
+
+describe("SandCastingService.currentStatuses", () => {
+  function statuses(rows: { status: string }[] | null, error: { message: string } | null = null, direction: { axis: string } | null = null) {
+    const filters: Record<string, unknown> = {};
+    // The status query ends on the last filter, so the chain itself is awaitable.
+    const chain: any = {
+      select: () => chain,
+      eq: (c: string, v: unknown) => ((filters[c] = v), chain),
+      then: (resolve: (v: unknown) => void) => resolve({ data: rows, error }),
+    };
+    const directions = { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: direction, error: null }) }) }) };
+    const service = new SandCastingService({ getUserClient: () => ({ from: (t: string) => (t === "casting_draw_directions" ? directions : chain) }) } as never, {} as never, {} as never, {} as never);
+    return { service, filters };
+  }
+
+  it("lists the statuses of the item's analyses of its current file, worker version and draw direction", async () => {
+    const { service, filters } = statuses([{ status: "queued" }, { status: "succeeded" }]);
+    expect(await service.currentStatuses("item-1", "path/part.step", "t")).toEqual(["queued", "succeeded"]);
+    expect(filters).toMatchObject({
+      bom_item_id: "item-1", source_path: "path/part.step", worker_version: CASTING_WORKER_VERSION,
+      schema_version: CASTING_SCHEMA_VERSION, config_hash: configHash({ drawDirection: "auto" }),
+    });
+  });
+
+  it("is empty without a file path or without rows, and a read error is thrown, never read as 'not requested'", async () => {
+    expect(await statuses([]).service.currentStatuses("item-1", null, "t")).toEqual([]);
+    expect(await statuses(null).service.currentStatuses("item-1", "p", "t")).toEqual([]);
+    await expect(statuses(null, { message: "down" }).service.currentStatuses("item-1", "p", "t")).rejects.toThrow("Could not read the casting analysis status: down");
+  });
+});

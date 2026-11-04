@@ -151,6 +151,16 @@ import { ReferenceMemo } from '../../common/cache/reference-memo';
 import { Traced } from '../../telemetry/traced';
 import { orIlikeContains } from '../../common/db/postgrest-filter';
 
+/** The part families that have a cost model: machining, sheet metal, injection molding and the casting families. */
+/** A solid part's volume and three bounding-box sides were measured (all positive). */
+export function hasMeasuredGeometry(item: { volume?: number | null; maxLength?: number | null; maxWidth?: number | null; maxHeight?: number | null }): boolean {
+  return [item.volume, item.maxLength, item.maxWidth, item.maxHeight].every((v) => Number(v) > 0);
+}
+
+export function hasCostModel(family: string): boolean {
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || castingProcessOfFamily(family) !== null;
+}
+
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
   if (lines.length === 0) return dto;
@@ -2967,6 +2977,42 @@ export class BOMItemsService {
     });
   }
 
+  /**
+   * A summary with no price: the part cannot be costed yet and `missingInputs` says what is missing. Every money field is 0 and in USD
+   * (nothing to convert, so no FX lookup).
+   */
+  private unpricedSummary(input: {
+    costingInputs: ReturnType<typeof resolveCostingInputs>;
+    batchSize: number;
+    family: string;
+    missingInputs: string[];
+    warnings: string[];
+  }): CostSummaryResponseDto {
+    const { costingInputs, batchSize, family, missingInputs, warnings } = input;
+    return {
+      scenarioReady: false,
+      resolvedInputs: costingInputs,
+      missingInputs,
+      materialCost: 0, materialGrade: '', grossWeightKg: 0,
+      materialCostPerKg: 0, materialSource: 'default' as const,
+      processLines: [], totalProcessCost: 0, totalCost: 0,
+      cycleTimes: { laserMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: 0 },
+      batchSize, family,
+      warnings,
+      ratesSource: 'none',
+      currency: 'USD', currencySymbol: '$', toUsdRate: 1,
+      sustainability: {
+        netWeightKg: 0, scrapKg: 0, wasteCostInr: 0, materialUtilizationPct: 0,
+        materialCo2Kg: 0, materialCo2PerKg: 0, materialCo2Source: 'default' as const,
+        processCo2Breakdown: [], totalProcessEnergyKwh: 0, totalProcessCo2Kg: 0,
+        totalCo2Kg: 0, co2PerKgPart: 0, co2Contributors: [], recyclabilityPct: 0,
+        sustainabilityScore: 0,
+        scoreBreakdown: { materialEfficiency: 0, carbonIntensity: 0, recyclability: 0, processEnergy: 0 },
+        opportunities: [], factorsSource: 'default',
+      },
+    } as unknown as CostSummaryResponseDto;
+  }
+
   /** The family route's quote, before the shared secondary operations. */
   private async computeCostSummary(
     id: string,
@@ -3034,28 +3080,7 @@ export class BOMItemsService {
       // to the scenario's chosen currency, or USD by default — see
       // normalizeCostSummaryToCurrency — but there is nothing to display
       // differently here since every figure is 0 either way.)
-      return {
-        scenarioReady: false,
-        resolvedInputs: costingInputs,
-        missingInputs: ['materialGrade'],
-        materialCost: 0, materialGrade: '', grossWeightKg: 0,
-        materialCostPerKg: 0, materialSource: 'default' as const,
-        processLines: [], totalProcessCost: 0, totalCost: 0,
-        cycleTimes: { laserMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: 0 },
-        batchSize, family: 'unknown',
-        warnings: [],
-        ratesSource: 'none',
-        currency: 'USD', currencySymbol: '$', toUsdRate: 1,
-        sustainability: {
-          netWeightKg: 0, scrapKg: 0, wasteCostInr: 0, materialUtilizationPct: 0,
-          materialCo2Kg: 0, materialCo2PerKg: 0, materialCo2Source: 'default' as const,
-          processCo2Breakdown: [], totalProcessEnergyKwh: 0, totalProcessCo2Kg: 0,
-          totalCo2Kg: 0, co2PerKgPart: 0, co2Contributors: [], recyclabilityPct: 0,
-          sustainabilityScore: 0,
-          scoreBreakdown: { materialEfficiency: 0, carbonIntensity: 0, recyclability: 0, processEnergy: 0 },
-          opportunities: [], factorsSource: 'default',
-        },
-      } as unknown as CostSummaryResponseDto;
+      return this.unpricedSummary({ costingInputs, batchSize, family: 'unknown', missingInputs: ['materialGrade'], warnings: [] });
     }
 
     // ── Scenario-applied gate ────────────────────────────────────────────────
@@ -3093,6 +3118,21 @@ export class BOMItemsService {
     // endpoints (see resolveEffectiveFamily).
     const familyResolution = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
     const family = familyResolution.family;
+    // A family with no cost model is not priced as sheet metal (the path below) with zeros for its geometry: it says what is missing.
+    if (!hasCostModel(family)) {
+      return this.unpricedSummary({
+        costingInputs, batchSize, family, missingInputs: ['partFamily'],
+        warnings: [`No cost model for part family "${family}": run Refresh Analysis (CAD feature extraction) first.`],
+      });
+    }
+
+    // Volume and bounding box come from the CAD analysis. Without them a solid part's cost would be computed from zeros.
+    if (item.file3dPath && family !== 'sheet_metal' && !hasMeasuredGeometry(item)) {
+      return this.unpricedSummary({
+        costingInputs, batchSize, family, missingInputs: ['geometry'],
+        warnings: ['The part has no measured volume or bounding box: run Refresh Analysis (CAD feature extraction) first.'],
+      });
+    }
 
     const cutLengthMm = (summary.cutLengthMm ?? item.cutLengthMm ?? 0) as number;
     const pierceCount = (summary.pierceCount ?? item.pierceCount ?? 0) as number;

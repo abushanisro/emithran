@@ -201,6 +201,26 @@ export class SandCastingService {
   }
 
   /**
+   * The statuses of the item's analyses of its current file made by the worker this backend was built for, along its current draw direction
+   * (the same rows latestResult picks from, finished or not). Empty means never requested. Read as the user.
+   */
+  async currentStatuses(bomItemId: string, sourcePath: string | null, token: string): Promise<string[]> {
+    if (!sourcePath) return [];
+    const config = configForAxis((await this.drawDirection(bomItemId, token)).axis);
+    const { data, error } = await this.database
+      .getUserClient(token)
+      .from("casting_analyses")
+      .select("status")
+      .eq("bom_item_id", bomItemId)
+      .eq("source_path", sourcePath)
+      .eq("worker_version", CASTING_WORKER_VERSION)
+      .eq("schema_version", CASTING_SCHEMA_VERSION)
+      .eq("config_hash", configHash(config));
+    if (error) throw new Error(`Could not read the casting analysis status: ${error.message}`);
+    return ((data ?? []) as { status: string }[]).map((r) => r.status);
+  }
+
+  /**
    * A short-lived signed URL for one 3D file of an analysis (its part mesh or its cores). The analysis is read as the user, so another organization's is
    * not found; the name must be one the result lists; the file is fetched from the store by the browser, not through this process.
    */

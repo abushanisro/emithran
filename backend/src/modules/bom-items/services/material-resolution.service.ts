@@ -149,7 +149,9 @@ export class MaterialResolutionService {
     const geoFamily: string =
       input.fg?.classification?.family ??
       input.item.familyClassification ??
-      (input.sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
+      // A thickness is a family only for a part costed from entered values. With a 3D model the classifier has not run yet,
+      // and a guess would price the part as sheet metal before its geometry is known.
+      (!input.item.file3dPath && input.sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
 
     if (isPlasticGrade(input.grade) && geoFamily !== 'plastic_molded') {
       return {

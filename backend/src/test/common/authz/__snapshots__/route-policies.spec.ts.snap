@@ -73,6 +73,7 @@ org:viewer      GET /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.
 org:viewer      GET /api/v1/bom-items  BOMItemsController.findAll
 org:viewer      GET /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.getSpecificationsByBomItem
 org:viewer      GET /api/v1/bom-items/:id  BOMItemsController.findOne
+org:viewer      GET /api/v1/bom-items/:id/analysis-status  BOMItemsController.getAnalysisStatus
 org:viewer      GET /api/v1/bom-items/:id/cad-analysis  BOMItemsController.getBOMItemCADAnalysis
 org:viewer      GET /api/v1/bom-items/:id/cad-analysis/history  BOMItemsController.getBOMItemAnalysisHistory
 org:viewer      GET /api/v1/bom-items/:id/candidate-routes  BOMItemsController.getCandidateRoutes

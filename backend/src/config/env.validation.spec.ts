@@ -117,3 +117,14 @@ describe('env validation: the client address behind the BFF', () => {
     expect(validate(base).TRUST_PROXY).toBe('0');
   });
 });
+
+describe('env validation: inactivity sign-out switch', () => {
+  it('is on by default', () => {
+    expect(validate(base).SESSION_IDLE_TIMEOUT_ENABLED).toBe('true');
+  });
+
+  it('can be switched off, and nothing but true or false is accepted', () => {
+    expect(validate({ ...base, SESSION_IDLE_TIMEOUT_ENABLED: 'false' }).SESSION_IDLE_TIMEOUT_ENABLED).toBe('false');
+    expect(() => validate({ ...base, SESSION_IDLE_TIMEOUT_ENABLED: 'off' })).toThrow();
+  });
+});

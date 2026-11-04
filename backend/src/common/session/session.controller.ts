@@ -5,7 +5,7 @@ import { Authenticated } from '../authz/authz-policy';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { SessionId } from './session-id.decorator';
 import { SessionActivityService, type ActivityKind } from './session-activity.service';
-import { SESSION_IDLE_POLICY, sessionDeadline, type SessionActivityTimes } from './session-idle-policy';
+import { SESSION_IDLE_POLICY, idleTimeoutEnabled, sessionDeadline, type SessionActivityTimes } from './session-idle-policy';
 
 export class SessionActivityDto {
   @IsIn(['user', 'job'])
@@ -14,7 +14,7 @@ export class SessionActivityDto {
 
 export interface SessionStatusDto {
   policy: typeof SESSION_IDLE_POLICY;
-  /** False only for the development bypass, which has no sign-in session. */
+  /** False for the development bypass (no sign-in session) and when the inactivity timeout is switched off. */
   enforced: boolean;
   deadline: number | null;
 }
@@ -36,7 +36,7 @@ export class SessionController {
     @SessionId() sessionId: string | undefined,
     @CurrentUser('id') userId: string,
   ): Promise<SessionStatusDto> {
-    if (!sessionId) return this.dto(null);
+    if (!sessionId || !idleTimeoutEnabled()) return this.dto(null);
     return this.dto(await this.sessionActivity.assertActive(sessionId, userId));
   }
 
@@ -48,7 +48,7 @@ export class SessionController {
     @SessionId() sessionId: string | undefined,
     @CurrentUser('id') userId: string,
   ): Promise<SessionStatusDto> {
-    if (!sessionId) return this.dto(null);
+    if (!sessionId || !idleTimeoutEnabled()) return this.dto(null);
     return this.dto(await this.sessionActivity.recordActivity(sessionId, userId, body.kind));
   }
 
