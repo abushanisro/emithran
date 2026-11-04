@@ -11,6 +11,7 @@
 -- box (t = d^2 / (4 alpha erfinv(theta)^2)), the depth the smaller of the plant's strip criterion and half the core's smallest section; the
 -- strip and handling time is read from the handling table by the core's weight. The box temperature, the cure temperature and the depth are the
 -- plant's own settings and are set in the Cost Guide; none is assumed.
+-- The sand's sensible heat to the cure temperature (a lower bound) is priced with the energy price set in the Cost Guide.
 --
 -- This migration creates one global calculator per spec entry (inputs are the
 -- values the cost engine seeds, each shown with its source in the calculation
@@ -30,10 +31,10 @@ BEGIN
   SELECT id INTO v_id FROM public.calculators WHERE name = $q$Sand Casting - Hot box coremaking$q$ AND user_id IS NULL AND retired_at IS NULL;
   IF v_id IS NULL THEN
     INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, $q$Sand Casting - Hot box coremaking$q$, 'process', 'single', false, true, true, $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed.$q$)
+    VALUES (NULL, $q$Sand Casting - Hot box coremaking$q$, 'process', 'single', false, true, true, $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed. The energy is the sand's sensible heat from its starting temperature to the cure temperature, a lower bound (holding the box at temperature between shots costs more); it is priced with the energy price set in the Cost Guide.$q$)
     RETURNING id INTO v_id;
   ELSE
-    UPDATE public.calculators SET calc_category = 'process', description = $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed.$q$, updated_at = now() WHERE id = v_id;
+    UPDATE public.calculators SET calc_category = 'process', description = $q$One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed. The energy is the sand's sensible heat from its starting temperature to the cure temperature, a lower bound (holding the box at temperature between shots costs more); it is priced with the energy price set in the Cost Guide.$q$, updated_at = now() WHERE id = v_id;
   END IF;
 
   DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
@@ -52,11 +53,15 @@ BEGIN
     (v_id, $q$Cure Temperature$q$, $q$Cure Temperature (°C)$q$, $q$number$q$, $q$°C$q$, NULL, NULL, NULL, NULL, 10, true),
     (v_id, $q$Required Cured Depth$q$, $q$Required Cured Depth (mm)$q$, $q$number$q$, $q$mm$q$, NULL, NULL, NULL, NULL, 11, true),
     (v_id, $q$Strip and Handling$q$, $q$Strip and Handling (s)$q$, $q$number$q$, $q$s$q$, NULL, NULL, NULL, NULL, 12, true),
-    (v_id, $q$Thermal Diffusivity$q$, $q$Thermal Diffusivity (m²/s)$q$, $q$calculated$q$, $q$m²/s$q$, NULL, NULL, NULL, $q${Sand Conductivity} / ({Sand Density} * {Sand Specific Heat})$q$, 13, false),
-    (v_id, $q$Cured Depth$q$, $q$Cured Depth (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$min({Required Cured Depth}, {Core Section} / 2)$q$, 14, false),
-    (v_id, $q$Temperature Ratio$q$, $q$Temperature Ratio$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q$({Corebox Temperature} - {Cure Temperature}) / ({Corebox Temperature} - {Initial Sand Temperature})$q$, 15, false),
-    (v_id, $q$Cure Time$q$, $q$Cure Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q$({Cured Depth} / 1000) ^ 2 / (4 * {Thermal Diffusivity} * ERFINV({Temperature Ratio}) ^ 2)$q$, 16, false),
-    (v_id, $q$Cycle Time$q$, $q$Cycle Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Blow Time} + {Cure Time} + {Strip and Handling}$q$, 17, false);
+    (v_id, $q$Energy Price$q$, $q$Energy Price (USD/kWh)$q$, $q$number$q$, $q$USD/kWh$q$, NULL, NULL, NULL, NULL, 13, true),
+    (v_id, $q$Thermal Diffusivity$q$, $q$Thermal Diffusivity (m²/s)$q$, $q$calculated$q$, $q$m²/s$q$, NULL, NULL, NULL, $q${Sand Conductivity} / ({Sand Density} * {Sand Specific Heat})$q$, 14, false),
+    (v_id, $q$Cured Depth$q$, $q$Cured Depth (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$min({Required Cured Depth}, {Core Section} / 2)$q$, 15, false),
+    (v_id, $q$Temperature Ratio$q$, $q$Temperature Ratio$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q$({Corebox Temperature} - {Cure Temperature}) / ({Corebox Temperature} - {Initial Sand Temperature})$q$, 16, false),
+    (v_id, $q$Cure Time$q$, $q$Cure Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q$({Cured Depth} / 1000) ^ 2 / (4 * {Thermal Diffusivity} * ERFINV({Temperature Ratio}) ^ 2)$q$, 17, false),
+    (v_id, $q$Sand Heat$q$, $q$Sand Heat (J)$q$, $q$calculated$q$, $q$J$q$, NULL, NULL, NULL, $q${Core Sand} * {Sand Specific Heat} * ({Cure Temperature} - {Initial Sand Temperature})$q$, 18, false),
+    (v_id, $q$Energy$q$, $q$Energy (kWh)$q$, $q$calculated$q$, $q$kWh$q$, NULL, NULL, NULL, $q${Sand Heat} / 3.6e6$q$, 19, false),
+    (v_id, $q$Energy Cost$q$, $q$Energy Cost (USD)$q$, $q$calculated$q$, $q$USD$q$, NULL, NULL, NULL, $q${Energy} * {Energy Price}$q$, 20, false),
+    (v_id, $q$Cycle Time$q$, $q$Cycle Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Blow Time} + {Cure Time} + {Strip and Handling}$q$, 21, false);
 
   UPDATE public.process_calculator_mappings
   SET calculator_id = v_id, calculator_name = $q$Sand Casting - Hot box coremaking$q$
@@ -70,7 +75,7 @@ DECLARE bad TEXT;
 BEGIN
   SELECT string_agg(e.name, ', ') INTO bad
   FROM (VALUES
-    ($q$Sand Casting - Hot box coremaking$q$, 17, 1)
+    ($q$Sand Casting - Hot box coremaking$q$, 21, 1)
   ) AS e(name, field_count, mapping_count)
   LEFT JOIN public.calculators c ON c.name = e.name AND c.user_id IS NULL AND c.retired_at IS NULL
   WHERE c.id IS NULL

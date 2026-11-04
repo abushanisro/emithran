@@ -119,6 +119,7 @@ export function makeCoreStep(ctx: SandRouteContext, machine: SandMachine, core: 
   const band = isHotBox ? handlingTime(ctx.ref, core.kg) : null;
   if (isHotBox && !band) return { ok: false, reasons: [`tblHandlingTimes has no band that takes a ${core.kg.toFixed(1)} kg core`] };
   const hot = ctx.hotBox;
+  const priced = ctx.energyPricePerKwh != null;
   const r = runStep(
     ctx, isHotBox ? HOT_BOX : COREMAKING, machine,
     {
@@ -132,12 +133,20 @@ export function makeCoreStep(ctx: SandRouteContext, machine: SandMachine, core: 
             hot_box_corebox_temp_c: { value: hot.coreboxTempC ?? NaN, source: 'core box temperature set in the Cost Guide (°C)' },
             hot_box_cure_temp_c: { value: hot.cureTempC ?? NaN, source: "binder cure temperature set in the Cost Guide (°C)" },
             hot_box_cured_depth_mm: { value: hot.curedDepthMm ?? NaN, source: 'cured depth before stripping set in the Cost Guide (mm)' },
+            // As for melting: an energy price the user has not set is not assumed; the energy is then not charged, and the line says so.
+            energy_price: { value: priced ? ctx.energyPricePerKwh! : 0, source: priced ? 'energy price set in the Cost Guide (USD/kWh)' : 'energy price not set: energy not charged' },
           }),
           lookup: valuesProvider({ 'tblHandlingTimes.Handling Time (s)': { value: band!.seconds, source: `tblHandlingTimes: ${band!.equipment} up to ${band!.maxKg} kg` } }),
         }
       : {},
   );
-  return 'run' in r ? { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: 0, notes: [] } : { ok: false, reasons: r.reasons };
+  if (!('run' in r)) return { ok: false, reasons: r.reasons };
+  // The sand's sensible heat to the cure temperature (a lower bound: holding the box hot between shots costs more), priced with the energy price.
+  const energyKwh = r.run.outputs['Energy'];
+  const notes = isHotBox && !priced && energyKwh != null
+    ? [`Hot box heating energy is not charged: the energy price is not set (the sand's heat alone is ${energyKwh.toFixed(3)} kWh per core, a lower bound).`]
+    : [];
+  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: isHotBox ? r.run.outputs['Energy Cost'] ?? 0 : 0, notes };
 }
 
 export interface CoreLine {

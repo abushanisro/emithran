@@ -111,7 +111,7 @@ describe('sand calculators run through the shared evaluator on hand-worked input
   const hotBox = (over: Record<string, number> = {}) =>
     runReferenceCalculator(byOperation, 'Hot Box', seeds({
       'Core Sand': 6, 'Blowing Rate': 12, 'Core Section': 60, 'Sand Density': 1600, 'Sand Specific Heat': 1170, 'Sand Conductivity': 0.52,
-      'Initial Sand Temperature': 20, 'Corebox Temperature': 245, 'Cure Temperature': 150, 'Required Cured Depth': 3, 'Strip and Handling': 10, ...over,
+      'Initial Sand Temperature': 20, 'Corebox Temperature': 245, 'Cure Temperature': 150, 'Required Cured Depth': 3, 'Strip and Handling': 10, 'Energy Price': 0.1, ...over,
     }));
 
   it('hot box: 6 kg at 12 kg/min is 30 s to blow; 3 mm of sand reaches 150 C from a 245 C box in 52.3 s; 10 s to strip: 92.3 s', () => {
@@ -138,6 +138,19 @@ describe('sand calculators run through the shared evaluator on hand-worked input
     expect(thin.outputs['Cured Depth']).toBe(2);
     expect(thin.outputs['Cure Time']).toBeCloseTo(23.2, 1);
     expect(hotBox({ 'Core Section': 200 }).outputs['Cured Depth']).toBe(3);
+  });
+
+  // The sand's sensible heat to the cure temperature: 6 kg x 1170 J/(kg K) x (150 - 20) K = 912 600 J = 0.2535 kWh; at 0.10 USD/kWh that is 0.02535 USD a core.
+  it('hot box energy: the sand\'s heat from 20 to 150 C, 6 kg: 912 600 J = 0.2535 kWh, 0.02535 USD at 0.10 USD/kWh', () => {
+    const run = hotBox();
+    expect(run.outputs['Sand Heat']).toBeCloseTo(912600, 6);
+    expect(run.outputs['Energy']).toBeCloseTo(0.2535, 9);
+    expect(run.outputs['Energy Cost']).toBeCloseTo(0.02535, 9);
+    // twice the price, twice the cost; no price, none
+    expect(hotBox({ 'Energy Price': 0.2 }).outputs['Energy Cost']).toBeCloseTo(0.0507, 9);
+    expect(hotBox({ 'Energy Price': 0 }).outputs['Energy Cost']).toBe(0);
+    // a cooler binder needs less heat: 100 C is 6 x 1170 x 80 = 561 600 J
+    expect(hotBox({ 'Cure Temperature': 100 }).outputs['Sand Heat']).toBeCloseTo(561600, 6);
   });
 
   it('hot box: no cure or strip literals remain, and the settings it needs are named inputs', () => {

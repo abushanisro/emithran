@@ -1300,7 +1300,7 @@
     {
       "key": "sand.hot_box",
       "name": "Sand Casting - Hot box coremaking",
-      "description": "One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed.",
+      "description": "One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box until a depth of the core is cured, then stripped and handled. The cure time is the time for that depth of sand to reach the binder's cure temperature by conduction from the box wall (1-D, semi-infinite: T(x,t) = Tbox + (T0 - Tbox) erf(x / (2 sqrt(alpha t))), so t = d^2 / (4 alpha erfinv(theta)^2) with theta = (Tbox - Tcure) / (Tbox - T0)); the depth is the smaller of the plant's strip criterion and half the core's smallest section. The box temperature, the cure temperature and the depth are the plant's own settings, set in the Cost Guide; none is assumed. The energy is the sand's sensible heat from its starting temperature to the cure temperature, a lower bound (holding the box at temperature between shots costs more); it is priced with the energy price set in the Cost Guide.",
       "operations": [
         "Hot Box"
       ],
@@ -1388,6 +1388,13 @@
           }
         },
         {
+          "name": "Energy Price",
+          "unit": "USD/kWh",
+          "source": {
+            "scenario": "energy_price"
+          }
+        },
+        {
           "name": "Thermal Diffusivity",
           "unit": "m²/s",
           "formula": "{Sand Conductivity} / ({Sand Density} * {Sand Specific Heat})"
@@ -1408,6 +1415,21 @@
           "formula": "({Cured Depth} / 1000) ^ 2 / (4 * {Thermal Diffusivity} * ERFINV({Temperature Ratio}) ^ 2)"
         },
         {
+          "name": "Sand Heat",
+          "unit": "J",
+          "formula": "{Core Sand} * {Sand Specific Heat} * ({Cure Temperature} - {Initial Sand Temperature})"
+        },
+        {
+          "name": "Energy",
+          "unit": "kWh",
+          "formula": "{Sand Heat} / 3.6e6"
+        },
+        {
+          "name": "Energy Cost",
+          "unit": "USD",
+          "formula": "{Energy} * {Energy Price}"
+        },
+        {
           "name": "Cycle Time",
           "unit": "s",
           "formula": "{Blow Time} + {Cure Time} + {Strip and Handling}"
@@ -1415,7 +1437,9 @@
       ],
       "results": [
         "Cure Time",
-        "Cured Depth"
+        "Cured Depth",
+        "Energy",
+        "Energy Cost"
       ]
     },
     {

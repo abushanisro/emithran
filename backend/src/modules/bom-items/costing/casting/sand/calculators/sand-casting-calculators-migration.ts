@@ -41,6 +41,7 @@ export function buildSandHotBoxPhysicsMigrationSql(): string {
         'box (t = d^2 / (4 alpha erfinv(theta)^2)), the depth the smaller of the plant\'s strip criterion and half the core\'s smallest section; the',
         'strip and handling time is read from the handling table by the core\'s weight. The box temperature, the cure temperature and the depth are the',
         'plant\'s own settings and are set in the Cost Guide; none is assumed.',
+        'The sand\'s sensible heat to the cure temperature (a lower bound) is priced with the energy price set in the Cost Guide.',
       ].join('\n'),
     },
   );

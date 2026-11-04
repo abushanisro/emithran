@@ -87,6 +87,26 @@ describe('makeCoreStep', () => {
     expect(cure({ curedDepthMm: 6 }) / cure({ curedDepthMm: 3 })).toBeCloseTo(4, 9);
   });
 
+  // 2.112 kg of sand x 1170 J/(kg K) x (150 - 20) K = 321 235.2 J = 0.08923 kWh; at 0.10 USD/kWh: 0.008923 USD a core.
+  it('the heating energy is priced with the energy price, and not charged (and said so) while it is not set', () => {
+    const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
+    const priced = makeCoreStep({ ...ctx, energyPricePerKwh: 0.1 }, m, core);
+    expect(priced.ok && priced.run.outputs['Energy']).toBeCloseTo(0.089232, 6);
+    expect(priced.ok && priced.energyCostUsd).toBeCloseTo(0.0089232, 7);
+    expect(priced.ok && priced.notes).toEqual([]);
+    const unpriced = makeCoreStep({ ...ctx, energyPricePerKwh: null }, m, core);
+    expect(unpriced.ok && unpriced.energyCostUsd).toBe(0);
+    expect(unpriced.ok && unpriced.notes).toEqual([expect.stringMatching(/^Hot box heating energy is not charged: the energy price is not set \(the sand's heat alone is 0\.089 kWh per core, a lower bound\)/)]);
+  });
+
+  it('the energy is added to the line, so a priced core costs more than an unpriced one by exactly that', () => {
+    const line = (energyPricePerKwh: number | null) =>
+      coreLine({ ctx: { ...ctx, energyPricePerKwh }, core, machinesByClass: byClass, batchSize: 250, costContext }).step.line;
+    const diff = line(0.1).totalCost - line(null).totalCost;
+    expect(diff).toBeCloseTo(0.0089232, 2); // the line rounds to cents: the difference is the energy to that precision
+    expect(line(0.1).totalCost).toBeGreaterThanOrEqual(line(null).totalCost);
+  });
+
   it('a core cured right through (thinner than twice the strip depth) is cured to its middle: a 4 mm side needs 2 mm, whatever the criterion', () => {
     const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
     const thin = { ...core, region: { ...core.region, sizeMm: [200, 100, 4] as [number, number, number] } };
