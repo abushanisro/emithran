@@ -7,6 +7,7 @@ export * from './useVendors';
 export * from './useBOM';
 export * from './useBOMItems';
 export * from './useCadUploads';
+export * from './useCastingAnalyses';
 export * from './useMHR';
 export * from './useLHR';
 

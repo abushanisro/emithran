@@ -15311,7 +15311,7 @@
             "bearer": []
           }
         ],
-        "summary": "The casting analyses of a BOM item, newest first. An empty list means not requested, never passed.",
+        "summary": "The casting analyses of a BOM item, newest first, without their results (read one analysis for its result). An empty list means not requested, never passed.",
         "tags": [
           "Casting analyses"
         ]
