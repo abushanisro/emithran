@@ -22,6 +22,8 @@ const feature = (id: string, type: string, parameters: Record<string, number>, f
 const result = (over: { wall?: unknown; features?: unknown[]; draft?: unknown } = {}) => ({
   parts: [{ casting: { wall_mm: over.wall === undefined ? { min: 5, nominal: 10, max: 50, samples: 9 } : over.wall, draft: over.draft ?? null }, features: over.features ?? [] }],
 });
+/** A wall measurement with the thinnest wall seen from each face (worker 0.15.0). */
+const wallWith = (...faces: Array<[number, number]>) => ({ min: 5, nominal: 10, max: 50, samples: 9, faces: faces.map(([face, min]) => ({ face, min, samples: 4 })) });
 const evaluate = (r: unknown, material: string | null = "Aluminum") => {
   const out = evaluateSandDfm(r, material, REF);
   if ("reason" in out) throw new Error(out.reason);
@@ -67,6 +69,37 @@ describe("evaluateSandDfm: one failing case per rule", () => {
       ["InsufficientExternalRadius", "SharpEdge:2", 0, 0.3],
       ["InsufficientInternalRadius", "SharpEdge:1", 0, 3],
     ]);
+  });
+});
+
+describe("evaluateSandDfm: thin walls found where they are (per face)", () => {
+  it("aluminium (limit 3 mm): a face whose thinnest wall is 2.5 or 2.9 is Major and carries its face; 3.0 (not below) and 3.2 pass", () => {
+    const out = evaluate(result({ wall: wallWith([4, 2.5], [5, 2.9], [6, 3.2], [7, 3]) }), "Aluminum");
+    expect(out.findings.filter((f) => f.rule === "ThinSection").map((f) => [f.faces, f.severity, f.measured, f.threshold])).toEqual([
+      [[4], "Major", 2.5, 3],
+      [[5], "Major", 2.9, 3],
+    ]);
+  });
+
+  it("the limit is the material's: brass (2.3 mm) accepts the 2.5 mm face", () => {
+    expect(evaluate(result({ wall: wallWith([4, 2.5]) }), "Brass").findings.filter((f) => f.rule === "ThinSection")).toEqual([]);
+  });
+
+  it("the faces judge the part where they are present, whatever the part's overall figure says; without them the part's figure judges", () => {
+    // overall 5th percentile 1 mm (thin) but every face measured over 3: the faces rule
+    const thinOverall = { min: 1, nominal: 10, max: 50, samples: 9 };
+    expect(evaluate(result({ wall: { ...thinOverall, faces: [{ face: 0, min: 4, samples: 2 }] } }), "Aluminum").findings.some((f) => f.rule === "ThinSection")).toBe(false);
+    const whole = evaluate(result({ wall: thinOverall }), "Aluminum").findings.filter((f) => f.rule === "ThinSection");
+    expect(whole).toEqual([expect.objectContaining({ measured: 1, faces: [], featureIds: [] })]);
+  });
+
+  it("a face entry that is not a whole face number with a finite thickness is ignored", () => {
+    const out = evaluate(result({ wall: { min: 5, nominal: 10, max: 50, samples: 9, faces: [{ face: "a", min: 1 }, { face: 1.5, min: 1 }, { face: 2, min: "x" }, null, { face: 3, min: 1 }] } }), "Aluminum");
+    expect(out.findings.filter((f) => f.rule === "ThinSection").map((f) => f.faces[0])).toEqual([3]);
+  });
+
+  it("a part whose every face is thick enough passes the rule", () => {
+    expect(evaluate(result({ wall: wallWith([0, 10], [1, 20]) }), "Aluminum").passed).toContain("ThinSection");
   });
 });
 

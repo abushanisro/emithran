@@ -28,9 +28,17 @@ using Xyz = std::array<double, 3>;
 
 // Wall thickness by ray casting (casting.cpp): from each surface point straight inwards to the opposite surface,
 // weighted by surface area. min and max are the 5th and 95th percentiles (single rays at edges are noise).
+// The thinnest wall measured from one face: the smallest distance from a point of the face, through the metal along the inward normal, to the next surface.
+struct FaceWall {
+  int face;       // TopExp::MapShapes order - 1, as the features, the draft and glb_faces number faces
+  double min;     // mm
+  int samples;    // rays from this face that found a far side
+};
+
 struct WallThickness {
   double min = 0, nominal = 0, max = 0;  // nominal: the area-weighted median
   int samples = 0;
+  std::vector<FaceWall> faces;  // every face that had a measurement, in face order: where the thin walls are
 };
 
 // One region of air enclosed between metal along the draw axis: sand must be placed there as a core (D127).

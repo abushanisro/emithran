@@ -106,6 +106,23 @@ draft_case hollow-box "-90..-90:2,0..0:8,90..90:2" "the two ends of the closed c
 draft_case taper-3 "3..3:1,90..90:2" "a cone leaning 3 degrees from the axis: the side is exactly 3, drafted"
 draft_case taper-04 "0.4..0.4:1,90..90:2" "the same at 0.4 degrees, under the 0.5 degree limit of the published rules"
 
+echo "== wall thickness by face (S6): the thinnest wall measured from each face, worked by hand from the geometry"
+# From a point of a face the distance through the metal along the inward normal to the next surface; per face, the smallest. Expected: the faces grouped by that thickness (mm), with their count.
+wall_case() { # <sample stem> <expected groups> <why>
+    got="$(node -e '
+        const w = JSON.parse(require("fs").readFileSync(process.argv[1])).parts[0].casting.wall_mm;
+        const g = new Map();
+        for (const f of w.faces) { const k = Math.round(f.min * 1e3) / 1e3; g.set(k, (g.get(k) || 0) + 1); }
+        console.log([...g].sort((a, b) => a[0] - b[0]).map(([k, n]) => k + ":" + n).join(","));
+    ' "$WORK/results/$1/result.json")"
+    [ "$got" = "$2" ] && pass "wall $1: $got ($3)" || fail "wall $1: got '$got', expected '$2' ($3)"
+}
+wall_case box "20:2,50:2,100:2" "100 x 50 x 20: through the 20, the 50 and the 100"
+wall_case cylinder "40:2,50:1" "radius 25, height 40: the ends through the 40, the side across the 50 diameter"
+wall_case tube "10:2,50:2" "outer radius 30, bore 20, height 50: the wall is 10 from both sides, the ends are 50"
+wall_case hollow-box "10:4,20:8" "100 x 60 x 40 with a 60 x 20 x 20 cavity: the faces over the cavity (top, bottom, and the cavity's own) are 10, the other eight 20"
+wall_case step-block "20:2,40:1,50:2,60:2,100:1" "the L step: bottom and step top 20, the high top 40, the left side and the riser 50, front and back 60, the right side 100"
+
 echo "== limits"
 run_sample assembly --deadline-ms 1
 mv "$WORK/results/assembly.out" "$WORK/deadline.out"; mv "$WORK/results/assembly.exit" "$WORK/deadline.exit"
