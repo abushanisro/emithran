@@ -96,3 +96,23 @@ export function realResinInputs(name: string): RealResinInputs {
     densityOfMeltKgM3: n('physicalProperties.densityOfMeltKgM3'),
   };
 }
+
+/** Every press in machine/injection_molding_machines.csv, as the selector's candidate pool carries it. */
+export function allRealPresses(): Array<{
+  name: string; maxTonnage: number; shotCapacityGrams: number; tieBarXMm: number; tieBarYMm: number;
+  timing: { injectionRateMm3PerS: number | null; dryCycleTimeS: number | null }; mhrUsd: number; goodPartYield: number;
+}> {
+  return read('machine/injection_molding_machines.csv').map((row) => ({
+    name: row['name']!,
+    maxTonnage: Number(row['limits.clampingForceKn']) / 9.80665,
+    shotCapacityGrams: Number(row['limits.shotSizeGppsG']),
+    tieBarXMm: Number(row['limits.tieBarDistanceHorMm']),
+    tieBarYMm: Number(row['limits.tieBarDistanceVertMm']),
+    timing: {
+      injectionRateMm3PerS: row['rates.injectionRateMm3PerS'] ? Number(row['rates.injectionRateMm3PerS']) : null,
+      dryCycleTimeS: row['time.dryCycleTimeS'] ? Number(row['time.dryCycleTimeS']) : null,
+    },
+    mhrUsd: Number(row['accounting.directOverheadRateUsdPerHr']) + Number(row['accounting.indirectOverheadRateUsdPerHr']),
+    goodPartYield: Number(row['yields.goodPartYield']),
+  }));
+}

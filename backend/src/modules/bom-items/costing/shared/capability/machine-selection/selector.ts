@@ -668,6 +668,8 @@ export function isCapable(
       if (req.clampTonnageRequired == null) return false;
       // No tonnage on file = not shown capable (never passed unchecked).
       if (cap.maxTonnage == null || cap.maxTonnage < req.clampTonnageRequired) return false;
+      // Shot size: a press that cannot fill one cavity is not capable (rated in GPPS grams).
+      if (req.shotGppsG != null && cap.shotCapacityGrams != null && cap.shotCapacityGrams < req.shotGppsG) return false;
       // Tie-bar spacing: additive formula, allow 90° rotation
       if (cap.tieBarXMm != null && cap.tieBarYMm != null && req.partLengthMm > 0 && req.partWidthMm > 0) {
         const reqL = req.partLengthMm + IM_TIEBAR_ADDEND_MM;
@@ -948,10 +950,9 @@ function buildReasons(
         ? (req.clampNotDerivableReason ?? 'Clamp force not derivable.')
         : `Requires ${r0(req.clampTonnageRequired)} t clamp force (reference model, incl. clampForceSafetyFactor)` +
           (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
-      if (req.shotWeightG != null && req.shotWeightG > 0) {
-        // Informational until mhr_records carries shot capacity (barrel size) —
-        // the gate switches on the day that column exists.
-        reasons.push(`Shot weight ${r0(req.shotWeightG)} g incl. runner — verify against barrel capacity`);
+      if (req.shotGppsG != null && req.shotGppsG > 0) {
+        reasons.push(`Shot ${r0(req.shotGppsG)} g GPPS-equivalent incl. runner` +
+          (cap.shotCapacityGrams != null ? ` ≤ ${r0(cap.shotCapacityGrams)} g machine shot size` : ' — machine shot size not on file'));
       }
       if (req.partLengthMm > 0 && req.partWidthMm > 0) {
         const reqL = req.partLengthMm + IM_TIEBAR_ADDEND_MM;

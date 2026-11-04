@@ -1,6 +1,6 @@
 import {
   classifyInspectionResource, estimateBendTonnage, recommendedBendTonnage, bendShoulderWidthMm,
-  BEND_COEFFICIENT, BEND_RECOMMENDED_FORCE_FACTOR, resolveUtsMpa,
+  classifyMaterialFamily, resolveBendRadiusMinFactor, BEND_COEFFICIENT, BEND_RECOMMENDED_FORCE_FACTOR, resolveUtsMpa,
 } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 
 describe('classifyInspectionResource', () => {
@@ -125,5 +125,16 @@ describe('resolveUtsMpa', () => {
     expect(resolveUtsMpa('IS2062 E250 CRCA')).toBe(370);
     expect(resolveUtsMpa('AL6061-T6')).toBe(310);
     expect(resolveUtsMpa(null)).toBeNull();
+  });
+});
+
+describe('stainless detection is shared by every classifier', () => {
+  it.each(['SUS304', '304', '316L', 'SS 201', 'AISI 430', 'Stainless 321'])('%s is stainless', (g) => {
+    expect(classifyMaterialFamily(g)).toBe('stainless');
+    expect(resolveBendRadiusMinFactor(g, 3)).toBe(2.0);
+  });
+  it('does not read BRASS or a plain number as stainless', () => {
+    expect(classifyMaterialFamily('Brass C360')).not.toBe('stainless');
+    expect(classifyMaterialFamily('IS2062 3041')).not.toBe('stainless');
   });
 });

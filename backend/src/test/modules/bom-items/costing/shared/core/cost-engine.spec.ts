@@ -7,7 +7,7 @@ import { UTILIZATION_ADVISORY_THRESHOLD_PCT } from '../../../../../../modules/bo
 
 function nesting(overrides: Partial<NestingResult> = {}): NestingResult {
   return {
-    sheetLengthMm: 3000, sheetWidthMm: 1500, partsPerSheet: 672,
+    sheetLengthMm: 3000, sheetWidthMm: 1500, partsPerSheet: 672, fitsSheet: true,
     sheetWeightKg: 53, grossWeightPerPartKg: 0.079, scrapWeightPerPartKg: 0.041,
     utilisationPct: 48.5, grossMaterialCost: 0.093, scrapRecoveryCost: 0,
     netMaterialCost: 0.093, partAllowanceMm: 2,
