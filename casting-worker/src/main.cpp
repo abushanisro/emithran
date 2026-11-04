@@ -1,7 +1,7 @@
 // geometry-worker: reads a STEP file through Open CASCADE's XDE and writes what it contains to result.json:
 // the assembly tree (names, quantities) and the properties of each distinct part (roadmap B1.2, ADR 0005), plus
 // model.glb and parts/<id>.glb for the 3D viewer and thumbnails (S2).
-//   geometry-worker [--deadline-ms N] <input.step>... <out-dir>
+//   geometry-worker [--deadline-ms N] [--draw-axis x|y|z] <input.step>... <out-dir>
 // Several STEP files are one product (D136): each file's top-level shapes are the tree's roots, tagged with the file;
 // a root already inside another file's assembly (an assembly exported with its parts) is not repeated; a file that
 // cannot be read makes the result partial ("inputs" says which), all of them unreadable_step.
@@ -44,7 +44,7 @@
 namespace {
 
 constexpr int kSchemaVersion = 1;
-constexpr const char* kWorkerVersion = "0.12.0";
+constexpr const char* kWorkerVersion = "0.13.0";
 
 int fail(const char* code, int exit_code) {
   std::cout << "{\"error\":\"" << code << "\"}\n";
@@ -103,6 +103,7 @@ void write_casting(JsonWriter& json, const std::optional<CastingProperties>& c) 
   const char axis[2] = {c->draw_axis, '\0'};
   json.begin_object()
       .key("draw_axis").value(axis)
+      .key("draw_axis_source").value(c->axis_requested ? "requested" : "auto")
       .key("draw_depth_mm").value(c->draw_depth)
       .key("projected_area_mm2").value(c->projected_area)
       .key("parting_line_mm").value(c->parting_line)
@@ -312,12 +313,23 @@ void part_ids(const Node& node, std::set<std::string>& out) {
 int main(int argc, char** argv) {
   int arg = 1;
   long deadline_ms = 0;
-  if (argc >= 3 && std::string(argv[1]) == "--deadline-ms") {
-    deadline_ms = parse_deadline(argv[2]);
-    arg = 3;
+  int forced_axis = -1;  // --draw-axis x|y|z: measure along that axis only
+  bool bad_option = false;
+  while (arg + 1 < argc && std::string(argv[arg]).rfind("--", 0) == 0) {  // options come first, each with its value
+    const std::string option = argv[arg], value = argv[arg + 1];
+    if (option == "--deadline-ms") {
+      deadline_ms = parse_deadline(value.c_str());
+      bad_option = bad_option || deadline_ms == 0;
+    } else if (option == "--draw-axis") {
+      forced_axis = value == "x" ? 0 : value == "y" ? 1 : value == "z" ? 2 : -1;
+      bad_option = bad_option || forced_axis < 0;
+    } else {
+      bad_option = true;
+    }
+    arg += 2;
   }
-  if (argc - arg < 2 || (arg == 3 && deadline_ms == 0)) {
-    std::cerr << "usage: geometry-worker [--deadline-ms 1..3600000] <input.step>... <out-dir>\n";
+  if (bad_option || argc - arg < 2) {
+    std::cerr << "usage: geometry-worker [--deadline-ms 1..3600000] [--draw-axis x|y|z] <input.step>... <out-dir>\n";
     return 64;
   }
   const std::string out_dir = argv[argc - 1];
@@ -424,7 +436,7 @@ int main(int argc, char** argv) {
   for (PartProperties& p : parts) {
     if (!p.valid || !p.volume || !p.box_min || !p.box_max) continue;
     try {
-      p.casting = measure_casting(labels.at(p.id), p);
+      p.casting = measure_casting(labels.at(p.id), p, forced_axis);
     } catch (const Standard_Failure&) {
       p.problems.push_back("failed:casting");
     }

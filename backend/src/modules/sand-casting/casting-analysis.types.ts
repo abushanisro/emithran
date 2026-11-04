@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 // worker, a new result contract or a new configuration is a new analysis, never a rewrite of an old one.
 
 /** The `worker_version` the deployed casting worker reports (casting-worker/src/main.cpp). Raise it together with the worker. */
-export const CASTING_WORKER_VERSION = "0.12.0";
+export const CASTING_WORKER_VERSION = "0.13.0";
 /** The `schema_version` of casting-worker/result.schema.json that this backend reads. */
 export const CASTING_SCHEMA_VERSION = 1;
 /** Where a BOM item's STEP file is kept (the same bucket cad-uploads writes to). */

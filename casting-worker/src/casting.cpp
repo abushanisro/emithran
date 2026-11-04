@@ -272,7 +272,7 @@ std::optional<WallThickness> wall(IntCurvesFace_ShapeIntersector& shape, const T
 
 }  // namespace
 
-CastingProperties measure_casting(const TDF_Label& part, const PartProperties& p) {
+CastingProperties measure_casting(const TDF_Label& part, const PartProperties& p, int forced_axis) {
   const TopoDS_Shape shape = XCAFDoc_ShapeTool::GetShape(part);
   const Xyz lo = *p.box_min, hi = *p.box_max;
   IntCurvesFace_ShapeIntersector rays;
@@ -281,6 +281,7 @@ CastingProperties measure_casting(const TDF_Label& part, const PartProperties& p
   View best;
   bool first = true;
   for (int axis = 0; axis < 3; ++axis) {
+    if (forced_axis >= 0 && axis != forced_axis) continue;
     const View view = look_along(rays, lo, hi, axis);
     const bool better = first || view.hidden < best.hidden ||
                         (view.hidden == best.hidden && view.depth < best.depth - 1e-9) ||
@@ -290,6 +291,7 @@ CastingProperties measure_casting(const TDF_Label& part, const PartProperties& p
   }
   CastingProperties c;
   c.draw_axis = "xyz"[best.axis];
+  c.axis_requested = forced_axis >= 0;
   c.draw_depth = best.depth;
   c.projected_area = best.area;
   c.parting_line = best.parting;

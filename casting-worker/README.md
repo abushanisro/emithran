@@ -7,7 +7,7 @@ properties, assembly tree, casting geometry (draw axis, parting line, wall thick
 
 ## Provenance
 
-Copied unchanged from `petrus-demo/geometry-worker` (worker 0.12.0, `schema_version` 1) on 2026-11-04.
+Copied unchanged from `petrus-demo/geometry-worker` (worker 0.13.0, `schema_version` 1) on 2026-11-04. 0.13.0 adds `--draw-axis x|y|z` (measure along the engineer's axis instead of the chosen one) and the result's `casting.draw_axis_source` (`auto` or `requested`); it was first copied as 0.12.0 and the four files that changed (`result.schema.json`, `src/casting.cpp`, `src/main.cpp`, `src/model.hpp`) were copied again, with their hashes.
 `PROVENANCE.sha256` holds the SHA-256 of every file **as copied**. The only file edited since is `Dockerfile`: the
 `cad-runner` stage and `BACKEND_IMAGE` argument (petrus-demo's Rust runner, not used here) and the schema's install
 folder were removed, and the `ninja-build` pin loosened to `1.12.1-1*` (the exact `+b1` build exists only on arm64; CI is amd64). Any other difference from that list is a change to the worker and belongs in its own review:
