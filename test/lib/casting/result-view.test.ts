@@ -3,6 +3,7 @@ import { castingPartView } from "@/lib/casting/result-view";
 
 const part = {
   glb: "parts/0-1-1-1.glb",
+  box_mm: { min: [0, 0, 0], max: [100, 60, 40], size: [100, 60, 40] },
   glb_faces: [3, 1, 2],
   features: [
     {
@@ -32,6 +33,7 @@ const part = {
     draw_axis_source: "requested",
     cores_glb: "parts/0-1-1-1-cores.glb",
     parting: {
+      height_mm: 50,
       points: [
         [0, 0, 5],
         [1, 0, 5],
@@ -78,6 +80,8 @@ describe("castingPartView", () => {
       ],
       drawAxis: "z",
       drawAxisSource: "requested",
+      box: { min: [0, 0, 0], max: [100, 60, 40] },
+      partingHeight: 50,
     });
   });
 
@@ -112,6 +116,8 @@ describe("castingPartView", () => {
       partingPoints: null,
       drawAxis: null,
       drawAxisSource: null,
+      box: null,
+      partingHeight: null,
       features: [
         {
           id: "Ring:1",

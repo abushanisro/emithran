@@ -14,6 +14,7 @@
 
 import type { CalculatorRunDto, CostSummaryDto, DieCastingProcessChoiceDto, DieToolingDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import type { SandRoute } from './sand/sand-route';
+import { gatingLayout } from './sand/sand-gating';
 import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
 import { castingSeed, runView } from './casting-calculator-seeds';
 import type { DieToolingResult } from './die-tooling';
@@ -226,7 +227,7 @@ export function buildCastingCostSummary(input: {
         perPartUsd: input.cores.corebox.perPartUsd != null ? Math.round(input.cores.corebox.perPartUsd * 10000) / 10000 : null,
       },
     } : {}),
-    ...(sand ? { sandCasting: { mouldingProcess: sand.mouldingProcess, mouldingMachine: sand.mouldingMachine, cavities: sand.cavities, coresMade: sand.coresMade, coresLeftSolid: sand.coresLeftSolid, complete: sand.complete, measuredBy: input.sand?.measuredBy ?? 'cad-engine' } } : {}),
+    ...(sand ? { sandCasting: { mouldingProcess: sand.mouldingProcess, mouldingMachine: sand.mouldingMachine, cavities: sand.cavities, coresMade: sand.coresMade, coresLeftSolid: sand.coresLeftSolid, complete: sand.complete, measuredBy: input.sand?.measuredBy ?? 'cad-engine', gating: gatingLayout(sand.gating) } } : {}),
     ...(sand && sand.tooling.items.length ? {
       coreboxTooling: {
         boxes: sand.tooling.items.reduce((n, t) => n + t.boxes, 0),

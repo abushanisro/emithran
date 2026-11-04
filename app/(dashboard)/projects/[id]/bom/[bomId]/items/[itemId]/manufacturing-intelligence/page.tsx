@@ -7158,6 +7158,7 @@ function PartDetailTab({
           // A sand-cast part's features come from its casting analysis (the worker's exact solid); the cad-engine's stay as the labelled fallback.
           <SandCastingFeaturesPanel
             itemId={item.id}
+            gating={cost?.sandCasting?.gating ?? null}
             fallback={(
               <DieCastingFeatureTreePanel
                 fg={fg ?? null}

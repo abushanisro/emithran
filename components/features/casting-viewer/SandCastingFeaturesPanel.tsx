@@ -16,6 +16,7 @@ import {
 import { analysisState, isReady } from "@/lib/casting/analysis-view";
 import { castingFeatureProperties, groupCastingFeatures } from "@/lib/casting/features";
 import { castingPartView } from "@/lib/casting/result-view";
+import { gatingSolids, toGlbShape, type SandGatingLayout } from "@/lib/casting/gating-layout";
 
 const SEVERITY_CLASS: Record<DfmFinding["severity"], string> = {
   Critical: "bg-red-500/15 text-red-600 border-red-500/30",
@@ -31,9 +32,12 @@ const SEVERITY_CLASS: Record<DfmFinding["severity"], string> = {
 export function SandCastingFeaturesPanel({
   itemId,
   fallback,
+  gating = null,
 }: {
   itemId: string;
   fallback: ReactNode;
+  /** The designed gating system and risers from the cost summary: drawn around the part as a schematic. */
+  gating?: SandGatingLayout | null;
 }) {
   const list = useCastingAnalyses(itemId);
   const direction = useDrawDirection(itemId);
@@ -51,6 +55,7 @@ export function SandCastingFeaturesPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCores, setShowCores] = useState(true);
   const [showParting, setShowParting] = useState(true);
+  const [showGating, setShowGating] = useState(true);
 
   if (!ready || !part) {
     const state = analysisState(list.data, Date.now());
@@ -96,6 +101,11 @@ export function SandCastingFeaturesPanel({
   }
 
   const groups = groupCastingFeatures(part.features);
+  // The designed system is laid out in the part's own coordinates (its box, draw axis and parting height from the same analysis), then into the viewer's frame.
+  const gatingShapes =
+    gating && part.box && part.drawAxis
+      ? gatingSolids(gating, part.box.min, part.box.max, part.drawAxis, part.partingHeight).map(toGlbShape)
+      : [];
   const selected = part.features.find((f) => f.id === selectedId) ?? null;
   const selectedRow = selected
     ? { feature: selected, label: selected.id, parent: selected.parent }
@@ -113,6 +123,8 @@ export function SandCastingFeaturesPanel({
             partingPoints={part.partingPoints}
             showCores={showCores}
             showParting={showParting}
+            gating={gatingShapes}
+            showGating={showGating}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -145,6 +157,21 @@ export function SandCastingFeaturesPanel({
               }}
             />
             Parting line
+          </label>
+        )}
+        {gatingShapes.length > 0 && (
+          <label
+            className="flex items-center gap-1"
+            title="The gating system and risers the route designed (sprue, well, runner, ingates, risers), laid out at the parting plane. A schematic placement: the part's CAD holds none of it."
+          >
+            <input
+              type="checkbox"
+              checked={showGating}
+              onChange={(e) => {
+                setShowGating(e.target.checked);
+              }}
+            />
+            Gating (designed)
           </label>
         )}
         {part.drawAxis && (
