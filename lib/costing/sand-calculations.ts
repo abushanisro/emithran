@@ -67,3 +67,13 @@ export function calculationEntries(
 function round(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
+
+/**
+ * The plant variable a trace input was read from, or null. The backend words the source of a variable input in one place
+ * (variableProvider in sand-seeds.ts): "Sand casting variable NAME (unit)", or "Your value for sand casting variable NAME ...: the plant
+ * value is V" once the part has its own value.
+ */
+export function variableOfSource(source: string | undefined): string | null {
+  const m = /^(?:Sand|Your value for sand) casting variable ([A-Za-z][A-Za-z0-9_]*)/.exec(source ?? '');
+  return m?.[1] ?? null;
+}

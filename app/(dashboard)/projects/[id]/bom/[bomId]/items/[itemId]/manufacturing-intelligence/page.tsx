@@ -6179,7 +6179,7 @@ function CostGuidePanel({
 
             {isSandCast && (
               <Section title="Sand Casting Calculations">
-                <SandCalculationsPanel entries={calculationEntries(cgpCostSummary?.processLines, cgpCostSummary?.calculatorRuns)} />
+                <SandCalculationsPanel bomItemId={item.id} entries={calculationEntries(cgpCostSummary?.processLines, cgpCostSummary?.calculatorRuns)} />
               </Section>
             )}
 

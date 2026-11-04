@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ProcessLineCost } from '@/lib/api/hooks/useBOMItems';
-import { calculationEntries, type CalculatorRun } from '@/lib/costing/sand-calculations';
+import { calculationEntries, variableOfSource, type CalculatorRun } from '@/lib/costing/sand-calculations';
 
 const line = (over: Partial<ProcessLineCost>) => ({ process: 'Pour', cycleTimeMin: 1.23456, ...over }) as ProcessLineCost;
 const run = (over: Partial<CalculatorRun>): CalculatorRun => ({
@@ -33,5 +33,15 @@ describe('sand calculation entries', () => {
 
   it('nothing in, nothing out', () => {
     expect(calculationEntries(undefined, undefined)).toEqual([]);
+  });
+});
+
+describe('the plant variable behind a trace input', () => {
+  it('is read from the backend wording, with or without a part value, and from nothing else', () => {
+    expect(variableOfSource('Sand casting variable finishAllowance (Length)')).toBe('finishAllowance');
+    expect(variableOfSource('Your value for sand casting variable finishAllowance (Length): the plant value is 0.5')).toBe('finishAllowance');
+    expect(variableOfSource('machine Hot box 1: cycle')).toBeNull();
+    expect(variableOfSource('Sand casting - Gating system')).toBeNull();
+    expect(variableOfSource(undefined)).toBeNull();
   });
 });
