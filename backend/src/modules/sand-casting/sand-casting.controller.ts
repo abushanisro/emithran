@@ -52,6 +52,13 @@ function view(row: CastingAnalysisRow) {
   };
 }
 
+/** The list view: no result (it can be large, and a page polls this list); the single analysis carries it. */
+function listView(row: CastingAnalysisRow) {
+  const { result: _result, ...rest } = view(row);
+  void _result;
+  return rest;
+}
+
 @ApiTags("Casting analyses")
 @UseGuards(OrganizationContextGuard)
 @ApiBearerAuth()
@@ -86,10 +93,10 @@ export class SandCastingController {
   @Get()
   @ApiOperation({
     summary:
-      "The casting analyses of a BOM item, newest first. An empty list means not requested, never passed.",
+      "The casting analyses of a BOM item, newest first, without their results (read one analysis for its result). An empty list means not requested, never passed.",
   })
   async list(@Query() query: CastingAnalysesQuery, @AccessToken() token: string) {
-    return (await this.casting.listForItem(query.bomItemId, token)).map(view);
+    return (await this.casting.listForItem(query.bomItemId, token)).map(listView);
   }
 
   @OrgRole("viewer")
