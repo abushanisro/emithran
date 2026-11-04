@@ -574,6 +574,8 @@ export interface CostSummaryDto {
   // High pressure die casting: cavities per die and the clamp / shot they set.
   // Present only when a die-cast part reached the HPDC engine's cavity step.
   dieCasting?: DieCastingBreakdown;
+  /** Sand casting: how the route was chosen, for the Cost Guide (the user's choices stay unset until made). */
+  sandCasting?: SandCastingBreakdown;
 
   // The die-casting die, amortised over its life (die-tooling.ts). USD, like
   // the injection-molding tooling: separate from the piece cost.
@@ -617,6 +619,18 @@ export interface CalculatorRunDto {
   trace: CalculationTraceStep[];
   lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
   missing: string[];
+}
+
+/** What the sand route decided: the moulding process and machine, the cavities per mould and the cores. */
+export interface SandCastingBreakdown {
+  mouldingProcess: string;
+  mouldingMachine: string;
+  cavities: number;
+  coresMade: number;
+  /** Cores too thin to cast: left solid and machined later. */
+  coresLeftSolid: number;
+  /** False while a step no machine can do is a gap. */
+  complete: boolean;
 }
 
 export interface MachineChoiceDto {

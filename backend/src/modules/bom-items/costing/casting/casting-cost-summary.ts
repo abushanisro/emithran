@@ -226,6 +226,7 @@ export function buildCastingCostSummary(input: {
         perPartUsd: input.cores.corebox.perPartUsd != null ? Math.round(input.cores.corebox.perPartUsd * 10000) / 10000 : null,
       },
     } : {}),
+    ...(sand ? { sandCasting: { mouldingProcess: sand.mouldingProcess, mouldingMachine: sand.mouldingMachine, cavities: sand.cavities, coresMade: sand.coresMade, coresLeftSolid: sand.coresLeftSolid, complete: sand.complete } } : {}),
     ...(sand && sand.tooling.items.length ? {
       coreboxTooling: {
         boxes: sand.tooling.items.reduce((n, t) => n + t.boxes, 0),
