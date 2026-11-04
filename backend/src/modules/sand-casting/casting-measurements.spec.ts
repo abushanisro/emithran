@@ -28,7 +28,7 @@ describe("measurementsFromCastingResult (the worker's result for a hollow box)",
 
   it("reads the core with its true volume and size", () => {
     const { measurements } = measurementsFromCastingResult(fixture);
-    expect(measurements!.rawCores).toEqual([{ volume_mm3: 24000, box_mm: [60, 20, 20] }]);
+    expect(measurements!.rawCores).toEqual([{ volume_mm3: 24000, area_mm2: null, box_mm: [60, 20, 20] }]);
   });
 
   it("measures a part with no core as having none (an empty list, not unknown)", () => {
@@ -48,5 +48,21 @@ describe("measurementsFromCastingResult (the worker's result for a hollow box)",
     expect(measurementsFromCastingResult({ parts: [{ ...fixture.parts[0], casting: null }] }).missing[0]).toMatch(/no casting measurement/);
     expect(measurementsFromCastingResult({ parts: [{ ...fixture.parts[0], volume_mm3: null }] }).missing[0]).toMatch(/part volume/);
     expect(measurementsFromCastingResult(null).measurements).toBeNull();
+  });
+});
+
+describe("the core's surface (worker 0.18.0)", () => {
+  it("is read from the result's area_mm2 when the worker gave one, and is null when it did not (a core without a body, or an earlier worker)", () => {
+    const withArea = {
+      ...fixture,
+      parts: [{ ...fixture.parts[0], casting: { ...fixture.parts[0].casting, cores: [
+        { ...fixture.parts[0].casting.cores[0], area_mm2: 5600 },
+        { ...fixture.parts[0].casting.cores[0], area_mm2: null },
+      ] } }],
+    };
+    expect(measurementsFromCastingResult(withArea).measurements!.rawCores).toEqual([
+      { volume_mm3: 24000, area_mm2: 5600, box_mm: [60, 20, 20] },
+      { volume_mm3: 24000, area_mm2: null, box_mm: [60, 20, 20] },
+    ]);
   });
 });

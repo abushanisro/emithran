@@ -1,7 +1,7 @@
 import { erf } from 'mathjs';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { buildSandCastingCalculatorsMigrationSql, buildSandGatingVelocityMigrationSql, buildSandHotBoxPhysicsMigrationSql } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
+import { buildSandCastingCalculatorsMigrationSql, buildSandGatingVelocityMigrationSql, buildSandHotBoxPhysicsMigrationSql, buildSandRefractoryMigrationSql } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
 import {
   loadSandCastingCalculatorSpec,
   sandCastingCalculatorsByName,
@@ -38,9 +38,14 @@ describe('sand casting calculator spec', () => {
     expect(committed.replace(/\r\n/g, '\n')).toBe(buildSandGatingVelocityMigrationSql());
   });
 
-  it('has the 20 calculators of the step design: 12 compute operations (20 of them), 8 are helpers', () => {
-    expect(all).toHaveLength(20);
-    expect(all.filter((c) => c.helper)).toHaveLength(8);
+  it('the committed migration 964 (refractory coat, drying, core assembly) equals what the spec generates for those three calculators alone', () => {
+    const committed = readFileSync(join(MIGRATIONS, '964_sand_refractory_calculators.sql'), 'utf8');
+    expect(committed.replace(/\r\n/g, '\n')).toBe(buildSandRefractoryMigrationSql());
+  });
+
+  it('has the 23 calculators of the step design: 12 compute operations (20 of them), 11 are helpers', () => {
+    expect(all).toHaveLength(23);
+    expect(all.filter((c) => c.helper)).toHaveLength(11);
     expect(all.flatMap((c) => c.operations)).toHaveLength(20);
   });
 
@@ -207,11 +212,48 @@ describe('sand calculators run through the shared evaluator on hand-worked input
     Liquidus: 1400, 'Sand Conductivity': 0.6, 'Sand Specific Heat': 1100, 'Mould Temperature': 21, Modulus: 8, Exponent: 2, 'Shakeout Time': 2,
     'Ingate Area': 300, 'Riser Contact': 100, 'Feed Rate': 50, 'Time per Load': 8, 'Parts per Load': 10, Surface: 120000, 'Blast Rate': 0.5,
     'Stub Height': 5, 'Riser Stub Height': 5, 'Parting Line': 800, 'Flash Thickness': 0.5, 'Flash Height': 2, 'Grinding Speed Gating': 410,
+    'Coated Area': 2e5, Coats: 1, 'Application Rate': 5, 'Output Volume': 6, 'Coating Density': 3250, 'Preparation Time': 0.25, 'Batch Size': 100,
+    'Drying Time': 20, 'Item Volume': 9e7, 'Items per Casting': 1, 'Bed Length': 1000, 'Bed Width': 1000, 'Bed Height': 1000, 'Available Factor': 0.8,
+    'Time per Glue': 60,
     'Grinding Speed Non-Gating': 410, 'Material Factor': 1, 'Inspection Rate': 1.4, Cores: 1, 'Single Core Factor': 1.5, 'Double Core Factor': 2,
     'Multi Core Adder': 0.1, 'Core Volume': 2e6, 'Core Length': 150, 'Print Length': 25, 'Core Sand': 3, 'Cycle per Core': 40, 'Blowing Rate': 12,
     'Core Section': 60, 'Initial Sand Temperature': 20, 'Corebox Temperature': 245, 'Cure Temperature': 150, 'Required Cured Depth': 3,
     'Strip and Handling': 10, 'Lifetime Volume': 10000, 'Refurb Life': 5000, 'Refurbs per Tool': 2, 'One Cavity Cost': 3000, 'Region Multiplier': 1,
   };
+
+  it('the refractory coat: coat time is the surface times the coats over the rate, the coating used is the surface times the method\'s output over its rate times the density, the slurry preparation shared by the batch', () => {
+    // 0.2 m2, 2 coats, 5 m2/min, 6 L/min, 3250 kg/m3, 0.25 h per batch of 100:
+    // coat 0.2 * 2 / 5 * 60 = 4.8 s; preparation 0.25 * 3600 / 100 = 9 s; 6 / 5 = 1.2 L/m2; 0.2 * 2 * 1.2 = 0.48 L; 0.48 / 1000 * 3250 = 1.56 kg.
+    const run = runReferenceCalculator(byName, 'Sand Casting - Refractory coat', seeds({ 'Coated Area': 2e5, Coats: 2, 'Application Rate': 5, 'Output Volume': 6, 'Coating Density': 3250, 'Preparation Time': 0.25, 'Batch Size': 100 }), 'Cycle Time');
+    expect(run.outputs['Coat Time']).toBeCloseTo(4.8, 9);
+    expect(run.outputs['Preparation per Casting']).toBeCloseTo(9, 9);
+    expect(run.value).toBeCloseTo(13.8, 9);
+    expect(run.outputs['Coating per Area']).toBeCloseTo(1.2, 9);
+    expect(run.outputs['Coating Volume']).toBeCloseTo(0.48, 9);
+    expect(run.outputs['Coating Mass']).toBeCloseTo(1.56, 9);
+  });
+
+  it('the refractory drying: the load is the bed less racking over the item\'s volume, the time and the oven energy are shared by the castings a load makes', () => {
+    // 1 m3 bed x 0.8 over a 600 x 500 x 300 flask (9e7 mm3): floor(8.888) = 8 flasks; a flask is half a casting's worth (2 cavities, 0.5 per casting):
+    // 16 castings a load; 20 min over 16 = 75 s; preparation 0.25 * 3600 / 100 = 9 s; 22.56 kW for 20 min over 16 = 0.47 kWh.
+    const run = runReferenceCalculator(byName, 'Sand Casting - Refractory drying', seeds({
+      'Drying Time': 20, 'Item Volume': 9e7, 'Items per Casting': 0.5, 'Bed Length': 1000, 'Bed Width': 1000, 'Bed Height': 1000, 'Available Factor': 0.8,
+      'Preparation Time': 0.25, 'Batch Size': 100, Power: 22.56,
+    }), 'Cycle Time');
+    expect(run.outputs['Items per Load']).toBe(8);
+    expect(run.outputs['Castings per Load']).toBe(16);
+    expect(run.outputs['Drying per Casting']).toBeCloseTo(75, 9);
+    expect(run.value).toBeCloseTo(84, 9);
+    expect(run.outputs['Energy']).toBeCloseTo(0.47, 9);
+  });
+
+  it('the core assembly: one glue for each core after the first', () => {
+    const time = (cores: number) => runReferenceCalculator(byName, 'Sand Casting - Core assembly', seeds({ Cores: cores, 'Time per Glue': 60 }), 'Cycle Time').value;
+    expect(time(3)).toBe(120);
+    expect(time(2)).toBe(60);
+    expect(time(1)).toBe(0);
+    expect(time(0)).toBe(0);
+  });
 
   it('every calculator of the spec runs to a finite output on a small iron casting, and every input has a plausible value in this table', () => {
     for (const c of all) {

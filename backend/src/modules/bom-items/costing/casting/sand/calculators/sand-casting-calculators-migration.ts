@@ -73,3 +73,30 @@ export function buildSandGatingVelocityMigrationSql(): string {
     },
   );
 }
+
+export const SAND_REFRACTORY_MIGRATION = 964;
+
+/**
+ * The SQL of migrations/964_sand_refractory_calculators.sql: the refractory coat, refractory drying and core assembly calculators alone, as the spec has
+ * them. They are new, so a database that ran 956 needs this one (calculators are matched by name; it is harmless after a fresh 956).
+ */
+export function buildSandRefractoryMigrationSql(): string {
+  const names = new Set(['Sand Casting - Refractory coat', 'Sand Casting - Refractory drying', 'Sand Casting - Core assembly']);
+  const spec = loadSandCastingCalculatorSpec();
+  return buildDomainCalculatorsMigrationSql(
+    { ...spec, calculators: spec.calculators.filter((c) => names.has(c.name)) },
+    {
+      number: SAND_REFRACTORY_MIGRATION,
+      title: 'Sand casting refractory coat, refractory drying and core assembly calculators.',
+      generator: 'scripts/generate-sand-casting-calculators-migration.ts',
+      specPath: 'src/modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators.json',
+      rootCause: [
+        'The route said "core coating is not costed" and left out the gluing of cores: the plant data names the coating methods (application rate and output),',
+        'the coating densities, the preparation times, the oven beds and singleCoreAssemblyTime, but no calculator used them. The coat time is the surface times',
+        'the number of coats over the application rate; the coating used is the surface times the method\'s output over its rate, times the density; drying is',
+        'the plant\'s time for a load shared by the castings a load holds (the bed less racking, over the item\'s volume); the gluing is one singleCoreAssemblyTime',
+        'for each core after the first. The drying time and the coating price are the plant\'s own settings, set in the Cost Guide; none is assumed.',
+      ].join('\n'),
+    },
+  );
+}

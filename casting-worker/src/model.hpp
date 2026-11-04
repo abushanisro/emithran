@@ -54,6 +54,7 @@ struct WallThickness {
 // Measured by rays; exact from the core's own body when it has one (cores.cpp, D145).
 struct CoreProperties {
   double volume = 0;  // mm³
+  double area = 0;    // mm², the core's whole surface (its prints included); exact, from the body: 0 and not reported without one
   Xyz size{};         // extents, largest first (mm)
   Xyz centre{};       // the middle of its air, by volume (mm)
   bool body = false;       // a solid was made of its faces (drawn in cores_glb)

@@ -74,6 +74,8 @@ export const allSandMachines = (): Record<string, SandMachine[]> => {
     sand_casting_cleaning: 'machines_cleaning.csv', sand_casting_finishing: 'machines_finishing.csv', sand_casting_visual_inspection: 'machines_visual_inspection.csv',
     sand_casting_hot_box: 'machines_hot_box.csv', sand_casting_co2_coremaking: 'machines_co2_coremaking.csv', sand_casting_no_bake: 'machines_no_bake_coremaking.csv',
     sand_casting_oil_core: 'machines_oil_core.csv', sand_casting_shell: 'machines_shell_coremaking.csv',
+    // The refractory steps: the dryers, and the Default work centre (in the air-dry file) that coats and glues; all seeded by 851.
+    sand_casting_refractory_coat_oven_dry: 'machines_refractory_coat_oven_dry.csv', sand_casting_refractory_coat_air_dry: 'machines_refractory_coat_air_dry.csv',
   };
   return Object.fromEntries(Object.entries(files).map(([cls, file]) => [cls, sandMachines(file, cls, () => ({ ratePerHr: 12.5, assumedDefaults: ['payback_period_years'] }))]));
 };

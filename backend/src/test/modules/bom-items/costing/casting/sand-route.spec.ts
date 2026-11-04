@@ -12,7 +12,7 @@ const input: SandRouteInput = {
   ref, spec: loadSandCastingCalculatorSpec(), calculators: sandCastingCalculatorsByName(), material: iron,
   part: {
     volumeMm3: (8 / iron.columns['density_kg_m3']!) * 1e9, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12,
-    partingLineMm: 900, abovePartingMm: 50, cores: [{ volumeMm3: 1.2e6, sizeMm: [200, 100, 60] }],
+    partingLineMm: 900, abovePartingMm: 50, cores: [{ volumeMm3: 1.2e6, areaMm2: null, sizeMm: [200, 100, 60] }],
   },
   machinesByClass: machines,
   scenario: { batchSize: 250, cavities: null, mouldingClass: null, chosenCoreProcess: null, energyPricePerKwh: 0.1, hotBox: HOT_BOX, lifetimeVolume: 10000 },

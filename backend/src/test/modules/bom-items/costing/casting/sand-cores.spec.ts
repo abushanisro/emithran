@@ -10,7 +10,7 @@ const iron = sandMaterial('ASTM Grade 20 Gray Iron');
 const ctx: SandRouteContext = {
   ref, spec, calculators: sandCastingCalculatorsByName(), material: iron,
   part: { netKg: 8, modulusMm: 10, dimsMm: [300, 200, 100], wallNominalMm: 12 },
-  cavities: 1, coresPerCasting: 1, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null, hotBox: HOT_BOX,
+  cavities: 1, coresPerCasting: 1, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null, hotBox: HOT_BOX, batchSize: 250,
 };
 const spec$ = (m: { specs: Readonly<Record<string, unknown>> }, k: string) => Number(m.specs[k]);
 const v = (k: string) => ref.number(k)!;
@@ -23,7 +23,7 @@ const byClass = {
   sand_casting_oil_core: sandMachines('machines_oil_core.csv', 'sand_casting_oil_core'),
   sand_casting_shell: sandMachines('machines_shell_coremaking.csv', 'sand_casting_shell'),
 };
-const small: CoreRegion = { volumeMm3: 1.2e6, sizeMm: [200, 100, 60] };
+const small: CoreRegion = { volumeMm3: 1.2e6, areaMm2: null, sizeMm: [200, 100, 60] };
 
 describe('sandCores', () => {
   it('core sand = (volume + two prints of volume / length x print length) x sand density, hand-worked from the variables', () => {
@@ -35,8 +35,8 @@ describe('sandCores', () => {
   });
 
   it('a core thinner than minSandCastableHoleDia is not a sand core: it is counted and left solid', () => {
-    const thinner: CoreRegion = { volumeMm3: 1e5, sizeMm: [100, 50, v('minSandCastableHoleDia') - 0.1] };
-    const r = sandCores(ctx, [small, thinner, { volumeMm3: 0, sizeMm: [0, 0, 0] }]);
+    const thinner: CoreRegion = { volumeMm3: 1e5, areaMm2: null, sizeMm: [100, 50, v('minSandCastableHoleDia') - 0.1] };
+    const r = sandCores(ctx, [small, thinner, { volumeMm3: 0, areaMm2: null, sizeMm: [0, 0, 0] }]);
     expect(r.cores).toHaveLength(1);
     expect(r.thin).toBe(2);
   });
@@ -150,7 +150,7 @@ describe('makeCoreStep', () => {
   it('refuses a core over the process weight limit, one that does not fit the machine\'s core box, and a machine with no cycle time', () => {
     const heavy = { ...core, kg: v('maxWeightShellCore') + 1 };
     expect(makeCoreStep(ctx, shell[0]!, heavy)).toEqual({ ok: false, reasons: [expect.stringContaining('maxWeightShellCore')] });
-    const big = sandCores(ctx, [{ volumeMm3: 1e6, sizeMm: [5000, 4000, 3000] }]).cores[0]!;
+    const big = sandCores(ctx, [{ volumeMm3: 1e6, areaMm2: null, sizeMm: [5000, 4000, 3000] }]).cores[0]!;
     const hot = byClass.sand_casting_hot_box[0]!;
     expect(makeCoreStep(ctx, hot, { ...big, kg: 1 })).toEqual({ ok: false, reasons: [expect.stringContaining('core boxes up to')] });
     const noCycle = { ...shell[0]!, specs: { ...shell[0]!.specs, base_cycle_time_s: 0 } };
@@ -189,7 +189,7 @@ describe('coreLine (which process makes the core)', () => {
   });
 
   it('no process able to make it gives a named gap, not a price', () => {
-    const impossible = { ...core, kg: 1e6, region: { volumeMm3: 1, sizeMm: [1e5, 1e5, 1e5] as const } };
+    const impossible = { ...core, kg: 1e6, region: { volumeMm3: 1, areaMm2: null, sizeMm: [1e5, 1e5, 1e5] as const } };
     const r = coreLine({ ...base, core: impossible });
     expect(r.step.machine).toBeNull();
     expect(r.step.line.totalCost).toBe(0);

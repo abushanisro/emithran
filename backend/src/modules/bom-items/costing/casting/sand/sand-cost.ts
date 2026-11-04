@@ -2,6 +2,7 @@
 // route takes them, the material row, and the route's costs in the location's currency. Pure.
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CoreRegion } from './sand-cores';
+import { COAT_CHOICES, DRY_METHODS } from './sand-refractory';
 import { MOULDING_PROCESSES, type SandPartInput, type SandRoute, type SandScenario } from './sand-route';
 import type { SandMaterial } from './sand-steps';
 
@@ -21,6 +22,11 @@ export const SAND_SCENARIO_KEYS = {
   hotBoxCoreboxTemp: 'hotBoxCoreboxTempC',
   hotBoxCureTemp: 'hotBoxCureTempC',
   hotBoxCuredDepth: 'hotBoxCuredDepthMm',
+  // The refractory coating (none unless chosen), how it is dried, the plant's drying time for a load, and the coating's price.
+  refractoryCoat: 'sandRefractoryCoat',
+  refractoryDryMethod: 'sandRefractoryDryMethod',
+  refractoryDryMinutes: 'sandRefractoryDryMinutes',
+  refractoryCoatPrice: 'refractoryCoatingUsdPerKg',
 } as const;
 
 /**
@@ -52,6 +58,12 @@ export function sandScenario(input: {
         coreboxTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCoreboxTemp]),
         cureTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCureTemp]),
         curedDepthMm: positive(o[SAND_SCENARIO_KEYS.hotBoxCuredDepth]),
+      },
+      refractory: {
+        coat: COAT_CHOICES.find((c) => c === o[SAND_SCENARIO_KEYS.refractoryCoat]) ?? 'none',
+        dryMethod: DRY_METHODS.find((m) => m === o[SAND_SCENARIO_KEYS.refractoryDryMethod]) ?? null,
+        dryMinutes: positive(o[SAND_SCENARIO_KEYS.refractoryDryMinutes]),
+        pricePerKg: positive(o[SAND_SCENARIO_KEYS.refractoryCoatPrice]),
       },
       lifetimeVolume: lifetime,
     },
@@ -95,7 +107,7 @@ export function sandPart(m: SandMeasurements): { part: SandPartInput | null; war
     cores = m.rawCores.flatMap((c: any) => {
       const volume = num(c?.volume_mm3);
       const size = Array.isArray(c?.box_mm) ? c.box_mm.map(Number).filter((v: number) => Number.isFinite(v)).sort((a: number, b: number) => b - a) : [];
-      return volume != null && size.length === 3 ? [{ volumeMm3: volume, sizeMm: [size[0], size[1], size[2]] as const }] : [];
+      return volume != null && size.length === 3 ? [{ volumeMm3: volume, areaMm2: positive(c?.area_mm2), sizeMm: [size[0], size[1], size[2]] as const }] : [];
     });
   } else warnings.push('Cores not measured (the analysis predates it): no core is costed. Re-run the analysis.');
   return {

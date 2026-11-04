@@ -149,6 +149,9 @@ void build_cores(const TDF_Label& part, PartProperties& p, const std::string& ou
     double x0, y0, z0, x1, y1, z1;
     box.Get(x0, y0, z0, x1, y1, z1);
     core.volume = props.Mass();
+    GProp_GProps surface;
+    BRepGProp::SurfaceProperties(*solid, surface);
+    core.area = surface.Mass();
     core.centre = {props.CentreOfMass().X(), props.CentreOfMass().Y(), props.CentreOfMass().Z()};
     core.size = {x1 - x0, y1 - y0, z1 - z0};
     std::sort(core.size.begin(), core.size.end(), std::greater<double>());

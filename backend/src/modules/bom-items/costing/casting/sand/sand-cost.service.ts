@@ -11,6 +11,7 @@ import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal,
 import { SandMachineService } from './sand-machine.service';
 import { SandReferenceService } from './sand-reference.service';
 import { SAND_CASTING_SOURCE_VERSION } from './sand-reference';
+import { REFRACTORY_CLASSES } from './sand-refractory';
 import { overridesMap } from './sand-variable-overrides';
 import { SandVariableOverridesService } from './sand-variable-overrides.service';
 import { buildSandRoute, MOULDING_PROCESSES, type SandRoute } from './sand-route';
@@ -20,6 +21,7 @@ import { CORE_PROCESSES } from './sand-cores';
 const SAND_MATERIAL_GROUP = 'Sand Casting';
 /** Every machine class the route can use. */
 const ROUTE_CLASSES = [
+  ...REFRACTORY_CLASSES,
   ...MOULDING_PROCESSES.map((p) => p.machineClass),
   ...CORE_PROCESSES.map((p) => p.machineClass),
   'sand_casting_melting', 'sand_casting_pour', 'sand_casting_cooling', 'sand_casting_shakeout', 'sand_casting_degating',
