@@ -293,8 +293,11 @@ export function computeNesting(input: NestingInput): NestingResult {
   let bestSheet: [number, number] = [last.widthMm, last.lengthMm];
 
   for (const { widthMm: w, lengthMm: l } of sheets) {
-    if (w < flatPatternWidthMm + 2 * edgeAllowanceMm) continue;
-    if (l < flatPatternLengthMm + 2 * edgeAllowanceMm) continue;
+    // A sheet can hold the part in either orientation, whichever way round the
+    // stock sheet's width/length happen to be recorded.
+    const fitsUpright = w >= flatPatternWidthMm + 2 * edgeAllowanceMm && l >= flatPatternLengthMm + 2 * edgeAllowanceMm;
+    const fitsRotated = w >= flatPatternLengthMm + 2 * edgeAllowanceMm && l >= flatPatternWidthMm + 2 * edgeAllowanceMm;
+    if (!fitsUpright && !fitsRotated) continue;
 
     const usableW = w - 2 * edgeAllowanceMm;
     const usableL = l - 2 * edgeAllowanceMm;

@@ -17,8 +17,12 @@ import type { TurretPunchMachineParams } from '../../shared/core/manufacturing-p
 // ── Normalise material names to match the seeded sm_lookup_laser_cut values ───
 export function normaliseLaserMaterial(grade: string | null | undefined): string {
   const g = (grade ?? '').toUpperCase();
-  if (/ALUMIN|AL\s*\d{4}|AA\s*\d{4}|6061|6063|5052|5754|7075|2024/.test(g)) return 'Aluminium';
-  if (/STAINLESS|SS\s*3\d{2}|SS\s*4\d{2}|AISI\s*3\d{2}|17-4|SS304|SS316/.test(g)) return 'Stainless Steel';
+  // classifyLaserMaterial is the capability gate's classifier and reads bare
+  // designations the patterns below miss ("SUS304", "304", "316L", "SS 201");
+  // both must agree or the cut-speed row and the power gate pick different materials.
+  const family = classifyLaserMaterial(grade ?? null);
+  if (family === 'AL' || /ALUMIN|AL\s*\d{4}|AA\s*\d{4}|6061|6063|5052|5754|7075|2024/.test(g)) return 'Aluminium';
+  if (family === 'SS' || /STAINLESS|SS\s*3\d{2}|SS\s*4\d{2}|AISI\s*3\d{2}|17-4|SS304|SS316/.test(g)) return 'Stainless Steel';
   if (/BRASS|CUZ|CW/.test(g)) return 'Brass';
   // Default: CRCA, IS2062, mild, HR, DC01, E250, MS → Carbon Steel
   return 'Carbon Steel';
