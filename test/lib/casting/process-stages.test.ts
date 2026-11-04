@@ -31,6 +31,24 @@ describe("the stages of making a sand casting", () => {
     expect(stages.flatMap((s) => s.lines)).toHaveLength(lines.length);
   });
 
+  it("puts the coating, the drying and the core gluing with the stage they belong to", () => {
+    const coated = processStages(
+      [
+        ...lines,
+        { process: "Core Refractory Coat", cycleTimeMin: 0.1 },
+        { process: "Core assembly", cycleTimeMin: 1 },
+        { process: "Refractory Coat Oven Dry (cores)", cycleTimeMin: 0.2 },
+        { process: "Mold Refractory Coat", cycleTimeMin: 0.3 },
+        { process: "Refractory Coat Air Dry (mould)", cycleTimeMin: 0.4 },
+      ],
+      "Horizontal Automatic",
+    );
+    const names = (k: string) => coated.find((s) => s.key === k)!.lines.map((l) => l.process);
+    expect(names("cores")).toEqual(["Hot Box coremaking", "Core Refractory Coat", "Core assembly", "Refractory Coat Oven Dry (cores)"]);
+    expect(names("mould")).toEqual(["Horizontal Automatic", "Mold Refractory Coat", "Refractory Coat Air Dry (mould)"]);
+    expect(coated.flatMap((s) => s.lines)).toHaveLength(lines.length + 5);
+  });
+
   it("adds a stage's minutes, and says nothing for a stage the route has no line for", () => {
     expect(stageMinutes(by("pour"))).toBe(2.5);
     expect(stageMinutes(by("finish"))).toBe(3.75);

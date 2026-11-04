@@ -678,6 +678,100 @@ BEGIN
 END
 $calc$;
 
+-- Sand Casting - Refractory coat
+DO $calc$
+DECLARE v_id UUID;
+BEGIN
+  SELECT id INTO v_id FROM public.calculators WHERE name = $q$Sand Casting - Refractory coat$q$ AND user_id IS NULL AND retired_at IS NULL;
+  IF v_id IS NULL THEN
+    INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
+    VALUES (NULL, $q$Sand Casting - Refractory coat$q$, 'process', 'single', false, true, true, $q$Refractory coating of a mould or its cores: the coat time is the surface times the number of coats over the application rate of the method (brushing, flow coating or spraying, as the plant's default names it); the coating used is that surface times the volume the method puts on a square metre (its output over its rate), times the coating's density; the preparation of the slurry is shared by the batch. The drying is a step of its own.$q$)
+    RETURNING id INTO v_id;
+  ELSE
+    UPDATE public.calculators SET calc_category = 'process', description = $q$Refractory coating of a mould or its cores: the coat time is the surface times the number of coats over the application rate of the method (brushing, flow coating or spraying, as the plant's default names it); the coating used is that surface times the volume the method puts on a square metre (its output over its rate), times the coating's density; the preparation of the slurry is shared by the batch. The drying is a step of its own.$q$, updated_at = now() WHERE id = v_id;
+  END IF;
+
+  DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
+  INSERT INTO public.calculator_fields
+    (calculator_id, field_name, display_label, field_type, unit, data_source, source_table, source_field, default_value, display_order, is_required)
+  VALUES
+    (v_id, $q$Coated Area$q$, $q$Coated Area (mm²)$q$, $q$number$q$, $q$mm²$q$, NULL, NULL, NULL, NULL, 1, true),
+    (v_id, $q$Coats$q$, $q$Coats$q$, $q$number$q$, NULL, NULL, NULL, NULL, NULL, 2, true),
+    (v_id, $q$Application Rate$q$, $q$Application Rate (m²/min)$q$, $q$number$q$, $q$m²/min$q$, NULL, NULL, NULL, NULL, 3, true),
+    (v_id, $q$Output Volume$q$, $q$Output Volume (L/min)$q$, $q$number$q$, $q$L/min$q$, NULL, NULL, NULL, NULL, 4, true),
+    (v_id, $q$Coating Density$q$, $q$Coating Density (kg/m³)$q$, $q$number$q$, $q$kg/m³$q$, NULL, NULL, NULL, NULL, 5, true),
+    (v_id, $q$Preparation Time$q$, $q$Preparation Time (hr)$q$, $q$number$q$, $q$hr$q$, NULL, NULL, NULL, NULL, 6, true),
+    (v_id, $q$Batch Size$q$, $q$Batch Size$q$, $q$number$q$, NULL, NULL, NULL, NULL, NULL, 7, true),
+    (v_id, $q$Area$q$, $q$Area (m²)$q$, $q$calculated$q$, $q$m²$q$, NULL, NULL, NULL, $q${Coated Area} / 1000000$q$, 8, false),
+    (v_id, $q$Coat Time$q$, $q$Coat Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Area} * {Coats} / {Application Rate} * 60$q$, 9, false),
+    (v_id, $q$Preparation per Casting$q$, $q$Preparation per Casting (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Preparation Time} * 3600 / {Batch Size}$q$, 10, false),
+    (v_id, $q$Coating per Area$q$, $q$Coating per Area (L/m²)$q$, $q$calculated$q$, $q$L/m²$q$, NULL, NULL, NULL, $q${Output Volume} / {Application Rate}$q$, 11, false),
+    (v_id, $q$Coating Volume$q$, $q$Coating Volume (L)$q$, $q$calculated$q$, $q$L$q$, NULL, NULL, NULL, $q${Area} * {Coats} * {Coating per Area}$q$, 12, false),
+    (v_id, $q$Coating Mass$q$, $q$Coating Mass (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q${Coating Volume} / 1000 * {Coating Density}$q$, 13, false),
+    (v_id, $q$Cycle Time$q$, $q$Cycle Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Coat Time} + {Preparation per Casting}$q$, 14, false);
+END
+$calc$;
+
+-- Sand Casting - Refractory drying
+DO $calc$
+DECLARE v_id UUID;
+BEGIN
+  SELECT id INTO v_id FROM public.calculators WHERE name = $q$Sand Casting - Refractory drying$q$ AND user_id IS NULL AND retired_at IS NULL;
+  IF v_id IS NULL THEN
+    INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
+    VALUES (NULL, $q$Sand Casting - Refractory drying$q$, 'process', 'single', false, true, true, $q$Drying of the coated moulds or cores in an oven or on an air-dry area: the plant's drying time for a load, shared by the castings one load holds. What a load holds is the part of the bed the racking leaves free (the plant's available factor) over the volume of one item (a flask, or a core's box); the items a casting needs over that is the castings a load makes. The oven's energy is its power over the drying time, shared the same way, priced with the energy price. The drying time is the plant's own setting (set in the Cost Guide); none is assumed.$q$)
+    RETURNING id INTO v_id;
+  ELSE
+    UPDATE public.calculators SET calc_category = 'process', description = $q$Drying of the coated moulds or cores in an oven or on an air-dry area: the plant's drying time for a load, shared by the castings one load holds. What a load holds is the part of the bed the racking leaves free (the plant's available factor) over the volume of one item (a flask, or a core's box); the items a casting needs over that is the castings a load makes. The oven's energy is its power over the drying time, shared the same way, priced with the energy price. The drying time is the plant's own setting (set in the Cost Guide); none is assumed.$q$, updated_at = now() WHERE id = v_id;
+  END IF;
+
+  DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
+  INSERT INTO public.calculator_fields
+    (calculator_id, field_name, display_label, field_type, unit, data_source, source_table, source_field, default_value, display_order, is_required)
+  VALUES
+    (v_id, $q$Drying Time$q$, $q$Drying Time (min)$q$, $q$number$q$, $q$min$q$, NULL, NULL, NULL, NULL, 1, true),
+    (v_id, $q$Item Volume$q$, $q$Item Volume (mm³)$q$, $q$number$q$, $q$mm³$q$, NULL, NULL, NULL, NULL, 2, true),
+    (v_id, $q$Items per Casting$q$, $q$Items per Casting$q$, $q$number$q$, NULL, NULL, NULL, NULL, NULL, 3, true),
+    (v_id, $q$Bed Length$q$, $q$Bed Length (mm)$q$, $q$number$q$, $q$mm$q$, NULL, NULL, NULL, NULL, 4, true),
+    (v_id, $q$Bed Width$q$, $q$Bed Width (mm)$q$, $q$number$q$, $q$mm$q$, NULL, NULL, NULL, NULL, 5, true),
+    (v_id, $q$Bed Height$q$, $q$Bed Height (mm)$q$, $q$number$q$, $q$mm$q$, NULL, NULL, NULL, NULL, 6, true),
+    (v_id, $q$Available Factor$q$, $q$Available Factor$q$, $q$number$q$, NULL, NULL, NULL, NULL, NULL, 7, true),
+    (v_id, $q$Preparation Time$q$, $q$Preparation Time (hr)$q$, $q$number$q$, $q$hr$q$, NULL, NULL, NULL, NULL, 8, true),
+    (v_id, $q$Batch Size$q$, $q$Batch Size$q$, $q$number$q$, NULL, NULL, NULL, NULL, NULL, 9, true),
+    (v_id, $q$Power$q$, $q$Power (kW)$q$, $q$number$q$, $q$kW$q$, NULL, NULL, NULL, NULL, 10, true),
+    (v_id, $q$Items per Load$q$, $q$Items per Load$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q$floor({Bed Length} * {Bed Width} * {Bed Height} * {Available Factor} / {Item Volume})$q$, 11, false),
+    (v_id, $q$Castings per Load$q$, $q$Castings per Load$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q${Items per Load} / {Items per Casting}$q$, 12, false),
+    (v_id, $q$Drying per Casting$q$, $q$Drying per Casting (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Drying Time} * 60 / {Castings per Load}$q$, 13, false),
+    (v_id, $q$Preparation per Casting$q$, $q$Preparation per Casting (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Preparation Time} * 3600 / {Batch Size}$q$, 14, false),
+    (v_id, $q$Energy$q$, $q$Energy (kWh)$q$, $q$calculated$q$, $q$kWh$q$, NULL, NULL, NULL, $q${Power} * {Drying Time} / 60 / {Castings per Load}$q$, 15, false),
+    (v_id, $q$Cycle Time$q$, $q$Cycle Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Drying per Casting} + {Preparation per Casting}$q$, 16, false);
+END
+$calc$;
+
+-- Sand Casting - Core assembly
+DO $calc$
+DECLARE v_id UUID;
+BEGIN
+  SELECT id INTO v_id FROM public.calculators WHERE name = $q$Sand Casting - Core assembly$q$ AND user_id IS NULL AND retired_at IS NULL;
+  IF v_id IS NULL THEN
+    INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
+    VALUES (NULL, $q$Sand Casting - Core assembly$q$, 'process', 'single', false, true, true, $q$Gluing the cores of one casting into an assembly: each core after the first is glued to the one before (or to the assembly), and the plant's time for one glue is singleCoreAssemblyTime (read in seconds).$q$)
+    RETURNING id INTO v_id;
+  ELSE
+    UPDATE public.calculators SET calc_category = 'process', description = $q$Gluing the cores of one casting into an assembly: each core after the first is glued to the one before (or to the assembly), and the plant's time for one glue is singleCoreAssemblyTime (read in seconds).$q$, updated_at = now() WHERE id = v_id;
+  END IF;
+
+  DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
+  INSERT INTO public.calculator_fields
+    (calculator_id, field_name, display_label, field_type, unit, data_source, source_table, source_field, default_value, display_order, is_required)
+  VALUES
+    (v_id, $q$Cores$q$, $q$Cores$q$, $q$number$q$, NULL, NULL, NULL, NULL, NULL, 1, true),
+    (v_id, $q$Time per Glue$q$, $q$Time per Glue (s)$q$, $q$number$q$, $q$s$q$, NULL, NULL, NULL, NULL, 2, true),
+    (v_id, $q$Glues$q$, $q$Glues$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q$max({Cores} - 1, 0)$q$, 3, false),
+    (v_id, $q$Cycle Time$q$, $q$Cycle Time (s)$q$, $q$calculated$q$, $q$s$q$, NULL, NULL, NULL, $q${Glues} * {Time per Glue}$q$, 4, false);
+END
+$calc$;
+
 -- Post-check: every calculator exists once, with all its fields, linked to every operation it computes.
 DO $post$
 DECLARE bad TEXT;
@@ -703,7 +797,10 @@ BEGIN
     ($q$Sand Casting - Core sand$q$, 5, 0),
     ($q$Sand Casting - Coremaking$q$, 3, 6),
     ($q$Sand Casting - Hot box coremaking$q$, 21, 1),
-    ($q$Sand Casting - Core box$q$, 8, 0)
+    ($q$Sand Casting - Core box$q$, 8, 0),
+    ($q$Sand Casting - Refractory coat$q$, 14, 0),
+    ($q$Sand Casting - Refractory drying$q$, 16, 0),
+    ($q$Sand Casting - Core assembly$q$, 4, 0)
   ) AS e(name, field_count, mapping_count)
   LEFT JOIN public.calculators c ON c.name = e.name AND c.user_id IS NULL AND c.retired_at IS NULL
   WHERE c.id IS NULL

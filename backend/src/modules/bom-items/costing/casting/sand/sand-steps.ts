@@ -65,10 +65,12 @@ export interface SandRouteContext {
   /** USD per kWh for melting; null until the user sets it (no default is assumed). */
   energyPricePerKwh: number | null;
   hotBox: HotBoxSettings;
+  /** The batch size of the scenario (the preparation of a coating or an oven is shared by it). */
+  batchSize: number;
 }
 
 export type StepOutcome =
-  | { ok: true; sec: number; run: ReferenceCalcRun; energyCostUsd: number; notes: string[] }
+  | { ok: true; sec: number; run: ReferenceCalcRun; energyCostUsd: number; notes: string[]; /** Material used by the step (the refractory coating), USD per casting, added to the run cost. */ materialCostUsd?: number }
   | { ok: false; reasons: string[] };
 
 const fail = (...reasons: string[]): StepOutcome => ({ ok: false, reasons });
@@ -256,7 +258,7 @@ export function selectAndCost(input: {
       machine: asFinishingMachine(m), sec: outcome.sec, batchSize: input.batchSize, costContext: input.costContext, warnings: [], run: outcome.run,
       breakdown: `${input.process}: ${r2(outcome.sec)} s per casting${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
     });
-    const energy = outcome.energyCostUsd;
+    const energy = outcome.energyCostUsd + (outcome.materialCostUsd ?? 0);
     const costed: ProcessLineCost = energy ? { ...base, runCost: r2(base.runCost + energy), totalCost: r2(base.totalCost + energy) } : base;
     return { m, outcome, costed };
   });

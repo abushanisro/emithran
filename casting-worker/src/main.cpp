@@ -44,7 +44,7 @@
 namespace {
 
 constexpr int kSchemaVersion = 1;
-constexpr const char* kWorkerVersion = "0.17.0";
+constexpr const char* kWorkerVersion = "0.18.0";
 
 int fail(const char* code, int exit_code) {
   std::cout << "{\"error\":\"" << code << "\"}\n";
@@ -147,6 +147,7 @@ void write_casting(JsonWriter& json, const std::optional<CastingProperties>& c) 
   for (const CoreProperties& core : c->cores) {
     json.begin_object()
         .key("volume_mm3").value(core.volume)
+        .key("area_mm2").value(core.body ? std::optional<double>(core.area) : std::nullopt)
         .key("size_mm").begin_array().value(core.size[0]).value(core.size[1]).value(core.size[2]).end_array()
         .key("centre_mm").begin_array().value(core.centre[0]).value(core.centre[1]).value(core.centre[2]).end_array()
         .key("body").value(core.body)

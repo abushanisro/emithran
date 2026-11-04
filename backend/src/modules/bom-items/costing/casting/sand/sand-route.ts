@@ -12,6 +12,7 @@ import type { CostContext } from '../casting-finishing';
 import { coreboxTooling, coreLine, sandCores, type CoreboxTooling, type CoreRegion } from './sand-cores';
 import { cleanStep, degateStep, finishStep, inspectStep, shakeoutStep, type SandFinishContext } from './sand-finishing-steps';
 import { referenceYieldNote } from './sand-yield';
+import { coreRefractoryLines, mouldRefractoryLines, NO_REFRACTORY, type RefractorySettings } from './sand-refractory';
 import { designGating, type GatingSystem, type SandFlask } from './sand-gating';
 import { ingateVelocityNote, RISER_EFFICIENCY_NOTE } from './sand-velocity';
 import { machineValue, type SandMachine } from './sand-machines';
@@ -60,6 +61,8 @@ export interface SandScenario {
   energyPricePerKwh: number | null;
   /** The plant's hot box settings; each null until the user sets it (no default is assumed). */
   hotBox: HotBoxSettings;
+  /** The refractory coating the user chose and how it is dried; absent: nothing is coated. */
+  refractory?: RefractorySettings;
   /** Parts made over the tooling's life: core boxes are shared by these. Null: the tooling is not costed (and said so), never spread over an assumed volume. */
   lifetimeVolume: number | null;
 }
@@ -166,7 +169,7 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   const base: SandRouteContext = {
     ref, spec: input.spec, calculators: input.calculators, material: input.material,
     part: { netKg, modulusMm: modulus, dimsMm: part.dimsMm, wallNominalMm: thickness },
-    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh, hotBox: scenario.hotBox,
+    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh, hotBox: scenario.hotBox, batchSize: scenario.batchSize,
   };
   const { system: gating, missing: gatingMissing } = designGating({
     netKg, volumeMm3: part.volumeMm3, modulusMm: modulus, densityKgM3: density, materialName: input.material.name,
@@ -219,6 +222,8 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   for (const core of cored.cores) {
     before.push(coreLine({ ctx, core, machinesByClass: input.machinesByClass, batchSize: scenario.batchSize, costContext: input.costContext, chosenProcess: scenario.chosenCoreProcess }).step);
   }
+  // The cores coated and dried, and glued into an assembly (only what the user chose to coat; the gluing needs two cores or more).
+  before.push(...coreRefractoryLines(ctx, scenario.refractory ?? NO_REFRACTORY, cored.cores.map((c) => c.region), { machinesByClass: input.machinesByClass, ...common }));
   const after: CostedStep[] = [
     step('Pour', 'sand_casting_pour', (m) => pourStep(ctx, m), ['The ladle holds one mould', 'A pouring coefficient for the material']),
     step('Cooling', 'sand_casting_cooling', (m) => coolStep(ctx, m, mould.machineClass === PIT_CLASS), ["Chvorinov's rule on the casting's modulus"]),
@@ -253,7 +258,10 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
     process: mouldingProcess, machineClass: mould.machineClass, machines: [mould], evaluate: (m) => mouldStep(ctx, m),
     criteria: ['The flask holds the part with its sand borders'], batchSize: scenario.batchSize, costContext: input.costContext, ref,
   });
-  const steps: CostedStep[] = [...before, mouldStepResult, ...after];
+  // The mould's cavity coated and the mould dried: after the mould is made, before the metal is poured (the flask is this machine's own).
+  const flask = flaskOf(mould);
+  const mouldCoating = mouldRefractoryLines(ctx, scenario.refractory ?? NO_REFRACTORY, flask.lengthMm * flask.widthMm * flask.heightMm, { machinesByClass: input.machinesByClass, batchSize: scenario.batchSize, costContext: input.costContext, ref });
+  const steps: CostedStep[] = [...before, mouldStepResult, ...mouldCoating, ...after];
   const lines = steps.map((s) => s.line);
   const gaps = lines.filter(isGap);
   // Scrapped parts are paid for by the good ones: the lines are divided by the product of the machines' good-part yields.

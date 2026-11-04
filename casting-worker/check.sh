@@ -139,6 +139,14 @@ wall_case tube "10:2,50:2" "outer radius 30, bore 20, height 50: the wall is 10 
 wall_case hollow-box "10:4,20:8" "100 x 60 x 40 with a 60 x 20 x 20 cavity: the faces over the cavity (top, bottom, and the cavity's own) are 10, the other eight 20"
 wall_case step-block "20:2,40:1,50:2,60:2,100:1" "the L step: bottom and step top 20, the high top 40, the left side and the riser 50, front and back 60, the right side 100"
 
+echo "== core surface (0.18.0): the exact area of a core's body, worked by hand"
+# hollow-box is 100 x 60 x 40 with a 60 x 20 x 20 cavity: the core is that cavity, its surface 2 (60*20 + 60*20 + 20*20) = 5600 mm2.
+core_area="$(node -e '
+    const c = JSON.parse(require("fs").readFileSync(process.argv[1])).parts[0].casting.cores;
+    console.log(c.length === 1 && c[0].body && Math.abs(c[0].area_mm2 - 5600) < 1 ? "ok" : "bad " + JSON.stringify(c.map((x) => [x.body, x.area_mm2])));
+' "$WORK/results/hollow-box/result.json")"
+[ "$core_area" = "ok" ] && pass "core area hollow-box: 5600 mm2 (the cavity's six faces)" || fail "core area hollow-box: $core_area"
+
 echo "== wall thickness over the surface (S6b): the rays themselves, for a colour map"
 # Every point is on a face the worker listed, its thickness is one of the box's three (20, 50, 100: through the thickness, the width and the length), and the faces' minima are the smallest of their points.
 points_case() { # <sample stem> <allowed thicknesses, comma separated> <why>

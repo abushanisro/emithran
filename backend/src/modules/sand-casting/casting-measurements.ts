@@ -39,7 +39,7 @@ export function measurementsFromCastingResult(result: unknown): AnalysisMeasurem
   const above = top != null && partingHeight != null && top - partingHeight > 0 ? top - partingHeight : null;
 
   const cores = Array.isArray(casting.cores)
-    ? casting.cores.flatMap((c: any) => (num(c?.volume_mm3) != null && Array.isArray(c?.size_mm) ? [{ volume_mm3: c.volume_mm3, box_mm: c.size_mm }] : []))
+    ? casting.cores.flatMap((c: any) => (num(c?.volume_mm3) != null && Array.isArray(c?.size_mm) ? [{ volume_mm3: c.volume_mm3, area_mm2: num(c?.area_mm2), box_mm: c.size_mm }] : []))
     : null;
   return {
     missing: [],

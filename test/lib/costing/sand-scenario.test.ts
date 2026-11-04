@@ -25,7 +25,7 @@ describe('sand scenario fields', () => {
   });
 
   it('uses the backend\'s keys and process names (a name it does not know is ignored there)', () => {
-    expect(SAND_SCENARIO_KEYS).toEqual({ mouldingProcess: 'sandMouldingProcess', coreProcess: 'sandCoreProcess', energyPrice: 'energyPriceUsdPerKwh', cavities: 'cavityCount', hotBoxCoreboxTemp: 'hotBoxCoreboxTempC', hotBoxCureTemp: 'hotBoxCureTempC', hotBoxCuredDepth: 'hotBoxCuredDepthMm' });
+    expect(SAND_SCENARIO_KEYS).toEqual({ mouldingProcess: 'sandMouldingProcess', coreProcess: 'sandCoreProcess', energyPrice: 'energyPriceUsdPerKwh', cavities: 'cavityCount', hotBoxCoreboxTemp: 'hotBoxCoreboxTempC', hotBoxCureTemp: 'hotBoxCureTempC', hotBoxCuredDepth: 'hotBoxCuredDepthMm', refractoryCoat: 'sandRefractoryCoat', refractoryDryMethod: 'sandRefractoryDryMethod', refractoryDryMinutes: 'sandRefractoryDryMinutes', refractoryCoatPrice: 'refractoryCoatingUsdPerKg' });
     expect(SAND_MOULDING_PROCESSES).toHaveLength(5);
     expect(SAND_CORE_PROCESSES).toEqual(['Hot Box', 'CO2 Cured', 'No Bake', 'Oil Core', 'Shell']);
   });

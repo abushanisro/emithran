@@ -6,6 +6,9 @@ import type { AnalysisState } from '@/lib/casting/analysis-view';
 import { alternativeRows, type SandRouteAlternative } from '@/lib/costing/sand-alternatives';
 import {
   HOT_BOX_GUIDANCE,
+  REFRACTORY_COAT_CHOICES,
+  REFRACTORY_DRY_METHODS,
+  REFRACTORY_GUIDANCE,
   SAND_CORE_PROCESSES,
   SAND_MOULDING_PROCESSES,
   SAND_SCENARIO_KEYS,
@@ -141,6 +144,48 @@ export function SandCastingSection({ overrides, route, onChange, analysis }: Pro
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCuredDepth]: v }); }}
         title={`Hot box core making. ${HOT_BOX_GUIDANCE.curedDepth}`}
       />
+      <div className={rowClass} title="Refractory coating is not costed unless you choose it. The coating methods, rates and densities are in the reference data; the drying time and the coating's price are yours to set.">
+        <span className={labelClass}>Refractory coat</span>
+        <select
+          className={`${controlClass} cursor-pointer`}
+          value={text(SAND_SCENARIO_KEYS.refractoryCoat)}
+          onChange={(e) => { onChange({ [SAND_SCENARIO_KEYS.refractoryCoat]: choiceOf(e.target.value) }); }}
+        >
+          <option value="">Not coated</option>
+          {REFRACTORY_COAT_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select>
+      </div>
+      {text(SAND_SCENARIO_KEYS.refractoryCoat) !== '' && (
+        <>
+          <div className={rowClass} title="How the coated mould or cores are dried.">
+            <span className={labelClass}>Drying</span>
+            <select
+              className={`${controlClass} cursor-pointer`}
+              value={text(SAND_SCENARIO_KEYS.refractoryDryMethod)}
+              onChange={(e) => { onChange({ [SAND_SCENARIO_KEYS.refractoryDryMethod]: choiceOf(e.target.value) }); }}
+            >
+              <option value="">Not set: the drying is not costed</option>
+              {REFRACTORY_DRY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+          <NumberField
+            label="Drying, min"
+            value={number(SAND_SCENARIO_KEYS.refractoryDryMinutes)}
+            placeholder="set: time for a load"
+            parse={parsePositive}
+            onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.refractoryDryMinutes]: v }); }}
+            title={REFRACTORY_GUIDANCE.dryMinutes}
+          />
+          <NumberField
+            label="Coating, USD/kg"
+            value={number(SAND_SCENARIO_KEYS.refractoryCoatPrice)}
+            placeholder="not set: coating not charged"
+            parse={parsePositive}
+            onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.refractoryCoatPrice]: v }); }}
+            title={REFRACTORY_GUIDANCE.price}
+          />
+        </>
+      )}
       <div className="pt-1 border-t border-border/50 mt-1 space-y-0.5" title="The casting worker measures the exact solid: cores, parting line and wall. Until one is done, the cad-engine's measurements are used.">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-muted-foreground">Casting analysis</span>
@@ -188,7 +233,7 @@ export function SandCastingSection({ overrides, route, onChange, analysis }: Pro
         </div>
       )}
       <p className="text-[10px] text-muted-foreground/60 leading-tight pt-0.5">
-        Core boxes are costed over annual volume × production life; patterns, core coating and sand are not costed.
+        Core boxes are costed over annual volume × production life; patterns and sand are not costed.
       </p>
     </div>
   );

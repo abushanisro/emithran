@@ -20,7 +20,7 @@ const col = (k: string) => iron.columns[k]!;
 const ctx: SandRouteContext = {
   ref, spec, calculators, material: iron,
   part: { netKg: 8, modulusMm: 10, dimsMm: [300, 200, 100], wallNominalMm: 12 },
-  cavities: 1, coresPerCasting: 0, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null, hotBox: HOT_BOX,
+  cavities: 1, coresPerCasting: 0, poured: { perCastingKg: 11, perMouldKg: 11 }, energyPricePerKwh: null, hotBox: HOT_BOX, batchSize: 250,
 };
 
 const horizontal = sandMachines('machines_horizontal_automatic.csv', 'sand_casting_horizontal_automatic');

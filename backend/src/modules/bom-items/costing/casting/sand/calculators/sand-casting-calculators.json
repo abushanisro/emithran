@@ -1528,6 +1528,244 @@
           "formula": "{Tooling Cost} / {Lifetime Volume}"
         }
       ]
+    },
+    {
+      "key": "sand.refractory_coat",
+      "name": "Sand Casting - Refractory coat",
+      "description": "Refractory coating of a mould or its cores: the coat time is the surface times the number of coats over the application rate of the method (brushing, flow coating or spraying, as the plant's default names it); the coating used is that surface times the volume the method puts on a square metre (its output over its rate), times the coating's density; the preparation of the slurry is shared by the batch. The drying is a step of its own.",
+      "operations": [],
+      "helper": true,
+      "output": "Cycle Time",
+      "fields": [
+        {
+          "name": "Coated Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "coat_area_mm2"
+          }
+        },
+        {
+          "name": "Coats",
+          "unit": null,
+          "source": {
+            "variable": "defaultNumMoldRefractoryCoatingApplications"
+          }
+        },
+        {
+          "name": "Application Rate",
+          "unit": "m²/min",
+          "source": {
+            "lookup": "tblRefractoryCoating.Application Rate (m^2 / min)"
+          }
+        },
+        {
+          "name": "Output Volume",
+          "unit": "L/min",
+          "source": {
+            "lookup": "tblRefractoryCoating.Average Output Volume (L / min)"
+          }
+        },
+        {
+          "name": "Coating Density",
+          "unit": "kg/m³",
+          "source": {
+            "lookup": "processConsumables.Density (kg / m^3)"
+          }
+        },
+        {
+          "name": "Preparation Time",
+          "unit": "hr",
+          "source": {
+            "engine": "prep_hr"
+          }
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": {
+            "engine": "batch_size"
+          }
+        },
+        {
+          "name": "Area",
+          "unit": "m²",
+          "formula": "{Coated Area} / 1000000"
+        },
+        {
+          "name": "Coat Time",
+          "unit": "s",
+          "formula": "{Area} * {Coats} / {Application Rate} * 60"
+        },
+        {
+          "name": "Preparation per Casting",
+          "unit": "s",
+          "formula": "{Preparation Time} * 3600 / {Batch Size}"
+        },
+        {
+          "name": "Coating per Area",
+          "unit": "L/m²",
+          "formula": "{Output Volume} / {Application Rate}"
+        },
+        {
+          "name": "Coating Volume",
+          "unit": "L",
+          "formula": "{Area} * {Coats} * {Coating per Area}"
+        },
+        {
+          "name": "Coating Mass",
+          "unit": "kg",
+          "formula": "{Coating Volume} / 1000 * {Coating Density}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Coat Time} + {Preparation per Casting}"
+        }
+      ]
+    },
+    {
+      "key": "sand.refractory_drying",
+      "name": "Sand Casting - Refractory drying",
+      "description": "Drying of the coated moulds or cores in an oven or on an air-dry area: the plant's drying time for a load, shared by the castings one load holds. What a load holds is the part of the bed the racking leaves free (the plant's available factor) over the volume of one item (a flask, or a core's box); the items a casting needs over that is the castings a load makes. The oven's energy is its power over the drying time, shared the same way, priced with the energy price. The drying time is the plant's own setting (set in the Cost Guide); none is assumed.",
+      "operations": [],
+      "helper": true,
+      "output": "Cycle Time",
+      "fields": [
+        {
+          "name": "Drying Time",
+          "unit": "min",
+          "source": {
+            "scenario": "refractory_dry_minutes"
+          }
+        },
+        {
+          "name": "Item Volume",
+          "unit": "mm³",
+          "source": {
+            "engine": "item_volume_mm3"
+          }
+        },
+        {
+          "name": "Items per Casting",
+          "unit": null,
+          "source": {
+            "engine": "items_per_casting"
+          }
+        },
+        {
+          "name": "Bed Length",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_length_mm"
+          }
+        },
+        {
+          "name": "Bed Width",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_width_mm"
+          }
+        },
+        {
+          "name": "Bed Height",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_height_mm"
+          }
+        },
+        {
+          "name": "Available Factor",
+          "unit": null,
+          "source": {
+            "engine": "available_factor"
+          }
+        },
+        {
+          "name": "Preparation Time",
+          "unit": "hr",
+          "source": {
+            "engine": "prep_hr"
+          }
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": {
+            "engine": "batch_size"
+          }
+        },
+        {
+          "name": "Power",
+          "unit": "kW",
+          "source": {
+            "machine": "machine_power_kw"
+          }
+        },
+        {
+          "name": "Items per Load",
+          "unit": null,
+          "formula": "floor({Bed Length} * {Bed Width} * {Bed Height} * {Available Factor} / {Item Volume})"
+        },
+        {
+          "name": "Castings per Load",
+          "unit": null,
+          "formula": "{Items per Load} / {Items per Casting}"
+        },
+        {
+          "name": "Drying per Casting",
+          "unit": "s",
+          "formula": "{Drying Time} * 60 / {Castings per Load}"
+        },
+        {
+          "name": "Preparation per Casting",
+          "unit": "s",
+          "formula": "{Preparation Time} * 3600 / {Batch Size}"
+        },
+        {
+          "name": "Energy",
+          "unit": "kWh",
+          "formula": "{Power} * {Drying Time} / 60 / {Castings per Load}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Drying per Casting} + {Preparation per Casting}"
+        }
+      ]
+    },
+    {
+      "key": "sand.core_assembly",
+      "name": "Sand Casting - Core assembly",
+      "description": "Gluing the cores of one casting into an assembly: each core after the first is glued to the one before (or to the assembly), and the plant's time for one glue is singleCoreAssemblyTime (read in seconds).",
+      "operations": [],
+      "helper": true,
+      "output": "Cycle Time",
+      "fields": [
+        {
+          "name": "Cores",
+          "unit": null,
+          "source": {
+            "engine": "cores_per_casting"
+          }
+        },
+        {
+          "name": "Time per Glue",
+          "unit": "s",
+          "source": {
+            "variable": "singleCoreAssemblyTime"
+          }
+        },
+        {
+          "name": "Glues",
+          "unit": null,
+          "formula": "max({Cores} - 1, 0)"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Glues} * {Time per Glue}"
+        }
+      ]
     }
   ]
 }

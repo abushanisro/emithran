@@ -23,6 +23,8 @@ export const CORE_BOX = 'Sand Casting - Core box';
 /** A core region as the worker measured it: its volume and extents, largest first (mm). */
 export interface CoreRegion {
   volumeMm3: number;
+  /** The core's whole surface (mm²), exact from its body; null when it has none or the analysis predates it. */
+  areaMm2: number | null;
   sizeMm: readonly [number, number, number];
 }
 

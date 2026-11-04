@@ -560,6 +560,14 @@ export const CASTING_RESULT_SCHEMA = {
                 "type": "number",
                 "minimum": 0
               },
+              "area_mm2": {
+                "description": "The core's whole surface, prints included, exact from its body (0.18.0). Null without a body; absent in results of earlier workers",
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
               "body": {
                 "description": "A solid was made of its faces; drawn as node \"core <n>\" in cores_glb",
                 "type": "boolean"

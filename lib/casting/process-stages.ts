@@ -45,14 +45,14 @@ const DEFS: readonly StageDef[] = [
     label: 'Make the mould',
     what: 'Sand is packed around the pattern in the cope and the drag; the cavity, sprue, runner and risers take shape. The mould is open here.',
     view: { mould: true, open: 1, cores: false, gating: true, section: false },
-    has: (p, m) => m != null && p === m,
+    has: (p, m) => (m != null && p === m) || p === 'Mold Refractory Coat' || p.endsWith('Dry (mould)'),
   },
   {
     key: 'cores',
     label: 'Make and set the cores',
     what: 'Cores form the holes and voids the pattern cannot; each is set in the drag before the mould closes.',
     view: { mould: true, open: 1, cores: true, gating: true, section: false },
-    has: (p) => /coremaking$/i.test(p),
+    has: (p) => /coremaking$/i.test(p) || p === 'Core Refractory Coat' || p === 'Core assembly' || p.endsWith('Dry (cores)'),
   },
   {
     key: 'close',
