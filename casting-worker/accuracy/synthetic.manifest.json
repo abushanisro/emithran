@@ -1,0 +1,24 @@
+{
+  "_comment": "Hand-worked labels of the worker's synthetic samples (casting-worker/tools/make_samples.cpp), from the geometry alone: weight = volume x density (7100 kg/m3, gray iron), cores = closed cavities, minimum wall = the thinnest section, draw axis = the shallowest direction (or the one with the least hidden material). A development check of the gate's tooling: a synthetic corpus can never pass the real-part gate (S3).",
+  "corpus": "synthetic",
+  "requiredPassRate": 1,
+  "minParts": 5,
+  "tolerances": { "weightPct": 0.1, "minWallMm": 0.5 },
+  "parts": [
+    { "id": "box", "file": "box.step", "densityKgM3": 7100,
+      "_by_hand": "100 x 50 x 20 mm: 100 000 mm3 = 0.71 kg; solid; thinnest 20 mm; shallowest 20 mm along z",
+      "labels": { "weightKg": 0.71, "coreCount": 0, "minWallMm": 20, "drawAxis": "z" } },
+    { "id": "hollow-box", "file": "hollow-box.step", "densityKgM3": 7100,
+      "_by_hand": "100 x 60 x 40 less a 60 x 20 x 20 cavity: 240 000 - 24 000 = 216 000 mm3 = 1.5336 kg; one core; walls (40-20)/2 = 10 mm; the cavity hides least along x",
+      "labels": { "weightKg": 1.5336, "coreCount": 1, "minWallMm": 10, "drawAxis": "x" } },
+    { "id": "tube", "file": "tube.step", "densityKgM3": 7100,
+      "_by_hand": "R30 r20 h50: pi (900 - 400) 50 = 78 539.8 mm3 = 0.557632 kg; open through; wall 30 - 20 = 10 mm; draw along the bore, z",
+      "labels": { "weightKg": 0.557632, "coreCount": 0, "minWallMm": 10, "drawAxis": "z" } },
+    { "id": "cylinder", "file": "cylinder.step", "densityKgM3": 7100,
+      "_by_hand": "R25 h40: pi 625 40 = 78 539.8 mm3 = 0.557632 kg; solid; thinnest 40 mm (its height); draw along z",
+      "labels": { "weightKg": 0.557632, "coreCount": 0, "minWallMm": 40, "drawAxis": "z" } },
+    { "id": "step-block", "file": "step-block.step", "densityKgM3": 7100,
+      "_by_hand": "100 x 60 x 40 less 50 x 60 x 20: 240 000 - 60 000 = 180 000 mm3 = 1.278 kg; solid; thinnest section 20 mm; draw along z",
+      "labels": { "weightKg": 1.278, "coreCount": 0, "minWallMm": 20, "drawAxis": "z" } }
+  ]
+}

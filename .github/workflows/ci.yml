@@ -290,6 +290,8 @@ jobs:
       - run: casting-worker/check.sh
       # The worker host (core's cad-worker-host + this worker, target `host`) in its sandbox, a real STEP part through the backend's own client over the socket.
       - run: casting-worker/e2e.sh
+      # The accuracy gate's tooling on the hand-worked synthetic samples (every label derived from the geometry, not from the worker). It can never claim S3: only real parts can.
+      - run: casting-worker/accuracy.sh --synthetic
 
   cad-engine:
     name: CAD Engine (Docker build)
