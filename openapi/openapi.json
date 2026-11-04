@@ -3575,6 +3575,33 @@
         ],
         "type": "object"
       },
+      "CreateSandSnapshotDto": {
+        "properties": {
+          "batchSize": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "label": {
+            "description": "What this freeze is, for example the quote it supports.",
+            "maxLength": 120,
+            "minLength": 3,
+            "type": "string"
+          },
+          "location": {
+            "description": "The digital factory location the cost is computed for.",
+            "type": "string"
+          },
+          "productionLifeYears": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "location"
+        ],
+        "type": "object"
+      },
       "CreateSupplierEvaluationDto": {
         "properties": {
           "bomItemId": {
@@ -7241,6 +7268,28 @@
       },
       "RequestQuoteDto": {
         "properties": {},
+        "type": "object"
+      },
+      "ReviewSandSnapshotDto": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "description": "Why. Required, and kept in the audit trail.",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "note"
+        ],
         "type": "object"
       },
       "RfqRecord": {
@@ -14296,6 +14345,72 @@
         "summary": "Design-for-casting checks of the item's sand casting analysis (severity, measured value, threshold, the rule's note, the faces); rules the analysis cannot measure are listed as not evaluated",
         "tags": [
           "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/sand-snapshots": {
+      "get": {
+        "operationId": "SandSnapshotsController_list_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The frozen cost results of the part, newest first, with their review.",
+        "tags": [
+          "Sand casting"
+        ]
+      },
+      "post": {
+        "operationId": "SandSnapshotsController_create_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSandSnapshotDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Freeze the part's cost as the server computes it now, with what it was computed with. Audited.",
+        "tags": [
+          "Sand casting"
         ]
       }
     },
@@ -25027,6 +25142,45 @@
         },
         "tags": [
           "ManufacturingKnowledge"
+        ]
+      }
+    },
+    "/api/v1/sand-snapshots/{snapshotId}/review": {
+      "post": {
+        "operationId": "SandSnapshotReviewController_review_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshotId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSandSnapshotDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A different member approves or rejects a submitted snapshot, with a note, once. Audited.",
+        "tags": [
+          "Sand casting"
         ]
       }
     },

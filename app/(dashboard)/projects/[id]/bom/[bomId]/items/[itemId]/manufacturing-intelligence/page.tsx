@@ -16,6 +16,7 @@ import { CopilotPanel } from '@/components/features/manufacturing-intelligence/C
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandBalancePanel } from '@/components/costing/SandBalancePanel';
 import { SandCalculationsPanel } from '@/components/costing/SandCalculationsPanel';
+import { SandSnapshotsPanel } from '@/components/costing/SandSnapshotsPanel';
 import { calculationEntries } from '@/lib/costing/sand-calculations';
 import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
 import { useCastingAnalyses, useRequestCastingAnalysis } from '@/lib/api/hooks/useCastingAnalyses';
@@ -6192,6 +6193,17 @@ function CostGuidePanel({
                   </div>
                 )}
                 <SandCalculationsPanel bomItemId={item.id} entries={calculationEntries(cgpCostSummary?.processLines, cgpCostSummary?.calculatorRuns)} />
+              </Section>
+            )}
+
+            {isSandCast && (
+              <Section title="Frozen Costs and Review">
+                <SandSnapshotsPanel
+                  bomItemId={item.id}
+                  location={factory}
+                  batchSize={batchSize}
+                  productionLifeYears={productionLife ?? undefined}
+                />
               </Section>
             )}
 
