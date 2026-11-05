@@ -57,6 +57,14 @@ class TestVoids:
         assert item["attributes"]["reading"] == "side_action_reading_v1"
         assert item["occurrences"][0]["face_ids"] == v["face_ids"]
 
+    def test_every_occurrence_carries_a_part_centred_centroid_for_the_viewer(self):
+        items = core(cut(box(100, 60, 20), side_pocket(10, 30)))["feature_graph"]["items"]
+        void = next(i for i in items if i["feature_type"] == "Void")
+        cx, cy, cz = void["occurrences"][0]["centroid"]
+        # the pocket is on the +x side of the block (x 50..100), y 10..30, z 5..15; the block's centre is (50, 30, 10)
+        assert cx > 0 and cy < 0 and abs(cz) < 6
+        assert all("centroid" in o for i in items for o in i["occurrences"])
+
     def test_a_pocket_the_halves_can_form_is_not_a_void(self):
         out = core(cut(box(100, 60, 20), box(30, 20, 10, at=(20, 20, 10))))  # open to +z: formed by the mold half
         assert out["side_actions"]["voids"] == []

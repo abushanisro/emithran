@@ -31,9 +31,15 @@ def build_feature_graph(
     all_types: Sequence[str],
     side_actions: Dict[str, Any] | None = None,
     parting: Dict[str, Any] | None = None,
+    centroid_of: Callable[[Sequence[int]], List[float]] | None = None,
 ) -> Dict[str, Any]:
     """`vocabulary(t)` returns t when it is a catalog feature type and raises when it is not (shared.feature_vocabulary.require_feature_type)."""
     items: List[Dict[str, Any]] = []
+
+    def occ(face_ids: Sequence[int]) -> Dict[str, Any]:
+        """One occurrence: its faces and, for the 3D viewer, where they are (part-centered coordinates, as in the other feature graphs)."""
+        return {"face_ids": list(face_ids), **({"centroid": centroid_of(face_ids)} if centroid_of else {})}
+
     consumed = set((side_actions or {}).get("consumed_ids", []))  # holes and voids that a ComboVoid replaces
     for h in holes.get("holes", []):
         if h["id"] in consumed:
@@ -41,14 +47,14 @@ def build_feature_graph(
         items.append({
             "id": h["id"], "feature_type": vocabulary(h["feature_type"]), "variant": h["variant"], "diameter_mm": h["diameter_mm"], "depth_mm": h["depth_mm"],
             "attributes": {"depth_to_diameter": h["depth_to_diameter"], "angle_to_pull_deg": h["angle_to_pull_deg"], "axis": h["axis"], "steps": h["steps"]},
-            "occurrences": [{"face_ids": h["face_ids"]}],
+            "occurrences": [occ(h["face_ids"])],
         })
     for kind, data in face_features.items():
         if kind == "unclassified" or data["faces"] == 0:
             continue
         items.append({
             "id": f"{kind.lower()}-all", "feature_type": vocabulary(kind), "variant": None, "diameter_mm": None, "depth_mm": None,
-            "attributes": {"faces": data["faces"], "area_mm2": data["area_mm2"]}, "occurrences": [{"face_ids": data["face_ids"]}],
+            "attributes": {"faces": data["faces"], "area_mm2": data["area_mm2"]}, "occurrences": [occ(data["face_ids"])],
         })
     for g in rib_groups:
         items.append({
@@ -62,20 +68,20 @@ def build_feature_graph(
         items.append({
             "id": v["id"], "feature_type": vocabulary("Void"), "variant": "side", "diameter_mm": v["equivalent_diameter_mm"], "depth_mm": v["depth_mm"],
             "attributes": {k: v[k] for k in ("area_mm2", "opening_area_mm2", "curved_area_ratio", "angle_to_pull_deg", "accessible_direction")} | {"reading": SIDE_READING},
-            "occurrences": [{"face_ids": v["face_ids"]}],
+            "occurrences": [occ(v["face_ids"])],
         })
     for c in sa.get("combo_voids", []):
         items.append({
             "id": c["id"], "feature_type": vocabulary("ComboVoid"), "variant": "side", "diameter_mm": None, "depth_mm": None,
             "attributes": {"members": c["member_ids"], "angle_to_pull_deg": c["angle_to_pull_deg"], "extent_mm": c["extent_mm"], "reading": SIDE_READING},
-            "occurrences": [{"face_ids": c["face_ids"]}],
+            "occurrences": [occ(c["face_ids"])],
         })
     for b in sa.get("bundles", []):
         items.append({
             "id": b["id"], "feature_type": vocabulary(b["feature_type"]), "variant": b["size_class"], "diameter_mm": None, "depth_mm": b["stroke_mm"],
             "attributes": {k: b[k] for k in ("count", "member_ids", "width_mm", "stroke_mm", "size_class", "direction", "slide_alternative", "worst_from_square_deg",
                                               "exceeds_max_action_length", "exceeds_max_stroke")} | {"reading": SIDE_READING},
-            "occurrences": [{"face_ids": b["face_ids"]}],
+            "occurrences": [occ(b["face_ids"])],
         })
     if parting and parting.get("status") == "found":
         items.append({

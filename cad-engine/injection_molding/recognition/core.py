@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from .census import surface_census
 from .draft import analyze_draft
@@ -18,6 +18,28 @@ from .vec import Vec
 from shared.feature_vocabulary import feature_types, require_feature_type
 
 VERSION = "plastic_recognition_core_v1"
+
+
+def _centroid_lookup(meshes: Sequence[Any]):
+    """face ids -> the centre of those faces in part-centered coordinates (the mesh's own bounding-box centre is taken as the part centre)."""
+    verts = [v for f in meshes for t in f.triangles for v in t.vertices]
+    if not verts:
+        return lambda ids: [0.0, 0.0, 0.0]
+    centre = [(min(v[i] for v in verts) + max(v[i] for v in verts)) / 2.0 for i in range(3)]
+    by_face = {}
+    for f in meshes:
+        w = sum(t.area for t in f.triangles)
+        if w > 0:
+            by_face[f.index] = (w, [sum(t.centroid[i] * t.area for t in f.triangles) / w for i in range(3)])
+
+    def centroid_of(face_ids: Sequence[int]) -> List[float]:
+        pts = [by_face[i] for i in face_ids if i in by_face]
+        if not pts:
+            return [0.0, 0.0, 0.0]
+        total = sum(w for w, _ in pts)
+        return [round(sum(w * c[i] for w, c in pts) / total - centre[i], 3) for i in range(3)]
+
+    return centroid_of
 
 
 def recognize_core(
@@ -46,6 +68,7 @@ def recognize_core(
     parting = parting_line(meshes, pull.vector, undrafted_deg)
     if parting["status"] == "found":
         parting["internal_cutouts"] = sum(1 for h in holes["holes"] if h["variant"] == "through")
+    centroid_of = _centroid_lookup(meshes)
     return {
         "version": VERSION,
         "surface_census": surface_census(meshes),
@@ -67,6 +90,6 @@ def recognize_core(
         "parting_line": parting,
         "feature_graph": build_feature_graph(
             holes, faces, legacy_rib_groups, legacy_rib_confidence, lambda t: require_feature_type("plastic_molding", t), sorted(feature_types("plastic_molding")),
-            side_actions=side, parting=parting,
+            side_actions=side, parting=parting, centroid_of=centroid_of,
         ),
     }
