@@ -76,13 +76,14 @@ export function upstreamUrl(path: readonly string[], search: string, apiBase: st
 export async function forwardRequest(
   req: Request,
   url: URL,
-  token: string,
+  /** The session's API token, or null for the local development bypass: no Authorization header is sent and the API acts as its configured dev account. */
+  token: string | null,
   fetcher: typeof fetch = fetch,
   maxBodyBytes: number = MAX_REQUEST_BODY_BYTES,
   forwardSecret: string | undefined = process.env.BFF_FORWARD_SECRET,
 ): Promise<Response> {
   const headers = new Headers({
-    authorization: `Bearer ${token}`,
+    ...(token !== null && { authorization: `Bearer ${token}` }),
     ...clientAddressHeaders(req, forwardSecret, Math.floor(Date.now() / 1000)),
   });
   for (const name of FORWARDED_REQUEST_HEADERS) {
