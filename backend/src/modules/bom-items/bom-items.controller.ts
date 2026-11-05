@@ -74,6 +74,7 @@ import {
 } from './costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
+import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
 import { SIGNED_URL_TTL_SEC, getReusableSignedUrl, rememberSignedUrl } from './services/signed-url-cache';
 import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
@@ -108,6 +109,7 @@ export class BOMItemsController {
     private readonly stepConverterService: StepConverterService,
     private readonly cadAnalysisService: CADAnalysisService,
     private readonly autoFillService: AutoFillService,
+    private readonly reanalysis: BomItemReanalysisService,
     private readonly secondaryProcessService: SecondaryProcessService,
     private readonly nreService: NreService,
     private readonly dfmScoringService: DFMScoringService,
@@ -503,89 +505,7 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<BOMItemResponseDto> {
-    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
-
-    if (!bomItem.file3dPath && !bomItem.fileStepPath) {
-      throw new BadRequestException('No 3D file found for this item — upload a STEP/STL file first');
-    }
-
-    // Prefer the original STEP (full OCC topology) over the browser-viewable STL
-    const analysisPath = bomItem.fileStepPath ?? bomItem.file3dPath!;
-    const signedUrl = await this.fileStorageService.getSignedUrl(analysisPath, 3600);
-
-    let fileBuffer: Buffer;
-    try {
-      const response = await axios.get(signedUrl, {
-        responseType: 'arraybuffer',
-        timeout: 60000,
-        maxContentLength: MAX_CAD_FILE_BYTES,
-      });
-      fileBuffer = Buffer.from(response.data);
-    } catch (err) {
-      this.logger.error(`[reanalyze] Failed to download file: ${err.message}`);
-      throw new BadRequestException('Failed to download 3D file from storage');
-    }
-
-    const fileName = analysisPath.split('/').pop() ?? 'model.stp';
-    // Re-analyse as the process the user chose (Create/Edit BOM Item's
-    // Process field, persisted as scenario_overrides.processGroup). Without
-    // this, every Refresh Analysis re-ran the geometric classifier alone and
-    // overwrote a Die Casting part's feature graph with machining features.
-    const chosenProcessGroup = (bomItem.scenarioOverrides as Record<string, unknown> | undefined)?.['processGroup'];
-    const familyHint = this.autoFillService.familyHintForProcessGroup(
-      typeof chosenProcessGroup === 'string' ? chosenProcessGroup : undefined,
-    );
-    const result = await this.autoFillService.analyzeAndSuggest(fileBuffer, fileName, user.id, token, undefined, true, familyHint);
-
-    // analyzeAndSuggest throws (503 engine unreachable / 422 file rejected)
-    // when the CAD engine did not analyse the file, so nothing below ever
-    // overwrites a stored analysis with non-engine geometry.
-
-    const geo = result.geometry;
-    const sug = result.suggestions;
-
-    // Carry the true-shape nest result across the re-analysis.
-    //
-    // analyzeAndSuggest builds featureGraph.summary as a fresh object, so this
-    // cache used to be destroyed on every Reanalyze. An uncached resolve then
-    // walked 5 candidate sheets sequentially against cad-engine's single-threaded
-    // /nest (13-30s per sheet on real parts), and BOTH cost-summary and
-    // route-comparison resolve it, concurrently, on the very next page load —
-    // which is what made those two requests hang until the client gave up.
-    //
-    // Safe to carry because validity is no longer "the summary was not
-    // rewritten": isTrueNestCostingCacheValid now also requires the cache's
-    // inputFingerprint to match the geometry it is being reused for, so a
-    // re-analysis that genuinely changed the flat pattern, thickness, density
-    // or volume produces a different fingerprint and the stale entry is refused
-    // rather than reused. A no-op re-analysis keeps its valid result.
-    const priorNestCache = (bomItem.featureGraph as any)?.summary?.trueNestCostingCache;
-    const featureGraph = result.featureGraph as any;
-    const featureGraphWithNestCache = priorNestCache
-      ? { ...featureGraph, summary: { ...(featureGraph?.summary ?? {}), trueNestCostingCache: priorNestCache } }
-      : featureGraph;
-
-    // Sync all geometry + classification fields, not just featureGraph.
-    // material / materialGrade are intentionally excluded — those come from 2D drawing analysis and user input.
-    const updateData: UpdateBOMItemDto = {
-      featureGraph: featureGraphWithNestCache as object,
-      holeCount: geo.holeCount,
-      bendCount: geo.bendCount,
-      cutLengthMm: geo.cutLengthMm,
-      sheetThicknessMm: geo.sheetThicknessMm,
-      pierceCount: geo.pierceCount,
-      flatPatternAreaMm2: geo.flatPatternAreaMm2,
-      ...(geo.weight > 0 && { weight: geo.weight }),
-      ...(geo.volume > 0 && { volume: geo.volume }),
-      ...(geo.surfaceArea > 0 && { surfaceArea: geo.surfaceArea }),
-      ...(geo.boundingBox.length > 0 && { maxLength: geo.boundingBox.length }),
-      ...(geo.boundingBox.width > 0 && { maxWidth: geo.boundingBox.width }),
-      ...(geo.boundingBox.height > 0 && { maxHeight: geo.boundingBox.height }),
-      ...(sug.familyClassification && { familyClassification: sug.familyClassification }),
-      ...(sug.familyConfidence != null && { familyConfidence: sug.familyConfidence }),
-    };
-
-    return this.bomItemsService.update(id, updateData, user.id, token);
+    return this.reanalysis.reanalyze(id, user.id, token);
   }
 
   // Manual re-trigger, mirroring /reanalyze's pattern for the 3D file — for

@@ -18,6 +18,7 @@
   "src/modules/bom-items/costing/sheet-metal/operation/catalog-operations.service.ts": 1,
   "src/modules/bom-items/services/file-storage.service.ts": 1,
   "src/modules/bom-items/services/nre.service.ts": 2,
+  "src/modules/bom-items/services/plastic-pull-direction.service.ts": 1,
   "src/modules/bom-items/services/secondary-process.service.ts": 2,
   "src/modules/cad-uploads/cad-upload-runner.ts": 1,
   "src/modules/cad-uploads/cad-uploads.service.ts": 1,

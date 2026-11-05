@@ -7847,6 +7847,30 @@
         ],
         "type": "object"
       },
+      "SetPullDirectionDto": {
+        "properties": {
+          "axis": {
+            "description": "The axis along which the mold opens. To return to the automatic choice, remove the pull direction.",
+            "enum": [
+              "x",
+              "y",
+              "z"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why the engineer overrides the automatic choice. Required, and kept in the audit trail.",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "axis",
+          "reason"
+        ],
+        "type": "object"
+      },
       "SetSandVariableOverrideDto": {
         "properties": {
           "reason": {
@@ -14184,6 +14208,99 @@
         "summary": "Approve or reject one decoded PMI record or a frame datum references (organization owners only; stale or ineligible records are refused)",
         "tags": [
           "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/pull-direction": {
+      "delete": {
+        "operationId": "BomItemPullDirectionController_clear_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return the part to the automatic pull direction and analyse it again. Audited.",
+        "tags": [
+          "Plastic molding"
+        ]
+      },
+      "get": {
+        "operationId": "BomItemPullDirectionController_get_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's pull direction: the engineer's axis with the reason, who and when, or none (the engine chooses).",
+        "tags": [
+          "Plastic molding"
+        ]
+      },
+      "put": {
+        "operationId": "BomItemPullDirectionController_set_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPullDirectionDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fix the pull axis of the part (with the reason) and analyse it again along it. Audited.",
+        "tags": [
+          "Plastic molding"
         ]
       }
     },

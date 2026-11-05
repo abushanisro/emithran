@@ -12,7 +12,7 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Tuple, Any, Dict, List, Optional
 
 from shared import telemetry
 from shared.memory_optimizer import AdvancedCADMemoryOptimizer
@@ -93,6 +93,7 @@ def analyze_part(
     force_reanalysis: bool = False,
     user_processes: Optional[List[Dict[str, Any]]] = None,
     family_hint: str = "",
+    pull_direction: Optional[Tuple[float, float, float]] = None,
 ) -> Dict[str, Any]:
     parsed_processes = user_processes or []
     with telemetry.stage("geometry_analysis"):
@@ -104,6 +105,7 @@ def analyze_part(
             user_processes=parsed_processes,
             file_hash=file_hash,
             family_hint=family_hint,
+            pull_direction=pull_direction,
         )
 
     logger.info(f"Advanced analysis completed for {filename}")
