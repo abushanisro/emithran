@@ -270,6 +270,9 @@ jobs:
       - run: docker build --platform linux/amd64 -t py-occt:dev -f geometry-worker/tests/Dockerfile.pyocct geometry-worker/tests
       # Same fixtures through the Python engine and the C++ worker; the two reports must agree.
       - run: python3 geometry-worker/tests/parity.py
+      # The comparison the real-file parity harness (tests/real/run.py, run by hand with real zips) classifies differences with.
+      - run: python3 -m unittest -q test_compare
+        working-directory: geometry-worker/tests/real
 
   casting-worker:
     name: Casting worker (C++ build, sandboxed run, hand-worked results)
