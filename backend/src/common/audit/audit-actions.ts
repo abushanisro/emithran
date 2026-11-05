@@ -19,6 +19,8 @@ export const AUDIT_ACTIONS = {
   'sand_snapshot.created': ['snapshotId', 'label', 'pieceCost'],
   'sand_snapshot.reviewed': ['snapshotId', 'decision', 'note'],
   'casting_analysis.failed': ['errorCode'],
+  // retention removed old, superseded or failed analyses (CASTING_RETENTION_DAYS); the system is the actor
+  'casting_retention.pruned': ['rows', 'files', 'days'],
   'file.deleted': ['fileType'],
   'bom.deleted': ['name'],
   'bom_item.deleted': ['name', 'itemType'],
