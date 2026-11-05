@@ -11,6 +11,7 @@ import {
   expandSearchTermSpellingVariants,
 } from './material-search-spelling';
 import { orderByRelevance, rankableFromDbRow } from './material-search-ranking';
+import { MOLDING_PROCESS_GROUPS, moldingFeedstockFilter } from './material-moldability';
 import { ilikeContains } from '../../common/db/postgrest-filter';
 
 // Re-exported so existing importers (and the spelling spec) keep working;
@@ -114,6 +115,8 @@ export class RawMaterialsService {
     if (query.processGroup) {
       processMaterialGroups = await this.materialGroupsForProcess(query.processGroup, accessToken);
       if (processMaterialGroups.length > 0) queryBuilder = queryBuilder.in('material_group', processMaterialGroups);
+      // A molding process offers molding feedstock only: its material group also holds 3D-printing resins and powders and stock shapes.
+      if (MOLDING_PROCESS_GROUPS.has(query.processGroup)) queryBuilder = queryBuilder.or(moldingFeedstockFilter());
     }
 
     if (query.material) {

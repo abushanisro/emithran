@@ -2215,7 +2215,8 @@ export class BOMItemsService {
   ): void {
     const noMachine = new Set<string>();
     for (const line of result.processLines) {
-      if (line.rateSource === 'no_db_rate') noMachine.add(line.machineClass.replace(/_/g, ' '));
+      // A line whose gap is explained (physicsGap: e.g. the material cannot be molded, so no press can be sized) is not a missing machine.
+      if (line.rateSource === 'no_db_rate' && !line.physicsGap) noMachine.add(line.machineClass.replace(/_/g, ' '));
     }
     if (noMachine.size > 0) {
       result.warnings.push(
@@ -3181,7 +3182,7 @@ export class BOMItemsService {
     if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
     const {
       materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
-      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, clampProperties,
+      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, stockForm, matlState, clampProperties,
       // cureTimeMinFromMaterial deliberately NOT destructured here: this
       // primary quote path has no per-item Compression Molding / RIM process
       // dispatch yet (only getRouteComparison() exposes those as alternate
@@ -4196,6 +4197,8 @@ export class BOMItemsService {
         plasticReferenceMissing: activePlasticRef.missing,
         location,
         materialType,
+        materialStockForm: stockForm,
+        materialMatlState: matlState,
         volume: (item.volume ?? 0) as number,
         surfaceArea: (item.surfaceArea ?? 0) as number,
         wallThicknessNominalMm: effectiveWallMm,
@@ -5730,6 +5733,8 @@ export class BOMItemsService {
       specificHeatMeltJgC: rcSpecificHeatMeltJgC, thermalConductivityMeltWMK: rcThermalConductivityMeltWMK,
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
       materialType: rcMaterialType,
+      stockForm: rcStockForm,
+      matlState: rcMatlState,
       clampProperties: rcClampProperties,
       densityOfMeltKgM3: rcDensityOfMeltKgM3,
     } = await this.resolveMaterialForFamily({
@@ -6369,7 +6374,7 @@ export class BOMItemsService {
         wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
         plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-        location, materialType: rcMaterialType,
+        location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
         cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
         deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
         materialClamp: rcClampProperties,
@@ -6578,7 +6583,7 @@ export class BOMItemsService {
         wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
         plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-        location, materialType: rcMaterialType,
+        location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
         cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
         mhrRate: mhrRates.structuralFoamMolding, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
         machineClampTonnes: sfmCandidate?.capability?.maxTonnage ?? null,
