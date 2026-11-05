@@ -51,6 +51,7 @@ function r6(n: number): number { return Math.round(n * 1e6) / 1e6; }
 // ── Constants not replaced by Phase 4 cycle-time engine ───────────────────────
 
 // Runner allowance and shot rule: shot-size.ts (shared with press selection).
+import { injectionMoldabilityGap, type MoldabilityGap } from '../../../../raw-materials/material-moldability';
 export { IM_RUNNER_SCRAP_PCT } from '../shot-size';
 
 // ── Removed, uncited constants (2026-09-11) ───────────────────────────────────
@@ -220,6 +221,30 @@ export interface InjectionMoldingCostInput {
   location?: string;
   // raw_materials.material_type of the resolved grade (tblToolLife key).
   materialType?: string | null;
+  // What the resolved grade is supplied as (raw_materials.stock_form / matl_state). A 3D-printing resin or powder, or a stock shape, is not
+  // injection-molding feedstock: the cost then says so once instead of failing step by step (material-moldability.ts). Absent = not judged by form.
+  materialStockForm?: string | null;
+  materialMatlState?: string | null;
+}
+
+/**
+ * Why the resolved material cannot be injection molded at all (a printing feedstock or a stock shape), or null. A grade that is molding feedstock
+ * but lacks some reference value keeps the specific warnings below: they name exactly what is missing. Silicone (LSR) is costed by its cure model.
+ */
+function materialNotMoldable(input: InjectionMoldingCostInput): MoldabilityGap | null {
+  if (resolveSubtype(input) === 'lsr') return null;
+  const gap = injectionMoldabilityGap({
+    grade: input.materialGrade,
+    stockForm: input.materialStockForm ?? null,
+    matlState: input.materialMatlState ?? null,
+    injectionPressureMaxMpa: input.materialClamp?.injectionPressureMaxMpa ?? null,
+    flowLengthRatio: input.materialClamp?.flowLengthRatio ?? null,
+    meltingTempC: input.realResinInputs?.meltingTempC ?? null,
+    moldTempC: input.realResinInputs?.moldTempC ?? null,
+    densityOfMeltKgM3: input.realResinInputs?.densityOfMeltKgM3 ?? null,
+    cureTimeMin: null,
+  });
+  return gap && gap.kind !== 'no_injection_data' ? gap : null;
 }
 
 // Auto-derive molding subtype from material grade + signals.
@@ -254,7 +279,11 @@ function makeLine(
 }
 
 type EngineResult = CostSummaryDto & { processTree: IMProcessTree };
-type CavitySizing = { count: number; constrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy']; unverifiedReason: string | null };
+type CavitySizing = {
+  count: number; constrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy']; unverifiedReason: string | null;
+  /** Set when the material is not injection-molding feedstock: the result carries this one finding instead of the steps it makes impossible. */
+  materialGap?: MoldabilityGap;
+};
 
 /** The press-sizing facts shared by every cavity candidate. */
 function pressSizingBasis(input: InjectionMoldingCostInput) {
@@ -291,6 +320,13 @@ function pressSizingBasis(input: InjectionMoldingCostInput) {
 }
 
 export function computeInjectionMoldedCostSummary(input: InjectionMoldingCostInput): EngineResult {
+  const materialGap = materialNotMoldable(input);
+  if (materialGap) {
+    return computeAtCavities(input, {
+      count: input.cavityCountOverride ?? input.plasticReference?.defaultNumCavities ?? 1,
+      constrainedBy: 'unverified', unverifiedReason: materialGap.reason, materialGap,
+    });
+  }
   const b = pressSizingBasis(input);
   const clampT = input.machineClampTonnes ?? null;
   const shotG = input.machineShotCapacityG ?? null;
@@ -438,7 +474,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     line.physicsGap = {
       gapType: 'unsupported_operation', process: processLabel, machineClass: mhrRate.machineClass,
       reason: gapReason,
-      requiredCapability: sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : 'Press good-part yield',
+      requiredCapability: sizing.materialGap ? 'An injection-molding material' : sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : 'Press good-part yield',
     };
   }
   if (cycle.derivable) line.calculationTrace = cycle.trace;
@@ -516,7 +552,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     projectedAreaCm2: projectedAreaMm2 != null ? Math.round(projectedAreaMm2 / 10) / 10 : null,
     flowClass: clampPerCavity.derivable ? clampPerCavity.flowClass : null,
     cavityPressureMpa: clampPerCavity.derivable ? r2(clampPerCavity.cavityPressureMpa) : null,
-    clampTrace: clampPerCavity.derivable ? clampPerCavity.trace : clampPerCavity.reason,
+    clampTrace: sizing.materialGap ? sizing.materialGap.reason : clampPerCavity.derivable ? clampPerCavity.trace : clampPerCavity.reason,
     clampRequiredT: clampRequiredT != null ? Math.round(clampRequiredT * 10) / 10 : null,
     clampMachineT: machineClampTonnes,
     clampUtilPct: pct(clampRequiredT, machineClampTonnes),
@@ -604,7 +640,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     },
     batchSize,
     family,
-    warnings,
+    // A material that cannot be molded makes every step below it fail in turn; the one finding is the answer, the rest is noise until it is fixed.
+    warnings: sizing.materialGap ? [sizing.materialGap.reason] : warnings,
     ratesSource: RATES_SOURCE_LABEL,
     sustainability,
     processTree,
