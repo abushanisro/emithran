@@ -310,6 +310,19 @@ describe('CadUploadRunner', () => {
     expect(last(updates)).toMatchObject({ status: 'failed', error_code: 'archive_unreadable' });
   });
 
+  it('says why each file it did not read was left out: a native CAD file is named as such, with what to do', async () => {
+    engineAnswers(report());
+    const { runner, updates } = setup(row({ file_name: 'pack.zip' }));
+    (runner as any).objects.get = async () => zip([
+      { name: 'a/gear.step', data: STEP }, { name: 'a/Cover.x_t', data: 'x' }, { name: 'a/drawing.pdf', data: 'x' },
+    ]);
+    await runner.tick();
+    expect((last(updates) as { result: { skipped: unknown } }).result.skipped).toEqual([
+      { path: 'a/Cover.x_t', reason: 'a native CAD file (.x_t), not read: export it as STEP (AP242) and upload that' },
+      { path: 'a/drawing.pdf', reason: 'not a STEP file' },
+    ]);
+  });
+
   it('says what a zip with no STEP file does hold, including an archive inside it that is not unpacked', async () => {
     const original = Buffer.from('x');
     const { runner, updates } = setup(row({ file_name: 'pack.zip' }));

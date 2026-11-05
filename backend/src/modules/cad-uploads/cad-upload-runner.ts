@@ -14,7 +14,7 @@ import { BOMItemsService } from '../bom-items/bom-items.service';
 import { FileStorageService } from '../bom-items/services/file-storage.service';
 import { parseAssemblyReport, type AssemblyNode, type AssemblyReport } from './assembly-report';
 import { CAD_BUCKET, type CadUploadRow } from './cad-upload.types';
-import { noStepFilesMessage } from './check-upload';
+import { noStepFilesMessage, skipReason } from './check-upload';
 import { planItems, withPackRoot, type PlannedItem } from './plan-items';
 import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
 import { observeQueueDepth, recordCadUploadDuration, type CadUploadOutcome } from '../../telemetry/metrics';
@@ -26,8 +26,6 @@ const POLL_MS = 30_000;
 const FAILED_SOURCE_DAYS = 7;
 const MAINTENANCE_EVERY_MS = 60 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
-/** Why a file of the zip is not read: the one reason a pack's design files can be left out for. */
-const NOT_STEP = 'not a STEP file';
 // Longer than the slowest legitimate run (engine call up to 10 min, plus item creation), so a live job is never re-claimed.
 const STALE_SECONDS = 1800;
 const MATERIALIZE_STALE_SECONDS = 900;
@@ -327,13 +325,18 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     if (!archive.ok) throw new PermanentFailure(archive.code, archive.message);
     const skipped = [...archive.skipped];
     const files: StepFile[] = [];
+    const notStep: string[] = []; // what the zip holds instead, for the error when it holds no STEP file
     for (const entry of archive.entries) {
       const inner = entry.path.slice(archive.root.length + 1);
       if (/\.(step|stp)$/i.test(entry.name)) files.push({ name: inner, bytes: entry.bytes });
-      else skipped.push({ path: inner, reason: NOT_STEP });
+      else {
+        skipped.push({ path: inner, reason: skipReason(entry.name) });
+        notStep.push(inner);
+      }
     }
     if (files.length === 0) {
-      throw new PermanentFailure('no_step_files', noStepFilesMessage(skipped.filter((s) => s.reason === NOT_STEP || s.reason === NESTED_ARCHIVE_REASON).map((s) => s.path)));
+      const nested = archive.skipped.filter((s) => s.reason === NESTED_ARCHIVE_REASON).map((s) => s.path);
+      throw new PermanentFailure('no_step_files', noStepFilesMessage([...notStep, ...nested]));
     }
     return { files, skipped };
   }

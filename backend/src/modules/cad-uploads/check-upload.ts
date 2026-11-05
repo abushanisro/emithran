@@ -4,6 +4,16 @@ export type UploadCheck = { ok: true; kind: 'zip' | 'step' } | { ok: false; code
 
 const NATIVE_CAD = /\.(sldasm|sldprt|catpart|catproduct|prt|asm|ipt|iam|x_t|x_b|3dm|dwg)$/i;
 
+/**
+ * Why a file of a zip that is not STEP is left out. A native CAD file (Parasolid, SolidWorks, CATIA...) is a part the user expects in the BOM, so
+ * the reason names its format and what to do; anything else (a drawing, a note) is just "not a STEP file". The Rust core says the same words
+ * (core/crates/runner/src/job.rs `skip_reason`), and the parity harness checks that they agree.
+ */
+export function skipReason(fileName: string): string {
+  const extension = /\.([a-z0-9_]+)$/i.exec(fileName)?.[1]?.toLowerCase();
+  return NATIVE_CAD.test(fileName) ? `a native CAD file (.${extension}), not read: export it as STEP (AP242) and upload that` : 'not a STEP file';
+}
+
 /** What the API accepts: a zip of STEP files, or one STEP file. Content is checked, not just the name. */
 export function checkUpload(name: string, bytes: Buffer): UploadCheck {
   const reject = (code: string, message: string): UploadCheck => ({ ok: false, code, message });
