@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
+import { describe, it, expect, vi } from 'vitest';
+
 import { invalidateBOMItemUpdateQueries, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 
 // P0.5 — DFM scores are material/thickness-bracketed (dfm-scoring.service.ts's
@@ -22,7 +23,7 @@ function updatedItem(overrides: Partial<BOMItem> = {}): BOMItem {
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,
-  } as BOMItem;
+  };
 }
 
 describe('invalidateBOMItemUpdateQueries — P0.5 material-grade DFM staleness fix', () => {
