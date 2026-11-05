@@ -1,5 +1,5 @@
 # ecad-engine: electronics design-file extraction service. Pure Python (no OpenCascade), so a slim image.
-FROM python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159
+FROM python:3.12-slim@sha256:e695ab189fa2d082b1c61c69a6b888a5adeca61ceeccad107b1ed2a125721a9e
 
 # Debian security fixes that landed after the base image was built (as in cad-engine and core): the pinned digest is reproducible, the patches are not in it yet.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
