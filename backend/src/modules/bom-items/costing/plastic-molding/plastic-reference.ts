@@ -47,7 +47,7 @@ export const PLASTIC_VARIABLE_KEYS = [
   'minimumPercentClampForceEasyFlow', 'minimumPercentClampForceMediumFlow', 'minimumPercentClampForceHardFlow',
   'conventionalRunnerMaxPressureReductionFactor', 'hotRunnerMaxPressureReductionFactor', 'minInjectionPressure',
   // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
-  'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilon',
+  'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilonForSlides', 'drawDirectionOrthogonalEpsilonForLifters',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -137,8 +137,10 @@ export interface PlasticReference {
 export interface FeatureRules {
   /** variables maxNoCoreInsertDiameter (mm): an obscured hole this small or smaller is made with an insert and needs no core. */
   maxNoCoreInsertDiameterMm: number | null;
-  /** variables drawDirectionOrthogonalEpsilon (deg): the angular tolerance between a feature's axis and the pull axis (parallel, or square to it). */
-  axisToleranceDeg: number | null;
+  /** variable drawDirectionOrthogonalEpsilonForSlides (deg): how far from square to the pull a feature's axis may be and still be served by a slide (side core). */
+  slideEpsilonDeg: number | null;
+  /** variable drawDirectionOrthogonalEpsilonForLifters (deg): the same for a lifter. */
+  lifterEpsilonDeg: number | null;
 }
 
 interface PlasticReferenceRows {
@@ -302,7 +304,8 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       toolroomRatesUsa,
       featureRules: {
         maxNoCoreInsertDiameterMm: optionalPositive('maxNoCoreInsertDiameter'),
-        axisToleranceDeg: optionalPositive('drawDirectionOrthogonalEpsilon'),
+        slideEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForSlides'),
+        lifterEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForLifters'),
       },
     },
     missing: [],

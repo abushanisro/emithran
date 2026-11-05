@@ -8,7 +8,7 @@ const INJECTION = [
   'Injection Molding:As Molded//PlanarFace', 'Injection Molding:As Molded//Rib', 'Injection Molding:No Cost Feature//Rib',
 ];
 const INSERT_ONLY = ['Insert Injection Molding:As Molded//SimpleHole', 'Insert Injection Molding:HoleUnscrewMandrel//SimpleHole'];
-const RULES: FeatureRules = { maxNoCoreInsertDiameterMm: 3, axisToleranceDeg: 10 };
+const RULES: FeatureRules = { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: 30, lifterEpsilonDeg: 10 };
 
 const hole = (id: string, diameter: number, angle: number | null): PlasticFeature => ({
   id, feature_type: 'SimpleHole', variant: 'through', diameter_mm: diameter, attributes: { angle_to_pull_deg: angle }, occurrences: [{ face_ids: [1] }],
@@ -30,7 +30,22 @@ describe('resolvePlasticCatalogOperations', () => {
     const [r] = run([hole('h1', 6.3, 90)]);
     expect(r.status).toBe('undecided');
     expect(r.operations).toEqual(['HoleLifter', 'HoleSideCore']);
-    expect(r.reason).toContain('above maxNoCoreInsertDiameter');
+    expect(r.reason).toContain('needs a core');
+  });
+
+  it('a hole 20 degrees from square is out of a lifter\'s reach but within a slide\'s: a side core, resolved', () => {
+    const [r] = run([hole('h1', 6.3, 70)]);
+    expect(r).toMatchObject({ status: 'resolved', operations: ['HoleSideCore'] });
+  });
+
+  it('an oblique hole (outside both epsilons) is undecided with the reason, not given a core', () => {
+    const [r] = run([hole('h1', 6.3, 40)]);
+    expect(r.status).toBe('undecided');
+    expect(r.reason).toMatch(/oblique/);
+  });
+
+  it('a hole within the along-the-pull limit is formed by the halves', () => {
+    expect(run([hole('h1', 6.3, 4.9)])[0]).toMatchObject({ status: 'resolved', operations: ['As Molded'] });
   });
 
   it('never picks UnscrewMandrel: CAD does not see threads', () => {
@@ -38,12 +53,12 @@ describe('resolvePlasticCatalogOperations', () => {
   });
 
   it('without the staged tolerance or the angle the hole is undecided and says why', () => {
-    expect(run([hole('h1', 6.3, 5)], INJECTION, { maxNoCoreInsertDiameterMm: 3, axisToleranceDeg: null })[0]).toMatchObject({ status: 'undecided' });
+    expect(run([hole('h1', 6.3, 90)], INJECTION, { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: null, lifterEpsilonDeg: null })[0]).toMatchObject({ status: 'undecided' });
     expect(run([hole('h1', 6.3, null)])[0].reason).toMatch(/not known/);
   });
 
   it('without maxNoCoreInsertDiameter an obscured hole is undecided, not assumed to need a core', () => {
-    const [r] = run([hole('h1', 2.5, 90)], INJECTION, { maxNoCoreInsertDiameterMm: null, axisToleranceDeg: 10 });
+    const [r] = run([hole('h1', 2.5, 90)], INJECTION, { maxNoCoreInsertDiameterMm: null, slideEpsilonDeg: 30, lifterEpsilonDeg: 10 });
     expect(r.status).toBe('undecided');
     expect(r.reason).toContain('not staged');
   });
