@@ -1,7 +1,7 @@
 import type { CatalogOperation } from '@/lib/api/hooks/useBOMItems';
 
 /**
- * Manufacturing Process tree rows for a sheet-metal step's catalog operations,
+ * Manufacturing Process tree rows for a sheet-metal or plastic-molding step's catalog operations,
  * in the catalog's own "Operation // Feature" form:
  *
  *   Punching // SimpleHole Ø4.0 ×14
@@ -23,7 +23,7 @@ export interface OperationTreeNode {
 const STATUS_LABEL: Record<CatalogOperation['status'], string> = {
   resolved: 'Resolved',
   undecided: 'Undecided — several catalog operations fit',
-  infeasible: 'Not possible on this machine',
+  infeasible: 'Not possible (see why)',
 };
 
 export function sheetMetalOperationNodes(idPrefix: string, operations: readonly CatalogOperation[]): OperationTreeNode[] {
