@@ -17,37 +17,11 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from .mesh import FaceMesh, Triangle
-
-Vec = Tuple[float, float, float]
+from .vec import Vec, angle_between_axes_deg, canonical, cross, dot, unit
 
 GRID = 96
 AXES: Tuple[Vec, ...] = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-
-
-def _dot(a: Vec, b: Vec) -> float:
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-
-
-def _cross(a: Vec, b: Vec) -> Vec:
-    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
-
-
-def unit(v: Vec) -> Vec:
-    m = math.sqrt(_dot(v, v))
-    if m < 1e-12:
-        raise ValueError("a direction cannot be the zero vector")
-    return (v[0] / m, v[1] / m, v[2] / m)
-
-
-def canonical(d: Vec) -> Vec:
-    """The same axis, signed so its largest component is positive: an axis has two names, this picks one."""
-    d = unit(d)
-    i = max(range(3), key=lambda k: abs(d[k]))
-    return d if d[i] >= 0 else (-d[0], -d[1], -d[2])
-
-
-def angle_between_axes_deg(a: Vec, b: Vec) -> float:
-    return math.degrees(math.acos(min(1.0, abs(_dot(unit(a), unit(b))))))
+_dot, _cross = dot, cross
 
 
 def candidate_directions(meshes: Sequence[FaceMesh], max_clusters: int = 6, dedupe_deg: float = 2.0) -> List[Vec]:

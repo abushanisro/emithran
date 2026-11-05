@@ -6,8 +6,10 @@ from typing import Any, Dict, Optional, Sequence
 
 from .census import surface_census
 from .draft import analyze_draft
+from .holes import recognize_holes
 from .mesh import tessellate_faces
-from .pull_direction import Vec, choose_pull_direction
+from .pull_direction import choose_pull_direction
+from .vec import Vec
 
 VERSION = "plastic_recognition_core_v1"
 
@@ -41,4 +43,5 @@ def recognize_core(
             ],
         },
         "draft": analyze_draft(meshes, pull.vector, undrafted_deg, max_draft_deg),
+        "features": recognize_holes(meshes, pull.vector),
     }

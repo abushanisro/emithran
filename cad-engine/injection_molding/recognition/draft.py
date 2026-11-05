@@ -12,7 +12,8 @@ import math
 from typing import Any, Dict, List, Sequence
 
 from .mesh import FaceMesh
-from .pull_direction import Vec, undercut_flags, unit
+from .pull_direction import undercut_flags
+from .vec import Vec, unit
 
 WALL_COS_THRESHOLD = math.cos(math.radians(75.0))
 # Worst class first: a tie goes to the class that costs more.
