@@ -193,6 +193,14 @@ describe('regressions', () => {
     expect(inr(5000).warnings.some((w) => w.includes('MATERIAL COST ALERT'))).toBe(true);
   });
 
+  it('the material alert states the USD price and the threshold it tests, and the quote-currency price when that differs', () => {
+    const alert = (r: ReturnType<typeof computeInjectionMoldedCostSummary>) => r.warnings.find((w) => w.includes('MATERIAL COST ALERT'));
+    expect(alert(computeInjectionMoldedCostSummary(absPart({ materialCostPerKg: 5000, usdToLocal: 85, currencySymbol: '₹' }))))
+      .toBe('MATERIAL COST ALERT: ABS resolved to $58.82/kg (₹5000.00/kg in the quote currency), above the $50/kg this check expects of a molding resin (most are under $40/kg). Verify the material grade; the cost breakdown below is unreliable until it is confirmed.');
+    expect(alert(computeInjectionMoldedCostSummary(absPart({ materialCostPerKg: 90 })))).toContain('resolved to $90.00/kg, above the $50/kg');
+    expect(alert(computeInjectionMoldedCostSummary(absPart({ materialCostPerKg: 50 })))).toBeUndefined(); // the threshold itself does not fire
+  });
+
   it('the tooling-dominated check compares USD tooling with the material price in USD, not in local currency', () => {
     // 0.1513 USD/part tooling vs material 0.052 kg: at 3.046 USD/kg = 0.158 USD x 2 -> no warning in USD;
     // the same part priced in INR (x85) must not change that verdict.

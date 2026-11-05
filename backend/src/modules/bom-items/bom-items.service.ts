@@ -58,6 +58,7 @@ import type { OperationLine } from './costing/machining/operation/operation-sequ
 import { splitDeepHoleOccurrences, resolveDeepHoleRules } from './costing/machining/operation/deep-hole-routing';
 import { splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
 import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-routing';
+import { undercutCountFromDraftSummary } from './costing/plastic-molding/draft-signals';
 import { computeInjectionMoldedCostSummary } from './costing/plastic-molding/process/cost-injection-molding-engine';
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
@@ -2220,8 +2221,9 @@ export class BOMItemsService {
     }
     if (noMachine.size > 0) {
       result.warnings.push(
-        `No machine in HR Rates for ${location} for: ${[...noMachine].join(', ')} — these operations carry ` +
-        `no machine cost. Add the machines to memory/ and seed them to cost them.`,
+        `No suitable machine in HR Rates for ${location} for: ${[...noMachine].join(', ')} — these operations carry no machine cost. ` +
+        `Either no machine of that class is on file (add it to memory/ and seed it), or none passes the capability check for this part ` +
+        `(see the machine selection reasons).`,
       );
     }
   }
@@ -4240,7 +4242,7 @@ export class BOMItemsService {
           bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
           // Phase 2 signals — null when CAD engine is pre-Phase 2 (safe: router applies
           // conservative defaults and records routingWarnings when signals are null)
-          undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
+          undercutCount: undercutCountFromDraftSummary(summary),
           partingComplexity: (summary.partingComplexity as number | null) ?? null,
           // Phase 3: insert candidates from CAD blind-hole OD matching
           insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
@@ -6322,7 +6324,7 @@ export class BOMItemsService {
           ? (summary.ribCount as number)
           : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
         bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
-        undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
+        undercutCount: undercutCountFromDraftSummary(summary),
         partingComplexity: (summary.partingComplexity as number | null) ?? null,
         insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
       };
