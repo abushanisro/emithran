@@ -22,7 +22,7 @@ class CompareReports(unittest.TestCase):
         stats = Stats()
         other = report(parts=[{**PART, "volume_mm3": 1000.4}])
         self.assertEqual(compare_reports(report(), other, stats), [])
-        self.assertAlmostEqual(stats.max_rel["parts[0:1].volume_mm3"], 0.0004)
+        self.assertAlmostEqual(stats.max_rel["parts[*].volume_mm3"], 0.0004)
 
     def test_a_volume_beyond_the_tolerance_is_geometry(self):
         found = compare_reports(report(), report(parts=[{**PART, "volume_mm3": 1010.0}]))
