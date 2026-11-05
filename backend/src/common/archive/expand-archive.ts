@@ -22,6 +22,9 @@ export type ExpandedArchive =
   | { ok: true; root: string; entries: ArchiveEntry[]; skipped: { path: string; reason: string }[] }
   | { ok: false; code: 'archive_unreadable' | 'archive_encrypted' | 'archive_entry_too_large' | 'archive_too_large' | 'archive_empty'; message: string };
 
+/** Why an archive inside the archive is left packed; callers that need to tell the user about it match on this. */
+export const NESTED_ARCHIVE_REASON = 'an archive inside the archive is not unpacked; upload it on its own';
+
 /** The folder name a pack stands for: its file name without the extension, and without characters a path cannot hold. */
 export function archiveRootName(fileName: string): string {
   const stem = fileName.replace(/\.zip$/i, '').replace(/[\\/]/g, ' ').trim();
@@ -54,7 +57,7 @@ export function expandArchive(fileName: string, buf: Buffer, limits: ArchiveLimi
       continue;
     }
     if (isArchiveName(name)) {
-      skipped.push({ path, reason: 'an archive inside the archive is not unpacked; upload it on its own' });
+      skipped.push({ path, reason: NESTED_ARCHIVE_REASON });
       continue;
     }
     const inflated = inflateEntry(buf, entry);

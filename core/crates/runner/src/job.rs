@@ -118,12 +118,44 @@ fn step_files(
         }
     }
     if files.is_empty() {
+        let others: Vec<&str> = skipped
+            .iter()
+            .filter(|s| s.reason == "not a STEP file" || s.reason.starts_with("an archive inside"))
+            .map(|s| s.path.as_str())
+            .collect();
         return Err(Failure::permanent(
             "no_step_files",
-            "The archive holds no STEP files.",
+            no_step_files_message(&others),
         ));
     }
     Ok((files, skipped))
+}
+
+/// What a zip with no STEP file says about itself: the kinds of file it does hold, so "no STEP files" is never a bare verdict.
+/// The same words as the backend's `noStepFilesMessage`, so either core tells the user the same thing.
+fn no_step_files_message(paths: &[&str]) -> String {
+    let mut by_type: Vec<(String, usize)> = Vec::new();
+    for path in paths {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        let ty = match name.rfind('.') {
+            Some(dot) if dot > 0 => name[dot..].to_ascii_lowercase(),
+            _ => "(no extension)".to_string(),
+        };
+        match by_type.iter_mut().find(|(t, _)| *t == ty) {
+            Some((_, n)) => *n += 1,
+            None => by_type.push((ty, 1)),
+        }
+    }
+    let advice = "Export your parts as STEP (AP242) and zip those.";
+    if by_type.is_empty() {
+        return format!("The archive holds no STEP files. {advice}");
+    }
+    by_type.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let found: Vec<String> = by_type.iter().map(|(t, n)| format!("{n} {t}")).collect();
+    format!(
+        "The archive holds no STEP files. It holds {}. {advice}",
+        found.join(", ")
+    )
 }
 
 /// Part nodes that are a whole uploaded file (a single-part STEP): their stored bytes are the file the customer sent, not a
@@ -752,5 +784,22 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(backend.failed.borrow().clone().unwrap().2, "no_step_files");
+    }
+
+    #[test]
+    fn a_zip_without_step_files_says_what_it_holds() {
+        let advice = "Export your parts as STEP (AP242) and zip those.";
+        assert_eq!(
+            no_step_files_message(&["P/P01.pdf", "P/P02.PDF", "P/readme.txt"]),
+            format!("The archive holds no STEP files. It holds 2 .pdf, 1 .txt. {advice}")
+        );
+        assert_eq!(
+            no_step_files_message(&["a/Top.SLDASM"]),
+            format!("The archive holds no STEP files. It holds 1 .sldasm. {advice}")
+        );
+        assert_eq!(
+            no_step_files_message(&[]),
+            format!("The archive holds no STEP files. {advice}")
+        );
     }
 }

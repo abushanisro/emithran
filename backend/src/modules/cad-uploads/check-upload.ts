@@ -22,3 +22,19 @@ export function checkUpload(name: string, bytes: Buffer): UploadCheck {
   }
   return reject('unsupported_type', `${name}: upload a .zip of STEP files, or a .step / .stp file.`);
 }
+
+/** What a zip with no STEP file says about itself: the kinds of file it does hold, so "no STEP files" is never a bare verdict. */
+export function noStepFilesMessage(paths: readonly string[]): string {
+  const base = 'The archive holds no STEP files.';
+  const advice = 'Export your parts as STEP (AP242) and zip those.';
+  const byType = new Map<string, number>();
+  for (const path of paths) {
+    const name = path.slice(path.lastIndexOf('/') + 1);
+    const dot = name.lastIndexOf('.');
+    const type = dot > 0 ? name.slice(dot).toLowerCase() : '(no extension)';
+    byType.set(type, (byType.get(type) ?? 0) + 1);
+  }
+  if (byType.size === 0) return `${base} ${advice}`;
+  const found = [...byType].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([type, n]) => `${n} ${type}`).join(', ');
+  return `${base} It holds ${found}. ${advice}`;
+}

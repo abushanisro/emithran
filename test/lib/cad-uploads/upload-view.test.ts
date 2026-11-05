@@ -26,8 +26,12 @@ describe('isInFlight', () => {
 
 describe('describeFailure', () => {
   it('gives a plain sentence per code and appends the recorded detail', () => {
-    expect(describeFailure({ errorCode: 'no_step_files', errorDetail: 'The archive holds no STEP files.' })).toContain('Export your parts as STEP');
+    expect(describeFailure({ errorCode: 'no_step_files', errorDetail: null })).toContain('Export your parts as STEP');
     expect(describeFailure({ errorCode: 'engine_rejected', errorDetail: 'x.step: only STEP files are supported' })).toBe('The CAD engine refused these files. x.step: only STEP files are supported');
+  });
+  it('shows what the zip held as the server recorded it, without repeating itself', () => {
+    const detail = 'The archive holds no STEP files. It holds 9 .pdf. Export your parts as STEP (AP242) and zip those.';
+    expect(describeFailure({ errorCode: 'no_step_files', errorDetail: detail })).toBe(detail);
   });
   it('never shows an empty message for an unknown code', () => {
     expect(describeFailure({ errorCode: 'something_new', errorDetail: null })).toBe('Processing failed.');

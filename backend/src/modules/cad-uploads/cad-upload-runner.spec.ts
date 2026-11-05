@@ -293,6 +293,18 @@ describe('CadUploadRunner', () => {
     expect(last(updates)).toMatchObject({ status: 'failed', error_code: 'archive_unreadable' });
   });
 
+  it('says what a zip with no STEP file does hold, including an archive inside it that is not unpacked', async () => {
+    const original = Buffer.from('x');
+    const { runner, updates } = setup(row({ file_name: 'pack.zip' }));
+    (runner as any).objects.get = async () => zip([{ name: 'Drawings/P01.pdf', data: original }, { name: 'Drawings/P02.pdf', data: original }, { name: 'Parts/inner.zip', data: original }]);
+    await runner.tick();
+    expect(last(updates)).toMatchObject({
+      status: 'failed',
+      error_code: 'no_step_files',
+      error_detail: 'The archive holds no STEP files. It holds 2 .pdf, 1 .zip. Export your parts as STEP (AP242) and zip those.',
+    });
+  });
+
   it('reports a result with no readable part as failed', async () => {
     engineAnswers({ ...report(), status: 'partial', assembly: [], inputs: [{ file: 'gear.step', status: 'unreadable', inside: null }] });
     const { runner, updates } = setup(row());
