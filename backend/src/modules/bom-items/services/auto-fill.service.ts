@@ -235,7 +235,7 @@ export class AutoFillService {
     // which the process heuristic below then labelled "Machining" at 0.6
     // confidence, plus a made-up make/buy, item type, cycle time and
     // confidence score, all returned as a normal 200. The upload form filled
-    // itself from that, and Refresh Analysis wrote it over a real analysis.
+    // itself from that, and a re-analysis wrote it over a real analysis.
     let cadResult: any;
     try {
       cadResult = await this.callCADEngineStateless(fileBuffer, fileName, forceReanalysis, familyHint, pullDirection);

@@ -8,7 +8,7 @@ import { AutoFillService } from './auto-fill.service';
 import { FileStorageService } from './file-storage.service';
 import { PlasticPullDirectionService } from './plastic-pull-direction.service';
 
-/** Runs the CAD analysis again on an item's stored 3D file and stores the result on the item (Refresh Analysis, and a changed pull direction). */
+/** Runs the CAD analysis (and the drawing's) on an item's stored files and stores the result on the item. Used by the analysis run (Apply Scenario) and by a changed pull direction. */
 @Injectable()
 export class BomItemReanalysisService {
   private readonly logger = new Logger(BomItemReanalysisService.name);
@@ -47,7 +47,7 @@ export class BomItemReanalysisService {
     const fileName = analysisPath.split('/').pop() ?? 'model.stp';
     // Re-analyse as the process the user chose (Create/Edit BOM Item's
     // Process field, persisted as scenario_overrides.processGroup). Without
-    // this, every Refresh Analysis re-ran the geometric classifier alone and
+    // this, every re-analysis re-ran the geometric classifier alone and
     // overwrote a Die Casting part's feature graph with machining features.
     const chosenProcessGroup = (bomItem.scenarioOverrides as Record<string, unknown> | undefined)?.['processGroup'];
     const familyHint = this.autoFillService.familyHintForProcessGroup(
@@ -106,5 +106,27 @@ export class BomItemReanalysisService {
     };
 
     return this.bomItemsService.update(id, updateData, userId, token);
+  }
+
+  /** Reads the title block, thread callouts and tolerances of the stored 2D drawing (a vector PDF) and stores them on the item. */
+  async analyzeDrawing(id: string, userId: string, token: string): Promise<BOMItemResponseDto> {
+    const bomItem = await this.bomItemsService.findOne(id, userId, token);
+    if (!bomItem.file2dPath) {
+      throw new BadRequestException('No 2D drawing found for this item — upload a PDF drawing first');
+    }
+    if (!bomItem.file2dPath.toLowerCase().endsWith('.pdf')) {
+      throw new BadRequestException('Drawing intelligence extraction requires a vector PDF (text extraction, not OCR) — this file is not a PDF');
+    }
+    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.file2dPath, 3600);
+    let fileBuffer: Buffer;
+    try {
+      const response = await axios.get(signedUrl, { responseType: 'arraybuffer', timeout: 60000, maxContentLength: MAX_CAD_FILE_BYTES });
+      fileBuffer = Buffer.from(response.data);
+    } catch (err: unknown) {
+      this.logger.error(`[analyze-drawing] Failed to download file: ${err instanceof Error ? err.message : String(err)}`);
+      throw new BadRequestException('Failed to download 2D file from storage');
+    }
+    const drawingResult = await this.autoFillService.analyzeDrawing(fileBuffer, bomItem.partNumber);
+    return this.bomItemsService.update(id, { drawingIntelligence: drawingResult as unknown as Record<string, any> }, userId, token);
   }
 }

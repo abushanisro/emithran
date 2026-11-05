@@ -2,8 +2,8 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, ArrowUp, Maximize2, Minimize2, ChevronDown, ChevronRight,
-  AlertCircle, GripVertical, GripHorizontal, RefreshCw,
+  ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
+  AlertCircle, GripVertical, GripHorizontal,
   Calculator, ShieldCheck, Flame, Loader2, Edit, X, Download,
   FileSpreadsheet, Search, Database,
 } from 'lucide-react';
@@ -37,9 +37,9 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
-import { applyBlockReason } from '@/lib/analysis/analysis-status';
+import { analysisNotReadyMessage, applyBlockReason } from '@/lib/analysis/analysis-status';
+import { useAnalysisRun } from '@/lib/api/hooks/useAnalysisRun';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
-import { useRefreshAnalysis } from '@/lib/api/hooks/useRefreshAnalysis';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import {
   resolveStoredProcessLines,
@@ -76,7 +76,7 @@ import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -102,7 +102,7 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // also used by NRE and by the drawing-callout surface-treatment auto-cost).
 import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/api/hooks/useSecondaryProcesses';
 import {
-  familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, FAMILY_HINT_TO_PROCESS_GROUP,
+  familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily,
 } from '@/lib/features/process-group';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
@@ -1896,10 +1896,10 @@ function CostSummaryTab({
       {!isScenarioReady && !hasStoredProcs && (
         <div className="pl-2 pb-2">
           <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
-            Press <strong>Refresh Analysis</strong> first, then set a material
-            grade, Digital Factory and batch size and press <strong>Apply</strong>.
-            Operations and costs are computed from the applied scenario against
-            the refreshed geometry — never before it.
+            Set a material grade, Digital Factory and batch size and press
+            <strong> Apply</strong>. The part is analysed first; operations and
+            costs are computed from the applied scenario against that
+            analysis — never before it.
           </div>
         </div>
       )}
@@ -1910,10 +1910,10 @@ function CostSummaryTab({
       {hasStoredMat && !hasStoredProcs && !isLoadingProcRecords && (
         <div className="pl-2 pb-2">
           <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
-            No process route applied yet. Press <strong>Refresh Analysis</strong>
-            to re-read the drawing, then <strong>Apply</strong> to compute and save
-            the route for this scenario. Process cost is taken from the applied
-            route, never from an unapplied estimate.
+            No process route applied yet. Press <strong>Apply</strong> to
+            analyse the part, then compute and save the route for this scenario.
+            Process cost is taken from the applied route, never from an
+            unapplied estimate.
           </div>
         </div>
       )}
@@ -2523,7 +2523,8 @@ function RouteComparisonCard({
   // commits the change server-side instead of only updating local UI state.
   const applyRoute = useApplyRoute(item.id);
   const analysisStatus = useAnalysisStatus(item.id);
-  const applyBlock = applyBlockReason({ status: analysisStatus.data, loading: analysisStatus.isPending, refreshing: false });
+  const applyBlock = applyBlockReason(analysisStatus.data);
+  const analysisRun = useAnalysisRun(item.id);
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
@@ -2829,16 +2830,24 @@ function RouteComparisonCard({
                     onClick={(e) => {
                       e.stopPropagation();
                       if (route.routeId) {
-                        applyRoute.mutate({ routeId: route.routeId, batchSize: comparison.resolvedInputs.batchSize, location: factory });
+                        // The route is computed from the part's analysis: the backend makes it current first (a no-op when it is).
+                        void analysisRun.mutateAsync().then((run) => {
+                          const notReady = analysisNotReadyMessage(run.status);
+                          if (notReady) { toast.error(notReady); return; }
+                          applyRoute.mutate({ routeId: route.routeId!, batchSize: comparison.resolvedInputs.batchSize, location: factory });
+                          onAppliedRouteChange(route.routeId);
+                          setSelectedRouteId(null);
+                        }).catch((err: unknown) => { toast.error(`Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`); });
+                        return;
                       }
                       onAppliedRouteChange(route.routeId);
                       setSelectedRouteId(null);
                     }}
-                    disabled={applyRoute.isPending || applyBlock != null}
+                    disabled={applyRoute.isPending || analysisRun.isPending || applyBlock != null}
                     title={applyBlock ?? undefined}
                     className="text-xs px-3 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 font-medium transition-colors disabled:opacity-50"
                   >
-                    {applyRoute.isPending ? 'Applying…' : 'Apply Route'}
+                    {analysisRun.isPending ? 'Analysing…' : applyRoute.isPending ? 'Applying…' : 'Apply Route'}
                   </button>
                 </div>
               )}
@@ -4724,11 +4733,9 @@ function CostGuidePanel({
   batchSizeAuto, setBatchSizeAuto, resolvedInputs,
   applyScenario,
   onManualClick, selectedManualRoute, onSelectHighlight,
-  dfmScores, refreshing,
+  dfmScores,
 }: {
   item: BOMItem; fg: FeatureGraph | null; summary: FeatureGraphSummary | null;
-  /** A Refresh Analysis is running: Apply waits for it. */
-  refreshing: boolean;
   // Real per-occurrence DFM risk from dfm-scoring.service.ts (the single DFM
   // authority, see P0.3) — threaded through so ManufacturingFeaturesTab can
   // present the backend's own UNDERSIZED_HOLE/CRACK_RISK findings instead of
@@ -4770,9 +4777,11 @@ function CostGuidePanel({
   const [tab, setTab] = useState<LeftTab>('scenario');
   const [leftAppliedRouteId, setLeftAppliedRouteId] = useState<string | null>(null);
   const applyRoute = useApplyRoute(item.id);
-  // Apply routes the part from its analysis: it waits until the analyses the part needs are finished (the backend refuses it otherwise).
+  // Apply Scenario starts with the analysis: the backend makes it current (a no-op when it is), so the user never starts one by hand. It only waits
+  // while the casting analysis it started is still running.
   const analysisStatus = useAnalysisStatus(item.id);
-  const applyBlock = applyBlockReason({ status: analysisStatus.data, loading: analysisStatus.isPending, refreshing });
+  const applyBlock = applyBlockReason(analysisStatus.data);
+  const analysisRun = useAnalysisRun(item.id);
   const [productLine, setProductLine] = useState('');
   const [matPickerOpen, setMatPickerOpen] = useState(false);
   // Apply Scenario confirmation + progress — the apply-route/apply-custom-route
@@ -5560,13 +5569,6 @@ function CostGuidePanel({
     () => optionsKeepingSelection(processGroupOptionsFrom(processCatalog?.mappings), selectedProcessGroup ?? ''),
     [processCatalog, selectedProcessGroup],
   );
-  // The chosen process has a CAD extractor (die_cast, sheet_metal, ...) but
-  // the stored features came from a different one — Refresh Analysis needed.
-  const analysedGroup = familyToProcessGroupLabel(fg?.classification?.family);
-  const processNeedsReanalysis =
-    !!selectedProcessGroup && !!analysedGroup && analysedGroup !== selectedProcessGroup
-    && Object.values(FAMILY_HINT_TO_PROCESS_GROUP).includes(selectedProcessGroup);
-
   // Fetch a broad slice of DB materials to validate AI candidates against.
   // Candidates not present in the DB (e.g. ABS on a sheet-metal part) are hidden.
   const { data: dbMaterialsForValidation } = useRawMaterials(
@@ -5586,8 +5588,21 @@ function CostGuidePanel({
     // step below is sent from this tab, so a sign-out midway would leave the
     // item partly applied.
     const endProtectedJob = beginProtectedJob('apply-scenario');
-    setApplyProgress({ step: 'Applying manufacturing route…', pct: 10 });
+    setApplyProgress({ step: 'Analysing the part…', pct: 5 });
     try {
+      // 1. The analysis comes first: the route and the material cost are computed from it. The backend decides what is missing and runs exactly
+      // that, and does nothing when everything is current. Nothing is written until the analysis is ready.
+      try {
+        const notReady = analysisNotReadyMessage((await analysisRun.mutateAsync()).status);
+        if (notReady) {
+          toast.warning(notReady);
+          return;
+        }
+      } catch (e: unknown) {
+        toast.error(`Analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        return;
+      }
+      setApplyProgress({ step: 'Applying manufacturing route…', pct: 10 });
       try {
         const routeStagedThisSession = processRouting === 'manual' && !!selectedManualRoute;
         // Annual volume first, and awaited: the batch size the route is applied
@@ -5753,10 +5768,10 @@ function CostGuidePanel({
             {(
               <Section title="Process Group">
                 {/* The user's choice, saved as scenario_overrides.processGroup.
-                    Refresh Analysis re-runs the CAD engine as this process
-                    (backend /reanalyze maps it to the family_hint), so picking
-                    Die Casting here and refreshing extracts die-casting
-                    features instead of machining ones. */}
+                    Apply Scenario analyses the part as this process (the
+                    backend maps it to the CAD family hint), so picking Die
+                    Casting here extracts die-casting features instead of
+                    machining ones. */}
                 <select
                   value={selectedProcessGroup ?? ''}
                   onChange={(e) => { patchScenarioOverrides.mutate({ id: item.id, patch: { processGroup: e.target.value || null } }); }}
@@ -5767,10 +5782,9 @@ function CostGuidePanel({
                     <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
-                {processNeedsReanalysis && (
+                {analysisStatus.data?.cad === 'stale' && (
                   <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight mt-1">
-                    Features were last extracted as {familyToProcessGroupLabel(fg?.classification?.family) ?? 'another process'} —
-                    click Refresh Analysis to extract {selectedProcessGroup} features.
+                    The stored features do not match this process (or are out of date): Apply Scenario analyses the part again.
                   </p>
                 )}
 
@@ -6951,7 +6965,7 @@ function DieCastingFeatureTreePanel({
     <>
       <Section title="Die Casting Features">
         {features.length === 0 ? (
-          <p className="text-[10px] text-muted-foreground">No die-casting features — set Process Group to Die Casting and click Refresh Analysis.</p>
+          <p className="text-[10px] text-muted-foreground">No die-casting features — set Process Group to Die Casting and press Apply to analyse the part.</p>
         ) : (
           <div className="space-y-0.5 text-[10px]">
             {/* Component: part-level facts from the extractor, not instances. */}
@@ -9225,7 +9239,6 @@ export default function ManufacturingIntelligencePage() {
 
   const queryClient = useQueryClient();
   const { data: item, isLoading } = useBOMItem(itemId);
-  const { data: analysisVersionData } = useAnalysisVersion();
   const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
   const [cadEvidence, setCadEvidence] = useState<CadEvidence | null>(null);
   const [file3dUrlError, setFile3dUrlError] = useState<string | null>(null);
@@ -9532,7 +9545,6 @@ export default function ManufacturingIntelligencePage() {
     }
     return routeApplied;
   };
-  const { refresh: handleRefreshAnalysis, refreshing } = useRefreshAnalysis(itemId, item?.file2dPath);
   // Applies the real machine picked per step in the Workflow Builder, after
   // applyRoute/applyCustomRoute create the process_cost_records rows — see
   // ManualRouteOption.machineOverrides / applyScenario above. Uses the DRAFT
@@ -9593,34 +9605,6 @@ export default function ManufacturingIntelligencePage() {
     () => normalizeFeatureGraph(item ? ((item.featureGraph) ?? null) : null),
     [item],
   );
-  const currentVersion = analysisVersionData?.version ?? 0;
-  const isStale = fg != null && currentVersion > 0 && (fg.feature_graph_version ?? 0) < currentVersion;
-  // A 3D file is on the item but it has never been through real CAD
-  // analysis — every panel on this page is blank until Refresh Analysis is
-  // clicked once, with nothing else on screen telling the user that's the
-  // next step. isStale (above) only covers the re-analyze-after-an-engine-
-  // upgrade case and requires fg to already exist, so it never fires here.
-  //
-  // Checked via fg?.classification, not just fg == null: a featureGraph can
-  // exist (e.g. written by a lighter-weight upload path that only recorded
-  // geometry/volume) without ever having gone through the real family
-  // classification + feature extraction that populates every other panel —
-  // confirmed live, a part whose header rendered normally (so fg was non-
-  // null) still showed every panel blank. This is the exact same signal the
-  // classification badge right next to this header already gates on
-  // (`{cls && (...)}` below, where cls = fg?.classification) — if that badge
-  // isn't showing, nothing downstream has real data either.
-  const chosenProcessGroup = item?.scenarioOverrides?.processGroup as string | undefined;
-  const lastAnalysedGroup = familyToProcessGroupLabel(fg?.classification?.family);
-  // Also pulse when the user's chosen process has its own CAD extractor but
-  // the stored features came from a different one (e.g. Die Casting chosen,
-  // features still the classifier's machining ones).
-  const needsFirstAnalysis = !!item?.file3dPath && (
-    !fg?.classification
-    || (!!chosenProcessGroup && !!lastAnalysedGroup && chosenProcessGroup !== lastAnalysedGroup
-        && Object.values(FAMILY_HINT_TO_PROCESS_GROUP).includes(chosenProcessGroup))
-  );
-
   const summary = useMemo(
     () => fg?.summary ?? (item ? buildSummary(item, fg) : null),
     [fg, item],
@@ -10422,8 +10406,6 @@ export default function ManufacturingIntelligencePage() {
           faceMap={faceMap}
           sheetThickness={effectiveSheetThicknessMm(item)}
           {...(setupAxes.length ? { axes: setupAxes } : {})}
-          onReanalyse={() => { void handleRefreshAnalysis().then(() => { setCadEvidence(null); }); }}
-          reanalysing={refreshing}
           onClose={() => { setCadEvidence(null); }}
         />
       )}
@@ -10448,31 +10430,6 @@ export default function ManufacturingIntelligencePage() {
       <div className="w-px h-4 bg-border mx-0.5 shrink-0" />
 
       {/* Action buttons */}
-      <button
-        onClick={() => { void handleRefreshAnalysis(); }}
-        disabled={refreshing || !item?.file3dPath}
-        className={`relative flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${
-          needsFirstAnalysis && !refreshing
-            ? 'border-primary ring-2 ring-primary/40 animate-pulse hover:bg-muted'
-            : 'border-border hover:bg-muted'
-        }`}
-      >
-        <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-        Refresh Analysis
-        {isStale && !refreshing && <span className="text-amber-500 ml-0.5">⚠</span>}
-        {/* Never analyzed yet — every panel on this page is blank until this
-            is clicked once, and nothing else on screen says so. A pointing
-            arrow + label is far harder to miss than the amber ⚠ above, which
-            only ever shows once fg already exists (the re-analyze case). */}
-        {needsFirstAnalysis && !refreshing && (
-          <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 flex flex-col items-center gap-0.5 animate-bounce pointer-events-none z-20">
-            <ArrowUp className="h-4 w-4 text-primary" />
-            <span className="text-[10px] font-semibold text-primary bg-background border border-primary/50 rounded px-1.5 py-0.5 shadow-xs whitespace-nowrap">
-              Click to analyze
-            </span>
-          </span>
-        )}
-      </button>
       <button
         onClick={() => { void handleRecalculateCost(); }}
         disabled={recalculating}
@@ -10732,7 +10689,7 @@ export default function ManufacturingIntelligencePage() {
     applyScenario,
     onManualClick: () => { setRouteDialogOpen(true); },
     selectedManualRoute, onSelectHighlight,
-    dfmScores, refreshing,
+    dfmScores,
   };
   const analysisProps = {
     projectId,
