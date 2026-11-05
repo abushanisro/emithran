@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
 import { AuditService } from '../../../../../common/audit/audit.service';
+import { isMissingTable } from '../../../../../common/db/missing-table';
 import { DatabaseService } from '../../../../../common/database/database.service';
 
 export type SnapshotStatus = 'submitted' | 'approved' | 'rejected';
@@ -96,6 +97,8 @@ export class SandSnapshotsService {
       .select(COLUMNS)
       .eq('bom_item_id', bomItemId)
       .order('created_at', { ascending: false });
+    // A database that predates migration 962 has no frozen costs: the list is empty (freezing one still fails, saying why).
+    if (error && isMissingTable(error)) return [];
     if (error) throw new Error(`Could not read the cost snapshots: ${error.message}`);
     return ((data ?? []) as Row[]).map(view);
   }

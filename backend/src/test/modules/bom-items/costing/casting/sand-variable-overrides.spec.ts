@@ -63,3 +63,33 @@ describe('checking a value against the plant variable it replaces', () => {
     expect(v).toMatchObject({ variable: REMELT, value: '9', plantValue: String(plant.number(REMELT)), reason: 'why' });
   });
 });
+
+import { SandVariableOverridesService } from '../../../../../modules/bom-items/costing/casting/sand/sand-variable-overrides.service';
+import { SandSnapshotsService } from '../../../../../modules/bom-items/costing/casting/sand/sand-snapshots.service';
+
+/** A client whose table read answers with the given error (select ... eq ... [order]). */
+const failingClient = (error: { code: string; message: string }) => {
+  const q: Record<string, unknown> = {};
+  q.select = () => q; q.eq = () => q;
+  q.order = () => Promise.resolve({ data: null, error });
+  q.then = (resolve: (v: unknown) => void) => resolve({ data: null, error });
+  return { from: () => q };
+};
+
+describe('a database that predates the overrides and the frozen costs', () => {
+  const missing = { code: 'PGRST205', message: "Could not find the table 'public.sand_variable_overrides' in the schema cache" };
+
+  it("has no part values of its own, so the plant values apply (and the costing does not fail)", async () => {
+    await expect(SandVariableOverridesService.rows(failingClient(missing) as never, 'item-1')).resolves.toEqual([]);
+  });
+
+  it('still stops on any other failure: a part with values of its own must not be priced with the plant\'s', async () => {
+    await expect(SandVariableOverridesService.rows(failingClient({ code: '57014', message: 'canceling statement due to statement timeout' }) as never, 'item-1')).rejects.toThrow(/Could not read the sand variable overrides/);
+  });
+
+  it('has no frozen costs: the list is empty', async () => {
+    const database = { getUserClient: () => ({ from: (t: string) => (t === 'bom_items' ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'item-1' }, error: null }) }) }) } : failingClient({ ...missing, message: "Could not find the table 'public.sand_cost_snapshots' in the schema cache" }).from()) }) };
+    const service = new SandSnapshotsService(database as never, {} as never);
+    await expect(service.list('item-1', 't')).resolves.toEqual([]);
+  });
+});

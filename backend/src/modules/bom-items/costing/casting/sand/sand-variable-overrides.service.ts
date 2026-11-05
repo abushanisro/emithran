@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
 import { AuditService } from '../../../../../common/audit/audit.service';
+import { isMissingTable } from '../../../../../common/db/missing-table';
 import type { DbClient } from '../../../../../common/db/postgrest-client';
 import { DatabaseService } from '../../../../../common/database/database.service';
 import { SandReferenceService } from './sand-reference.service';
@@ -35,6 +36,9 @@ export class SandVariableOverridesService {
   /** The rows of one BOM item, read with the caller's client (row-level security limits them to their organization). */
   static async rows(client: DbClient, bomItemId: string): Promise<SandVariableOverrideRow[]> {
     const { data, error } = await client.from('sand_variable_overrides').select(COLUMNS).eq('bom_item_id', bomItemId);
+    // A database that predates migration 961 has no such table, and so no part has values of its own: the plant values apply. Any other failure still stops
+    // the costing, because pricing a part that has its own values with the plant's would be a wrong price, not a missing feature.
+    if (error && isMissingTable(error)) return [];
     if (error) throw new Error(`Could not read the sand variable overrides: ${error.message}`);
     return (data ?? []) as SandVariableOverrideRow[];
   }

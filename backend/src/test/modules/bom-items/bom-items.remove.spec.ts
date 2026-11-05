@@ -11,7 +11,7 @@ const ITEM = 'item-1';
  * `all` is the database; `hidden` holds ids of production_lot_materials rows RLS hides from the caller. `failOn` makes a
  * table's read fail. Records every write and every privileged call.
  */
-function harness(all: Rows, hidden: Set<string> = new Set(), failOn?: string) {
+function harness(all: Rows, hidden: Set<string> = new Set(), failOn?: string, failCode = 'XX000') {
   const writes: string[] = [];
   const privileged: string[] = [];
   const makeClient = (asService: boolean) => ({
@@ -22,7 +22,7 @@ function harness(all: Rows, hidden: Set<string> = new Set(), failOn?: string) {
       const visibleRows = () => (all[table] ?? []).filter((r) => asService || table !== 'production_lot_materials' || !hidden.has(r.id as string));
       const matching = () => visibleRows().filter((r) => filters.every(([col, vals]) => vals.includes(r[col])));
       const run = async () => {
-        if (failOn === table && op === 'select') return { data: null, error: { message: `${table} unreadable`, code: 'XX000' }, count: null };
+        if (failOn === table && op === 'select') return { data: null, error: { message: failCode === 'PGRST205' ? `Could not find the table 'public.${table}' in the schema cache` : `${table} unreadable`, code: failCode }, count: null };
         if (op === 'select') {
           const rows = matching();
           return { data: head ? null : rows, error: null, count: rows.length };
@@ -96,6 +96,19 @@ describe('BOMItemsService.remove', () => {
     ]);
     expect(all.bom_items).toHaveLength(0);
     expect(all.production_lot_materials).toHaveLength(0);
+  });
+
+  it("deletes the item in a database that has no process route tables (a retired structure), without the 500 that stopped every delete there", async () => {
+    const { service, writes, all } = harness(base(), new Set(), 'process_routes', 'PGRST205');
+    await expect(service.remove(ITEM, 'u', 't')).resolves.toBeUndefined();
+    expect(writes).toEqual(['update bom_items', 'delete bom_items']);
+    expect(all.bom_items).toHaveLength(0);
+  });
+
+  it('still stops when the process routes fail to read for any other reason', async () => {
+    const { service, writes } = harness(base(), new Set(), 'process_routes', '57014');
+    await expect(service.remove(ITEM, 'u', 't')).rejects.toThrow(InternalServerErrorException);
+    expect(writes).toEqual([]);
   });
 
   it('is 404 for an item the caller cannot see', async () => {
