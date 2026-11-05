@@ -18,7 +18,8 @@ import { getProcessLabelForClass } from '../../../modules/bom-items/costing/shar
 // the writer had to send them, and migration 704's RPC had to carry them (they
 // were absent from its jsonb_to_recordset list and were silently dropped).
 
-const CONTROLLER = join(__dirname, '..', '..', '..', 'modules', 'bom-items', 'bom-items.controller.ts');
+// The writer moved out of the controller unchanged (RouteApplicationService): the route-application endpoints and Apply Scenario share it.
+const CONTROLLER = join(__dirname, '..', '..', '..', 'modules', 'bom-items', 'services', 'route-application.service.ts');
 const RPC = join(__dirname, '..', '..', '..', '..', 'migrations', '706_persist_process_line_costs.sql');
 // The CURRENT definition of the same function. 706 added the three cost
 // columns, 707 the currency contract, 718 the costed-operation provenance --
