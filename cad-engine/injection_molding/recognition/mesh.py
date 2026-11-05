@@ -16,11 +16,21 @@ class Triangle:
 
 
 @dataclass(frozen=True)
+class Revolved:
+    """The analytic parameters of a cylinder or cone face: where its axis is and how wide it is (the face's own extent is measured from its mesh)."""
+    axis_point: Vec
+    axis: Vec          # unit
+    radius: float      # cylinder radius; for a cone, the radius at its reference plane
+    half_angle: float  # radians; 0 for a cylinder
+
+
+@dataclass(frozen=True)
 class FaceMesh:
     index: int      # ordinal of the face in TopExp_Explorer order, the numbering every other detector and the 3D viewer use
     surface: str    # plane | cylinder | cone | sphere | torus | bspline | bezier | revolution | extrusion | offset | other
     area: float
     triangles: List[Triangle]
+    revolved: "Revolved | None" = None  # set for cylinders and cones
 
 
 def _surface_name(adaptor_type: Any) -> str:
@@ -75,7 +85,7 @@ def tessellate_faces(shape: Any, linear_deflection: float, angular_deflection: f
                 t = _triangle(nodes[a - 1], nodes[b - 1], nodes[c - 1])
                 if t is not None:
                     triangles.append(t)
-        out.append(FaceMesh(index=index, surface=surface, area=area, triangles=triangles))
+        out.append(FaceMesh(index=index, surface=surface, area=area, triangles=triangles, revolved=_revolved(face, surface)))
         index += 1
         explorer.Next()
     return out
@@ -94,3 +104,21 @@ def _triangle(p: Vec, q: Vec, r: Vec) -> "Triangle | None":
         area=twice_area / 2.0,
         vertices=(p, q, r),
     )
+
+
+def _revolved(face: Any, surface: str) -> "Revolved | None":
+    if surface not in ("cylinder", "cone"):
+        return None
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+
+    adaptor = BRepAdaptor_Surface(face)
+    if surface == "cylinder":
+        c = adaptor.Cylinder()
+        radius, half_angle = float(c.Radius()), 0.0
+        axis = c.Axis()
+    else:
+        c = adaptor.Cone()
+        radius, half_angle = float(c.RefRadius()), float(c.SemiAngle())
+        axis = c.Axis()
+    d, p = axis.Direction(), axis.Location()
+    return Revolved(axis_point=(float(p.X()), float(p.Y()), float(p.Z())), axis=(float(d.X()), float(d.Y()), float(d.Z())), radius=radius, half_angle=half_angle)

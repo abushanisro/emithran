@@ -185,3 +185,5 @@ def test_recognize_core_reports_the_census_the_direction_and_the_draft_together(
     assert out["pull_direction"]["axis"] == "z"
     assert out["surface_census"]["faces"] == 7
     assert out["draft"]["faces_by_class"]["undrafted"] >= 4  # the box walls and the hole wall have no draft
+    assert [(h["feature_type"], h["variant"]) for h in out["features"]["holes"]] == [("SimpleHole", "through")]
+    assert out["features"]["holes"][0]["angle_to_pull_deg"] == pytest.approx(0.0, abs=0.5)
