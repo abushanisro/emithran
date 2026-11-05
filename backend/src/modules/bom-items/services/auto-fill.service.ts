@@ -502,6 +502,8 @@ export class AutoFillService {
           undercutFaceCount:    cadMI?.features?.undercut_face_count ?? 0,
           partingComplexity:    cadMI?.features?.parting_complexity ?? null,
           avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
+          // The recognised features (holes, faces, ribs) the catalog operations are resolved from; null on an older CAD engine.
+          plasticFeatureGraph:  cadMI?.features?.recognition_core?.feature_graph ?? null,
         } : {}),
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
         // (cadMI.features). Detection + highlighting only; process routing and
