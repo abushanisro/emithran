@@ -583,6 +583,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       moldBaseAreaMm2,
       cavityCount,
       undercutCount: effectiveUndercutCount,
+      slideBundles: signals.slideBundleCount ?? null,
+      slideOrLifterBundles: signals.slideOrLifterBundleCount ?? 0,
       tables: plasticRef.tooling,
       toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null,
       location: input.location ?? '(unknown location)',

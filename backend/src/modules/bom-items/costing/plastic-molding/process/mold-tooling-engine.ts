@@ -67,6 +67,13 @@ interface MoldToolingInput {
   cavityCount: number;
   /** Real, already-extracted undercut count (signals.undercutCount) — gates side-action hardware. */
   undercutCount: number;
+  /**
+   * Recognised bundles only a slide can serve. Null = the features were not recognised (older engine): the hardware then follows undercutCount, as it did.
+   * Known: the slide hardware is priced when there is at least one, and only then, because a lifter has none of it.
+   */
+  slideBundles: number | null;
+  /** Bundles a lifter or a slide could serve: not decided (clearance beside the part), so no slide hardware is assumed for them. */
+  slideOrLifterBundles: number;
   /** Staged tooling tables (plastic-reference.ts). */
   tables: MoldToolingTables;
   /** Toolroom rates for the quote location, or null when none is on file for it. */
@@ -111,10 +118,12 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   const noAssemblyTime: string[] = [];
   let assemblyHrs = 0;
 
+  // Slide hardware (hydraulic cylinder, side lock): by the recognised slide bundles when the features were recognised, else by the undercut count.
+  const needsSlideHardware = input.slideBundles == null ? input.undercutCount > 0 : input.slideBundles > 0;
   const t = input.tables;
   const assemblyHrByKey = new Map(t.assemblyTimes.map((a) => [componentNameKey(a.name), a.hours]));
   for (const c of t.components) {
-    if (SIDE_ACTION_ONLY_COMPONENTS.has(componentNameKey(c.name)) && input.undercutCount <= 0) continue; // real: no slide needed
+    if (SIDE_ACTION_ONLY_COMPONENTS.has(componentNameKey(c.name)) && !needsSlideHardware) continue; // real: no slide needed
     if (c.quantity === null) {
       missingComponents.push(`${c.name} (real unit cost on file, but this part's real quantity is not derivable from any sourced table)`);
       continue;
@@ -136,6 +145,17 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   const estimatedAssemblyOperators = bracket(t.operatorsByArea, (r) => r.areaM2, areaM2).operators;
 
   const warnings = [SCOPE_WARNING];
+  if (input.slideBundles != null && input.slideBundles === 0 && input.slideOrLifterBundles > 0) {
+    warnings.push(
+      `Slide hardware (hydraulic cylinder, side lock) is not priced: ${input.slideOrLifterBundles} side-action bundle${input.slideOrLifterBundles === 1 ? '' : 's'} could be lifters or slides, `
+      + 'which depends on the clearance beside the part in the tool and is not assessed. No lifter hardware cost is on file.',
+    );
+  }
+  if (input.slideBundles != null && input.slideBundles > 0) {
+    warnings.push(
+      `Slide hardware is priced at the staged quantity for one mold set (cmStandardToolingComponents), not scaled by the ${input.slideBundles} slide bundle${input.slideBundles === 1 ? '' : 's'}: no per-slide quantity is on file.`,
+    );
+  }
   if (missingComponents.length > 0) {
     warnings.push(`Real components with no derivable quantity on file, so not included: ${missingComponents.join(', ')}.`);
   }

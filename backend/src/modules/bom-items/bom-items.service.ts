@@ -60,6 +60,7 @@ import { splitDeepHoleOccurrences, resolveDeepHoleRules } from './costing/machin
 import { splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
 import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-routing';
 import { undercutCountFromDraftSummary } from './costing/plastic-molding/draft-signals';
+import { sideActionSignals } from './costing/plastic-molding/side-action-signals';
 import { computeInjectionMoldedCostSummary } from './costing/plastic-molding/process/cost-injection-molding-engine';
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
@@ -4244,7 +4245,10 @@ export class BOMItemsService {
           bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
           // Phase 2 signals — null when CAD engine is pre-Phase 2 (safe: router applies
           // conservative defaults and records routingWarnings when signals are null)
-          undercutCount: undercutCountFromDraftSummary(summary),
+          // Features that need a side action when the recognised graph can say; else the draft analysis's face count.
+          undercutCount: sideActionSignals(summary.plasticFeatureGraph)?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
+          slideBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideBundles ?? null,
+          slideOrLifterBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideOrLifterBundles ?? null,
           partingComplexity: (summary.partingComplexity as number | null) ?? null,
           // Phase 3: insert candidates from CAD blind-hole OD matching
           insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
@@ -6343,7 +6347,9 @@ export class BOMItemsService {
           ? (summary.ribCount as number)
           : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
         bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
-        undercutCount: undercutCountFromDraftSummary(summary),
+        undercutCount: sideActionSignals(summary.plasticFeatureGraph)?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
+        slideBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideBundles ?? null,
+        slideOrLifterBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideOrLifterBundles ?? null,
         partingComplexity: (summary.partingComplexity as number | null) ?? null,
         insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
       };
