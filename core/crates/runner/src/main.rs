@@ -24,8 +24,26 @@ fn number(name: &str, default: u64) -> u64 {
 
 const MIB: u64 = 1024 * 1024;
 
+/// What a zip may expand to, in MiB: the same setting, default and bounds as the backend (`ARCHIVE_MAX_EXPANDED_MB`, backend/src/common/
+/// resource-limits.ts), so one value governs both cores and a zip is accepted or refused the same way whichever core reads it. Unlike the
+/// other settings here, a value that is set but not a whole number in range is an error, not a silent default: the backend refuses to start on it too.
+fn archive_total_mb(raw: Option<&str>) -> Result<u64, String> {
+    const DEFAULT: u64 = 256;
+    match raw.map(str::trim) {
+        None | Some("") => Ok(DEFAULT),
+        Some(v) => match v.parse::<u64>() {
+            Ok(n) if (1..=4096).contains(&n) => Ok(n),
+            _ => Err(format!(
+                "ARCHIVE_MAX_EXPANDED_MB={v} must be a whole number from 1 to 4096 (default {DEFAULT})"
+            )),
+        },
+    }
+}
+
 fn config() -> Result<(Config, Duration), String> {
     let max_entry = number("MAX_UPLOAD_MB", 50) * MIB;
+    let max_total =
+        archive_total_mb(std::env::var("ARCHIVE_MAX_EXPANDED_MB").ok().as_deref())? * MIB;
     let max_entries = 10_000;
     let config = Config {
         worker: RemoteWorker {
@@ -42,7 +60,7 @@ fn config() -> Result<(Config, Duration), String> {
         archive: Limits {
             max_entries,
             max_entry_bytes: max_entry,
-            max_total_bytes: max_entry * 8,
+            max_total_bytes: max_total,
         },
     };
     Ok((config, Duration::from_secs(number("POLL_SECONDS", 30))))
@@ -128,4 +146,24 @@ async fn serve<B: Backend>(backend: &B, config: &Config, poll: Duration) {
         }
     }
     eprintln!("cad-runner stopped");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::archive_total_mb;
+
+    #[test]
+    fn the_expansion_cap_is_the_backends_setting_with_the_backends_default_and_bounds() {
+        assert_eq!(archive_total_mb(None), Ok(256));
+        assert_eq!(archive_total_mb(Some("")), Ok(256));
+        assert_eq!(archive_total_mb(Some(" 512 ")), Ok(512));
+        assert_eq!(archive_total_mb(Some("1")), Ok(1));
+        assert_eq!(archive_total_mb(Some("4096")), Ok(4096));
+        for bad in ["0", "4097", "-1", "256.5", "lots"] {
+            assert!(
+                archive_total_mb(Some(bad)).is_err(),
+                "{bad} should be refused"
+            );
+        }
+    }
 }
