@@ -1,6 +1,6 @@
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 
-import { checkUpload, noStepFilesMessage } from './check-upload';
+import { checkUpload, noStepFilesMessage, skipReason } from './check-upload';
 
 const STEP = Buffer.from('ISO-10303-21;\nHEADER;');
 const ZIP = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(30)]);
@@ -47,5 +47,17 @@ describe('noStepFilesMessage', () => {
 
   it('says only what is certain when nothing else was found', () => {
     expect(noStepFilesMessage([])).toBe(`The archive holds no STEP files. ${advice}`);
+  });
+});
+
+describe('skipReason', () => {
+  it('names a native CAD format and says to export it as STEP', () => {
+    expect(skipReason('Plastic Components/Front Top Cover.x_t')).toBe('a native CAD file (.x_t), not read: export it as STEP (AP242) and upload that');
+    expect(skipReason('Pack/Housing.SLDPRT')).toBe('a native CAD file (.sldprt), not read: export it as STEP (AP242) and upload that');
+  });
+
+  it('keeps the plain reason for a drawing or a note', () => {
+    expect(skipReason('Drawings/P01.pdf')).toBe('not a STEP file');
+    expect(skipReason('readme.txt')).toBe('not a STEP file');
   });
 });

@@ -94,8 +94,16 @@ def fixture_cases(out: Path) -> list:
     drawings = out / "_inputs" / "pack-with-drawings-only.zip"
     with zipfile.ZipFile(drawings, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("Drawings/P01.pdf", b"%PDF-1.4 not cad")
+    # A pack as a customer sends it: one STEP part and native CAD files (Parasolid) beside it. Both cores must leave the same files out, for the same reasons.
+    mixed = out / "_inputs" / "pack-with-native-cad.zip"
+    with zipfile.ZipFile(mixed, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("Pack/plate.step", (FIXTURES / "plate.step").read_bytes())
+        z.writestr("Pack/Front Top Cover.x_t", b"**ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        z.writestr("Pack/Housing.SLDPRT", b"not a step file")
+        z.writestr("Pack/drawing.pdf", b"%PDF-1.4")
     return [("fixture: nested assembly + loose parts (zip)", pack), ("fixture: nested assembly (one STEP file)", FIXTURES / "nested-assembly.step"),
-            ("fixture: zip with a corrupt STEP file", broken), ("fixture: zip with no CAD file", drawings)]
+            ("fixture: zip with a corrupt STEP file", broken), ("fixture: zip with no CAD file", drawings),
+            ("fixture: zip with a STEP part and native CAD files", mixed)]
 
 
 def slug(label: str) -> str:

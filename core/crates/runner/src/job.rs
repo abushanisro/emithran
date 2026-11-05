@@ -97,6 +97,12 @@ fn step_files(
             reason: s.reason.to_string(),
         })
         .collect();
+    let nested: Vec<String> = skipped
+        .iter()
+        .filter(|s| s.reason.starts_with("an archive inside"))
+        .map(|s| s.path.clone())
+        .collect();
+    let mut not_step: Vec<String> = Vec::new(); // what the zip holds instead, for the error when it holds no STEP file
     let mut files = Vec::new();
     for entry in expanded.entries {
         let inner = entry
@@ -112,16 +118,17 @@ fn step_files(
             });
         } else {
             skipped.push(Skip {
-                path: inner,
-                reason: "not a STEP file".to_string(),
+                path: inner.clone(),
+                reason: skip_reason(&entry.name),
             });
+            not_step.push(inner);
         }
     }
     if files.is_empty() {
-        let others: Vec<&str> = skipped
+        let others: Vec<&str> = not_step
             .iter()
-            .filter(|s| s.reason == "not a STEP file" || s.reason.starts_with("an archive inside"))
-            .map(|s| s.path.as_str())
+            .chain(nested.iter())
+            .map(String::as_str)
             .collect();
         return Err(Failure::permanent(
             "no_step_files",
@@ -129,6 +136,33 @@ fn step_files(
         ));
     }
     Ok((files, skipped))
+}
+
+/// Why a file of a zip that is not STEP is left out. A native CAD file (Parasolid, SolidWorks, CATIA...) is a part the user expects in the BOM,
+/// so the reason names its format and what to do; anything else (a drawing, a note) is just "not a STEP file". The same words as the backend's
+/// `skipReason` (check-upload.ts); the parity harness checks that the two cores agree.
+fn skip_reason(file_name: &str) -> String {
+    const NATIVE: [&str; 12] = [
+        "sldasm",
+        "sldprt",
+        "catpart",
+        "catproduct",
+        "prt",
+        "asm",
+        "ipt",
+        "iam",
+        "x_t",
+        "x_b",
+        "3dm",
+        "dwg",
+    ];
+    let lower = file_name.to_ascii_lowercase();
+    match lower.rsplit_once('.') {
+        Some((_, ext)) if NATIVE.contains(&ext) => format!(
+            "a native CAD file (.{ext}), not read: export it as STEP (AP242) and upload that"
+        ),
+        _ => "not a STEP file".to_string(),
+    }
 }
 
 /// What a zip with no STEP file says about itself: the kinds of file it does hold, so "no STEP files" is never a bare verdict.
@@ -784,6 +818,20 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(backend.failed.borrow().clone().unwrap().2, "no_step_files");
+    }
+
+    #[test]
+    fn a_file_left_out_says_why_and_a_native_cad_file_says_what_to_do() {
+        assert_eq!(
+            skip_reason("Plastic Components/Front Top Cover.x_t"),
+            "a native CAD file (.x_t), not read: export it as STEP (AP242) and upload that"
+        );
+        assert_eq!(
+            skip_reason("Pack/Housing.SLDPRT"),
+            "a native CAD file (.sldprt), not read: export it as STEP (AP242) and upload that"
+        );
+        assert_eq!(skip_reason("Drawings/P01.pdf"), "not a STEP file");
+        assert_eq!(skip_reason("readme"), "not a STEP file");
     }
 
     #[test]
