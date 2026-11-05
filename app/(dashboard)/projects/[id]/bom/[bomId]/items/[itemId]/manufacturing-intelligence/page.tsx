@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
 import { analysisNotReadyMessage, applyBlockReason } from '@/lib/analysis/analysis-status';
+import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { useAnalysisRun } from '@/lib/api/hooks/useAnalysisRun';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -1379,7 +1380,7 @@ function CostSummaryTab({
   onShowEvidence?: ((evidence: CadEvidence | null) => void) | undefined;
   activeEvidenceLabel?: string | null | undefined;
 }) {
-  const { data: cost, isLoading } = useCostSummary(item.id, batchSize, factory);
+  const { data: cost, isLoading, dataUpdatedAt: costUpdatedAt } = useCostSummary(item.id, batchSize, factory);
   const { data: comparison } = useRouteComparison(item.id, batchSize, factory);
   const { data: existingProcRecords, isLoading: isLoadingProcRecords } = useProcessCosts({ bomItemId: item.id, isActive: true, enabled: !!item.id });
   // The caller never actually passes appliedRouteId (see <CostSummaryTab .../>
@@ -1827,6 +1828,14 @@ function CostSummaryTab({
           )}
         </div>
       </div>
+
+      {/* ── The applied cost as a table: compact here, every column in the dialog. The editable records it is made of are below. ── */}
+      <CostTablePanel itemId={item.id} refreshKey={costUpdatedAt} display={{ symbol: sym, fromUsd }} />
+
+      <details className="group/edit border-t border-border/60 pt-2">
+        <summary className="cursor-pointer select-none py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground">
+          Edit costs
+        </summary>
 
       {/* ── DIRECT MATERIAL ── editable via RawMaterialsSection ── */}
       <SectionHeader label="Direct Material Costs" />
@@ -2471,6 +2480,8 @@ function CostSummaryTab({
       <div className="-mx-4">
         <ToolingSection bomItemId={item.id} bomItem={item} compact currencySymbol={sym} conversionRate={fromUsd} />
       </div>
+
+      </details>
 
       {/* ── Grand total footer ── */}
       <div className="flex items-baseline justify-between pt-3 mt-1 border-t-2 border-border">
