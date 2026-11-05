@@ -89,8 +89,8 @@ describe('buildCostTable', () => {
     }
   });
 
-  it('the basic columns are the ones that add up to the piece part cost', () => {
-    expect(COST_COLUMNS.filter((c) => c.basic).map((c) => c.key)).toEqual(['materialCost', 'processCost', 'amortizedBatchSetup', 'totalVariable', 'pieceCost']);
+  it('the basic columns are the ones that add up to the piece part cost (the total variable cost is the same number, so only the dialog shows both)', () => {
+    expect(COST_COLUMNS.filter((c) => c.basic).map((c) => c.key)).toEqual(['materialCost', 'processCost', 'amortizedBatchSetup', 'pieceCost']);
   });
 
   it('is in USD, the currency every persisted cost table is native to', () => {

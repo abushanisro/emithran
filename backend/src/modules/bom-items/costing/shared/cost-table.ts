@@ -41,7 +41,7 @@ export const COST_COLUMNS: readonly CostColumn[] = [
   { key: 'logistics', label: 'Logistics', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false },
   { key: 'tooling', label: 'Tooling (amortized)', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false },
   { key: 'otherDirect', label: 'Other Direct Costs', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false, note: 'Procured parts.' },
-  { key: 'totalVariable', label: 'Total Variable Costs', group: 'Variable Costs', unit: 'usd', modelled: true, basic: true },
+  { key: 'totalVariable', label: 'Total Variable Costs', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false },
   { key: 'indirectOverhead', label: 'Indirect Overhead', group: 'Period Costs', unit: 'usd', modelled: false, basic: false, note: 'Not modelled: no indirect overhead rate is on file.' },
   { key: 'sga', label: 'SG&A', group: 'Period Costs', unit: 'usd', modelled: false, basic: false, note: 'Not modelled: no SG&A rate is on file.' },
   { key: 'margin', label: 'Margin', group: 'Period Costs', unit: 'usd', modelled: false, basic: false, note: 'Not modelled: no margin is on file.' },
