@@ -35,21 +35,33 @@ the page-only extractor-mismatch rule (`processNeedsReanalysis`), the `refreshin
 and every text that told the user to press Refresh Analysis. `test/app/refresh-analysis-removed.test.ts` keeps it from coming back (the electronics module
 is a different workflow with its own button and is not covered).
 
-## Not done, and the follow-up
+## Apply Scenario as one backend operation (`POST /bom-items/:id/scenario-applications`)
 
-Apply Scenario's **writes** are still orchestrated by the browser (`applyScenarioNow`): commit the annual volume, patch `scenario_overrides`, save the
-material grade, build the material-cost record from the engine's cost summary (price by location, usage, scrap), re-apply the route
-(`route-applications`, which is already one atomic server-side replace), and refetch the cost summary. They are not one transaction: a failure midway
-leaves the earlier writes in place, and the guards that prevent duplicates (`autoAddLock`, abort-on-failed-deactivate) live in the client.
+`ScenarioApplicationService` is the single orchestration boundary and the only owner of the applied scenario's state:
 
-The right next step is one backend operation, `POST /bom-items/:id/scenario-applications`, that owns that sequence behind the same `ensureCurrent`:
-- **Request**: the staged scenario (location, routing mode and route, batch size, annual volume, production life, currency and ask price, material grade)
-  and the `appliedRevision` the client saw.
-- **State** (no migration needed to start): `scenario_overrides.appliedScenario = { revision, status: applying | applied | failed, appliedAt, analysisVersion, error }`,
-  moved with a compare-and-set on `revision` (a PostgREST filter on the jsonb path), so two applies cannot interleave and a stale client gets 409.
-- **Steps**, each idempotent so a retry converges: analysis, annual volume and material grade, one `merge_scenario_overrides`, material-cost snapshot (the
-  logic now in `autoAddMaterialCost`, ported to a service next to the cost summary it reads), route apply (extract `applyRoute` from the controller into a
-  service), then one cost-summary computation whose result is returned as the canonical response.
-- **Failure**: the status is set to `failed` with the reason and the previous applied results stay; the frontend renders the returned state.
-Cross-table atomicity would need a database function (the route replace already has one); the status-and-retry design above is the smaller step.
-That move is a large change to a 2,300-line controller and a 1,000-line client sequence and deserves its own change with its own tests.
+1. the analysis is made current (`AnalysisRunService`); nothing is written, and the state is untouched, if it cannot be;
+2. `begin_scenario_application` (migration 969), one statement under a row lock: one apply at a time per item, against the revision the caller saw
+   (`409 scenario_revision_conflict`, `409 scenario_apply_in_progress`; an apply that began over 15 minutes ago and never finished may be taken over);
+3. the scenario fields: annual volume and material grade on the item, every scenario key in one atomic `merge_scenario_overrides`;
+4. the material cost record, a snapshot of the engine's own cost summary at this scenario (`MaterialCostSnapshotService`; kept when still right, else every
+   active record is retired first and one is written);
+5. the route (`RouteApplicationService`: the engine's recommendation, a chosen route, a Workflow Builder route, or the one already applied);
+6. the machines picked in the Workflow Builder (a failure is reported, it does not undo the route);
+7. the state: `applied` with revision + 1, or `failed` with the reason and the revision unchanged.
+
+**State** is `scenario_overrides.appliedScenario = { revision, status: applying | applied | failed, startedAt, appliedAt | failedAt, error, analysisVersion }`.
+No new table: it lives in the column that already holds the scenario, and only this service writes it (a patch that names the key is refused).
+
+**Not one database transaction**: the writes go through the services that own them, over several tables (the route replace is already atomic in the database).
+A failure midway keeps the earlier writes and says so (`failed` + the reason); every step is idempotent, so applying again converges. What can no longer happen:
+the page showing "applied" over a refused route, two applies interleaving, a retry duplicating a record.
+
+**Material price**: the browser used to price the record itself (a location-name match and a currency guess). It now takes the price from the one derivation the
+cost-record service owns (regional column, currency conversion, a disclosed India fallback, currency provenance); only when raw_materials has no price does it
+carry the engine's own price per kg. On the Back cover that changed the stored unit cost from 240 to 5.864 USD/kg for the same grade.
+
+## Still to do
+
+The page still runs its own write sequence (`applyScenarioNow`, about 1,000 lines). Switching it to this one call, and deleting that sequence (`autoAddMaterialCost`,
+`reapplyExistingOrDefaultRoute`, `commitAnnualVolume`, the locks, the progress steps) is the next change. The old default-line route path (no route applied and
+manual routing) is not carried over: `keep` falls back to the engine's recommendation and says so.

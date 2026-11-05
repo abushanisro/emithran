@@ -304,6 +304,7 @@ org:member      POST /api/v1/bom-items/:id/pmi-records/review  BOMItemsControlle
 org:member      POST /api/v1/bom-items/:id/reanalyze  BOMItemsController.reanalyze
 org:member      POST /api/v1/bom-items/:id/route-applications  BOMItemsController.applyRoute
 org:member      POST /api/v1/bom-items/:id/sand-snapshots  SandSnapshotsController.create
+org:member      POST /api/v1/bom-items/:id/scenario-applications  BOMItemsController.applyScenario
 org:member      POST /api/v1/bom-items/:id/step-conversions  BOMItemsController.convertStepFile
 org:member      POST /api/v1/bom-items/autofill-analyses  BOMItemsController.analyzeForAutoFill
 org:member      POST /api/v1/bom-items/autofill-analysis-jobs  BOMItemsController.startAnalyzeForAutoFill

@@ -75,6 +75,8 @@ import {
 import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
 import { RouteApplicationService } from './services/route-application.service';
+import { ScenarioApplicationService } from './services/scenario-application.service';
+import { ApplyScenarioDto, type ScenarioApplicationResult } from './dto/apply-scenario.dto';
 import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
 import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
@@ -125,6 +127,7 @@ export class BOMItemsController {
     private readonly audit: AuditService,
     private readonly analysisStatusService: AnalysisStatusService,
     private readonly routeApplications: RouteApplicationService,
+    private readonly scenarioApplications: ScenarioApplicationService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -288,6 +291,29 @@ export class BOMItemsController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(OrganizationContextGuard)
+  @Post(':id/scenario-applications')
+  @ApiOperation({
+    summary: 'Apply a scenario as one operation: make the analysis current, write the scenario, the material cost record and the route, and store the outcome',
+    description:
+      'One apply at a time per item, against the revision the caller read (409 scenario_revision_conflict / scenario_apply_in_progress). ' +
+      "The outcome is stored in scenario_overrides.appliedScenario: revision (successful applies), status applying | applied | failed, the reason when failed. " +
+      'Not one database transaction: a failure keeps the earlier writes and says so; applying again converges.',
+  })
+  @ApiResponse({ status: 200, description: 'The applied scenario state, what ran, and what was written' })
+  @ApiResponse({ status: 409, description: 'analysis_not_ready, scenario_revision_conflict or scenario_apply_in_progress' })
+  async applyScenario(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() request: ApplyScenarioDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<ScenarioApplicationResult> {
+    return this.scenarioApplications.apply({ bomItemId: id, userId: user.id, organizationId, token, request });
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(OrganizationContextGuard)
   @Post(':id/analysis-runs')
   @ApiOperation({ summary: "Make the item's analysis current: run what analysis-status says is missing (CAD features, drawing, casting analysis) and nothing else" })
   @ApiResponse({ status: 200, description: 'What ran, and the analysis status after it' })
