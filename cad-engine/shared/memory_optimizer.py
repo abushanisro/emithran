@@ -317,6 +317,7 @@ class AdvancedCADMemoryOptimizer:
         user_processes: Optional[List[Any]] = None,
         file_hash: Optional[str] = None,
         family_hint: str = "",
+        pull_direction: Optional[Tuple[float, float, float]] = None,
     ) -> OptimizationResult:
         """
         Comprehensive geometry analysis and memory optimization
@@ -352,7 +353,7 @@ class AdvancedCADMemoryOptimizer:
             raise ValueError("analyze_and_optimize received a null/empty TopoDS_Shape -- the STEP file likely failed to parse into valid geometry")
         try:
             # Generate geometry hash for caching
-            geometry_hash = self._calculate_geometry_hash(shape, file_path, file_hash, family_hint)
+            geometry_hash = self._calculate_geometry_hash(shape, file_path, file_hash, family_hint, pull_direction)
 
             # Check cache first (unless forced reanalysis)
             if not force_reanalysis and geometry_hash in self.optimization_cache:
@@ -383,7 +384,7 @@ class AdvancedCADMemoryOptimizer:
             
             with self._lock:
                 # Step 1: Advanced geometry analysis
-                geometry_features = self._analyze_geometry_advanced(shape, family_hint=family_hint)
+                geometry_features = self._analyze_geometry_advanced(shape, family_hint=family_hint, pull_direction=pull_direction)
                 
                 # Step 2: Memory optimization
                 memory_metrics = self._optimize_memory_advanced(shape, geometry_features, strategy)
@@ -430,7 +431,7 @@ class AdvancedCADMemoryOptimizer:
             logger.error(f"Optimization failed: {str(e)}", exc_info=True)
             raise
 
-    def _analyze_geometry_advanced(self, shape: TopoDS_Shape, family_hint: str = "") -> GeometryFeatures:
+    def _analyze_geometry_advanced(self, shape: TopoDS_Shape, family_hint: str = "", pull_direction: Optional[Tuple[float, float, float]] = None) -> GeometryFeatures:
         """
         Advanced geometry analysis — real measurements, no simulated values.
         Fixes GProp_GProps_MomentOfInertia by using gp_Ax1 (axis) not gp_Pnt.
@@ -474,7 +475,8 @@ class AdvancedCADMemoryOptimizer:
         feature_count = self._count_topological_features(shape)
         complexity_score = self._calculate_complexity_score(shape, feature_count, volume, surface_area)
         manufacturing_features = self._analyze_manufacturing_features(
-            shape, bounding_box, volume_mm3=round(float(volume), 4), family_hint=family_hint
+            shape, bounding_box, volume_mm3=round(float(volume), 4), family_hint=family_hint,
+            pull_direction=pull_direction,
         )
 
         return GeometryFeatures(
@@ -487,7 +489,7 @@ class AdvancedCADMemoryOptimizer:
             manufacturing_features=manufacturing_features
         )
 
-    def _analyze_manufacturing_features(self, shape: TopoDS_Shape, bounding_box: dict, volume_mm3: float = 0.0, family_hint: str = "") -> dict:
+    def _analyze_manufacturing_features(self, shape: TopoDS_Shape, bounding_box: dict, volume_mm3: float = 0.0, family_hint: str = "", pull_direction: Optional[Tuple[float, float, float]] = None) -> dict:
         """Real manufacturing feature analysis using OpenCASCADE topology."""
         # Mesh the shape before any topology queries so BRep_Tool.Triangulation returns
         # face data for face_map.  Same deflection params as ShapeMesher in services.py
@@ -725,6 +727,7 @@ class AdvancedCADMemoryOptimizer:
                     pocket_count=pocket_count,
                     face_map=holes.get('face_map', []),
                     face_map_tri_total=holes.get('face_map_tri_total', 0),
+                    pull_direction_override=pull_direction,
                 )
             elif detected_family in CASTING_FAMILY_DOMAIN:
                 # One casting extractor for every casting process; the
@@ -1296,7 +1299,7 @@ class AdvancedCADMemoryOptimizer:
     # PRIVATE HELPER METHODS
     # ============================================================================
 
-    def _calculate_geometry_hash(self, shape: TopoDS_Shape, file_path: Optional[str] = None, file_hash: Optional[str] = None, family_hint: str = "") -> str:
+    def _calculate_geometry_hash(self, shape: TopoDS_Shape, file_path: Optional[str] = None, file_hash: Optional[str] = None, family_hint: str = "", pull_direction: Optional[Tuple[float, float, float]] = None) -> str:
         """Generate unique hash for geometry caching"""
         hasher = hashlib.sha256()
 
@@ -1313,6 +1316,11 @@ class AdvancedCADMemoryOptimizer:
 
         # Salt with extraction logic version so algorithm changes auto-invalidate
         hasher.update(self.CACHE_VERSION.encode())
+
+        # Salt with the engineer's mold-opening axis: the same part analysed along another pull axis has other undercuts, draft and holes
+        # ("obscured" or not), so it must never share a cache entry with the automatic analysis.
+        if pull_direction is not None:
+            hasher.update(("pull:" + ",".join(f"{c:.6f}" for c in pull_direction)).encode())
 
         # Salt with family_hint: the SAME geometry analyzed once with the Die
         # Casting Phase 1 manual override and once without it must never share
