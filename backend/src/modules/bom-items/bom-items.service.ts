@@ -6167,7 +6167,16 @@ export class BOMItemsService {
               family,
               accessToken,
             })
-          : [];
+          : family === 'plastic_molded'
+            // Injection, structural foam, reaction injection and compression routes: each line resolves against its own process's catalog rows.
+            ? await this.plasticCatalogOperations.attach({
+                lines: route.processLines,
+                graph: ((fg?.summary as any)?.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,
+                rules: (await this.plasticReferenceService.getReference()).reference?.featureRules ?? null,
+                family,
+                accessToken,
+              })
+            : [];
         // Inherited tapping runs on THIS route's primary machine — surface that
         // machine on the Tapping line, not the "class default (tapping)" panel.
         if (mhrRates.tapping.source !== 'mhr_database') {
@@ -6184,7 +6193,8 @@ export class BOMItemsService {
         }
         return warnings;
       }));
-      dto.comparisonWarnings.push(...routeWarnings.flat());
+      // The routes share one feature graph, so a note about it (the types not assessed yet) comes back once per route: say it once.
+      dto.comparisonWarnings.push(...new Set(routeWarnings.flat()));
       this.appendRateWarnings(
         { processLines: dto.routes.flatMap((r) => r.processLines), warnings: dto.comparisonWarnings },
         location,
