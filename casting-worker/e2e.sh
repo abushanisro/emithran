@@ -25,8 +25,14 @@ $CONTAINER volume create "$ID-sock" >/dev/null
 $CONTAINER run -d --name "$ID-host" --network none --read-only --user 10005:10005 --cap-drop ALL --security-opt no-new-privileges \
     --memory 2g --cpus 2 --pids-limit 128 --tmpfs /tmp:size=1g,uid=10005,gid=10005,mode=0700 -e WORKER_MEMORY_MB=1536 \
     -v "$ID-sock:/run/cad-worker" casting-worker-host:check >/dev/null
-for _ in $(seq 1 60); do $CONTAINER exec "$ID-host" cad-worker-host health >/dev/null 2>&1 && break; sleep 1; done
-$CONTAINER exec "$ID-host" cad-worker-host health >/dev/null 2>&1 && echo "PASS  the host accepts a connection on its socket" || { echo "FAIL  the host did not come up"; $CONTAINER logs "$ID-host" | tail -5; exit 1; }
+# One answer decides: the loop's own, not a second probe straight after it (the host serves one connection at a time, and a probe that lands while it
+# is still finishing the first one can fail for that alone, which failed CI on a host that was up).
+up=0
+for _ in $(seq 1 60); do
+    if $CONTAINER exec "$ID-host" cad-worker-host health >/dev/null 2>&1; then up=1; break; fi
+    sleep 1
+done
+if [ "$up" = 1 ]; then echo "PASS  the host accepts a connection on its socket"; else echo "FAIL  the host did not come up"; $CONTAINER logs "$ID-host" | tail -5; exit 1; fi
 
 echo "== the backend's client, in a container with the socket volume and the worker's group (as the backend runs)"
 $CONTAINER run --rm --network none --user 1000:1000 --group-add 10005 -v "$ID-sock:/run/casting-worker" -v "$PWD/backend:/app:ro" -v "$PWD/$WORK/samples:/samples:ro" \
