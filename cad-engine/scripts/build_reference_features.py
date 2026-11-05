@@ -9,6 +9,8 @@ Sources (raw, untouched, source of truth):
   memory/machining/operations_full__operations.csv     (1174 rows)
   memory/machining/operations_full__warnings.csv       (disclosed capture gaps)
   memory/Die Casting/Processes/operations.csv          (122 rows)
+  memory/Plastic Modeling/process/digital_factory_operations.csv  (92 rows: injection, reaction injection,
+                                                       structural foam and compression molding)
 
 Grammar of every row (same as memory/sheetmetal/process/build-taxonomy.mjs):
   Machine:Level[:Level...]
@@ -49,6 +51,9 @@ SOURCES = {
     # different grammar that cannot be mapped without inventing a rule.
     "sand_casting": REPO / "memory" / "Sand casting" / "Processes" / "operations.csv",
     "investment_casting": REPO / "memory" / "Casting Investment" / "Processes" / "operations.csv",
+    # Plastic molding: same Machine:Operation//Feature grammar ("Injection Molding:HoleSideCore//SimpleHole"),
+    # the catalog the plastic feature recognition must emit its feature types from.
+    "plastic_molding": REPO / "memory" / "Plastic Modeling" / "process" / "digital_factory_operations.csv",
 }
 # Domains whose catalogs are casting catalogs (shared alias handling below).
 CASTING_DOMAINS = {"die_casting", "sand_casting", "investment_casting"}
@@ -79,7 +84,7 @@ def _read_rows(domain: str) -> List[str]:
         reader = csv.DictReader(fh)
         column = (
             "raw_operation_string" if domain == "sheet_metal"
-            else "processName" if domain == "machining"
+            else "processName" if domain in ("machining", "plastic_molding")
             else "Process Name"  # casting catalogs
         )
         if column not in (reader.fieldnames or []):
@@ -178,6 +183,7 @@ def main() -> int:
         "die_casting": "DieCastingFeatureType",
         "sand_casting": "SandCastingFeatureType",
         "investment_casting": "InvestmentCastingFeatureType",
+        "plastic_molding": "PlasticMoldingFeatureType",
     }
     missing_names = [d for d in domains if d not in DOMAIN_TS_NAMES]
     if missing_names:
