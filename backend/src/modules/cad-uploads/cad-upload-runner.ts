@@ -15,7 +15,7 @@ import { FileStorageService } from '../bom-items/services/file-storage.service';
 import { parseAssemblyReport, type AssemblyNode, type AssemblyReport } from './assembly-report';
 import { CAD_BUCKET, type CadUploadRow } from './cad-upload.types';
 import { noStepFilesMessage } from './check-upload';
-import { planItems, type PlannedItem } from './plan-items';
+import { planItems, withPackRoot, type PlannedItem } from './plan-items';
 import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
 import { observeQueueDepth, recordCadUploadDuration, type CadUploadOutcome } from '../../telemetry/metrics';
 
@@ -230,7 +230,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     const stored = row.result as { report?: unknown; skipped?: { path: string; reason: string }[] } | null;
     let report: AssemblyReport;
     try {
-      report = parseAssemblyReport(stored?.report);
+      report = withPackRoot(parseAssemblyReport(stored?.report), row.file_name);
     } catch (error) {
       throw new PermanentFailure('invalid_engine_result', error instanceof Error ? error.message : String(error));
     }
@@ -243,7 +243,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
       exported.set(definition, stored);
     }
     await this.createItems(row, items, [], exported);
-    const { error } = await this.admin.from('cad_uploads').update({ status: 'done', finished_at: new Date().toISOString() }).eq('id', row.id);
+    const { error } = await this.admin.from('cad_uploads').update({ status: 'done', result: { ...stored, report }, finished_at: new Date().toISOString() }).eq('id', row.id);
     if (error) throw new Error(`could not save the result: ${error.message}`);
     // The parts now live on their BOM items; the work copies and the original are no longer needed.
     await this.objects.remove(CAD_BUCKET, [...exported.keys()].map((d) => `${partsPrefix}/${partFileName(d)}`))
@@ -282,9 +282,10 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     if (!original) throw new Error('could not read the stored upload: not found');
     const { files, skipped } = await this.stepFiles(row, original);
 
-    const report = await this.analyse(files);
-    if (report.assembly.length === 0) throw new PermanentFailure('no_solids', 'None of the STEP files could be read as a part or assembly.');
+    const analysed = await this.analyse(files);
+    if (analysed.assembly.length === 0) throw new PermanentFailure('no_solids', 'None of the STEP files could be read as a part or assembly.');
 
+    const report = withPackRoot(analysed, row.file_name);
     const items = planItems(report, row.id.slice(0, 6));
     const needsFile = items.filter((i) => i.definition && !i.ownFile).map((i) => i.definition as string);
     const exported = await this.exportParts(files, [...new Set(needsFile)]);

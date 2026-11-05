@@ -1,7 +1,7 @@
 import { BOMItemType } from '../bom-items/dto/bom-items.dto';
 
 import { parseAssemblyReport, type AssemblyNode, type AssemblyReport } from './assembly-report';
-import { planItems } from './plan-items';
+import { packName, planItems, withPackRoot } from './plan-items';
 
 const node = (definition: string, name: string, kind: AssemblyNode['kind'], quantity = 1, children: AssemblyNode[] = [], file = 'asm.step'): AssemblyNode =>
   ({ definition, name, kind, quantity, file, children });
@@ -69,5 +69,49 @@ describe('parseAssemblyReport', () => {
   it('matches the canonical schema in cad-engine (run npm run cad:sync-contract when this fails)', () => {
     const { render, out } = require('../../../scripts/sync-cad-contract.js');
     expect(require('fs').readFileSync(out, 'utf8')).toBe(render());
+  });
+});
+
+describe('withPackRoot', () => {
+  const loose = (name: string) => node(name, name, 'part', 1, [], `${name}.step`);
+
+  it('hangs a pack of loose parts from one main assembly named after the upload', () => {
+    const packed = withPackRoot(report([loose('Gear'), loose('Shaft')]), 'liner.zip');
+    expect(packed.assembly).toHaveLength(1);
+    const items = planItems(packed, 'ab12');
+    expect(items.map((i) => [i.key, i.parentKey, i.name, i.itemType])).toEqual([
+      ['0', null, 'liner', BOMItemType.ASSEMBLY],
+      ['0.0', '0', 'Gear', BOMItemType.CHILD_PART],
+      ['0.1', '0', 'Shaft', BOMItemType.CHILD_PART],
+    ]);
+  });
+
+  it('still gives each loose part its own file, and an assembly beside them keeps its sub-assemblies', () => {
+    const asm = node('0:1', 'Top', 'assembly', 1, [node('0:2', 'Sub', 'assembly', 1, [node('0:3', 'Box', 'part', 2, [], 'top.step')], 'top.step')], 'top.step');
+    const items = planItems(withPackRoot(report([asm, loose('Washer')]), 'pack.zip'), 't');
+    expect(Object.fromEntries(items.map((i) => [i.name, [i.itemType, i.ownFile]]))).toEqual({
+      pack: [BOMItemType.ASSEMBLY, null],
+      Top: [BOMItemType.SUB_ASSEMBLY, null],
+      Sub: [BOMItemType.SUB_ASSEMBLY, null],
+      Box: [BOMItemType.CHILD_PART, null],
+      Washer: [BOMItemType.CHILD_PART, 'Washer.step'],
+    });
+  });
+
+  it('leaves one top-level node as reported: a real assembly stays the main assembly, a single part stays a part', () => {
+    const asm = report([node('0:1', 'Top', 'assembly', 1, [], 'top.step')]);
+    expect(withPackRoot(asm, 'x.zip')).toBe(asm);
+    const part = report([loose('Gear')]);
+    expect(withPackRoot(part, 'gear.step')).toBe(part);
+  });
+
+  it('is idempotent, so a stored report that was already packed is not packed twice', () => {
+    const once = withPackRoot(report([loose('A'), loose('B')]), 'p.zip');
+    expect(withPackRoot(once, 'p.zip')).toBe(once);
+  });
+
+  it('names the assembly from the file name, never empty', () => {
+    expect(packName('Linear SA P2.ZIP')).toBe('Linear SA P2');
+    expect(packName('.zip')).toBe('Uploaded assembly');
   });
 });
