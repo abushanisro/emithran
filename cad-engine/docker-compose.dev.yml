@@ -26,6 +26,10 @@ services:
       context: .
       dockerfile: Dockerfile
     image: mithran-cad-engine:dev
+    # pythonocc-core 7.7.2 (the OCCT binding the Dockerfile pins) is published on conda-forge for linux-64 only. Without this pin
+    # Docker builds for the host's architecture, and on Apple Silicon the conda step fails with PackagesNotFoundInChannelsError.
+    # The production compose files pin the same platform.
+    platform: linux/amd64
     container_name: mithran-cad-engine-dev
     # Docker runs inside the WSL distro and stops with it; come back up
     # whenever the daemon starts again instead of staying Exited.
