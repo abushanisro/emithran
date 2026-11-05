@@ -46,6 +46,8 @@ export const PLASTIC_VARIABLE_KEYS = [
   'flowRatioThresholdEasyFlow', 'flowRatioThresholdMediumFlow',
   'minimumPercentClampForceEasyFlow', 'minimumPercentClampForceMediumFlow', 'minimumPercentClampForceHardFlow',
   'conventionalRunnerMaxPressureReductionFactor', 'hotRunnerMaxPressureReductionFactor', 'minInjectionPressure',
+  // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
+  'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilon',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -125,6 +127,18 @@ export interface PlasticReference {
   defaultToolLifeShots: number;
   /** digital_factory_settings_usa, Default profile. USA only: no other location is on file. */
   toolroomRatesUsa: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number };
+  /**
+   * Variables that decide which catalog operation a recognised feature needs. Optional, unlike the rest of the reference: a database without them
+   * still costs the part, and the operations the missing variable would decide are reported undecided (plastic-catalog-operation-resolver.ts).
+   */
+  featureRules: FeatureRules;
+}
+
+export interface FeatureRules {
+  /** variables maxNoCoreInsertDiameter (mm): an obscured hole this small or smaller is made with an insert and needs no core. */
+  maxNoCoreInsertDiameterMm: number | null;
+  /** variables drawDirectionOrthogonalEpsilon (deg): the angular tolerance between a feature's axis and the pull axis (parallel, or square to it). */
+  axisToleranceDeg: number | null;
 }
 
 interface PlasticReferenceRows {
@@ -158,6 +172,10 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     const v = vars.get(k);
     if (v == null || v <= 0) { missing.push(`variables: ${k}`); return NaN; }
     return v;
+  };
+  const optionalPositive = (k: string): number | null => {
+    const v = vars.get(k);
+    return v != null && v > 0 ? v : null;
   };
   const table = (k: string) => {
     const t = rows.lookups[k];
@@ -282,6 +300,10 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       toolLifeShotsByType,
       defaultToolLifeShots,
       toolroomRatesUsa,
+      featureRules: {
+        maxNoCoreInsertDiameterMm: optionalPositive('maxNoCoreInsertDiameter'),
+        axisToleranceDeg: optionalPositive('drawDirectionOrthogonalEpsilon'),
+      },
     },
     missing: [],
   };

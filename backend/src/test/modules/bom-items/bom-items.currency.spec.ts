@@ -3,6 +3,7 @@
 // resolveDisplayCurrency and normalizeCostSummaryToCurrency (both private,
 // exercised via `as any`, matching the established pattern in
 // bom-items.usage-calculators.spec.ts / bom-items.true-nest-costing.spec.ts).
+import { type PlasticCatalogOperationsService } from '../../../modules/bom-items/costing/plastic-molding/operation/plastic-catalog-operations.service';
 import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
 import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
 import type { CastingReferenceService } from '../../../modules/bom-items/costing/casting/casting-reference.service';
@@ -43,6 +44,7 @@ function buildService() {
     {} as unknown as SandCostService,
     {} as unknown as FeatureToleranceService,
     {} as unknown as SheetMetalCatalogOperationsService,
+    {} as unknown as PlasticCatalogOperationsService,
     {} as unknown as HydroformingReferenceService,
   );
 }

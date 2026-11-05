@@ -3,6 +3,7 @@ import { HydroformingReferenceService } from './costing/hydroforming/hydroformin
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
 import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
+import { PlasticCatalogOperationsService, type PlasticFeatureGraph } from './costing/plastic-molding/operation/plastic-catalog-operations.service';
 import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
 import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-operation-resolver';
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
@@ -259,6 +260,7 @@ export class BOMItemsService {
     private readonly sandCostService: SandCostService,
     private readonly featureToleranceService: FeatureToleranceService,
     private readonly smCatalogOperations: SheetMetalCatalogOperationsService,
+    private readonly plasticCatalogOperations: PlasticCatalogOperationsService,
     private readonly hydroformingReference: HydroformingReferenceService,
   ) { }
 
@@ -4250,6 +4252,13 @@ export class BOMItemsService {
       };
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);
+      imResult.warnings.push(...await this.plasticCatalogOperations.attach({
+        lines: imResult.processLines,
+        graph: (summary.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,
+        rules: activePlasticRef.reference?.featureRules ?? null,
+        family,
+        accessToken,
+      }));
       imResult.drawingCadConsistency = drawingCadConsistency;
 
       // Clamp / shot sizing against the selected press is computed by the engine
