@@ -73,6 +73,8 @@ import { effectiveSheetThicknessMm } from '@/lib/costing/effective-sheet-thickne
 import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
+import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
+import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
@@ -8880,11 +8882,11 @@ function GeometricCostDriversPanel({
     const hasData =
       !!wallNominalMm || ribCount > 0 || throughHoleCount > 0 || blindFeatureCount > 0 ||
       undercutFaceCount > 0 || undraftedFaceCount > 0 || insertCandidateCount > 0 || partingComplexity != null;
-    // Feature types the engine does not recognise yet: their absence from the tree is not "none found".
-    const notAssessed: string[] = imS.plasticFeatureGraph?.not_yet_recognized ?? [];
+    // The recognised features, and what the engine did not assess (their absence from the tree is not "none found").
+    const plasticGraph = isPlasticGraph(imS.plasticFeatureGraph) ? imS.plasticFeatureGraph : null;
     return {
       wallNominalMm, wallMinMm, wallMaxMm, ribCount, throughHoleCount, blindFeatureCount,
-      undercutFaceCount, undraftedFaceCount, insertCandidateCount, partingComplexity, avgDraftDeg, hasData, notAssessed,
+      undercutFaceCount, undraftedFaceCount, insertCandidateCount, partingComplexity, avgDraftDeg, hasData, plasticGraph,
     };
   }, [fg?.summary]);
   const leaves = collectLeaves(tree);
@@ -8950,11 +8952,7 @@ function GeometricCostDriversPanel({
       {tab === 'geo' && (
         <div className="flex-1 overflow-y-auto divide-y divide-border/40">
           {isIM && <PullDirectionControl itemId={item.id} />}
-          {isIM && imGeo.notAssessed.length > 0 && (
-            <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
-              Not assessed from the CAD yet: {imGeo.notAssessed.join(', ')}. Their operations are not in the process tree.
-            </div>
-          )}
+          {isIM && imGeo.plasticGraph && <PlasticRecognisedFeatures graph={imGeo.plasticGraph} onSelectHighlight={onSelectHighlight} />}
           {isIM && imGeo.hasData && (
             <>
               {imGeo.wallNominalMm != null && (
@@ -10358,7 +10356,12 @@ export default function ManufacturingIntelligencePage() {
     // old cut-path highlight instead of that group's own occurrences).
     setSelectedDirectV2Feature(null);
     setSelectedNodeId(node.id);
-    const v2Features = fg?.feature_graph_v2?.features ?? [];
+    // Plastic molding: the recognised features (the catalog operations in the tree point at them by id) highlight like feature_graph_v2 ones.
+    const plasticGraph = (fg?.summary as { plasticFeatureGraph?: unknown } | undefined)?.plasticFeatureGraph;
+    const plasticFeatures = isPlasticGraph(plasticGraph)
+      ? plasticGraph.items.filter((i) => i.occurrences.some((o) => o.centroid)).map((i) => ({ id: i.id, feature_type: i.feature_type, occurrences: i.occurrences })) as unknown as FeatureNodeV2[]
+      : [];
+    const v2Features = [...(fg?.feature_graph_v2?.features ?? []), ...plasticFeatures];
     const fm = faceMap ?? [];
     if (node.kind === 'operation') {
       const visual = computeOperationVisual(node.label, v2Features, fm);
