@@ -84,7 +84,9 @@ class TestFeatureGraph:
 
     def test_every_type_not_yet_recognized_is_listed_so_none_found_is_never_assumed(self):
         g = self.graph(box(100, 60, 20))
-        assert g["not_yet_recognized"] == ["ComboVoid", "LifterBundle", "PartingLine", "SharpEdge", "SlideBundle", "Void"]
+        # a plain box has walls along the pull, so its parting line is not shown by the geometry; SharpEdge has no staged rule
+        assert g["not_yet_recognized"] == ["PartingLine", "SharpEdge"]
+        assert set(g["not_assessed_reasons"]) == {"PartingLine", "SharpEdge"}
         assert set(g["not_yet_recognized"]) | RECOGNIZED == set(feature_types("plastic_molding"))
 
     def test_the_vocabulary_gate_refuses_a_type_the_catalog_does_not_have(self):
