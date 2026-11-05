@@ -115,7 +115,13 @@ export class MaterialCostSnapshotService {
       const usdPerKg = (summary.materialCostPerKg ?? 0) / (summary.usdToDisplayRate ?? 1);
       if (usdPerKg > 0) {
         this.logger.log(`No raw_materials price for "${grade}" at ${location}: the record carries the engine's ${usdPerKg.toFixed(4)} USD/kg`);
-        await this.costRecords.update(created.id, { unitCost: usdPerKg } as never, userId, token);
+        // The service noted that it found no price and defaulted to 0: say what the record carries now.
+        await this.costRecords.update(
+          created.id,
+          { unitCost: usdPerKg, notes: `No raw_materials price for "${grade}" at ${location}: the unit cost is the cost engine's price per kg (${usdPerKg.toFixed(4)} USD).` } as never,
+          userId,
+          token,
+        );
       }
     }
     return { action: 'replaced', recordId: created.id, usage };

@@ -68,7 +68,7 @@ describe('MaterialCostSnapshotService.ensure', () => {
   it('when raw_materials has no price the record carries the engine\'s price per kg in USD, not zero', async () => {
     const { svc, costRecords } = build([], { id: 'new', unitCost: 0 });
     await svc.ensure(input(summary({ materialCostPerKg: 8, usdToDisplayRate: 2 })));
-    expect(costRecords.update).toHaveBeenCalledWith('new', { unitCost: 4 }, 'u', 't');
+    expect(costRecords.update).toHaveBeenCalledWith('new', { unitCost: 4, notes: expect.stringContaining('the cost engine\'s price per kg (4.0000 USD)') }, 'u', 't');
   });
 
   it('does not overwrite a price the service found', async () => {
