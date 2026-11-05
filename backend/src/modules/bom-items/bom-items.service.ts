@@ -1,4 +1,5 @@
 import type { DbClient } from '../../common/db/postgrest-client';
+import { isMissingTable } from '../../common/db/missing-table';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
@@ -735,9 +736,11 @@ export class BOMItemsService {
       if (error) fail('could not remove production lot materials', error);
     }
 
+    // Process routes are a retired structure: nothing creates them any more, and a database built from the current baseline may not have the tables at
+    // all. A database without them has none to remove; any other failure to read them still stops the delete.
     const { data: routes, error: routesReadError } = await client.from('process_routes').select('id').eq('bom_item_id', id);
-    if (routesReadError) fail('could not read process routes', routesReadError);
-    if (routes && routes.length > 0) {
+    if (routesReadError && !isMissingTable(routesReadError)) fail('could not read process routes', routesReadError);
+    if (!routesReadError && routes && routes.length > 0) {
       const { error: stepsError } = await client.from('process_route_steps').delete().in('process_route_id', routes.map((r) => r.id));
       if (stepsError) fail('could not remove process route steps', stepsError);
       const { error: routesError } = await client.from('process_routes').delete().eq('bom_item_id', id);
