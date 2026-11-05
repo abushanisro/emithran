@@ -13511,6 +13511,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/cost-table": {
+      "get": {
+        "operationId": "BOMItemsController_getCostTable_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cost table; a column the cost model has no data for is declared modelled: false with the reason"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's applied cost as a table: cost objects (part, material, process groups, processes, logistics, procured parts, tooling) by column, in USD",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/custom-route-applications": {
       "post": {
         "description": "Takes a real, already-engine-computed route (by cutting method) and writes only the processLines the user selected, in their chosen order. Rejects any requested process not present in the real computed set — never fabricates a cost line.",

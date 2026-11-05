@@ -80,6 +80,7 @@ org:viewer      GET /api/v1/bom-items/:id/cad-analysis  BOMItemsController.getBO
 org:viewer      GET /api/v1/bom-items/:id/cad-analysis/history  BOMItemsController.getBOMItemAnalysisHistory
 org:viewer      GET /api/v1/bom-items/:id/candidate-routes  BOMItemsController.getCandidateRoutes
 org:viewer      GET /api/v1/bom-items/:id/cost-summary  BOMItemsController.getCostSummary
+org:viewer      GET /api/v1/bom-items/:id/cost-table  BOMItemsController.getCostTable
 org:viewer      GET /api/v1/bom-items/:id/dependencies  BOMItemsController.checkDeleteDependencies
 org:viewer      GET /api/v1/bom-items/:id/dfm-scores  BOMItemsController.getDFMScores
 org:viewer      GET /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.get

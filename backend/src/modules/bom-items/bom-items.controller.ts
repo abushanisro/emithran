@@ -76,6 +76,8 @@ import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-pr
 import axios from 'axios';
 import { RouteApplicationService } from './services/route-application.service';
 import { ScenarioApplicationService } from './services/scenario-application.service';
+import { CostTableService } from './services/cost-table.service';
+import type { CostTable } from './costing/shared/cost-table';
 import { ApplyScenarioDto, type ScenarioApplicationResult } from './dto/apply-scenario.dto';
 import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
 import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
@@ -128,6 +130,7 @@ export class BOMItemsController {
     private readonly analysisStatusService: AnalysisStatusService,
     private readonly routeApplications: RouteApplicationService,
     private readonly scenarioApplications: ScenarioApplicationService,
+    private readonly costTables: CostTableService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -288,6 +291,14 @@ export class BOMItemsController {
   @ApiResponse({ status: 200, description: 'Analysis status' })
   async getAnalysisStatus(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<AnalysisStatus> {
     return this.analysisStatusService.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/cost-table')
+  @ApiOperation({ summary: "The part's applied cost as a table: cost objects (part, material, process groups, processes, logistics, procured parts, tooling) by column, in USD" })
+  @ApiResponse({ status: 200, description: 'The cost table; a column the cost model has no data for is declared modelled: false with the reason' })
+  async getCostTable(@Param('id', ParseUUIDPipe) id: string, @AccessToken() token: string): Promise<CostTable> {
+    return this.costTables.forItem(id, token);
   }
 
   @HttpCode(HttpStatus.OK)
