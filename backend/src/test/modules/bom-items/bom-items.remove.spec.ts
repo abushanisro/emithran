@@ -84,31 +84,22 @@ describe('BOMItemsService.remove', () => {
     expect(all.bom_items).toHaveLength(1);
   });
 
-  it("removes the caller's own lot materials, routes and the item, all as the caller", async () => {
+  it("removes the caller's own lot materials and the item, all as the caller (the item's routes go with it by the foreign keys)", async () => {
     const rows = base();
     rows.production_lot_materials = [{ id: 'mine', bom_item_id: ITEM, production_lot_id: 'lot-mine' }];
-    rows.process_routes = [{ id: 'r1', bom_item_id: ITEM }];
-    rows.process_route_steps = [{ id: 's1', process_route_id: 'r1' }];
     const { service, writes, all } = harness(rows);
     await service.remove(ITEM, 'u', 't');
-    expect(writes).toEqual([
-      'delete production_lot_materials', 'delete process_route_steps', 'delete process_routes', 'update bom_items', 'delete bom_items',
-    ]);
+    expect(writes).toEqual(['delete production_lot_materials', 'update bom_items', 'delete bom_items']);
     expect(all.bom_items).toHaveLength(0);
     expect(all.production_lot_materials).toHaveLength(0);
   });
 
-  it("deletes the item in a database that has no process route tables (a retired structure), without the 500 that stopped every delete there", async () => {
+  it('reads no process route table at all: the database cascades them, so a database without those tables deletes the same way', async () => {
+    // process_routes is made unreadable (as it is where the table does not exist): the delete must not touch it.
     const { service, writes, all } = harness(base(), new Set(), 'process_routes', 'PGRST205');
     await expect(service.remove(ITEM, 'u', 't')).resolves.toBeUndefined();
     expect(writes).toEqual(['update bom_items', 'delete bom_items']);
     expect(all.bom_items).toHaveLength(0);
-  });
-
-  it('still stops when the process routes fail to read for any other reason', async () => {
-    const { service, writes } = harness(base(), new Set(), 'process_routes', '57014');
-    await expect(service.remove(ITEM, 'u', 't')).rejects.toThrow(InternalServerErrorException);
-    expect(writes).toEqual([]);
   });
 
   it('is 404 for an item the caller cannot see', async () => {
@@ -117,7 +108,7 @@ describe('BOMItemsService.remove', () => {
     await expect(harness(rows).service.remove(ITEM, 'u', 't')).rejects.toThrow(NotFoundException);
   });
 
-  it.each(['bom_items', 'production_lot_materials', 'process_routes'])('throws, changing nothing further, when %s cannot be read', async (table) => {
+  it.each(['bom_items', 'production_lot_materials'])('throws, changing nothing further, when %s cannot be read', async (table) => {
     const { service, writes } = harness(base(), new Set(), table);
     await expect(service.remove(ITEM, 'u', 't')).rejects.toThrow(InternalServerErrorException);
     expect(writes).toEqual([]);
