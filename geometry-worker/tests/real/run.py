@@ -356,12 +356,15 @@ def config_differences() -> list:
     notes = []
     rust_main = (ROOT / "core/crates/runner/src/main.rs").read_text()
     limits = (ROOT / "backend/src/common/resource-limits.ts").read_text()
-    m = re.search(r"max_total_bytes:\s*max_entry\s*\*\s*(\d+)", rust_main)
-    t = re.search(r"ARCHIVE_MAX_EXPANDED_MB',\s*(\d+)", limits)
-    if m and t:
-        rust_mb, ts_mb = 50 * int(m.group(1)), int(t.group(1))
-        if rust_mb != ts_mb:
-            notes.append(f"Archive expansion cap: Rust runner {rust_mb} MB (max file size x {m.group(1)}), backend default {ts_mb} MB (ARCHIVE_MAX_EXPANDED_MB). A zip between the two is accepted by one core and refused by the other.")
+    compose = (ROOT / "docker-compose.prod.yml").read_text()
+    ts = re.search(r"ARCHIVE_MAX_EXPANDED_MB',\s*(\d+)", limits)
+    rust = re.search(r"const DEFAULT: u64 = (\d+);", rust_main) if "ARCHIVE_MAX_EXPANDED_MB" in rust_main else None
+    if not (ts and rust):
+        notes.append("Archive expansion cap: the Rust runner does not read ARCHIVE_MAX_EXPANDED_MB, so a zip between the two caps is accepted by one core and refused by the other.")
+    elif ts.group(1) != rust.group(1):
+        notes.append(f"Archive expansion cap defaults differ: backend {ts.group(1)} MB, Rust runner {rust.group(1)} MB.")
+    if len(re.findall(r"ARCHIVE_MAX_EXPANDED_MB:", compose)) < 2:
+        notes.append("docker-compose.prod.yml passes ARCHIVE_MAX_EXPANDED_MB to fewer than both the backend and cad-core.")
     return notes
 
 

@@ -16,6 +16,7 @@ The runner talks to PostgREST and the S3-compatible bucket over HTTP(S) only (a 
 role, migration 951): no Postgres connection, like the rest of the backend.
 `CAD_CORE=python` (default) keeps the old path (NestJS calls the Python `cad-engine`); `CAD_CORE=rust` makes NestJS materialize only and
 `cad-runner` analyse. Exactly one analyser may run for a deployment.
+Both cores read the same archive limits, so a zip is accepted or refused alike whichever one runs: `MAX_UPLOAD_MB` (a file) and `ARCHIVE_MAX_EXPANDED_MB` (what it may expand to, default 256; the Rust runner refuses a value outside 1-4096 as the backend does).
 
 ## Isolation (two containers)
 The process that parses customer STEP holds no secret, has no network, a read-only root and its own UID; the process that holds the

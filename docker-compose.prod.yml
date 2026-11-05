@@ -277,6 +277,8 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in the env file}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # What a zip may expand to: the same setting and default as the backend, so either core accepts or refuses a zip alike.
+      ARCHIVE_MAX_EXPANDED_MB: ${ARCHIVE_MAX_EXPANDED_MB:-256}
       WORKER_DEADLINE_SECONDS: 600
       WORKER_SOCKET: /run/cad-worker/worker.sock
       # What the worker may send back (result.json and the part files); held in memory until stored.
