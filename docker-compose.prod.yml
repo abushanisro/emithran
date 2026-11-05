@@ -151,6 +151,7 @@ services:
       CAD_CORE: ${CAD_CORE:-python}
       # Empty: casting analyses stay queued. /run/casting-worker/worker.sock with the sand-casting profile running (casting-worker service below).
       CASTING_WORKER_SOCKET: ${CASTING_WORKER_SOCKET:-}
+      CASTING_RETENTION_DAYS: ${CASTING_RETENTION_DAYS:-}
       # python: cad-engine /nest. rust: the nester binary shipped in this image (falls back to python if it is unavailable).
       NESTING_ENGINE: ${NESTING_ENGINE:-python}
       # Data: the postgrest service below, with tokens this backend signs. Files: an S3-compatible bucket.
