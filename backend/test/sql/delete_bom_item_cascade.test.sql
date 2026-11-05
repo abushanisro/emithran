@@ -7,8 +7,9 @@ CREATE TABLE public.production_lot_materials (
   production_lot_id uuid NOT NULL REFERENCES public.production_lots(id),
   bom_item_id uuid NOT NULL REFERENCES public.bom_items(id) ON DELETE RESTRICT
 );
-CREATE TABLE public.process_routes (id uuid PRIMARY KEY, bom_item_id uuid REFERENCES public.bom_items(id));
-CREATE TABLE public.process_route_steps (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), process_route_id uuid REFERENCES public.process_routes(id));
+-- the retired planner's tables, with the foreign keys they have (011): the routes of an item and their steps go with it
+CREATE TABLE public.process_routes (id uuid PRIMARY KEY, bom_item_id uuid NOT NULL REFERENCES public.bom_items(id) ON DELETE CASCADE);
+CREATE TABLE public.process_route_steps (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), process_route_id uuid NOT NULL REFERENCES public.process_routes(id) ON DELETE CASCADE);
 -- the legacy function, as some databases carry it
 CREATE FUNCTION public.cascade_delete_bom_item(p_item uuid) RETURNS void LANGUAGE sql AS $$ SELECT $$;
 
@@ -30,7 +31,8 @@ INSERT INTO public.process_routes (id, bom_item_id) VALUES ('eeeeeeee-0000-4000-
 INSERT INTO public.process_route_steps (process_route_id) VALUES ('eeeeeeee-0000-4000-8000-000000000001');
 
 \i /migrations/945_delete_bom_item_cascade.sql
-\i /migrations/945_delete_bom_item_cascade.sql
+\i /migrations/965_delete_bom_item_cascade_relies_on_fk_cascade.sql
+\i /migrations/965_delete_bom_item_cascade_relies_on_fk_cascade.sql
 
 SET ROLE authenticated;
 DO $$
@@ -84,7 +86,7 @@ BEGIN
   ASSERT (SELECT parent_item_id FROM public.bom_items WHERE id = 'cccccccc-0000-4000-8000-000000000002') IS NULL, 'its child is detached';
   ASSERT (SELECT count(*) FROM public.production_lot_materials) = 0, 'every lot''s reference to it is removed';
   ASSERT (SELECT count(*) FROM public.production_lots) = 2, 'the lots themselves stay';
-  ASSERT (SELECT count(*) FROM public.process_routes) = 0 AND (SELECT count(*) FROM public.process_route_steps) = 0, 'its routes are removed';
+  ASSERT (SELECT count(*) FROM public.process_routes) = 0 AND (SELECT count(*) FROM public.process_route_steps) = 0, 'its routes and their steps are removed, by the foreign keys';
   SELECT * INTO e FROM public.audit_events;
   ASSERT e.action = 'bom_item.force_deleted' AND e.actor_id = '11111111-0000-4000-8000-00000000000a' AND e.actor_kind = 'user'
      AND e.org_id = 'aaaaaaaa-0000-4000-8000-000000000001' AND e.target_id = 'cccccccc-0000-4000-8000-000000000001'

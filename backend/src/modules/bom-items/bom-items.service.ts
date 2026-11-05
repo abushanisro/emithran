@@ -1,5 +1,4 @@
 import type { DbClient } from '../../common/db/postgrest-client';
-import { isMissingTable } from '../../common/db/missing-table';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
@@ -702,8 +701,9 @@ export class BOMItemsService {
 
 
   /**
-   * Deletes a BOM item and the references the caller may remove: their production lot materials, the item's process routes
-   * (and steps), and the parent link of its children. Everything is written as the caller (RLS). Production lot materials are
+   * Deletes a BOM item and the references the caller may remove: their production lot materials and the parent link of its
+   * children. Everything else that hangs off the item (its process routes and their steps among them) goes with it by the
+   * foreign keys' ON DELETE CASCADE: the database does that, so no table beyond the item's own is read here. Everything is written as the caller (RLS). Production lot materials are
    * readable and writable only by the owner of the lot's BOM (migration 067) and reference the item ON DELETE RESTRICT, so when
    * another member's lot uses the part the delete is refused before anything is changed, with 409 BOM_ITEM_IN_PRODUCTION_LOTS
    * naming the blocking lots (LotBlockers); never forced through with the privileged client. An organization admin can force it
@@ -734,17 +734,6 @@ export class BOMItemsService {
     if (blockers.visibleLotIds.length > 0) {
       const { error } = await client.from('production_lot_materials').delete().eq('bom_item_id', id);
       if (error) fail('could not remove production lot materials', error);
-    }
-
-    // Process routes are a retired structure: nothing creates them any more, and a database built from the current baseline may not have the tables at
-    // all. A database without them has none to remove; any other failure to read them still stops the delete.
-    const { data: routes, error: routesReadError } = await client.from('process_routes').select('id').eq('bom_item_id', id);
-    if (routesReadError && !isMissingTable(routesReadError)) fail('could not read process routes', routesReadError);
-    if (!routesReadError && routes && routes.length > 0) {
-      const { error: stepsError } = await client.from('process_route_steps').delete().in('process_route_id', routes.map((r) => r.id));
-      if (stepsError) fail('could not remove process route steps', stepsError);
-      const { error: routesError } = await client.from('process_routes').delete().eq('bom_item_id', id);
-      if (routesError) fail('could not remove process routes', routesError);
     }
 
     const { error: childError } = await client.from('bom_items').update({ parent_item_id: null }).eq('parent_item_id', id);
@@ -929,16 +918,6 @@ export class BOMItemsService {
 
     if (prodCount && prodCount > 0) {
       blockers.push(`${prodCount} production lot material(s)`);
-    }
-
-    // Check process routes
-    const { count: routeCount } = await client
-      .from('process_routes')
-      .select('*', { count: 'exact', head: true })
-      .eq('bom_item_id', id);
-
-    if (routeCount && routeCount > 0) {
-      blockers.push(`${routeCount} process route(s)`);
     }
 
     // Check child items
