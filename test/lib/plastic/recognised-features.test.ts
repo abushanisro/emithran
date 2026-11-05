@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupFeatures, isPlasticGraph, notAssessed, type PlasticFeatureGraph, type PlasticGraphItem } from "@/lib/plastic/recognised-features";
+import { groupFeatures, isPlasticGraph, isolatedUndercutNote, notAssessed, type PlasticFeatureGraph, type PlasticGraphItem } from "@/lib/plastic/recognised-features";
 
 const item = (feature_type: string, attributes: Record<string, unknown> = {}, id = feature_type): PlasticGraphItem => ({
   id, feature_type, variant: null, diameter_mm: null, depth_mm: null, attributes, occurrences: [{ face_ids: [1], centroid: [0, 0, 0] }],
@@ -32,5 +32,16 @@ describe("notAssessed / isPlasticGraph", () => {
     expect(isPlasticGraph(graph)).toBe(true);
     expect(isPlasticGraph({ schema: "feature_graph_v2", items: [] })).toBe(false);
     expect(isPlasticGraph(null)).toBe(false);
+  });
+});
+
+describe("isolatedUndercutNote", () => {
+  const base: PlasticFeatureGraph = { schema: "plastic_feature_graph_v1", items: [], not_yet_recognized: [], unclassified_faces: 0 };
+
+  it("says how many undercut faces are not a cavity, and nothing when there are none or the engine is older", () => {
+    expect(isolatedUndercutNote({ ...base, isolated_undercut_faces: { count: 21, area_mm2: 83.4, face_ids: [] } })).toBe("21 isolated undercut faces (83.4 mm² in all) are not a cavity and not counted as a feature.");
+    expect(isolatedUndercutNote({ ...base, isolated_undercut_faces: { count: 1, area_mm2: 5, face_ids: [] } })).toContain("1 isolated undercut face (5 mm² in all) is not");
+    expect(isolatedUndercutNote({ ...base, isolated_undercut_faces: { count: 0, area_mm2: 0, face_ids: [] } })).toBeNull();
+    expect(isolatedUndercutNote(base)).toBeNull();
   });
 });

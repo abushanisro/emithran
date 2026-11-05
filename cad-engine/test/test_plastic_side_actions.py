@@ -75,6 +75,35 @@ class TestVoids:
         assert sa["voids"] == [] and sa["combo_voids"] == [] and sa["bundles"] == []
 
 
+class TestIsolatedUndercutFaces:
+    def test_a_single_undercut_face_is_counted_apart_and_not_a_void(self, monkeypatch):
+        from injection_molding.recognition import side_actions
+
+        monkeypatch.setattr(side_actions, "MIN_VOID_FACES", 99)  # every cluster is now "too small to be a cavity"
+        out = core(cut(box(100, 60, 20), side_pocket(10, 30)))
+        assert out["side_actions"]["voids"] == []
+        iso = out["feature_graph"]["isolated_undercut_faces"]
+        assert iso["count"] == 1 and iso["area_mm2"] > 0 and iso["face_ids"]
+        assert not [i for i in out["feature_graph"]["items"] if i["feature_type"] == "Void"]
+
+    def test_a_cavity_leaves_nothing_isolated(self):
+        out = core(cut(box(100, 60, 20), side_pocket(10, 30)))
+        assert out["feature_graph"]["isolated_undercut_faces"]["count"] == 0
+
+
+class TestVoidWithNoDirection:
+    def test_a_void_no_axis_sees_is_flagged_not_given_a_default_direction(self):
+        from injection_molding.recognition.feature_graph import build_feature_graph
+        from shared.feature_vocabulary import feature_types, require_feature_type
+
+        void = {"id": "void-1", "face_ids": [1, 2], "area_mm2": 40.0, "accessible_direction": None, "visible_area_mm2": 0.0, "opening_area_mm2": 0.0,
+                "depth_mm": None, "equivalent_diameter_mm": None, "curved_area_ratio": 0.0, "angle_to_pull_deg": None}
+        g = build_feature_graph({"holes": []}, {}, [], 0.0, lambda t: require_feature_type("plastic_molding", t), sorted(feature_types("plastic_molding")),
+                                side_actions={"voids": [void], "combo_voids": [], "bundles": [], "consumed_ids": []})
+        item = next(i for i in g["items"] if i["feature_type"] == "Void")
+        assert item["variant"] == "no_accessible_direction" and item["attributes"]["accessible_direction"] is None
+
+
 class TestBundles:
     def test_two_close_side_pockets_on_one_axis_share_one_slide_bundle(self):
         part = cut(box(100, 60, 20), side_pocket(5, 15), side_pocket(25, 35))

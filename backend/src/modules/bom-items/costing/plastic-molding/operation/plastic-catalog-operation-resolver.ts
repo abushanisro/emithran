@@ -115,8 +115,13 @@ export const ALONG_PULL_MAX_DEG = 5;
 
 function decideHole(f: PlasticFeature, candidates: readonly string[], rules: FeatureRules): Decision {
   const angle = f.attributes?.angle_to_pull_deg ?? null;
+  const isHole = HOLE_TYPES.has(f.feature_type);
   const undecided = (reason: string): Decision => ({ operations: [...candidates], status: 'undecided', reason });
-  if (angle == null) return undecided('The hole\'s direction against the pull is not known.');
+  if (angle == null) {
+    return undecided(isHole
+      ? 'The hole\'s direction against the pull is not known.'
+      : 'No axis the engine tested sees this region (it is enclosed or covered every way), so there is no direction a core could be pulled along: not decided.');
+  }
 
   if (angle <= ALONG_PULL_MAX_DEG) {
     return candidates.includes(AS_MOLDED)
@@ -129,8 +134,8 @@ function decideHole(f: PlasticFeature, candidates: readonly string[], rules: Fea
   const sideCore = endsWith(candidates, 'SideCore');
   const lifter = endsWith(candidates, 'Lifter');
   // A combo of voids and holes is never an insert: it has no size to compare, so it is treated as larger than any insert.
-  const widest = f.feature_type === 'ComboVoid' ? Number.POSITIVE_INFINITY : Math.max(f.diameter_mm ?? 0, ...(f.attributes?.steps ?? []).map((s) => s.diameter_mm));
-  const size = Number.isFinite(widest) ? `Ø${widest} mm` : 'The group';
+  const widest = !isHole ? Number.POSITIVE_INFINITY : Math.max(f.diameter_mm ?? 0, ...(f.attributes?.steps ?? []).map((s) => s.diameter_mm));
+  const size = isHole ? `Ø${widest} mm` : 'The region';
   const limit = rules.maxNoCoreInsertDiameterMm;
   const what = HOLE_TYPES.has(f.feature_type) ? 'hole' : 'region';
   const why = `The ${what}'s axis is ${angle.toFixed(1)}° from the pull, so the mold halves cannot form it`;
@@ -139,10 +144,11 @@ function decideHole(f: PlasticFeature, candidates: readonly string[], rules: Fea
     if (others.length === 0) return { operations: [], status: 'infeasible', reason: `${why}, and this process's catalog has no core, lifter or insert operation for it.` };
     return { operations: others, status: 'undecided', reason: `${why}; this process's catalog offers only ${others.join(', ')} for it, and whether that applies is not decided from the CAD.` };
   }
-  if (limit != null && noCore && widest > 0 && widest <= limit) {
+  // The insert rule (maxNoCoreInsertDiameter) is about holes. A region has no diameter to compare, so it never resolves to an insert here.
+  if (isHole && limit != null && noCore && widest > 0 && widest <= limit) {
     return { operations: [noCore], status: 'resolved', reason: `${why}; ${size} is within maxNoCoreInsertDiameter (${limit} mm): made with an insert, no core.` };
   }
-  if (limit == null && noCore) return undecided(`${why}; maxNoCoreInsertDiameter is not staged, so an insert cannot be told from a core.`);
+  if (isHole && limit == null && noCore) return undecided(`${why}; maxNoCoreInsertDiameter is not staged, so an insert cannot be told from a core.`);
 
   // A core is needed. A slide (side core) serves an axis within drawDirectionOrthogonalEpsilonForSlides of square to the pull, a lifter one within ...ForLifters.
   const fromSquare = 90 - angle;
@@ -155,7 +161,7 @@ function decideHole(f: PlasticFeature, candidates: readonly string[], rules: Fea
   if (lifter && lifterEps != null && fromSquare <= lifterEps) fits.push(lifter);
   if (fits.length === 0) {
     const reach = [sideCore && `a side core (within ${slideEps}° of square)`, lifter && `a lifter (within ${lifterEps}°)`].filter(Boolean).join(' or ');
-    return undecided(`${why}, and it is ${fromSquare.toFixed(1)}° from square to the pull, outside what ${reach} serves: it is oblique and would need an angled core, which is not decided here.`);
+    return { operations: candidates.filter((op) => op !== AS_MOLDED), status: 'undecided', reason: `${why}, and it is ${fromSquare.toFixed(1)}° from square to the pull, outside what ${reach} serves: it is oblique and would need an angled core, which is not decided here.` };
   }
   return {
     operations: fits.sort(),

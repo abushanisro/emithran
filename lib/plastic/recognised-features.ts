@@ -20,6 +20,8 @@ export interface PlasticFeatureGraph {
   /** Why each one was not assessed (engine side). Absent on an older engine. */
   not_assessed_reasons?: Record<string, string>;
   unclassified_faces: number;
+  /** Single undercut faces: not cavities, so not counted as voids; reported here so they are not lost. Absent on an older engine. */
+  isolated_undercut_faces?: { count: number; area_mm2: number; face_ids: number[] };
 }
 
 export interface FeatureGroup {
@@ -60,4 +62,11 @@ export function groupFeatures(items: readonly PlasticGraphItem[]): FeatureGroup[
 /** What to say about a feature type that was not assessed. */
 export function notAssessed(g: PlasticFeatureGraph): { type: string; reason: string }[] {
   return g.not_yet_recognized.map((type) => ({ type, reason: g.not_assessed_reasons?.[type] ?? 'not assessed from the CAD yet' }));
+}
+
+/** One sentence about the undercut faces that are not a cavity, or null when there are none. */
+export function isolatedUndercutNote(g: PlasticFeatureGraph): string | null {
+  const iso = g.isolated_undercut_faces;
+  if (!iso || iso.count === 0) return null;
+  return `${iso.count} isolated undercut face${iso.count === 1 ? '' : 's'} (${iso.area_mm2} mm² in all) ${iso.count === 1 ? 'is' : 'are'} not a cavity and not counted as a feature.`;
 }

@@ -98,15 +98,29 @@ describe('resolvePlasticCatalogOperations', () => {
       expect(r).toMatchObject({ status: 'undecided', operations: ['VoidLifter', 'VoidSideCore'] });
     });
 
-    it('a tiny void is an insert; a void 20 degrees from square is a side core', () => {
-      expect(run([feature('Void', { diameter_mm: 2, attributes: { angle_to_pull_deg: 90 } })], SIDE)[0]).toMatchObject({ status: 'resolved', operations: ['VoidNoCore'] });
+    it('a void is never an insert (that rule is about holes); one 20 degrees from square is a side core', () => {
+      const tiny = run([feature('Void', { diameter_mm: 0.9, attributes: { angle_to_pull_deg: 90 } })], SIDE)[0];
+      expect(tiny.operations).not.toContain('VoidNoCore');
+      expect(tiny.operations).toEqual(['VoidLifter', 'VoidSideCore']);
       expect(run([feature('Void', { diameter_mm: 40, attributes: { angle_to_pull_deg: 70 } })], SIDE)[0]).toMatchObject({ status: 'resolved', operations: ['VoidSideCore'] });
+    });
+
+    it('a void no axis sees has no direction to pull a core along: undecided, with the reason', () => {
+      const [r] = run([feature('Void', { variant: 'no_accessible_direction', attributes: { angle_to_pull_deg: null } })], SIDE);
+      expect(r.status).toBe('undecided');
+      expect(r.reason).toMatch(/no direction a core could be pulled along/);
+    });
+
+    it('an oblique void is not offered As Molded: it cannot be formed by the halves', () => {
+      const [r] = run([feature('Void', { attributes: { angle_to_pull_deg: 40 } })], SIDE);
+      expect(r.status).toBe('undecided');
+      expect(r.operations).not.toContain('As Molded');
     });
 
     it('a combo is never judged an insert', () => {
       const [r] = run([feature('ComboVoid', { attributes: { angle_to_pull_deg: 90 } })], SIDE);
       expect(r.operations).toEqual(['ComboVoidLifter', 'ComboVoidSideCore']);
-      expect(r.reason).toContain('The group');
+      expect(r.reason).toContain('The region');
     });
 
     it('a slide bundle is Slides; a lifter bundle is undecided between Lifters and Slides', () => {

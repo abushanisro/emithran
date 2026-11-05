@@ -1,6 +1,6 @@
 "use client";
 
-import { groupFeatures, notAssessed, type FeatureGroup, type PlasticFeatureGraph } from "@/lib/plastic/recognised-features";
+import { groupFeatures, isolatedUndercutNote, notAssessed, type FeatureGroup, type PlasticFeatureGraph } from "@/lib/plastic/recognised-features";
 import type { FeatureNodeV2 } from "@/lib/types/manufacturing";
 
 const READING_NOTE =
@@ -52,6 +52,7 @@ export function PlasticRecognisedFeatures({ graph, onSelectHighlight }: { graph:
           ))}
         </div>
       )}
+      {isolatedUndercutNote(graph) && <div className="text-muted-foreground">{isolatedUndercutNote(graph)}</div>}
       {graph.unclassified_faces > 0 && <div className="text-muted-foreground">{graph.unclassified_faces} faces could not be typed.</div>}
     </div>
   );
