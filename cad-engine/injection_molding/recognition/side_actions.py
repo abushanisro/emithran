@@ -4,7 +4,9 @@ Side actions: the parts of the mold that move sideways (slides, lifters, side co
 READINGS. The staged variables define these concepts only by their notes ("accessible direction", "bundling", "pitch between holes or voids"), not by an algorithm.
 What is implemented is a reading of those notes, stated here and carried in each result's `reading` so no one takes it for the vendor's rule:
 
-* Void: a region the two main mold halves cannot form and that is not a round hole. Its faces are the faces covered along the pull direction (undercut) joined
+* Void: a CAVITY the two main mold halves cannot form and that is not a round hole: at least two faces (a floor and a wall). A single undercut face (the
+  underside of a lip, a fragment of a fillet) is not a cavity; those are counted and measured in `isolated_undercut_faces`, never dropped silently and never
+  counted as features. Its faces are the faces covered along the pull direction (undercut) joined
   through the concave walls that bridge two of them (the back and side walls of a pocket under an overhang). A void the halves CAN form (a pocket along the
   pull) needs no tooling beyond As Molded and stays in the face features. Its accessible direction is the direction from which most of its surface is visible
   (the way a core would be pulled), found by the same depth-buffer visibility as the pull direction.
@@ -27,6 +29,7 @@ from .vec import Vec, angle_between_axes_deg, canonical, cross, dot, norm, sub, 
 
 READING = "side_action_reading_v1"
 MIN_VOID_AREA_MM2 = 1.0  # below this a cluster is tessellation noise, not a feature (reported as ignored)
+MIN_VOID_FACES = 2  # a cavity has a floor and a wall; a lone undercut face is reported apart, not as a feature
 UNDERCUT_FACE_FRACTION = 0.5  # a face is an undercut face when at least this share of its area is covered along the pull
 
 
@@ -112,7 +115,7 @@ def find_voids(meshes: Sequence[FaceMesh], pull: Vec, hole_face_ids: Set[int], u
         if f.area > 0 and covered / f.area >= UNDERCUT_FACE_FRACTION:
             undercut.add(f.index)
     if not undercut:
-        return {"voids": [], "ignored_clusters": 0}
+        return {"voids": [], "ignored_clusters": 0, "isolated_undercut_faces": {"count": 0, "area_mm2": 0.0, "face_ids": []}}
 
     adj = _face_adjacency(_face_edges(meshes))
     dsu = _DSU()
@@ -143,15 +146,22 @@ def find_voids(meshes: Sequence[FaceMesh], pull: Vec, hole_face_ids: Set[int], u
 
     voids: List[Dict[str, Any]] = []
     ignored = 0
+    isolated = {"count": 0, "area_mm2": 0.0, "face_ids": []}
     for faces in clusters.values():
         verts = _faces_vertices(by_index, faces)
         area = sum(by_index[f].area for f in faces)
         if area < MIN_VOID_AREA_MM2 or not verts:
             ignored += 1
             continue
+        if len(faces) < MIN_VOID_FACES:
+            isolated["count"] += 1
+            isolated["area_mm2"] += area
+            isolated["face_ids"].extend(sorted(faces))
+            continue
         voids.append({"face_ids": sorted(faces), "area_mm2": area, "vertices": verts})
+    isolated["area_mm2"] = round(isolated["area_mm2"], 2)
     if not voids:
-        return {"voids": [], "ignored_clusters": ignored}
+        return {"voids": [], "ignored_clusters": ignored, "isolated_undercut_faces": isolated}
 
     # accessible direction: the signed axis from which most of the cluster's surface is visible
     flag_cache: Dict[Tuple[int, int, int], Dict[int, List[bool]]] = {}
@@ -173,7 +183,7 @@ def find_voids(meshes: Sequence[FaceMesh], pull: Vec, hole_face_ids: Set[int], u
             m = canonical(mean)
             if all(angle_between_axes_deg(m, c) > 2.0 for c in candidates):
                 candidates.append(m)
-        best: Tuple[float, Vec] = (-1.0, (0.0, 0.0, 1.0))
+        best: Tuple[float, Vec | None] = (0.0, None)
         for d in candidates:
             cov = covered_along(d)
             for sign in (1.0, -1.0):
@@ -182,6 +192,15 @@ def find_voids(meshes: Sequence[FaceMesh], pull: Vec, hole_face_ids: Set[int], u
                 if seen > best[0]:
                     best = (seen, s)
         seen_area, s = best
+        if s is None:
+            # no tested axis sees any of it: it is enclosed or covered every way. It has no direction a core could be pulled along, and says so.
+            curved = sum(by_index[f].area for f in faces if by_index[f].surface != "plane")
+            out.append({
+                "face_ids": faces, "area_mm2": round(v["area_mm2"], 2), "accessible_direction": None, "visible_area_mm2": 0.0, "opening_area_mm2": 0.0,
+                "depth_mm": None, "equivalent_diameter_mm": None, "curved_area_ratio": round(curved / v["area_mm2"], 3), "angle_to_pull_deg": None,
+                "_vertices": v["vertices"], "_direction": None,
+            })
+            continue
         lo, hi = _extent(v["vertices"], s)
         facing = sum(max(0.0, dot(t.normal, s)) * t.area for _, t, _ in tris if dot(t.normal, s) > eps)
         curved = sum(by_index[f].area for f in faces if by_index[f].surface != "plane")
@@ -195,13 +214,15 @@ def find_voids(meshes: Sequence[FaceMesh], pull: Vec, hole_face_ids: Set[int], u
         })
     for i, v in enumerate(out, 1):
         v["id"] = f"void-{i}"
-    return {"voids": out, "ignored_clusters": ignored}
+    return {"voids": out, "ignored_clusters": ignored, "isolated_undercut_faces": isolated}
 
 
 def _action_items(voids: List[Dict[str, Any]], holes: List[Dict[str, Any]], by_index: Dict[int, FaceMesh], pull: Vec, along_pull_deg: float) -> List[Dict[str, Any]]:
     """Everything that needs a side action: voids, and holes whose axis is not along the pull."""
     items: List[Dict[str, Any]] = []
     for v in voids:
+        if v["_direction"] is None:
+            continue  # no direction to pull a core along: it cannot share an action
         pts = v["_vertices"]
         items.append({"id": v["id"], "kind": "void", "direction": v["_direction"], "signed": True, "bbox": _bbox(pts), "points": pts, "face_ids": v["face_ids"]})
     for h in holes:

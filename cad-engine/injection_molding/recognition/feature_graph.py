@@ -66,7 +66,8 @@ def build_feature_graph(
         if v["id"] in consumed:
             continue
         items.append({
-            "id": v["id"], "feature_type": vocabulary("Void"), "variant": "side", "diameter_mm": v["equivalent_diameter_mm"], "depth_mm": v["depth_mm"],
+            "id": v["id"], "feature_type": vocabulary("Void"), "variant": "side" if v["accessible_direction"] is not None else "no_accessible_direction",
+            "diameter_mm": v["equivalent_diameter_mm"], "depth_mm": v["depth_mm"],
             "attributes": {k: v[k] for k in ("area_mm2", "opening_area_mm2", "curved_area_ratio", "angle_to_pull_deg", "accessible_direction")} | {"reading": SIDE_READING},
             "occurrences": [occ(v["face_ids"])],
         })
@@ -101,4 +102,6 @@ def build_feature_graph(
         "not_yet_recognized": not_assessed,
         "not_assessed_reasons": reasons,
         "unclassified_faces": unclassified,
+        # Single undercut faces are not cavities (see side_actions.py): counted here so they are not lost.
+        "isolated_undercut_faces": sa.get("isolated_undercut_faces", {"count": 0, "area_mm2": 0.0, "face_ids": []}),
     }

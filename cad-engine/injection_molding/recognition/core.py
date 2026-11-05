@@ -65,6 +65,7 @@ def recognize_core(
     side = combine_and_bundle(found["voids"], holes["holes"], meshes, pull.vector, staged_rules(), max_draft_deg)
     side["voids"] = [{k: v for k, v in x.items() if not k.startswith("_")} for x in found["voids"]]
     side["ignored_clusters"] = found["ignored_clusters"]
+    side["isolated_undercut_faces"] = found["isolated_undercut_faces"]
     parting = parting_line(meshes, pull.vector, undrafted_deg)
     if parting["status"] == "found":
         parting["internal_cutouts"] = sum(1 for h in holes["holes"] if h["variant"] == "through")
