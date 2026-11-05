@@ -20,6 +20,10 @@
     "investment_casting": {
       "path": "memory/Casting Investment/Processes/operations.csv",
       "sha256": "e3f364e67a863f06e639c63c48375bc13e86a13bc4bb061637c8ffbf3578b2ed"
+    },
+    "plastic_molding": {
+      "path": "memory/Plastic Modeling/process/digital_factory_operations.csv",
+      "sha256": "a39535b946270f328d439c038edeafc038f06c6ded097f4c56e434e9eac0da04"
     }
   },
   "domains": {
@@ -2612,6 +2616,187 @@
         "Ceramic Core Making:Ceramic Coring",
         "Soluble Wax Core Making:Soluble Wax Coring"
       ]
+    },
+    "plastic_molding": {
+      "row_count": 92,
+      "feature_types": {
+        "ComboVoid": {
+          "child_features": [],
+          "machines": [
+            "Injection Molding",
+            "No Cost Feature",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded",
+            "ComboVoidLifter",
+            "ComboVoidNoCore",
+            "ComboVoidSideCore",
+            "ComboVoidUnscrewMandrel",
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "CurvedSurface": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded"
+          ],
+          "parent_features": []
+        },
+        "CurvedWall": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded"
+          ],
+          "parent_features": []
+        },
+        "LifterBundle": {
+          "child_features": [],
+          "machines": [
+            "Injection Molding",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "Lifters"
+          ],
+          "parent_features": []
+        },
+        "MultiStepHole": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "No Cost Feature",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded",
+            "MstepLifter",
+            "MstepNoCore",
+            "MstepSideCore",
+            "MstepUnscrewMandrel",
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "PartingLine": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "Manual Flash Trimming",
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "PlanarFace": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded"
+          ],
+          "parent_features": []
+        },
+        "Rib": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded"
+          ],
+          "parent_features": []
+        },
+        "SharpEdge": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded"
+          ],
+          "parent_features": []
+        },
+        "SimpleHole": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "No Cost Feature",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded",
+            "HoleLifter",
+            "HoleNoCore",
+            "HoleSideCore",
+            "HoleUnscrewMandrel",
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "SlideBundle": {
+          "child_features": [],
+          "machines": [
+            "Injection Molding",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "Slides"
+          ],
+          "parent_features": []
+        },
+        "Void": {
+          "child_features": [],
+          "machines": [
+            "Compression Molding",
+            "Injection Molding",
+            "No Cost Feature",
+            "Reaction Injection Molding",
+            "Structural Foam Molding"
+          ],
+          "operations": [
+            "As Molded",
+            "No Cost Feature",
+            "VoidLifter",
+            "VoidNoCore",
+            "VoidSideCore"
+          ],
+          "parent_features": []
+        }
+      },
+      "rows_without_feature": []
     }
   }
 }
