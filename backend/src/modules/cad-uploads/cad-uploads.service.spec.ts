@@ -15,7 +15,7 @@ const stored = (over: Partial<CadUploadRow> = {}): CadUploadRow => ({
 });
 
 /** A fake service-role client that remembers what was stored, inserted and updated. `existing` is the row already in the table. */
-function setup(existing: CadUploadRow | null, options: { raceOnInsert?: boolean } = {}) {
+function setup(existing: CadUploadRow | null, options: { raceOnInsert?: boolean; liveItems?: string[] } = {}) {
   let row: CadUploadRow | null = existing;
   const calls = { storage: [] as string[], inserts: 0, updates: [] as Record<string, unknown>[] };
   const table = {
@@ -45,8 +45,10 @@ function setup(existing: CadUploadRow | null, options: { raceOnInsert?: boolean 
       }),
     }),
   };
+  // bom_items: which of the asked ids still exist
+  const items = { select: () => ({ in: (_column: string, ids: string[]) => ({ limit: async () => ({ data: ids.filter((id) => (options.liveItems ?? []).includes(id)).slice(0, 1).map((id) => ({ id })), error: null }) }) }) };
   const admin = {
-    from: () => table,
+    from: (name: string) => (name === 'bom_items' ? items : table),
   };
   const objects = { put: async (_bucket: string, path: string) => { calls.storage.push(path); } };
   const bomItems = { getProjectIdForBOM: jest.fn(async () => 'proj-1') };
@@ -73,13 +75,14 @@ describe('CadUploadsService.create', () => {
     expect(fresh.audit.recordBestEffort).toHaveBeenCalledWith({
       action: 'upload.created', targetType: 'cad_upload', targetId: 'up-1', organizationId: 'org-1', meta: { fileName: 'part.step', sizeBytes: BYTES.length },
     });
-    const repeat = setup(stored({ status: 'done' }));
+    const repeat = setup(stored({ status: 'done', created_item_ids: ['i1'] }), { liveItems: ['i1'] });
     await repeat.service.create(input);
     expect(repeat.audit.recordBestEffort).not.toHaveBeenCalled();
   });
 
   it.each(['queued', 'running', 'done'] as const)('answers the same bytes with the existing %s upload and touches neither storage nor the table', async (status) => {
-    const { service, calls, runner } = setup(stored({ status }));
+    // a finished upload still has what it created in the BOM
+    const { service, calls, runner } = setup(stored({ status, created_item_ids: ['i1'] }), { liveItems: ['i1'] });
     const { upload, duplicate } = await service.create(input);
     expect(duplicate).toBe(true);
     expect(upload.id).toBe('up-1');
@@ -102,6 +105,38 @@ describe('CadUploadsService.create', () => {
     await service.create(input);
     expect(calls.storage).toEqual([`cad-uploads/org-1/${SHA}.step`]);
     expect(calls.updates[0]).toMatchObject({ status: 'queued', source_deleted_at: null });
+  });
+
+  it('returns the earlier result when the upload finished and its items are still in the BOM', async () => {
+    const { service, calls } = setup(stored({ status: 'done', created_item_ids: ['i1', 'i2'], source_deleted_at: '2026-11-05T00:00:00Z' }), { liveItems: ['i2'] });
+    const { duplicate } = await service.create(input);
+    expect(duplicate).toBe(true);
+    expect(calls.storage).toEqual([]);
+    expect(calls.updates).toEqual([]);
+  });
+
+  it('imports the same file again when the upload finished but every item it created has been deleted', async () => {
+    const { service, calls, runner } = setup(stored({ status: 'done', created_item_ids: ['i1', 'i2'], materialize_attempts: 1, source_deleted_at: '2026-11-05T00:00:00Z' }), { liveItems: [] });
+    const { upload, duplicate } = await service.create(input);
+    expect(duplicate).toBe(false);
+    expect(calls.storage).toEqual([`cad-uploads/org-1/${SHA}.step`]); // its original was removed after the first import
+    expect(calls.updates).toEqual([expect.objectContaining({ status: 'queued', attempts: 0, materialize_attempts: 0, source_deleted_at: null })]);
+    expect(upload.status).toBe('queued');
+    expect(runner.wake).toHaveBeenCalled();
+  });
+
+  it('does not import a file again while its upload is still being processed', async () => {
+    for (const status of ['queued', 'running', 'analysed', 'materializing'] as const) {
+      const { service, calls } = setup(stored({ status }));
+      expect((await service.create(input)).duplicate).toBe(true);
+      expect(calls.updates).toEqual([]);
+    }
+  });
+
+  it('looks for surviving items in batches, so a large upload does not make a request line too long', async () => {
+    const ids = Array.from({ length: 450 }, (_, i) => `item-${i}`);
+    const { service } = setup(stored({ status: 'done', created_item_ids: ids }), { liveItems: ['item-449'] });
+    expect((await service.create(input)).duplicate).toBe(true); // found in the last batch
   });
 
   it('treats losing a race with an identical upload as a duplicate, not an error', async () => {
