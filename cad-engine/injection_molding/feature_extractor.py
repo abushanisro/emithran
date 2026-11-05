@@ -141,7 +141,7 @@ class InjectionMoldedFeatureExtractor:
 
         # Geometric recognition over every surface (plane, cylinder, cone, free-form): the census, the mold-opening direction and draft/undercut on
         # all faces. Additive: the legacy fields below are unchanged until the backend moves to it.
-        recognition_core = self._recognition_core(shape, bbox_dims, pull_direction_override)
+        recognition_core = self._recognition_core(shape, bbox_dims, pull_direction_override, ribs)
 
         logger.info(
             f"[InjectionMolded] wall={modal_thickness:.2f}mm "
@@ -222,10 +222,15 @@ class InjectionMoldedFeatureExtractor:
             "extraction_version": "im_v6_recognition_core",
         }
 
-    def _recognition_core(self, shape: Any, bbox_dims: List[float], pull_override: Optional[Tuple[float, float, float]]) -> Dict[str, Any]:
+    def _recognition_core(
+        self, shape: Any, bbox_dims: List[float], pull_override: Optional[Tuple[float, float, float]], ribs: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """The recognition core's result, or a visible failure: an error here never takes the legacy analysis down with it, but it is never silent."""
         try:
-            return recognize_core(shape, bbox_dims, self.UNDRAFTED_DEG, self.MAX_DRAFT_DEG, pull_override)
+            return recognize_core(
+                shape, bbox_dims, self.UNDRAFTED_DEG, self.MAX_DRAFT_DEG, pull_override,
+                legacy_rib_groups=ribs.get("rib_groups", []), legacy_rib_confidence=float(ribs.get("rib_confidence", 0.0)),
+            )
         except Exception as e:  # noqa: BLE001 - reported in the result and logged, see above
             logger.exception("[InjectionMolded] recognition core failed")
             return {"version": "plastic_recognition_core_v1", "status": "failed", "error": f"{type(e).__name__}: {e}"}
