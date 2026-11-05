@@ -43,6 +43,12 @@ describe('AnalysisRunService.ensureCurrent', () => {
     return { svc, reanalysis, casting };
   }
 
+  it('refuses to run without an organization context', async () => {
+    const { svc, reanalysis } = build([needsCad]);
+    await expect(svc.ensureCurrent({ ...input, organizationId: '' })).rejects.toThrow(/No organization context/);
+    expect(reanalysis.reanalyze).not.toHaveBeenCalled();
+  });
+
   it('does nothing when every analysis is current', async () => {
     const { svc, reanalysis, casting } = build([ready]);
     const r = await svc.ensureCurrent(input);

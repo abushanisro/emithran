@@ -15,6 +15,8 @@ export const AUDIT_ACTIONS = {
   // an engineer fixed (or released) the pull axis of a plastic part; the reason is the engineer's own words
   'plastic_pull_direction.set': ['axis', 'reason', 'previousAxis'],
   'plastic_pull_direction.cleared': ['previousAxis', 'previousReason'],
+  // a scenario was applied to a BOM item as one operation (analysis, material cost, route); the route is the chosen id or the mode
+  'scenario_application.applied': ['revision', 'route', 'material'],
   // an engineer set (or released) one plant variable for one sand-cast part; the reason is the engineer's own words
   'sand_variable_override.set': ['variable', 'value', 'reason', 'previousValue', 'plantValue'],
   'sand_variable_override.cleared': ['variable', 'previousValue', 'previousReason'],

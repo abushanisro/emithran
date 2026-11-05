@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
 import { SandCastingService } from '../../sand-casting/sand-casting.service';
 import type { AnalysisStatus } from '../analysis-status';
@@ -41,6 +41,8 @@ export class AnalysisRunService {
   ) {}
 
   ensureCurrent(input: AnalysisRunInput): Promise<AnalysisRunResult> {
+    // Resolved by OrganizationContextGuard on the route: the casting analysis the run may start is stored under it.
+    if (!input.organizationId) return Promise.reject(new BadRequestException('No organization context: the analysis cannot be started for the part.'));
     const running = this.inFlight.get(input.bomItemId);
     if (running) return running;
     const run = this.run(input).finally(() => this.inFlight.delete(input.bomItemId));
