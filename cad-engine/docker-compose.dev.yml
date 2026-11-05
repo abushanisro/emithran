@@ -1,11 +1,12 @@
-# Local development runtime for the CAD engine.
+# Local development runtime for the CAD engine. One file, the same on Windows (WSL2), macOS and Linux.
 #
-# Why this file exists: pythonocc-core ships unsigned .pyd binaries. Windows 11
-# Smart App Control blocks them at load time (CodeIntegrity event 3077, policy
-# {0283AC0F-FFF1-49AE-ADA1-8A933130CAD6}) and SAC has no allowlist or exclusion
-# mechanism, so `python main.py` cannot work natively on Windows while SAC is
-# enforcing. Running the engine in the same Linux image Railway builds from
-# sidesteps that and removes dev/prod drift at the same time.
+# Why a container: pythonocc-core (the OpenCASCADE binding) comes from conda-forge, not pip, and on Windows 11 Smart App Control
+# blocks its unsigned .pyd binaries at load time (CodeIntegrity event 3077, policy {0283AC0F-FFF1-49AE-ADA1-8A933130CAD6}), so
+# `python main.py` cannot work natively there. The container is the one runtime every host shares, and it is the image Railway
+# builds from, so dev and prod cannot drift.
+#
+# Why linux/amd64 on every service: conda-forge publishes pythonocc-core 7.7.2 for linux-64 only. x86 hosts (Windows, Linux, Intel
+# Mac) run it natively; Apple Silicon runs it under emulation (Docker Desktop: enable "Use Rosetta for x86_64/amd64 emulation").
 #
 #   docker compose -f docker-compose.dev.yml up --build
 #   docker compose -f docker-compose.dev.yml run --rm cad-engine pytest test -q
@@ -26,9 +27,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: mithran-cad-engine:dev
-    # pythonocc-core 7.7.2 (the OCCT binding the Dockerfile pins) is published on conda-forge for linux-64 only. Without this pin
-    # Docker builds for the host's architecture, and on Apple Silicon the conda step fails with PackagesNotFoundInChannelsError.
-    # The production compose files pin the same platform.
     platform: linux/amd64
     container_name: mithran-cad-engine-dev
     # Docker runs inside the WSL distro and stops with it; come back up
@@ -38,10 +36,10 @@ services:
       - "5055:5055"
     volumes:
       # Live source. Shadows the image's baked /app copy so edits made on the
-      # Windows side apply without a rebuild.
+      # host apply without a rebuild.
       - .:/app
-      # Anonymous volumes so container-written caches never land on the
-      # Windows/OneDrive mount, where they would be slow and cross-platform dirty.
+      # Anonymous volumes so container-written caches never land on the host
+      # mount (a Windows/OneDrive drive or a macOS bind mount), where they would be slow and dirty.
       - /app/__pycache__
       - /app/.pytest_cache
     env_file:
@@ -51,8 +49,8 @@ services:
       PORT: "5055"
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
-      # inotify does not propagate across the Windows drvfs mount, so the
-      # reloader must poll to notice edits made from the Windows side.
+      # inotify does not propagate across a Windows drvfs mount (and not reliably across a macOS bind mount), so the
+      # reloader polls to notice edits made on the host.
       WATCHFILES_FORCE_POLLING: "true"
     # main.py hardcodes reload=False (correct for production), so the dev loop
     # invokes uvicorn directly instead of patching the production entrypoint.
@@ -89,6 +87,7 @@ services:
       args:
         BASE_IMAGE: mithran-cad-engine:dev
     image: mithran-cad-engine:test
+    platform: linux/amd64
     profiles: ["test"]
     volumes:
       - .:/app

@@ -91,11 +91,18 @@ Convert STEP file to STL and return as base64
 
 ## Local Development
 
-The engine runs in a Linux container, not natively on the host.
-For day-to-day start/stop/test commands see [`RUNNING.md`](./RUNNING.md);
-this section covers why, and first-time setup.
+The engine runs in a Linux container, not natively on the host, and the same
+`docker-compose.dev.yml` serves Windows, macOS and Linux. For day-to-day
+start/stop/test commands see [`RUNNING.md`](./RUNNING.md); this section covers
+why, and first-time setup per host.
 
-### Why not `python main.py` on Windows
+### Why not `python main.py`
+
+pythonocc-core, the OpenCASCADE binding, is installed from conda-forge (it is not
+on pip), and conda-forge publishes version 7.7.2 for linux-64 only. The container
+gives every host the same runtime, and it is the image Railway deploys.
+
+On Windows there is a second reason:
 
 pythonocc-core ships unsigned `.pyd` binaries. With Windows 11 Smart App Control
 enforcing, Code Integrity refuses to map them into `python.exe`:
@@ -112,7 +119,9 @@ self-signed certificates do not satisfy it, so reinstalling the conda package or
 re-signing the binaries cannot fix it. The container is the supported path, and
 it also makes local runs match the image Railway deploys.
 
-### One-time host setup (Windows)
+### One-time host setup
+
+#### Windows
 
 Requires WSL2. Docker Engine runs inside the distro, so Docker Desktop is not
 needed and no Windows administrator rights are required beyond WSL itself.
@@ -128,16 +137,23 @@ wsl -d Ubuntu-24.04 -- docker version
 `metadata` in `/etc/wsl.conf`, creates a non-root user, and installs Docker
 Engine plus the Compose plugin from Docker's official apt repository.
 
+#### macOS and Linux
+
+Install Docker (Docker Desktop or OrbStack on macOS; Docker Engine on Linux). Nothing
+else. On **Apple Silicon**, enable Docker Desktop's "Use Rosetta for x86_64/amd64
+emulation": the engine runs as linux/amd64 (the compose file pins it), under
+emulation, so it is slower than on an x86 host but is the same image.
+
 ### Run
 
 ```bash
-# inside the distro, from the cad-engine directory
+# from the cad-engine directory (on Windows: inside the WSL distro)
 docker compose -f docker-compose.dev.yml up --build
-# http://localhost:5055/health - also reachable from Windows
+# http://localhost:5055/health - also reachable from the host
 ```
 
 The source tree is bind-mounted and uvicorn runs with `--reload`, so edits made
-on the Windows side take effect without a rebuild.
+on the host take effect without a rebuild.
 
 ### Tests
 
@@ -151,11 +167,6 @@ docker compose -f docker-compose.dev.yml build cad-engine
 docker compose -f docker-compose.dev.yml build tests
 docker compose -f docker-compose.dev.yml run --rm tests
 ```
-
-### macOS and Linux hosts
-
-Smart App Control is Windows-only. There, `pip install -r requirements.txt` plus
-`python main.py` works natively, and the compose file above works unchanged.
 
 ## Docker Deployment
 
