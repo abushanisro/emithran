@@ -19,6 +19,7 @@ How the sand-casting analysis and costing run in production, what can go wrong, 
 | --- | --- | --- |
 | `CASTING_WORKER_SOCKET` | unset | Path of the worker host's Unix socket (`/run/casting-worker/worker.sock` in `docker-compose.prod.yml`, profile `sand-casting`). **Unset: analyses are accepted and stay `queued`.** |
 | `CASTING_ANALYSIS_RUNNER` | on | `off` switches the runner off on this instance (use it on every replica but one if you run several). |
+| `CASTING_RETENTION_DAYS` | unset (off) | A positive whole number of days. Set: every 6 hours, analyses older than that which are failed, for a file the part no longer has, or from an earlier worker are removed (see Data). |
 | `CASTING_WORKER_DEADLINE_MS` | 600000 | The longest one job may run; the host stops the worker after it (`deadline_exceeded`). |
 
 ## Health
@@ -44,6 +45,16 @@ Page on `casting_worker` down for more than a few minutes when `CASTING_WORKER_S
 | The cost says `incomplete` | A route step has no machine, or a setting is missing (hot box settings, the drying time of a coating chosen) | The line is named a gap with its reasons; set the value in the Cost Guide, or add the machine in HR Rates. |
 | Frozen cost refused: "route incomplete" | The route has a gap | Fix the gap first. |
 
+## A database that is behind the code
+
+The sand-casting tables and calculators come from migrations 955 (casting analyses), 957 (draw direction), 960 (draw direction bound to its geometry), 961 (a
+part's own plant values), 962 (frozen costs), 956/958/959/964 (the calculators). A database missing them shows as 500s on the part page. Look at the backend
+log: `Could not find the table 'public.<name>' in the schema cache` (PGRST205) names the missing table. Apply what is missing with
+`cd backend && npm run db:migrate -- --env <env> --dry-run`, then without `--dry-run`.
+
+The code tolerates the two newest optional tables (961, 962: no part values and no frozen costs are assumed) and the retired `process_routes` tables
+(nothing to remove on a delete); it does not hide the others, because costing a sand-cast part without its analysis tables would be a wrong answer.
+
 ## Upgrading the worker
 
 `CASTING_WORKER_VERSION` (`casting-analysis.types.ts`) is part of what identifies an analysis: a new worker version means every part is analysed
@@ -62,11 +73,14 @@ again the next time it is opened. Release steps:
   item. Include them in backups with the rest of the schema.
 - **Files:** each analysis stores its meshes under `casting-analyses/<organization>/<analysis>/` in the `bom-files` bucket. An analysis is a few
   hundred KB of result JSON plus a few hundred KB of GLB.
-- **Retention is not automated.** Analyses of a file that was replaced stay (they are what a frozen cost or an engineer's earlier choice was based on).
-  Watch the growth: `SELECT count(*), pg_size_pretty(sum(pg_column_size(result))) FROM casting_analyses;` and the bucket prefix size. If it needs
-  pruning, delete `failed` rows older than your retention first (they have no files); deleting a `succeeded` row leaves its files orphaned unless the
-  `output_prefix` is removed with it, and a row whose files another row reuses (`output_prefix` shared) must not be.
-- **Audit events:** `casting_analysis.requested`, `casting_analysis.failed`, `casting_draw_direction.set|cleared`, `sand_variable_override.set|cleared`,
+- **Retention is opt-in** (`CASTING_RETENTION_DAYS`; nothing is deleted on an assumed schedule). When set, an analysis older than that is removed if it
+  `failed`, its BOM item's 3D file has been replaced, or an earlier worker made it (the part is analysed again when opened). Nothing else refers to an
+  analysis: a frozen cost keeps its own copy of the summary, and an engineer's draw direction keeps a copy of the geometry it was chosen on. The files of a
+  removed analysis are removed only when no remaining row points at the same `output_prefix` (a reused row points at the original's). Each pass handles 200
+  analyses and writes a `casting_retention.pruned` audit event per organization. **Not covered:** deleting a BOM item removes its analysis rows by cascade
+  but leaves their files; list `casting-analyses/<organization>/` in the bucket against `casting_analyses.output_prefix` to find them. Watch the growth
+  either way: `SELECT count(*), pg_size_pretty(sum(pg_column_size(result))) FROM casting_analyses;` and the bucket prefix size.
+- **Audit events:** `casting_analysis.requested`, `casting_analysis.failed`, `casting_retention.pruned`, `casting_draw_direction.set|cleared`, `sand_variable_override.set|cleared`,
   `sand_snapshot.created|reviewed`.
 
 ## Settings the plant owns (nothing is assumed)
