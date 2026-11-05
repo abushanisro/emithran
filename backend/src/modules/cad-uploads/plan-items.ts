@@ -18,10 +18,33 @@ export interface PlannedItem {
   measured: { volume: number; surfaceArea: number; maxLength: number; maxWidth: number; maxHeight: number } | null;
 }
 
+/** What the upload's file name stands for: the main assembly's name when the file holds several top-level parts. */
+export function packName(fileName: string): string {
+  return fileName.replace(/\.(zip|step|stp)$/i, '').replace(/[\\/]/g, ' ').trim() || 'Uploaded assembly';
+}
+
+/**
+ * A pack of loose parts has no assembly of its own, yet a BOM needs a main assembly to hang them from. When the engine reports several
+ * top-level nodes, they become the children of one assembly named after the upload; a single top-level node (a real assembly, or one part)
+ * is left exactly as reported. Idempotent: the result has one root.
+ */
+export function withPackRoot(report: AssemblyReport, fileName: string): AssemblyReport {
+  if (report.assembly.length < 2) return report;
+  const name = packName(fileName);
+  const root: AssemblyNode = { definition: `pack:${name}`, name, kind: 'assembly', quantity: 1, file: '', children: report.assembly };
+  return { ...report, assembly: [root] };
+}
+
 /** The BOM lines an engine report becomes: one per tree node, parents before children. Pure. */
 export function planItems(report: AssemblyReport, uploadTag: string): PlannedItem[] {
   const partById = new Map(report.parts.map((p) => [p.id, p]));
-  const ownFiles = new Map(report.assembly.filter((n) => n.kind === 'part').map((n) => [n.definition, n.file]));
+  // A part is a whole uploaded file when no assembly came from that file: parts inside an assembly file name the assembly's file.
+  const assemblyFiles = new Set<string>();
+  const collect = (nodes: AssemblyNode[]): void => nodes.forEach((n) => { if (n.kind !== 'part') assemblyFiles.add(n.file); collect(n.children); });
+  collect(report.assembly);
+  const ownFiles = new Map<string, string>();
+  const claim = (nodes: AssemblyNode[]): void => nodes.forEach((n) => { if (n.kind === 'part' && !assemblyFiles.has(n.file)) ownFiles.set(n.definition, n.file); claim(n.children); });
+  claim(report.assembly);
   const items: PlannedItem[] = [];
   const walk = (node: AssemblyNode, key: string, parentKey: string | null) => {
     items.push({

@@ -89,6 +89,23 @@ describe('CadUploadRunner', () => {
     expect(last(updates)).toMatchObject({ status: 'done', result: { report: report(), skipped: [] } });
   });
 
+  it('hangs the loose parts of a zip from a main assembly named after the zip, and records the tree as it created it', async () => {
+    const two = report();
+    two.assembly = [two.assembly[0]!, { ...two.assembly[0]!, definition: '0:2', name: 'Shaft' }];
+    engineAnswers(two);
+    const { runner, updates, bomItems } = setup(row({ file_name: 'liner.zip' }));
+    (runner as any).objects.get = async () => zip([{ name: 'a/gear.step', data: STEP }]);
+    await runner.tick();
+    const dtos = (bomItems.createForUpload.mock.calls as unknown as [Record<string, unknown>][]).map(([d]) => d);
+    expect(dtos.map((d) => [d.name, d.itemType, d.parentItemId])).toEqual([
+      ['liner', 'assembly', undefined],
+      ['Gear', 'child_part', 'item-1'],
+      ['Shaft', 'child_part', 'item-1'],
+    ]);
+    const saved = (last(updates) as { result: { report: AssemblyReport } }).result.report;
+    expect(saved.assembly.map((n) => [n.name, n.children.map((c) => c.name)])).toEqual([['liner', ['Gear', 'Shaft']]]);
+  });
+
   it('links children to their parent and gives parts that exist only inside the assembly file their own exported STEP', async () => {
     const post = engineAnswers(asmReport(), partsZip());
     const { runner, bomItems, files } = setup(row());
