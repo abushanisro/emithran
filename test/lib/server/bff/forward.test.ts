@@ -52,6 +52,13 @@ const browserRequest = (init: { method?: string; body?: string } = {}) =>
 describe('forwardRequest', () => {
   const url = new URL(`${API}/projects`);
 
+  it('sends no Authorization header for the local development bypass (no token), and still only the allow-listed headers', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    await forwardRequest(browserRequest(), url, null, fetcher);
+    const headers = new Headers((fetcher.mock.calls[0]![1] as RequestInit).headers);
+    expect(headers.has('authorization')).toBe(false);
+  });
+
   it("sends the session's token and only the allow-listed browser headers", async () => {
     const { fetcher, sent } = capture(new Response('{}'));
     await forwardRequest(browserRequest(), url, 'server-token', fetcher);
