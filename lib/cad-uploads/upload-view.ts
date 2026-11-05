@@ -16,8 +16,12 @@ const FAILURES: Record<string, string> = {
   processing_failed: 'Processing failed after several attempts.',
 };
 
+const DETAIL_IS_COMPLETE: ReadonlySet<string> = new Set(['no_step_files']);
+
 /** What to tell the user about a failed upload: a plain sentence per code, plus the detail the server recorded. */
 export function describeFailure(upload: Pick<CadUpload, 'errorCode' | 'errorDetail'>): string {
+  // For these the server's detail is the whole answer (it names what the zip held): the plain sentence would only repeat its first half.
+  if (upload.errorCode && DETAIL_IS_COMPLETE.has(upload.errorCode) && upload.errorDetail) return upload.errorDetail;
   const base = (upload.errorCode ? FAILURES[upload.errorCode] : undefined) ?? 'Processing failed.';
   return upload.errorDetail && upload.errorDetail !== base ? `${base} ${upload.errorDetail}` : base;
 }

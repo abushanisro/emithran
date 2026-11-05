@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, PayloadTooLargeException, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import FormData from 'form-data';
 
-import { type ArchiveLimits, type ExpandedArchive } from '../../common/archive/expand-archive';
+import { NESTED_ARCHIVE_REASON, type ArchiveLimits, type ExpandedArchive } from '../../common/archive/expand-archive';
 import { expandArchiveInWorker } from '../../common/heavy-work/heavy-work';
 import { AuditService } from '../../common/audit/audit.service';
 import { cadEngineHttp } from '../../common/resilience/engine-http';
@@ -14,6 +14,7 @@ import { BOMItemsService } from '../bom-items/bom-items.service';
 import { FileStorageService } from '../bom-items/services/file-storage.service';
 import { parseAssemblyReport, type AssemblyNode, type AssemblyReport } from './assembly-report';
 import { CAD_BUCKET, type CadUploadRow } from './cad-upload.types';
+import { noStepFilesMessage } from './check-upload';
 import { planItems, type PlannedItem } from './plan-items';
 import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
 import { observeQueueDepth, recordCadUploadDuration, type CadUploadOutcome } from '../../telemetry/metrics';
@@ -25,6 +26,8 @@ const POLL_MS = 30_000;
 const FAILED_SOURCE_DAYS = 7;
 const MAINTENANCE_EVERY_MS = 60 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
+/** Why a file of the zip is not read: the one reason a pack's design files can be left out for. */
+const NOT_STEP = 'not a STEP file';
 // Longer than the slowest legitimate run (engine call up to 10 min, plus item creation), so a live job is never re-claimed.
 const STALE_SECONDS = 1800;
 const MATERIALIZE_STALE_SECONDS = 900;
@@ -326,9 +329,11 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     for (const entry of archive.entries) {
       const inner = entry.path.slice(archive.root.length + 1);
       if (/\.(step|stp)$/i.test(entry.name)) files.push({ name: inner, bytes: entry.bytes });
-      else skipped.push({ path: inner, reason: 'not a STEP file' });
+      else skipped.push({ path: inner, reason: NOT_STEP });
     }
-    if (files.length === 0) throw new PermanentFailure('no_step_files', 'The archive holds no STEP files.');
+    if (files.length === 0) {
+      throw new PermanentFailure('no_step_files', noStepFilesMessage(skipped.filter((s) => s.reason === NOT_STEP || s.reason === NESTED_ARCHIVE_REASON).map((s) => s.path)));
+    }
     return { files, skipped };
   }
 

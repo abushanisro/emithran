@@ -1,6 +1,6 @@
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 
-import { checkUpload } from './check-upload';
+import { checkUpload, noStepFilesMessage } from './check-upload';
 
 const STEP = Buffer.from('ISO-10303-21;\nHEADER;');
 const ZIP = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(30)]);
@@ -31,5 +31,21 @@ describe('checkUpload', () => {
   it('refuses empty and unknown files', () => {
     expect(checkUpload('a.step', Buffer.alloc(0))).toMatchObject({ ok: false, code: 'empty_file' });
     expect(checkUpload('notes.txt', STEP)).toMatchObject({ ok: false, code: 'unsupported_type' });
+  });
+});
+
+describe('noStepFilesMessage', () => {
+  const advice = 'Export your parts as STEP (AP242) and zip those.';
+
+  it('names the kinds of file the zip does hold, most common first', () => {
+    expect(noStepFilesMessage(['P/P01.pdf', 'P/P02.PDF', 'P/readme.txt'])).toBe(`The archive holds no STEP files. It holds 2 .pdf, 1 .txt. ${advice}`);
+  });
+
+  it('shows native CAD by its extension, so the user sees why it was not read', () => {
+    expect(noStepFilesMessage(['a/Top.SLDASM', 'a/Bolt.sldprt'])).toBe(`The archive holds no STEP files. It holds 1 .sldasm, 1 .sldprt. ${advice}`);
+  });
+
+  it('says only what is certain when nothing else was found', () => {
+    expect(noStepFilesMessage([])).toBe(`The archive holds no STEP files. ${advice}`);
   });
 });
