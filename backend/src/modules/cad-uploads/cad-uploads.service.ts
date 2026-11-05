@@ -20,6 +20,9 @@ export interface NewUpload {
   token: string;
 }
 
+/** How many of an upload's item ids are looked up at once (a long id list would make the request line too long). */
+const ITEM_CHECK_BATCH = 200;
+
 // The API half of ZIP / STEP assembly upload: store the bytes, queue one row, never parse CAD. The runner does the rest.
 @Injectable()
 export class CadUploadsService {
@@ -60,9 +63,9 @@ export class CadUploadsService {
 
     // The same bytes again must cost nothing: check for them BEFORE touching storage (a repeat used to re-upload the whole file).
     const existing = await this.find(admin, input.bomId, sha256);
-    if (existing && existing.status !== 'failed') return { upload: existing, duplicate: true };
+    if (existing && (await this.isRepeat(admin, existing))) return { upload: existing, duplicate: true };
 
-    // New, or failed earlier. Only a failed upload whose original is still stored can be retried without sending the bytes again.
+    // New, failed earlier, or finished but with every item since deleted. Only an upload whose original is still stored can be retried without sending the bytes again.
     if (!existing || existing.source_deleted_at) await this.objects.put(CAD_BUCKET, storagePath, input.bytes, { upsert: true });
 
     if (existing) return { upload: await this.requeue(admin, existing.id), duplicate: false };
@@ -90,7 +93,7 @@ export class CadUploadsService {
     // Lost a race with the same upload arriving at the same moment: it is the existing row now.
     const raced = await this.find(admin, input.bomId, sha256);
     if (!raced) throw new Error('Could not read the existing upload');
-    return raced.status === 'failed' ? { upload: await this.requeue(admin, raced.id), duplicate: false } : { upload: raced, duplicate: true };
+    return (await this.isRepeat(admin, raced)) ? { upload: raced, duplicate: true } : { upload: await this.requeue(admin, raced.id), duplicate: false };
   }
 
   /** Read as the user, so row-level security keeps other organizations' uploads invisible. */
@@ -107,11 +110,31 @@ export class CadUploadsService {
     return (data as CadUploadRow | null) ?? null;
   }
 
-  /** Uploading the same file again after a failure is a request to retry it. */
+  /**
+   * Whether these bytes, arriving again, add nothing: the upload is still being processed, or it finished and what it created is still in the BOM.
+   * A failed upload is retried, and so is a finished one whose items have all been deleted since: the file is wanted in the BOM again, and
+   * answering "already uploaded" would show the result of items that no longer exist.
+   */
+  private async isRepeat(admin: ReturnType<DatabaseService['getPrivilegedClient']>, upload: CadUploadRow): Promise<boolean> {
+    if (upload.status === 'failed') return false;
+    if (upload.status !== 'done') return true;
+    return this.anyItemLeft(admin, upload.created_item_ids);
+  }
+
+  private async anyItemLeft(admin: ReturnType<DatabaseService['getPrivilegedClient']>, ids: string[]): Promise<boolean> {
+    for (let i = 0; i < ids.length; i += ITEM_CHECK_BATCH) {
+      const { data, error } = await admin.from('bom_items').select('id').in('id', ids.slice(i, i + ITEM_CHECK_BATCH)).limit(1);
+      if (error) throw new Error(`Could not check the items of the earlier upload: ${error.message}`);
+      if (data && data.length > 0) return true;
+    }
+    return false;
+  }
+
+  /** Uploading the same file again after a failure (or after its items were deleted) is a request to import it again. */
   private async requeue(admin: ReturnType<DatabaseService['getPrivilegedClient']>, id: string): Promise<CadUploadRow> {
     const retried = await admin
       .from('cad_uploads')
-      .update({ status: 'queued', attempts: 0, error_code: null, error_detail: null, finished_at: null, source_deleted_at: null })
+      .update({ status: 'queued', attempts: 0, materialize_attempts: 0, error_code: null, error_detail: null, finished_at: null, source_deleted_at: null })
       .eq('id', id)
       .select('*')
       .single();
