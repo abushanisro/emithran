@@ -8,7 +8,7 @@ const INJECTION = [
   'Injection Molding:As Molded//PlanarFace', 'Injection Molding:As Molded//Rib', 'Injection Molding:No Cost Feature//Rib',
 ];
 const INSERT_ONLY = ['Insert Injection Molding:As Molded//SimpleHole', 'Insert Injection Molding:HoleUnscrewMandrel//SimpleHole'];
-const RULES: FeatureRules = { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: 30, lifterEpsilonDeg: 10 };
+const RULES: FeatureRules = { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: 30, lifterEpsilonDeg: 10, autoManualFlashTrimming: true };
 
 const hole = (id: string, diameter: number, angle: number | null): PlasticFeature => ({
   id, feature_type: 'SimpleHole', variant: 'through', diameter_mm: diameter, attributes: { angle_to_pull_deg: angle }, occurrences: [{ face_ids: [1] }],
@@ -53,12 +53,12 @@ describe('resolvePlasticCatalogOperations', () => {
   });
 
   it('without the staged tolerance or the angle the hole is undecided and says why', () => {
-    expect(run([hole('h1', 6.3, 90)], INJECTION, { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: null, lifterEpsilonDeg: null })[0]).toMatchObject({ status: 'undecided' });
+    expect(run([hole('h1', 6.3, 90)], INJECTION, { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: null, lifterEpsilonDeg: null, autoManualFlashTrimming: null })[0]).toMatchObject({ status: 'undecided' });
     expect(run([hole('h1', 6.3, null)])[0].reason).toMatch(/not known/);
   });
 
   it('without maxNoCoreInsertDiameter an obscured hole is undecided, not assumed to need a core', () => {
-    const [r] = run([hole('h1', 2.5, 90)], INJECTION, { maxNoCoreInsertDiameterMm: null, slideEpsilonDeg: 30, lifterEpsilonDeg: 10 });
+    const [r] = run([hole('h1', 2.5, 90)], INJECTION, { maxNoCoreInsertDiameterMm: null, slideEpsilonDeg: 30, lifterEpsilonDeg: 10, autoManualFlashTrimming: true });
     expect(r.status).toBe('undecided');
     expect(r.reason).toContain('not staged');
   });
@@ -83,5 +83,57 @@ describe('resolvePlasticCatalogOperations', () => {
   it('an obscured hole in a process with only an unscrewing operation is undecided, not infeasible; with nothing at all it is infeasible', () => {
     expect(run([hole('h', 6.3, 90)], INSERT_ONLY)[0]).toMatchObject({ status: 'undecided', operations: ['HoleUnscrewMandrel'] });
     expect(run([hole('h', 6.3, 90)], ['X:As Molded//SimpleHole'])[0]).toMatchObject({ status: 'infeasible', operations: [] });
+  });
+
+  describe('voids, bundles and the parting line', () => {
+    const SIDE = [
+      'Injection Molding:As Molded//Void', 'Injection Molding:VoidNoCore//Void', 'Injection Molding:VoidSideCore//Void', 'Injection Molding:VoidLifter//Void',
+      'Injection Molding:As Molded//ComboVoid', 'Injection Molding:ComboVoidNoCore//ComboVoid', 'Injection Molding:ComboVoidSideCore//ComboVoid', 'Injection Molding:ComboVoidLifter//ComboVoid',
+      'Injection Molding:Lifters//LifterBundle', 'Injection Molding:Slides//SlideBundle',
+    ];
+    const feature = (feature_type: string, over: Partial<PlasticFeature> = {}): PlasticFeature => ({ id: feature_type, feature_type, variant: 'side', occurrences: [{ face_ids: [1] }], ...over });
+
+    it('a big void square to the pull needs a core: side core or lifter, undecided', () => {
+      const [r] = run([feature('Void', { diameter_mm: 40, attributes: { angle_to_pull_deg: 90 } })], SIDE);
+      expect(r).toMatchObject({ status: 'undecided', operations: ['VoidLifter', 'VoidSideCore'] });
+    });
+
+    it('a tiny void is an insert; a void 20 degrees from square is a side core', () => {
+      expect(run([feature('Void', { diameter_mm: 2, attributes: { angle_to_pull_deg: 90 } })], SIDE)[0]).toMatchObject({ status: 'resolved', operations: ['VoidNoCore'] });
+      expect(run([feature('Void', { diameter_mm: 40, attributes: { angle_to_pull_deg: 70 } })], SIDE)[0]).toMatchObject({ status: 'resolved', operations: ['VoidSideCore'] });
+    });
+
+    it('a combo is never judged an insert', () => {
+      const [r] = run([feature('ComboVoid', { attributes: { angle_to_pull_deg: 90 } })], SIDE);
+      expect(r.operations).toEqual(['ComboVoidLifter', 'ComboVoidSideCore']);
+      expect(r.reason).toContain('The group');
+    });
+
+    it('a slide bundle is Slides; a lifter bundle is undecided between Lifters and Slides', () => {
+      expect(run([feature('SlideBundle', { attributes: { count: 3 } })], SIDE)[0]).toMatchObject({ status: 'resolved', operations: ['Slides'], count: 3 });
+      const [r] = run([feature('LifterBundle', { attributes: { count: 2, slide_alternative: true } })], SIDE);
+      expect(r).toMatchObject({ status: 'undecided', operations: ['Lifters', 'Slides'] });
+      expect(r.reason).toMatch(/clearance/);
+    });
+
+    it('a bundle over the staged action length or stroke is undecided: it would have to be split', () => {
+      const [r] = run([feature('SlideBundle', { attributes: { count: 4, exceeds_max_action_length: true, width_mm: 612 } })], SIDE);
+      expect(r.status).toBe('undecided');
+      expect(r.reason).toContain('612 mm wide');
+    });
+
+    it('flash trimming on the parting line: included for a part without cutouts, undecided with them', () => {
+      const CM = ['Compression Molding:Manual Flash Trimming//PartingLine'];
+      const parting = (internal_cutouts: number) => feature('PartingLine', { variant: 'flat', attributes: { internal_cutouts } });
+      expect(run([parting(0)], CM)[0]).toMatchObject({ status: 'resolved', operations: ['Manual Flash Trimming'] });
+      const withHoles = run([parting(2)], CM)[0];
+      expect(withHoles.status).toBe('undecided');
+      expect(withHoles.reason).toContain('2 through holes');
+      expect(run([parting(0)], CM, { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: 30, lifterEpsilonDeg: 10, autoManualFlashTrimming: null })[0].status).toBe('undecided');
+    });
+
+    it('injection molding has no parting-line operation: the feature is left out', () => {
+      expect(run([feature('PartingLine', { attributes: { internal_cutouts: 0 } })], SIDE)).toEqual([]);
+    });
   });
 });

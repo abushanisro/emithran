@@ -46,7 +46,7 @@ function service() {
 }
 
 describe('PlasticCatalogOperationsService', () => {
-  const rules = { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: 30, lifterEpsilonDeg: 10 };
+  const rules = { maxNoCoreInsertDiameterMm: 3, slideEpsilonDeg: 30, lifterEpsilonDeg: 10, autoManualFlashTrimming: true };
 
   it('resolves each molding line against its own process catalog', async () => {
     const lines = ['injection_molding', 'reaction_injection_molding', 'structural_foam_molding', 'compression_molding'].map(line);
