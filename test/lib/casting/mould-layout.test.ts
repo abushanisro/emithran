@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GatingSolid } from "@/lib/casting/gating-layout";
-import { gatingWhenOpen, mouldSolids } from "@/lib/casting/mould-layout";
+import { gatingWhenOpen, mouldSolids, sectionAxisFor } from "@/lib/casting/mould-layout";
 
 // A part 100 x 60 x 40 mm with its parting plane at z = 20, a runner beside it, in a flask 400 x 300 x 200 mm.
 const part = { partMin: [0, 0, 0] as const, partMax: [100, 60, 40] as const };
@@ -76,5 +76,14 @@ describe("the gating when the mould is opened", () => {
   });
   it("closed, nothing moves", () => {
     expect(gatingWhenOpen(solids, "z", 0)).toEqual(solids);
+  });
+});
+
+describe("the section", () => {
+  it("never cuts in the parting plane: across the frame's z when the draw axis is x, across x otherwise", () => {
+    expect(sectionAxisFor("x")).toBe(2);
+    expect(sectionAxisFor("y")).toBe(0);
+    expect(sectionAxisFor("z")).toBe(0);
+    expect(sectionAxisFor(null)).toBe(0);
   });
 });

@@ -26,7 +26,7 @@ import {
   toGlbShape,
   type SandGatingLayout,
 } from "@/lib/casting/gating-layout";
-import { gatingWhenOpen, mouldSolids, type FlaskSize } from "@/lib/casting/mould-layout";
+import { gatingWhenOpen, mouldSolids, sectionAxisFor, type FlaskSize } from "@/lib/casting/mould-layout";
 import { processStages, type StageLine } from "@/lib/casting/process-stages";
 import { castingPartView } from "@/lib/casting/result-view";
 import { thicknessField } from "@/lib/casting/thickness-field";
@@ -204,6 +204,7 @@ export function SandCastingFeaturesPanel({
             mould={mouldShapes}
             showMould={showMould}
             section={section}
+            sectionAxis={sectionAxisFor(part.drawAxis)}
             faceColors={faceColors}
             thicknessField={field}
           />

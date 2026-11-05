@@ -106,3 +106,12 @@ export function gatingWhenOpen(solids: readonly GatingSolid[], drawAxis: 'x' | '
     return { name: s.name, cylinder: { ...s.cylinder, base } };
   });
 }
+
+/**
+ * The axis of the viewer's frame the section cuts across, so the cut is never in the parting plane (which is perpendicular to the draw axis).
+ * The GLB frame maps the part's x to x, y to -z and z to y (viewer-model.ts toGlbFrame): a draw axis of x is the frame's x, so cut across z; y and z
+ * are the frame's z and y, so cutting across x is always clear of the plane.
+ */
+export function sectionAxisFor(drawAxis: 'x' | 'y' | 'z' | null): 0 | 1 | 2 {
+  return drawAxis === 'x' ? 2 : 0;
+}

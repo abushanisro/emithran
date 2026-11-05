@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Home, Loader2 } from "lucide-react";
@@ -58,6 +58,8 @@ interface CastingPartViewerProps {
   showMould?: boolean;
   /** Cut the mould in half across its length so the part inside shows. */
   section?: boolean;
+  /** The axis of the GLB frame the section cuts across (0 x, 1 y, 2 z): never the draw axis, or the cut would lie in the parting plane. */
+  sectionAxis?: 0 | 1 | 2;
   /** Face number (the result's numbering) to colour: the draft overlay. Applied only when the loaded model matches `glbFaces`. */
   faceColors?: ReadonlyMap<number, string> | null;
   /** The wall thickness over the surface (worker 0.17.0 rays): each vertex coloured from the nearest rays of its face. Wins over `faceColors`. */
@@ -81,6 +83,7 @@ export function CastingPartViewer({
   mould = [],
   showMould = false,
   section = false,
+  sectionAxis = 0,
   faceColors = null,
   thicknessField = null,
 }: CastingPartViewerProps) {
@@ -105,6 +108,15 @@ export function CastingPartViewer({
   const bounds = useMemo(
     () => (part.scene ? boundsOfObject(part.scene) : null),
     [part.scene],
+  );
+
+  // The camera fits the part, and the mould too once it is shown (the flask is much larger than a small part, and would fill the view with the part lost
+  // in it). It refits when the mould is shown or hidden, not as the slider moves it.
+  const mouldRef = useRef(mould);
+  mouldRef.current = mould;
+  const fitBounds = useMemo(
+    () => (showMould ? unionBounds(bounds, mouldBoundsOf(mouldRef.current)) : bounds),
+    [bounds, showMould],
   );
 
   return (
@@ -149,8 +161,8 @@ export function CastingPartViewer({
           <Lines positions={edges} color={EDGE_COLOR} />
           {showParting && <Lines positions={parting} color={PARTING_COLOR} />}
           {showGating && <GatingSolids shapes={gating} />}
-          {showMould && <SandMould shapes={mould} section={section} />}
-          <CameraRig bounds={bounds} nonce={nonce} />
+          {showMould && <SandMould shapes={mould} section={section} axis={sectionAxis} />}
+          <CameraRig bounds={fitBounds} nonce={nonce} />
           <OrbitControls makeDefault enableDamping />
         </Canvas>
       )}
@@ -246,6 +258,29 @@ function disposeObject(root: THREE.Object3D) {
     for (const mat of Array.isArray(m.material) ? m.material : [m.material])
       mat.dispose();
   });
+}
+
+/** The corners that hold every box of the mould (centre and size, in the GLB frame); null without one. */
+function mouldBoundsOf(shapes: readonly GlbShape[]): Box3Like | null {
+  const boxes = shapes.filter((s) => s.kind === "box");
+  if (boxes.length === 0) return null;
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (const b of boxes) {
+    for (let i = 0; i < 3; i++) {
+      min[i] = Math.min(min[i] ?? Infinity, (b.center[i] ?? 0) - (b.size[i] ?? 0) / 2);
+      max[i] = Math.max(max[i] ?? -Infinity, (b.center[i] ?? 0) + (b.size[i] ?? 0) / 2);
+    }
+  }
+  return { min, max };
+}
+
+function unionBounds(a: Box3Like | null, b: Box3Like | null): Box3Like | null {
+  if (!a || !b) return a ?? b;
+  return {
+    min: [Math.min(a.min[0], b.min[0]), Math.min(a.min[1], b.min[1]), Math.min(a.min[2], b.min[2])],
+    max: [Math.max(a.max[0], b.max[0]), Math.max(a.max[1], b.max[1]), Math.max(a.max[2], b.max[2])],
+  };
 }
 
 function boundsOfObject(root: THREE.Object3D): Box3Like | null {
@@ -400,26 +435,36 @@ function Body({
   );
 }
 
-/** The mould: cope and drag as translucent sand boxes, the parting plane as a thin plate; cut in half across x when `section` is on. */
-function SandMould({ shapes, section }: { shapes: readonly GlbShape[]; section: boolean }) {
+/** The parting plate a little smaller across than the sand it lies in, so its edges do not share a plane with the sand's sides (they would flicker where the two overlap). */
+function insetPlate(size: Xyz): [number, number, number] {
+  const thin = Math.min(...size);
+  return [size[0], size[1], size[2]].map((v) => (v === thin ? v : v * 0.98)) as [number, number, number];
+}
+
+/** The mould: cope and drag as translucent sand boxes, the parting plane as a thin plate; cut in half across `axis` when `section` is on. */
+function SandMould({ shapes, section, axis }: { shapes: readonly GlbShape[]; section: boolean; axis: 0 | 1 | 2 }) {
   const boxes = useMemo(() => shapes.filter((s) => s.kind === "box"), [shapes]);
   const plane = useMemo(() => {
     if (boxes.length === 0) return null;
-    const cx = boxes.reduce((sum, b) => sum + b.center[0], 0) / boxes.length;
-    // Keeps the points with x at or below the middle of the mould.
-    return new THREE.Plane(new THREE.Vector3(-1, 0, 0), cx);
-  }, [boxes]);
+    const middle = boxes.reduce((sum, b) => sum + b.center[axis], 0) / boxes.length;
+    // Keeps the points at or below the middle of the mould along the cut axis.
+    const normal = new THREE.Vector3(0, 0, 0).setComponent(axis, -1);
+    return new THREE.Plane(normal, middle);
+  }, [boxes, axis]);
   return (
     <>
       {boxes.map((shape) => (
         <mesh key={shape.name} position={shape.center} name={shape.name} renderOrder={-1}>
-          <boxGeometry args={shape.size} />
+          <boxGeometry args={shape.name === "Parting plane" ? insetPlate(shape.size) : shape.size} />
           <meshStandardMaterial
             color={shape.name === "Parting plane" ? PARTING_COLOR : shape.name === "Drag" ? DRAG_COLOR : COPE_COLOR}
             transparent
             opacity={shape.name === "Parting plane" ? 0.5 : 0.28}
             depthWrite={false}
-            side={THREE.DoubleSide}
+            side={THREE.FrontSide}
+            polygonOffset={shape.name === "Parting plane"}
+            polygonOffsetFactor={-2}
+            polygonOffsetUnits={-2}
             clippingPlanes={section && plane ? [plane] : []}
           />
         </mesh>
