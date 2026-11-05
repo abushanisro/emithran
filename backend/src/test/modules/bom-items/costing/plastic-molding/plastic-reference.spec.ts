@@ -39,7 +39,7 @@ describe('resolvePlasticReference', () => {
 
 describe('computeMoldToolingCost on the real tables', () => {
   it('counts Guide Pin at its real 0.25 h and says Guide Bush has no assembly time', () => {
-    const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, tables: REF.tooling, toolroomRates: null, location: 'India' });
+    const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling, toolroomRates: null, location: 'India' });
     // Air Poppet 30x0.006 + Ejector Guide Pin Bushing 6x2 + Guide Pin 4x0.25 + Limit Switch 4x1 + Return Pin 6x1
     expect(r.estimatedAssemblyHrs).toBeCloseTo(30 * 0.006 + 6 * 2 + 4 * 0.25 + 4 * 1 + 6 * 1, 6);
     expect(r.warnings.some((w) => w.includes('No assembly time on file') && w.includes('Guide Bush'))).toBe(true);
@@ -51,7 +51,7 @@ describe('computeMoldToolingCost on the real tables', () => {
   });
 
   it('prices the hours at the reference USA toolroom rates', () => {
-    const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, tables: REF.tooling, toolroomRates: REF.toolroomRatesUsa, location: 'USA' });
+    const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling, toolroomRates: REF.toolroomRatesUsa, location: 'USA' });
     expect(REF.toolroomRatesUsa).toEqual({ designUsdPerHr: 64.73, machiningUsdPerHr: 100.55, assemblyUsdPerHr: 76.81 });
     expect(r.labourCostUsd).toBeCloseTo(
       r.estimatedDesignHrs * 64.73 + r.estimatedMachiningHrs * 100.55 + r.estimatedAssemblyHrs * 76.81, 6);
