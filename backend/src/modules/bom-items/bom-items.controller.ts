@@ -74,6 +74,7 @@ import {
 } from './costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
+import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
 import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
 import { SIGNED_URL_TTL_SEC, getReusableSignedUrl, rememberSignedUrl } from './services/signed-url-cache';
@@ -110,6 +111,7 @@ export class BOMItemsController {
     private readonly cadAnalysisService: CADAnalysisService,
     private readonly autoFillService: AutoFillService,
     private readonly reanalysis: BomItemReanalysisService,
+    private readonly analysisRuns: AnalysisRunService,
     private readonly secondaryProcessService: SecondaryProcessService,
     private readonly nreService: NreService,
     private readonly dfmScoringService: DFMScoringService,
@@ -281,6 +283,19 @@ export class BOMItemsController {
   @ApiResponse({ status: 200, description: 'Analysis status' })
   async getAnalysisStatus(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<AnalysisStatus> {
     return this.analysisStatusService.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/analysis-runs')
+  @ApiOperation({ summary: "Make the item's analysis current: run what analysis-status says is missing (CAD features, drawing, casting analysis) and nothing else" })
+  @ApiResponse({ status: 200, description: 'What ran, and the analysis status after it' })
+  async runAnalysis(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<AnalysisRunResult> {
+    return this.analysisRuns.ensureCurrent({ bomItemId: id, userId: user.id, organizationId, token });
   }
 
   @OrgRole('viewer')
@@ -521,38 +536,7 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<BOMItemResponseDto> {
-    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
-
-    if (!bomItem.file2dPath) {
-      throw new BadRequestException('No 2D drawing found for this item — upload a PDF drawing first');
-    }
-    if (!bomItem.file2dPath.toLowerCase().endsWith('.pdf')) {
-      throw new BadRequestException('Drawing intelligence extraction requires a vector PDF (text extraction, not OCR) — this file is not a PDF');
-    }
-
-    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.file2dPath, 3600);
-
-    let fileBuffer: Buffer;
-    try {
-      const response = await axios.get(signedUrl, {
-        responseType: 'arraybuffer',
-        timeout: 60000,
-        maxContentLength: MAX_CAD_FILE_BYTES,
-      });
-      fileBuffer = Buffer.from(response.data);
-    } catch (err: any) {
-      this.logger.error(`[analyze-drawing] Failed to download file: ${err.message}`);
-      throw new BadRequestException('Failed to download 2D file from storage');
-    }
-
-    const drawingResult = await this.autoFillService.analyzeDrawing(fileBuffer, bomItem.partNumber);
-
-    return this.bomItemsService.update(
-      id,
-      { drawingIntelligence: drawingResult as unknown as Record<string, any> },
-      user.id,
-      token,
-    );
+    return this.reanalysis.analyzeDrawing(id, user.id, token);
   }
 
   @OrgRole('viewer')

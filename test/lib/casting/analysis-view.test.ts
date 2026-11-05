@@ -10,9 +10,9 @@ const analysis = (over: Partial<CastingAnalysisSummary> = {}): CastingAnalysisSu
 });
 
 describe('analysisState', () => {
-  it('no analysis is "not requested", never "done", and points to Refresh Analysis (no separate request button)', () => {
+  it('no analysis is "not requested", never "done", and points to Apply Scenario (no separate request button)', () => {
     for (const none of [undefined, []]) {
-      expect(analysisState(none, NOW)).toEqual({ kind: 'none', label: 'Not requested', detail: 'Run Refresh Analysis to start it.', requestLabel: null });
+      expect(analysisState(none, NOW)).toEqual({ kind: 'none', label: 'Not requested', detail: 'Apply Scenario starts it.', requestLabel: null });
     }
   });
 

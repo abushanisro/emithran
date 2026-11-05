@@ -3118,7 +3118,7 @@ export class BOMItemsService {
     if (!hasCostModel(family)) {
       return this.unpricedSummary({
         costingInputs, batchSize, family, missingInputs: ['partFamily'],
-        warnings: [`No cost model for part family "${family}": run Refresh Analysis (CAD feature extraction) first.`],
+        warnings: [`No cost model for part family "${family}": press Apply Scenario (it extracts the CAD features first).`],
       });
     }
 
@@ -3126,7 +3126,7 @@ export class BOMItemsService {
     if (item.file3dPath && family !== 'sheet_metal' && !hasMeasuredGeometry(item)) {
       return this.unpricedSummary({
         costingInputs, batchSize, family, missingInputs: ['geometry'],
-        warnings: ['The part has no measured volume or bounding box: run Refresh Analysis (CAD feature extraction) first.'],
+        warnings: ['The part has no measured volume or bounding box: press Apply Scenario (it extracts the CAD features first).'],
       });
     }
 

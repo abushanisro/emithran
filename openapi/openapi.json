@@ -13072,6 +13072,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/analysis-runs": {
+      "post": {
+        "operationId": "BOMItemsController_runAnalysis_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What ran, and the analysis status after it"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Make the item's analysis current: run what analysis-status says is missing (CAD features, drawing, casting analysis) and nothing else",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/analysis-status": {
       "get": {
         "operationId": "BOMItemsController_getAnalysisStatus_v1",

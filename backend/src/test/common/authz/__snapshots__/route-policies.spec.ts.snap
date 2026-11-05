@@ -291,6 +291,7 @@ org:member      POST /api/v1/balloon-diagrams  ProjectReportsController.createBa
 org:member      POST /api/v1/balloon-diagrams/:id/annotations  ProjectReportsController.addAnnotation
 org:member      POST /api/v1/benchmark-sessions  BenchmarkSessionsController.create
 org:member      POST /api/v1/bom-items  BOMItemsController.create
+org:member      POST /api/v1/bom-items/:id/analysis-runs  BOMItemsController.runAnalysis
 org:member      POST /api/v1/bom-items/:id/cad-analyses  BOMItemsController.analyzeBOMItemCAD
 org:member      POST /api/v1/bom-items/:id/calculator-inputs  BOMItemsController.resolveCalculatorInputs
 org:member      POST /api/v1/bom-items/:id/cost-override  BOMItemsController.setCostOverride

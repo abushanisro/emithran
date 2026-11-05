@@ -15,7 +15,7 @@ export type MissingAnalysis = 'cad_features' | 'casting_analysis';
 
 /** What to tell the user to run, for each missing analysis. */
 export const MISSING_ANALYSIS_TEXT: Readonly<Record<MissingAnalysis, string>> = {
-  cad_features: 'run Refresh Analysis to extract the CAD features',
+  cad_features: 'the CAD features must be extracted (Apply Scenario does this)',
   casting_analysis: 'the casting analysis must finish',
 };
 
@@ -53,6 +53,11 @@ export interface AnalysisStatusInput {
   drawingIntelligence?: unknown;
   familyClassification?: string | null;
   manufacturingFamilyOverride?: string | null;
+  /**
+   * The CAD family the user's chosen process is extracted as (scenario_overrides.processGroup -> family hint), or null when that process has no
+   * extractor of its own. When it differs from the family the stored features came from, those features are the wrong ones for the process.
+   */
+  chosenFamilyHint?: string | null;
 }
 
 /**
@@ -76,6 +81,10 @@ export function deriveAnalysisStatus(
     // A featureGraph without a classification (geometry only, or a cache) is not an analysis.
     if (!item.featureGraph?.classification?.family) cad = 'none';
     else cad = (item.featureGraph.feature_graph_version ?? 0) < currentVersion ? 'stale' : 'ready';
+    // The chosen process has its own CAD extractor but the stored features came from another one (Die Casting chosen, machining features stored):
+    // they are not this process's features. This rule used to live in the page; the status is the one place that says whether to analyse.
+    const analysedFamily = item.featureGraph?.classification?.family;
+    if (cad === 'ready' && item.chosenFamilyHint && analysedFamily && item.chosenFamilyHint !== analysedFamily) cad = 'stale';
   }
 
   const needsCasting = hasModel && !!family && castingProcessOfFamily(family) === 'sand_casting';
