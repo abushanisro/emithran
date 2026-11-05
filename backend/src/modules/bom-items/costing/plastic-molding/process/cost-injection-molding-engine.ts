@@ -54,6 +54,9 @@ function r6(n: number): number { return Math.round(n * 1e6) / 1e6; }
 import { injectionMoldabilityGap, type MoldabilityGap } from '../../../../raw-materials/material-moldability';
 export { IM_RUNNER_SCRAP_PCT } from '../shot-size';
 
+/** USD per kg above which a molding resin's price is flagged for verification. */
+const MOLDING_RESIN_PRICE_ALERT_USD_PER_KG = 50;
+
 // ── Removed, uncited constants (2026-09-11) ───────────────────────────────────
 // This block used to hold 16 named-literal time constants (mold setup 60min,
 // material drying 15min, gate trim 5s/10cm², deflash 20s, side-action
@@ -369,17 +372,16 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (isLsr) {
     warnings.push('LSR (thermoset) — Arrhenius cure model used; Menges cooling does NOT apply. Mold temperature 180°C (heated).');
   }
-  // Engineering plastics are $2–40/kg (commodity to engineering resin).
-  // Anything above $50/kg almost certainly indicates a mis-mapped material grade
-  // (e.g. a metal or composite grade resolved as the fallback for a plastic name).
-  // Surface this early so it is impossible to miss in the cost breakdown.
+  // A molding resin above this USD price per kg is usually a mis-resolved grade (a metal or composite grade picked up for a plastic's name), so it is
+  // surfaced where it cannot be missed. Specialty resins (PEEK, PEI) can be genuinely dearer, so the message asks to verify and does not block.
   const usdToLocal = input.usdToLocal ?? 1;
-  if (materialCostPerKg / usdToLocal > 50) {
-    const alertSym = input.currencySymbol ?? '$';
+  const materialUsdPerKg = materialCostPerKg / usdToLocal;
+  if (materialUsdPerKg > MOLDING_RESIN_PRICE_ALERT_USD_PER_KG) {
+    const local = usdToLocal === 1 ? '' : ` (${input.currencySymbol ?? ''}${materialCostPerKg.toFixed(2)}/kg in the quote currency)`;
     warnings.push(
-      `MATERIAL COST ALERT: ${materialGrade ?? 'Unknown'} resolved to ${alertSym}${materialCostPerKg.toFixed(2)}/kg — ` +
-      `engineering plastics are typically $2–40/kg (USD benchmark). ` +
-      `Verify the material grade in the BOM item; the cost breakdown below is unreliable until corrected.`,
+      `MATERIAL COST ALERT: ${materialGrade ?? 'Unknown'} resolved to $${materialUsdPerKg.toFixed(2)}/kg${local}, above the ` +
+      `$${MOLDING_RESIN_PRICE_ALERT_USD_PER_KG}/kg this check expects of a molding resin (most are under $40/kg). ` +
+      `Verify the material grade; the cost breakdown below is unreliable until it is confirmed.`,
     );
   }
   if (sizing.unverifiedReason) warnings.push(sizing.unverifiedReason);
