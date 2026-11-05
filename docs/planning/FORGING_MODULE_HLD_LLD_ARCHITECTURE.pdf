@@ -1,0 +1,1546 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R 20 0 R 22 0 R 24 0 R 26 0 R 28 0 R 30 0 R 32 0 R] /Count 15 >>
+endobj
+3 0 obj
+<<
+  /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+  /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+  /F3 << /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+>>
+endobj
+4 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 5 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+5 0 obj
+<< /Length 7452 >>
+stream
+BT /F2 15 Tf 0.120 0.230 0.540 rg 54.00 738.00 Td (eMithran Forging Costing & CAD Intelligence Architecture) Tj ET
+BT /F1 10.5 Tf 0.300 0.350 0.450 rg 54.00 718.00 Td (High-Level \(HLD\) & Low-Level Design \(LLD\) Specification) Tj ET
+0.120 0.230 0.540 rg 54.00 682.00 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 688.00 Td (Document Attribute) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 310.00 688.00 Td (Specification Details) Tj ET
+1.000 1.000 1.000 rg 54.00 663.50 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 663.50 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 672.00 Td (Version & Status) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 672.00 Td (1.0.0 \(Engineering Architecture Standard\)) Tj ET
+0.970 0.980 0.990 rg 54.00 645.00 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 645.00 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 653.50 Td (Publication Date) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 653.50 Td (November 2026) Tj ET
+1.000 1.000 1.000 rg 54.00 616.00 504.00 29.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 616.00 504.00 29.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 635.00 Td (Target Architecture) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 635.00 Td (eMithran NestJS Monolith + OpenCASCADE cad-engine +) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 625.00 Td (PostgreSQL RLS) Tj ET
+0.970 0.980 0.990 rg 54.00 597.50 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 597.50 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 606.00 Td (Document Owner) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 606.00 Td (eMithran Core Manufacturing Architecture Team) Tj ET
+0.940 0.960 0.990 rg 54.00 563.50 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 563.50 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 570.50 Td (1. Executive Summary & Architectural Scope) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 541.50 Td (This document defines the comprehensive High-Level Design \(HLD\) and Low-Level Design \(LLD\) for the) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 528.00 Td (eMithran Forging Costing and Manufacturing Intelligence Module. Following the architectural paradigms) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 514.50 Td (established in eMithran for Sheet Metal, CNC Machining, High Pressure Die Casting \(HPDC\), Gravity Die) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 501.00 Td (Casting \(GDC\), and Injection Molding, the Forging Module is architected as a Domain-Driven Design) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 487.50 Td (\(DDD\) micromodule embedded within the NestJS monolith backend, coupled with physics-based geometric) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 474.00 Td (feature extraction in the Python OpenCASCADE CAD Engine \(cad-engine\), and backed by PostgreSQL with) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 460.50 Td (Row-Level Security \(RLS\).) Tj ET
+0.940 0.960 1.000 rg 54.00 327.00 504.00 116.00 re f
+1 w 0.750 0.850 0.980 RG 54.00 327.00 504.00 116.00 re S
+0.150 0.380 0.920 rg 54.00 327.00 4.00 116.00 re f
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 429.00 Td (Core Architectural Mandate: 1. Pure Calculation Engines: Cost and physics engines perform) Tj ET
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 416.50 Td (deterministic calculations without in-flight database I/O.) Tj ET
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 404.00 Td (2. Transparent Breakdown: Every line item is decomposed into Material, Machine \(MHR\), Labor \(LHR/Wage) Tj ET
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 391.50 Td (Grade\), Tooling Amortisation, Secondary Operations, and Scrap Recovery.) Tj ET
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 379.00 Td (3. OpenCASCADE CAD Extraction: True B-Rep topological feature extraction directly from STEP) Tj ET
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 366.50 Td (AP203/AP214/AP242 solid models.) Tj ET
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 354.00 Td (4. Dual Tenancy & Zero Data Leakage: All client CAD models and rate tables reside securely with) Tj ET
+BT /F1 8.5 Tf 0.100 0.200 0.450 rg 68.00 341.50 Td (Postgres RLS.) Tj ET
+0.120 0.230 0.540 rg 54.00 297.00 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 303.00 Td (Module Domain) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 184.00 303.00 Td (Component Location) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 310.00 303.00 Td (Primary Technology) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 436.00 303.00 Td (Responsibility Boundary) Tj ET
+1.000 1.000 1.000 rg 54.00 257.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 257.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 287.00 Td (CAD Feature Engine) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 287.00 Td (cad-engine/forging/) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 287.00 Td (Python 3.10 + OpenCASCADE) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 277.00 Td (\(PythonOCC\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 287.00 Td (Parting plane, draft) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 277.00 Td (angles, ribs/webs, radii,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 267.00 Td (undercuts, billet sizing) Tj ET
+0.970 0.980 0.990 rg 54.00 218.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 218.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 247.50 Td (Backend Costing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 247.50 Td (backend/src/modules/bom-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 237.50 Td (items/costing/forging/) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 247.50 Td (NestJS + TypeScript) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 247.50 Td (Routing, machine matching,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 237.50 Td (cycle time synthesis,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 227.50 Td (tooling amortisation) Tj ET
+1.000 1.000 1.000 rg 54.00 178.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 178.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 208.00 Td (Reference & Lookup) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 208.00 Td (machining_reference_data &) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 198.00 Td (forging_lookup_tables) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 208.00 Td (PostgreSQL 15 + PostgREST) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 198.00 Td (RLS) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 208.00 Td (Flow stress curves,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 198.00 Td (friction factors, flash) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 188.00 Td (ratios, complexity tables) Tj ET
+0.970 0.980 0.990 rg 54.00 128.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 128.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 168.50 Td (Machine & Labor DB) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 168.50 Td (mhr_records, lhr_records) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 168.50 Td (PostgreSQL RLS) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 168.50 Td (Press/hammer MHR rates,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 158.50 Td (crew sizes, regional wage) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 148.50 Td (grade buckets) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 138.50 Td (\(USA/IN/MX/EU\)) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 1 of 15) Tj ET
+endstream
+endobj
+6 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 7 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+7 0 obj
+<< /Length 6863 >>
+stream
+1.000 1.000 1.000 rg 54.00 688.00 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 688.00 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 728.00 Td (Frontend Intelligence) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 728.00 Td (components/bom/forging-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 718.00 Td (intel/) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 728.00 Td (Next.js 14 + React +) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 718.00 Td (Three.js) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 728.00 Td (3D Parting line) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 718.00 Td (visualizer, DFM draft) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 708.00 Td (angle heatmaps, cost) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 698.00 Td (drivers breakdown) Tj ET
+0.940 0.960 0.990 rg 54.00 664.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 664.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 671.00 Td (2. High-Level Design \(HLD\): System Architecture & Data Flow) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 642.00 Td (The Forging Module sits seamlessly within eMithran's CAD-to-Cost pipeline. The architecture guarantees) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 628.50 Td (zero side effects, asynchronous processing for large assemblies via Redis/Postgres job queues, and) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 615.00 Td (sub-second calculation latency once geometric parameters are extracted.) Tj ET
+0.060 0.090 0.160 rg 54.00 175.50 504.00 422.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 175.50 504.00 422.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 585.50 Td (flowchart TD) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 575.50 Td (    User\([Enterprise User / Estimator]\) -->|Upload STEP / CAD| FE[Next.js Frontend]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 565.50 Td (    FE -->|POST /api/v1/cad-uploads| Gateway[NestJS Monolith API Gateway]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 555.50 Td (    Gateway -->|Queue Job| PG_Job[\(PostgreSQL Queue / RLS\)]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 545.50 Td (    PG_Job -->|Process STEP| CE[Python CAD Engine FastAPI]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 535.50 Td (    ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 525.50 Td (    subgraph CAD_Engine ["CAD Engine \(OpenCASCADE / cad-engine/forging\)"]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 515.50 Td (        CE --> StepParser[B-Rep TopoDS_Shape Parser]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 505.50 Td (        StepParser --> PartingDetect[Parting Line & Split Plane Detector]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 495.50 Td (        PartingDetect --> Silhouette[Parting Plane Projected Area & Perimeter]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 485.50 Td (        Silhouette --> DraftClassify[Draft Angle & Undercut Classifier]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 475.50 Td (        DraftClassify --> RibWebRadius[Rib, Web & Fillet Radius Analyzer]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 465.50 Td (        RibWebRadius --> BilletCurve[Cross-Sectional Area Distribution A\(x\)]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 455.50 Td (        BilletCurve --> FeatGraph[Build ForgingFeatureGraphV2]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 445.50 Td (    end) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 435.50 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 425.50 Td (    FeatGraph -->|JSON Feature Payload| Gateway) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 415.50 Td (    Gateway --> ForgingService[ForgingCostService / BOMItemsService]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 405.50 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 395.50 Td (    subgraph Forging_Engine ["Backend Forging Cost Engine \(backend/.../costing/forging\)") Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 385.50 Td (        ForgingService --> FeatOps[forging-feature-operations.ts: Select Operations]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 375.50 Td (        ForgingService --> RouteSelect[forging-process-choice.ts: Route Optimization]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 365.50 Td (        ForgingService --> MatResolve[forging-materials.ts: Billet Sizing & Gross Wt]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 355.50 Td (        ForgingService --> MachSelect[forging-machine.ts: Press Tonnage & Energy]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 345.50 Td (        ForgingService --> ToolCost[forging-tooling.ts: Die Block, CNC, EDM & Life]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 335.50 Td (        ForgingService --> CycleTime[forging-calculators: Physics Cycle Times]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 325.50 Td (        ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 315.50 Td (        FeatOps --> CostSynth[forging-cost-summary.ts: Pure Cost Synthesis]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 305.50 Td (        RouteSelect --> CostSynth) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 295.50 Td (        MatResolve --> CostSynth) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 285.50 Td (        MachSelect --> CostSynth) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 275.50 Td (        ToolCost --> CostSynth) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 265.50 Td (        CycleTime --> CostSynth) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 255.50 Td (    end) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 245.50 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 235.50 Td (    CostSynth --> DB[\(PostgreSQL Database\)]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 225.50 Td (    DB -.->|MHR Rates| MachSelect) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 215.50 Td (    DB -.->|LHR Wage Grades| MachSelect) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 205.50 Td (    DB -.->|Flow Stress / Tables| CycleTime) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 195.50 Td (    CostSynth -->|CostSummaryDto & DFM Report| Gateway) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 185.50 Td (    Gateway -->|Interactive 3D & Cost Drivers| FE) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 165.50 Td (The execution model enforces that: \(1\) CAD geometry analysis occurs once and is cached immutably by) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 152.00 Td (geometry hash; \(2\) Scenario analysis \(e.g. changing factory location from USA to India or changing) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 138.50 Td (batch quantity from 500 to 20,000\) re-runs only the pure calculation engine without re-invoking the) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 125.00 Td (CAD kernel.) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 2 of 15) Tj ET
+endstream
+endobj
+8 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 9 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+9 0 obj
+<< /Length 5653 >>
+stream
+0.940 0.960 0.990 rg 54.00 724.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 724.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 731.00 Td (3. CAD Feature Extraction Engine \(cad-engine/forging/\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 702.00 Td (The Python OpenCASCADE feature extraction engine extracts B-Rep solid model characteristics essential) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 688.50 Td (for closed-die, open-die, and upset forging. It mirrors the design pattern of) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 675.00 Td (`DieCastingFeatureExtractor` and `SheetMetalFeatureExtractor`.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 649.50 Td (3.1 Parting Line and Parting Plane Detection) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 633.50 Td (Forging dies consist of an Upper Die \(Hammer/Ram\) and Lower Die \(Anvil/Bed\). The parting surface is) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 620.00 Td (determined by analyzing surface normals relative to candidate pressing vectors \(typically the 3) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 606.50 Td (principal inertia axes X, Y, Z\):) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 593.00 Td (- Surface Normal Classification: For each face F, calculate the dot product of face normal n with pull) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 579.50 Td (vector v. Faces with n · v > 0 belong to the upper die; faces with n · v < 0 belong to the lower die.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 566.00 Td (- Silhouette Perimeter: The locus of points where n · v = 0 forms candidate parting line segments.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 552.50 Td (- Optimal Split Selection: Evaluates draft angle balance, minimizes projected area overhangs, and) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 539.00 Td (avoids trapped undercut volumes.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 513.50 Td (3.2 Projected Area, Perimeter & Flash Gutter Footprint) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 497.50 Td (The required press tonnage is directly proportional to the total projected area on the parting plane:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 484.00 Td (- Part Projected Area \(Ap\): The 2D polygonal shadow of the 3D solid projected onto the parting plane) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 470.50 Td (normal.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 457.00 Td (- Flash Land Area \(Af\): For closed-die forging, excess material escapes into a flash gutter. The flash) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 443.50 Td (land width \(wf\) typically ranges from 3% to 6% of the part width. Af = Lp × wf, where Lp is the) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 430.00 Td (parting line perimeter.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 416.50 Td (- Total Projected Area: Atot = Ap + Af.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 391.00 Td (3.3 Draft Angle & Undercut Analysis) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 375.00 Td (Draft angles are mandatory to extract the forged component from die cavities without galling or die) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 361.50 Td (sticking:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 348.00 Td (- External Draft Angles: Standard steel forgings require 3° to 7° \(aluminum 1° to 3°\).) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 334.50 Td (- Internal Draft Angles \(Cavity / Ribs\): Sinking recesses shrink onto die projections during cooling;) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 321.00 Td (internal draft requires 5° to 10°.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 307.50 Td (- Undercut Detection: Faces where surface normal points away from the pull direction \(re-entrant) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 294.00 Td (angles\) are classified as Undercuts. Undercuts cannot be forged in standard two-piece dies and require) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 280.50 Td (either side-action wedges, split dies, or secondary machining.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 255.00 Td (3.4 Ribs, Webs, and Fillet Radii Detection) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 239.00 Td (Fillet and corner radii dictate metal flow into cavities and prevent premature die cracking from) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 225.50 Td (thermal-mechanical fatigue:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 212.00 Td (- Corner Radius \(rc\): Radius on male die projections. Minimum rc = 1.5 mm to 3.0 mm + 0.05 × cavity) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 198.50 Td (depth.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 185.00 Td (- Fillet Radius \(rf\): Radius at inside cavity corners. Sharp fillets cause cold shuts, flow folding,) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 171.50 Td (and stress concentrations.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 158.00 Td (- Web Thickness \(tw\) and Rib Aspect Ratio: The engine computes the ratio of rib height \(hr\) to rib) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 144.50 Td (width \(wr\). Ratios hr / wr > 4:1 trigger DFM warnings for high forging pressure and die wear.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 119.00 Td (3.5 Cross-Sectional Area Distribution Curve A\(x\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 103.00 Td (To determine preforming requirements \(fullering, edging, roll forging\), the CAD engine slices the) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 3 of 15) Tj ET
+endstream
+endobj
+10 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 11 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+11 0 obj
+<< /Length 9486 >>
+stream
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 738.00 Td (solid along the principal forging axis into N equidistant planes \(typically 50-100 slices\),) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 724.50 Td (calculating cross-sectional area A\(x\). Regions where dA/dx exceeds critical thresholds indicate the) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 711.00 Td (necessity of preforming operations to avoid flash wastage and folding defects.) Tj ET
+0.940 0.960 0.990 rg 54.00 679.50 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 679.50 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 686.50 Td (4. Forging Processes Taxonomy & Process Routing) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 657.50 Td (eMithran classifies forging into 6 distinct manufacturing processes, each characterized by specific) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 644.00 Td (tooling architectures, machine kinematics, and economic batch thresholds:) Tj ET
+0.120 0.230 0.540 rg 54.00 608.50 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 614.50 Td (Process Name) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 158.80 614.50 Td (Key Characteristics) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 259.60 614.50 Td (Typical Batch Size) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 360.40 614.50 Td (Tolerance Class) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 461.20 614.50 Td (Common Applications) Tj ET
+1.000 1.000 1.000 rg 54.00 548.00 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 548.00 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 598.50 Td (Closed-Die) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 588.50 Td (\(Impression\) Hot) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 578.50 Td (Forging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 598.50 Td (Two-piece dies with) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 588.50 Td (flash gutter; heated) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 578.50 Td (billet \(1100°C-1250°C) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 568.50 Td (for steel\); high) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 558.50 Td (strength-to-weight) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 598.50 Td (500 - 100,000+) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 598.50 Td (DIN 7526 Grade F / E) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 598.50 Td (Automotive) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 588.50 Td (crankshafts,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 578.50 Td (connecting rods,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 568.50 Td (steering knuckles,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 558.50 Td (aerospace brackets) Tj ET
+0.970 0.980 0.990 rg 54.00 487.50 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 487.50 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 538.00 Td (Warm Forging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 538.00 Td (Forged between 650°C) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 528.00 Td (- 850°C; reduced) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 518.00 Td (scale oxidation;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 508.00 Td (closer net-shape) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 498.00 Td (tolerances) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 538.00 Td (5,000 - 200,000+) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 538.00 Td (DIN 7526 Grade E) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 538.00 Td (Transmission bevel) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 528.00 Td (gears, CV joint) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 518.00 Td (spiders, constant) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 508.00 Td (velocity components) Tj ET
+1.000 1.000 1.000 rg 54.00 427.00 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 427.00 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 477.50 Td (Cold Forging /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 467.50 Td (Heading) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 477.50 Td (Room temperature;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 467.50 Td (high dimensional) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 457.50 Td (accuracy; work) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 447.50 Td (hardening; requires) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 437.50 Td (phosphate/soap lube) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 477.50 Td (10,000 - 1,000,000+) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 477.50 Td (IT8 - IT10) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 477.50 Td (High-strength) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 467.50 Td (fasteners, spark plug) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 457.50 Td (shells, drive) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 447.50 Td (pinions, stepped) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 437.50 Td (shafts) Tj ET
+0.970 0.980 0.990 rg 54.00 356.00 504.00 71.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 356.00 504.00 71.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 417.00 Td (Open-Die \(Smith /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 407.00 Td (Hammer\) Forging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 417.00 Td (Flat or simple) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 407.00 Td (contour dies; free) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 397.00 Td (lateral metal flow;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 387.00 Td (operator/manipulator) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 377.00 Td (intensive; low) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 367.00 Td (tooling cost) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 417.00 Td (1 - 100) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 417.00 Td (Rough Envelope) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 407.00 Td (\(±5-15mm\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 417.00 Td (Heavy turbine shafts,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 407.00 Td (large marine crane) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 397.00 Td (hooks, generator) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 387.00 Td (rotors, prototype) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 377.00 Td (blanks) Tj ET
+1.000 1.000 1.000 rg 54.00 295.50 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 295.50 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 346.00 Td (Horizontal Upset) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 336.00 Td (Forging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 346.00 Td (Multi-stage heading &) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 336.00 Td (gripping dies; bar) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 326.00 Td (stock heated at end;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 316.00 Td (accumulates volume) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 306.00 Td (locally) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 346.00 Td (1,000 - 100,000+) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 346.00 Td (DIN 7526 Grade F) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 346.00 Td (Engine valves, axle) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 336.00 Td (shafts, flanged) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 326.00 Td (tubes, track pins) Tj ET
+0.970 0.980 0.990 rg 54.00 235.00 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 235.00 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 285.50 Td (Seamless Ring Rolling) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 285.50 Td (Radial-axial rolling) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 275.50 Td (mills; hollow) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 265.50 Td (doughnut preform) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 255.50 Td (rolled into high-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 245.50 Td (integrity ring) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 285.50 Td (50 - 10,000+) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 285.50 Td (ISO 3134 Class 2) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 285.50 Td (Bearing raceways, jet) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 275.50 Td (engine casing rings,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 265.50 Td (wind turbine slewing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 255.50 Td (rings, pipe flanges) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 217.00 Td (4.1 Route Selection Decision Algorithm) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 201.00 Td (The automated route selector \(`forging-process-choice.ts`\) compares feasible routes based on total) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 187.50 Td (cost per part \(piece cost + die tooling per part amortization\). Feasibility is evaluated against: \(1\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 174.00 Td (Part envelope and bounding weight; \(2\) Annual production volume; \(3\) Geometric complexity score; \(4\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 160.50 Td (Alloy forgeability rating.) Tj ET
+0.940 0.960 0.990 rg 54.00 129.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 129.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 136.00 Td (5. Lookup Tables & Empirical Engineering Reference Data) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 107.00 Td (The Forging Module integrates reference tables seeded into `machining_reference_data` and queried) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 4 of 15) Tj ET
+endstream
+endobj
+12 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 13 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+13 0 obj
+<< /Length 8849 >>
+stream
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 738.00 Td (through `forging-lookup-tables.ts`. These tables capture empirical manufacturing constants proven) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 724.50 Td (across industry standards \(DIN 7526, EN 10254, ASM Handbook Vol 14A\).) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 699.00 Td (5.1 Material Flow Stress Constants \(?f\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 683.00 Td (Flow stress ?f \(MPa\) represents resistance to plastic deformation as a function of temperature T \(°C\),) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 669.50 Td (strain ?, and strain rate ?_dot \(s?¹\):) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 656.00 Td (?f = K · \(?_dot\)^m · exp\(Q / RT\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 642.50 Td (Where K is strength coefficient, m is strain-rate sensitivity, and Q is activation energy.) Tj ET
+0.120 0.230 0.540 rg 54.00 607.00 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 613.00 Td (Material Grade) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 158.80 613.00 Td (Forging Temp Window \(°C\)) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 259.60 613.00 Td (Flow Stress ?f \(MPa\)) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 360.40 613.00 Td (Oxidation Scale Factor \(% ) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 461.20 613.00 Td (Forgeability Index \(0-10\)) Tj ET
+1.000 1.000 1.000 rg 54.00 588.50 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 588.50 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 597.00 Td (AISI 1020 / C20) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 597.00 Td (1150 - 1250) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 597.00 Td (80 - 120) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 597.00 Td (2.0%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 597.00 Td (9.5 \(Excellent\)) Tj ET
+0.970 0.980 0.990 rg 54.00 570.00 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 570.00 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 578.50 Td (AISI 1045 / C45) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 578.50 Td (1100 - 1220) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 578.50 Td (110 - 150) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 578.50 Td (2.2%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 578.50 Td (9.0 \(Very Good\)) Tj ET
+1.000 1.000 1.000 rg 54.00 551.50 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 551.50 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 560.00 Td (AISI 4140 / 42CrMo4) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 560.00 Td (1050 - 1200) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 560.00 Td (140 - 190) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 560.00 Td (2.5%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 560.00 Td (8.0 \(Good\)) Tj ET
+0.970 0.980 0.990 rg 54.00 533.00 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 533.00 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 541.50 Td (AISI 4340 / 34CrNiMo6) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 541.50 Td (1050 - 1180) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 541.50 Td (160 - 220) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 541.50 Td (2.5%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 541.50 Td (7.5 \(Moderate\)) Tj ET
+1.000 1.000 1.000 rg 54.00 504.00 504.00 29.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 504.00 504.00 29.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 523.00 Td (SS 304 / 1.4301) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 523.00 Td (1050 - 1200) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 523.00 Td (190 - 260) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 523.00 Td (1.0% \(Protective) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 513.00 Td (scale\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 523.00 Td (6.5 \(Work hardens\)) Tj ET
+0.970 0.980 0.990 rg 54.00 475.00 504.00 29.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 475.00 504.00 29.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 494.00 Td (SS 316L / 1.4404) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 494.00 Td (1050 - 1180) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 494.00 Td (210 - 280) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 494.00 Td (1.0%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 494.00 Td (6.0 \(High hot) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 484.00 Td (strength\)) Tj ET
+1.000 1.000 1.000 rg 54.00 446.00 504.00 29.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 446.00 504.00 29.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 465.00 Td (Al 6061-T6) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 465.00 Td (430 - 480) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 465.00 Td (60 - 90) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 465.00 Td (0.0% \(Zero scale) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 455.00 Td (loss\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 465.00 Td (8.5 \(Narrow temp) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 455.00 Td (band\)) Tj ET
+0.970 0.980 0.990 rg 54.00 427.50 504.00 18.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 427.50 504.00 18.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 436.00 Td (Al 7075-T6) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 436.00 Td (380 - 440) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 436.00 Td (90 - 130) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 436.00 Td (0.0%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 436.00 Td (6.0 \(Crack sensitive\)) Tj ET
+1.000 1.000 1.000 rg 54.00 398.50 504.00 29.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 398.50 504.00 29.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 417.50 Td (Ti-6Al-4V \(Grade 5\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 417.50 Td (900 - 980 \(Alpha-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 407.50 Td (Beta\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 417.50 Td (240 - 350) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 417.50 Td (0.5% \(Alpha case) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 407.50 Td (defect\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 417.50 Td (4.0 \(Narrow beta) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 407.50 Td (transus\)) Tj ET
+0.970 0.980 0.990 rg 54.00 369.50 504.00 29.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 369.50 504.00 29.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 388.50 Td (Inconel 718) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 388.50 Td (980 - 1120) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 388.50 Td (320 - 480) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 388.50 Td (0.2%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 388.50 Td (2.5 \(Severe tool) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 378.50 Td (wear\)) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 351.50 Td (5.2 Shape Complexity Factor \(Cs / S1, S2\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 335.50 Td (According to DIN 7526, part complexity is classified by the ratio of part volume \(Vp\) to bounding) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 322.00 Td (circumscribed cylinder volume \(Vc\):) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 308.50 Td (- Class S1 \(Simple\): Vp / Vc > 0.6. Flat, circular, or block shapes with minimal ribs \(Cs = 1.1 -) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 295.00 Td (1.3\).) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 281.50 Td (- Class S2 \(Moderate\): 0.3 < Vp / Vc ? 0.6. Simple flanges, shafts, discs with moderate bosses \(Cs =) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 268.00 Td (1.3 - 1.6\).) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 254.50 Td (- Class S3 \(Complex\): 0.15 < Vp / Vc ? 0.3. Deep ribs, thin webs, asymmetrical arms \(Cs = 1.6 - 2.0\).) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 241.00 Td (- Class S4 \(Severe / Very Complex\): Vp / Vc ? 0.15. Multiple thin ribs, deep pockets, tall bosses \(Cs) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 227.50 Td (= 2.0 - 2.5\).) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 202.00 Td (5.3 Flash Land Sizing and Ratios) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 186.00 Td (The flash land width-to-thickness ratio \(wf / tf\) controls cavity backpressure ensuring complete) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 172.50 Td (filling before flash freezes:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 159.00 Td (- Flash thickness tf = 0.016 × sqrt\(Ap\) + 0.5 mm.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 145.50 Td (- Flash land width wf = 3.0 × tf to 5.0 × tf.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 132.00 Td (- Flash weight typically constitutes 10% to 25% of gross billet weight.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 106.50 Td (5.4 Die Wear & Tool Life Expectancy) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 5 of 15) Tj ET
+endstream
+endobj
+14 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 15 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+15 0 obj
+<< /Length 9043 >>
+stream
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 738.00 Td (Die life \(blow count before redressing or replacement\) depends on die steel grade \(DIN 1.2714 / AISI) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 724.50 Td (H13 / H11\), forging temperature, and surface treatment:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 711.00 Td (- Uncoated H13 on Carbon Steel: 8,000 - 15,000 parts.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 697.50 Td (- Gas Nitrided / Plasma Nitrided H13: 20,000 - 35,000 parts.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 684.00 Td (- Hardfaced Stellite / Maraging Inlay: 40,000 - 70,000 parts.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 670.50 Td (- Stainless Steel Forging: 0.6× steel die life; Titanium Forging: 0.4× steel die life.) Tj ET
+0.940 0.960 0.990 rg 54.00 639.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 639.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 646.00 Td (6. Machine Database & Selection Engine \(MHR & Press Kinematics\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 617.00 Td (Forging machinery is stored in `mhr_records` and queried through `forging-machine.ts`. Presses and) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 603.50 Td (hammers differ fundamentally in their energy and force delivery characteristics:) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 578.00 Td (6.1 Machine Classes & Kinematics) Tj ET
+0.120 0.230 0.540 rg 54.00 544.00 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 550.00 Td (Machine Class) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 184.00 550.00 Td (Force / Energy Delivery) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 310.00 550.00 Td (Kinematics & Contact Time) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 436.00 550.00 Td (Primary Application) Tj ET
+1.000 1.000 1.000 rg 54.00 504.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 504.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 534.00 Td (Hydraulic Forging Press) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 534.00 Td (Constant rated force) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 524.00 Td (throughout stroke; 500T -) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 514.00 Td (30,000T) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 534.00 Td (Slow ram speed \(10-50) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 524.00 Td (mm/s\); long die contact;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 514.00 Td (high heat transfer) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 534.00 Td (Large forgings, isothermal) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 524.00 Td (forging, heavy open-die,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 514.00 Td (titanium & nickel) Tj ET
+0.970 0.980 0.990 rg 54.00 454.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 454.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 494.50 Td (Mechanical Crank Press) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 494.50 Td (Displacement-dependent) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 484.50 Td (force \(peaks near Bottom) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 474.50 Td (Dead Center\); 300T -) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 464.50 Td (8,000T) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 494.50 Td (Rapid sinusoidal motion) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 484.50 Td (\(30-90 SPM\); short contact) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 474.50 Td (time; high productivity) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 494.50 Td (High-volume closed die) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 484.50 Td (automotive, connecting) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 474.50 Td (rods, gears) Tj ET
+1.000 1.000 1.000 rg 54.00 415.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 415.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 444.50 Td (Screw Press \(Direct Drive) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 434.50 Td (/ Friction\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 444.50 Td (Fixed kinetic energy per) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 434.50 Td (blow; 400T - 6,300T; self-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 424.50 Td (limiting load) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 444.50 Td (Intermediate speed) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 434.50 Td (\(100-300 mm/s\); bounce-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 424.50 Td (back stroke; high accuracy) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 444.50 Td (Turbine blades, precision) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 434.50 Td (bevel gears, hand tools) Tj ET
+0.970 0.980 0.990 rg 54.00 365.00 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 365.00 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 405.00 Td (Drop Hammer \(Air / Steam /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 395.00 Td (Counterblow\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 405.00 Td (High kinetic energy E =) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 395.00 Td (0.5·m·v²; strain rates up) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 385.00 Td (to 100 s?¹; 10 kJ - 500 kJ) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 405.00 Td (Impact duration < 10 ms;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 395.00 Td (minimal die chilling;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 385.00 Td (multi-blow progressive) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 375.00 Td (shaping) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 405.00 Td (Medium to heavy steel) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 395.00 Td (forgings, complex shapes) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 385.00 Td (with multi-impression dies) Tj ET
+1.000 1.000 1.000 rg 54.00 325.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 325.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 355.00 Td (Horizontal Upsetter) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 355.00 Td (Horizontal heading slide +) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 345.00 Td (vertical gripping slide;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 335.00 Td (2" to 10" bar capacity) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 355.00 Td (Multi-cavity sequence;) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 345.00 Td (automatic bar feed) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 355.00 Td (Long shafts with upsets,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 345.00 Td (valves, flanged axles) Tj ET
+0.970 0.980 0.990 rg 54.00 286.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 286.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 315.50 Td (Radial-Axial Ring Rolling) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 305.50 Td (Mill) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 315.50 Td (Continuous radial and) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 305.50 Td (axial rolling forces; OD) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 295.50 Td (200 mm - 5000 mm) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 315.50 Td (Continuous rotary) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 305.50 Td (deformation; fast cycle) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 295.50 Td (time \(20-90 s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 315.50 Td (Seamless rings, bearing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 305.50 Td (races, aerospace flanges) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 268.00 Td (6.2 Physics-Based Tonnage & Energy Formulation) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 252.00 Td (The required press forging load F_req \(kN\) is determined via the slab method formulation:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 238.50 Td (F_req = ?f · Cs · Atot · [1 + \(2 · ? · r_avg\) / \(3 · h_avg\)] / 1000) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 225.00 Td (Where:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 211.50 Td (- ?f = Flow stress of alloy at forging finish temperature \(MPa\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 198.00 Td (- Cs = Shape complexity factor \(1.1 to 2.5\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 184.50 Td (- Atot = Total projected area including flash land \(mm²\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 171.00 Td (- ? = Friction coefficient at die-billet interface \(0.25 cold, 0.40 hot with graphite\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 157.50 Td (- r_avg = Characteristic radius of forging = sqrt\(Ap / ?\) \(mm\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 144.00 Td (- h_avg = Mean thickness of forging = Volume / Ap \(mm\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 123.75 Td (For hammers and screw presses, required blow energy E_req \(kJ\) is calculated as:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 110.25 Td (E_req = 1.35 · Vp · ?f · ln\(h0 / h1\) / 1000) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 6 of 15) Tj ET
+endstream
+endobj
+16 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 17 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+17 0 obj
+<< /Length 5923 >>
+stream
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 738.00 Td (Where h0 is initial billet height and h1 is final forged height.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 712.50 Td (6.3 Machine Hour Rate \(MHR\) Breakdown Model) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 696.50 Td (MHR represents the hourly cost of operating the machine \(excluding direct operating labor crew, which) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 683.00 Td (is costed separately via LHR\). The formula enforces financial rigor:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 669.50 Td (MHR \($/hr\) = CapEx_Depreciation + Electricity_Cost + Gas_Furnace_Cost + Die_Bolster_Floor_Space +) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 656.00 Td (Maintenance_Spares + Lubrication_Pumping) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 642.50 Td (Where:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 629.00 Td (- CapEx Depreciation = \(Machine Purchase Price - Residual Value\) / \(Useful Life Years × Annual) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 615.50 Td (Operating Hours × OEE\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 602.00 Td (- Electricity Cost = Connected Power \(kW\) × Utilization Factor × Industrial Power Rate \($/kWh\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 588.50 Td (- Maintenance & Wear = 8% to 12% of annual capital expenditure.) Tj ET
+0.940 0.960 0.990 rg 54.00 557.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 557.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 564.00 Td (7. Raw Materials, Billet Sizing & Yield Economics) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 535.00 Td (Material cost represents 35% to 60% of total forging piece cost. The raw material engine computes) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 521.50 Td (exact billet dimensions, gross input weight, and net weight from 3D CAD density.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 496.00 Td (7.1 Gross Weight Synthesis Formula) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 480.00 Td (Gross Billet Weight \(W_gross\) is synthesized from net part weight and all manufacturing yield losses:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 466.50 Td (W_gross = W_net + W_flash + W_scale + W_tong + W_kerf) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 453.00 Td (1. Net Part Weight \(W_net\): Volume \(Vp from CAD\) × Density \(? from `raw_materials`\).) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 439.50 Td (2. Flash Loss \(W_flash\): Total flash land volume × Density. Typically 12% - 25% of W_net.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 426.00 Td (3. Scale Oxidation Loss \(W_scale\): Hot steel forms iron oxide scale in gas furnaces \(2.0% - 3.0% of) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 412.50 Td (heated weight\). In induction furnaces with inert atmosphere, scale loss drops to 0.5% - 1.0%.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 399.00 Td (4. Tong Hold Loss \(W_tong\): Gripping margin on billet bar \(required in open-die and hammer forgings;) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 385.50 Td (zero in automated transfer presses\).) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 372.00 Td (5. Saw Kerf Loss \(W_kerf\): Material converted to chips during billet cutoff = \(?/4 · D² ·) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 358.50 Td (saw_blade_thickness\) × ?.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 333.00 Td (7.2 Scrap Recovery & Buyback Valuation) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 317.00 Td (Scrap generated from trimming flash and saw kerf is credited back at commodity scrap buyback rates:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 303.50 Td (Net Material Cost = \(W_gross × Raw_Material_Cost_Per_Kg\) - \(W_scrap × Scrap_Credit_Rate_Per_Kg\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 290.00 Td (Where W_scrap = W_flash + W_kerf + W_tong \(scale loss cannot be credited as solid scrap\).) Tj ET
+0.940 0.960 0.990 rg 54.00 258.50 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 258.50 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 265.50 Td (8. Wage Grade & Labor Rate Architecture \(LHR\)) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 236.50 Td (Forging is a crew-based manufacturing operation. Unlike solitary CNC machining, a heavy forging press) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 223.00 Td (line operates with a synchronized crew consisting of distinct skill tiers.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 197.50 Td (8.1 Forging Crew Hierarchy & Wage Grade Categories) Tj ET
+0.120 0.230 0.540 rg 54.00 163.50 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 169.50 Td (Wage Grade / Role) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 184.00 169.50 Td (Skill Category) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 310.00 169.50 Td (Key Operational Responsibi) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 436.00 169.50 Td (Typical Line Allocation) Tj ET
+1.000 1.000 1.000 rg 54.00 113.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 113.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 153.50 Td (Master Forger / Head Press) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 143.50 Td (Lead) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 153.50 Td (Grade A+ \(Specialist\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 153.50 Td (Press setup, die) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 143.50 Td (alignment, stroke tuning,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 133.50 Td (first-piece inspection,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 123.50 Td (closed-die balance) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 153.50 Td (1 per forging line \(leads) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 143.50 Td (crew\)) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 7 of 15) Tj ET
+endstream
+endobj
+18 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 19 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+19 0 obj
+<< /Length 7500 >>
+stream
+0.970 0.980 0.990 rg 54.00 698.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 698.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 728.00 Td (Press Operator) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 728.00 Td (Grade A \(Skilled\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 728.00 Td (Operating press controls,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 718.00 Td (lubricating dies with) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 708.00 Td (spray wand/auto-sprayer) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 728.00 Td (1 per press) Tj ET
+1.000 1.000 1.000 rg 54.00 659.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 659.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 688.50 Td (Manipulator / Crane Driver) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 688.50 Td (Grade A \(Skilled\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 688.50 Td (Guiding heavy billets with) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 678.50 Td (hydraulic manipulator into) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 668.50 Td (hammer/press dies) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 688.50 Td (1 for open-die & heavy) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 678.50 Td (presses \(>2500T\)) Tj ET
+0.970 0.980 0.990 rg 54.00 598.50 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 598.50 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 649.00 Td (Billet Heater / Furnace) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 639.00 Td (Loader) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 649.00 Td (Grade B \(Semi-Skilled\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 649.00 Td (Monitoring induction) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 639.00 Td (heater / gas furnace) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 629.00 Td (temperature, pyrometer) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 619.00 Td (verification, descaling) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 609.00 Td (transfer) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 649.00 Td (1 per line) Tj ET
+1.000 1.000 1.000 rg 54.00 559.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 559.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 588.50 Td (Trimming & Piercing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 578.50 Td (Operator) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 588.50 Td (Grade B \(Semi-Skilled\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 588.50 Td (Transferring hot forging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 578.50 Td (to trim press, punching) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 568.50 Td (out flash and web plugs) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 588.50 Td (1 per trim press) Tj ET
+0.970 0.980 0.990 rg 54.00 509.00 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 509.00 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 549.00 Td (Heat Treatment Technician) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 549.00 Td (Grade A \(Skilled\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 549.00 Td (Furnace cycle management,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 539.00 Td (quench tank agitation,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 529.00 Td (hardness testing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 519.00 Td (\(Brinell/Rockwell\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 549.00 Td (Shared across heat treat) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 539.00 Td (department \(0.25 FTE/part\)) Tj ET
+1.000 1.000 1.000 rg 54.00 459.00 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 459.00 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 499.00 Td (Fettling / Grinding /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 489.00 Td (Blasting Labor) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 499.00 Td (Grade C \(General\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 499.00 Td (Operating shot blast) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 489.00 Td (tumbler, manual grinding) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 479.00 Td (of trim remnants / parting) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 469.00 Td (fins) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 499.00 Td (1 per finishing station) Tj ET
+0.970 0.980 0.990 rg 54.00 398.50 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 398.50 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 449.00 Td (NDT & Quality Inspector) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 449.00 Td (Grade A+ \(Certified Level) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 439.00 Td (II\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 449.00 Td (Magnetic Particle) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 439.00 Td (Inspection \(MPI\),) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 429.00 Td (Ultrasonic flaw testing,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 419.00 Td (CMM dimensional) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 409.00 Td (verification) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 449.00 Td (1 per quality batch cell) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 380.50 Td (8.2 Digital Factory Regional Wage Benchmarks) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 364.50 Td (eMithran benchmarks Labor Hour Rates \(LHR\) across its 6 global manufacturing regions \(stored in) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 351.00 Td (`lhr_records` and updated quarterly\). Forging operations scale labor costs based on regional crewed) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 337.50 Td (rates:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 324.00 Td (- United States \(Midwest\): Grade A+ = $65/hr | Grade A = $48/hr | Grade B = $34/hr | Grade C = $26/hr) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 310.50 Td (- Mexico \(Monterrey / Bajio\): Grade A+ = $16/hr | Grade A = $11/hr | Grade B = $7.50/hr | Grade C =) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 297.00 Td ($5.20/hr) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 283.50 Td (- India \(Pune / Chennai\): Grade A+ = $9.50/hr | Grade A = $6.20/hr | Grade B = $4.10/hr | Grade C =) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 270.00 Td ($2.80/hr) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 256.50 Td (- Poland / CEE: Grade A+ = $28/hr | Grade A = $20/hr | Grade B = $14/hr | Grade C = $10.50/hr) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 243.00 Td (- Germany \(Baden-Württemberg\): Grade A+ = $82/hr | Grade A = $62/hr | Grade B = $45/hr | Grade C =) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 229.50 Td ($34/hr) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 216.00 Td (- Vietnam \(Hai Phong\): Grade A+ = $8.00/hr | Grade A = $5.20/hr | Grade B = $3.50/hr | Grade C =) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 202.50 Td ($2.40/hr) Tj ET
+0.940 0.960 0.990 rg 54.00 171.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 171.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 178.00 Td (9. Operations Taxonomy & Standard Routing Workflow) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 149.00 Td (Forging operations are registered in `process_taxonomy_operations`. A complete standard manufacturing) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 135.50 Td (route consists of 13 sequential operations \(OP 10 to OP 130\):) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 8 of 15) Tj ET
+endstream
+endobj
+20 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 21 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+21 0 obj
+<< /Length 12703 >>
+stream
+0.120 0.230 0.540 rg 54.00 720.00 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 726.00 Td (Op Nbr) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 158.80 726.00 Td (Operation Name) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 259.60 726.00 Td (Machine Class) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 360.40 726.00 Td (Cycle Time Formulation) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 461.20 726.00 Td (Labor Crew Allocation) Tj ET
+1.000 1.000 1.000 rg 54.00 680.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 680.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 710.00 Td (OP 10) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 710.00 Td (Billet Cutoff) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 710.00 Td (Automatic Bandsaw /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 700.00 Td (Cold Billet Shear) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 710.00 Td (T_cut = Area_bar /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 700.00 Td (Cut_rate \(mm²/min\) +) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 690.00 Td (5s index) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 710.00 Td (1 Operator per 3 saws) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 700.00 Td (\(0.33 FTE\)) Tj ET
+0.970 0.980 0.990 rg 54.00 630.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 630.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 670.50 Td (OP 20) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 670.50 Td (Billet Preheating) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 670.50 Td (Medium-Frequency) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 660.50 Td (Induction Furnace /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 650.50 Td (Gas Furnace) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 670.50 Td (T_heat = Continuous) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 660.50 Td (feed; cycle matched) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 650.50 Td (to press stroke \(e.g.) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 640.50 Td (15-45s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 670.50 Td (1 Furnace Loader) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 660.50 Td (\(Grade B\)) Tj ET
+1.000 1.000 1.000 rg 54.00 591.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 591.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 620.50 Td (OP 30) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 620.50 Td (Billet Descaling) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 620.50 Td (High-Pressure) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 610.50 Td (Waterjet \(200-300) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 600.50 Td (bar\) / Scraping Rolls) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 620.50 Td (T_desc = 2.0 to 4.0) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 610.50 Td (seconds per slug) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 620.50 Td (Automated / In-line) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 610.50 Td (conveyor) Tj ET
+0.970 0.980 0.990 rg 54.00 551.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 551.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 581.00 Td (OP 40) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 581.00 Td (Preforming / Busting) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 581.00 Td (Fullering / Edging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 571.00 Td (Die Cavity or Cross-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 561.00 Td (Wedge Rolls) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 581.00 Td (T_preform = 1 to 2) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 571.00 Td (blows / strokes) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 561.00 Td (\(4-8s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 581.00 Td (Included in main) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 571.00 Td (forge press crew) Tj ET
+1.000 1.000 1.000 rg 54.00 512.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 512.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 541.50 Td (OP 50) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 541.50 Td (Blocker Impression) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 531.50 Td (Forging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 541.50 Td (Forging Press /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 531.50 Td (Hammer \(Blocker) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 521.50 Td (Cavity\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 541.50 Td (T_block = 1 stroke) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 531.50 Td (\(press\) or 2-3 blows) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 521.50 Td (\(hammer\) \(6-12s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 541.50 Td (Main Forge Press Crew) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 531.50 Td (\(Lead + Operator\)) Tj ET
+0.970 0.980 0.990 rg 54.00 472.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 472.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 502.00 Td (OP 60) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 502.00 Td (Finisher Impression) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 492.00 Td (Forging) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 502.00 Td (Forging Press /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 492.00 Td (Hammer \(Finisher) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 482.00 Td (Cavity\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 502.00 Td (T_finish = 1 stroke) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 492.00 Td (or 2 blows + die) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 482.00 Td (blow/lube \(8-16s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 502.00 Td (Main Forge Press Crew) Tj ET
+1.000 1.000 1.000 rg 54.00 433.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 433.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 462.50 Td (OP 70) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 462.50 Td (Hot Trimming &) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 452.50 Td (Piercing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 462.50 Td (Mechanical Crank Trim) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 452.50 Td (Press \(100T - 600T\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 462.50 Td (T_trim = 1 single) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 452.50 Td (stroke + unload flash) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 442.50 Td (\(4-8s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 462.50 Td (1 Trimming Operator) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 452.50 Td (\(Grade B\)) Tj ET
+0.970 0.980 0.990 rg 54.00 393.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 393.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 423.00 Td (OP 80) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 423.00 Td (Coining / Sizing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 413.00 Td (\(Restriking\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 423.00 Td (Heavy Knuckle-Joint) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 413.00 Td (Coining Press) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 423.00 Td (T_coin = 1 stroke) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 413.00 Td (\(optional, for tight) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 403.00 Td (tolerances\) \(5-8s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 423.00 Td (1 Coining Press) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 413.00 Td (Operator \(Grade B\)) Tj ET
+1.000 1.000 1.000 rg 54.00 354.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 354.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 383.50 Td (OP 90) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 383.50 Td (Heat Treatment) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 383.50 Td (Continuous Roller) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 373.50 Td (Hearth / Batch Car-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 363.50 Td (Bottom Furnace) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 383.50 Td (T_ht = Batch cycle) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 373.50 Td (\(Normalizing, Q&T,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 363.50 Td (Isothermal Anneal\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 383.50 Td (Shared Furnace) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 373.50 Td (Specialist \(0.2 FTE\)) Tj ET
+0.970 0.980 0.990 rg 54.00 314.50 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 314.50 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 344.00 Td (OP 100) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 344.00 Td (Surface Descaling &) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 334.00 Td (Shot Blast) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 344.00 Td (Rotary Barrel /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 334.00 Td (Monorail Hanger Shot) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 324.00 Td (Blaster) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 344.00 Td (T_blast = Batch cycle) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 334.00 Td (\(8-15 min per basket) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 324.00 Td (/ 50 parts\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 344.00 Td (1 Finishing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 334.00 Td (Technician \(Grade C\)) Tj ET
+1.000 1.000 1.000 rg 54.00 264.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 264.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 304.50 Td (OP 110) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 304.50 Td (Secondary Machining) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 304.50 Td (CNC Horizontal /) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 294.50 Td (Vertical Machining) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 284.50 Td (Center) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 304.50 Td (Calculated via) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 294.50 Td (Machining Module) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 284.50 Td (\(milling, drilling,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 274.50 Td (tapping\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 304.50 Td (1 CNC Machinist per 2) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 294.50 Td (machines \(0.5 FTE\)) Tj ET
+0.970 0.980 0.990 rg 54.00 214.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 214.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 254.50 Td (OP 120) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 254.50 Td (Inspection & NDT) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 254.50 Td (Magnetic Particle) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 244.50 Td (\(MPI\) / Ultrasonic) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 234.50 Td (\(UT\) / CMM) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 254.50 Td (T_insp = Statistical) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 244.50 Td (sampling \(AQL\) or) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 234.50 Td (100% safety critical) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 224.50 Td (\(30-120s\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 254.50 Td (1 Certified Inspector) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 244.50 Td (Level II \(Grade A+\)) Tj ET
+1.000 1.000 1.000 rg 54.00 164.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 164.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 204.50 Td (OP 130) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 204.50 Td (Tooling & Die) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 194.50 Td (Amortisation) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 204.50 Td (Die Maintenance Shop) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 194.50 Td (/ CNC Sinker EDM) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 204.50 Td (Amortised =) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 194.50 Td (Total_Die_Set_Cost / ) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 184.50 Td (Total_Production_Volu) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 174.50 Td (me) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 204.50 Td (Die Shop Amortised) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 194.50 Td (Capital) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 146.50 Td (9.1 Die Tooling Cost Model) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 130.50 Td (Forging die tooling represents a substantial non-recurring engineering \(NRE\) investment. Total die) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 117.00 Td (cost comprises:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 103.50 Td (Die_Cost = Die_Steel_Material + CNC_Rough_Machining + CNC_Finish_Machining + EDM_Die_Sinking +) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 9 of 15) Tj ET
+endstream
+endobj
+22 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 23 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+23 0 obj
+<< /Length 5632 >>
+stream
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 738.00 Td (Heat_Treatment_Die + Die_Polishing + Bolster_Mounting) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 724.50 Td (Where:) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 711.00 Td (- Die Block Material = Volume of Upper + Lower Die Blocks × Density × Steel Cost/kg \(DIN 1.2714 / AISI) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 697.50 Td (H13\).) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 684.00 Td (- Die cavity volume is sized to ensure 3× to 5× part depth thickness to resist bursting pressures.) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 670.50 Td (- Per-piece tooling cost = Die_Cost / N_pieces_total \(or amortised per batch if replaced\).) Tj ET
+0.940 0.960 0.990 rg 54.00 639.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 639.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 646.00 Td (10. Low-Level Design \(LLD\): Code Modules, Interfaces & SQL Schemas) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 617.00 Td (This section specifies the exact TypeScript interfaces, Python classes, and PostgreSQL schema) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 603.50 Td (definitions required to implement the Forging Module across the repository.) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 578.00 Td (10.1 Backend TypeScript Architecture \(backend/src/modules/bom-items/costing/forging/\)) Tj ET
+0.060 0.090 0.160 rg 54.00 90.00 504.00 472.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 90.00 504.00 472.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 550.00 Td (// backend/src/modules/bom-items/costing/forging/forging-types.ts) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 540.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 530.00 Td (export type ForgingProcessType =) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 520.00 Td (  | 'CLOSED_DIE_HOT') Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 510.00 Td (  | 'WARM_FORGING') Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 500.00 Td (  | 'COLD_HEADING') Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 490.00 Td (  | 'OPEN_DIE_HAMMER') Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 480.00 Td (  | 'UPSET_FORGING') Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 470.00 Td (  | 'SEAMLESS_RING_ROLLING';) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 460.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 450.00 Td (export interface ForgingGeometryInput {) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 440.00 Td (  netVolumeMm3: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 430.00 Td (  projectedAreaMm2: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 420.00 Td (  partingPerimeterMm: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 410.00 Td (  partingPlaneNormal: [number, number, number];) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 400.00 Td (  boundingBoxDimsMm: [number, number, number];) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 390.00 Td (  maxRibHeightMm: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 380.00 Td (  minWebThicknessMm: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 370.00 Td (  minFilletRadiusMm: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 360.00 Td (  minCornerRadiusMm: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 350.00 Td (  undercutVolumeMm3: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 340.00 Td (  hasTrappedUndercuts: boolean;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 330.00 Td (  crossSectionAreaCurve: Array<{ positionMm: number; areaMm2: number }>;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 320.00 Td (}) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 310.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 300.00 Td (export interface ForgingMaterialSpecs {) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 290.00 Td (  grade: string;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 280.00 Td (  family: string;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 270.00 Td (  densityKgM3: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 260.00 Td (  forgingTempStartC: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 250.00 Td (  forgingTempFinishC: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 240.00 Td (  flowStressMpa: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 230.00 Td (  scaleLossPct: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 220.00 Td (  costPerKg: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 210.00 Td (  scrapCreditPerKg: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 200.00 Td (}) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 190.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 180.00 Td (export interface ForgingMachineSpec {) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 170.00 Td (  machineId: string;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 160.00 Td (  name: string;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 150.00 Td (  machineClass: 'HYDRAULIC_PRESS' | 'MECHANICAL_PRESS' | 'SCREW_PRESS' | 'DROP_HAMMER' |) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 140.00 Td (  ratedTonnageKn: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 130.00 Td (  energyCapacityKj?: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 120.00 Td (  bedWidthMm: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 110.00 Td (  bedDepthMm: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 100.00 Td (  maxStrokeMm: number;) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 10 of 15) Tj ET
+endstream
+endobj
+24 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 25 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+25 0 obj
+<< /Length 5715 >>
+stream
+0.060 0.090 0.160 rg 54.00 296.00 504.00 442.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 296.00 504.00 442.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 726.00 Td (  strokesPerMinute: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 716.00 Td (  machineRatePerHr: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 706.00 Td (  requiredCrewSize: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 696.00 Td (  crewWageGradeDistribution: Record<string, number>; // e.g. { 'GRADE_A_PLUS': 1, 'GRADE) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 686.00 Td (}) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 676.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 666.00 Td (export interface ForgingCostSummaryDto {) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 656.00 Td (  partId: string;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 646.00 Td (  process: ForgingProcessType;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 636.00 Td (  batchSize: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 626.00 Td (  annualVolume: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 616.00 Td (  ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 606.00 Td (  // Weights \(kg\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 596.00 Td (  netWeightKg: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 586.00 Td (  flashWeightKg: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 576.00 Td (  scaleLossKg: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 566.00 Td (  grossBilletWeightKg: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 556.00 Td (  materialYieldPct: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 546.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 536.00 Td (  // Cost Breakdown \($\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 526.00 Td (  rawMaterialCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 516.00 Td (  scrapCredit: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 506.00 Td (  netMaterialCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 496.00 Td (  ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 486.00 Td (  forgingMachineCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 476.00 Td (  forgingLaborCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 466.00 Td (  heatingCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 456.00 Td (  trimmingCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 446.00 Td (  heatTreatmentCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 436.00 Td (  shotBlastingCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 426.00 Td (  secondaryMachiningCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 416.00 Td (  inspectionNdtCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 406.00 Td (  ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 396.00 Td (  totalProcessCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 386.00 Td (  dieToolingSetCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 376.00 Td (  dieToolingAmortisedPerPart: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 366.00 Td (  ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 356.00 Td (  piecePartCost: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 346.00 Td (  totalPieceCostWithTooling: number;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 336.00 Td (  ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 326.00 Td (  // DFM Warnings) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 316.00 Td (  dfmWarnings: Array<{ code: string; severity: 'INFO' | 'WARNING' | 'BLOCKER'; message: ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 306.00 Td (}) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 278.00 Td (10.2 Pure Calculation Engine \(forging-cost-engine.ts\)) Tj ET
+0.060 0.090 0.160 rg 54.00 90.00 504.00 172.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 90.00 504.00 172.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 250.00 Td (// backend/src/modules/bom-items/costing/forging/forging-cost-engine.ts) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 240.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 230.00 Td (import { ForgingGeometryInput, ForgingMaterialSpecs, ForgingMachineSpec, ForgingCostSumm) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 220.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 210.00 Td (export function calculateRequiredForgingTonnageKn\() Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 200.00 Td (  geom: ForgingGeometryInput,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 190.00 Td (  mat: ForgingMaterialSpecs,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 180.00 Td (  complexityFactor: number = 1.4,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 170.00 Td (  frictionCoeff: number = 0.35,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 160.00 Td (\): number {) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 150.00 Td (  // Flash land sizing) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 140.00 Td (  const flashThicknessMm = 0.016 * Math.sqrt\(geom.projectedAreaMm2\) + 0.5;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 130.00 Td (  const flashLandWidthMm = 3.5 * flashThicknessMm;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 120.00 Td (  const flashAreaMm2 = geom.partingPerimeterMm * flashLandWidthMm;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 110.00 Td (  const totalProjectedAreaMm2 = geom.projectedAreaMm2 + flashAreaMm2;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 100.00 Td () Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 11 of 15) Tj ET
+endstream
+endobj
+26 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 27 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+27 0 obj
+<< /Length 6497 >>
+stream
+0.060 0.090 0.160 rg 54.00 446.00 504.00 292.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 446.00 504.00 292.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 726.00 Td (  const charRadiusMm = Math.sqrt\(geom.projectedAreaMm2 / Math.PI\);) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 716.00 Td (  const avgThicknessMm = Math.max\(2.0, geom.netVolumeMm3 / geom.projectedAreaMm2\);) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 706.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 696.00 Td (  // Slab method with shape complexity and die friction) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 686.00 Td (  const pressureMultiplier = 1.0 + \(2.0 * frictionCoeff * charRadiusMm\) / \(3.0 * avgThic) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 676.00 Td (  const requiredLoadN = mat.flowStressMpa * complexityFactor * totalProjectedAreaMm2 * p) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 666.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 656.00 Td (  return Math.round\(requiredLoadN / 1000.0\);) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 646.00 Td (}) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 636.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 626.00 Td (export function synthesizeGrossBilletWeightKg\() Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 616.00 Td (  geom: ForgingGeometryInput,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 606.00 Td (  mat: ForgingMaterialSpecs,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 596.00 Td (\): { netWeightKg: number; flashWeightKg: number; scaleLossKg: number; grossWeightKg: num) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 586.00 Td (  const netWeightKg = \(geom.netVolumeMm3 * 1e-9\) * mat.densityKgM3;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 576.00 Td (  ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 566.00 Td (  const flashThicknessMm = 0.016 * Math.sqrt\(geom.projectedAreaMm2\) + 0.5;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 556.00 Td (  const flashLandWidthMm = 3.5 * flashThicknessMm;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 546.00 Td (  const flashVolumeMm3 = geom.partingPerimeterMm * flashLandWidthMm * flashThicknessMm;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 536.00 Td (  const flashWeightKg = \(flashVolumeMm3 * 1e-9\) * mat.densityKgM3;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 526.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 516.00 Td (  const subTotalKg = netWeightKg + flashWeightKg;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 506.00 Td (  const scaleLossKg = subTotalKg * \(mat.scaleLossPct / 100.0\);) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 496.00 Td (  const sawKerfLossKg = 0.05 * netWeightKg; // Standard 5% saw / crop end allowance) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 486.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 476.00 Td (  const grossWeightKg = subTotalKg + scaleLossKg + sawKerfLossKg;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 466.00 Td (  return { netWeightKg, flashWeightKg, scaleLossKg, grossWeightKg };) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 456.00 Td (}) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 428.00 Td (10.3 Python OpenCASCADE Feature Extractor \(cad-engine/forging/\)) Tj ET
+0.060 0.090 0.160 rg 54.00 90.00 504.00 322.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 90.00 504.00 322.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 400.00 Td (# cad-engine/forging/feature_extractor.py) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 390.00 Td (from __future__ import annotations) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 380.00 Td (import math) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 370.00 Td (import logging) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 360.00 Td (from typing import Any, Dict, List, Optional) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 350.00 Td (from OCC.Core.BRepGProp import brepgprop) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 340.00 Td (from OCC.Core.GProp import GProp_GProps) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 330.00 Td (from OCC.Core.TopAbs import TopAbs_FACE) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 320.00 Td (from OCC.Core.TopExp import TopExp_Explorer) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 310.00 Td (from OCC.Core.BRepAdaptor import BRepAdaptor_Surface) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 300.00 Td (from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Cylinder) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 290.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 280.00 Td (logger = logging.getLogger\(__name__\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 270.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 260.00 Td (class ForgingFeatureExtractor:) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 250.00 Td (    """Extracts B-Rep geometric features required for forging costing and DFM.""") Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 240.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 230.00 Td (    def extract\(self, shape: Any, bbox_dims: List[float], pull_axis: Optional[List[float) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 220.00 Td (        axis = pull_axis if pull_axis else [0.0, 0.0, 1.0]) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 210.00 Td (        ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 200.00 Td (        props = GProp_GProps\(\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 190.00 Td (        brepgprop.VolumeProperties\(shape, props\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 180.00 Td (        net_volume = props.Mass\(\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 170.00 Td (        ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 160.00 Td (        brepgprop.SurfaceProperties\(shape, props\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 150.00 Td (        surface_area = props.Mass\(\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 140.00 Td (        ) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 130.00 Td (        # Analyze draft angles on all faces) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 120.00 Td (        exp = TopExp_Explorer\(shape, TopAbs_FACE\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 110.00 Td (        draft_angles: List[float] = []) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 100.00 Td (        undercuts: List[Dict[str, Any]] = []) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 12 of 15) Tj ET
+endstream
+endobj
+28 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 29 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+29 0 obj
+<< /Length 6956 >>
+stream
+0.060 0.090 0.160 rg 54.00 326.00 504.00 412.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 326.00 504.00 412.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 726.00 Td (        parting_line_faces: List[int] = []) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 716.00 Td (        face_idx = 0) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 706.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 696.00 Td (        while exp.More\(\):) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 686.00 Td (            face = exp.Current\(\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 676.00 Td (            surf = BRepAdaptor_Surface\(face\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 666.00 Td (            # Evaluate midpoint normal) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 656.00 Td (            u_mid = \(surf.FirstUParameter\(\) + surf.LastUParameter\(\)\) / 2.0) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 646.00 Td (            v_mid = \(surf.FirstVParameter\(\) + surf.LastVParameter\(\)\) / 2.0) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 636.00 Td (            pnt, d1u, d1v = surf.D1\(u_mid, v_mid\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 626.00 Td (            normal = d1u.Crossed\(d1v\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 616.00 Td (            if normal.Magnitude\(\) > 1e-6:) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 606.00 Td (                normal.Normalize\(\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 596.00 Td (                cos_theta = normal.X\(\) * axis[0] + normal.Y\(\) * axis[1] + normal.Z\(\) * a) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 586.00 Td (                angle_deg = 90.0 - math.degrees\(math.acos\(max\(-1.0, min\(1.0, cos_theta\)\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 576.00 Td (                draft_angles.append\(angle_deg\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 566.00 Td (                if abs\(angle_deg\) < 1.0:) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 556.00 Td (                    parting_line_faces.append\(face_idx\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 546.00 Td (                elif angle_deg < -0.5:) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 536.00 Td (                    undercuts.append\({"face_id": face_idx, "angle_deg": round\(angle_deg,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 526.00 Td (            face_idx += 1) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 516.00 Td (            exp.Next\(\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 506.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 496.00 Td (        # Compute silhouette projected area on parting plane) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 486.00 Td (        projected_area = bbox_dims[0] * bbox_dims[1] * 0.785 # Bounding ellipse approxim) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 476.00 Td (        parting_perimeter = 2.0 * \(bbox_dims[0] + bbox_dims[1]\) * 1.15) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 466.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 456.00 Td (        return {) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 446.00 Td (            "domain": "forging",) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 436.00 Td (            "net_volume_mm3": round\(net_volume, 2\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 426.00 Td (            "surface_area_mm2": round\(surface_area, 2\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 416.00 Td (            "projected_area_mm2": round\(projected_area, 2\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 406.00 Td (            "parting_perimeter_mm": round\(parting_perimeter, 2\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 396.00 Td (            "primary_pull_axis": axis,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 386.00 Td (            "min_draft_angle_deg": round\(min\(draft_angles\), 2\) if draft_angles else 0.0,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 376.00 Td (            "has_undercuts": len\(undercuts\) > 0,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 366.00 Td (            "undercut_count": len\(undercuts\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 356.00 Td (            "undercuts": undercuts,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 346.00 Td (            "parting_line_face_count": len\(parting_line_faces\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 336.00 Td (        }) Tj ET
+BT /F2 10.5 Tf 0.150 0.350 0.750 rg 54.00 308.00 Td (10.4 Database Schemas & Migration Script \(PostgreSQL\)) Tj ET
+0.060 0.090 0.160 rg 54.00 90.00 504.00 202.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 90.00 504.00 202.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 280.00 Td (-- backend/src/database/migrations/950_create_forging_module_tables.sql) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 270.00 Td (-- Enables Forging Machine, Materials, and Empirical Lookup Tables with Tenancy RLS) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 260.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 250.00 Td (CREATE TABLE IF NOT EXISTS public.forging_machines \() Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 240.00 Td (    id UUID PRIMARY KEY DEFAULT gen_random_uuid\(\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 230.00 Td (    organization_id UUID REFERENCES public.organizations\(id\) ON DELETE CASCADE,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 220.00 Td (    machine_name VARCHAR\(100\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 210.00 Td (    machine_class VARCHAR\(50\) NOT NULL, -- 'HYDRAULIC_PRESS', 'MECHANICAL_PRESS', 'SCREW) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 200.00 Td (    rated_tonnage_kn NUMERIC\(12,2\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 190.00 Td (    energy_capacity_kj NUMERIC\(10,2\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 180.00 Td (    bed_width_mm NUMERIC\(10,2\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 170.00 Td (    bed_depth_mm NUMERIC\(10,2\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 160.00 Td (    max_stroke_mm NUMERIC\(10,2\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 150.00 Td (    strokes_per_minute NUMERIC\(6,2\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 140.00 Td (    machine_rate_per_hr NUMERIC\(10,2\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 130.00 Td (    required_crew_size INT NOT NULL DEFAULT 2,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 120.00 Td (    crew_wage_distribution JSONB NOT NULL DEFAULT '{"GRADE_A": 1, "GRADE_B": 1}',) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 110.00 Td (    location VARCHAR\(50\) NOT NULL DEFAULT 'USA',) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 100.00 Td (    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW\(\)) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 13 of 15) Tj ET
+endstream
+endobj
+30 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 31 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+31 0 obj
+<< /Length 8189 >>
+stream
+0.060 0.090 0.160 rg 54.00 506.00 504.00 232.00 re f
+0.8 w 0.200 0.250 0.350 RG 54.00 506.00 504.00 232.00 re S
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 726.00 Td (\);) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 716.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 706.00 Td (CREATE TABLE IF NOT EXISTS public.forging_lookup_tables \() Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 696.00 Td (    id UUID PRIMARY KEY DEFAULT gen_random_uuid\(\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 686.00 Td (    table_name VARCHAR\(100\) NOT NULL, -- 'FLOW_STRESS', 'FRICTION_FACTOR', 'COMPLEXITY_F) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 676.00 Td (    alloy_grade VARCHAR\(50\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 666.00 Td (    key VARCHAR\(100\) NOT NULL,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 656.00 Td (    numeric_value NUMERIC\(14,4\),) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 646.00 Td (    json_data JSONB,) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 636.00 Td (    source_standard VARCHAR\(100\) DEFAULT 'DIN_7526 / ASM_VOL_14A',) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 626.00 Td (    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW\(\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 616.00 Td (\);) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 606.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 596.00 Td (-- Enable Row Level Security \(RLS\)) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 586.00 Td (ALTER TABLE public.forging_machines ENABLE ROW LEVEL SECURITY;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 576.00 Td (ALTER TABLE public.forging_lookup_tables ENABLE ROW LEVEL SECURITY;) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 566.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 556.00 Td (CREATE POLICY forging_machines_read_policy ON public.forging_machines) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 546.00 Td (    FOR SELECT USING \(organization_id IS NULL OR organization_id = auth.current_organiza) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 536.00 Td () Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 526.00 Td (CREATE POLICY forging_lookup_tables_read_policy ON public.forging_lookup_tables) Tj ET
+BT /F3 7.5 Tf 0.220 0.740 0.970 rg 64.00 516.00 Td (    FOR SELECT USING \(true\); -- Master lookup reference data is readable by all authenti) Tj ET
+0.940 0.960 0.990 rg 54.00 482.00 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 482.00 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 489.00 Td (11. DFM Rules, Quality Assurance & Engineering Standards) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 460.00 Td (The Forging Module includes automated Design for Manufacturability \(DFM\) verification rules that) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 446.50 Td (inspect geometry against industry thresholds before costing is finalized:) Tj ET
+0.120 0.230 0.540 rg 54.00 411.00 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 417.00 Td (Rule Code) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 158.80 417.00 Td (DFM Inspection Check) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 259.60 417.00 Td (Threshold Condition) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 360.40 417.00 Td (Severity) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 461.20 417.00 Td (Engineering Recommendation) Tj ET
+1.000 1.000 1.000 rg 54.00 350.50 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 350.50 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 401.00 Td (DFM-FRG-001) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 401.00 Td (Zero / Insufficient) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 391.00 Td (External Draft) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 401.00 Td (Draft Angle < 3.0° on) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 391.00 Td (non-parting faces) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 401.00 Td (WARNING) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 401.00 Td (Increase external) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 391.00 Td (draft to minimum 5°) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 381.00 Td (\(steel\) or 3°) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 371.00 Td (\(aluminum\) to avoid) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 361.00 Td (die sticking.) Tj ET
+0.970 0.980 0.990 rg 54.00 279.50 504.00 71.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 279.50 504.00 71.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 340.50 Td (DFM-FRG-002) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 340.50 Td (Trapped Undercut) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 330.50 Td (Geometry) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 340.50 Td (Surface normal dot) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 330.50 Td (product < -0.05) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 340.50 Td (BLOCKER) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 340.50 Td (Cannot forge in) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 330.50 Td (standard 2-piece) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 320.50 Td (dies. Requires split) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 310.50 Td (die, side-action) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 300.50 Td (core, or secondary) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 290.50 Td (CNC milling.) Tj ET
+1.000 1.000 1.000 rg 54.00 219.00 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 219.00 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 269.50 Td (DFM-FRG-003) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 269.50 Td (Sharp Fillet Radius) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 269.50 Td (Fillet Radius rf <) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 259.50 Td (2.0 mm) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 269.50 Td (WARNING) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 269.50 Td (Risk of die cracking) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 259.50 Td (and cold shut flow) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 249.50 Td (defect. Increase) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 239.50 Td (fillet radius to) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 229.50 Td (minimum 3.5 mm.) Tj ET
+0.970 0.980 0.990 rg 54.00 158.50 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 158.50 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 209.00 Td (DFM-FRG-004) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 209.00 Td (Excessive Rib Aspect) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 199.00 Td (Ratio) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 209.00 Td (Rib Height / Rib) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 199.00 Td (Width > 4.5:1) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 209.00 Td (WARNING) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 209.00 Td (High cavity pressure) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 199.00 Td (and rapid die wear.) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 189.00 Td (Taper rib walls or) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 179.00 Td (increase web) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 169.00 Td (thickness.) Tj ET
+1.000 1.000 1.000 rg 54.00 98.00 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 98.00 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 148.50 Td (DFM-FRG-005) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 148.50 Td (Thin Web Section) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 148.50 Td (Web Thickness < 3.0) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 138.50 Td (mm \(Steel\) / 2.0 mm) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 128.50 Td (\(Al\)) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 148.50 Td (BLOCKER) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 148.50 Td (Thin webs cool) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 138.50 Td (prematurely causing) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 128.50 Td (unfill defects and) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 118.50 Td (die damage. Thicken) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 108.50 Td (web.) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 14 of 15) Tj ET
+endstream
+endobj
+32 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612.00 792.00]
+  /Contents 33 0 R
+  /Resources << /Font 3 0 R >>
+>>
+endobj
+33 0 obj
+<< /Length 5505 >>
+stream
+0.970 0.980 0.990 rg 54.00 677.50 504.00 60.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 677.50 504.00 60.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 728.00 Td (DFM-FRG-006) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 728.00 Td (High Tonnage) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 158.80 718.00 Td (Requirement) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 728.00 Td (Required Press) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 718.00 Td (Tonnage > Maximum) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 259.60 708.00 Td (Plant Machine) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 360.40 728.00 Td (BLOCKER) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 728.00 Td (Part exceeds plant) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 718.00 Td (press capacity.) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 708.00 Td (Reroute to hydraulic) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 698.00 Td (multi-action press or) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 461.20 688.00 Td (open-die preform.) Tj ET
+0.940 0.960 0.990 rg 54.00 653.50 504.00 24.00 re f
+0.120 0.230 0.540 rg 54.00 653.50 4.00 24.00 re f
+BT /F2 12 Tf 0.120 0.230 0.540 rg 66.00 660.50 Td (12. Implementation Plan & Delivery Milestones) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 631.50 Td (The module implementation is partitioned into four phased engineering sprints across the 3 core) Tj ET
+BT /F1 9.5 Tf 0.150 0.200 0.250 rg 54.00 618.00 Td (layers:) Tj ET
+0.120 0.230 0.540 rg 54.00 582.50 504.00 18.00 re f
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 58.00 588.50 Td (Sprint Phase) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 184.00 588.50 Td (Scope & Deliverables) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 310.00 588.50 Td (Target Components) Tj ET
+BT /F2 7.5 Tf 1.000 1.000 1.000 rg 436.00 588.50 Td (Acceptance Criteria) Tj ET
+1.000 1.000 1.000 rg 54.00 532.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 532.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 572.50 Td (Phase 1: CAD Engine) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 572.50 Td (OpenCASCADE feature) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 562.50 Td (extractor, parting line &) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 552.50 Td (draft angle detection) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 572.50 Td (cad-engine/forging/) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 572.50 Td (Pass 25 unit tests on) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 562.50 Td (automotive crankshaft and) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 552.50 Td (connecting rod STEP) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 542.50 Td (models.) Tj ET
+0.970 0.980 0.990 rg 54.00 482.50 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 482.50 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 522.50 Td (Phase 2: Database & Seed) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 522.50 Td (Postgres migrations) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 512.50 Td (950-953, seed 45 press) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 502.50 Td (machines & DIN lookup) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 492.50 Td (tables) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 522.50 Td (backend/src/database/migra) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 512.50 Td (tions/) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 522.50 Td (All tables queryable with) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 512.50 Td (RLS tenant isolation) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 502.50 Td (verified in pgTAP tests.) Tj ET
+1.000 1.000 1.000 rg 54.00 443.00 504.00 39.50 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 443.00 504.00 39.50 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 472.50 Td (Phase 3: Cost Engine) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 472.50 Td (Pure calculation engine,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 462.50 Td (physics tonnage, gross) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 452.50 Td (weight, multi-wage LHR) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 472.50 Td (backend/.../costing/forgin) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 462.50 Td (g/) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 472.50 Td (Cost calculation latency <) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 462.50 Td (15ms; accurate within ±3%) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 452.50 Td (of benchmark quote data.) Tj ET
+0.970 0.980 0.990 rg 54.00 393.00 504.00 50.00 re f
+0.5 w 0.880 0.910 0.940 RG 54.00 393.00 504.00 50.00 re S
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 58.00 433.00 Td (Phase 4: Frontend & DFM) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 433.00 Td (Three.js 3D parting line) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 423.00 Td (viewer, DFM rule violation) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 184.00 413.00 Td (list, cost drivers) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 433.00 Td (components/bom/forging-) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 310.00 423.00 Td (intel/) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 433.00 Td (Visual display of parting) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 423.00 Td (line, draft angle heatmap,) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 413.00 Td (and one-click PDF quote) Tj ET
+BT /F1 7.0 Tf 0.150 0.200 0.250 rg 436.00 403.00 Td (export.) Tj ET
+0.5 w 0.8 0.85 0.9 RG 54.00 38.00 504.00 0.00 re S
+BT /F1 7.5 Tf 0.45 0.52 0.6 rg 54.00 26.00 Td (eMithran Confidential  |  Forging Architecture Specification  |  Page 15 of 15) Tj ET
+endstream
+endobj
+xref
+0 34
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000218 00000 n 
+0000000425 00000 n 
+0000000557 00000 n 
+0000008061 00000 n 
+0000008193 00000 n 
+0000015108 00000 n 
+0000015240 00000 n 
+0000020945 00000 n 
+0000021079 00000 n 
+0000030618 00000 n 
+0000030752 00000 n 
+0000039654 00000 n 
+0000039788 00000 n 
+0000048884 00000 n 
+0000049018 00000 n 
+0000054994 00000 n 
+0000055128 00000 n 
+0000062681 00000 n 
+0000062815 00000 n 
+0000075572 00000 n 
+0000075706 00000 n 
+0000081391 00000 n 
+0000081525 00000 n 
+0000087293 00000 n 
+0000087427 00000 n 
+0000093977 00000 n 
+0000094111 00000 n 
+0000101120 00000 n 
+0000101254 00000 n 
+0000109496 00000 n 
+0000109630 00000 n 
+trailer
+<< /Size 34 /Root 1 0 R >>
+startxref
+115188
+%%EOF

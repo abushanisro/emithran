@@ -1,6 +1,8 @@
 import { Auth0Client, filterDefaultIdTokenClaims } from '@auth0/nextjs-auth0/server';
 import { NextResponse } from 'next/server';
 
+import { assertAuth0Config, AUTH0_SESSION } from '@/lib/auth0-config';
+
 let client: Auth0Client | undefined;
 
 /**
@@ -9,13 +11,15 @@ let client: Auth0Client | undefined;
  * The access token it keeps is for the eMithran API (AUTH0_AUDIENCE): the backend verifies it, the browser never sees the secret.
  */
 export function getAuth0(): Auth0Client {
-  const audience = process.env.AUTH0_AUDIENCE;
-  if (!audience) throw new Error('AUTH0_AUDIENCE is not set: Auth0 would issue a token the backend cannot accept');
+  if (!client) assertAuth0Config();
+  const audience = process.env.AUTH0_AUDIENCE ?? null; // never null: assertAuth0Config just checked it
   client ??= new Auth0Client({
     authorizationParameters: {
       audience,
       scope: 'openid profile email offline_access',
     },
+    // One clock: Auth0's cookie rolls with activity and always outlives the backend's 30-minute idle timer, which is what ends a session.
+    session: { rolling: true, ...AUTH0_SESSION },
     // Auth0 never offers sign-up here: people are invited (the backend allow-list decides who gets in).
     signInReturnToPath: '/',
     // The BFF attaches the token to API calls on the server, so the route that would hand tokens to browser JavaScript is closed.

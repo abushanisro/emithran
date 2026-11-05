@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "dev:local": "node scripts/dev-local.mjs",
     "build": "next build",
     "start": "node .next/standalone/server.js",
     "start:production": "NODE_ENV=production node .next/standalone/server.js",

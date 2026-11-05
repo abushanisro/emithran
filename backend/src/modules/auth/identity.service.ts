@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 
 import { DatabaseService } from '../../common/database/database.service';
 import { Auth0TokenVerifier, TokenRejected, type VerifiedLogin } from './auth0-token-verifier';
@@ -33,6 +33,7 @@ export interface IdentityPolicy {
 @Injectable()
 export class IdentityService {
   private readonly decisions = new Map<string, { userId: string; email: string; until: number }>();
+  private readonly logger = new Logger(IdentityService.name);
   private readonly trustedConnections: string[];
 
   constructor(
@@ -52,7 +53,11 @@ export class IdentityService {
     try {
       login = await this.verifier.verify(token);
     } catch (error) {
-      if (error instanceof TokenRejected && error.isServiceFailure) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+      if (error instanceof TokenRejected && error.isServiceFailure) {
+        // A 503 the person cannot explain: say here why (Auth0's signing keys could not be fetched in time).
+        this.logger.error(`Sign-in 503: ${error.code}: ${error.message}`);
+        throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+      }
       throw new UnauthorizedException('Invalid or expired token');
     }
 
@@ -90,14 +95,20 @@ export class IdentityService {
       p_connection: login.connection ?? null,
       p_trusted_connections: this.trustedConnections,
     });
-    if (linked.error) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+    if (linked.error) {
+      this.logger.error(`Sign-in 503: link_identity failed: ${linked.error.code} ${linked.error.message}`);
+      throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+    }
     const userId = linked.data as string | null;
     if (!userId) throw new ForbiddenException('This account has not been invited to eMithran');
 
     // The allow-list check and the account's own email in one step (migration 938): the email bound into the request and the
     // database token is auth.users.email, never the token's claim, which an upstream change could make differ for a known sub.
     const account = await admin.rpc('identity_user_email', { p_user_id: userId });
-    if (account.error) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+    if (account.error) {
+      this.logger.error(`Sign-in 503: identity_user_email failed: ${account.error.code} ${account.error.message}`);
+      throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+    }
     const email = account.data;
     if (typeof email !== 'string' || email === '') throw new ForbiddenException('This account has not been invited to eMithran');
     return { userId, email };

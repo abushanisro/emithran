@@ -1,0 +1,6 @@
+{
+  "AUTH0_AUDIENCE": "https://api.emithran.com",
+  "AUTH0_CLAIM_NAMESPACE": "https://emithran.com/",
+  "AUTH0_DB_CONNECTION": "Username-Password-Authentication",
+  "APP_BASE_URL": "http://localhost:3000"
+}

@@ -95,3 +95,5 @@ test-results/
 
 # Scratch output of casting-worker/check.sh
 .cache/
+auth0/env/*.json
+!auth0/env/*.example.json

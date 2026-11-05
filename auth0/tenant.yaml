@@ -1,0 +1,72 @@
+# The eMithran Auth0 tenant, as code (deployed with auth0-deploy-cli: auth0/README.md).
+# ##NAME## placeholders are filled from the per-environment settings file (auth0/env/<local|stage|prd>.json, git-ignored).
+# Nothing secret lives here: client secrets stay in Auth0 and in the app's env file.
+# Only the objects below are managed; the tool never deletes anything that is not listed (AUTH0_ALLOW_DELETE=false).
+
+resourceServers:
+  # The eMithran API. The backend accepts RS256 only.
+  - name: eMithran API
+    identifier: "##AUTH0_AUDIENCE##"
+    signing_alg: RS256
+    allow_offline_access: true
+    token_lifetime: 86400
+    token_lifetime_for_web: 7200
+    skip_consent_for_verifiable_first_party_clients: true
+
+clients:
+  - name: eMithran Web
+    app_type: regular_web
+    callbacks:
+      - "##APP_BASE_URL##/auth/callback"
+    allowed_logout_urls:
+      - "##APP_BASE_URL##"
+    web_origins: []
+    grant_types:
+      - authorization_code
+      - refresh_token
+    oidc_conformant: true
+    is_first_party: true
+    jwt_configuration:
+      alg: RS256
+      lifetime_in_seconds: 36000
+    refresh_token:
+      rotation_type: rotating
+      expiration_type: expiring
+      token_lifetime: 86400
+      idle_token_lifetime: 28800
+      infinite_token_lifetime: false
+      infinite_idle_token_lifetime: false
+
+# Without this grant every sign-in is refused with: Client "..." is not authorized to access resource server.
+clientGrants:
+  - client_id: eMithran Web
+    audience: "##AUTH0_AUDIENCE##"
+    scope: []
+
+connections:
+  # Invited people only: public sign-up is OFF, and the only social/self-service login is none.
+  # The company SSO (enterprise) connection holds a client secret from Google/Microsoft, so it is created in the dashboard and is not
+  # listed here; drift check (npm run auth0:drift) still verifies it is the only other kind of login enabled.
+  - name: "##AUTH0_DB_CONNECTION##"
+    strategy: auth0
+    enabled_clients:
+      - eMithran Web
+    options:
+      disable_signup: true
+      brute_force_protection: true
+      requires_username: false
+      password_policy: good
+
+actions:
+  - name: emithran-claims
+    deployed: true
+    runtime: node22
+    supported_triggers:
+      - id: post-login
+        version: v3
+    code: ./actions/emithran-claims.js
+
+triggers:
+  post-login:
+    - action_name: emithran-claims
+      display_name: emithran-claims

@@ -17,6 +17,11 @@ async function options(): Promise<Auth0ClientOptions> {
   vi.resetModules();
   constructed.length = 0;
   vi.stubEnv('AUTH0_AUDIENCE', 'https://api.example.com');
+  vi.stubEnv('AUTH0_DOMAIN', 'tenant.eu.auth0.com');
+  vi.stubEnv('AUTH0_CLIENT_ID', 'id');
+  vi.stubEnv('AUTH0_CLIENT_SECRET', 'secret');
+  vi.stubEnv('AUTH0_SECRET', 'a'.repeat(64));
+  vi.stubEnv('APP_BASE_URL', 'http://localhost:3000');
   (await import('@/lib/auth0')).getAuth0();
   const built = constructed[0];
   if (!built) throw new Error('Auth0Client was not constructed');
@@ -46,10 +51,26 @@ describe('Auth0 client options', () => {
   });
 });
 
+describe('Auth0 session clock', () => {
+  it('rolls with activity and outlives the backend idle timer', async () => {
+    const { session } = await options();
+    expect(session?.rolling).toBe(true);
+    expect(session?.inactivityDuration).toBeGreaterThan(30 * 60);
+  });
+
+  it('refuses to start with a broken configuration, naming the problem', async () => {
+    await options();
+    vi.resetModules();
+    vi.stubEnv('AUTH0_DOMAIN', '');
+    const { getAuth0 } = await import('@/lib/auth0');
+    expect(() => getAuth0()).toThrow(/AUTH0_DOMAIN is not set/);
+  });
+});
+
 describe('Auth0 sign-in callback', () => {
   async function onCallback() {
-    vi.stubEnv('APP_BASE_URL', 'https://app.example.com');
     const hook = (await options()).onCallback;
+    vi.stubEnv('APP_BASE_URL', 'https://app.example.com');
     if (!hook) throw new Error('onCallback is not set');
     return hook;
   }

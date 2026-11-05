@@ -14,6 +14,7 @@ type Me =
   | { state: 'loading' }
   | { state: 'denied' }
   | { state: 'idle' }
+  | { state: 'unavailable' }
   | { state: 'failed' }
   | { state: 'ok'; id: string; email: string; organizationRole: OrganizationRole | null; platformAdmin: boolean }
 
@@ -29,6 +30,8 @@ async function fetchMe(): Promise<Me> {
     if (res.status === 401) {
       if (isSessionIdleBody(await res.json().catch(() => null))) return { state: 'idle' }
     }
+    // 5xx: the BFF could not reach the API (502), or the API could not check the login (503). The login itself may be fine.
+    if (res.status >= 500) return { state: 'unavailable' }
     if (!res.ok) return { state: 'failed' }
     const body = (await res.json()) as {
       data?: { id?: string; email?: string; organizationRole?: OrganizationRole | null; platformAdmin?: boolean }
@@ -38,9 +41,13 @@ async function fetchMe(): Promise<Me> {
       ? { state: 'ok', id: me.id, email: me.email ?? '', organizationRole: me.organizationRole ?? null, platformAdmin: me.platformAdmin === true }
       : { state: 'failed' }
   } catch {
-    return { state: 'failed' }
+    // The request never got an answer (the app server itself is down or the network dropped): nothing says the login is bad.
+    return { state: 'unavailable' }
   }
 }
+
+/** How often the app asks again while the API is unreachable, so it continues on its own once the API is back. */
+const UNAVAILABLE_RETRY_MS = 5_000
 
 /**
  * The company single sign-on connection (an Auth0 enterprise connection: Google Workspace, Microsoft Entra ID, SAML, ...), named at build
@@ -69,6 +76,14 @@ const go = (path: string) => {
 export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
   const { user: auth0User, isLoading } = useUser()
   const [me, setMe] = useState<Me>({ state: 'loading' })
+  const [attempt, setAttempt] = useState(0)
+  const retry = useCallback(() => { setAttempt((n) => n + 1) }, [])
+
+  useEffect(() => {
+    if (me.state !== 'unavailable') return
+    const timer = setTimeout(retry, UNAVAILABLE_RETRY_MS)
+    return () => { clearTimeout(timer) }
+  }, [me, retry])
 
   useEffect(() => {
     if (isLoading) return
@@ -77,6 +92,8 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
       appReadiness.resetAuth()
       return
     }
+    // A new look at a signed-in person starts from 'loading', so a stale 'failed' (from before sign-in) never flashes the rejected screen.
+    setMe((prev) => (prev.state === 'ok' || prev.state === 'unavailable' ? prev : { state: 'loading' }))
     let cancelled = false
     void fetchMe().then((result) => {
       if (cancelled) return
@@ -91,7 +108,7 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
       else appReadiness.resetAuth()
     })
     return () => { cancelled = true }
-  }, [auth0User, isLoading])
+  }, [auth0User, isLoading, attempt])
 
   const user = useMemo<AuthUser | null>(
     () =>
@@ -119,6 +136,9 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     loading: isLoading || (!!auth0User && me.state === 'loading'),
     accessDenied: me.state === 'denied',
+    serviceUnavailable: !!auth0User && me.state === 'unavailable',
+    loginRejected: !!auth0User && me.state === 'failed',
+    retry,
     signIn,
     ssoAvailable: sso !== null,
     signInWithSso,
