@@ -73,6 +73,7 @@ import { effectiveSheetThicknessMm } from '@/lib/costing/effective-sheet-thickne
 import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
+import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
@@ -784,7 +785,8 @@ function buildProcessTree(
 
     // Sheet metal: the catalog operations this step performs on the part's own
     // CAD features ("Punching // SimpleHole Ø4.0 ×14"), resolved by the backend.
-    if (isSheetMetal && matchedCostLine?.catalogOperations?.length) {
+    // Plastic molding: the same, from the recognised features and the molding process's catalog rows (backend plastic-catalog-operation-resolver.ts).
+    if ((isSheetMetal || family === 'plastic_molded') && matchedCostLine?.catalogOperations?.length) {
       const withMachine = (n: OperationTreeNode): ProcessTreeNode =>
         ({ ...n, factory, machine, ...(n.children ? { children: n.children.map(withMachine) } : {}) });
       featureNodes.push(...sheetMetalOperationNodes(`catop_${opIdx}`, matchedCostLine.catalogOperations).map(withMachine));
@@ -8878,9 +8880,11 @@ function GeometricCostDriversPanel({
     const hasData =
       !!wallNominalMm || ribCount > 0 || throughHoleCount > 0 || blindFeatureCount > 0 ||
       undercutFaceCount > 0 || undraftedFaceCount > 0 || insertCandidateCount > 0 || partingComplexity != null;
+    // Feature types the engine does not recognise yet: their absence from the tree is not "none found".
+    const notAssessed: string[] = imS.plasticFeatureGraph?.not_yet_recognized ?? [];
     return {
       wallNominalMm, wallMinMm, wallMaxMm, ribCount, throughHoleCount, blindFeatureCount,
-      undercutFaceCount, undraftedFaceCount, insertCandidateCount, partingComplexity, avgDraftDeg, hasData,
+      undercutFaceCount, undraftedFaceCount, insertCandidateCount, partingComplexity, avgDraftDeg, hasData, notAssessed,
     };
   }, [fg?.summary]);
   const leaves = collectLeaves(tree);
@@ -8945,6 +8949,12 @@ function GeometricCostDriversPanel({
       {/* Geometry tab */}
       {tab === 'geo' && (
         <div className="flex-1 overflow-y-auto divide-y divide-border/40">
+          {isIM && <PullDirectionControl itemId={item.id} />}
+          {isIM && imGeo.notAssessed.length > 0 && (
+            <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
+              Not assessed from the CAD yet: {imGeo.notAssessed.join(', ')}. Their operations are not in the process tree.
+            </div>
+          )}
           {isIM && imGeo.hasData && (
             <>
               {imGeo.wallNominalMm != null && (
