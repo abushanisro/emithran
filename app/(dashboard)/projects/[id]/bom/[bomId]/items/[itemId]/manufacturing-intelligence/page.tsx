@@ -4120,6 +4120,8 @@ function RouteSelectionDialog({
 
   const canSetDynamicRoute = !!cuttingRouteId && !!additionalSteps && !!dynamicCuttingStep;
   const canSetCompleteRoute = isCompleteRouteApplicable(cuttingRouteId);
+  // Heat, surface and other secondary operations sit in a column beside the routes, so they are seen while a route is compared.
+  const showSecondary = !isSheetMetal && !!cost?.secondaryOperations && !!itemId;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -4145,6 +4147,12 @@ function RouteSelectionDialog({
                   : 'No priced routes are available for this part family yet.'}
           </p>
         </DialogHeader>
+
+        {isIM && comparison.data?.materialNote && (
+          <div role="alert" className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs leading-snug text-amber-700 dark:text-amber-400">
+            <span className="font-medium">Material: </span>{comparison.data.materialNote.reason}
+          </div>
+        )}
 
         {isSheetMetal ? (
           <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(300px,380px)_minmax(0,1fr)_minmax(250px,300px)] divide-y md:divide-y-0 md:divide-x divide-border/60">
@@ -4210,12 +4218,13 @@ function RouteSelectionDialog({
              each real route here is already a complete quote (see
              handleApplyCompleteRoute). The right pane is a read-only view of
              the selected route's real processLines, not an editor. */
-          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(320px,400px)_1fr] divide-y md:divide-y-0 md:divide-x divide-border/60">
+          <div className={`flex-1 min-h-0 grid grid-cols-1 divide-y md:divide-y-0 md:divide-x divide-border/60 ${showSecondary ? 'md:grid-cols-[minmax(300px,380px)_minmax(0,1fr)_minmax(280px,340px)]' : 'md:grid-cols-[minmax(320px,400px)_1fr]'}`}>
             <RouteCompareList
               nodes={routeTree}
               selectedId={cuttingRouteId}
               onSelect={(node) => { setCuttingRouteId(node.id); }}
-              recommendedIds={[]}
+              recommendedIds={isIM && comparison.data?.recommendedRouteId ? [comparison.data.recommendedRouteId] : []}
+              topRecommendedLabel="Recommended"
               sortMode={sortMode}
               onSortModeChange={setSortMode}
               currencySymbol={currencySymbol}
@@ -4266,25 +4275,20 @@ function RouteSelectionDialog({
                 </>
               )}
             </div>
+            {showSecondary && (
+              <SecondaryOperationsPicker
+                ops={cost!.secondaryOperations!}
+                currencySymbol={cost!.currencySymbol ?? '$'}
+                disabled={patchSecondary.isPending}
+                onChange={(sel) => { patchSecondary.mutate({ id: itemId!, patch: { secondaryOperations: sel } }); }}
+              />
+            )}
           </div>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <p className="text-xs text-muted-foreground">
               No priced routes are available for this part family yet.
             </p>
-          </div>
-        )}
-
-        {!isSheetMetal && cost?.secondaryOperations && itemId && (
-          <div className="px-5 py-3 border-t shrink-0">
-            <h4 className="text-xs font-semibold mb-1">Secondary operations (heat treatment, surface treatment, other)</h4>
-            <p className="text-[10px] text-muted-foreground mb-1.5">Added to whichever route is set, Auto or Manual; saved as soon as you tick.</p>
-            <SecondaryOperationsPicker
-              ops={cost.secondaryOperations}
-              currencySymbol={cost.currencySymbol ?? '$'}
-              disabled={patchSecondary.isPending}
-              onChange={(sel) => { patchSecondary.mutate({ id: itemId, patch: { secondaryOperations: sel } }); }}
-            />
           </div>
         )}
 

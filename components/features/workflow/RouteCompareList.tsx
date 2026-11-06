@@ -52,6 +52,8 @@ export interface RouteCompareListProps {
    *  a caller whose 'cutting'-tagged routes are not Sheet Metal's cutting
    *  methods (e.g. Injection Molding's real molding-process alternatives). */
   cuttingGroupMeta?: { title: string; description: string };
+  /** Badge on the first recommended route. Sheet metal's is its CAD-based pick; a family whose recommendation is the cheapest capable route says so. */
+  topRecommendedLabel?: string;
 }
 
 function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'violet' | 'red'; children: React.ReactNode }) {
@@ -71,12 +73,16 @@ function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'viole
 
 export function RouteCompareList({
   nodes, selectedId, onSelect, recommendedIds, sortMode, onSortModeChange, currencySymbol,
-  isLoading = false, errorMessage = null, cuttingGroupMeta,
+  isLoading = false, errorMessage = null, cuttingGroupMeta, topRecommendedLabel = 'CAD-optimal',
 }: RouteCompareListProps) {
   const groupId = useId();
   const listRef = useRef<HTMLDivElement>(null);
 
-  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds), cuttingGroupMeta);
+  // Routes that can be used come first in every group; the ones that cannot stay listed below, muted, with the reason.
+  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds), cuttingGroupMeta).map((g) => ({
+    ...g,
+    nodes: [...g.nodes.filter((n) => n.feasible), ...g.nodes.filter((n) => !n.feasible)],
+  }));
   const costScale = maxRouteCost(nodes);
   const selectableIds = groups.flatMap((g) => g.nodes.filter((n) => n.selectable).map((n) => n.id));
 
@@ -183,7 +189,8 @@ export function RouteCompareList({
                       'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
                       node.selectable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
                       isSelected && 'bg-brand-500/10',
-                      !node.feasible && 'opacity-70',
+                      !node.feasible && 'text-muted-foreground',
+                      recommendedRank === 0 && !isSelected && 'bg-brand-500/5',
                     )}
                   >
                     {/* Selected marker as a full-height rail — reads at a glance
@@ -209,12 +216,12 @@ export function RouteCompareList({
                         <span className={cn('text-[13px] leading-tight', isSelected ? 'font-semibold' : 'font-medium')}>
                           {node.label}
                         </span>
-                        {recommendedRank === 0 && <Badge tone="blue">CAD-optimal</Badge>}
+                        {recommendedRank === 0 && <Badge tone="blue">{topRecommendedLabel}</Badge>}
                         {recommendedRank > 0 && <Badge tone="blue">Recommended</Badge>}
                         {node.badges.lowestCost && <Badge tone="emerald">Lowest cost</Badge>}
                         {node.badges.fastest && <Badge tone="violet">Fastest</Badge>}
                         {node.badges.bestQuality && <Badge tone="amber">Best quality</Badge>}
-                        {!node.feasible && <Badge tone="red">Not capable</Badge>}
+                        {!node.feasible && <span className="inline-flex items-center rounded-full border border-border px-1.5 py-px text-[10px] font-medium leading-4 text-muted-foreground">Not usable</span>}
                       </div>
 
                       {node.machineName && (
@@ -235,8 +242,8 @@ export function RouteCompareList({
                       )}
 
                       {!node.feasible && node.infeasibleReason && (
-                        <p className="mt-1.5 flex items-start gap-1 text-[11px] leading-snug text-red-300/90">
-                          <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+                        <p className="mt-1.5 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground">
+                          <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-500" />
                           <span>{node.infeasibleReason}</span>
                         </p>
                       )}
