@@ -134,6 +134,8 @@ export interface ScenarioApplicationResult {
   scenario: AppliedScenarioState;
   analysis: { ran: string[] };
   material: { grade: string; action: 'kept' | 'replaced'; recordId: string | null } | null;
+  /** The mold (and die) the engine priced, written as tooling items. */
+  tooling: { action: 'kept' | 'replaced' | 'none'; items: string[] };
   route: { mode: ScenarioRouteMode; routeId: string | null; routeLabel: string; created: number; operations: string[] };
   machineOverrides: { saved: number; failed: Array<{ processKey: string; message: string }> };
   warnings: string[];

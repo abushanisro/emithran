@@ -29,6 +29,7 @@ function build(over: {
   };
   const analysisRuns = { ensureCurrent: jest.fn().mockImplementation(() => { calls.push('analysis'); return Promise.resolve({ ran: ['cad_features'], status: over.analysis ?? READY }); }) };
   const materials = { ensure: jest.fn().mockImplementation(() => { calls.push('material'); return Promise.resolve({ action: 'replaced', recordId: 'r1', usage: null }); }) };
+  const toolingCosts = { ensure: jest.fn().mockImplementation(() => { calls.push('tooling'); return Promise.resolve({ action: 'replaced', items: ['Injection mold'] }); }) };
   const routes = {
     applyRoute: jest.fn().mockImplementation(() => {
       calls.push('route');
@@ -37,17 +38,17 @@ function build(over: {
     applyCustomRoute: jest.fn().mockImplementation(() => { calls.push('custom-route'); return Promise.resolve({ created: 2, operations: ['x'], routeLabel: 'Custom', needsManualCycleTime: [] }); }),
   };
   const audit = { recordBestEffort: jest.fn().mockResolvedValue(undefined) };
-  const svc = new ScenarioApplicationService(bomItems as never, database as never, analysisRuns as never, materials as never, routes as never, audit as never);
-  return { svc, calls, patches, bomItems, materials, routes, audit, analysisRuns };
+  const svc = new ScenarioApplicationService(bomItems as never, database as never, analysisRuns as never, materials as never, toolingCosts as never, routes as never, audit as never);
+  return { svc, calls, patches, bomItems, materials, toolingCosts, routes, audit, analysisRuns };
 }
 const input = (request: object) => ({ bomItemId: 'i1', userId: 'u', organizationId: 'o', token: 't', request: { location: 'USA', route: { mode: 'auto' }, ...request } as never });
 const stateWritten = (patches: Array<Record<string, unknown>>) => patches.map((p) => p['appliedScenario']).filter(Boolean) as Array<Record<string, unknown>>;
 
 describe('ScenarioApplicationService.apply', () => {
-  it('runs the steps in order: analysis, begin, fields, material, route, then the applied state', async () => {
+  it('runs the steps in order: analysis, begin, fields, material, route, tooling, then the applied state', async () => {
     const { svc, calls } = build();
     await svc.apply(input({ materialGrade: 'ABS', annualVolume: 5000 }));
-    expect(calls).toEqual(['analysis', 'begin', 'item.update', 'overrides', 'cost-summary', 'material', 'route', 'overrides']);
+    expect(calls).toEqual(['analysis', 'begin', 'item.update', 'overrides', 'cost-summary', 'material', 'route', 'cost-summary', 'tooling', 'overrides']);
   });
 
   it('returns the canonical result: revision + 1, what ran, the material and the route', async () => {
@@ -57,6 +58,7 @@ describe('ScenarioApplicationService.apply', () => {
     expect(r.analysis.ran).toEqual(['cad_features']);
     expect(r.material).toEqual({ grade: 'ABS', action: 'replaced', recordId: 'r1' });
     expect(r.route).toMatchObject({ mode: 'auto', routeId: 'im-standard-200t', created: 5 });
+    expect(r.tooling).toEqual({ action: 'replaced', items: ['Injection mold'] });
   });
 
   it('writes every scenario key in one merge, and the grade as a manual pick', async () => {
