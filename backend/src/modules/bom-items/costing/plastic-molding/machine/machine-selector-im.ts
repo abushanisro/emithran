@@ -1,18 +1,13 @@
-// IM press capability — the physical constraints a press must meet for a part.
-// Failure at any constraint = not capable (the reasons say which).
-// 1. Clamp force:   the reference clamp model (clamp-force.ts): projected area × cavities ×
-//                   cavity pressure (flow class of the material) × clampForceSafetyFactor
-// 2. Shot capacity: GPPS-equivalent grams per cavity × cavities (shot-size.ts) ≤ the
-//                   press shot size (rated in GPPS grams)
-// 3. Tie-bar spacing: (partLength + 45mm) ≤ tieBarX && (partWidth + 45mm) ≤ tieBarY; 90° rotation allowed
-// 4. Daylight:     minMoldHeight ≤ estimatedToolHeight ≤ maxMoldHeight (skip if no data)
+// The press tiers of the Route Comparison. Whether a press is capable is the shared rule in shared/capability/machine-selection/press-checks.ts (clamp,
+// shot, tie-bars, daylight), the same one the Cost Summary's press selection uses; this module derives the clamp force the part needs from the
+// reference model and groups the presses into size classes.
 //
 // Which capable press a route uses is decided by cost, not a score: the caller
 // runs the cost engine for each capable press in a tier and keeps the cheapest
 // (bom-items.service getRouteComparison).
 
 import type { MachineCandidate } from '../../../dto/machine-selection.dto';
-import { IM_TIEBAR_ADDEND_MM } from '../../shared/capability/machine-selection/physics';
+import { checkPress } from '../../shared/capability/machine-selection/press-checks';
 import { requiredClampForce, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import type { ClampModel } from '../plastic-reference';
 
@@ -50,93 +45,31 @@ export function evaluateIMCandidate(
   req: IMSelectionRequirements,
 ): IMCandidateEvaluation {
   const cap = candidate.capability;
-  const blockReasons: string[] = [];
-
-  // ── 1. Clamp force (reference model; not derivable = not sized) ─────────
-  let clampRequiredT: number | null = null;
-  let clampUtil: number | null = null;
+  // The clamp the part needs comes from the reference model; whether this press meets it, the shot, tie-bars and daylight are the one shared rule.
   const clamp = requiredClampForce({
     model: req.clampModel, material: req.material, materialLabel: req.materialLabel,
     projectedAreaMm2: req.projectedAreaMm2 ?? 0, cavityCount: req.cavityCount, runner: req.runner,
   });
-  if (!clamp.derivable) {
-    blockReasons.push(clamp.reason);
-  } else {
-    clampRequiredT = clamp.requiredTonnes;
-    const machineClampT = cap.maxTonnage;
-    if (machineClampT == null || machineClampT < clampRequiredT) {
-      blockReasons.push(
-        `Clamp: need ${clampRequiredT.toFixed(0)}T, machine has ${machineClampT ?? '?'}T`,
-      );
-    } else {
-      clampUtil = clampRequiredT / machineClampT;
-    }
-  }
-
-  // ── 2. Shot capacity (GPPS-equivalent grams, shot-size.ts) ─────────────────
   const shotRequiredG = req.shotGppsGPerCavity != null ? req.shotGppsGPerCavity * req.cavityCount : null;
-  let shotUtil: number | null = null;
-  const machineShotG = cap.shotCapacityGrams;
-  if (shotRequiredG == null) {
-    blockReasons.push('Shot size not derivable: the material has no reference melt density (migration 831).');
-  } else if (machineShotG == null) {
-    blockReasons.push('Shot: the press has no shot size on file.');
-  } else {
-    if (machineShotG < shotRequiredG) {
-      blockReasons.push(
-        `Shot: need ${shotRequiredG.toFixed(0)}g, machine has ${machineShotG}g`,
-      );
-    } else {
-      shotUtil = shotRequiredG / machineShotG;
-    }
-  }
-
-  // ── 3. Tie-bar spacing ────────────────────────────────────────────────────
-  // Required clearance = part footprint + runner allowance + platen-to-tie-bar clearance.
-  // Additive (+45mm total), not proportional — runner thickness is fixed regardless of part size.
-  // Mold can be rotated 90° on the platen — accept either orientation.
-  const hasTieBars = cap.tieBarXMm != null && cap.tieBarYMm != null;
-  const hasFootprint = req.partLengthMm != null && req.partWidthMm != null;
-  if (hasTieBars && hasFootprint) {
-    const reqL = req.partLengthMm! + IM_TIEBAR_ADDEND_MM;
-    const reqW = req.partWidthMm!  + IM_TIEBAR_ADDEND_MM;
-    const tieX = cap.tieBarXMm!;
-    const tieY = cap.tieBarYMm!;
-    const fitsNormal  = reqL <= tieX && reqW <= tieY;
-    const fitsRotated = reqL <= tieY && reqW <= tieX;
-    if (!fitsNormal && !fitsRotated) {
-      blockReasons.push(
-        `Tie-bar: part + runner ${reqL.toFixed(0)}×${reqW.toFixed(0)}mm exceeds machine ${tieX}×${tieY}mm`,
-      );
-    }
-  }
-
-  // ── 4. Daylight / mold height ─────────────────────────────────────────────
-  if (req.estimatedToolHeightMm != null) {
-    if (cap.minMoldHeightMm != null && req.estimatedToolHeightMm < cap.minMoldHeightMm) {
-      blockReasons.push(
-        `Daylight: tool ${req.estimatedToolHeightMm}mm < machine min ${cap.minMoldHeightMm}mm`,
-      );
-    }
-    if (cap.maxMoldHeightMm != null && req.estimatedToolHeightMm > cap.maxMoldHeightMm) {
-      blockReasons.push(
-        `Daylight: tool ${req.estimatedToolHeightMm}mm > machine max ${cap.maxMoldHeightMm}mm`,
-      );
-    }
-  }
-
-  const capable = blockReasons.length === 0;
+  const checks = checkPress(cap, {
+    clampTonnageRequired: clamp.derivable ? clamp.requiredTonnes : null,
+    clampNotDerivableReason: clamp.derivable ? null : clamp.reason,
+    shotGppsG: shotRequiredG,
+    partLengthMm: req.partLengthMm,
+    partWidthMm: req.partWidthMm,
+    estimatedToolHeightMm: req.estimatedToolHeightMm,
+  });
 
   return {
     candidate,
-    capable,
-    blockReasons,
-    clampRequiredT: clampRequiredT ? Math.round(clampRequiredT) : null,
+    capable: checks.capable,
+    blockReasons: checks.reasons,
+    clampRequiredT: checks.clampRequiredT ? Math.round(checks.clampRequiredT) : null,
     clampMachineT: cap.maxTonnage,
-    clampUtil,
+    clampUtil: checks.clampUtil,
     shotRequiredG: shotRequiredG != null ? Math.round(shotRequiredG) : null,
-    shotMachineG: machineShotG,
-    shotUtil,
+    shotMachineG: cap.shotCapacityGrams,
+    shotUtil: checks.shotUtil,
   };
 }
 
