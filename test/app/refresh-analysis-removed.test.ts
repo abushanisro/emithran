@@ -26,9 +26,10 @@ describe("no Refresh Analysis action", () => {
     expect(hits).toEqual([]);
   });
 
-  it("the manufacturing-intelligence page starts Apply Scenario with the analysis run", () => {
+  it("the manufacturing-intelligence page applies a scenario as one backend request, which makes the analysis current itself", () => {
     const page = readFileSync(join(ROOT, "app/(dashboard)/projects/[id]/bom/[bomId]/items/[itemId]/manufacturing-intelligence/page.tsx"), "utf8");
-    expect(page).toContain("useAnalysisRun(item.id)");
-    expect(page).toMatch(/analysisRun\.mutateAsync\(\)[\s\S]{0,400}Applying manufacturing route/);
+    expect(page).toContain("useApplyScenario(item?.id)");
+    // The step-by-step client sequence (material record, route re-apply, volume commit as part of Apply) is gone.
+    for (const removed of ["autoAddMaterialCost", "reapplyExistingOrDefaultRoute", "autoAddProcessCosts", "useCreateRawMaterialCost"]) expect(page).not.toContain(removed);
   });
 });

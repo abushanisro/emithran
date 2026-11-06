@@ -66,6 +66,13 @@ describe('ScenarioApplicationService.apply', () => {
     expect(bomItems.update).toHaveBeenCalledWith('i1', { materialGrade: 'ABS', materialSource: 'manual' }, 'u', 't');
   });
 
+  it('the grade the part is already costed as keeps its source: Apply does not turn a drawing-read grade into a manual pick', async () => {
+    const { svc, bomItems } = build();
+    bomItems.findOne.mockResolvedValue({ id: 'i1', volume: 10, weight: 1, materialGrade: 'ABS', materialSource: 'drawing' });
+    await svc.apply({ bomItemId: 'i1', userId: 'u', organizationId: 'o', token: 't', request: { location: 'USA', materialGrade: 'ABS', route: { mode: 'auto' } } as never });
+    expect(bomItems.update).not.toHaveBeenCalled();
+  });
+
   it('batchSize null clears the override; omitted leaves it', async () => {
     const a = build(); await a.svc.apply(input({ batchSize: null }));
     expect(a.patches[0]).toMatchObject({ batchSize: null });

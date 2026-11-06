@@ -41,6 +41,8 @@ import { analysisNotReadyMessage, applyBlockReason } from '@/lib/analysis/analys
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useAnalysisRun } from '@/lib/api/hooks/useAnalysisRun';
+import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
+import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import {
@@ -66,8 +68,6 @@ import { adaptRoutesToTree, RouteTreeValidationError, type RouteNode } from '@/l
 import { selectTopRoutes, type RouteSortMode } from '@/lib/routing/route-sort';
 import type { WorkflowRouteStep } from '@/lib/routing/route-step';
 import { sequenceProcessRows } from '@/lib/routing/process-sequence';
-import { resolveLineSetup, roundSetupMinutes } from '@/lib/costing/process-line-setup';
-import { deriveMaterialUsage } from '@/lib/costing/material-usage';
 
 
 import { ModelViewer } from '@/components/ui/model-viewer';
@@ -78,7 +78,7 @@ import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { useBOMItem, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -95,7 +95,7 @@ import { useSmLookupTables, type ReferenceTable } from '@/lib/api/hooks/useProce
 import { useRawMaterials, useRawMaterialFilterOptions } from '@/lib/api/hooks/useRawMaterials';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
-import { useCreateRawMaterialCost, useRawMaterialCosts } from '@/lib/api/hooks/useRawMaterialCosts';
+import { useRawMaterialCosts } from '@/lib/api/hooks/useRawMaterialCosts';
 import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // useSecondaryProcesses is still used below to feed the main process tree
 // (treeProps -> buildProcessTree's secondaryLines) -- only the dedicated
@@ -115,7 +115,7 @@ import { ProcessCostDialog } from '@/components/features/process-planning/Proces
 import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
 import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
 import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
-import { useCreateProcessCost, useUpdateProcessCost, useDeleteProcessCost, useProcessCosts, type CreateProcessCostDto } from '@/lib/api/hooks/useProcessCosts';
+import { useCreateProcessCost, useUpdateProcessCost, useDeleteProcessCost, useProcessCosts } from '@/lib/api/hooks/useProcessCosts';
 import { usePackagingLogisticsCosts } from '@/lib/api/hooks/usePackagingLogisticsCosts';
 import { useProcuredPartsCosts } from '@/lib/api/hooks/useProcuredPartsCosts';
 import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
@@ -1534,19 +1534,8 @@ function CostSummaryTab({
   const deleteProcCost = useDeleteProcessCost();
   const sortedStoredProcs = [...(existingProcRecords?.records ?? [])].sort((a: any, b: any) => (a.opNbr || 0) - (b.opNbr || 0));
 
-  // NOTE: there used to be an auto-resync effect here that re-linked saved
-  // process rows to the current Digital Factory's live machine/labour rates
-  // on every Apply. Removed — it raced against reapplyExistingOrDefaultRoute/
-  // autoAddProcessCosts (top-level, see runApplyScenario), which ALREADY
-  // deactivates and fully recreates every process_cost_records row from the
-  // live engine on every non-manual-routing Apply. Two independent processes
-  // both mutating the same rows in the same Apply click produced exactly the
-  // flip-flopping/inflating numbers this was meant to fix — confirmed live:
-  // "Re-synced 6 process rows..." and "Process cost added successfully" x6
-  // firing together, one process updating rows the other was mid-deactivating.
-  // autoAddProcessCosts's own currency-unit bug (display-currency values sent
-  // as if native-local) is the fix that actually matters, and it now lives
-  // there, the single place that recreates these rows.
+  // There is no effect here that re-links saved process rows to the live rates: Apply Scenario rewrites every process row from the engine in one
+  // backend request (scenario-applications), so a second writer in the same click would only fight it.
 
   // `opNbrIfNew` is used ONLY when this line has no saved record yet and the
   // dialog is about to create one. It used to be a render index turned into
@@ -2162,8 +2151,7 @@ function CostSummaryTab({
                       // existing row's own location column also often null) it
                       // falls back to getCurrencyForLocation('') -> 'USD',
                       // making the conversion a no-op and storing the native
-                      // value verbatim mislabeled USD. Same root cause fixed in
-                      // autoAddProcessCosts above.
+                      // value verbatim mislabeled USD.
                       const displayRate = candidate?.hourlyRate ?? 0;
                       updateProcCost.mutate({
                         id: proc.id,
@@ -4777,21 +4765,18 @@ function CostGuidePanel({
   // this panel's own ~13s cost-summary query.
   resolvedInputs: ResolvedCostingInputs | null;
   /** Resolves false when the staged route could not be applied (nothing was written for it). */
-  applyScenario: (extraPatch?: Record<string, unknown>) => Promise<boolean>;
+  applyScenario: (staged: { annualVolumeDraft: number | null; materialGrade: string; scenarioPatch?: Record<string, unknown> }) => Promise<ScenarioApplicationResult | null>;
   onManualClick: () => void;
   selectedManualRoute: ManualRouteOption | null;
   onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
 }) {
-  const queryClient = useQueryClient();
   type LeftTab = 'scenario' | 'geo' | 'gdt' | 'features' | 'machine';
   const [tab, setTab] = useState<LeftTab>('scenario');
   const [leftAppliedRouteId, setLeftAppliedRouteId] = useState<string | null>(null);
-  const applyRoute = useApplyRoute(item.id);
   // Apply Scenario starts with the analysis: the backend makes it current (a no-op when it is), so the user never starts one by hand. It only waits
   // while the casting analysis it started is still running.
   const analysisStatus = useAnalysisStatus(item.id);
   const applyBlock = applyBlockReason(analysisStatus.data);
-  const analysisRun = useAnalysisRun(item.id);
   const [productLine, setProductLine] = useState('');
   const [matPickerOpen, setMatPickerOpen] = useState(false);
   // Apply Scenario confirmation + progress — the apply-route/apply-custom-route
@@ -4897,572 +4882,8 @@ function CostGuidePanel({
     })
     .slice(0, 18);
 
-  // ── Auto-add raw material cost when material grade is applied ─────────────
-  const createRawMatCost = useCreateRawMaterialCost();
-
-  // ── Auto-add process costs when material grade is applied ──────────────────
-  const createProcessCost = useCreateProcessCost();
   // React Query deduplicates by key — resolves from cache when CostSummaryTab already called it
   const { data: cgpCostSummary } = useCostSummary(item.id, batchSize, factory);
-
-  // Synchronous guard — prevents duplicate records when SET is clicked rapidly
-  // (React Query cache can be stale between two fast consecutive calls)
-  const autoAddLock = useRef<Set<string>>(new Set());
-
-  // `factory` is a prop, captured by value in whatever render created the
-  // currently-executing async closure. runApplyScenario calls applyScenario()
-  // (which does setFactory(factoryDraft) in the PARENT) and then, in the SAME
-  // tick, calls autoAddMaterialCost/reapplyExistingOrDefaultRoute below —
-  // long before the parent's re-render can flow the new `factory` prop back
-  // down here. Reading bare `factory` at that point silently uses the
-  // location the user just switched AWAY from. locationOverride lets
-  // runApplyScenario pass factoryDraft (the value `factory` is actively
-  // becoming) explicitly instead of waiting on a prop update that hasn't
-  // happened yet — the same class of stale-closure hazard already handled
-  // for applyManualMachineOverride/AnalysisTabsPanel via `scenarioDirty ?
-  // factoryDraft : factory` at the ManufacturingIntelligencePage level.
-  const fetchFreshCostSummary = async (loc: string) => {
-    try {
-      return await queryClient.fetchQuery<CostSummaryDto>({
-        queryKey: costSummaryQueryKey(item.id, batchSize, loc),
-        queryFn: () => apiClient.get<CostSummaryDto>(
-          costSummaryUrl(item.id, batchSize, loc),
-          { timeout: 180000 },
-        ),
-        staleTime: 1000 * 60 * 5,
-      });
-    } catch {
-      return undefined;
-    }
-  };
-
-  const autoAddProcessCosts = async (locationOverride?: string) => {
-    if (autoAddLock.current.has('process')) return;
-    autoAddLock.current.add('process');
-    const loc = locationOverride ?? factory;
-    try {
-      // Fresh server check so stale React Query cache doesn't block re-creation
-      // after a material-grade change (when the Apply button has already deactivated old records).
-      try {
-        const freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
-          params: { bomItemId: item.id, isActive: true, page: 1, limit: 5 },
-        });
-        if ((freshProcs?.records?.length ?? 0) > 0) return;
-      } catch { /* pre-check failure — fall through */ }
-
-      // Always read from the live query cache — the closure-captured cgpCostSummary
-      // was fetched before material grade was set and has empty processLines.
-      // When `loc` differs from the still-stale `factory` prop, the cache was
-      // never populated under this key either — fetch it fresh so the machine/
-      // labour selection below reflects the NEW location, not the old one.
-      const liveSummary = queryClient.getQueryData<typeof cgpCostSummary>(
-        costSummaryQueryKey(item.id, batchSize, loc),
-      );
-      const freshSummaryForProcess = liveSummary ?? (loc !== factory ? await fetchFreshCostSummary(loc) : cgpCostSummary);
-      const lines = freshSummaryForProcess?.processLines ?? [];
-      if (!lines.length) return;
-      // The batch these very lines were amortised over. Read off the summary
-      // being written, never from this component's request state: setupTimeMins
-      // below INVERTS the engine's own division, so using any other number
-      // silently back-derives a setup time the engine never computed and
-      // persists it onto the row.
-      const summaryBatchSize = freshSummaryForProcess?.resolvedInputs.batchSize
-        ?? freshSummaryForProcess?.batchSize;
-      if (summaryBatchSize === undefined) return;
-      // line.hourlyRate/labourRate/machineSelection candidates are already
-      // converted to the scenario's DISPLAY currency (see
-      // normalizeCostSummaryToCurrency) — e.g. ₹ for an India/China factory
-      // scenario priced in INR. process_cost_records.machineRate/laborRate
-      // must always be USD; the create endpoint re-derives USD itself via
-      // toUsdCreate(value, rowLocation), treating whatever number it's given
-      // as ALREADY being in that row's location's OWN native currency (¥ for
-      // China) — never the scenario's display currency. Sending a display
-      // value straight through was silently mis-converted every time a route
-      // got (re)applied (confirmed live: a real $21.26/hr China machine was
-      // persisted as machineRate≈$301.7/hr — an ~14x inflation, the exact
-      // CNY→INR reference rate — repeating on every Apply since this
-      // function recreates every row from scratch). Dividing by toUsdRate
-      // (the same native→display factor normalizeCostSummaryToCurrency
-      // itself used) recovers the real native-currency figure the backend
-      // expects, so it converts back to the correct USD value.
-      // `?? 1` alone doesn't catch a literal 0 (nullish coalescing only
-      // replaces null/undefined) — dividing by a real 0 would send Infinity
-      // as machineRate/laborRate, which a NUMERIC DB column rejects outright,
-      // silently failing the whole row's creation.
-      const toUsdRateForProcess = freshSummaryForProcess?.toUsdRate || 1;
-      const toNativeLocalForProcess = (displayValue: number) => displayValue / toUsdRateForProcess;
-      for (const [i, line] of lines.entries()) {
-        // process_cost_records.cycle_time is NUMERIC(12,2) — round to 2dp,
-        // not to a whole integer (see the matching fix on the Calculator
-        // button handlers above for why that silently loses real precision).
-        const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
-        // A genuine physics gap (physicsGap present — see cost-breakdown.dto.ts's
-        // doc comment) leaves cycleTimeMin at a real, unresolved 0, never a
-        // guessed number. CreateProcessCostDto requires cycleTime >= 1 (a
-        // process cannot take zero time), so persisting this row would mean
-        // either failing validation (the "Time must be 1 or greater" 400 this
-        // was silently retrying on every Apply) or fabricating a fake cycle
-        // time to satisfy it — both wrong. Skip the line instead; the gap is
-        // already surfaced to the user via the cost.warnings banner above.
-        if (cycleTimeSec < 1) continue;
-        // The engine's exact, un-amortised setup minutes and real crew size,
-        // read straight off the line. This path PERSISTS them, so the previous
-        // reverse-derivation from the rounded amortised setupCost did real
-        // damage: at batch 100,000 a genuine 4.8-minute laser setup and a
-        // 5.0-minute PEM setup were both written as 0.0, which is what put
-        // "Setup (0.0 min / 100000) $0.00" on every row of the Cost Guide.
-        // The backend's own apply-route writer has read line.setupTimeMin /
-        // line.operators directly since the machine-spec work; this brings the
-        // auto-fill path onto the same contract. See process-line-setup.ts.
-        const lineSetup = resolveLineSetup(line, summaryBatchSize);
-        const setupTimeMins = roundSetupMinutes(lineSetup.setupTimeMin);
-        // Link the real recommended machine (same one the ⭐ picker already
-        // shows) instead of leaving mhrId unset — otherwise every
-        // auto-created row reads "Manual rate — not linked to a machine"
-        // even though a specific real machine was already identified for it.
-        const recommendedCandidate = line.machineSelection?.balanced?.candidate;
-        const machineRateDisplay = recommendedCandidate?.hourlyRate ?? line.hourlyRate;
-        const laborRateDisplay = line.labourRate ?? 0;
-        const payload: CreateProcessCostDto = {
-          bomItemId: item.id,
-          opNbr: (i + 1) * 10,
-          // ROOT CAUSE (confirmed live, 2026-09-18): `operation` is the field
-          // engine-generated lines identify themselves through (see this
-          // DTO's own doc comment: "engine-generated lines... NULL [category],
-          // identify themselves through `operation`"). line.operation is a
-          // real identity, but it's resolved PURELY by machine class
-          // (processIdentityByMachineClass, one entry per class) — every
-          // real, distinct line on the same machine (e.g. a 2-Axis Bar Feed
-          // Lathe's "Rough Turning"/"Finish Turning"/"Boring/Drilling") shares
-          // the identical class-level identity string. Saving that instead
-          // of line.process (the engine's own distinct per-line name)
-          // collapsed all three into one repeated label in the Manufacturing
-          // Process tree ("2 Axis Bar Feed Lathe with Sub Spindle" x3).
-          // line.process is always real and always distinct; prefer it.
-          // (`|| ''` only satisfies exactOptionalPropertyTypes' string
-          // requirement -- line.process is a required field on
-          // ProcessLineCost and always populated by makeLine(), so this
-          // fallback is never actually reached.)
-          operation: line.process || line.operation || '',
-          // The machine's own HR Rates group (what the Process picker lists),
-          // else the catalog identity. Neither = left empty: the dialog then
-          // reads it off the linked machine. Never guessed from the class.
-          ...((line.machineSelection?.balanced?.candidate?.processGroup ?? line.processGroup)
-            ? { processGroup: (line.machineSelection?.balanced?.candidate?.processGroup ?? line.processGroup)! }
-            : {}),
-          processRoute: line.processRoute || line.process,
-          // ROOT CAUSE (confirmed live): without this, the backend's own
-          // create() does getCurrencyForLocation(undefined ?? '') -> 'USD',
-          // making toUsdCreate a no-op (rate * convertStrict('USD','USD') =
-          // rate * 1) -- so the native-currency value below (correctly
-          // recovered from the display-currency line via toNativeLocalForProcess)
-          // was being stored VERBATIM and mislabeled currency='USD' instead of
-          // actually being converted. Every "inflated rate" bug this session
-          // traced back to this one missing field, not the conversion math.
-          location: loc,
-          machineRate: toNativeLocalForProcess(machineRateDisplay),
-          laborRate: toNativeLocalForProcess(laborRateDisplay),
-          directRate: toNativeLocalForProcess(machineRateDisplay),
-          indirectRate: 0,
-          fringeRate: 0,
-          machineValue: 0,
-          cycleTime: cycleTimeSec,
-          setupTime: setupTimeMins,
-          setupManning: lineSetup.setupManning,
-          batchSize: summaryBatchSize,
-          heads: 1,
-          partsPerCycle: 1,
-          scrap: 0,
-          // Deliberately omitted rather than set to a literal 8. This payload is
-          // assembled from a resolved machine, and the real hours/day for it is
-          // shifts_per_day x hours_per_shift on its own mhr_records row — not a
-          // constant. The column is disclosure only (the cost engine declares
-          // shiftPatternHoursPerDay but no calculation reads it), so leaving it
-          // unset is honest where a hardcoded 8 was not.
-          isActive: true,
-        };
-        if (recommendedCandidate?.machineId) payload.mhrId = recommendedCandidate.machineId;
-        // Inspection (and any other class priced via a flat resource rate,
-        // not the CNC/laser-style machineSelection candidate list) has no
-        // machineSelection candidate, but DOES carry a real resolved
-        // mhrId/benchmarkMhrId directly on the line (see finalizeInspectionLine
-        // in inspection-engine.ts). Without this, every such auto-created row
-        // persisted with no machine link at all, so it displayed "Manual rate
-        // — not linked to a machine" forever, even though a real, priced
-        // resource was used for its rate. machineName itself is never sent —
-        // the backend always derives it server-side from mhrId/benchmarkMhrId.
-        if (!payload.mhrId && (line as any).mhrId) payload.mhrId = (line as any).mhrId;
-        if (!payload.mhrId && (line as any).benchmarkMhrId) payload.benchmarkMhrId = (line as any).benchmarkMhrId;
-        try {
-          await createProcessCost.mutateAsync(payload);
-        } catch (err) {
-          // Individual line failure is non-fatal to the rest of the loop, but
-          // silently swallowing it left "· not saved" with no way to tell WHY
-          // (bad payload value, validation error, etc.) — log it so the real
-          // cause is visible instead of having to guess blind.
-          console.error(`[autoAddProcessCosts] failed to create "${payload.operation ?? '(no operation)'}":`, err, payload);
-        }
-      }
-    } finally {
-      autoAddLock.current.delete('process');
-    }
-  };
-
-  const autoAddMaterialCost = async (grade: string, locationOverride?: string) => {
-    if (autoAddLock.current.has('material')) return;
-    autoAddLock.current.add('material');
-    const loc = locationOverride ?? factory;
-
-    try {
-      // Live nesting-derived weights -- fetched BEFORE the existing-record
-      // guard below, so that guard can detect when a persisted record has
-      // gone stale relative to the CURRENT nesting/costing result, not just
-      // when material grade changed. Confirmed live: a record created
-      // before this true-shape costing fix landed kept reporting its OLD
-      // netUsage/scrap% forever (grossUsage happened to already be correct,
-      // so comparing gross alone would NOT have caught this -- netUsage is
-      // the field that actually goes stale here).
-      const liveSummaryForStaleness = queryClient.getQueryData<typeof cgpCostSummary>(
-        costSummaryQueryKey(item.id, batchSize, loc),
-      );
-      const freshSummaryForStaleness = liveSummaryForStaleness ?? (loc !== factory ? await fetchFreshCostSummary(loc) : cgpCostSummary);
-      const rawLiveGrossKgForStaleness = freshSummaryForStaleness?.grossWeightKg ?? 0;
-      const liveGrossKgForStaleness = rawLiveGrossKgForStaleness > 0 ? rawLiveGrossKgForStaleness : null;
-      const rawLiveNetKgForStaleness = freshSummaryForStaleness?.blankSpec?.netWeightKg ?? 0;
-      const liveNetKgForStaleness = rawLiveNetKgForStaleness > 0 ? rawLiveNetKgForStaleness : null;
-
-      // Fresh server check — stale React Query cache after a deletion would incorrectly
-      // block creation if we relied on `existingRawCosts` (stale until background refetch).
-      // Only bail out if there's a record with a meaningful cost (totalCost > 0).
-      // Zero-cost records from before the weight fix must be ignored so the correct
-      // record can be created (the zero records are cleaned up server-side by the replace).
-      let fresh: { records: any[] } | undefined;
-      try {
-        fresh = await apiClient.get<{ records: any[] }>('/raw-material-costs', {
-          params: { bomItemId: item.id, isActive: true, page: 1, limit: 10 },
-        });
-      } catch (e) {
-        // raw-material-costs.service.ts's create() has no server-side "deactivate
-        // existing active rows for this bom item first" step — it always inserts a
-        // fresh active row. Proceeding here on a failed pre-check (as this used to,
-        // trusting the server to "enforce uniqueness" — it doesn't) would create a
-        // second active material cost row alongside whatever is already active,
-        // doubling Direct Material Costs. Abort instead.
-        console.error('[autoAddMaterialCost] failed to read existing raw material costs:', e);
-        toast.error('Could not verify the current material cost record — Apply was aborted to avoid a duplicate. Please retry.');
-        return;
-      }
-      {
-        const records = fresh?.records ?? [];
-        const existingForGrade = records.find((r: any) => (r.totalCost ?? 0) > 0 && r.materialName === grade);
-        // A record for this grade is only "still valid" if its stored
-        // net/gross usage still agree with the CURRENT live nesting result
-        // -- not merely because the grade hasn't changed. A >1% relative
-        // disagreement on EITHER means the underlying nesting/costing
-        // result has moved on since this record was created (a geometry
-        // re-analysis, a sheet-size change, or a costing-formula fix like
-        // this one), and the record must be rebuilt, never left frozen.
-        const relDiff = (stored: number, live: number) => (live > 0 ? Math.abs(stored - live) / live : 0);
-        const staleAgainstLiveNesting = !!existingForGrade && (
-          (liveGrossKgForStaleness !== null && relDiff(Number(existingForGrade.grossUsage ?? 0), liveGrossKgForStaleness) > 0.01) ||
-          (liveNetKgForStaleness !== null && relDiff(Number(existingForGrade.netUsage ?? 0), liveNetKgForStaleness) > 0.01)
-        );
-        // Geometry (gross/net usage) doesn't change when only the Digital
-        // Factory location changes -- the price PER KG does. Without this,
-        // switching factory and clicking Apply left the material's unit_cost
-        // frozen at whatever location it was originally priced for forever,
-        // since the geometry-only staleness check above always still agreed.
-        const staleAgainstLocation = !!existingForGrade && (existingForGrade.country ?? '') !== loc;
-        const hasValidRecordForThisGrade = !!existingForGrade && !staleAgainstLiveNesting && !staleAgainstLocation;
-        if (hasValidRecordForThisGrade) return;
-        // Mark ALL active records inactive — the grade changed, the record
-        // is stale against the live nesting result or the Digital Factory
-        // location, or it had $0 cost. This replaces stale material records
-        // cleanly without leaving ghost entries.
-        const staleIds = records.map((r: any) => r.id as string).filter(Boolean);
-        const failedIds: string[] = [];
-        for (const id of staleIds) {
-          try {
-            await apiClient.put(`/raw-material-costs/${id}`, { isActive: false });
-          } catch (e) {
-            failedIds.push(id);
-            console.error(`[autoAddMaterialCost] failed to deactivate raw material cost ${id}:`, e);
-          }
-        }
-        if (failedIds.length > 0) {
-          // create() below always inserts a new active row with no server-side
-          // dedup — proceeding while a stale row is still active produces two
-          // active material cost records for this bom item.
-          toast.error(`Could not clear ${failedIds.length} existing material cost row(s) — Apply was aborted to avoid a duplicate. Please retry.`);
-          return;
-        }
-      }
-      // Look up material -- exact name first (already-loaded caches), then the
-      // server's RANKED search for a loose grade ("6061", "IS2062 E250 CRCA").
-      // The ranker is the same deterministic one the costing engine resolves
-      // material with (exact > alias > designation > cross-standard > prefix,
-      // base grade over suffix variants), and it flags `matchIsBest` on a row
-      // ONLY when the term is unambiguous -- so this record and the engine
-      // agree on one row, and a bare family name ("ALUMINUM") selects nothing
-      // instead of whichever row sorted first. The old client-side token
-      // scoring broke ties by list order and only ran for multi-word grades.
-      const exactMatchMat = (m: RawMaterial) =>
-        materialLabel(m.material, m.materialGrade) === grade ||
-        m.materialGrade === grade ||
-        m.material === grade;
-
-      let mat: RawMaterial | undefined =
-        allMatsData?.items?.find(exactMatchMat) ??
-        dbMaterialsForValidation?.items?.find(exactMatchMat);
-
-      if (!mat) {
-        try {
-          const resp = await apiClient.get<{ items: RawMaterial[] }>('/raw-materials', { params: { search: grade, limit: 10 } });
-          mat = resp?.items?.find(exactMatchMat) ?? resp?.items?.find((m) => m.matchIsBest);
-        } catch { /* lookup failure is non-fatal */ }
-      }
-
-      const density = mat?.densityKgM3 ?? null;
-
-      // Weight chain — order depends on part family:
-      //
-      // item.volume and item.weight are BOTH snapshots captured once at CAD
-      // upload time from the drawing's own detected thickness. Neither is
-      // recomputed when Blank Thickness's Manual Override changes — so for a
-      // sheet metal part with an active thickness override, both are stale
-      // by construction (e.g. baked in at CAD's 1.5mm while the effective/
-      // costed thickness is 2mm), regardless of whether the material's real
-      // density is known. Confirmed live: a 2mm SS304 part with a 3,245 mm²
-      // flat pattern (expected ~0.05-0.06 kg) came out as 0.0138 kg — right
-      // in line with item.weight's 1.5mm-CAD-thickness snapshot, not the 2mm
-      // override.
-      //
-      // The engine's own grossWeightKg is the only source that's always
-      // live-recomputed from flatPatternAreaMm2 × the EFFECTIVE (override-
-      // aware) thickness (see resolveEffectiveSheetThicknessMm in
-      // getCostSummary) — so for sheet metal it is the authoritative weight,
-      // even when the real material's density isn't in raw_materials yet
-      // (that gap only affects price/density, not geometry, and is already
-      // surfaced by its own warning banner).
-      //
-      // For non-sheet-metal (machined/solid) parts there's no flat-pattern
-      // concept or thickness override to go stale against, so item.volume ×
-      // a real DB density remains the most accurate source there.
-      //
-      // Read from live query cache — closure-captured cgpCostSummary is stale (ran before
-      // material grade was set), so grossWeightKg there is 0. After Apply triggers a refetch,
-      // the cache holds the correct value even though the closure variable hasn't updated.
-      const liveSummary = queryClient.getQueryData<typeof cgpCostSummary>(
-        costSummaryQueryKey(item.id, batchSize, loc),
-      );
-      const freshSummary = liveSummary ?? (loc !== factory ? await fetchFreshCostSummary(loc) : cgpCostSummary);
-      const rawEngineGrossKg = freshSummary?.grossWeightKg ?? 0;
-      const engineGrossKg = rawEngineGrossKg > 0 ? rawEngineGrossKg : null;
-      // Real per-part net weight straight from the nesting engine
-      // (computeNesting's mass-based formula, or the true-shape override --
-      // see bom-items.service.ts's blankSpec construction) -- NEVER derived
-      // from an assumed scrap% here. Confirmed live: deriving net weight as
-      // grossUsage*(1-10%) instead of reading this real value silently
-      // discarded the part's actual CAD net weight, and a real ~40% scrap
-      // (59.7% utilization on an irregular frame part) got recorded to
-      // Direct Material Costs as a fake, frozen 10%.
-      const rawEngineNetKg = freshSummary?.blankSpec?.netWeightKg ?? 0;
-      const engineNetKg = rawEngineNetKg > 0 ? rawEngineNetKg : null;
-      const cadWeight = typeof item.weight === 'number' && item.weight > 0 ? item.weight : null;
-      const isSheetMetalPart = fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0;
-      // Real sheet nesting, else the real machining stock the blank optimizer
-      // selected (stock volume x density -- the same figure the engine prices
-      // material on), else a disclosed net/(1-10%) estimate used only when
-      // neither exists yet (cost summary still loading, or density unresolved).
-      // See deriveMaterialUsage: the estimate must never override a real
-      // stock weight, which was the bug for machined parts.
-      const { grossUsage, netUsage, scrapPct: scrap } = deriveMaterialUsage({
-        blankSpec: freshSummary?.blankSpec,
-        isSheetMetal: isSheetMetalPart,
-        engineGrossKg,
-        engineNetKg,
-        itemVolumeMm3: item.volume,
-        densityKgM3: density,
-        cadWeightKg: cadWeight,
-        castingMetal: freshSummary?.dieCasting?.metal ?? null,
-      });
-
-      // Location-based pricing. localCurr always matches the CURRENT factory's
-      // own native currency (parsed from the same `factory` string as the
-      // regional column pick below), so freshSummary's own live rates convert
-      // it correctly — never a hardcoded per-currency table that drifts out
-      // of date against the real exchange_rates data (the exact bug already
-      // fixed in RawMaterialDialog.tsx/useExchangeRates.ts this session).
-      // toUsdRate = native->display, usdToDisplayRate = USD->display, so
-      // toUsdRate/usdToDisplayRate = native->USD.
-      let unitCost = 0;
-      if (mat) {
-        const locLower = (loc || '').toLowerCase();
-        let localAmt = 0;
-        if      (locLower.includes('india'))       { localAmt = mat.costIndia   ?? 0; }
-        else if (locLower.includes('usa'))         { localAmt = mat.costUsa     ?? 0; }
-        else if (locLower.includes('china'))       { localAmt = mat.costChina   ?? 0; }
-        else if (locLower.includes('germany'))     { localAmt = mat.costGermany ?? 0; }
-        else if (locLower.includes('france'))      { localAmt = mat.costFrance  ?? 0; }
-        else if (locLower.includes('w. europe') || locLower.includes('western europe')) { localAmt = mat.costWEurope ?? 0; }
-        else if (locLower.includes('e. europe') || locLower.includes('eastern europe')) { localAmt = mat.costEEurope ?? 0; }
-        else if (locLower.includes('mexico'))      { localAmt = mat.costMexico  ?? 0; }
-        if (!localAmt) localAmt = Number(mat.cost ?? mat.unitCost ?? 0);
-        const nativeToUsd = (freshSummary?.toUsdRate ?? 1) / (freshSummary?.usdToDisplayRate ?? 1);
-        unitCost = localAmt * nativeToUsd;
-      }
-
-      // Fallback: DB has no pricing — use the engine's materialCostPerKg, which
-      // is already in the DISPLAY currency (cost.currency), converted back to
-      // USD for storage (raw_material_cost_records.unit_cost is always USD).
-      // Dividing by usdToDisplayRate (USD→display), NOT multiplying by
-      // toUsdRate (which converts a DIFFERENT thing — the factory's own
-      // native-currency figures — see cost-breakdown.dto.ts's doc comment).
-      if (!unitCost) {
-        const usdToDisplay = freshSummary?.usdToDisplayRate ?? 1;
-        unitCost = (freshSummary?.materialCostPerKg ?? 0) / usdToDisplay;
-      }
-
-      await createRawMatCost.mutateAsync({
-        bomItemId: item.id,
-        ...(mat?.id ? { materialId: mat.id } : {}),
-        materialName: grade,
-        materialGroup: mat?.materialGroup,
-        materialType: mat?.materialType,
-        materialDescription: mat?.materialDescription,
-        country: loc,
-        netUsage,
-        grossUsage,
-        scrap,
-        overhead: 5,
-        reclaimRate: 0,
-        unitCost,
-        isActive: true,
-      } as any);
-    } catch (e) {
-      console.error('[autoAddMaterialCost] failed:', e);
-    } finally {
-      autoAddLock.current.delete('material');
-    }
-  };
-
-  // Re-applies whatever manufacturing route is currently in effect — a
-  // staged Workflow Builder pick, or an already-persisted route re-applied
-  // with fresh material/batch/location — instead of blindly recreating the
-  // engine's own default route. Every place that changes material grade
-  // (Enter, dropdown pick, the mini "Apply" badge, drawing-suggested
-  // "Apply") used to call autoAddProcessCosts() directly, which silently
-  // discarded an explicitly-chosen alternate route (e.g. Turret Punching)
-  // and replaced it with the engine default (Laser Cut + Bend Brake +
-  // Deburr) every single time — confirmed live via process_cost_records
-  // showing notes=null (never auto_fill_from_route/auto_fill_from_custom_
-  // route) across an entire test session despite a manual route being
-  // staged throughout.
-  // No manual route staged this session — re-apply whatever route is
-  // already persisted (so a material-grade-only change doesn't silently
-  // revert an earlier explicit pick), else fall back to the engine's own
-  // default route. Called by the bottom "Apply" button's own material-grade
-  // branch (which has already called
-  // applyScenario() itself when a route WAS staged, so it skips this).
-  const reapplyExistingOrDefaultRoute = async (locationOverride?: string) => {
-    // Guards the WHOLE deactivate-then-recreate sequence, not just the create
-    // step inside autoAddProcessCosts — without this, two overlapping calls
-    // (a real double-click, or a scenario Apply landing while a material-grade
-    // quick-apply from the sidebar is still in flight) could each fetch the
-    // same still-active rows, each deactivate them, then each independently
-    // recreate a full set — producing two active rows per operation with no
-    // error, since neither call ever saw the other's writes.
-    if (autoAddLock.current.has('route')) return;
-    autoAddLock.current.add('route');
-    const loc = locationOverride ?? factory;
-    const routingMode = processRouting;
-    try {
-      let existingRouteId: string | null = null;
-      let freshProcs: { records: any[] } | undefined;
-      try {
-        freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
-          params: { bomItemId: item.id, isActive: true, page: 1, limit: 50 },
-        });
-        for (const r of (freshProcs?.records ?? [])) {
-          const m = /^auto_fill_from_route:(.+)$/.exec(r?.notes ?? '');
-          if (m) { existingRouteId = m[1] ?? null; break; }
-        }
-      } catch (e) {
-        // Can't tell whether a route is already applied — do NOT fall through
-        // to the "no route" default-create path below, which would add a
-        // second full set of rows on top of whatever is already active.
-        console.error('[reapplyExistingOrDefaultRoute] failed to read existing process costs:', e);
-        toast.error('Could not verify the current process routing — Apply was aborted to avoid creating duplicate rows. Please retry.');
-        return;
-      }
-
-      // ── Automatic routing: re-evaluate the candidate routes ────────────────
-      // The defect this closes: automatic routing never consulted the route
-      // comparison at all. It re-applied whatever route id was already stamped
-      // on the persisted records, and when there was none it copied a fixed
-      // default line set — so the backend could cost fifteen candidate routes,
-      // rank them, and have that result reach nothing. A cheaper applicable
-      // route could not win no matter what the real data said.
-      //
-      // Automatic routing asks the SERVER to apply its own recommendation
-      // (routeId 'auto'). The server chooses it from the very comparison it then
-      // applies with, so the choice and the costing can never come from two
-      // computations, and there is no separate ~100 s comparison fetch here. Batch
-      // size, annual volume and production life reach that decision through the
-      // one canonical resolver, from the scenario applyScenario has just written.
-      //
-      // Manual routing deliberately does NOT come through here: a route the
-      // user chose is re-applied as-is, never replaced by the recommendation.
-      // When no route is both feasible and fully costed, the server refuses (the
-      // mutation's onError toast says why) and writes nothing, so whatever route is
-      // already applied stays. A failed request must never downgrade to the fixed
-      // default line set.
-      const routeIdToApply: string | null = routingMode === 'auto' ? AUTO_ROUTE_ID : existingRouteId;
-
-      if (routeIdToApply) {
-        // applyRoute's backend endpoint deletes ALL active rows and inserts the
-        // new set in one request (writeProcessLinesAsRecords) — atomic from the
-        // client's point of view, no separate deactivation step needed here.
-        // It also persists the exact setupTimeMin/operators and the real
-        // machine_class and route id, which the default-create path below
-        // cannot, so this is the branch that produces a reproducible route.
-        try {
-          // No batchSize stated on purpose. applyScenario has already written
-          // the committed batch to scenario_overrides, and the server resolves
-          // from there — so this re-apply cannot rewrite the records at the
-          // batch that was current when this closure was created. That stale
-          // capture was the reason changing Batch Size and pressing Apply left
-          // Auto-routed rows amortised over the OLD batch.
-          await applyRoute.mutateAsync({ routeId: routeIdToApply, location: loc });
-        } catch { /* errors surfaced by the mutation's own onError toast */ }
-      } else {
-        // No backend bulk-replace exists for the ad-hoc "engine default route"
-        // path, so deactivation happens client-side, one row at a time. A
-        // failed deactivation here must NOT be swallowed — proceeding to
-        // autoAddProcessCosts afterward would leave that row active while a
-        // freshly recreated duplicate of the same operation also becomes
-        // active, which is exactly the "duplicate rows after Apply" defect.
-        const staleRows = (freshProcs?.records ?? []).filter((r) => !!r?.id);
-        const failedIds: string[] = [];
-        for (const r of staleRows) {
-          try {
-            await apiClient.put(`/process-costs/${r.id}`, { isActive: false });
-          } catch (e) {
-            failedIds.push(r.id);
-            console.error(`[reapplyExistingOrDefaultRoute] failed to deactivate process cost ${r.id}:`, e);
-          }
-        }
-        void queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
-        if (failedIds.length > 0) {
-          toast.error(`Could not clear ${failedIds.length} existing process cost row(s) — Apply was aborted to avoid duplicates. Please retry.`);
-          return;
-        }
-        await autoAddProcessCosts(loc);
-      }
-    } finally {
-      autoAddLock.current.delete('route');
-    }
-  };
 
   // ── Currency & Ask Price — real FX architecture ────────────────────────────
   // Factory currency is resolved server-side from LOCATION_INFO (the same
@@ -5563,7 +4984,6 @@ function CostGuidePanel({
       setAskPriceConvertBanner(null);
     }
   };
-  const { data: materialCandidates } = useMaterialIntelligence(item.id);
   const updateBOMItem = useUpdateBOMItem();
   const patchScenarioOverrides = usePatchScenarioOverrides();
   // A sand-cast part's casting analysis: only read (and polled) for sand casting.
@@ -5579,151 +4999,64 @@ function CostGuidePanel({
     () => optionsKeepingSelection(processGroupOptionsFrom(processCatalog?.mappings), selectedProcessGroup ?? ''),
     [processCatalog, selectedProcessGroup],
   );
-  // Fetch a broad slice of DB materials to validate AI candidates against.
-  // Candidates not present in the DB (e.g. ABS on a sheet-metal part) are hidden.
-  const { data: dbMaterialsForValidation } = useRawMaterials(
-    (materialCandidates?.length ?? 0) > 0 ? { limit: 500 } : undefined,
-  );
   const UNSPECIFIED_MATERIALS = new Set(['Unknown', 'Not specified', 'Not Specified', 'None', '']);
   const drawingMaterial = item.drawingIntelligence?.material;
   const hasDrawingMaterial = !!drawingMaterial && !UNSPECIFIED_MATERIALS.has(drawingMaterial.trim());
   const cadThicknessMm = summary?.sheetThicknessMm ?? 0;
 
-  // The actual apply logic — previously ran straight from the button's onClick
-  // with no confirmation and no visible progress. Now triggered only after the
-  // user confirms via the AlertDialog below, with applyProgress driving a
-  // step-by-step indicator instead of a single silent 12-60s wait.
+  // Apply Scenario is ONE backend operation (POST scenario-applications): it makes the analysis current, writes the scenario, the material cost record
+  // and the route, and stores the outcome. This only gathers what the form staged, sends it, and reports the result.
   const applyScenarioNow = async () => {
-    // Protected from the inactivity sign-out (up to 15 extra minutes): every
-    // step below is sent from this tab, so a sign-out midway would leave the
-    // item partly applied.
+    // Protected from the inactivity sign-out (up to 15 extra minutes): a sign-out midway would leave the request unanswered.
     const endProtectedJob = beginProtectedJob('apply-scenario');
-    setApplyProgress({ step: 'Analysing the part…', pct: 5 });
+    setApplyProgress({ step: 'Applying the scenario…', pct: 30 });
     try {
-      // 1. The analysis comes first: the route and the material cost are computed from it. The backend decides what is missing and runs exactly
-      // that, and does nothing when everything is current. Nothing is written until the analysis is ready.
-      try {
-        const notReady = analysisNotReadyMessage((await analysisRun.mutateAsync()).status);
-        if (notReady) {
-          toast.warning(notReady);
-          return;
+      // Currency & Ask Price ride in the same scenario patch. Only written when a real rate resolved (identity, live reference/budget, or a complete
+      // custom rate+reason): never a fabricated number under the applied scenario's identity.
+      let scenarioFxPatch: Record<string, unknown> | undefined;
+      if (resolvedFxRate) {
+        const fxSnapshot = {
+          factoryCurrency: factoryCurrencyInfo?.code ?? '',
+          scenarioCurrency: scenarioCurrencyDraft,
+          provider: resolvedFxRate.provider,
+          source: resolvedFxRate.source,
+          rate: resolvedFxRate.rate,
+          rateDate: resolvedFxRate.rateDate,
+          rateType: rateTypeDraft,
+          retrievedAt: new Date().toISOString(),
+          ...(rateTypeDraft === 'custom' ? { customReason: customReasonDraft.trim() } : {}),
+        };
+        // An unresolved convert/clear prompt after a currency change: Ask Price is left untouched rather than stamped with the new currency.
+        if (askPriceConvertBanner) {
+          toast.warning('Ask Price left unchanged — resolve the currency-change prompt (Convert or Clear) before it is saved under the new currency.');
         }
-      } catch (e: unknown) {
-        toast.error(`Analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
-        return;
+        const trimmedAskPrice = askPriceDraft.trim();
+        const askPriceNum = parseFloat(trimmedAskPrice);
+        const askPricePatch: { amount: number; currency: string } | null | undefined =
+          askPriceConvertBanner
+            ? undefined
+            : trimmedAskPrice === ''
+              ? null // explicit clear
+              : Number.isFinite(askPriceNum)
+                ? { amount: askPriceNum, currency: scenarioCurrencyDraft }
+                : undefined; // invalid / mid-typing: leave the saved value untouched
+        scenarioFxPatch = {
+          scenarioCurrency: scenarioCurrencyDraft, fxSnapshot,
+          ...(askPricePatch !== undefined ? { askPrice: askPricePatch } : {}),
+        };
       }
-      setApplyProgress({ step: 'Applying manufacturing route…', pct: 10 });
-      try {
-        const routeStagedThisSession = processRouting === 'manual' && !!selectedManualRoute;
-        // Annual volume first, and awaited: the batch size the route is applied
-        // at is derived from it server-side, so committing it after (or racing)
-        // applyScenario would apply the route at the OLD volume. No-ops when the
-        // field is unchanged. Reaching Apply without blurring the field is the
-        // normal case -- clicking the button is what blurs it -- so this cannot
-        // rely on onBlur having already fired and settled.
-        await commitAnnualVolume();
-        // Currency & Ask Price ride in the same scenario_overrides bag as factory/batch
-        // size (one atomic merge, merge_scenario_overrides), in the SAME request as
-        // applyScenario's own patch. Only written when a real rate resolved
-        // (identity, live reference/budget, or a complete custom rate+reason) —
-        // never a fabricated number under the applied scenario's identity.
-        let scenarioFxPatch: Record<string, unknown> | undefined;
-        if (resolvedFxRate) {
-          const fxSnapshot = {
-            factoryCurrency: factoryCurrencyInfo?.code ?? '',
-            scenarioCurrency: scenarioCurrencyDraft,
-            provider: resolvedFxRate.provider,
-            source: resolvedFxRate.source,
-            rate: resolvedFxRate.rate,
-            rateDate: resolvedFxRate.rateDate,
-            rateType: rateTypeDraft,
-            retrievedAt: new Date().toISOString(),
-            ...(rateTypeDraft === 'custom' ? { customReason: customReasonDraft.trim() } : {}),
-          };
-          // If the user changed Scenario Currency and hasn't yet resolved the
-          // ask-price-convert prompt (convert vs. clear), do NOT write Ask
-          // Price at all — silently stamping the old, unconverted number with
-          // the new currency would misrepresent it. The previously saved
-          // Ask Price (if any) is simply left untouched.
-          if (askPriceConvertBanner) {
-            toast.warning('Ask Price left unchanged — resolve the currency-change prompt (Convert or Clear) before it is saved under the new currency.');
-          }
-          const trimmedAskPrice = askPriceDraft.trim();
-          const askPriceNum = parseFloat(trimmedAskPrice);
-          const askPricePatch: { amount: number; currency: string } | null | undefined =
-            askPriceConvertBanner
-              ? undefined // unresolved convert/clear prompt — leave the existing saved value untouched
-              : trimmedAskPrice === ''
-                ? null // explicit clear
-                : Number.isFinite(askPriceNum)
-                  ? { amount: askPriceNum, currency: scenarioCurrencyDraft }
-                  : undefined; // invalid/mid-typing — leave the existing saved value untouched
-          scenarioFxPatch = {
-            scenarioCurrency: scenarioCurrencyDraft, fxSnapshot,
-            ...(askPricePatch !== undefined ? { askPrice: askPricePatch } : {}),
-          };
-        }
-        const routeApplied = await applyScenario(scenarioFxPatch);
-        if (!routeApplied) {
-          toast.error('Scenario not applied — the staged route was refused, see the message above. It has been cleared; Apply again to use the Auto-recommended route, or pick another route in the Workflow Builder.');
-          return;
-        }
-        setApplyProgress({ step: 'Saving material grade…', pct: 40 });
-
-        // Single commit point for Material Grade — every picker interaction above
-        // (typing, dropdown pick, Browse dialog, drawing suggestion) only stages
-        // matInputValue; nothing writes materialGrade to the server until here.
-        // materialSource: 'manual' is real provenance (migration 081): it's what
-        // lets the backend's costing precedence (bom-items.service.ts) trust this
-        // explicit selection is exactly that — explicit, not a guess.
-        const pendingGrade = matInputValue.trim();
-        if (pendingGrade && pendingGrade !== costedGrade(item)) {
-          try {
-            await updateBOMItem.mutateAsync({ id: item.id, data: { materialGrade: pendingGrade, materialSource: 'manual' } });
-          } catch { /* non-fatal — proceed with whatever is on the server */ }
-        }
-
-        setApplyProgress({ step: 'Updating material and process cost…', pct: 60 });
-
-        const currentGrade = pendingGrade || costedGrade(item);
-        if (currentGrade) {
-          setApplyProgress({ step: 'Updating material cost…', pct: 80 });
-          // Pass factoryDraft explicitly rather than relying on the `factory`
-          // prop: applyScenario() above just called setFactory(factoryDraft)
-          // in the parent, but that state update hasn't flowed back down as
-          // a new `factory` prop yet — this closure is still running against
-          // the render that started it. Without this, switching Digital
-          // Factory and clicking Apply silently re-priced material/machine/
-          // labour against the OLD location every time.
-          await autoAddMaterialCost(currentGrade, factoryDraft);
-
-          if (!routeStagedThisSession) {
-            setApplyProgress({ step: 'Re-applying process route…', pct: 90 });
-            await reapplyExistingOrDefaultRoute(factoryDraft);
-          }
-        }
-
-        // ONE cost-summary computation, after every write. It used to be forced
-        // here before the material and route writes, then refetched again by each
-        // write's own invalidation: up to three 35-95 s computations per Apply.
-        // cancelRefetch:false joins the fetch the last invalidation already started
-        // instead of cancelling and restarting it.
-        setApplyProgress({ step: 'Recalculating cost summary…', pct: 90 });
-        await queryClient.refetchQueries({
-          queryKey: ['bom-items', item.id, 'cost-summary'],
-          exact: false,
-          type: 'active',
-        }, { cancelRefetch: false });
-      } catch { /* outer safety net — never block the toast */ }
-
-      const appliedParts: string[] = [
-        processRouting === 'manual' && selectedManualRoute ? selectedManualRoute.label : 'Auto-recommended route',
-      ];
-      const gradeForToast = matInputValue.trim() || costedGrade(item);
-      if (gradeForToast) appliedParts.push(`Material: ${gradeForToast}`);
+      const result = await applyScenario({
+        annualVolumeDraft,
+        materialGrade: matInputValue.trim() || costedGrade(item),
+        ...(scenarioFxPatch ? { scenarioPatch: scenarioFxPatch } : {}),
+      });
+      if (!result) return;
+      const appliedParts: string[] = [result.route.routeLabel || 'Auto-recommended route'];
+      if (result.material) appliedParts.push(`Material: ${result.material.grade}`);
       if (batchSizeDraft !== null) appliedParts.push(`Batch: ${batchSizeDraft.toLocaleString()}`);
       appliedParts.push(`Location: ${factoryDraft}`);
       toast.success('Scenario applied', { description: appliedParts.join(' · ') });
+      for (const w of result.warnings) toast.warning(w);
     } finally {
       endProtectedJob();
       setApplyProgress(null);
@@ -9303,7 +8636,6 @@ export default function ManufacturingIntelligencePage() {
   const [processRouting, setProcessRouting] = useState<'auto' | 'manual'>('auto');
   const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const [selectedManualRoute, setSelectedManualRoute] = useState<ManualRouteOption | null>(null);
-  const applyRoute = useApplyRoute(item?.id);
   const [operationVisual, setOperationVisual] = useState<OperationVisual>(null);
   const [vizLabel, setVizLabel] = useState<string | null>(null);
   // 'USA'/250 are only the pre-load defaults — resynced below from this
@@ -9330,7 +8662,6 @@ export default function ManufacturingIntelligencePage() {
   // treating "untouched" as "auto" would silently discard a deliberate override
   // set in an earlier session.
   const [batchSizeAuto, setBatchSizeAuto] = useState(false);
-  const patchScenarioOverrides = usePatchScenarioOverrides();
   // Seed factory/batchSize (and their drafts) from the server's saved
   // scenario_overrides — but ONLY ONCE per item load, via the ref guard
   // below. Without the guard, this effect re-fires on EVERY refetch of
@@ -9459,118 +8790,55 @@ export default function ManufacturingIntelligencePage() {
   // Digital Factory/Batch Size + the staged Workflow Builder route together
   // and only THEN run its own material-grade-driven logic — there is no
   // longer a separate top "Apply Scenario" banner/button.
-  const applyScenario = async (extraPatch?: Record<string, unknown>): Promise<boolean> => {
-    let routeApplied = true;
-    const isDieCastPart = (item?.familyClassification ?? fg?.classification?.family) === 'die_cast';
-    setFactory(factoryDraft);
-    // Only an explicit override becomes a request param. On an auto request the
-    // committed copy is dropped so effectiveBatchSize falls through to the
-    // server-resolved (derived) value instead of pinning the old number.
-    if (batchSizeDraft !== null) setBatchSize(batchSizeDraft);
-    else if (batchSizeAuto) setBatchSize(undefined);
-    // The auto request is consumed by this apply. It has to be cleared, or
-    // scenarioDirty (which counts batchSizeAuto) would stay true forever and
-    // leave the unapplied-changes state showing after a successful apply.
-    setBatchSizeAuto(false);
-    if (item?.id) {
-      // productionLifeYears rides in the same override bag as location/batchSize
-      // — merge_scenario_overrides has no key whitelist, so it needs no schema
-      // change — and is read back by resolveCostingInputs on the server. Before
-      // this it was UI-only state that reached no calculation at all.
-      // One awaited request for the whole scenario (extraPatch carries currency and
-      // ask price): a second, un-awaited PATCH raced this one, doubled the
-      // invalidation waves, and was a fire-and-forget write nothing could fail.
-      try {
-      await patchScenarioOverrides.mutateAsync({
-        id: item.id,
-        patch: {
-          location: factoryDraft,
-          processRouting,
-          // Die casting: Manual = the process picked in the Workflow Builder;
-          // Auto = cleared, so the cheapest feasible process is quoted.
-          ...(isDieCastPart ? {
-            dieCastingProcess: processRouting === 'manual' ? selectedManualRoute?.dieCastingProcess ?? null : null,
-          } : {}),
-          // null removes the override: resolveScenarioBatchSize treats any
-          // non-numeric / sub-1 value as absent, so the derived
-          // ceil(annualVolume / BATCHES_PER_YEAR) tier takes over again.
-          ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : batchSizeAuto ? { batchSize: null } : {}),
-          ...(productionLife !== null ? { productionLifeYears: productionLife } : {}),
-          ...(extraPatch ?? {}),
-        },
-      });
-      } catch { /* the mutation's own onError toast reports the failed save */ }
+  const applyScenarioRequest = useApplyScenario(item?.id);
+  const applyScenario = async (
+    staged: { annualVolumeDraft: number | null; materialGrade: string; scenarioPatch?: Record<string, unknown> },
+  ): Promise<ScenarioApplicationResult | null> => {
+    if (!item?.id) return null;
+    const appliedRevision = (item.scenarioOverrides?.['appliedScenario'] as { revision?: number } | undefined)?.revision;
+    const built = buildApplyScenarioRequest({
+      location: factoryDraft,
+      batchSizeDraft,
+      batchSizeAuto,
+      productionLife,
+      annualVolumeDraft: staged.annualVolumeDraft,
+      annualVolumeSaved: item.annualVolume ?? null,
+      materialGrade: staged.materialGrade,
+      processRouting,
+      manualRoute: selectedManualRoute,
+      isDieCast: (item.familyClassification ?? fg?.classification?.family) === 'die_cast',
+      ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
+      ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
+    });
+    if (!built.ok) {
+      toast.error(built.reason);
+      setSelectedManualRoute(null);
+      setProcessRouting('auto');
+      return null;
     }
-    // Workflow Builder's "Set Route" only stages selectedManualRoute — the
-    // real apply-route/apply-custom-route call (creating process_cost_records)
-    // happens HERE, bundled with whatever Digital Factory/Batch Size was just
-    // committed above, using factoryDraft/batchSizeDraft directly rather than
-    // the (not-yet-updated) factory/batchSize state.
-    if (processRouting === 'manual' && selectedManualRoute && item?.id) {
-      const route = selectedManualRoute;
-      // Each picked machine is saved before the cost refreshes; a failed save
-      // is reported (useMachineOverride has no error toast of its own).
-      const applyMachineOverrides = async () => {
-        for (const ov of route.machineOverrides ?? []) {
-          try {
-            await applyManualMachineOverride.mutateAsync(ov);
-          } catch (e: unknown) {
-            toast.error(`Could not save the machine picked for ${ov.processKey}: ${e instanceof Error ? e.message : 'unknown error'}`);
-          }
-        }
-      };
-      if (route.dynamicCuttingRouteId) {
-        // apply-custom-route writes ONLY what's listed in `steps` — it never
-        // implicitly includes baseCuttingRouteId's own cutting line. Without
-        // this prepend, the cutting operation (e.g. Turret Punching) is
-        // silently absent from every applied custom route — confirmed live:
-        // the backend logged "wrote 3 ops: Press Brake, Deburring, Hole
-        // Extrusion (Burring)" with the cutting op missing entirely.
-        const steps: ApplyCustomRouteStep[] = [
-          ...(route.dynamicCuttingStep ? [{ process: route.dynamicCuttingStep.process }] : []),
-          ...(route.dynamicSteps ?? []).map((s): ApplyCustomRouteStep => s.isReal
-            ? { process: s.process }
-            : {
-                process: s.process,
-                machineClass: s.machineClass,
-                ...(s.processGroup !== undefined ? { processGroup: s.processGroup } : {}),
-                ...(s.processRoute !== undefined ? { processRoute: s.processRoute } : {}),
-              }),
-        ];
-        try {
-          await applyCustomRoute.mutateAsync({ baseCuttingRouteId: route.dynamicCuttingRouteId, steps, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
-          await applyMachineOverrides();
-        } catch { routeApplied = false; /* the mutation's own onError toast states why */ }
-      } else if (route.directApplyRouteId) {
-        try {
-          await applyRoute.mutateAsync({ routeId: route.directApplyRouteId, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
-          await applyMachineOverrides();
-        } catch { routeApplied = false; /* the mutation's own onError toast states why */ }
-      } else {
-        // A selectedManualRoute with neither dynamicCuttingRouteId nor
-        // directApplyRouteId has no real apply target. Say so, rather than
-        // leave the Process Routing panel showing a route nothing wrote.
-        toast.error(`"${route.label}" cannot be applied — no real route target was resolved for it. Reopen Workflow Builder and pick a route again.`);
-        routeApplied = false;
-      }
-      // A staged route the server refused stays staged otherwise, and every later
-      // Apply re-sends and re-fails it (reported: the same Turret 400 on each click).
-      // Drop it so the next Apply runs Auto; nothing was written for it.
-      if (!routeApplied) {
+    try {
+      const result = await applyScenarioRequest.mutateAsync(built.request);
+      // Applied: what was staged is now the committed scenario.
+      setFactory(factoryDraft);
+      if (batchSizeDraft !== null) setBatchSize(batchSizeDraft);
+      else if (batchSizeAuto) setBatchSize(undefined);
+      setBatchSizeAuto(false);
+      for (const f of result.machineOverrides.failed) toast.error(`Could not save the machine picked for ${f.processKey}: ${f.message}`);
+      return result;
+    } catch (e: unknown) {
+      const code = e instanceof ApiError ? e.code : undefined;
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      if (code === 'analysis_not_ready') toast.warning(message);
+      else if (code === 'scenario_revision_conflict' || code === 'scenario_apply_in_progress') toast.error(message);
+      else toast.error(`Scenario not applied: ${message}`);
+      // A staged route the server refused (400) would otherwise stay staged and be re-sent and re-refused by every later Apply.
+      if (e instanceof ApiError && e.status === 400 && built.request.route.mode !== 'keep') {
         setSelectedManualRoute(null);
         setProcessRouting('auto');
       }
+      return null;
     }
-    return routeApplied;
   };
-  // Applies the real machine picked per step in the Workflow Builder, after
-  // applyRoute/applyCustomRoute create the process_cost_records rows — see
-  // ManualRouteOption.machineOverrides / applyScenario above. Uses the DRAFT
-  // location while scenarioDirty so this mutation's closure can't fire with a
-  // stale committed location before setFactory's state update has propagated.
-  const applyManualMachineOverride = useMachineOverride(item?.id, scenarioDirty ? factoryDraft : factory);
-  const applyCustomRoute = useApplyCustomRoute(item?.id);
-
   // ── Right panel tab — lifted so the inspector bridge button can switch it ─────
   const [rightTab, setRightTab] = useState<RightTabKey>('copilot');
 

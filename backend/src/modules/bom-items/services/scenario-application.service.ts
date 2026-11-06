@@ -77,11 +77,15 @@ export class ScenarioApplicationService {
 
     try {
       // 3. The scenario fields.
+      const grade = request.materialGrade?.trim();
+      const before = grade ? await this.bomItems.findOne(id, userId, token) : null;
       const itemPatch: Record<string, unknown> = {};
       if (request.annualVolume !== undefined) itemPatch['annualVolume'] = request.annualVolume;
-      if (request.materialGrade?.trim()) {
-        itemPatch['materialGrade'] = request.materialGrade.trim();
-        itemPatch['materialSource'] = 'manual'; // an explicit pick: costing trusts it as such
+      // A different grade is an explicit pick: costing trusts it as such. The grade the part is already costed as keeps its source (a grade
+      // read from the drawing does not become "manual" because Apply was pressed).
+      if (grade && grade !== (before?.materialGrade ?? before?.material ?? null)) {
+        itemPatch['materialGrade'] = grade;
+        itemPatch['materialSource'] = 'manual';
       }
       if (Object.keys(itemPatch).length > 0) await this.bomItems.update(id, itemPatch as never, userId, token);
 
@@ -98,7 +102,6 @@ export class ScenarioApplicationService {
 
       // 4. The material cost record, from the cost summary at this scenario.
       let material: ScenarioApplicationResult['material'] = null;
-      const grade = request.materialGrade?.trim();
       if (grade) {
         const item = await this.bomItems.findOne(id, userId, token);
         const summary = await this.bomItems.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
