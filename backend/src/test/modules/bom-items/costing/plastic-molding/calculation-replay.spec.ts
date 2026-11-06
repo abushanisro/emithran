@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { canonicalReferenceRows, resolvePlasticReference } from '../../../../../modules/bom-items/costing/plastic-molding/plastic-reference';
 import { replayPlasticLine } from '../../../../../modules/bom-items/costing/plastic-molding/calculation-replay';
 import type { CalculationSnapshot } from '../../../../../modules/bom-items/costing/plastic-molding/calculation-snapshot';
@@ -106,5 +108,65 @@ describe('replaying a saved plastic calculation from what is persisted', () => {
 
   it('the snapshot stays small enough to store on every row (inputs included, without the reference or the machine selection log)', () => {
     expect(JSON.stringify(saveLine(part()).snapshot).length).toBeLessThan(6000);
+  });
+
+  describe('auditable: the evidence a replay stands on, and no way to the live data', () => {
+    it('a reproduction names every check it made, in order, and what it stood on', () => {
+      const { saved, snapshot } = saveLine(part());
+      const r = replayPlasticLine(snapshot, storedRows(), saved);
+      expect(r.audit.map((a) => a.split(':')[0])).toEqual(['inputs', 'engine contract', 'formulas', 'reference rows', 'recomputed', 'compared']);
+      expect(r.audit[3]).toContain('the stored copy (not the live data)');
+      expect(r.audit[3]).toContain(snapshot.referenceData.fingerprint);
+      expect(r.audit[2]).toContain('F-04 v1');
+      expect(r.audit[5]).toMatch(/5 amounts, all equal/);
+      expect(r.evidence).toEqual({
+        referenceSource: 'stored', snapshotFingerprint: snapshot.referenceData.fingerprint, storedRowsFingerprint: snapshot.referenceData.fingerprint,
+        fingerprintVerified: true, formulaVersionsMatch: true, engineVersionRecorded: 'emithran-cost-1', engineVersionNow: 'emithran-cost-1', inputsRecorded: true,
+      });
+    });
+
+    it('a refusal is on the audit trail too, after the checks that passed, and the evidence shows which did not', () => {
+      const { saved, snapshot } = saveLine(part());
+      const r = replayPlasticLine(snapshot, null, saved);
+      expect(r.audit[r.audit.length - 1]).toMatch(/^REFUSED: the reference rows for fingerprint .* are not stored$/);
+      expect(r.evidence).toMatchObject({ referenceSource: 'unavailable', storedRowsFingerprint: null, fingerprintVerified: false, formulaVersionsMatch: true });
+      expect(r.replayed).toBeNull();
+    });
+
+    it('altered rows are named as such in the evidence: the stored fingerprint no longer equals the recorded one', () => {
+      const { saved, snapshot } = saveLine(part());
+      const altered = storedRows();
+      altered.variables[0].value = 999;
+      const r = replayPlasticLine(snapshot, altered, saved);
+      expect(r.evidence.fingerprintVerified).toBe(false);
+      expect(r.evidence.storedRowsFingerprint).not.toBe(r.evidence.snapshotFingerprint);
+    });
+
+    it('never uses the live reference data, even if the snapshot\'s own inputs try to carry one: the stored rows always win', () => {
+      const { saved, snapshot } = saveLine(part());
+      const moved = { ...ROWS, variables: ROWS.variables.map((v) => (v.key === 'cycleTimeAdjustmentFactor' ? { ...v, value: Number(v.value) * 2 } : v)) };
+      const liveMoved = resolvePlasticReference({ variables: moved.variables, lookups: moved.lookups, ...(moved.gppsMaterial ? { gppsMaterial: moved.gppsMaterial } : {}) }).reference!;
+      const smuggled = { ...snapshot, inputs: { ...snapshot.inputs, plasticReference: liveMoved, plasticReferenceMissing: ['x'] } };
+      expect(replayPlasticLine(smuggled as unknown as CalculationSnapshot, storedRows(), saved).reproduced).toBe(true);
+    });
+
+    it('the replay module has no way to reach live data: it imports no database, no service and no reference loader (a structural guarantee, not a convention)', () => {
+      const source = readFileSync(join(__dirname, '../../../../../modules/bom-items/costing/plastic-molding/calculation-replay.ts'), 'utf8');
+      const imports = [...source.matchAll(/^import .* from '([^']+)'/gm)].map((m) => m[1]!);
+      expect(imports.filter((i) => /database|service|nestjs|postgrest|db\//i.test(i))).toEqual([]);
+    });
+
+    it('with no stored rows it does not fall back to anything: it refuses', () => {
+      const { saved, snapshot } = saveLine(part());
+      expect(replayPlasticLine(snapshot, null, saved)).toMatchObject({ reproduced: false, replayed: null });
+    });
+
+    it('refuses when the engine contract has changed: the code outside the registered formulas is not the code that made the number', () => {
+      const { saved, snapshot } = saveLine(part());
+      const r = replayPlasticLine({ ...snapshot, engineVersion: 'emithran-cost-0' }, storedRows(), saved);
+      expect(r.reproduced).toBe(false);
+      expect(r.reasons[0]).toContain('emithran-cost-1 (calculated with emithran-cost-0)');
+      expect(r.evidence.engineVersionRecorded).toBe('emithran-cost-0');
+    });
   });
 });
