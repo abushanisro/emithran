@@ -65,7 +65,8 @@ describe('plastic formula registry', () => {
   it('every implemented formula names an existing file, and that file names the formula id: the code and the registry cannot drift apart silently', () => {
     for (const f of implemented) {
       expect(f.implementedIn).toBeTruthy();
-      const file = path.join(COSTING, f.implementedIn!.startsWith('../') ? f.implementedIn!.replace('../', '') : `plastic-molding/${f.implementedIn}`);
+      // implementedIn is relative to plastic-molding/ and may climb out of it ('../shared/...'): resolve it, never rewrite the string.
+      const file = path.resolve(COSTING, 'plastic-molding', f.implementedIn!);
       expect({ id: f.id, file, exists: fs.existsSync(file) }).toEqual({ id: f.id, file, exists: true });
       const text = fs.readFileSync(file, 'utf8');
       expect({ id: f.id, named: new RegExp(`\\b${f.id}\\b`).test(text) }).toEqual({ id: f.id, named: true });
