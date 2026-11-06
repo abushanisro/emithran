@@ -6,6 +6,7 @@ import {
   LOCATION_INFO, classifyInspectionResource, DEFAULT_COSTING_LOCATION,
 } from '../costing/shared/core/default-rates.constants';
 import type { MachineClass } from '../costing/shared/core/default-rates.constants';
+import { mhrRateFromCandidate } from '../costing/shared/capability/machine-selection/rate-from-candidate';
 import { fetchMachinePool, selectMachine } from '../costing/shared/capability/machine-selection/selector';
 import type { MachineRequirement } from '../costing/shared/capability/machine-selection/physics';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
@@ -228,36 +229,7 @@ export class RateResolutionService {
         requirement: requirements[cls] ?? { kind: 'generic' },
         overrideMachineId: overrides.get(cls) ?? null,
       });
-      const cand = selection.balanced.candidate;
-      const real = cand.machineId != null;
-      const labourUsd = real ? cand.laborRateUsdHr : null;
-      const labourRate = labourUsd != null && labourUsd > 0 ? labourUsd * usdToLocal : null;
-      return {
-        rate: real ? cand.hourlyRate : 0,
-        source: real ? 'mhr_database' : 'no_db_rate',
-        machineClass: cls,
-        machineName: cand.machineName,
-        commodityCode: cand.commodityCode,
-        selection,
-        operators: cand.operators,
-        machineLaborRateUsdHr: cand.laborRateUsdHr,
-        labourRate,
-        labourRateSource: labourRate != null ? 'mhr_machine_specific' : 'no_lhr_rate',
-        pressCycleTimeS: cand.pressCycleTimeS,
-        handlingConstS: cand.handlingConstS,
-        handlingMassCoeffSPerKg: cand.handlingMassCoeffSPerKg,
-        cutToLengthCycleConstS: cand.cutToLengthCycleConstS,
-        cutToLengthCycleMassCoeffSPerKg: cand.cutToLengthCycleMassCoeffSPerKg,
-        cutToLengthCutSpeedS: cand.cutToLengthCutSpeedS,
-        numberSpindles: cand.numberSpindles,
-        drumIndexTimeS: cand.drumIndexTimeS,
-        transferTimeS: cand.transferTimeS,
-        stockFeedTimeS: cand.stockFeedTimeS,
-        speedSynchronizationTimeS: cand.speedSynchronizationTimeS,
-        setupTimeHr: cand.setupTimeHr,
-        directOverheadRate: cand.directOverheadRate,
-        indirectOverheadRate: cand.indirectOverheadRate,
-      };
+      return mhrRateFromCandidate(selection.balanced.candidate, cls, usdToLocal, selection);
     };
 
     // "Laser Cutting" is one process line regardless of which real laser

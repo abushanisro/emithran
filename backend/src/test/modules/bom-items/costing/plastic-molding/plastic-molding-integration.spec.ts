@@ -40,7 +40,7 @@ function quote(over: Partial<InjectionMoldingCostInput> = {}, pressName = pick()
   return computeInjectionMoldedCostSummary({
     volume: PART.volume, surfaceArea: 30_000, wallThicknessNominalMm: PART.wall, materialGrade: 'PA66',
     materialCostPerKg: PART.costPerKg, materialDensityKgM3: PART.densityKgM3, materialSource: 'db', batchSize: 1000, family: 'plastic_molded',
-    mhrRate: { rate: p.mhrUsd, source: 'mhr_database', machineClass: 'injection_molding', machineName: p.name, commodityCode: null },
+    mhrRate: { rate: p.mhrUsd, labourRate: 30, source: 'mhr_database', machineClass: 'injection_molding', machineName: p.name, commodityCode: null },
     deburrRate: { rate: 0, source: 'mhr_database', machineClass: 'deburring', machineName: null, commodityCode: null },
     inspectionRate: { rate: 0, source: 'mhr_database', machineClass: 'cmm', machineName: null, commodityCode: null },
     machineClampTonnes: p.maxTonnage, machineShotCapacityG: p.shotCapacityGrams, pressTiming: p.timing, goodPartYield: p.goodPartYield,

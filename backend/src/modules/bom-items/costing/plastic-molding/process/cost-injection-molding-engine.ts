@@ -260,20 +260,35 @@ function resolveSubtype(input: InjectionMoldingCostInput): MoldingSubtype {
   return 'standard';
 }
 
+/**
+ * One molding line, charged for the press and for the people who run it. A cycle minute costs the machine rate plus the labour rate times the
+ * operators the press is manned with (mhr_records.operators; one when the record names none); the setup minutes of the batch cost the same,
+ * spread over the batch. The two parts are kept apart on the line (machineCostPerPart / laborCostPerPart) and add up to the line's cost.
+ */
 function makeLine(
   process: string,
-  setupCost: number,
-  runCost: number,
+  setupMin: number | null,
+  batchSize: number,
   cycleTimeMin: number,
   rate: MHRRateInput,
 ): ProcessLineCost {
+  const operators = rate.operators ?? 1;
+  const labourPerHr = (rate.labourRate ?? 0) * operators;
+  const perPart = (hourly: number) => ((setupMin ?? 0) / 60 * hourly) / Math.max(batchSize, 1) + (cycleTimeMin / 60) * hourly;
+  const setupPerPart = (hourly: number) => ((setupMin ?? 0) / 60 * hourly) / Math.max(batchSize, 1);
+  const setupCost = setupPerPart(rate.rate + labourPerHr);
+  const totalCost = perPart(rate.rate + labourPerHr);
   return {
     process,
     setupCost: r2(setupCost),
-    runCost: r2(runCost),
-    totalCost: r2(setupCost + runCost),
+    runCost: r2(totalCost - setupCost),
+    totalCost: r2(totalCost),
+    machineCostPerPart: r2(perPart(rate.rate)),
+    laborCostPerPart: r2(perPart(labourPerHr)),
     cycleTimeMin: r2(cycleTimeMin),
     hourlyRate: rate.rate,
+    labourRate: rate.labourRate ?? null,
+    operators,
     rateSource: rate.source,
     machineClass: rate.machineClass,
     machineName: rate.machineName,
@@ -473,16 +488,17 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   const processLabel = MOLDING_PROCESS_LABEL[mhrRate.machineClass] ?? 'Injection Molding';
   const inCycleMin = cycle.derivable ? (cycle.totalCycleSec / cavityCount / perGood) / 60 : 0;
   moldingMin += inCycleMin;
-  // Setup is the press's machine time for the batch, spread over its parts, at the same machine rate the run is charged at.
-  const setupCostPerPart = pressSetupMin === null ? 0 : (pressSetupMin / 60) * mhrRate.rate / Math.max(batchSize, 1);
-  const line = makeLine(processLabel, setupCostPerPart, r2((inCycleMin / 60) * mhrRate.rate), inCycleMin, mhrRate);
+  const line = makeLine(processLabel, pressSetupMin, batchSize, inCycleMin, mhrRate);
   if (pressSetupMin !== null) { line.setupTimeMin = pressSetupMin; line.setupTimeSource = 'machine'; }
-  const gapReason = sizing.unverifiedReason ?? cycleGapReason ?? yieldGapReason;
+  // The people who run the press are part of the price: no labour rate on file for it leaves the line a gap, not a free operator.
+  const labourGapReason = mhrRate.labourRate == null ? `No labour rate on file for ${mhrRate.machineName ?? 'this press'}: the operator cost cannot be charged.` : null;
+  if (labourGapReason) warnings.push(labourGapReason);
+  const gapReason = sizing.unverifiedReason ?? cycleGapReason ?? yieldGapReason ?? labourGapReason;
   if (gapReason) {
     line.physicsGap = {
       gapType: 'unsupported_operation', process: processLabel, machineClass: mhrRate.machineClass,
       reason: gapReason,
-      requiredCapability: sizing.materialGap ? 'An injection-molding material' : sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : 'Press good-part yield',
+      requiredCapability: sizing.materialGap ? 'An injection-molding material' : sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : yieldGapReason ? 'Press good-part yield' : 'Labour rate (HR Rates)',
     };
   }
   if (cycle.derivable) line.calculationTrace = cycle.trace;

@@ -11,7 +11,7 @@ import { realMaterialClamp, realPlasticReference, realPress, realResinInputs } f
 const REF = realPlasticReference();
 const MID = realPress('Arburg Allrounder 420 C 1300 - 350');
 const rate = (machineClass: string, rateUsd: number, machineName: string | null) =>
-  ({ rate: rateUsd, source: 'mhr_database' as const, machineClass, machineName, commodityCode: null });
+  ({ rate: rateUsd, labourRate: 30, source: 'mhr_database' as const, machineClass, machineName, commodityCode: null });
 
 const base = (over: Partial<InjectionMoldingCostInput>): InjectionMoldingCostInput => ({
   volume: 18_800, surfaceArea: 25_700, wallThicknessNominalMm: 1.5, batchSize: 3001, family: 'plastic_molded', materialSource: 'db',

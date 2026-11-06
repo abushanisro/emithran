@@ -10,6 +10,7 @@ import { PlasticReferenceService } from './lookup/plastic-reference.service';
 import { injectionMoldabilityGap } from '../../../raw-materials/material-moldability';
 import { buildMoldingCommonInput, partBboxLongestFirst, type MoldingSummary } from './molding-input';
 import { estimatedToolHeightMm } from '../shared/capability/machine-selection/press-checks';
+import { mhrRateFromCandidate } from '../shared/capability/machine-selection/rate-from-candidate';
 import { fetchMachinePool } from '../shared/capability/machine-selection/selector';
 import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL } from '../shared/core/default-rates.constants';
 import { findRouteDataGaps } from '../shared/core/engine-kernel';
@@ -165,12 +166,7 @@ export class PlasticRouteComparisonService {
         const cand = ev.candidate;
         const cost = computeInjectionMoldedCostSummary({
           ...imCommon,
-          mhrRate: {
-            rate: cand.hourlyRate, source: 'mhr_database',
-            machineClass: 'injection_molding', machineName: cand.machineName, commodityCode: cand.commodityCode,
-            // The press's own setup time, so the molding line carries it (without it the route is never fully costed and cannot be applied).
-            setupTimeHr: cand.setupTimeHr ?? null,
-          },
+          mhrRate: mhrRateFromCandidate(cand, 'injection_molding', rcUsdToLocal),
           machineClampTonnes: cand.capability.maxTonnage, machineShotCapacityG: cand.capability.shotCapacityGrams,
           pressTiming: cand.machineId ? pressRecordsRC.get(cand.machineId) ?? null : null,
           goodPartYield: cand.machineId ? pressRecordsRC.get(cand.machineId)?.goodPartYield ?? null : null,

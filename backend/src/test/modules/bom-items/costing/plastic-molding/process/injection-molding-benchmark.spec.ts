@@ -27,7 +27,7 @@ const MATERIALS = {
 } as const;
 
 const rate = (machineClass: string, rateUsd: number, machineName: string | null) =>
-  ({ rate: rateUsd, source: 'mhr_database' as const, machineClass, machineName, commodityCode: null });
+  ({ rate: rateUsd, labourRate: 30, source: 'mhr_database' as const, machineClass, machineName, commodityCode: null });
 
 function input(material: keyof typeof MATERIALS, press: Press, name: string, overrides: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCostInput {
   const m = MATERIALS[material];
