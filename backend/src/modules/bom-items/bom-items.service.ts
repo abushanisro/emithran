@@ -41,6 +41,7 @@ import type { MachiningCostInput, MachineClassId } from './costing/machining/pro
 import { machiningFeatureCounts } from './costing/machining/operation/machining-feature-counts';
 import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-rule';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
+import { buildMoldingCommonInput } from './costing/plastic-molding/molding-input';
 import { injectionMoldabilityGap } from '../raw-materials/material-moldability';
 import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
 import { SecondaryProcessService } from './services/secondary-process.service';
@@ -4175,86 +4176,30 @@ export class BOMItemsService {
     }
 
     if (family === 'plastic_molded') {
-      const imBbox = [
-        ((item as any).maxLength ?? 0) as number,
-        ((item as any).maxWidth ?? 0) as number,
-        ((item as any).maxHeight ?? 0) as number,
-      ].sort((a, b) => b - a);
-      // The selected press's real clamp tonnage and shot capacity, from its own
-      // machine record. No name-pattern guess and no "0.9 x tonnage" shot rule:
-      // without them the engine does not size cavities and marks the molding
-      // line incomplete.
+      // The selected press's real clamp tonnage and shot capacity, from its own machine record. No name-pattern guess and no "0.9 x tonnage" shot
+      // rule: without them the engine does not size cavities and marks the molding line incomplete.
       const selectedImCandidate = mhrRates.injectionMolding.selection?.balanced?.candidate;
-      const machineClampTonnes = selectedImCandidate?.capability?.maxTonnage ?? null;
-      const machineShotCapacityG = selectedImCandidate?.capability?.shotCapacityGrams ?? null;
       // The press's own HR Rates row: injection rate, dry cycle, good-part yield.
       const pressRecord = selectedImCandidate?.machineId
         ? (await this.plasticReferenceService.getPressRecords(this.databaseService.getClient(accessToken), [selectedImCandidate.machineId])).get(selectedImCandidate.machineId) ?? null
         : null;
-
-      // Wall thickness: the CAD nominal wall only. Without it the cycle time is
-      // not derivable and the engine says so (no bounding-box stand-in).
-      const effectiveWallMm = (summary.wallThicknessNominalMm ?? 0) as number;
-
       const activePlasticRef = await this.plasticReferenceService.getReference();
       const imInput: InjectionMoldingCostInput = {
-        currencySymbol: locInfo.symbol,
-        usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
-        plasticReference: activePlasticRef.reference,
-        plasticReferenceMissing: activePlasticRef.missing,
-        location,
-        materialType,
-        materialStockForm: stockForm,
-        materialMatlState: matlState,
-        volume: (item.volume ?? 0) as number,
-        surfaceArea: (item.surfaceArea ?? 0) as number,
-        wallThicknessNominalMm: effectiveWallMm,
-        materialGrade: grade,
-        materialCostPerKg,
-        materialDensityKgM3,
-        materialSource,
-        batchSize,
-        family,
+        ...buildMoldingCommonInput({
+          item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
+          material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
+          plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
+          currencySymbol: locInfo.symbol,
+          usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
+          deburrRate: mhrRates.deburring,
+          inspectionRate: mhrRates.inspection,
+          cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
+        }),
         mhrRate: mhrRates.injectionMolding,
-        deburrRate: mhrRates.deburring,
-        inspectionRate: mhrRates.inspection,
-        machineClampTonnes,
-        machineShotCapacityG,
+        machineClampTonnes: selectedImCandidate?.capability?.maxTonnage ?? null,
+        machineShotCapacityG: selectedImCandidate?.capability?.shotCapacityGrams ?? null,
         pressTiming: pressRecord,
         goodPartYield: pressRecord?.goodPartYield ?? null,
-        cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
-        materialClamp: clampProperties,
-        // Tooling amortization — both values come from the canonical costing
-        // input resolver above, never re-read from the item or hardcoded here.
-        annualVolume: annualVolume ?? undefined,
-        productionLifeYears,
-        // Phase 4: bbox dimensions for fill-time and gate-recommendation models.
-        // imBbox is sorted descending, so [0]=longest, [1]=mid, [2]=shortest.
-        bboxMaxMm: imBbox[0],
-        bboxMidMm: imBbox[1],
-        realResinInputs,
-        signals: {
-          projectedAreaMm2: imBbox[0] * imBbox[1] > 0 ? imBbox[0] * imBbox[1] : null,
-          wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
-          wallThicknessMaxMm: (summary.wallThicknessMaxMm as number) > 0 ? (summary.wallThicknessMaxMm as number) : null,
-          // Phase 4: use real rib count (antiparallel wall-face pairs); fall back to
-          // pocket-floor proxy when CAD engine is pre-Phase 4.
-          ribCount: (summary.ribCount as number) > 0
-            ? (summary.ribCount as number)
-            : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
-          // Phase 4: bosses = blind cylindrical features (capped), NOT all cylinders.
-          // holeOrBossCount lumps through-holes and bosses; blindFeatureCount is cap-detected.
-          bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
-          // Phase 2 signals — null when CAD engine is pre-Phase 2 (safe: router applies
-          // conservative defaults and records routingWarnings when signals are null)
-          // Features that need a side action when the recognised graph can say; else the draft analysis's face count.
-          undercutCount: sideActionSignals(summary.plasticFeatureGraph)?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
-          slideBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideBundles ?? null,
-          slideOrLifterBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideOrLifterBundles ?? null,
-          partingComplexity: (summary.partingComplexity as number | null) ?? null,
-          // Phase 3: insert candidates from CAD blind-hole OD matching
-          insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
-        },
       };
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);

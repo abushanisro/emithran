@@ -5,7 +5,7 @@
 // the fallback. Reading `count > 0 ? count : null` told the router that a part analysed with no undercuts was never analysed, and the cost view
 // warned "Undercut detection not run" on exactly the parts whose undrafted faces and parting complexity it was showing.
 
-interface DraftSummary {
+export interface DraftSummary {
   undercutFaceCount?: unknown;
   partingComplexity?: unknown;
 }
