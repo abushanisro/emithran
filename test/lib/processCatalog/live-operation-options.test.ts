@@ -150,3 +150,31 @@ describe('effectiveOperation', () => {
     expect(effectiveOperation(settled)).toBe('Inspection'); // no stale state from the loading render
   });
 });
+
+describe('liveOperationOptions with the category catalog', () => {
+  const injection = { process: 'Injection Molding', machineClass: 'injection_molding', cycleTimeMin: 0.16 };
+  const catalog = [
+    { operationCategory: 'As Molded', featureType: 'Rib' },
+    { operationCategory: 'HoleSideCore', featureType: 'SimpleHole' },
+    { operationCategory: 'Slides', featureType: 'Undercut' },
+    { operationCategory: 'As Molded', featureType: 'Rib' }, // duplicate row
+    { operationCategory: null, featureType: 'Rib' },        // incomplete row
+  ];
+
+  it('lists the whole catalog of the category after the operations this part needs, each once', () => {
+    const opts = liveOperationOptions([injection], new Set(['injection_molding']), new Map(), catalog);
+    expect(opts.map((o) => o.value)).toEqual(['Injection Molding', 'As Molded // Rib', 'HoleSideCore // SimpleHole', 'Slides // Undercut']);
+    expect(opts.filter((o) => o.notOnPart).map((o) => o.lineProcess)).toEqual(['Injection Molding', 'Injection Molding', 'Injection Molding']);
+  });
+
+  it('does not mark an operation the part needs as not on the part', () => {
+    const line = { ...injection, catalogOperations: [{ operations: ['As Molded'], featureType: 'Rib', count: 4, status: 'ok' }] };
+    const opts = liveOperationOptions([line], new Set(['injection_molding']), new Map(), catalog);
+    expect(opts.find((o) => o.value === 'As Molded // Rib')).toMatchObject({ label: 'As Molded // Rib [4]' });
+    expect(opts.find((o) => o.value === 'As Molded // Rib')!.notOnPart).toBeUndefined();
+  });
+
+  it('offers no catalog operation when the part has no line of the category to attach it to', () => {
+    expect(liveOperationOptions([], new Set(['injection_molding']), new Map(), catalog)).toEqual([]);
+  });
+});

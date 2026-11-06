@@ -28,6 +28,7 @@ import {
   deburrCycleSec,
   deburrSecPerMm,
 } from './physics';
+import { checkPress, SHOT_NOT_DERIVABLE_REASON } from './press-checks';
 import {
   EMPTY_CAPABILITY,
   MACHINE_CLASS_DEFAULTS,
@@ -663,23 +664,16 @@ export function isCapable(
       if (cap.maxLengthMm != null && cap.maxLengthMm < req.lengthMm * ENVELOPE_MARGIN) return false;
       return true;
     }
-    case 'injection_molding': {
-      // Reference clamp force already carries clampForceSafetyFactor: no TONNAGE_MARGIN on top.
-      if (req.clampTonnageRequired == null) return false;
-      // No tonnage on file = not shown capable (never passed unchecked).
-      if (cap.maxTonnage == null || cap.maxTonnage < req.clampTonnageRequired) return false;
-      // Shot size: a press that cannot fill one cavity is not capable (rated in GPPS grams).
-      if (req.shotGppsG != null && cap.shotCapacityGrams != null && cap.shotCapacityGrams < req.shotGppsG) return false;
-      // Tie-bar spacing: additive formula, allow 90° rotation
-      if (cap.tieBarXMm != null && cap.tieBarYMm != null && req.partLengthMm > 0 && req.partWidthMm > 0) {
-        const reqL = req.partLengthMm + IM_TIEBAR_ADDEND_MM;
-        const reqW = req.partWidthMm  + IM_TIEBAR_ADDEND_MM;
-        const fitsNormal  = reqL <= cap.tieBarXMm && reqW <= cap.tieBarYMm;
-        const fitsRotated = reqL <= cap.tieBarYMm && reqW <= cap.tieBarXMm;
-        if (!fitsNormal && !fitsRotated) return false;
-      }
-      return true;
-    }
+    case 'injection_molding':
+      // One rule for every view of a press (press-checks.ts); a part dimension CAD did not measure (0) is not checked.
+      return checkPress(cap, {
+        clampTonnageRequired: req.clampTonnageRequired,
+        clampNotDerivableReason: req.clampNotDerivableReason,
+        shotGppsG: req.shotGppsG,
+        partLengthMm: req.partLengthMm > 0 ? req.partLengthMm : null,
+        partWidthMm: req.partWidthMm > 0 ? req.partWidthMm : null,
+        estimatedToolHeightMm: req.estimatedToolHeightMm,
+      }).capable;
     case 'deburr':
       // Capable when this machine's own time per mm of burr edge is on file.
       return deburrCycleSec(candidate, req) != null;
@@ -1146,7 +1140,10 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
   // No capable machine. Reported as an absence — never priced from anywhere else.
   if (eligible.length === 0 && !input.overrideMachineId) {
     // Machines exist but the part cannot be sized for any of them (a molding material with no reference data): say that, not "none can do it".
-    const unsized = requirement.kind === 'injection_molding' && requirement.clampTonnageRequired == null ? requirement.clampNotDerivableReason : undefined;
+    const unsized = requirement.kind !== 'injection_molding' ? undefined
+      : requirement.clampTonnageRequired == null ? requirement.clampNotDerivableReason
+      : requirement.shotGppsG == null ? SHOT_NOT_DERIVABLE_REASON
+      : undefined;
     const reason = classPool.length === 0
       ? `No machine of this class in HR Rates for ${location} — not costed; add it to memory/ and seed it`
       : unsized

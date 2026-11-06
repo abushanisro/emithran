@@ -8,6 +8,7 @@ import type { RateResolutionService } from '../../services/rate-resolution.servi
 import type { MaterialResolutionService } from '../../services/material-resolution.service';
 import { PlasticReferenceService } from './lookup/plastic-reference.service';
 import { injectionMoldabilityGap } from '../../../raw-materials/material-moldability';
+import { estimatedToolHeightMm } from '../shared/capability/machine-selection/press-checks';
 import { fetchMachinePool } from '../shared/capability/machine-selection/selector';
 import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL } from '../shared/core/default-rates.constants';
 import { findRouteDataGaps } from '../shared/core/engine-kernel';
@@ -125,8 +126,7 @@ export class PlasticRouteComparisonService {
       partLengthMm: imBboxRC[0] > 0 ? imBboxRC[0] : null,  // largest bbox dim
       partWidthMm: imBboxRC[1] > 0 ? imBboxRC[1] : null,
       partHeightMm: imBboxRC[2] > 0 ? imBboxRC[2] : null,
-      // Tool height estimate: bbox max + 100mm tooling allowance (conservative)
-      estimatedToolHeightMm: imBboxRC[0] > 0 ? imBboxRC[0] + 100 : null,
+      estimatedToolHeightMm: estimatedToolHeightMm(imBboxRC[0]),
     };
 
     // Fetch machine pool and run tier-based 4-constraint selection.
