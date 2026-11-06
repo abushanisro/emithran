@@ -22,9 +22,28 @@ function configuredHosts(): string[] {
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
+const MAX_PATH_CHARS = 2048;
+const MAX_QUERY_CHARS = 4096;
+/** An encoded slash or backslash, or an encoded control character: the path would mean something to the file store that it does not mean to us. */
+const UNSAFE_PATH_ESCAPE = /%(2f|5c|[01][0-9a-f]|7f)/i;
+
 /**
- * The URL to fetch, or null when `raw` is not on a trusted storage host. The result is rebuilt from the configured host entry
- * (a server-side value) plus the caller's path and query, so the host that is contacted never comes from the request itself.
+ * Whether a request path is plain object-path text on the storage host: a bounded length, no encoded separators or control characters, and no dot
+ * segment (decoded: `%2e%2e` is `..`). The URL parser already collapses literal dot segments; this refuses what survives it.
+ */
+export function isSafeStoragePath(pathname: string): boolean {
+  if (!pathname.startsWith('/') || pathname.length > MAX_PATH_CHARS || UNSAFE_PATH_ESCAPE.test(pathname)) return false;
+  return pathname.split('/').every((segment) => {
+    let decoded: string;
+    try { decoded = decodeURIComponent(segment); } catch { return false; }
+    return decoded !== '.' && decoded !== '..';
+  });
+}
+
+/**
+ * The URL to fetch, or null when `raw` is not on a trusted storage host. The scheme and the host of the result come only from the server: the scheme
+ * is a literal chosen by comparison, the host is the configured entry. The request contributes a path and a query, and only after they pass
+ * isSafeStoragePath and a length cap; they are set on a URL whose origin is already fixed, never concatenated into the front of it.
  */
 export function trustedStorageUrl(
   raw: string,
@@ -39,7 +58,11 @@ export function trustedStorageUrl(
   if (!trusted) return null;
   const local = nodeEnv !== 'production' && (IPV4.test(url.hostname) || url.hostname === 'localhost');
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) return null;
-  return `${url.protocol}//${trusted}${url.pathname}${url.search}`;
+  if (!isSafeStoragePath(url.pathname) || url.search.length > MAX_QUERY_CHARS) return null;
+  const target = new URL(`${url.protocol === 'http:' ? 'http' : 'https'}://${trusted}`);
+  target.pathname = url.pathname;
+  target.search = url.search;
+  return target.href;
 }
 
 export function isTrustedStorageUrl(

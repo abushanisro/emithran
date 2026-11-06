@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  fetchTrustedFile, isServableContentType, isTrustedStorageUrl, limitStream, PayloadTooLargeError, readLimited,
+  fetchTrustedFile, isSafeStoragePath, isServableContentType, isTrustedStorageUrl, limitStream, PayloadTooLargeError, readLimited,
   trustedStorageUrl, UntrustedUrlError,
 } from '@/lib/server/safe-fetch';
 
@@ -17,6 +17,48 @@ describe('trustedStorageUrl', () => {
     expect(trustedStorageUrl('https://evil.example/x', HOSTS, 'production')).toBeNull();
     expect(trustedStorageUrl('https://abc.supabase.co@evil.example/x', HOSTS, 'production')).toBeNull();
     expect(trustedStorageUrl('not a url', HOSTS, 'production')).toBeNull();
+  });
+});
+
+describe('the path and query the request contributes', () => {
+  const url = (path: string) => `https://abc.supabase.co${path}`;
+
+  it('keeps an ordinary object path, with its escapes and its query, exactly', () => {
+    expect(trustedStorageUrl(url('/storage/v1/object/sign/bom-files/a%20b/x.stl?token=t&X-Amz-Signature=ab%2Bc'), HOSTS, 'production'))
+      .toBe('https://abc.supabase.co/storage/v1/object/sign/bom-files/a%20b/x.stl?token=t&X-Amz-Signature=ab%2Bc');
+  });
+
+  it('refuses an encoded slash or backslash, in either case: the file store may read them as separators', () => {
+    for (const p of ['/a%2fb', '/a%2Fb', '/a%5cb', '/a%5Cb']) expect(trustedStorageUrl(url(p), HOSTS, 'production')).toBeNull();
+  });
+
+  it('refuses an encoded control character or NUL', () => {
+    for (const p of ['/a%00b', '/a%0ab', '/a%0Db', '/a%1fb', '/a%7fb']) expect(trustedStorageUrl(url(p), HOSTS, 'production')).toBeNull();
+  });
+
+  it('a dot segment never survives: literal and encoded ones are collapsed by the URL parser, and what the parser leaves is refused', () => {
+    expect(trustedStorageUrl(url('/a/../b/x.pdf'), HOSTS, 'production')).toBe('https://abc.supabase.co/b/x.pdf');
+    expect(trustedStorageUrl(url('/a/%2e%2e/b/x.pdf'), HOSTS, 'production')).toBe('https://abc.supabase.co/b/x.pdf');
+    expect(isSafeStoragePath('/a/../b')).toBe(false);
+    expect(isSafeStoragePath('/a/%2e%2e/b')).toBe(false);
+    expect(isSafeStoragePath('/a/./b')).toBe(false);
+  });
+
+  it('refuses a path or query beyond the length caps', () => {
+    expect(trustedStorageUrl(url(`/${'a'.repeat(2100)}`), HOSTS, 'production')).toBeNull();
+    expect(trustedStorageUrl(url(`/x?${'q'.repeat(4100)}`), HOSTS, 'production')).toBeNull();
+    expect(trustedStorageUrl(url(`/${'a'.repeat(2000)}?${'q'.repeat(4000)}`), HOSTS, 'production')).not.toBeNull();
+  });
+
+  it('the host and scheme of the result are the configured ones, whatever the request spelled (case, default port, a look-alike userinfo)', () => {
+    expect(trustedStorageUrl('https://ABC.Supabase.CO:443/x', HOSTS, 'production')).toBe('https://abc.supabase.co/x');
+    // a backslash makes the URL parser read what follows as path: the request still reaches the configured host, never evil.example
+    expect(new URL(String(trustedStorageUrl('https://abc.supabase.co\\@evil.example/x', HOSTS, 'production'))).host).toBe('abc.supabase.co');
+    expect(trustedStorageUrl('http://127.0.0.1:54321/storage/x', ['127.0.0.1:54321'], 'development')).toBe('http://127.0.0.1:54321/storage/x');
+  });
+
+  it('is not fooled by the fragment: it is dropped, never sent', () => {
+    expect(trustedStorageUrl(url('/x.pdf#//evil.example'), HOSTS, 'production')).toBe('https://abc.supabase.co/x.pdf');
   });
 });
 
