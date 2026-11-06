@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import type { SecondaryOperationsDto, SecondaryOptionDto } from '@/lib/api/hooks/useBOMItems';
 
 type Group = 'heat' | 'surface' | 'other';
-const GROUPS: Array<{ key: Group; label: string }> = [
+const GROUPS: { key: Group; label: string }[] = [
   { key: 'heat', label: 'Heat Treatment' },
   { key: 'surface', label: 'Surface Treatment' },
   { key: 'other', label: 'Other Secondary' },
@@ -25,7 +24,6 @@ export function SecondaryOperationsPicker({
   onChange: (selection: Record<Group, string[]>) => void;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState<Group | null>(null);
   const selected = (g: Group) => ops[g].filter((o) => o.selected).map((o) => o.process);
   const toggle = (g: Group, process: string) => {
     const next = { heat: selected('heat'), surface: selected('surface'), other: selected('other') };
@@ -34,75 +32,79 @@ export function SecondaryOperationsPicker({
   };
   const cost = (o: SecondaryOptionDto) =>
     o.costPerPart != null ? `${currencySymbol}${o.costPerPart.toFixed(2)}` : o.status === 'not_applicable' ? 'n/a' : 'not costed';
+  const picked = GROUPS.flatMap(({ key }) => ops[key].filter((o) => o.selected));
+  const total = picked.reduce((sum, o) => sum + (o.costPerPart ?? 0), 0);
+  const uncosted = picked.filter((o) => o.costPerPart == null).length;
 
   return (
-    <div className="space-y-1.5">
-      <p className="text-[10px] text-muted-foreground">
-        {ops.source === 'drawing' ? 'Pre-selected from the drawing callouts.' : 'Your selection.'} Each pick is a line on the quote.
-      </p>
-      {GROUPS.map(({ key, label }) => {
-        const picked = ops[key].filter((o) => o.selected);
-        return (
-          <div key={key}>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => setOpen(open === key ? null : key)}
-              className="w-full flex items-center justify-between gap-2 text-xs border border-border rounded px-2 py-1 bg-background hover:bg-muted/40 disabled:opacity-50"
-            >
-              <span className="text-muted-foreground shrink-0">{label}</span>
-              <span className="truncate text-right">
-                {picked.length === 0 ? 'None' : picked.map((o) => o.process).join(', ')}
-              </span>
-            </button>
-            {/* The selection, with the machine each pick is costed on. */}
-            {picked.length > 0 && (
-              <ul className="mt-1 space-y-1">
-                {picked.map((o) => (
-                  <li key={o.process} className="rounded border border-border/60 bg-muted/20 px-2 py-1 text-[11px]">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium truncate">{o.process}</span>
-                      <span className="tabular-nums shrink-0">{cost(o)}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground truncate" title={o.reason}>
-                      {o.machineName ?? 'No machine on file'}
-                      {o.cycleTimeSec != null && ` · ${(o.cycleTimeSec / 60).toFixed(2)} min`}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {open === key && (
-              <div className="mt-1 max-h-56 overflow-y-auto rounded border border-border bg-background">
-                {ops[key].length === 0 && <p className="px-2 py-1 text-[10px] text-muted-foreground">No processes on file.</p>}
-                {ops[key].map((o) => (
-                  <label
-                    key={o.process}
-                    title={o.reason}
-                    className="flex items-center gap-2 px-2 py-1 text-[11px] cursor-pointer hover:bg-muted/40"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={o.selected}
-                      disabled={disabled}
-                      onChange={() => toggle(key, o.process)}
-                      className="accent-brand-600 shrink-0"
-                    />
-                    <span className="flex-1 min-w-0 truncate">
-                      {o.process}
-                      {o.fromDrawing && <span className="ml-1 text-[9px] text-brand-400">from drawing</span>}
-                    </span>
-                    <span className={`tabular-nums shrink-0 ${o.costPerPart == null ? 'text-muted-foreground' : ''}`}>{cost(o)}</span>
-                  </label>
-                ))}
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-border/60 px-4 py-3">
+        <h4 className="text-sm font-semibold">Secondary operations</h4>
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          {ops.source === 'drawing' ? 'Pre-selected from the drawing callouts.' : 'Your selection.'} Each tick is a line on the quote and is saved at once.
+        </p>
+      </div>
+
+      {/* Every group is open: nothing is hidden behind a click, and a group with no pick says so in its header. */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+        {GROUPS.map(({ key, label }) => {
+          const count = ops[key].filter((o) => o.selected).length;
+          return (
+            <section key={key} aria-label={label}>
+              <div className="mb-1 flex items-baseline justify-between">
+                <h5 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</h5>
+                <span className="text-[10px] text-muted-foreground">{count === 0 ? 'None' : `${count} selected`}</span>
               </div>
-            )}
-          </div>
-        );
-      })}
-      {ops.dataWarnings.length > 0 && (
-        <p className="text-[10px] text-amber-600 dark:text-amber-500">{ops.dataWarnings.join(' ')}</p>
-      )}
+              {ops[key].length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No processes on file.</p>
+              ) : (
+                <ul className="max-h-48 divide-y divide-border/40 overflow-y-auto rounded border border-border/60">
+                  {ops[key].map((o) => (
+                    <li key={o.process}>
+                      <label
+                        title={o.reason}
+                        className={`flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-muted/40 ${o.selected ? 'bg-brand-50/40 dark:bg-brand-950/20' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={o.selected}
+                          disabled={disabled}
+                          onChange={() => { toggle(key, o.process); }}
+                          className="mt-0.5 shrink-0 accent-brand-600"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">
+                            {o.process}
+                            {o.fromDrawing && <span className="ml-1 text-[9px] text-brand-400">from drawing</span>}
+                          </span>
+                          {o.selected && (
+                            <span className="block truncate text-[10px] text-muted-foreground">
+                              {o.machineName ?? 'No machine on file'}
+                              {o.cycleTimeSec != null && ` · ${(o.cycleTimeSec / 60).toFixed(2)} min`}
+                            </span>
+                          )}
+                        </span>
+                        <span className={`shrink-0 tabular-nums ${o.costPerPart == null ? 'text-muted-foreground' : ''}`}>{cost(o)}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+        {ops.dataWarnings.length > 0 && (
+          <p className="text-[10px] text-amber-600 dark:text-amber-500">{ops.dataWarnings.join(' ')}</p>
+        )}
+      </div>
+
+      <div className="shrink-0 border-t border-border/60 px-4 py-3">
+        <div className="flex items-baseline justify-between text-xs">
+          <span className="text-muted-foreground">{picked.length === 0 ? 'No secondary operations' : `${picked.length} selected`}</span>
+          <span className="font-semibold tabular-nums">{currencySymbol}{total.toFixed(2)} / part</span>
+        </div>
+        {uncosted > 0 && <p className="mt-0.5 text-[10px] text-muted-foreground">{uncosted} selected without a cost on file; not in this total.</p>}
+      </div>
     </div>
   );
 }
