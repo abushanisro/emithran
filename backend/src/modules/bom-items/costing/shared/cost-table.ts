@@ -32,16 +32,6 @@ export interface CostColumn {
 export const COST_COLUMNS: readonly CostColumn[] = [
   { key: 'annualVolume', label: 'Annual Volume', group: 'Manufacturing', unit: 'count', modelled: true, basic: false },
   { key: 'laborTimeSec', label: 'Labor Time (s)', group: 'Manufacturing', unit: 'seconds', modelled: true, basic: false, note: 'The cycle time per part of the operation.' },
-  { key: 'operationNumber', label: 'Op #', group: 'Process Source', unit: 'count', modelled: true, basic: false, note: "The operation's number in the route." },
-  { key: 'machineName', label: 'Machine', group: 'Process Source', unit: 'text', modelled: true, basic: false },
-  { key: 'partsPerCycle', label: 'Parts per Cycle', group: 'Process Source', unit: 'count', modelled: true, basic: false },
-  { key: 'scrapPct', label: 'Scrap (%)', group: 'Process Source', unit: 'percent', modelled: true, basic: false },
-  { key: 'setupTimeMin', label: 'Setup Time (min)', group: 'Process Source', unit: 'minutes', modelled: true, basic: false, note: 'Per batch.' },
-  { key: 'batchSize', label: 'Batch Size', group: 'Process Source', unit: 'count', modelled: true, basic: false, note: 'The batch the setup is spread over.' },
-  { key: 'machineRate', label: 'Machine Rate (USD/hr)', group: 'Process Source', unit: 'usd_per_hr', modelled: true, basic: false },
-  { key: 'laborRate', label: 'Labor Rate (USD/hr)', group: 'Process Source', unit: 'usd_per_hr', modelled: true, basic: false },
-  { key: 'timingSource', label: 'Cycle Time Source', group: 'Process Source', unit: 'text', modelled: true, basic: false, note: 'Where the cycle time came from; empty when the record does not say.' },
-  { key: 'setupTimeSource', label: 'Setup Time Source', group: 'Process Source', unit: 'text', modelled: true, basic: false, note: 'Where the setup time came from; empty when the record does not say.' },
   { key: 'finishMassKg', label: 'Finish Mass (kg)', group: 'Material Info', unit: 'kg', modelled: true, basic: false },
   { key: 'materialComposition', label: 'Material Composition', group: 'Material Info', unit: 'text', modelled: true, basic: false },
   { key: 'utilizationPct', label: 'Utilization (%)', group: 'Material Info', unit: 'percent', modelled: true, basic: false },
@@ -59,6 +49,16 @@ export const COST_COLUMNS: readonly CostColumn[] = [
   { key: 'pieceCost', label: 'Piece Part Cost', group: 'Piece Part Cost', unit: 'usd', modelled: true, basic: true, note: 'Equals the total variable cost: period costs are not modelled.' },
   { key: 'capitalInvestment', label: 'Total Capital Investments', group: 'Capital Costs', unit: 'usd', modelled: true, basic: false, note: 'The tooling investment on file.' },
   { key: 'targetCost', label: 'Target Cost', group: 'Cost Targets', unit: 'usd', modelled: false, basic: false, note: 'Not modelled: no target cost is on file.' },
+  { key: 'operationNumber', label: 'Op #', group: 'Process Source', unit: 'count', modelled: true, basic: false, note: "The operation's number in the route." },
+  { key: 'machineName', label: 'Machine', group: 'Process Source', unit: 'text', modelled: true, basic: false },
+  { key: 'partsPerCycle', label: 'Parts per Cycle', group: 'Process Source', unit: 'count', modelled: true, basic: false },
+  { key: 'scrapPct', label: 'Scrap (%)', group: 'Process Source', unit: 'percent', modelled: true, basic: false },
+  { key: 'setupTimeMin', label: 'Setup Time (min)', group: 'Process Source', unit: 'minutes', modelled: true, basic: false, note: 'Per batch.' },
+  { key: 'batchSize', label: 'Batch Size', group: 'Process Source', unit: 'count', modelled: true, basic: false, note: 'The batch the setup is spread over.' },
+  { key: 'machineRate', label: 'Machine Rate (USD/hr)', group: 'Process Source', unit: 'usd_per_hr', modelled: true, basic: false },
+  { key: 'laborRate', label: 'Labor Rate (USD/hr)', group: 'Process Source', unit: 'usd_per_hr', modelled: true, basic: false },
+  { key: 'timingSource', label: 'Cycle Time Source', group: 'Process Source', unit: 'text', modelled: true, basic: false, note: 'Where the cycle time came from; empty when the record does not say.' },
+  { key: 'setupTimeSource', label: 'Setup Time Source', group: 'Process Source', unit: 'text', modelled: true, basic: false, note: 'Where the setup time came from; empty when the record does not say.' },
 ];
 
 export type CostRowKind = 'part' | 'material' | 'group' | 'process' | 'logistics' | 'procured' | 'tooling';
