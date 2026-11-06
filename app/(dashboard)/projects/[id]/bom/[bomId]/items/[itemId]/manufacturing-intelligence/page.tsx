@@ -808,16 +808,16 @@ function buildProcessTree(
     // line, live or applied). The earlier grouped-by-diameter hole and grouped-by-radius bend rows were a
     // second representation of the same CAD features and are gone.
     if (isMachiningFamily && (matchedCostLine?.featureOperations?.length ?? 0) > 0) {
-      // Casting: "Operation // Feature [n]" from the catalog, each listing the
+      // Casting and machining: "Feature ×n", its catalog operation an attribute,, each listing the
       // feature instances it applies to (highlight exactly those).
       matchedCostLine!.featureOperations!.forEach((g, i) => {
         featureNodes.push({
           id: `castop_${opIdx}_${i}`,
           kind: 'feature',
-          label: `${g.operation ?? 'Undetermined'} // ${g.featureType} [${g.instances.length}]`,
+          label: `${g.featureType} ×${g.instances.length}`,
           factory, machine,
           v2Occurrences: g.instances.filter((x) => x.featureId).map((x) => ({ featureId: x.featureId!, occurrenceIndex: x.occurrenceIndex })),
-          attrs: [{ name: 'Why', value: g.reason }],
+          attrs: [{ name: 'Operation', value: g.operation ?? 'Undetermined' }, { name: 'Why', value: g.reason }],
           children: g.instances.map((x, j) => ({
             id: `castop_${opIdx}_${i}_${j}`,
             kind: 'feature' as const,
