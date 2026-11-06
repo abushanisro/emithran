@@ -16,7 +16,7 @@ Validation vocabulary used throughout (the same three states the engine must exp
 
 ## 1. Inventory of `memory/`
 
-1,218 files in 35 folders (1,150 csv, 25 png, 19 md, 15 json, 6 xlsx, 1 each of pdf, docx, txt).
+1,218 files in 34 folders (1,150 csv, 25 png, 19 md, 15 json, 6 xlsx, 1 each of pdf, docx, txt).
 
 | Folder | Files | Plastic relevance |
 |---|---|---|
@@ -27,6 +27,8 @@ Validation vocabulary used throughout (the same three states the engine must exp
 | `Standards/` | 2 | ISO 286 tolerances. Not used for molding. |
 | `Sheetmetal/` (17 `.md` specs, 1 `.docx`; the two `.xlsx` calculator workbooks are in `database/`) | 148 | **The only folder with written specifications.** Sheet metal has algorithm documents; **plastic has none.** |
 | `Countries data/`, `database/`, others | | Location rates and the sheet-metal calculator workbooks. |
+
+Hygiene: `memory/memory` is a symlink to `memory/` itself, so a recursive tool that follows links walks the tree to unbounded depth. It is not a folder and holds no files; remove it or exclude it from tooling.
 
 **Finding 1 (decisive for the plan): `memory/Plastic Modeling/` contains data, not formulas.** No specification, workbook or standard describes how a mold, a cycle or a quote is computed. The only prose is the `notes` column of the variables (e.g. "Used in the Compression Molding process routing"). Every formula in the engine today was therefore written by engineers from literature or from those one-line notes. Section 6 classifies each.
 
@@ -156,7 +158,7 @@ interface CalcStep {
 
 | ID | Finding | Evidence | Effect | Fix (needs approval) |
 |---|---|---|---|---|
-| **D-1** | **Fractional operators lost in staging.** Source: all 81 injection and all 21 structural-foam presses have `numberOfOperators = 0.5`. Staged `mhr_records.operators` is `smallint`, so 0.5 became 1. | Source CSV vs `mhr_records` (81/81 injection, 21/21 foam differ). Kawaguchi KM80: source 0.5, database 1. | **The labour charged since #230 is 2x the source for 102 presses** (Back cover: cycle labour $0.092 would be $0.046; the Injection Molding line $0.61 would be $0.43). | Make the column `numeric(4,2)`, restage, add a source-vs-database parity test over all 127 presses. Lowers injection and foam prices. |
+| **D-1** (fix proposed in #236) | **Fractional operators lost in staging.** Source: all 81 injection and all 21 structural-foam presses have `numberOfOperators = 0.5`. Staged `mhr_records.operators` is `smallint`, so 0.5 became 1. | Source CSV vs `mhr_records` (81/81 injection, 21/21 foam differ). Kawaguchi KM80: source 0.5, database 1. | **The labour charged since #230 is 2x the source for 102 presses** (Back cover: cycle labour $0.092 would be $0.046; the Injection Molding line $0.61 would be $0.43). | Make the column `numeric(4,2)`, restage, add a source-vs-database parity test over all 127 presses. Lowers injection and foam prices. |
 | D-2 | `overhead_multiplier`: source `0.0` (injection, foam), staged `1.000`. Compression: 15 of 23 differ. RIM: 2 of 2. | Same comparison | Not read by the engine today (machine rate already equals direct + indirect overhead: 8.19 + 14.5 = 22.69), so no price effect now; a latent conflict | Decide the meaning; then stage faithfully |
 | D-3 | `mold-tooling-engine.ts` says a "+35 % per additional cavity" heuristic "is retained". **The code has no per-cavity scaling**: a 1-cavity and an 8-cavity mold cost the same. | `grep` finds the comment only | Multi-cavity tooling is understated | Remove the stale comment and decide a rule (UNSUPPORTED until specified) |
 | D-4 | SPI mold class is computed and shown but never enters the tooling cost. | `computeMoldToolingCost` has no class input | Class 101 and Class 105 molds cost the same | Specify class-dependent build cost, or stop implying it matters |
