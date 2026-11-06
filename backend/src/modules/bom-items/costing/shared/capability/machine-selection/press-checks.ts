@@ -1,3 +1,4 @@
+// Formula registry (plastic-molding/formula-registry.ts): F-11. Change a formula or its constants -> bump its version there.
 // Whether an injection press can run a part: the ONE rule. The shared machine selector (isCapable, which picks the press for the Cost Summary) and the
 // plastic tier evaluator (which prices a press per size class in the Route Comparison) both call checkPress, so a press is capable in one view exactly
 // when it is capable in the other. The reason text lives here too, so what the user is told is what was tested.

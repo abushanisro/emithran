@@ -1,3 +1,4 @@
+// Formula registry (plastic-molding/formula-registry.ts): F-01. Change a formula or its constants -> bump its version there.
 // Required injection-molding clamp force: the reference model, the ONE
 // implementation every clamp check calls (machine selection, route
 // comparison, cavity count, the active quote). Pure; all parameters come
