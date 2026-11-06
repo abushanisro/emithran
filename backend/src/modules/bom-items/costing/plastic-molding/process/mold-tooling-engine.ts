@@ -1,3 +1,4 @@
+// Formula registry (plastic-molding/formula-registry.ts): F-16. Change a formula or its constants -> bump its version there.
 // Injection Molding mold-tooling cost — the real replacement for
 // SPI_MOLD_CLASSES.baseCostUsd's uncited flat per-class dollar figures
 // ($50,000/$25,000/$12,000/$5,000/$1,500), found during the 2026-09-10

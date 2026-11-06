@@ -1,3 +1,4 @@
+// Formula registry (plastic-molding/formula-registry.ts): F-10, F-12, F-13, F-14, F-15, F-17, F-18. Change a formula or its constants -> bump its version there.
 // Injection-molded plastic parts — cost engine.
 //
 // Consumes the routed process tree from routing-engine.ts and prices exactly

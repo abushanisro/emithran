@@ -1,3 +1,4 @@
+// Formula registry (plastic-molding/formula-registry.ts): F-02, F-03. Change a formula or its constants -> bump its version there.
 // Shot size one cavity needs, in the unit press shot capacity is rated in:
 // GPPS grams (memory/Plastic Modeling/machine: limits.shotSizeGppsG). The ONE
 // rule the press selector and the cost engine both use.

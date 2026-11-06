@@ -1,3 +1,4 @@
+// Formula registry (plastic-molding/formula-registry.ts): F-04, F-05, F-06, F-07, F-08, F-09. Change a formula or its constants -> bump its version there.
 // Injection molding cycle time, from real inputs only: the material's
 // reference thermal properties, the selected press's own timing, and the
 // staged Plastic reference (plastic-reference.ts CycleModel).
