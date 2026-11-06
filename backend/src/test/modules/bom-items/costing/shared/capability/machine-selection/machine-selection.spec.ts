@@ -1349,3 +1349,22 @@ describe('deburr line (Phase 4)', () => {
     expect(why).toContain('= 2.9 s');
   });
 });
+
+describe('selectMachine — a molding part that cannot be sized', () => {
+  it('says the part cannot be sized for the machines that exist, with the reason, not that none can do it', () => {
+    const press = candidate({ machineId: 'p1', machineName: 'Press 1', machineClass: 'injection_molding', hourlyRate: 40, capability: { maxTonnage: 100 } });
+    const result = selectMachine({
+      pool: [press],
+      location: 'USA',
+      machineClass: 'injection_molding',
+      requirement: {
+        kind: 'injection_molding', clampTonnageRequired: null, shotGppsG: null, projectedAreaMm2: 10_000, partLengthMm: 150, partWidthMm: 100,
+        clampNotDerivableReason: 'Clamp force not derivable: Generic X has no reference injection pressure / flow length ratio.',
+      } as never,
+    });
+    const reason = result.balanced.reasons[0]!;
+    expect(reason).toMatch(/1 machine of this class is in HR Rates for USA, but the part cannot be sized/);
+    expect(reason).toMatch(/Generic X has no reference injection pressure/);
+    expect(reason).not.toMatch(/can do this part/);
+  });
+});

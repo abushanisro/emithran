@@ -1145,9 +1145,13 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
 
   // No capable machine. Reported as an absence — never priced from anywhere else.
   if (eligible.length === 0 && !input.overrideMachineId) {
+    // Machines exist but the part cannot be sized for any of them (a molding material with no reference data): say that, not "none can do it".
+    const unsized = requirement.kind === 'injection_molding' && requirement.clampTonnageRequired == null ? requirement.clampNotDerivableReason : undefined;
     const reason = classPool.length === 0
       ? `No machine of this class in HR Rates for ${location} — not costed; add it to memory/ and seed it`
-      : `No machine of this class in HR Rates for ${location} can do this part — not costed`;
+      : unsized
+        ? `${classPool.length} machine${classPool.length === 1 ? "" : "s"} of this class ${classPool.length === 1 ? "is" : "are"} in HR Rates for ${location}, but the part cannot be sized for ${classPool.length === 1 ? "it" : "them"} — not costed. ${unsized}`
+        : `No machine of this class in HR Rates for ${location} can do this part — not costed`;
     const rec: MachineRecommendation = {
       candidate: makeNoMachineCandidate(machineClass),
       score: 0,
