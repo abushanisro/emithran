@@ -287,3 +287,48 @@ describe('press labour', () => {
     expect(findRouteDataGaps(noLabour.processLines).map((g) => g.reason).join(' ')).toContain('No labour rate on file');
   });
 });
+
+// CHARACTERIZATION, not endorsement: these pin what the model does today so that a change to it is deliberate (docs/plastic-modeling/investigations.md,
+// I-1 and I-2). A reviewer who changes a number here is changing the cost model and needs the formula's approval (formula register F-15..F-17).
+describe('characterization: what the mold cost depends on today', () => {
+  const mold = (over: Partial<InjectionMoldingCostInput>, signals: object = {}) => {
+    const r = computeInjectionMoldedCostSummary(absPart({ annualVolume: 100_000, productionLifeYears: 3, ...over, signals: { projectedAreaMm2: 10_000, undercutCount: 0, ...signals } }));
+    return { total: r.tooling!.moldCostUsd, molds: r.tooling!.moldsRequired!, perMold: r.tooling!.moldCostUsd / r.tooling!.moldsRequired!, cls: r.tooling!.moldClass, bom: r.tooling!.moldBomSubtotalUsd };
+  };
+
+  it('I-1: the cost of ONE mold does not grow with the cavity count (1 to 8 cavities: +1.3 %, only the plate area term moves); more cavities only mean fewer molds worn out', () => {
+    const one = mold({ cavityCountOverride: 1 });
+    expect(one.molds).toBe(3);
+    for (const cavities of [2, 4, 8]) {
+      const m = mold({ cavityCountOverride: cavities });
+      expect(m.bom).toBe(one.bom); // the same purchased components for any number of cavities
+      expect(m.perMold / one.perMold).toBeGreaterThan(0.99);
+      expect(m.perMold / one.perMold).toBeLessThan(1.02);
+    }
+    expect(mold({ cavityCountOverride: 4 }).molds).toBe(1);
+    expect(mold({ cavityCountOverride: 4 }).total).toBeLessThan(one.total); // a 4-cavity tool is priced below a 1-cavity one only because fewer molds wear out
+  });
+
+  it('I-2: the SPI class changes with volume, complexity and undercuts, but not the cost of a mold (Class 105, 103 and 101 molds cost the same each)', () => {
+    const c105 = mold({ annualVolume: 1000, productionLifeYears: 1 });
+    const c103 = mold({ annualVolume: 100_000, productionLifeYears: 3 });
+    const c101 = mold({ annualVolume: 2_000_000, productionLifeYears: 5 });
+    expect([c105.cls, c103.cls, c101.cls]).toEqual(['Class105', 'Class103', 'Class101']);
+    expect(c103.perMold).toBeCloseTo(c105.perMold, 2);
+    expect(c101.perMold).toBeCloseTo(c105.perMold, 2);
+  });
+
+  it('I-2: how many molds are bought comes from tblToolLife (shots per tool by resin), not from the class rating: a Class 101 mold rated for 9,999,999,999 cycles is bought 70 times for 10 million ABS shots', () => {
+    const c101 = mold({ annualVolume: 2_000_000, productionLifeYears: 5 });
+    expect(c101.cls).toBe('Class101');
+    expect(c101.molds).toBe(Math.ceil(10_000_000 / 144_000)); // tblToolLife ABS
+  });
+
+  it('I-2: undercuts add the staged slide hardware (hydraulic cylinder, side lock) and raise the class; nothing else about the class is priced', () => {
+    const plain = mold({}, { partingComplexity: 0.1 });
+    const slides = mold({}, { partingComplexity: 0.9, undercutCount: 6, slideBundleCount: 2 });
+    expect(slides.bom! - plain.bom!).toBe(1400 + 640); // 4 hydraulic cylinders x 350 + 4 side locks x 160
+    expect(slides.cls).toBe('Class102');
+  });
+});
+
