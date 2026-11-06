@@ -289,10 +289,10 @@ BEGIN
   SELECT id INTO v_id FROM public.calculators WHERE name = $q$Sand Casting - Pour$q$ AND user_id IS NULL AND retired_at IS NULL;
   IF v_id IS NULL THEN
     INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, $q$Sand Casting - Pour$q$, 'process', 'single', false, true, true, $q$Pouring time per mould from the alloy's coefficient and the pounds poured (aPriori pour formula), plus the ladle transport shared by the moulds one ladle fills; shared by the cavities.$q$)
+    VALUES (NULL, $q$Sand Casting - Pour$q$, 'process', 'single', false, true, true, $q$Pouring time per mould from the alloy's coefficient and the pounds poured, plus the ladle transport shared by the moulds one ladle fills; shared by the cavities.$q$)
     RETURNING id INTO v_id;
   ELSE
-    UPDATE public.calculators SET calc_category = 'process', description = $q$Pouring time per mould from the alloy's coefficient and the pounds poured (aPriori pour formula), plus the ladle transport shared by the moulds one ladle fills; shared by the cavities.$q$, updated_at = now() WHERE id = v_id;
+    UPDATE public.calculators SET calc_category = 'process', description = $q$Pouring time per mould from the alloy's coefficient and the pounds poured, plus the ladle transport shared by the moulds one ladle fills; shared by the cavities.$q$, updated_at = now() WHERE id = v_id;
   END IF;
 
   DELETE FROM public.calculator_fields WHERE calculator_id = v_id;

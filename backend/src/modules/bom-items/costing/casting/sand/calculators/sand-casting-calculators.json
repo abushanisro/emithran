@@ -757,7 +757,7 @@
     {
       "key": "sand.pour",
       "name": "Sand Casting - Pour",
-      "description": "Pouring time per mould from the alloy's coefficient and the pounds poured (aPriori pour formula), plus the ladle transport shared by the moulds one ladle fills; shared by the cavities.",
+      "description": "Pouring time per mould from the alloy's coefficient and the pounds poured, plus the ladle transport shared by the moulds one ladle fills; shared by the cavities.",
       "operations": [
         "Pour"
       ],

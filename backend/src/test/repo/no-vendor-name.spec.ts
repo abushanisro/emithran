@@ -7,13 +7,6 @@ import { join } from 'path';
 const NAME = new RegExp('a' + 'Priori', 'i');
 const ROOT = join(__dirname, '..', '..', '..', '..');
 
-// Applied migration 956 and the spec that generates it carry the name in one calculator description. The migration runner refuses a database that
-// applied 956 if the file changes, so it cannot be edited in place; they change together in a follow-up that also updates the stored checksum.
-const KNOWN = new Set([
-  'backend/migrations/956_sand_casting_calculators.sql',
-  'backend/src/modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators.json',
-]);
-
 describe('the licensed source is not named in the repository', () => {
   const files = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' }).split('\0').filter(Boolean);
 
@@ -21,7 +14,7 @@ describe('the licensed source is not named in the repository', () => {
     expect(files.filter((f) => NAME.test(f))).toEqual([]);
   });
 
-  it('no tracked text file contains it, except the two known files', () => {
+  it('no tracked text file contains it, ', () => {
     const hits = files.filter((f) => {
       if (/\.(png|jpg|jpeg|gif|ico|woff2?|zip|xlsx|docx|pdf|lock)$/i.test(f)) return false;
       try {
@@ -30,6 +23,6 @@ describe('the licensed source is not named in the repository', () => {
         return false; // a deleted or unreadable path
       }
     });
-    expect(hits.filter((f) => !KNOWN.has(f))).toEqual([]);
+    expect(hits).toEqual([]);
   });
 });
