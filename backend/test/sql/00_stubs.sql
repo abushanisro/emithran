@@ -47,7 +47,8 @@ CREATE TABLE public.organizations (id uuid PRIMARY KEY DEFAULT gen_random_uuid()
 -- the columns of mhr_records (migrations 001..542) that should-cost calibration (953) works on
 CREATE TABLE public.mhr_records (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), process_family text, location text, source_type text,
-  total_machine_hour_rate numeric, mhr_usd_per_hour numeric, organization_id uuid
+  total_machine_hour_rate numeric, mhr_usd_per_hour numeric, organization_id uuid,
+  operators smallint DEFAULT 1 -- migration 971 makes it numeric(5,2)
 );
 CREATE TABLE public.api_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

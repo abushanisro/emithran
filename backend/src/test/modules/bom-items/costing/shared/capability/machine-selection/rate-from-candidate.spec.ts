@@ -15,6 +15,10 @@ describe('mhrRateFromCandidate', () => {
     });
   });
 
+  it('a fraction of an operator reaches the engine as it is stored: 0.5 is not rounded to 1', () => {
+    expect(mhrRateFromCandidate({ ...press, operators: 0.5 }, 'injection_molding', 1).operators).toBe(0.5);
+  });
+
   it('a machine with no labour rate on file has none: it is not turned into a zero', () => {
     const rate = mhrRateFromCandidate({ ...press, laborRateUsdHr: null }, 'injection_molding', 1);
     expect(rate.labourRate).toBeNull();

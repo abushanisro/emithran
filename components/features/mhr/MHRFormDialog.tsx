@@ -400,7 +400,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="operators">Operators</Label>
-                  <Input id="operators" type="number" step="1" min="0" {...register('operators', { valueAsNumber: true })} placeholder="e.g., 1" />
+                  <Input id="operators" type="number" step="0.01" min="0" {...register('operators', { valueAsNumber: true })} placeholder="e.g., 1" />
                   <p className="text-xs text-muted-foreground">Used directly in real quote costing — this machine's operations use this operator count for setup and cycle labor, instead of a generic default. Leave blank to fall back to that default.</p>
                 </div>
                 <div className="space-y-2">
