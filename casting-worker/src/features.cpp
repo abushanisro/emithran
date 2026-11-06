@@ -1,5 +1,5 @@
 // Casting features of one part (roadmap F1/F2, D132–D134), on the exact B-rep, in the part's own coordinates.
-// Feature types are those of the sand-casting operations catalogue; definitions follow aPriori's GCDs:
+// Feature types are those of the sand-casting operations catalogue; definitions follow the geometric cost drivers (GCDs) of the staged sand-casting catalogue:
 //  - PlanarFace: a plane; CurvedWall: a cylinder, an extrusion, or a cone drafted 5° or less; CurvedSurface: any
 //    other face (cones over 5°, spheres, tori, revolutions, free-form).
 //  - SharpEdge: two faces meeting with a crease (not tangent, continuity C0 after EncodeRegularity at 1°); edges

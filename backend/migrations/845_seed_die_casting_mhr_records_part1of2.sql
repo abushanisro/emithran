@@ -20,7 +20,7 @@
 --    MHR = Direct OH + Indirect OH, LHR = labour rate, every other source
 --    column in specs; HR Rates category = benchmark_source_key prefix.
 --
--- 2. India: memory/Die Casting/Indian data/aPriori_India_Casting_Machine_Rates_FULL.csv
+-- 2. India: memory/Die Casting/Indian data/eMithran_India_Casting_Machine_Rates_FULL.csv
 --    83 machines (High Pressure Die Casting 63/63, Gravity Die Casting 20/20), each its USA twin at India rates
 --    (every column cloned; location India, country IN, rates USD, as 594/829).
 --    Transcription errors resolved to the one unclaimed USA name within edit
