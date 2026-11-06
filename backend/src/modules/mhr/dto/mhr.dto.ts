@@ -162,7 +162,7 @@ export class CreateMHRDto {
   @ApiPropertyOptional() @IsString() @IsOptional() processCategory?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() machineClass?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() automationLevel?: string;
-  @ApiPropertyOptional() @IsNumber() @Min(1) @IsOptional() operators?: number;
+  @ApiPropertyOptional({ description: 'Operators the machine is manned with; fractional (0.5 = one operator for two machines).' }) @IsNumber() @Min(0.01) @IsOptional() operators?: number;
   @ApiPropertyOptional() @IsString() @IsOptional() wageGrade?: string;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() machinePriceUsd?: number;
   @ApiPropertyOptional() @IsString() @IsOptional() manufacturerCountry?: string;
@@ -360,7 +360,7 @@ export class UpdateMHRDto {
   @ApiPropertyOptional() @IsString() @IsOptional() processCategory?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() machineClass?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() automationLevel?: string;
-  @ApiPropertyOptional() @IsNumber() @Min(1) @IsOptional() operators?: number;
+  @ApiPropertyOptional({ description: 'Operators the machine is manned with; fractional (0.5 = one operator for two machines).' }) @IsNumber() @Min(0.01) @IsOptional() operators?: number;
   @ApiPropertyOptional() @IsString() @IsOptional() wageGrade?: string;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() machinePriceUsd?: number;
   @ApiPropertyOptional() @IsString() @IsOptional() manufacturerCountry?: string;
