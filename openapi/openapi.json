@@ -1995,6 +1995,7 @@
             "type": "string"
           },
           "operators": {
+            "description": "Operators the machine is manned with; fractional (0.5 = one operator for two machines).",
             "type": "number"
           },
           "paybackPeriodYears": {
@@ -9442,6 +9443,7 @@
             "type": "string"
           },
           "operators": {
+            "description": "Operators the machine is manned with; fractional (0.5 = one operator for two machines).",
             "type": "number"
           },
           "paybackPeriodYears": {
