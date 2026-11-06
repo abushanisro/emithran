@@ -35,6 +35,7 @@
 // deciding on a number the database does not hold.
 
 import MANIFEST from '../../../processes/memory-reference-domains.json';
+import { fingerprintRows } from './reference-fingerprint';
 
 export const PLASTIC_REFERENCE_SOURCE_VERSION: string =
   MANIFEST.domains.find((d) => d.key === 'injection_molding')!.sourceVersion;
@@ -109,6 +110,9 @@ export interface CycleModel {
 }
 
 export interface PlasticReference {
+  /** The staged dataset these rows belong to (e.g. '2026-Plastic') and a fingerprint of the exact rows read: a saved calculation records both (calculation-snapshot.ts). */
+  sourceVersion: string;
+  datasetFingerprint: string;
   clampForceSafetyFactor: number;
   clampModel: ClampModel;
   cycleModel: CycleModel;
@@ -293,6 +297,8 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
   if (missing.length > 0) return { reference: null, missing };
   return {
     reference: {
+      sourceVersion: PLASTIC_REFERENCE_SOURCE_VERSION,
+      datasetFingerprint: fingerprintRows({ variables: [...rows.variables].sort((a, b) => (a.key < b.key ? -1 : 1)), lookups: rows.lookups, gppsMaterial: rows.gppsMaterial ?? null }),
       clampForceSafetyFactor,
       clampModel,
       cycleModel,

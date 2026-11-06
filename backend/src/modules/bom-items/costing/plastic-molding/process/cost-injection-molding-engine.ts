@@ -19,7 +19,9 @@
 // The gate feeds the gate_trimming routing rule: hot_tip and sub gates
 // self-de-gate, so gate_trimming is not routed for those gate types.
 
+import { buildCalculationSnapshot } from '../calculation-snapshot';
 import { buildQuoteValidation } from '../quote-validation';
+import { COST_ENGINE_CONTRACT_VERSION } from '../../shared/core/persisted-process-cost';
 import { RATES_SOURCE_LABEL } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import { computeSustainability } from '../../shared/core/cost-engine';
@@ -668,6 +670,14 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     }
   }
 
+  // How far the quote can be trusted, and the snapshot that lets it be reproduced: a material that cannot be molded is the one finding above, there
+  // is no quote to qualify.
+  const validation = sizing.materialGap ? undefined : buildQuoteValidation(
+    usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
+    unsupportedFormulas({ tooling: toolingResult != null, routed }),
+  );
+  if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION);
+
   return {
     materialCost,
     materialGrade: materialGrade ?? 'Unknown',
@@ -693,13 +703,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     processTree,
     injectionMolding: imBreakdown,
     ...(toolingResult ? { tooling: toolingResult } : {}),
-    // A material that cannot be molded is reported as the one finding above: there is no quote to qualify.
-    ...(sizing.materialGap ? {} : {
-      validation: buildQuoteValidation(
-        usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
-        unsupportedFormulas({ tooling: toolingResult != null, routed }),
-      ),
-    }),
+    ...(validation ? { validation } : {}),
   };
 }
 
