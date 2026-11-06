@@ -6442,6 +6442,8 @@ export class BOMItemsService {
             mhrRate: {
               rate: cand.hourlyRate, source: 'mhr_database',
               machineClass: 'injection_molding', machineName: cand.machineName, commodityCode: cand.commodityCode,
+              // The press's own setup time, so the molding line carries it (without it the route is never fully costed and cannot be applied).
+              setupTimeHr: cand.setupTimeHr ?? null,
             },
             machineClampTonnes: cand.capability.maxTonnage, machineShotCapacityG: cand.capability.shotCapacityGrams,
             pressTiming: cand.machineId ? pressRecordsRC.get(cand.machineId) ?? null : null,

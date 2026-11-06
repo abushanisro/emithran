@@ -15,6 +15,7 @@ import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../../../../../modu
 import { computeCoolingTimeSec, computeCycleTime, resinThermalProps } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
 import { computeInjectionMoldedCostSummary } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
+import { findRouteDataGaps } from '../../../../../modules/bom-items/costing/shared/core/engine-kernel';
 import { isPlasticGrade } from '../../../../../modules/bom-items/costing/plastic-molding/process/process-tree';
 import { isCapable } from '../../../../../modules/bom-items/costing/shared/capability/machine-selection/selector';
 import { injectionMoldingRequirement } from '../../../../../modules/bom-items/costing/shared/capability/machine-selection/physics';
@@ -127,6 +128,21 @@ describe('cooling and cycle time', () => {
     expect(c.coolSec).toBe(13.6);
     expect(c.moldMotionSec).toBe(2);
     expect(c.totalCycleSec).toBe(20.69);
+  });
+});
+
+describe('press setup', () => {
+  it('a press with a setup time on file charges it as the line\'s setup, so the route is fully costed; with none, the route stays incomplete', () => {
+    const base = absPart();
+    const withSetup = computeInjectionMoldedCostSummary({ ...base, batchSize: 250, mhrRate: { ...base.mhrRate, setupTimeHr: 2 } });
+    const line = withSetup.processLines.find((l) => l.process === 'Injection Molding')!;
+    expect(line.setupTimeMin).toBe(120);
+    expect(line.setupTimeSource).toBe('machine');
+    expect(line.setupCost).toBeCloseTo((2 * base.mhrRate.rate) / 250, 2);
+    expect(findRouteDataGaps(withSetup.processLines)).toEqual([]);
+
+    const without = computeInjectionMoldedCostSummary({ ...base, batchSize: 250, mhrRate: { ...base.mhrRate, setupTimeHr: null } });
+    expect(findRouteDataGaps(without.processLines).map((g) => g.reason)).toEqual(['setup time was not resolved, and this system will not persist a substituted one']);
   });
 });
 
