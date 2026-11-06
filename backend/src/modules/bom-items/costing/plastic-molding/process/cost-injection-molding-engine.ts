@@ -263,7 +263,8 @@ function resolveSubtype(input: InjectionMoldingCostInput): MoldingSubtype {
 /**
  * One molding line, charged for the press and for the people who run it. A cycle minute costs the machine rate plus the labour rate times the
  * operators the press is manned with (mhr_records.operators; one when the record names none); the setup minutes of the batch cost the same,
- * spread over the batch. The two parts are kept apart on the line (machineCostPerPart / laborCostPerPart) and add up to the line's cost.
+ * spread over the batch. The cycle's two parts are kept apart on the line (machineCostPerPart / laborCostPerPart); with the setup share (setupCost,
+ * machine and labour together) they add up to the line's cost.
  */
 function makeLine(
   process: string,
@@ -274,17 +275,16 @@ function makeLine(
 ): ProcessLineCost {
   const operators = rate.operators ?? 1;
   const labourPerHr = (rate.labourRate ?? 0) * operators;
-  const perPart = (hourly: number) => ((setupMin ?? 0) / 60 * hourly) / Math.max(batchSize, 1) + (cycleTimeMin / 60) * hourly;
-  const setupPerPart = (hourly: number) => ((setupMin ?? 0) / 60 * hourly) / Math.max(batchSize, 1);
-  const setupCost = setupPerPart(rate.rate + labourPerHr);
-  const totalCost = perPart(rate.rate + labourPerHr);
+  const runPerPart = (hourly: number) => (cycleTimeMin / 60) * hourly;
+  const setupCost = ((setupMin ?? 0) / 60 * (rate.rate + labourPerHr)) / Math.max(batchSize, 1);
+  const totalCost = setupCost + runPerPart(rate.rate + labourPerHr);
   return {
     process,
     setupCost: r2(setupCost),
     runCost: r2(totalCost - setupCost),
     totalCost: r2(totalCost),
-    machineCostPerPart: r2(perPart(rate.rate)),
-    laborCostPerPart: r2(perPart(labourPerHr)),
+    machineCostPerPart: r2(runPerPart(rate.rate)),
+    laborCostPerPart: r2(runPerPart(labourPerHr)),
     cycleTimeMin: r2(cycleTimeMin),
     hourlyRate: rate.rate,
     labourRate: rate.labourRate ?? null,

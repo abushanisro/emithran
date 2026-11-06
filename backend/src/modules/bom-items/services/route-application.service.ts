@@ -381,6 +381,9 @@ export class RouteApplicationService {
        */
       labourRate?: number | null;
       setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'none';
+      /** The cycle's machine / labour split when the engine states it (ProcessLineCost); persisted into machine_cost_per_part / labor_cost_per_part (migration 970). */
+      machineCostPerPart?: number;
+      laborCostPerPart?: number;
     }>,
     batchSize: number,
     location: string,
@@ -696,6 +699,9 @@ export class RouteApplicationService {
         setup_cost_per_part:       line.setupCost ?? null,
         total_cycle_cost_per_part: line.runCost ?? null,
         total_cost_per_part:       line.totalCost ?? null,
+        // The cycle's machine / labour split when the engine states it (migration 970); null when it does not, never a zero.
+        machine_cost_per_part:     line.machineCostPerPart ?? null,
+        labor_cost_per_part:       line.laborCostPerPart ?? null,
         // Costed-operation provenance (migration 718).
         //
         // line_hourly_rate is line.hourlyRate verbatim and UNROUNDED -- the

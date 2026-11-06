@@ -109,3 +109,29 @@ describe('buildCostTable', () => {
     expect(buildCostTable(input()).currency).toBe('USD');
   });
 });
+
+describe('buildCostTable — labor and direct overhead', () => {
+  const molding = process({ id: 'm', operation: 'Injection Molding', process_group: 'Plastic Molding', cycle_time: '9.6', setup_cost_per_part: '0.4574', total_cost_per_part: '0.6099', machine_cost_per_part: '0.0605', labor_cost_per_part: '0.0920' });
+
+  it('an operation whose engine states the split shows its labor and its machine (direct overhead) apart, and with its setup they are its cost', () => {
+    const v = row(buildCostTable(input({ processes: [molding as never] })), 'process:m').values;
+    expect(v).toMatchObject({ laborCost: 0.092, directOverhead: 0.0605, amortizedBatchSetup: 0.4574 });
+    expect(Number(v.laborCost) + Number(v.directOverhead) + Number(v.amortizedBatchSetup)).toBeCloseTo(0.6099, 4);
+  });
+
+  it('an operation whose engine does not state it leaves both empty: no zero stands in for an unknown split', () => {
+    const v = row(buildCostTable(input()), 'process:a').values;
+    expect(v.laborCost).toBeNull();
+    expect(v.directOverhead).toBeNull();
+  });
+
+  it('the group and the part add up the operations that have it', () => {
+    const t = buildCostTable(input({ processes: [molding as never, process({ id: 'n', operation: 'Inspection', process_group: 'Plastic Molding', total_cost_per_part: '0.05', setup_cost_per_part: '0' }) as never] }));
+    expect(row(t, 'group:Plastic Molding').values.laborCost).toBeCloseTo(0.092, 4);
+    expect(row(t, 'part:i1').values.directOverhead).toBeCloseTo(0.0605, 4);
+  });
+
+  it('both are columns of the Variable Costs band', () => {
+    expect(COST_COLUMNS.filter((c) => c.key === 'laborCost' || c.key === 'directOverhead').map((c) => c.group)).toEqual(['Variable Costs', 'Variable Costs']);
+  });
+});

@@ -339,7 +339,7 @@ export interface ProcessLineCost {
    * machine, and so the UI can show what the setup cost was actually manned at.
    */
   operators?: number | null;
-  /** The part of `totalCost` that is machine time (cycle + setup) and the part that is operator labour, for engines that charge both. Their sum is `totalCost` (before rounding). */
+  /** The cycle's cost split into machine time and operator labour, for engines that charge both. With `setupCost` (machine and labour together) they add up to `totalCost` (before rounding). */
   machineCostPerPart?: number;
   laborCostPerPart?: number;
   // local currency/hr — the MACHINE hour rate, and only that.

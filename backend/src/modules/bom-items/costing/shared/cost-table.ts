@@ -8,7 +8,7 @@ export type CostColumnKey =
   | 'annualVolume' | 'laborTimeSec'
   | 'operationNumber' | 'machineName' | 'partsPerCycle' | 'scrapPct' | 'setupTimeMin' | 'batchSize' | 'machineRate' | 'laborRate' | 'timingSource' | 'setupTimeSource'
   | 'finishMassKg' | 'materialComposition' | 'utilizationPct' | 'materialUnitCost'
-  | 'materialCost' | 'processCost' | 'amortizedBatchSetup' | 'logistics' | 'tooling' | 'otherDirect' | 'totalVariable'
+  | 'materialCost' | 'processCost' | 'laborCost' | 'directOverhead' | 'amortizedBatchSetup' | 'logistics' | 'tooling' | 'otherDirect' | 'totalVariable'
   | 'indirectOverhead' | 'sga' | 'margin'
   | 'pieceCost'
   | 'capitalInvestment'
@@ -37,7 +37,9 @@ export const COST_COLUMNS: readonly CostColumn[] = [
   { key: 'utilizationPct', label: 'Utilization (%)', group: 'Material Info', unit: 'percent', modelled: true, basic: false },
   { key: 'materialUnitCost', label: 'Material Unit Cost (USD/kg)', group: 'Material Info', unit: 'usd_per_kg', modelled: true, basic: false },
   { key: 'materialCost', label: 'Material Cost', group: 'Variable Costs', unit: 'usd', modelled: true, basic: true },
-  { key: 'processCost', label: 'Process Cost', group: 'Variable Costs', unit: 'usd', modelled: true, basic: true, note: "The operation's cost per part less its amortized setup: machine, labour, inspection and yield. The machine and labour split is not stored per operation." },
+  { key: 'processCost', label: 'Process Cost', group: 'Variable Costs', unit: 'usd', modelled: true, basic: true, note: "The operation's cost per part less its amortized setup: machine, labour, inspection and yield." },
+  { key: 'laborCost', label: 'Labor', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false, note: "The operators' cost per part in the cycle (labour rate x operators x cycle time). Shown where the operation's engine states it apart from the machine; empty where it does not yet." },
+  { key: 'directOverhead', label: 'Direct Overhead', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false, note: "The machine's cost per part in the cycle (machine rate x cycle time). Shown where the operation's engine states it apart from the labour; empty where it does not yet." },
   { key: 'amortizedBatchSetup', label: 'Amortized Batch Setup', group: 'Variable Costs', unit: 'usd', modelled: true, basic: true },
   { key: 'logistics', label: 'Logistics', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false },
   { key: 'tooling', label: 'Tooling (amortized)', group: 'Variable Costs', unit: 'usd', modelled: true, basic: false },
@@ -84,7 +86,7 @@ export interface CostTable {
 // The stored rows, as the database names the columns (numeric columns arrive as numbers or numeric strings).
 type Num = number | string | null | undefined;
 export interface ProcessRecord { id: string; operation: string | null; process_name: string | null; process_group: string | null; machine_name: string | null; cycle_time: Num; setup_cost_per_part: Num; total_cost_per_part: Num; op_nbr: Num; created_at: string;
-  parts_per_cycle?: Num; scrap?: Num; setup_time?: Num; batch_size?: Num; machine_rate?: Num; labor_rate?: Num; timing_source?: string | null; setup_time_source?: string | null }
+  parts_per_cycle?: Num; scrap?: Num; setup_time?: Num; batch_size?: Num; machine_rate?: Num; labor_rate?: Num; timing_source?: string | null; setup_time_source?: string | null; machine_cost_per_part?: Num; labor_cost_per_part?: Num }
 export interface MaterialRecord { id: string; material_name: string | null; unit_cost: Num; net_usage: Num; total_cost: Num; material_utilization_rate: Num }
 export interface LogisticsRecord { id: string; cost_name: string | null; total_cost: Num }
 export interface ProcuredRecord { id: string; part_name: string | null; total_cost: Num }
@@ -106,7 +108,7 @@ const num = (v: Num): number | null => {
 };
 
 /** The money columns a parent adds up from its children. */
-const SUMMED: readonly CostColumnKey[] = ['materialCost', 'processCost', 'amortizedBatchSetup', 'logistics', 'tooling', 'otherDirect', 'capitalInvestment'];
+const SUMMED: readonly CostColumnKey[] = ['materialCost', 'processCost', 'laborCost', 'directOverhead', 'amortizedBatchSetup', 'logistics', 'tooling', 'otherDirect', 'capitalInvestment'];
 
 function withTotals(values: CostRow['values']): CostRow['values'] {
   const total = (['materialCost', 'processCost', 'amortizedBatchSetup', 'logistics', 'tooling', 'otherDirect'] as const)
@@ -155,6 +157,8 @@ export function buildCostTable(input: CostTableInput): CostTable {
         ...((total ?? 0) > 0 ? {} : { statusNote: 'This operation carries no cost.' }),
         values: withTotals({
           processCost: total === null ? null : total - setup,
+          laborCost: num(p.labor_cost_per_part),
+          directOverhead: num(p.machine_cost_per_part),
           amortizedBatchSetup: num(p.setup_cost_per_part),
           ...(seconds !== null ? { laborTimeSec: seconds } : {}),
           // The operation's source, as the record states it: nothing is derived, an unstated one stays empty.
