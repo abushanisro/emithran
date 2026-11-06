@@ -46,6 +46,8 @@ INSERT INTO public.process_calculator_mappings (process_group, process_route, op
 SELECT 'Sand Casting', n, n, false FROM unnest(ARRAY['Cleaning','CO2 Cured','Cooling','Core Refractory Coat','Degating','Finishing','Horizontal Automatic','Hot Box',
   'Isocure Gas','Manual Coremaking','Manual Floor Moldmaking','Manual Pit Moldmaking','Manual Std Moldmaking','Melting','Mold Refractory Coat','No Bake','Oil Core','Pour',
   'Refractory Coat Air Dry','Refractory Coat Oven Dry','Shakeout','Shell','Stock Core','Vertical Automatic','Visual Inspection']) AS n;
+-- the process cost table as the real database has it (migration 034 on): migration 970 adds columns to it and redefines the function that fills it
+CREATE TABLE public.process_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid, is_active boolean DEFAULT true);
 INSERT INTO public.projects (user_id, name) VALUES ('11111111-1111-4111-8111-111111111111','Alice project');
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own ON public.projects FOR SELECT TO authenticated USING (user_id = auth.uid());
