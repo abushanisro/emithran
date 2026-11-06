@@ -2,12 +2,12 @@ import type { CatalogOperation } from '@/lib/api/hooks/useBOMItems';
 
 /**
  * Manufacturing Process tree rows for a sheet-metal or plastic-molding step's catalog operations,
- * in the catalog's own "Operation // Feature" form:
+ * named by the feature; the catalog operation is an attribute of the row, not part of its name:
  *
- *   Punching // SimpleHole Ø4.0 ×14
- *     Punching // Edge
- *   Perforating // SimpleHole Ø4.0 ×20
- *   Nibbling or Punching // Blank ×1        (undecided: both listed, none picked)
+ *   SimpleHole Ø4.0 ×14      (Operation: Punching)
+ *     Edge
+ *   SimpleHole Ø4.0 ×20      (Operation: Perforating)
+ *   Blank ×1                 (undecided: Operation lists both, none picked)
  *
  * Every value comes from the backend resolver; nothing is derived here.
  */
@@ -34,9 +34,10 @@ export function sheetMetalOperationNodes(idPrefix: string, operations: readonly 
     return {
       id,
       kind: 'feature',
-      label: `${name} // ${op.featureType}${dia} ×${op.count}`,
+      label: `${op.featureType}${dia} ×${op.count}`,
       v2FeatureIds: op.featureIds,
       attrs: [
+        { name: 'Operation', value: name },
         { name: 'Status', value: STATUS_LABEL[op.status] },
         { name: 'Feature', value: `${op.featureType} (${op.variant})` },
         { name: 'Count', value: String(op.count) },
@@ -48,9 +49,9 @@ export function sheetMetalOperationNodes(idPrefix: string, operations: readonly 
             children: op.children.map((c, j) => ({
               id: `${id}_${j}`,
               kind: 'feature' as const,
-              label: `${c.operation} // ${c.featureType}`,
+              label: c.featureType,
               v2FeatureIds: op.featureIds,
-              attrs: [{ name: 'Catalog step of', value: `${op.operations[0]} // ${op.featureType}` }],
+              attrs: [{ name: 'Operation', value: c.operation }],
             })),
           }
         : {}),
