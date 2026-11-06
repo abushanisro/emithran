@@ -15,6 +15,7 @@ import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../../../../../modu
 import { computeCoolingTimeSec, computeCycleTime, resinThermalProps } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
 import { computeInjectionMoldedCostSummary } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
+import { expectSetupContract } from '../shared/setup-contract';
 import { findRouteDataGaps } from '../../../../../modules/bom-items/costing/shared/core/engine-kernel';
 import { isPlasticGrade } from '../../../../../modules/bom-items/costing/plastic-molding/process/process-tree';
 import { isCapable } from '../../../../../modules/bom-items/costing/shared/capability/machine-selection/selector';
@@ -143,6 +144,8 @@ describe('press setup', () => {
 
     const without = computeInjectionMoldedCostSummary({ ...base, batchSize: 250, mhrRate: { ...base.mhrRate, setupTimeHr: null } });
     expect(findRouteDataGaps(without.processLines).map((g) => g.reason)).toEqual(['setup time was not resolved, and this system will not persist a substituted one']);
+    expectSetupContract(withSetup.processLines, true, 'Injection Molding');
+    expectSetupContract(without.processLines, false, 'Injection Molding');
   });
 });
 

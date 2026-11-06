@@ -1,4 +1,5 @@
 import { join } from 'path';
+import { expectSetupContract } from '../shared/setup-contract';
 import { CASTING_LOOKUP_KEYS, resolveCastingMaterial, resolveCastingReference, type CastingReferenceRows } from '../../../../../modules/bom-items/costing/casting/casting-reference';
 import type { HpdcMachine } from '../../../../../modules/bom-items/costing/casting/hpdc-machine';
 import { computeHpdc } from '../../../../../modules/bom-items/costing/casting/hpdc-engine';
@@ -234,5 +235,20 @@ describe('die-cast part through the Cost Summary (real calculators, memory data)
       expect(g.summary.dieCasting!.metal.meltedKg!).toBeCloseTo(0.348 / (0.7 + 0.01), 3);
       expect(Math.abs(g.summary.totalCost - (g.summary.materialCost + g.summary.totalProcessCost))).toBeLessThanOrEqual(0.0101);
     });
+  });
+});
+
+describe('setup-time contract (shared rule, see shared/setup-contract.ts)', () => {
+  const run = (process: 'hpdc' | 'gdc', setupOnFile: boolean) => {
+    const noSetup = (ms: HpdcMachine[]) => ms.map((m) => ({ ...m, setupTimeHr: null }));
+    return process === 'hpdc'
+      ? computeHpdc({ reference: ref, referenceMissing: [], calculators, material: alloy, materialGrade: alloy.name, geometry, machines: setupOnFile ? hpdcMachines : noSetup(hpdcMachines), batchSize: 1000, costContext: ctx })
+      : computeGdc({ reference: ref, referenceMissing: [], calculators, material: alloy, materialGrade: alloy.name, geometry, machines: setupOnFile ? gdcMachines : noSetup(gdcMachines), batchSize: 1000, coreCount: 0, costContext: ctx });
+  };
+
+  it.each(['hpdc', 'gdc'] as const)('%s: a machine with a setup time carries it; one without leaves the route a data gap', (process) => {
+    const label = run(process, true).processLines[0]!.process;
+    expectSetupContract(run(process, true).processLines, true, label);
+    expectSetupContract(run(process, false).processLines, false, label);
   });
 });

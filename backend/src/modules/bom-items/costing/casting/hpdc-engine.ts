@@ -391,7 +391,8 @@ export function computeHpdc(input: {
       runCost: r2(best.terms.total - best.terms.setupCost),
       totalCost: r2(best.terms.total),
       cycleTimeMin: r3(best.run.value! / 60),
-      setupTimeMin: r3((best.m.setupTimeHr ?? 0) * 60),
+      // A machine with no setup time on file leaves it unset, so the route is a data gap; 0 minutes would read as a real, free setup.
+      ...(best.m.setupTimeHr != null ? { setupTimeMin: r3(best.m.setupTimeHr * 60) } : {}),
       setupTimeSource: best.m.setupTimeHr != null ? 'machine' : 'none',
       operators: best.m.operators,
       hourlyRate: best.m.machineRatePerHr!,
