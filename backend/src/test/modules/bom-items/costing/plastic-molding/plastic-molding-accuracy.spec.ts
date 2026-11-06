@@ -287,3 +287,18 @@ describe('press labour', () => {
     expect(findRouteDataGaps(noLabour.processLines).map((g) => g.reason).join(' ')).toContain('No labour rate on file');
   });
 });
+
+describe('operations the model does not cost', () => {
+  const warn = (signals: object, grade = 'Generic ABS') => computeInjectionMoldedCostSummary({ ...absPart(), materialGrade: grade, signals: { ...absPart().signals, ...signals } }).warnings.join('\n');
+
+  it('names the reference data a required operation has that the model does not read yet, instead of saying none exists', () => {
+    const w = warn({ undercutCount: 6 });
+    expect(w).toContain('Side Action (Slide/Lifter) required');
+    expect(w).toContain('tblSlideSizes');
+    expect(w).not.toMatch(/Side Action[^\n]*no sourced time\/rate data/);
+  });
+
+  it('an operation with nothing in the reference still says there is no sourced data', () => {
+    expect(warn({}, 'Generic ABS')).toMatch(/Visual Inspection required[^\n]*no sourced time\/rate data exists/);
+  });
+});
