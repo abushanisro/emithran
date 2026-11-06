@@ -17,9 +17,32 @@ export interface RouteToolingItem {
   amortizationParts: number;
 }
 
-/** The tools of the summary's route. Plastic molding: the mold (every mold the job wears out, one investment). */
-export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'family'>): RouteToolingItem[] {
+/**
+ * A tool the engine reports as an investment and a cost per part, with no part count: the count it was amortised over is investment / per part.
+ * The per-part figure is rounded to 4 decimals, so the count is exact to that rounding (a tool worth under 0.05 USD a part is not written: the
+ * count would be off by more than 0.1%).
+ */
+function fromPerPart(key: string, toolingType: string, description: string, specifications: string, investmentUsd: number | null | undefined, perPartUsd: number | null | undefined): RouteToolingItem[] {
+  if (!(investmentUsd != null && investmentUsd > 0 && perPartUsd != null && perPartUsd >= 0.05)) return [];
+  return [{ key, toolingType, description, specifications, investmentUsd, amortizationParts: Math.round(investmentUsd / perPartUsd) }];
+}
+
+/**
+ * The tools of the summary's route: the injection mold (every mold the job wears out, one investment), the die casting die, and the coreboxes of the
+ * cores (die casting and sand casting).
+ */
+export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'family' | 'dieTooling' | 'coreboxTooling'>): RouteToolingItem[] {
   const items: RouteToolingItem[] = [];
+  const die = summary.dieTooling;
+  if (die?.ok) {
+    items.push(...fromPerPart(
+      'die', 'die', `Die casting die (${die.complexity})`,
+      `${die.diesRequired ?? 1} die(s)${die.dieSizeMm ? `, ${die.dieSizeMm.map((v) => Math.round(v)).join(' x ')} mm` : ''}${die.shotsPerDie != null ? `; one lasts ${die.shotsPerDie.toLocaleString('en-US')} shots` : ''}.`,
+      die.totalToolingUsd ?? die.dieCostUsd, die.perPartUsd,
+    ));
+  }
+  const box = summary.coreboxTooling;
+  if (box) items.push(...fromPerPart('corebox', 'die', `Corebox (${box.boxes})`, box.detail, box.costUsd, box.perPartUsd));
   const t = summary.tooling;
   if (t && t.moldCostUsd > 0) {
     const parts = Math.round(t.annualVolume * t.productionLifeYears);
