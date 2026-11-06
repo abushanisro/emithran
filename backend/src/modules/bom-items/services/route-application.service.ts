@@ -21,6 +21,7 @@ import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge } from 
 import { RouteResultDto } from '../dto/route-comparison.dto';
 import { PersistedLineCurrency, resolvePersistedCostCurrencyBasis } from '../costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from '../costing/shared/core/persisted-process-cost';
+import { PlasticReferenceService } from '../costing/plastic-molding/lookup/plastic-reference.service';
 
 /**
  * Writes a route (the engine's recommendation, a chosen route, or a Workflow Builder route) as the part's process cost records. The one place that does
@@ -36,6 +37,7 @@ export class RouteApplicationService {
     private readonly exchangeRateService: ExchangeRateService,
     private readonly audit: AuditService,
     private readonly analysisStatusService: AnalysisStatusService,
+    private readonly plasticReference: PlasticReferenceService,
   ) {}
 
   /**
@@ -384,6 +386,8 @@ export class RouteApplicationService {
       /** The cycle's machine / labour split when the engine states it (ProcessLineCost); persisted into machine_cost_per_part / labor_cost_per_part (migration 970). */
       machineCostPerPart?: number;
       laborCostPerPart?: number;
+      /** The versions the line was calculated with (ProcessLineCost.calculationSnapshot); persisted into calculation_breakdown (migration 972). */
+      calculationSnapshot?: object;
     }>,
     batchSize: number,
     location: string,
@@ -516,6 +520,17 @@ export class RouteApplicationService {
           const g = m.process_group || m.commodity_code;
           if (g) machineGroupById.set(m.id, g);
         }
+      }
+    }
+
+    // A line that records how it was calculated is reproducible only if the reference rows it read are stored too (reference_data_snapshots, once per
+    // fingerprint). Stored first, so no saved row ever names a fingerprint that has no stored rows; if they cannot be stored nothing is applied.
+    for (const fingerprint of new Set(lines.map((l) => (l.calculationSnapshot as { referenceData?: { fingerprint?: string } } | undefined)?.referenceData?.fingerprint).filter((f): f is string => !!f))) {
+      try {
+        await this.plasticReference.persistSnapshot(fingerprint);
+      } catch (e: unknown) {
+        this.logger.error(`[apply-route] reference rows ${fingerprint} not stored for bom_item ${id}: ${e instanceof Error ? e.message : String(e)}`);
+        throw new InternalServerErrorException(`Failed to apply the route: the reference data this calculation used could not be stored, so it could not be reproduced later. No changes were made.`);
       }
     }
 
@@ -700,6 +715,8 @@ export class RouteApplicationService {
         total_cycle_cost_per_part: line.runCost ?? null,
         total_cost_per_part:       line.totalCost ?? null,
         // The cycle's machine / labour split when the engine states it (migration 970); null when it does not, never a zero.
+        // The dataset, engine and formula versions the line was calculated with (migration 972); null for a line whose engine does not record them.
+        calculation_breakdown:     line.calculationSnapshot ?? null,
         machine_cost_per_part:     line.machineCostPerPart ?? null,
         labor_cost_per_part:       line.laborCostPerPart ?? null,
         // Costed-operation provenance (migration 718).

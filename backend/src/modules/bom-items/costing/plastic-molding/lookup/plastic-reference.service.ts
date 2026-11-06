@@ -7,6 +7,8 @@ import {
   PLASTIC_REFERENCE_SOURCE_VERSION,
   PLASTIC_VARIABLE_KEYS,
   resolvePlasticReference,
+  canonicalReferenceRows,
+  type CanonicalReferenceRows,
   type PlasticReference,
 } from '../plastic-reference';
 
@@ -39,6 +41,8 @@ export class PlasticReferenceService {
   constructor(private readonly database: DatabaseService) {}
 
   private cached: { reference: PlasticReference | null; missing: string[] } | null = null;
+  /** The canonical rows each loaded reference was resolved from, by fingerprint: what a saved calculation stores so it can be replayed. */
+  private readonly rowsByFingerprint = new Map<string, CanonicalReferenceRows>();
 
   async getReference(): Promise<{ reference: PlasticReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
@@ -54,12 +58,35 @@ export class PlasticReferenceService {
     ]);
     const error = vars.error ?? lookups.error ?? gpps.error;
     if (error) return { reference: null, missing: [`Plastic reference data (${error.message})`] };
-    this.cached = resolvePlasticReference({
+    const rows = {
       variables: vars.data ?? [],
       lookups: Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
       gppsMaterial: gpps.data ?? undefined,
-    });
+    };
+    this.cached = resolvePlasticReference(rows);
+    if (this.cached.reference) this.rowsByFingerprint.set(this.cached.reference.datasetFingerprint, canonicalReferenceRows(rows));
     return this.cached;
+  }
+
+  /**
+   * Stores the reference rows a calculation read, once per fingerprint (reference_data_snapshots: content-addressed, never changed), so a saved
+   * calculation can be recomputed later from what it recorded. Throws when the rows cannot be stored: a calculation that claims to be reproducible
+   * and is not is worse than one that is not saved.
+   */
+  async persistSnapshot(fingerprint: string): Promise<void> {
+    const rows = this.rowsByFingerprint.get(fingerprint);
+    if (!rows) throw new Error(`The reference rows for fingerprint ${fingerprint} are not loaded in this process, so they cannot be stored.`);
+    const db = this.database.getPrivilegedClient('reference-data: reference_data_snapshots, a content-addressed copy of the public-read reference rows');
+    const { error } = await db.from('reference_data_snapshots')
+      .upsert({ fingerprint, source_version: PLASTIC_REFERENCE_SOURCE_VERSION, rows }, { onConflict: 'fingerprint', ignoreDuplicates: true });
+    if (error) throw new Error(`Could not store the reference rows ${fingerprint}: ${error.message}`);
+  }
+
+  /** The stored reference rows of a fingerprint, or null when none were stored. Read as the caller (signed-in users may read the table). */
+  async loadSnapshot(client: DbClient, fingerprint: string): Promise<CanonicalReferenceRows | null> {
+    const { data, error } = await client.from('reference_data_snapshots').select('rows').eq('fingerprint', fingerprint).maybeSingle();
+    if (error) throw new Error(`Could not read the reference rows ${fingerprint}: ${error.message}`);
+    return (data?.rows as CanonicalReferenceRows | undefined) ?? null;
   }
 
   /**

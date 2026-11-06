@@ -421,6 +421,8 @@ export interface ProcessLineCost {
   // PDF export so costing/manufacturing engineering can verify the number
   // independent of this app.
   calculationTrace?: CalculationTraceStep[];
+  /** Plastic molding: the dataset, engine and formula versions this line was calculated with; persisted into process_cost_records.calculation_breakdown (migration 972). */
+  calculationSnapshot?: import('../costing/plastic-molding/calculation-snapshot').CalculationSnapshot;
   // Machining calculators: per input field, the machining_reference_data
   // lookup table and the row(s) its value came from (every column/value in
   // `row` identifies them) — the dialog's lookup-table viewer outlines them.

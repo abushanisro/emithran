@@ -404,3 +404,26 @@ describe('quote validation: how far the quote can be trusted', () => {
     expect(r.validation).toBeUndefined();
   });
 });
+
+describe('calculation snapshot on the saved line', () => {
+  const line = () => computeInjectionMoldedCostSummary(absPart({ annualVolume: 100_000, productionLifeYears: 3 })).processLines.find((l) => l.process === 'Injection Molding')!;
+
+  it('the molding line carries the dataset fingerprint, the engine contract and the formulas the quote used with their versions', () => {
+    const s = line().calculationSnapshot!;
+    expect(s.schema).toBe('plastic_calc_snapshot_v1');
+    expect(s.referenceData).toEqual({ sourceVersion: REF.sourceVersion, fingerprint: REF.datasetFingerprint });
+    expect(s.engineVersion).toBe('emithran-cost-1');
+    expect(s.formulas.map((f) => f.id)).toEqual(expect.arrayContaining(['F-04', 'F-12', 'F-16']));
+    expect(s.state).toBe('ASSUMED');
+    expect(s.unsupported).toContain('G-01');
+  });
+
+  it('the fingerprint is that of the reference rows (the real staged data resolves to one stable value)', () => {
+    expect(REF.datasetFingerprint).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('a material that cannot be molded has no snapshot: there is no calculation to reproduce', () => {
+    const r = computeInjectionMoldedCostSummary(absPart({ materialGrade: 'Clear Resin (SLA)', materialStockForm: 'Liquid Resin (SLA)', materialMatlState: 'Photopolymer' }));
+    expect(r.processLines.every((l) => l.calculationSnapshot === undefined)).toBe(true);
+  });
+});

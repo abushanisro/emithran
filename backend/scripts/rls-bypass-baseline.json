@@ -11,7 +11,7 @@
   "src/modules/bom-items/costing/casting/sand/sand-snapshots.service.ts": 1,
   "src/modules/bom-items/costing/casting/sand/sand-variable-overrides.service.ts": 1,
   "src/modules/bom-items/costing/machining/lookup/machining-lookup.service.ts": 9,
-  "src/modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service.ts": 1,
+  "src/modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service.ts": 2,
   "src/modules/bom-items/costing/shared/tolerance/tolerance-reference.service.ts": 1,
   "src/modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service.ts": 37,
   "src/modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service.ts": 1,
