@@ -1221,6 +1221,8 @@ export class MHRService {
       const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
       return isNaN(n) ? fallback : n;
     };
+    // Operators are fractional (0.5 = one operator for two machines); a missing or non-positive cell is one operator, as before.
+    const positiveOrOne = (n: number): number => (n > 0 ? n : 1);
     const toStr = (v: ExcelJS.CellValue, fallback = ''): string =>
       v != null ? String(v).trim() : fallback;
 
@@ -1586,7 +1588,7 @@ export class MHRService {
           process_category:     processCategoryCol ? toStr(row.getCell(processCategoryCol).value) || null : null,
           machine_class:        machineClassCol ? toStr(row.getCell(machineClassCol).value) || null : null,
           automation_level:     automationLevelCol ? toStr(row.getCell(automationLevelCol).value) || null : null,
-          operators:            operatorsCol ? Math.max(1, toNum(row.getCell(operatorsCol).value, 1)) : 1,
+          operators:            operatorsCol ? positiveOrOne(toNum(row.getCell(operatorsCol).value, 1)) : 1,
           wage_grade:           wageGradeCol ? toStr(row.getCell(wageGradeCol).value) || null : null,
           machine_price_usd:    rawMachinePriceUsd || null,
           manufacturer_country: mfrCountryCol ? toStr(row.getCell(mfrCountryCol).value) || null : null,

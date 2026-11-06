@@ -281,6 +281,20 @@ describe('press labour', () => {
     expect(line.setupCost + line.runCost).toBeCloseTo(line.totalCost, 2);
   });
 
+  it('half an operator (one operator for two presses, the source value of every injection and foam press) charges half the labour', () => {
+    const base = absPart();
+    const run = (operators: number) => computeInjectionMoldedCostSummary({ ...base, batchSize: 250, mhrRate: { ...base.mhrRate, setupTimeHr: 2, labourRate: 34.48, operators } });
+    const half = run(0.5).processLines.find((l) => l.process === 'Injection Molding')!;
+    const one = run(1).processLines.find((l) => l.process === 'Injection Molding')!;
+    expect(half.operators).toBe(0.5);
+    // Hand-worked on the Kawaguchi KM80 figures (machine 22.69, labour 34.48/h, setup 2 h, batch 250): the crew's hourly cost is 34.48 x 0.5 = 17.24.
+    const cycleHours = run(0.5).injectionMolding!.cycleTimeSec / 3600;
+    expect(half.laborCostPerPart).toBeCloseTo(cycleHours * 17.24, 2);
+    expect(half.setupCost).toBeCloseTo((2 / 250) * (base.mhrRate.rate + 17.24), 2);
+    expect(half.laborCostPerPart).toBeCloseTo(one.laborCostPerPart! / 2, 2);
+    expect(half.machineCostPerPart).toBeCloseTo(one.machineCostPerPart!, 2); // the machine is charged the same
+  });
+
   it('a press with no labour rate on file leaves the line a gap instead of a free operator', () => {
     const base = absPart();
     const noLabour = computeInjectionMoldedCostSummary({ ...base, mhrRate: { ...base.mhrRate, setupTimeHr: 2, labourRate: null } });
