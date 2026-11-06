@@ -1,3 +1,4 @@
+import { PROCESS_COMPATIBILITY_KEYS, parseProcessCompatibility, type ProcessCompatibility } from '../process-compatibility';
 import { Injectable } from '@nestjs/common';
 import type { DbClient } from '../../../../../common/db/postgrest-client';
 import { DatabaseService } from '../../../../../common/database/database.service';
@@ -80,6 +81,17 @@ export class PlasticReferenceService {
       if (name && r.value_num !== null) row[name] = Number(r.value_num);
     }
     return { data: Object.keys(row).length ? row : null, error: null };
+  }
+
+  /** The molding processes the material's dataset flags allow (see process-compatibility.ts); every flag null when the grade has none on file. */
+  async getProcessCompatibility(client: DbClient, grade: string | null): Promise<ProcessCompatibility> {
+    if (!grade) return parseProcessCompatibility([]);
+    const { data, error } = await client
+      .from('raw_material_properties')
+      .select('property_key, value_text, raw_materials!inner(grade)')
+      .eq('raw_materials.grade', grade)
+      .in('property_key', PROCESS_COMPATIBILITY_KEYS);
+    return parseProcessCompatibility(error ? [] : ((data ?? []) as Array<{ property_key: string; value_text: string | null }>));
   }
 
   /**

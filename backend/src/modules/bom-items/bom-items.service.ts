@@ -41,6 +41,7 @@ import type { MachiningCostInput, MachineClassId } from './costing/machining/pro
 import { machiningFeatureCounts } from './costing/machining/operation/machining-feature-counts';
 import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-rule';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
+import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { resolveGdtCallouts } from './costing/shared/physics/gdt-callouts';
 import { detectDrawingCadMismatches, type FactMismatch } from './costing/shared/physics/drawing-cad-consistency';
@@ -6526,7 +6527,11 @@ export class BOMItemsService {
         // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
         cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
       });
-      const compressionCapable = mhrRates.compressionMolding.source === 'mhr_database';
+      // A route is a real alternative only on a material the dataset flags for that process, and only where a real machine rate resolved.
+      const processCompat = await this.plasticReferenceService.getProcessCompatibility(this.databaseService.getClient(accessToken), grade);
+      const compatGap = (process: MoldingProcess) => processCompatibilityGap(processCompat, process, grade);
+      const compressionGap = compatGap('compression');
+      const compressionCapable = mhrRates.compressionMolding.source === 'mhr_database' && compressionGap == null;
       imRoutes.push({
         routeId: 'im-compression-molding',
         routeLabel: mhrRates.compressionMolding.machineName
@@ -6550,8 +6555,8 @@ export class BOMItemsService {
           cuttingCapable: compressionCapable, pressBrakeCapable: compressionCapable, overallCapable: compressionCapable,
           confidence: compressionCapable ? 'medium' : 'low',
           estimatedTonnage: null,
-          reasonCodes: compressionCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
-          warnings: compressionCapable ? [] : ['No real compression_molding machine rate resolved for this location'],
+          reasonCodes: compressionCapable ? [] : [compressionGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
+          warnings: compressionCapable ? [] : [compressionGap ?? 'No real compression_molding machine rate resolved for this location'],
         },
         warnings: [...compressionResult.warnings, ...comparisonWarnings], ratesSource: RATES_SOURCE_LABEL,
       } satisfies RouteResultDto);
@@ -6564,7 +6569,8 @@ export class BOMItemsService {
         // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
         cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
       });
-      const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database';
+      const rimGap = compatGap('reaction_injection');
+      const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database' && rimGap == null;
       imRoutes.push({
         routeId: 'im-reaction-injection-molding',
         routeLabel: mhrRates.reactionInjectionMolding.machineName
@@ -6592,13 +6598,13 @@ export class BOMItemsService {
           // physics as Injection Molding (buildPartRequirements) — see that
           // function's comment on why RIM reuses the IM clamp formula as-is.
           estimatedTonnage: mhrRates.reactionInjectionMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
-          reasonCodes: rimCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
+          reasonCodes: rimCapable ? [] : [rimGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
           // Real reason from selectMachine() — distinguishes "no machine of
           // this class exists" from "real machines exist but none fit this
           // part's clamp/footprint requirement", now that RIM is capability-
           // gated instead of always-generic.
           warnings: rimCapable ? [] : [
-            mhrRates.reactionInjectionMolding.selection?.balanced?.reasons?.[0]
+            rimGap ?? mhrRates.reactionInjectionMolding.selection?.balanced?.reasons?.[0]
               ?? 'No real reaction_injection_molding machine rate resolved for this location',
           ],
         },
@@ -6626,7 +6632,8 @@ export class BOMItemsService {
       };
       const structuralFoamCost = computeInjectionMoldedCostSummary(structuralFoamInput);
       structuralFoamCost.warnings.push(...comparisonWarnings);
-      const structuralFoamCapable = mhrRates.structuralFoamMolding.source === 'mhr_database';
+      const foamGap = compatGap('injection_or_foam');
+      const structuralFoamCapable = mhrRates.structuralFoamMolding.source === 'mhr_database' && foamGap == null;
       imRoutes.push({
         routeId: 'im-structural-foam-molding',
         routeLabel: mhrRates.structuralFoamMolding.machineName
@@ -6655,9 +6662,9 @@ export class BOMItemsService {
           // injectionMoldingRequirement() physics as Injection Molding
           // (buildPartRequirements) — see that function's comment.
           estimatedTonnage: mhrRates.structuralFoamMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
-          reasonCodes: structuralFoamCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
+          reasonCodes: structuralFoamCapable ? [] : [foamGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
           warnings: structuralFoamCapable ? [] : [
-            mhrRates.structuralFoamMolding.selection?.balanced?.reasons?.[0]
+            foamGap ?? mhrRates.structuralFoamMolding.selection?.balanced?.reasons?.[0]
               ?? 'No real structural_foam_molding machine rate resolved for this location',
           ],
         },
