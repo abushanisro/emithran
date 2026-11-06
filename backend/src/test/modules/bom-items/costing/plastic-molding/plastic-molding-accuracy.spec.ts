@@ -254,7 +254,7 @@ describe('press capability (active-quote selector): shot size gates a press', ()
     expect(isCapable(press(132, 117), need(57.8))).toBe(true);
   });
 
-  it('does not gate on a shot that is not derivable', () => {
-    expect(isCapable(press(132, 37.69), need(null))).toBe(true);
+  it('a shot that cannot be derived (no melt density) means the press cannot be sized: not capable, never passed unchecked', () => {
+    expect(isCapable(press(132, 37.69), need(null))).toBe(false);
   });
 });

@@ -1367,4 +1367,13 @@ describe('selectMachine — a molding part that cannot be sized', () => {
     expect(reason).toMatch(/Generic X has no reference injection pressure/);
     expect(reason).not.toMatch(/can do this part/);
   });
+
+  it('names a shot that cannot be derived the same way', () => {
+    const press = candidate({ machineId: 'p1', machineName: 'Press 1', machineClass: 'injection_molding', hourlyRate: 40, capability: { maxTonnage: 100 } });
+    const result = selectMachine({
+      pool: [press], location: 'USA', machineClass: 'injection_molding',
+      requirement: { kind: 'injection_molding', clampTonnageRequired: 50, shotGppsG: null, projectedAreaMm2: 10_000, partLengthMm: 150, partWidthMm: 100, clampNotDerivableReason: null, estimatedToolHeightMm: null } as never,
+    });
+    expect(result.balanced.reasons[0]).toMatch(/the part cannot be sized for it.*Shot size not derivable/);
+  });
 });

@@ -112,6 +112,7 @@ import {
   MATERIAL_MRR_CM3_MIN,
 } from './costing/shared/capability/machine-selection/physics';
 import type { MachineRequirement } from './costing/shared/capability/machine-selection/physics';
+import { estimatedToolHeightMm } from './costing/shared/capability/machine-selection/press-checks';
 import { explainCandidate, fetchMachinePool } from './costing/shared/capability/machine-selection/selector';
 import type { CapabilityCheck, MachineCandidate, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
 import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
@@ -1456,6 +1457,8 @@ export class BOMItemsService {
           : null,
         partLengthMm: dims[0],
         partWidthMm: dims[1],
+        // The daylight check, as the Route Comparison's press tiers make it: a press the tool does not fit is not the press this quote runs on.
+        estimatedToolHeightMm: estimatedToolHeightMm(dims[0]),
       });
       requirements.injection_molding = imRequirement;
       // Structural Foam Molding and Reaction Injection Molding machines were
@@ -6375,8 +6378,7 @@ export class BOMItemsService {
         partLengthMm: imBboxRC[0] > 0 ? imBboxRC[0] : null,  // largest bbox dim
         partWidthMm: imBboxRC[1] > 0 ? imBboxRC[1] : null,
         partHeightMm: imBboxRC[2] > 0 ? imBboxRC[2] : null,
-        // Tool height estimate: bbox max + 100mm tooling allowance (conservative)
-        estimatedToolHeightMm: imBboxRC[0] > 0 ? imBboxRC[0] + 100 : null,
+        estimatedToolHeightMm: estimatedToolHeightMm(imBboxRC[0]),
       };
 
       // Fetch machine pool and run tier-based 4-constraint selection.

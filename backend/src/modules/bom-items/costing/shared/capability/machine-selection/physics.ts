@@ -235,6 +235,8 @@ interface InjectionMoldingRequirement {
   shotGppsG: number | null;
   partLengthMm: number;          // largest bbox dim — tie-bar spacing check
   partWidthMm: number;           // second bbox dim
+  /** Estimated tool height for the daylight check (press-checks.ts); null = not estimated, the check is skipped. */
+  estimatedToolHeightMm: number | null;
 }
 
 // Real machine_library.json "Standard Press"/"Tandem Press"/"Progressive Die
@@ -568,6 +570,7 @@ export function injectionMoldingRequirement(input: {
   shotGppsG?: number | null;
   partLengthMm?: number;
   partWidthMm?: number;
+  estimatedToolHeightMm?: number | null;
 }): InjectionMoldingRequirement {
   return {
     kind: 'injection_molding',
@@ -577,5 +580,6 @@ export function injectionMoldingRequirement(input: {
     shotGppsG: input.shotGppsG ?? null,
     partLengthMm: Math.max(input.partLengthMm ?? 0, 0),
     partWidthMm: Math.max(input.partWidthMm ?? 0, 0),
+    estimatedToolHeightMm: input.estimatedToolHeightMm ?? null,
   };
 }
