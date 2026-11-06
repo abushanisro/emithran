@@ -8,6 +8,7 @@ import type { RateResolutionService } from '../../services/rate-resolution.servi
 import type { MaterialResolutionService } from '../../services/material-resolution.service';
 import { PlasticReferenceService } from './lookup/plastic-reference.service';
 import { injectionMoldabilityGap } from '../../../raw-materials/material-moldability';
+import { buildMoldingCommonInput, partBboxLongestFirst, type MoldingSummary } from './molding-input';
 import { estimatedToolHeightMm } from '../shared/capability/machine-selection/press-checks';
 import { fetchMachinePool } from '../shared/capability/machine-selection/selector';
 import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL } from '../shared/core/default-rates.constants';
@@ -35,7 +36,7 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
 export interface PlasticComparisonInput {
   item: BOMItemResponseDto;
   /** The feature graph's summary: wall thickness, ribs, undercuts, the plastic feature graph. */
-  summary: Record<string, unknown> & DraftSummary & { plasticFeatureGraph?: PlasticFeatureGraph | null };
+  summary: MoldingSummary;
   grade: string | null;
   material: ResolvedMaterial;
   mhrRates: ResolvedRates;
@@ -82,30 +83,9 @@ export class PlasticRouteComparisonService {
       densityOfMeltKgM3: rcDensityOfMeltKgM3,
     };
     const client = this.database.getClient(accessToken);
-    const imBboxRC = [
-      ((item as any).maxLength ?? 0) as number,
-      ((item as any).maxWidth ?? 0) as number,
-      ((item as any).maxHeight ?? 0) as number,
-    ].sort((a, b) => b - a);
-    // CAD nominal wall only (see the active quote).
-    const effectiveWallMmRC = (summary.wallThicknessNominalMm ?? 0) as number;
+    const imBboxRC = partBboxLongestFirst(item);
     const projectedAreaMm2 = imBboxRC[0] * imBboxRC[1] > 0 ? imBboxRC[0] * imBboxRC[1] : null;
     const partVolumeMm3 = (item.volume ?? 0) as number;
-
-    const imSignals = {
-      projectedAreaMm2,
-      wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
-      wallThicknessMaxMm: (summary.wallThicknessMaxMm as number) > 0 ? (summary.wallThicknessMaxMm as number) : null,
-      ribCount: (summary.ribCount as number) > 0
-        ? (summary.ribCount as number)
-        : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
-      bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
-      undercutCount: sideActionSignals(summary.plasticFeatureGraph)?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
-      slideBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideBundles ?? null,
-      slideOrLifterBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideOrLifterBundles ?? null,
-      partingComplexity: (summary.partingComplexity as number | null) ?? null,
-      insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
-    };
 
     const plasticRefSet = await this.plasticReference.getReference();
     const plasticRef = plasticRefSet.reference;
@@ -148,21 +128,17 @@ export class PlasticRouteComparisonService {
       [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? ''],
     );
     const rcUsdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
-    const imCommon: Omit<InjectionMoldingCostInput, 'mhrRate' | 'machineClampTonnes' | 'machineShotCapacityG' | 'pressTiming'> = {
-      volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
-      wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
-      materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
-      plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-      location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
-      cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
+    const imCommon = buildMoldingCommonInput({
+      item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
+      material: {
+        materialCostPerKg, materialDensityKgM3, materialSource, materialType: rcMaterialType, materialStockForm: rcStockForm,
+        materialMatlState: rcMatlState, materialClamp: rcClampProperties, realResinInputs: rcRealResinInputs,
+      },
+      plasticReference: { plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing },
+      currencySymbol: locInfo.symbol, usdToLocal: rcUsdToLocal,
       deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
-      materialClamp: rcClampProperties,
-      annualVolume: annualVolume ?? undefined, productionLifeYears,
-      bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
-      currencySymbol: locInfo.symbol,
-      usdToLocal: rcUsdToLocal,
-      realResinInputs: rcRealResinInputs,
-    };
+      cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
+    });
     // What is wrong with the material itself is said once, on the comparison (materialNote), not again on every press tier.
     const materialNote = injectionMoldabilityGap({
       grade, stockForm: rcStockForm, matlState: rcMatlState,
@@ -378,23 +354,12 @@ export class PlasticRouteComparisonService {
     } satisfies RouteResultDto);
 
     const structuralFoamInput: InjectionMoldingCostInput = {
-      volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
-      wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
-      materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
-      plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-      location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
-      cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
-      mhrRate: mhrRates.structuralFoamMolding, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
+      ...imCommon,
+      mhrRate: mhrRates.structuralFoamMolding,
       machineClampTonnes: sfmCandidate?.capability?.maxTonnage ?? null,
       machineShotCapacityG: sfmCandidate?.capability?.shotCapacityGrams ?? null,
       pressTiming: sfmCandidate?.machineId ? pressRecordsRC.get(sfmCandidate.machineId) ?? null : null,
       goodPartYield: sfmCandidate?.machineId ? pressRecordsRC.get(sfmCandidate.machineId)?.goodPartYield ?? null : null,
-      materialClamp: rcClampProperties,
-      annualVolume: annualVolume ?? undefined, productionLifeYears,
-      bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
-      currencySymbol: locInfo.symbol,
-      usdToLocal: rcUsdToLocal,
-      realResinInputs: rcRealResinInputs,
     };
     const structuralFoamCost = computeInjectionMoldedCostSummary(structuralFoamInput);
     structuralFoamCost.warnings.push(...comparisonWarnings);
