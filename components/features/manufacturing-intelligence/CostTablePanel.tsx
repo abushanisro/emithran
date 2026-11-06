@@ -10,7 +10,7 @@ import { useCostTable } from "@/lib/api/hooks/useCostTable";
 import { notModelled, type Display } from "@/lib/costing/cost-table";
 
 /**
- * The Cost tab's cost view: the compact table of the part's applied cost, and the full Part Details table in a dialog (every column, the period and
+ * The Cost tab's entry to the Part Details table (the applied cost, every column) in a dialog (every column, the period and
  * capital columns the cost model has no data for shown empty with the reason). It reads the stored records, so it shows what Apply wrote.
  */
 export function CostTablePanel({ itemId, refreshKey, display }: { itemId: string; refreshKey: number; display: Display }) {
@@ -21,21 +21,15 @@ export function CostTablePanel({ itemId, refreshKey, display }: { itemId: string
   return (
     <section className="space-y-1.5 pb-3" aria-label="Part cost">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Part cost</h3>
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Part details</h3>
         <Button type="button" variant="outline" size="sm" className="h-6 gap-1 px-2 text-[11px]" disabled={!table} onClick={() => { setOpen(true); }}>
-          <Maximize2 className="h-3 w-3" /> Full details
+          <Maximize2 className="h-3 w-3" /> Open table
         </Button>
       </div>
 
       {isLoading && <p role="status" className="py-4 text-center text-xs text-muted-foreground">Reading the applied cost…</p>}
       {error && <p role="alert" className="py-2 text-xs text-red-600">The cost table could not be read.</p>}
       {table && part?.statusNote && <p className="text-xs text-amber-600 dark:text-amber-500">{part.statusNote}</p>}
-      {table && table.rows.length > 1 && (
-        <div className="max-h-[320px] overflow-auto rounded border border-border/60">
-          <CostTable table={table} columns="basic" display={display} />
-        </div>
-      )}
-
       {table && (
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="flex h-[88vh] w-[96vw] max-w-[96vw] flex-col gap-2 sm:max-w-[96vw]">

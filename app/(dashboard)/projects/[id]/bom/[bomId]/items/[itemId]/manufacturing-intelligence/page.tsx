@@ -1831,13 +1831,8 @@ function CostSummaryTab({
         </div>
       </div>
 
-      {/* ── The applied cost as a table: compact here, every column in the dialog. The editable records it is made of are below. ── */}
+      {/* ── The cost sections below are the working view; the applied cost as a full table opens from here. ── */}
       <CostTablePanel itemId={item.id} refreshKey={costUpdatedAt} display={{ symbol: sym, fromUsd }} />
-
-      <details className="group/edit border-t border-border/60 pt-2">
-        <summary className="cursor-pointer select-none py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground">
-          Edit costs
-        </summary>
 
       {/* ── DIRECT MATERIAL ── editable via RawMaterialsSection ── */}
       <SectionHeader label="Direct Material Costs" />
@@ -2482,8 +2477,6 @@ function CostSummaryTab({
       <div className="-mx-4">
         <ToolingSection bomItemId={item.id} bomItem={item} compact currencySymbol={sym} conversionRate={fromUsd} />
       </div>
-
-      </details>
 
       {/* ── Grand total footer ── */}
       <div className="flex items-baseline justify-between pt-3 mt-1 border-t-2 border-border">
