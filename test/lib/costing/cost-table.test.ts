@@ -41,6 +41,13 @@ describe("visibleRows", () => {
   });
 });
 
+describe("formatCell — rates and setup time", () => {
+  it("shows an hourly rate with cents and a setup time in minutes", () => {
+    expect(formatCell(38.69, col("r", "Process Source", { unit: "usd_per_hr" }), display)).toBe("$38.69");
+    expect(formatCell(4.8, col("s", "Process Source", { unit: "minutes" }), display)).toBe("4.80");
+  });
+});
+
 describe("formatCell", () => {
   it("shows money in the display currency with three decimals, and an empty cell as a dash", () => {
     expect(formatCell(0.101168, col("m"), display)).toBe("$0.101");

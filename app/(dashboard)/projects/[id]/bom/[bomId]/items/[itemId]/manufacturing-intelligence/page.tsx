@@ -1374,15 +1374,16 @@ function PanelHeader({
 // ── CostSummaryTab — eMithran-style with inline editing ─────────────────────
 
 function CostSummaryTab({
-  item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight, onShowEvidence, activeEvidenceLabel,
+  item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight, onShowEvidence, activeEvidenceLabel, onOpenExcel,
 }: {
   item: BOMItem; batchSize: number | undefined; appliedRouteId?: string | null; factory?: string;
   fg?: FeatureGraph | null | undefined;
   onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
   onShowEvidence?: ((evidence: CadEvidence | null) => void) | undefined;
   activeEvidenceLabel?: string | null | undefined;
+  onOpenExcel: () => void;
 }) {
-  const { data: cost, isLoading, dataUpdatedAt: costUpdatedAt } = useCostSummary(item.id, batchSize, factory);
+  const { data: cost, isLoading } = useCostSummary(item.id, batchSize, factory);
   const { data: comparison } = useRouteComparison(item.id, batchSize, factory);
   const { data: existingProcRecords, isLoading: isLoadingProcRecords } = useProcessCosts({ bomItemId: item.id, isActive: true, enabled: !!item.id });
   // The caller never actually passes appliedRouteId (see <CostSummaryTab .../>
@@ -1832,7 +1833,7 @@ function CostSummaryTab({
       </div>
 
       {/* ── The cost sections below are the working view; the applied cost as a full table opens from here. ── */}
-      <CostTablePanel itemId={item.id} refreshKey={costUpdatedAt} display={{ symbol: sym, fromUsd }} />
+      <CostTablePanel onOpenExcel={onOpenExcel} />
 
       {/* ── DIRECT MATERIAL ── editable via RawMaterialsSection ── */}
       <SectionHeader label="Direct Material Costs" />
@@ -8515,7 +8516,7 @@ function AnalysisTabsPanel({
         )}
 
         {tab === 'cost' && (
-          <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} onShowEvidence={onShowEvidence} activeEvidenceLabel={activeEvidenceLabel} />
+          <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} onShowEvidence={onShowEvidence} activeEvidenceLabel={activeEvidenceLabel} onOpenExcel={() => { onTabChange('excel'); }} />
         )}
 
         {tab === 'validation' && item && (

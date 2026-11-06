@@ -15,6 +15,18 @@ const input = (over: Partial<CostTableInput> = {}): CostTableInput => ({
 });
 const row = (t: ReturnType<typeof buildCostTable>, id: string) => t.rows.find((r) => r.id === id)!;
 
+describe('buildCostTable — process source', () => {
+  it('shows an operation\'s source exactly as its record states it, and leaves an unstated one empty', () => {
+    const t = buildCostTable(input({
+      processes: [process({ id: 'a', op_nbr: 10, machine_name: 'Salvagnini L3-30', parts_per_cycle: '1.00', scrap: '0.00', setup_time: '4.80', batch_size: '250',
+        machine_rate: '38.69', labor_rate: '36.30', timing_source: null, setup_time_source: 'machine' }) as never],
+    }));
+    const v = row(t, 'process:a').values;
+    expect(v).toMatchObject({ operationNumber: 10, machineName: 'Salvagnini L3-30', partsPerCycle: 1, setupTimeMin: 4.8, batchSize: 250, machineRate: 38.69, laborRate: 36.3, setupTimeSource: 'machine' });
+    expect(v.timingSource).toBeNull();
+  });
+});
+
 describe('buildCostTable', () => {
   it('lays the part out as part > material and process groups > processes, in operation order', () => {
     const t = buildCostTable(input());

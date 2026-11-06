@@ -6,6 +6,7 @@
 
 export type CostColumnKey =
   | 'annualVolume' | 'laborTimeSec'
+  | 'operationNumber' | 'machineName' | 'partsPerCycle' | 'scrapPct' | 'setupTimeMin' | 'batchSize' | 'machineRate' | 'laborRate' | 'timingSource' | 'setupTimeSource'
   | 'finishMassKg' | 'materialComposition' | 'utilizationPct' | 'materialUnitCost'
   | 'materialCost' | 'processCost' | 'amortizedBatchSetup' | 'logistics' | 'tooling' | 'otherDirect' | 'totalVariable'
   | 'indirectOverhead' | 'sga' | 'margin'
@@ -13,8 +14,8 @@ export type CostColumnKey =
   | 'capitalInvestment'
   | 'targetCost';
 
-export type CostColumnGroup = 'Manufacturing' | 'Material Info' | 'Variable Costs' | 'Period Costs' | 'Piece Part Cost' | 'Capital Costs' | 'Cost Targets';
-export type CostUnit = 'usd' | 'usd_per_kg' | 'seconds' | 'kg' | 'percent' | 'count' | 'text';
+export type CostColumnGroup = 'Manufacturing' | 'Process Source' | 'Material Info' | 'Variable Costs' | 'Period Costs' | 'Piece Part Cost' | 'Capital Costs' | 'Cost Targets';
+export type CostUnit = 'usd' | 'usd_per_kg' | 'usd_per_hr' | 'minutes' | 'seconds' | 'kg' | 'percent' | 'count' | 'text';
 
 export interface CostColumn {
   key: CostColumnKey;
@@ -31,6 +32,16 @@ export interface CostColumn {
 export const COST_COLUMNS: readonly CostColumn[] = [
   { key: 'annualVolume', label: 'Annual Volume', group: 'Manufacturing', unit: 'count', modelled: true, basic: false },
   { key: 'laborTimeSec', label: 'Labor Time (s)', group: 'Manufacturing', unit: 'seconds', modelled: true, basic: false, note: 'The cycle time per part of the operation.' },
+  { key: 'operationNumber', label: 'Op #', group: 'Process Source', unit: 'count', modelled: true, basic: false, note: "The operation's number in the route." },
+  { key: 'machineName', label: 'Machine', group: 'Process Source', unit: 'text', modelled: true, basic: false },
+  { key: 'partsPerCycle', label: 'Parts per Cycle', group: 'Process Source', unit: 'count', modelled: true, basic: false },
+  { key: 'scrapPct', label: 'Scrap (%)', group: 'Process Source', unit: 'percent', modelled: true, basic: false },
+  { key: 'setupTimeMin', label: 'Setup Time (min)', group: 'Process Source', unit: 'minutes', modelled: true, basic: false, note: 'Per batch.' },
+  { key: 'batchSize', label: 'Batch Size', group: 'Process Source', unit: 'count', modelled: true, basic: false, note: 'The batch the setup is spread over.' },
+  { key: 'machineRate', label: 'Machine Rate (USD/hr)', group: 'Process Source', unit: 'usd_per_hr', modelled: true, basic: false },
+  { key: 'laborRate', label: 'Labor Rate (USD/hr)', group: 'Process Source', unit: 'usd_per_hr', modelled: true, basic: false },
+  { key: 'timingSource', label: 'Cycle Time Source', group: 'Process Source', unit: 'text', modelled: true, basic: false, note: 'Where the cycle time came from; empty when the record does not say.' },
+  { key: 'setupTimeSource', label: 'Setup Time Source', group: 'Process Source', unit: 'text', modelled: true, basic: false, note: 'Where the setup time came from; empty when the record does not say.' },
   { key: 'finishMassKg', label: 'Finish Mass (kg)', group: 'Material Info', unit: 'kg', modelled: true, basic: false },
   { key: 'materialComposition', label: 'Material Composition', group: 'Material Info', unit: 'text', modelled: true, basic: false },
   { key: 'utilizationPct', label: 'Utilization (%)', group: 'Material Info', unit: 'percent', modelled: true, basic: false },
@@ -72,7 +83,8 @@ export interface CostTable {
 
 // The stored rows, as the database names the columns (numeric columns arrive as numbers or numeric strings).
 type Num = number | string | null | undefined;
-export interface ProcessRecord { id: string; operation: string | null; process_name: string | null; process_group: string | null; machine_name: string | null; cycle_time: Num; setup_cost_per_part: Num; total_cost_per_part: Num; op_nbr: Num; created_at: string }
+export interface ProcessRecord { id: string; operation: string | null; process_name: string | null; process_group: string | null; machine_name: string | null; cycle_time: Num; setup_cost_per_part: Num; total_cost_per_part: Num; op_nbr: Num; created_at: string;
+  parts_per_cycle?: Num; scrap?: Num; setup_time?: Num; batch_size?: Num; machine_rate?: Num; labor_rate?: Num; timing_source?: string | null; setup_time_source?: string | null }
 export interface MaterialRecord { id: string; material_name: string | null; unit_cost: Num; net_usage: Num; total_cost: Num; material_utilization_rate: Num }
 export interface LogisticsRecord { id: string; cost_name: string | null; total_cost: Num }
 export interface ProcuredRecord { id: string; part_name: string | null; total_cost: Num }
@@ -145,6 +157,10 @@ export function buildCostTable(input: CostTableInput): CostTable {
           processCost: total === null ? null : total - setup,
           amortizedBatchSetup: num(p.setup_cost_per_part),
           ...(seconds !== null ? { laborTimeSec: seconds } : {}),
+          // The operation's source, as the record states it: nothing is derived, an unstated one stays empty.
+          operationNumber: num(p.op_nbr), machineName: p.machine_name || null, partsPerCycle: num(p.parts_per_cycle), scrapPct: num(p.scrap),
+          setupTimeMin: num(p.setup_time), batchSize: num(p.batch_size), machineRate: num(p.machine_rate), laborRate: num(p.labor_rate),
+          timingSource: p.timing_source || null, setupTimeSource: p.setup_time_source || null,
         }),
       };
     });
