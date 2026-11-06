@@ -728,9 +728,15 @@ export function ProcessCostDialog({
     return map;
   }, [activeMappings, categoryMachineClasses]);
 
+  // Every catalog operation of the category's machine classes (the whole of memory/<family>/process/digital_factory_operations.csv for it).
+  const categoryCatalogOperations = useMemo(
+    () => activeMappings.filter((m) => m.machineClass && categoryMachineClasses.has(m.machineClass)).flatMap((m) => m.taxonomy?.operations ?? []),
+    [activeMappings, categoryMachineClasses],
+  );
+
   const operationOptions = useMemo(
-    () => (selectedCategory ? liveOperationOptions(liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation) : []),
-    [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation],
+    () => (selectedCategory ? liveOperationOptions(liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation, categoryCatalogOperations) : []),
+    [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation, categoryCatalogOperations],
   );
 
   // Root cause of "selected in the backend but the field shows unselected":
@@ -3021,7 +3027,7 @@ export function ProcessCostDialog({
                           <SelectContent>
                             {operationOptionsWithSaved.map((op) => (
                               <SelectItem key={op.value} value={op.value}>
-                                {op.cycleTimeMin > 0 ? `${op.label} · ${op.cycleTimeMin.toFixed(2)} min` : op.label}
+                                {op.cycleTimeMin > 0 ? `${op.label} · ${op.cycleTimeMin.toFixed(2)} min` : op.notOnPart ? `${op.label} · not on this part` : op.label}
                               </SelectItem>
                             ))}
                           </SelectContent>

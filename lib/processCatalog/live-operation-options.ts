@@ -35,6 +35,14 @@ export interface LiveOperationOption {
   cycleTimeMin: number;
   /** The live line this option belongs to (its engine name). */
   lineProcess: string;
+  /** True for a catalog operation of the category that this part's geometry does not need: listed so the whole catalog is browsable. */
+  notOnPart?: true;
+}
+
+/** One operation of the process catalog (process_taxonomy_operations): "As Molded" on a "Rib", "HoleSideCore" on a "SimpleHole". */
+export interface CatalogOperation {
+  operationCategory: string | null;
+  featureType: string | null;
 }
 
 /** Operations of the live lines that run on one of `machineClasses`, sorted by
@@ -50,6 +58,7 @@ export function liveOperationOptions(
   lines: readonly LiveOperationLine[],
   machineClasses: ReadonlySet<string>,
   featureTypeByOperation: ReadonlyMap<string, string>,
+  catalogOperations: readonly CatalogOperation[] = [],
 ): LiveOperationOption[] {
   const byValue = new Map<string, LiveOperationOption>();
   for (const line of lines) {
@@ -73,7 +82,25 @@ export function liveOperationOptions(
       lineProcess: line.process,
     });
   }
-  return [...byValue.values()].sort((a, b) => a.label.localeCompare(b.label));
+  addCatalogOperations(byValue, lines, machineClasses, catalogOperations);
+  return [...byValue.values()].sort((a, b) => Number(!!a.notOnPart) - Number(!!b.notOnPart) || a.label.localeCompare(b.label));
+}
+
+/** The rest of the category's catalog, after the operations this part needs: each is "Operation // FeatureType", shared with the category's live line. */
+function addCatalogOperations(
+  byValue: Map<string, LiveOperationOption>,
+  lines: readonly LiveOperationLine[],
+  machineClasses: ReadonlySet<string>,
+  catalogOperations: readonly CatalogOperation[],
+): void {
+  const host = lines.find((l) => machineClasses.has(l.machineClass));
+  if (!host) return; // no line of this category on the part: nothing to attach an operation to
+  for (const c of catalogOperations) {
+    if (!c.operationCategory || !c.featureType) continue;
+    const value = `${c.operationCategory} // ${c.featureType}`;
+    if (byValue.has(value)) continue;
+    byValue.set(value, { value, label: value, detail: null, cycleTimeMin: 0, lineProcess: host.process, notOnPart: true });
+  }
 }
 
 /**
