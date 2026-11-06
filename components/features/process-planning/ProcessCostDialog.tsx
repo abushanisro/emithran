@@ -34,7 +34,7 @@ import { calculatorsApi } from '@/lib/api/calculators';
 import { apiClient } from '@/lib/api/client';
 import { PROCESS_DIALOG_CALCULATOR_QUERY, useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
-import { keepsSavedOperation, resolveLineIdentity } from '@/lib/processCatalog/line-identity';
+import { findDuplicateOperation, keepsSavedOperation, resolveLineIdentity } from '@/lib/processCatalog/line-identity';
 import {
   effectiveProcessGroupOf,
   buildHrRatesIndex,
@@ -52,7 +52,7 @@ import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
 import { isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { effectiveOperation, liveOperationOptions, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
+import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
 // The Deburr calculator's time per mm is each Deslag machine's own perimeter allowance
@@ -734,11 +734,6 @@ export function ProcessCostDialog({
     [activeMappings, categoryMachineClasses],
   );
 
-  const operationOptions = useMemo(
-    () => (selectedCategory ? liveOperationOptions(liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation, categoryCatalogOperations) : []),
-    [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation, categoryCatalogOperations],
-  );
-
   // Root cause of "selected in the backend but the field shows unselected":
   // Radix Select only displays a value when it exactly matches one of its
   // current SelectItems. liveProcessLines is this part's CURRENT live-engine
@@ -890,10 +885,21 @@ export function ProcessCostDialog({
   // Inspection line to a Black Oxide machine) the old operation no longer
   // belongs to it (see lib/processCatalog/line-identity.ts).
   const savedOperationApplies = keepsSavedOperation(editData?.machineClass, selectedMachineClass);
-  const operationOptionsWithSaved = useMemo((): LiveOperationOption[] => {
-    if (!savedOperationApplies || !savedLiveOperation || operationOptions.some((op) => op.value === savedLiveOperation)) return operationOptions;
-    return [...operationOptions, { value: savedLiveOperation, label: `${savedLiveOperation} (saved on this line)`, detail: null, cycleTimeMin: 0, lineProcess: savedLiveOperation }];
-  }, [operationOptions, savedLiveOperation, savedOperationApplies]);
+  // The category's own operation in the process catalog: what a new line's catalog operations share when the part has no live line to attach them to.
+  const categoryOperation = useMemo(
+    () => activeMappings.find((m) => m.machineClass && categoryMachineClasses.has(m.machineClass))?.operation ?? null,
+    [activeMappings, categoryMachineClasses],
+  );
+  // Independent of the part's cost: loading, empty or populated, new line or saved, the whole catalog of the category is offered (lib/processCatalog/live-operation-options.ts).
+  const operationOptionsWithSaved = useMemo(
+    (): LiveOperationOption[] => (selectedCategory
+      ? operationChoices({
+        lines: liveProcessLines, machineClasses: categoryMachineClasses, featureTypeByOperation: catalogFeatureTypeByOperation,
+        catalogOperations: categoryCatalogOperations, savedOperation: savedOperationApplies ? savedLiveOperation : '', savedApplies: savedOperationApplies, categoryOperation,
+      })
+      : []),
+    [selectedCategory, liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation, categoryCatalogOperations, savedLiveOperation, savedOperationApplies, categoryOperation],
+  );
   const selectedOperation = effectiveOperation({
     choice: operationChoice,
     options: operationOptionsWithSaved,
@@ -2703,8 +2709,8 @@ export function ProcessCostDialog({
     // feature-derived line (not the currently costed route), there is
     // nothing real to require a pick from, so a pre-existing saved value
     // (if any) is preserved instead of being blocked on.
-    if (operationOptions.length > 0 && !selectedOperation) {
-      setSubmitError('Please select an Operation (3) — sourced from this part\'s real CAD feature extraction');
+    if (operationOptionsWithSaved.length > 0 && !selectedOperation) {
+      setSubmitError('Please select an Operation (3) from the list for this category');
       return;
     }
     // Machineless legacy lines (Raw Material, Packing & Delivery, General)
@@ -2715,6 +2721,13 @@ export function ProcessCostDialog({
       : lineIdentity;
     if (!identity.ok) {
       setSubmitError(identity.reason);
+      return;
+    }
+    // One operation is one line: a second line of the same machine class with the same operation is the same operation costed twice.
+    const unchangedSavedLine = !!editData && editData.machineClass === selectedMachineClass && editData.operation === identity.operation; // an old duplicate stays editable
+    const duplicate = isNonMachineOperation || unchangedSavedLine ? null : findDuplicateOperation(existingProcesses, { id: editData?.id ?? null, machineClass: selectedMachineClass, operation: identity.operation });
+    if (duplicate) {
+      setSubmitError(`This part already has "${identity.operation}" on this machine class${duplicate.opNbr != null ? ` (operation ${duplicate.opNbr})` : ''}. Edit that line instead of adding it again.`);
       return;
     }
     setSubmitError(null);

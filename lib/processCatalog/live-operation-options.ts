@@ -59,6 +59,8 @@ export function liveOperationOptions(
   machineClasses: ReadonlySet<string>,
   featureTypeByOperation: ReadonlyMap<string, string>,
   catalogOperations: readonly CatalogOperation[] = [],
+  /** The line being edited, when the part has no live line of the category (the page did not pass them, or the cost has not loaded): the catalog operations attach to it. */
+  savedLineProcess: string | null = null,
 ): LiveOperationOption[] {
   const byValue = new Map<string, LiveOperationOption>();
   for (const line of lines) {
@@ -82,7 +84,7 @@ export function liveOperationOptions(
       lineProcess: line.process,
     });
   }
-  addCatalogOperations(byValue, lines, machineClasses, catalogOperations);
+  addCatalogOperations(byValue, lines, machineClasses, catalogOperations, savedLineProcess);
   return [...byValue.values()].sort((a, b) => Number(!!a.notOnPart) - Number(!!b.notOnPart) || a.label.localeCompare(b.label));
 }
 
@@ -92,14 +94,16 @@ function addCatalogOperations(
   lines: readonly LiveOperationLine[],
   machineClasses: ReadonlySet<string>,
   catalogOperations: readonly CatalogOperation[],
+  savedLineProcess: string | null,
 ): void {
-  const host = lines.find((l) => machineClasses.has(l.machineClass));
-  if (!host) return; // no line of this category on the part: nothing to attach an operation to
+  // The live line of the category, else the saved line being edited: the catalog of a category is the same whether or not this part's cost is live.
+  const hostProcess = lines.find((l) => machineClasses.has(l.machineClass))?.process ?? savedLineProcess;
+  if (!hostProcess) return; // a new line with no live line of the category: nothing to attach an operation to
   for (const c of catalogOperations) {
     if (!c.operationCategory || !c.featureType) continue;
     const value = `${c.operationCategory} // ${c.featureType}`;
     if (byValue.has(value)) continue;
-    byValue.set(value, { value, label: value, detail: null, cycleTimeMin: 0, lineProcess: host.process, notOnPart: true });
+    byValue.set(value, { value, label: value, detail: null, cycleTimeMin: 0, lineProcess: hostProcess, notOnPart: true });
   }
 }
 
@@ -167,3 +171,28 @@ export function effectiveOperation(input: {
   if (input.savedApplies && input.savedOperation && offered(input.savedOperation)) return input.savedOperation;
   return '';
 }
+
+/**
+ * The Operation choices the dialog offers, in every state of the part's cost: still loading (no lines), loaded and empty, or populated; for a new line or a
+ * saved one. Always the part's own operations first (when its cost is live), then the whole catalog of the category, then the saved operation when it
+ * is not among them. The catalog operations share the first of: the live line of the category, the saved line being edited, the category's own
+ * operation (its process-catalog name), so a new line is offered them too.
+ */
+export function operationChoices(input: {
+  lines: readonly LiveOperationLine[] | undefined;
+  machineClasses: ReadonlySet<string>;
+  featureTypeByOperation: ReadonlyMap<string, string>;
+  catalogOperations: readonly CatalogOperation[];
+  /** The saved line's operation as the live lines name it ('' for a new line). */
+  savedOperation: string;
+  /** The saved operation still applies (its machine class is unchanged). */
+  savedApplies: boolean;
+  /** The category's own operation name in the process catalog, for a line with nothing else to attach to. */
+  categoryOperation: string | null;
+}): LiveOperationOption[] {
+  const base = liveOperationOptions(input.lines ?? [], input.machineClasses, input.featureTypeByOperation, input.catalogOperations, input.savedOperation || input.categoryOperation);
+  const saved = input.savedOperation;
+  if (!input.savedApplies || !saved || base.some((o) => o.value === saved)) return base;
+  return [...base, { value: saved, label: `${saved} (saved on this line)`, detail: null, cycleTimeMin: 0, lineProcess: saved }];
+}
+
