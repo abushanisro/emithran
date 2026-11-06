@@ -2,7 +2,7 @@
  * The part's applied cost as a table (backend GET /bom-items/:id/cost-table), and how the page lays it out. Pure, so it is tested. The backend states every
  * number and which columns it has no data for; nothing here computes a cost.
  */
-export type CostUnit = "usd" | "usd_per_kg" | "seconds" | "kg" | "percent" | "count" | "text";
+export type CostUnit = "usd" | "usd_per_kg" | "usd_per_hr" | "minutes" | "seconds" | "kg" | "percent" | "count" | "text";
 
 export interface CostColumn {
   key: string;
@@ -89,6 +89,8 @@ export function formatCell(value: number | string | null | undefined, column: Co
   if (!Number.isFinite(n)) return "—";
   switch (column.unit) {
     case "usd": return `${display.symbol}${grouped(n * display.fromUsd, 3)}`;
+    case "usd_per_hr": return `${display.symbol}${grouped(n * display.fromUsd, 2)}`;
+    case "minutes": return grouped(n, 2);
     case "usd_per_kg": return `${display.symbol}${grouped(n * display.fromUsd, 3)}`;
     case "seconds": return grouped(n, 1);
     case "kg": return grouped(n, 3);
