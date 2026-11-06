@@ -8,6 +8,7 @@ import { AUTO_ROUTE_ID } from '../dto/apply-route.dto';
 import type { AppliedScenarioState, ApplyScenarioDto, ScenarioApplicationResult } from '../dto/apply-scenario.dto';
 import { AnalysisRunService } from './analysis-run.service';
 import { MaterialCostSnapshotService } from './material-cost-snapshot.service';
+import { ToolingCostSnapshotService } from './tooling-cost-snapshot.service';
 import { RouteApplicationService } from './route-application.service';
 
 export interface ScenarioApplicationInput {
@@ -31,6 +32,7 @@ const ERROR_MAX = 500;
  *   3. the scenario fields: annual volume and material grade on the item, every scenario key in one atomic merge;
  *   4. the material cost record, a snapshot of the engine's own cost summary at this scenario (MaterialCostSnapshotService);
  *   5. the route (RouteApplicationService: the engine's recommendation, a chosen route, a Workflow Builder route, or the one already applied);
+ *      and the tooling that route needs (ToolingCostSnapshotService: the mold the engine priced);
  *   6. the machines picked in the Workflow Builder;
  *   7. the state becomes 'applied' with revision + 1, or 'failed' with the reason and the revision unchanged.
  *
@@ -47,6 +49,7 @@ export class ScenarioApplicationService {
     private readonly database: DatabaseService,
     private readonly analysisRuns: AnalysisRunService,
     private readonly materials: MaterialCostSnapshotService,
+    private readonly toolingCosts: ToolingCostSnapshotService,
     private readonly routes: RouteApplicationService,
     private readonly audit: AuditService,
   ) {}
@@ -112,6 +115,10 @@ export class ScenarioApplicationService {
       // 5. The route.
       const route = await this.applyRoute(id, request, user, token, warnings);
 
+      // 5b. The tooling the applied route needs (the mold), from the cost summary at this scenario.
+      const afterRoute = await this.bomItems.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
+      const tooling = await this.toolingCosts.ensure({ bomItemId: id, summary: afterRoute, userId, organizationId, token });
+
       // 6. The machines picked in the Workflow Builder: a machine that cannot be saved is reported, and does not undo the route.
       const machineOverrides: ScenarioApplicationResult['machineOverrides'] = { saved: 0, failed: [] };
       for (const ov of request.machineOverrides ?? []) {
@@ -135,7 +142,7 @@ export class ScenarioApplicationService {
         organizationId,
         meta: { revision: scenario.revision, route: route.routeId ?? route.mode, material: grade ?? null },
       });
-      return { scenario, analysis: { ran: run.ran }, material, route, machineOverrides, warnings };
+      return { scenario, analysis: { ran: run.ran }, material, tooling, route, machineOverrides, warnings };
     } catch (e: unknown) {
       await this.fail(id, revision, startedAt, e, token);
       throw e;

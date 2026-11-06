@@ -20,6 +20,7 @@ export interface ScenarioApplicationResult {
   scenario: AppliedScenarioState;
   analysis: { ran: string[] };
   material: { grade: string; action: 'kept' | 'replaced'; recordId: string | null } | null;
+  tooling: { action: 'kept' | 'replaced' | 'none'; items: string[] };
   route: { mode: string; routeId: string | null; routeLabel: string; created: number; operations: string[] };
   machineOverrides: { saved: number; failed: { processKey: string; message: string }[] };
   warnings: string[];
@@ -45,6 +46,8 @@ export function useApplyScenario(bomItemId: string | undefined) {
         ['bom-items', bomItemId],
         ['process-costs'],
         ['raw-material-costs'],
+        ['tooling-costs'],
+        ['bom-item-cost'],
         analysisStatusKey(bomItemId),
       ]) void queryClient.invalidateQueries({ queryKey: key });
     },
