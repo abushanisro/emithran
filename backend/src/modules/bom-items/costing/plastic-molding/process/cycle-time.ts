@@ -25,11 +25,16 @@
 // LSR (thermoset) cures instead of cooling: Arrhenius cure time, literature
 // constants (Ossipov et al., Polymer Engineering 2002), no pack phase.
 
+import { formulaById } from '../formula-registry';
 import type { CycleModel } from '../plastic-reference';
 import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
 
-const step = (fieldName: string, value: number, source: string): CalculationTraceStep =>
-  ({ fieldName, displayLabel: `${fieldName} (s)`, kind: 'calculated', value, unit: 's', source });
+/** A calculated trace step, tied to the registered formula that produced it: its id, version and validation state travel with the number. */
+const step = (formulaId: string, fieldName: string, value: number, source: string): CalculationTraceStep => {
+  const f = formulaById(formulaId);
+  if (!f) throw new Error(`Formula ${formulaId} is not in the plastic formula registry`);
+  return { fieldName, displayLabel: `${fieldName} (s)`, kind: 'calculated', value, unit: 's', source, formulaId, formulaVersion: f.version, state: f.state };
+};
 
 export type GateType = 'edge' | 'fan' | 'sub' | 'hot_tip';
 
@@ -154,7 +159,7 @@ export function computeCycleTime(input: {
   if (input.isLsr) {
     if (wall != null) {
       coolSec = computeLsrCureTime(wall);
-      trace.push(step('Cure Time', coolSec, `LSR Arrhenius at ${LSR_DEFAULT_MOLD_TEMP_C} C, wall ${wall} mm (literature constants)`));
+      trace.push(step('F-09', 'Cure Time', coolSec, `LSR Arrhenius at ${LSR_DEFAULT_MOLD_TEMP_C} C, wall ${wall} mm (literature constants)`));
     }
   } else {
     const thermal = resinThermalProps(input.real, input.model.moldTemperatureIncreaseC);
@@ -162,7 +167,7 @@ export function computeCycleTime(input: {
     else if (wall != null) {
       coolSec = computeCoolingTimeSec(wall, thermal.props);
       if (coolSec == null) missing.push('material temperatures give no Menges solution (eject must lie between mold and melt)');
-      else trace.push(step('Cooling Time', coolSec, `Menges: wall ${wall} mm, α ${thermal.props.alpha.toFixed(4)} mm²/s (k / ρ_melt·cp), Tm ${thermal.props.Tm} / Tw ${thermal.props.Tw} / Te ${thermal.props.Te} C (material reference)`));
+      else trace.push(step('F-04', 'Cooling Time', coolSec, `Menges: wall ${wall} mm, α ${thermal.props.alpha.toFixed(4)} mm²/s (k / ρ_melt·cp), Tm ${thermal.props.Tm} / Tw ${thermal.props.Tw} / Te ${thermal.props.Te} C (material reference)`));
     }
   }
 
@@ -178,12 +183,12 @@ export function computeCycleTime(input: {
     shotMeltVolumeMm3: input.shotMeltVolumeMm3!, injectionRateMm3PerS: rate!,
     cavityCount: input.cavityCount, gatesPerCavity: input.gatesPerCavity, model: input.model,
   });
-  trace.push(step('Fill Time', fillSec, `${Math.round(input.shotMeltVolumeMm3!)} mm³ shot melt / ${rate} mm³/s press injection rate × injectionTimeAdjustmentFactors (${input.cavityCount} cav, ${input.gatesPerCavity} gate/cav)`));
+  trace.push(step('F-05', 'Fill Time', fillSec, `${Math.round(input.shotMeltVolumeMm3!)} mm³ shot melt / ${rate} mm³/s press injection rate × injectionTimeAdjustmentFactors (${input.cavityCount} cav, ${input.gatesPerCavity} gate/cav)`));
   const packSec = input.isLsr ? 0 : computePackTimeSec(coolSec);
-  if (!input.isLsr) trace.push(step('Pack Time', packSec, '0.35 × cooling, floor 2 s: Menges gate-freeze rule (the reference data holds no hold time)'));
-  trace.push(step('Mold Open/Close Time', dry!, 'Press dry cycle, Euromap 6 (machine reference record)'));
+  if (!input.isLsr) trace.push(step('F-06', 'Pack Time', packSec, '0.35 × cooling, floor 2 s: Menges gate-freeze rule (the reference data holds no hold time)'));
+  trace.push(step('F-07', 'Mold Open/Close Time', dry!, 'Press dry cycle, Euromap 6 (machine reference record)'));
   const factor = input.model.cycleTimeAdjustmentFactor;
   const totalCycleSec = Math.round((fillSec + packSec + coolSec + dry!) * factor * 100) / 100;
-  trace.push(step('Cycle Time', totalCycleSec, `(fill + pack + cooling + mold open/close) × cycleTimeAdjustmentFactor ${factor}; ejector travel not modelled (no press ejector velocity on file)`));
+  trace.push(step('F-08', 'Cycle Time', totalCycleSec, `(fill + pack + cooling + mold open/close) × cycleTimeAdjustmentFactor ${factor}; ejector travel not modelled (no press ejector velocity on file)`));
   return { derivable: true, fillSec, packSec, coolSec, moldMotionSec: dry!, totalCycleSec, trace };
 }
