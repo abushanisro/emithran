@@ -456,7 +456,10 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       materialGrade ? `${materialGrade} is hygroscopic` : undefined,
     ));
   }
-  if (routed.has('mold_setup')) {
+  // The press's own setup time (mhr_records.setup_time_hr, from the machine data) is the sourced setup of this route; with none on file, setup stays
+  // uncosted and the route says so rather than carrying an invented time.
+  const pressSetupMin = mhrRate.setupTimeHr != null && mhrRate.setupTimeHr >= 0 ? mhrRate.setupTimeHr * 60 : null;
+  if (routed.has('mold_setup') && pressSetupMin === null) {
     warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.mold_setup));
   }
 
@@ -470,7 +473,10 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   const processLabel = MOLDING_PROCESS_LABEL[mhrRate.machineClass] ?? 'Injection Molding';
   const inCycleMin = cycle.derivable ? (cycle.totalCycleSec / cavityCount / perGood) / 60 : 0;
   moldingMin += inCycleMin;
-  const line = makeLine(processLabel, 0, r2((inCycleMin / 60) * mhrRate.rate), inCycleMin, mhrRate);
+  // Setup is the press's machine time for the batch, spread over its parts, at the same machine rate the run is charged at.
+  const setupCostPerPart = pressSetupMin === null ? 0 : (pressSetupMin / 60) * mhrRate.rate / Math.max(batchSize, 1);
+  const line = makeLine(processLabel, setupCostPerPart, r2((inCycleMin / 60) * mhrRate.rate), inCycleMin, mhrRate);
+  if (pressSetupMin !== null) { line.setupTimeMin = pressSetupMin; line.setupTimeSource = 'machine'; }
   const gapReason = sizing.unverifiedReason ?? cycleGapReason ?? yieldGapReason;
   if (gapReason) {
     line.physicsGap = {
