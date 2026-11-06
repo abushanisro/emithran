@@ -19,7 +19,7 @@ export function PartDetailsSheet({ itemId, refreshKey, display, inDialog = false
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={cn("flex flex-col gap-2 p-3", expanded ? "fixed inset-0 z-50 bg-background" : "h-full min-h-0", inDialog && "pr-10")}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-3", expanded ? "fixed inset-0 z-50 bg-background" : "h-full min-h-0", inDialog && "pr-10")}>
       <div className="flex shrink-0 items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">{table?.rows[0]?.name ?? "Part"} — Part details</h3>
@@ -43,7 +43,7 @@ export function PartDetailsSheet({ itemId, refreshKey, display, inDialog = false
       )}
       {table && (
         <>
-          <div className="min-h-0 flex-1 overflow-auto rounded border border-border/60">
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded border border-border/60">
             <CostTable table={table} columns="all" display={display} />
           </div>
           <details className="shrink-0 text-[11px] text-muted-foreground">
