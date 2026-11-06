@@ -39,6 +39,7 @@ import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
 import { analysisNotReadyMessage, applyBlockReason } from '@/lib/analysis/analysis-status';
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
+import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useAnalysisRun } from '@/lib/api/hooks/useAnalysisRun';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -304,6 +305,7 @@ const RIGHT_TABS = [
   { key: 'detail',        label: 'Detail'       },
   { key: 'investment',    label: 'Invest'       },
   { key: 'vendor_network', label: 'Vendors'     },
+  { key: 'excel',          label: 'Excel'       },
 ] as const;
 type RightTabKey = (typeof RIGHT_TABS)[number]['key'];
 
@@ -8402,7 +8404,7 @@ function AnalysisTabsPanel({
   // 'USA' (useCostSummary's own fallback), running a second, wasted full
   // cost computation on every load/Apply regardless of the real Digital
   // Factory. `factory` is already a real prop on this component.
-  const { data: summaryForPartTab } = useCostSummary(item.id, batchSize, factory);
+  const { data: summaryForPartTab, dataUpdatedAt: summaryUpdatedAt } = useCostSummary(item.id, batchSize, factory);
   // What this part is actually being priced at, read back from the engine.
   // Panels below that need a definite quantity (an RFQ volume, the Copilot's
   // context) get these rather than a number this component chose.
@@ -8576,7 +8578,15 @@ function AnalysisTabsPanel({
           />
         )}
 
-        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'copilot' && tab !== 'vendor_network' && (
+        {tab === 'excel' && (
+          <PartDetailsSheet
+            itemId={item.id}
+            refreshKey={summaryUpdatedAt}
+            display={{ symbol: summaryForPartTab?.currencySymbol ?? '$', fromUsd: summaryForPartTab?.usdToDisplayRate ?? 1 }}
+          />
+        )}
+
+        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'excel' && tab !== 'validation' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'copilot' && tab !== 'vendor_network' && (
           <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
             <AlertCircle className="h-6 w-6 opacity-30" />
             <p className="text-xs text-center">{RIGHT_TABS.find((t) => t.key === tab)?.label} coming in Phase 2.</p>
