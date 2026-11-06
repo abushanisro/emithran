@@ -735,8 +735,8 @@ export function ProcessCostDialog({
   );
 
   const operationOptions = useMemo(
-    () => (selectedCategory ? liveOperationOptions(liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation, categoryCatalogOperations) : []),
-    [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation, categoryCatalogOperations],
+    () => (selectedCategory ? liveOperationOptions(liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation, categoryCatalogOperations, editData?.operation || null) : []),
+    [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation, categoryCatalogOperations, editData?.operation],
   );
 
   // Root cause of "selected in the backend but the field shows unselected":

@@ -174,7 +174,18 @@ describe('liveOperationOptions with the category catalog', () => {
     expect(opts.find((o) => o.value === 'As Molded // Rib')!.notOnPart).toBeUndefined();
   });
 
-  it('offers no catalog operation when the part has no line of the category to attach it to', () => {
+  it('offers no catalog operation for a new line when the part has no live line of the category to attach it to', () => {
     expect(liveOperationOptions([], new Set(['injection_molding']), new Map(), catalog)).toEqual([]);
+  });
+
+  it('lists the whole catalog for a saved line even when the page passed no live lines: the catalog does not depend on the part\'s live cost', () => {
+    const opts = liveOperationOptions([], new Set(['injection_molding']), new Map(), catalog, 'Injection Molding');
+    expect(opts.map((o) => o.value)).toEqual(['As Molded // Rib', 'HoleSideCore // SimpleHole', 'Slides // Undercut']);
+    expect(opts.every((o) => o.notOnPart && o.lineProcess === 'Injection Molding')).toBe(true);
+  });
+
+  it('a live line of the category still wins over the saved line as the one the operations share', () => {
+    const opts = liveOperationOptions([injection], new Set(['injection_molding']), new Map(), catalog, 'Something Else');
+    expect(opts.find((o) => o.value === 'Slides // Undercut')!.lineProcess).toBe('Injection Molding');
   });
 });

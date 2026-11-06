@@ -59,6 +59,8 @@ export function liveOperationOptions(
   machineClasses: ReadonlySet<string>,
   featureTypeByOperation: ReadonlyMap<string, string>,
   catalogOperations: readonly CatalogOperation[] = [],
+  /** The line being edited, when the part has no live line of the category (the page did not pass them, or the cost has not loaded): the catalog operations attach to it. */
+  savedLineProcess: string | null = null,
 ): LiveOperationOption[] {
   const byValue = new Map<string, LiveOperationOption>();
   for (const line of lines) {
@@ -82,7 +84,7 @@ export function liveOperationOptions(
       lineProcess: line.process,
     });
   }
-  addCatalogOperations(byValue, lines, machineClasses, catalogOperations);
+  addCatalogOperations(byValue, lines, machineClasses, catalogOperations, savedLineProcess);
   return [...byValue.values()].sort((a, b) => Number(!!a.notOnPart) - Number(!!b.notOnPart) || a.label.localeCompare(b.label));
 }
 
@@ -92,14 +94,16 @@ function addCatalogOperations(
   lines: readonly LiveOperationLine[],
   machineClasses: ReadonlySet<string>,
   catalogOperations: readonly CatalogOperation[],
+  savedLineProcess: string | null,
 ): void {
-  const host = lines.find((l) => machineClasses.has(l.machineClass));
-  if (!host) return; // no line of this category on the part: nothing to attach an operation to
+  // The live line of the category, else the saved line being edited: the catalog of a category is the same whether or not this part's cost is live.
+  const hostProcess = lines.find((l) => machineClasses.has(l.machineClass))?.process ?? savedLineProcess;
+  if (!hostProcess) return; // a new line with no live line of the category: nothing to attach an operation to
   for (const c of catalogOperations) {
     if (!c.operationCategory || !c.featureType) continue;
     const value = `${c.operationCategory} // ${c.featureType}`;
     if (byValue.has(value)) continue;
-    byValue.set(value, { value, label: value, detail: null, cycleTimeMin: 0, lineProcess: host.process, notOnPart: true });
+    byValue.set(value, { value, label: value, detail: null, cycleTimeMin: 0, lineProcess: hostProcess, notOnPart: true });
   }
 }
 
