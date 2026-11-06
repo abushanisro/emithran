@@ -30,6 +30,7 @@ import { HydroformingReferenceService } from './costing/hydroforming/hydroformin
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
+import { PlasticRouteComparisonService } from './costing/plastic-molding/plastic-route-comparison.service';
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
 import { SandReferenceService } from './costing/casting/sand/sand-reference.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
@@ -54,7 +55,7 @@ import { SandSnapshotReviewController, SandSnapshotsController } from './sand-sn
 @Module({
   imports: [DatabaseModule, LoggerModule, ConfigModule, ManufacturingKnowledgeModule, ManufacturingRulesModule, ExchangeRateModule, MHRModule, SandCastingModule, RawMaterialsModule],
   controllers: [BOMItemsController, BomItemPullDirectionController, SandVariableOverridesController, SandSnapshotsController, SandSnapshotReviewController],
-  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService, CastingReferenceService, SandReferenceService, SandMachineService, SandCostService, SandVariableOverridesService, SandSnapshotsService, FeatureToleranceService, PmiReviewService, ToleranceReferenceService, SheetMetalCatalogOperationsService, PlasticCatalogOperationsService, PlasticPullDirectionService, BomItemReanalysisService, AnalysisRunService, RouteApplicationService, MaterialCostSnapshotService, ScenarioApplicationService, CostTableService, HydroformingReferenceService, AnalysisStatusService],
+  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService, PlasticRouteComparisonService, CastingReferenceService, SandReferenceService, SandMachineService, SandCostService, SandVariableOverridesService, SandSnapshotsService, FeatureToleranceService, PmiReviewService, ToleranceReferenceService, SheetMetalCatalogOperationsService, PlasticCatalogOperationsService, PlasticPullDirectionService, BomItemReanalysisService, AnalysisRunService, RouteApplicationService, MaterialCostSnapshotService, ScenarioApplicationService, CostTableService, HydroformingReferenceService, AnalysisStatusService],
   exports: [BOMItemsService, AnalysisStatusService, FileStorageService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalLookupService, MachiningLookupService],
 })
 export class BOMItemsModule {}
