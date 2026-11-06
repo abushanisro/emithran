@@ -360,3 +360,47 @@ describe('operations the model does not cost', () => {
     expect(warn({}, 'Generic ABS')).toMatch(/Visual Inspection required[^\n]*no sourced time\/rate data exists/);
   });
 });
+
+describe('quote validation: how far the quote can be trusted', () => {
+  const part = (over: Partial<InjectionMoldingCostInput> = {}) => computeInjectionMoldedCostSummary(absPart({ annualVolume: 100_000, productionLifeYears: 3, ...over }));
+
+  it('lists the formulas the quote used with their versions, the weakest state, and the assumptions it rests on', () => {
+    const v = part().validation!;
+    expect(v.formulas.map((f) => f.id)).toEqual(expect.arrayContaining(['F-01', 'F-02', 'F-03', 'F-04', 'F-05', 'F-06', 'F-07', 'F-08', 'F-10', 'F-11', 'F-12', 'F-13', 'F-14', 'F-15', 'F-16', 'F-17', 'F-18']));
+    expect(v.formulas.find((f) => f.id === 'F-04')).toMatchObject({ version: 1, state: 'ASSUMED' });
+    expect(v.state).toBe('ASSUMED');
+    expect(v.assumptions.some((a) => a.startsWith('F-03: '))).toBe(true); // the runner allowance
+    expect(v.assumptions.some((a) => a.startsWith('F-16: '))).toBe(true); // the mold tooling scope
+  });
+
+  it('says what a real mold quote needs that the model cannot compute: a quote with a mold is not complete', () => {
+    const v = part().validation!;
+    expect(v.complete).toBe(false);
+    // G-11: ABS is hygroscopic, so material drying is routed, and no data exists for it
+    expect(v.unsupported.map((u) => u.id)).toEqual(['G-01', 'G-02', 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08', 'G-09', 'G-10', 'G-11']);
+  });
+
+  it('without a volume there is no mold: the mold formulas and gaps are left out, the cycle and period gaps remain', () => {
+    const v = computeInjectionMoldedCostSummary(absPart()).validation!;
+    expect(v.formulas.map((f) => f.id)).not.toContain('F-16');
+    expect(v.unsupported.map((u) => u.id)).toEqual(['G-09', 'G-10', 'G-11']);
+  });
+
+  it('a cycle that cannot be derived does not claim the cycle formulas', () => {
+    const v = part({ pressTiming: null }).validation!;
+    expect(v.formulas.map((f) => f.id)).not.toEqual(expect.arrayContaining(['F-04']));
+  });
+
+  it('the cycle steps in the trace carry their formula id, version and state', () => {
+    const line = part().processLines.find((l) => l.process === 'Injection Molding')!;
+    const byId = Object.fromEntries((line.calculationTrace ?? []).map((t) => [t.formulaId, t]));
+    expect(byId['F-04']).toMatchObject({ fieldName: 'Cooling Time', formulaVersion: 1, state: 'ASSUMED' });
+    expect(byId['F-05']).toMatchObject({ state: 'VALIDATED' });
+    expect(byId['F-07']).toMatchObject({ state: 'VALIDATED' });
+  });
+
+  it('a material that cannot be molded has no quote to qualify: no validation, the one finding stands', () => {
+    const r = computeInjectionMoldedCostSummary(absPart({ materialGrade: 'Clear Resin (SLA)', materialStockForm: 'Liquid Resin (SLA)', materialMatlState: 'Photopolymer' }));
+    expect(r.validation).toBeUndefined();
+  });
+});

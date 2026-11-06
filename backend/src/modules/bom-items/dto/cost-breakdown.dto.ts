@@ -106,6 +106,10 @@ export interface CalculationTraceStep {
   // 'input' steps whose value was measured on CAD faces: which measurement
   // (see costing/shared/cad-evidence.ts), so the UI can show those faces.
   evidence?: CadEvidenceKey;
+  /** Plastic molding: the registered formula (costing/plastic-molding/formula-registry.ts) that produced a calculated step, its version and validation state. */
+  formulaId?: string;
+  formulaVersion?: number;
+  state?: 'VALIDATED' | 'ASSUMED' | 'UNSUPPORTED';
 }
 
 // Every lookup table declares exactly one policy (lookup_table_policy,
@@ -464,6 +468,15 @@ export interface ProcessLineCost {
 // this rather than presenting totalCost as if every process priced cleanly.
 export type CostStatus = 'complete' | 'incomplete';
 
+/** How far a plastic quote can be trusted (costing/plastic-molding/quote-validation.ts). */
+export interface QuoteValidationDto {
+  state: 'VALIDATED' | 'ASSUMED' | 'UNSUPPORTED';
+  complete: boolean;
+  formulas: Array<{ id: string; version: number; name: string; state: 'VALIDATED' | 'ASSUMED' | 'UNSUPPORTED' }>;
+  assumptions: string[];
+  unsupported: Array<{ id: string; name: string; stagedData: string }>;
+}
+
 export interface CostSummaryDto {
   // Scenario readiness gate — explicitly false when required inputs are missing.
   // Absent (undefined) or true means ready. Frontend blocks cost display on false.
@@ -573,6 +586,8 @@ export interface CostSummaryDto {
   // Injection-molding-specific piece-cost breakdown (separate from tooling).
   // Present only when family === 'plastic_molded'.
   injectionMolding?: InjectionMoldingBreakdown;
+  /** Plastic molding: the formulas this quote used, their validation states and assumptions, and what it leaves out (see QuoteValidationDto). */
+  validation?: QuoteValidationDto;
 
   // High pressure die casting: cavities per die and the clamp / shot they set.
   // Present only when a die-cast part reached the HPDC engine's cavity step.

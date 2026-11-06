@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
 import { analysisNotReadyMessage, applyBlockReason } from '@/lib/analysis/analysis-status';
+import { QuoteValidationNote } from '@/components/features/manufacturing-intelligence/QuoteValidationNote';
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useAnalysisRun } from '@/lib/api/hooks/useAnalysisRun';
@@ -1794,6 +1795,7 @@ function CostSummaryTab({
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">1 pc · batch {cost.batchSize}</p>
+          {isScenarioReady && <QuoteValidationNote validation={cost.validation} />}
           {isScenarioReady && cost.costStatus === 'incomplete' && !!cost.incompleteProcesses?.length && (
             <p className="text-[10px] text-destructive mt-0.5 max-w-[220px]">
               Partial total — {cost.incompleteProcesses.join(', ')} unresolved

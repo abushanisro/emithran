@@ -816,6 +816,18 @@ export interface RouteResultSustainability {
  *  partial figure, not a real quote, when this is 'incomplete'. */
 export type CostStatus = 'complete' | 'incomplete';
 
+export type ValidationState = 'VALIDATED' | 'ASSUMED' | 'UNSUPPORTED';
+
+export interface QuoteValidation {
+  /** The weakest state among the formulas the quote used. */
+  state: ValidationState;
+  /** False when something a real quote needs is not computed (see `unsupported`). */
+  complete: boolean;
+  formulas: Array<{ id: string; version: number; name: string; state: ValidationState }>;
+  assumptions: string[];
+  unsupported: Array<{ id: string; name: string; stagedData: string }>;
+}
+
 export interface CostSummaryDto {
   // Scenario readiness — false when no material is applied; frontend blocks cost display
   scenarioReady?: boolean;
@@ -871,6 +883,8 @@ export interface CostSummaryDto {
   blankSpec?: BlankSpecDto;
   /** Present only when family === 'plastic_molded' — see InjectionMoldingBreakdown. */
   injectionMolding?: InjectionMoldingBreakdown;
+  /** Plastic molding: how far this quote can be trusted (backend QuoteValidationDto). Absent for other families and for a part that cannot be molded. */
+  validation?: QuoteValidation;
   /** Present when a die-cast part reached the HPDC cavity step — see DieCastingBreakdown. */
   dieCasting?: DieCastingBreakdown;
   /** Sand casting: what the route decided (mirrors the backend's SandCastingBreakdown). */

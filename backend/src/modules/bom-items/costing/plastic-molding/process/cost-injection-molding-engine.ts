@@ -19,6 +19,7 @@
 // The gate feeds the gate_trimming routing rule: hot_tip and sub gates
 // self-de-gate, so gate_trimming is not routed for those gate types.
 
+import { buildQuoteValidation } from '../quote-validation';
 import { RATES_SOURCE_LABEL } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import { computeSustainability } from '../../shared/core/cost-engine';
@@ -692,5 +693,38 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     processTree,
     injectionMolding: imBreakdown,
     ...(toolingResult ? { tooling: toolingResult } : {}),
+    // A material that cannot be molded is reported as the one finding above: there is no quote to qualify.
+    ...(sizing.materialGap ? {} : {
+      validation: buildQuoteValidation(
+        usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
+        unsupportedFormulas({ tooling: toolingResult != null, routed }),
+      ),
+    }),
   };
+}
+
+/** The registered formulas this quote computed (formula-registry.ts). F-03 and F-12 and F-14 are always part of the quote: a runner allowance, a press line, material. */
+function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelected: boolean; cycleDerivable: boolean; yieldKnown: boolean; tooling: boolean }): string[] {
+  return [
+    'F-02', 'F-03', 'F-10', 'F-12', 'F-14',
+    ...(q.clampDerivable ? ['F-01'] : []),
+    ...(q.pressSelected ? ['F-11'] : []),
+    ...(q.cycleDerivable ? [q.isLsr ? 'F-09' : 'F-04', ...(q.isLsr ? [] : ['F-06']), 'F-05', 'F-07', 'F-08'] : []),
+    ...(q.yieldKnown ? ['F-13'] : []),
+    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18'] : []),
+  ];
+}
+
+/**
+ * What a real quote needs and this model cannot compute: the mold's steel, blocks, side actions, EDM, texture, cooling and extras whenever a mold is
+ * priced (it is priced from components and hours only), the cycle's handling and plasticizing and the period costs always, and the operations the
+ * route needs that have no data at all.
+ */
+function unsupportedFormulas(q: { tooling: boolean; routed: ReadonlySet<string> }): string[] {
+  const noData = ['material_drying', 'visual_inspection', 'ultrasonic_welding', 'secondary_cure_oven', 'lsr_compound_dosing'].some((op) => q.routed.has(op));
+  return [
+    ...(q.tooling ? ['G-01', 'G-02', 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08'] : []),
+    'G-09', 'G-10',
+    ...(noData ? ['G-11'] : []),
+  ];
 }
