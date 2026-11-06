@@ -51,7 +51,11 @@ function r6(n: number): number { return Math.round(n * 1e6) / 1e6; }
 // ── Constants not replaced by Phase 4 cycle-time engine ───────────────────────
 
 // Runner allowance and shot rule: shot-size.ts (shared with press selection).
+import { injectionMoldabilityGap, type MoldabilityGap } from '../../../../raw-materials/material-moldability';
 export { IM_RUNNER_SCRAP_PCT } from '../shot-size';
+
+/** USD per kg above which a molding resin's price is flagged for verification. */
+const MOLDING_RESIN_PRICE_ALERT_USD_PER_KG = 50;
 
 // ── Removed, uncited constants (2026-09-11) ───────────────────────────────────
 // This block used to hold 16 named-literal time constants (mold setup 60min,
@@ -220,6 +224,30 @@ export interface InjectionMoldingCostInput {
   location?: string;
   // raw_materials.material_type of the resolved grade (tblToolLife key).
   materialType?: string | null;
+  // What the resolved grade is supplied as (raw_materials.stock_form / matl_state). A 3D-printing resin or powder, or a stock shape, is not
+  // injection-molding feedstock: the cost then says so once instead of failing step by step (material-moldability.ts). Absent = not judged by form.
+  materialStockForm?: string | null;
+  materialMatlState?: string | null;
+}
+
+/**
+ * Why the resolved material cannot be injection molded at all (a printing feedstock or a stock shape), or null. A grade that is molding feedstock
+ * but lacks some reference value keeps the specific warnings below: they name exactly what is missing. Silicone (LSR) is costed by its cure model.
+ */
+function materialNotMoldable(input: InjectionMoldingCostInput): MoldabilityGap | null {
+  if (resolveSubtype(input) === 'lsr') return null;
+  const gap = injectionMoldabilityGap({
+    grade: input.materialGrade,
+    stockForm: input.materialStockForm ?? null,
+    matlState: input.materialMatlState ?? null,
+    injectionPressureMaxMpa: input.materialClamp?.injectionPressureMaxMpa ?? null,
+    flowLengthRatio: input.materialClamp?.flowLengthRatio ?? null,
+    meltingTempC: input.realResinInputs?.meltingTempC ?? null,
+    moldTempC: input.realResinInputs?.moldTempC ?? null,
+    densityOfMeltKgM3: input.realResinInputs?.densityOfMeltKgM3 ?? null,
+    cureTimeMin: null,
+  });
+  return gap && gap.kind !== 'no_injection_data' ? gap : null;
 }
 
 // Auto-derive molding subtype from material grade + signals.
@@ -254,7 +282,11 @@ function makeLine(
 }
 
 type EngineResult = CostSummaryDto & { processTree: IMProcessTree };
-type CavitySizing = { count: number; constrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy']; unverifiedReason: string | null };
+type CavitySizing = {
+  count: number; constrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy']; unverifiedReason: string | null;
+  /** Set when the material is not injection-molding feedstock: the result carries this one finding instead of the steps it makes impossible. */
+  materialGap?: MoldabilityGap;
+};
 
 /** The press-sizing facts shared by every cavity candidate. */
 function pressSizingBasis(input: InjectionMoldingCostInput) {
@@ -291,6 +323,13 @@ function pressSizingBasis(input: InjectionMoldingCostInput) {
 }
 
 export function computeInjectionMoldedCostSummary(input: InjectionMoldingCostInput): EngineResult {
+  const materialGap = materialNotMoldable(input);
+  if (materialGap) {
+    return computeAtCavities(input, {
+      count: input.cavityCountOverride ?? input.plasticReference?.defaultNumCavities ?? 1,
+      constrainedBy: 'unverified', unverifiedReason: materialGap.reason, materialGap,
+    });
+  }
   const b = pressSizingBasis(input);
   const clampT = input.machineClampTonnes ?? null;
   const shotG = input.machineShotCapacityG ?? null;
@@ -333,17 +372,16 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (isLsr) {
     warnings.push('LSR (thermoset) — Arrhenius cure model used; Menges cooling does NOT apply. Mold temperature 180°C (heated).');
   }
-  // Engineering plastics are $2–40/kg (commodity to engineering resin).
-  // Anything above $50/kg almost certainly indicates a mis-mapped material grade
-  // (e.g. a metal or composite grade resolved as the fallback for a plastic name).
-  // Surface this early so it is impossible to miss in the cost breakdown.
+  // A molding resin above this USD price per kg is usually a mis-resolved grade (a metal or composite grade picked up for a plastic's name), so it is
+  // surfaced where it cannot be missed. Specialty resins (PEEK, PEI) can be genuinely dearer, so the message asks to verify and does not block.
   const usdToLocal = input.usdToLocal ?? 1;
-  if (materialCostPerKg / usdToLocal > 50) {
-    const alertSym = input.currencySymbol ?? '$';
+  const materialUsdPerKg = materialCostPerKg / usdToLocal;
+  if (materialUsdPerKg > MOLDING_RESIN_PRICE_ALERT_USD_PER_KG) {
+    const local = usdToLocal === 1 ? '' : ` (${input.currencySymbol ?? ''}${materialCostPerKg.toFixed(2)}/kg in the quote currency)`;
     warnings.push(
-      `MATERIAL COST ALERT: ${materialGrade ?? 'Unknown'} resolved to ${alertSym}${materialCostPerKg.toFixed(2)}/kg — ` +
-      `engineering plastics are typically $2–40/kg (USD benchmark). ` +
-      `Verify the material grade in the BOM item; the cost breakdown below is unreliable until corrected.`,
+      `MATERIAL COST ALERT: ${materialGrade ?? 'Unknown'} resolved to $${materialUsdPerKg.toFixed(2)}/kg${local}, above the ` +
+      `$${MOLDING_RESIN_PRICE_ALERT_USD_PER_KG}/kg this check expects of a molding resin (most are under $40/kg). ` +
+      `Verify the material grade; the cost breakdown below is unreliable until it is confirmed.`,
     );
   }
   if (sizing.unverifiedReason) warnings.push(sizing.unverifiedReason);
@@ -438,7 +476,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     line.physicsGap = {
       gapType: 'unsupported_operation', process: processLabel, machineClass: mhrRate.machineClass,
       reason: gapReason,
-      requiredCapability: sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : 'Press good-part yield',
+      requiredCapability: sizing.materialGap ? 'An injection-molding material' : sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : 'Press good-part yield',
     };
   }
   if (cycle.derivable) line.calculationTrace = cycle.trace;
@@ -516,7 +554,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     projectedAreaCm2: projectedAreaMm2 != null ? Math.round(projectedAreaMm2 / 10) / 10 : null,
     flowClass: clampPerCavity.derivable ? clampPerCavity.flowClass : null,
     cavityPressureMpa: clampPerCavity.derivable ? r2(clampPerCavity.cavityPressureMpa) : null,
-    clampTrace: clampPerCavity.derivable ? clampPerCavity.trace : clampPerCavity.reason,
+    clampTrace: sizing.materialGap ? sizing.materialGap.reason : clampPerCavity.derivable ? clampPerCavity.trace : clampPerCavity.reason,
     clampRequiredT: clampRequiredT != null ? Math.round(clampRequiredT * 10) / 10 : null,
     clampMachineT: machineClampTonnes,
     clampUtilPct: pct(clampRequiredT, machineClampTonnes),
@@ -545,6 +583,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       moldBaseAreaMm2,
       cavityCount,
       undercutCount: effectiveUndercutCount,
+      slideBundles: signals.slideBundleCount ?? null,
+      slideOrLifterBundles: signals.slideOrLifterBundleCount ?? 0,
       tables: plasticRef.tooling,
       toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null,
       location: input.location ?? '(unknown location)',
@@ -604,7 +644,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     },
     batchSize,
     family,
-    warnings,
+    // A material that cannot be molded makes every step below it fail in turn; the one finding is the answer, the rest is noise until it is fixed.
+    warnings: sizing.materialGap ? [sizing.materialGap.reason] : warnings,
     ratesSource: RATES_SOURCE_LABEL,
     sustainability,
     processTree,

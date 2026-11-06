@@ -6,6 +6,7 @@
 // private method directly (a standard, acceptable pattern for testing one
 // method of a very large service class), spying on the public
 // findOne/update methods instead of mocking the PostgREST query builder chain.
+import { type PlasticCatalogOperationsService } from '../../../modules/bom-items/costing/plastic-molding/operation/plastic-catalog-operations.service';
 import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
 import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
 import type { CastingReferenceService } from '../../../modules/bom-items/costing/casting/casting-reference.service';
@@ -82,6 +83,7 @@ function buildService(computeTrueNest: jest.Mock) {
     {} as unknown as SandCostService,
     {} as unknown as FeatureToleranceService,
     {} as unknown as SheetMetalCatalogOperationsService,
+    {} as unknown as PlasticCatalogOperationsService,
     {} as unknown as HydroformingReferenceService,
   );
   const findOneSpy = jest.spyOn(service, 'findOne')

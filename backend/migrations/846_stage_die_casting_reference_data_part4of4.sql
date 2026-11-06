@@ -9,8 +9,8 @@
 --   variable 521, lookup_table 48, operation 121, process 13, material 68, wage_grade 13
 -- Files (memory/Die Casting/):
 --   Die casting_variables.csv                            521 row(s)
---   Indian data/aPriori_India_Casting_Machine_Rates_FULL.csv lookup_table (98 rows)
---   Indian data/aPriori_India_Raw_Material_Prices.csv    lookup_table (67 rows)
+--   Indian data/eMithran_India_Casting_Machine_Rates_FULL.csv lookup_table (98 rows)
+--   Indian data/eMithran_India_Raw_Material_Prices.csv    lookup_table (67 rows)
 --   Lookup/burnHoleBaseCharge.csv                        lookup_table (4 rows)
 --   Lookup/burnHoleRate.csv                              lookup_table (4 rows)
 --   Lookup/burnProfileBaseCharge.csv                     lookup_table (4 rows)

@@ -21,19 +21,22 @@ const tooSmall: CatalogOperation = {
 describe('sheetMetalOperationNodes', () => {
   const [p, b, s] = sheetMetalOperationNodes('catop_0', [punched, blank, tooSmall]);
 
-  it('labels a resolved operation in the catalog "Operation // Feature" form with size and count', () => {
-    expect(p!.label).toBe('Punching // SimpleHole Ø4.0 ×14');
+  it('names a resolved feature with size and count, the operation as an attribute', () => {
+    expect(p!.label).toBe('SimpleHole Ø4.0 ×14');
+    expect(p!.attrs.find((a) => a.name === 'Operation')?.value).toBe('Punching');
     expect(p!.v2FeatureIds).toEqual(['hole_d4']);
-    expect(p!.children?.map((c) => c.label)).toEqual(['Punching // Edge']);
+    expect(p!.children?.map((c) => c.label)).toEqual(['Edge']);
   });
 
   it('shows every candidate of an undecided feature, picking none', () => {
-    expect(b!.label).toBe('Nibbling or Punching // Blank ×1');
+    expect(b!.label).toBe('Blank ×1');
+    expect(b!.attrs.find((a) => a.name === 'Operation')?.value).toBe('Nibbling or Punching');
     expect(b!.attrs.find((a) => a.name === 'Status')?.value).toMatch(/Undecided/);
   });
 
   it('marks a feature the machine cannot make, with the reason', () => {
-    expect(s!.label).toBe('No operation // SimpleHole Ø1.2 ×2');
+    expect(s!.label).toBe('SimpleHole Ø1.2 ×2');
+    expect(s!.attrs.find((a) => a.name === 'Operation')?.value).toBe('No operation');
     expect(s!.attrs.find((a) => a.name === 'Why')?.value).toMatch(/smallest punchable/);
   });
 });

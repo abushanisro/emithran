@@ -1,0 +1,53 @@
+{
+  "source": "memory/Plastic Modeling/variables/digital_factory_variables.csv",
+  "rules": {
+    "drawDirectionOrthogonalEpsilon": {
+      "value": 5.0,
+      "meaning": "angular difference of setup axes of features sharing a bundle (deg)"
+    },
+    "drawDirectionOrthogonalEpsilonForLifters": {
+      "value": 10.0,
+      "meaning": "how far from square to the pull an axis may be and still be served by a lifter (deg)"
+    },
+    "drawDirectionOrthogonalEpsilonForSlides": {
+      "value": 30.0,
+      "meaning": "the same for a slide (deg)"
+    },
+    "maxGCDPitch": {
+      "value": 50.8,
+      "meaning": "bundling: pitch between holes or voids (mm)"
+    },
+    "minActionGcdsDepthOverlap": {
+      "value": 0.0,
+      "meaning": "bundling: minimal axial overlap of features bundled on one action (mm)"
+    },
+    "maxActionLength": {
+      "value": 500.0,
+      "meaning": "bundling: distance parallel to the parting line between start and end of a slide or lifter (mm)"
+    },
+    "maxCorePullStrokeLength": {
+      "value": 152.4,
+      "meaning": "bundling: longest core pull stroke (mm)"
+    },
+    "smallLifterBundleWidthThreshold": {
+      "value": 76.2,
+      "meaning": "width between a small and a medium lifter bundle (mm)"
+    },
+    "mediumLifterBundleWidthThreshold": {
+      "value": 127.0,
+      "meaning": "width between a medium and a large lifter bundle (mm)"
+    },
+    "smallSlideBundleWidthThreshold": {
+      "value": 76.2,
+      "meaning": "width between a small and a medium slide bundle (mm)"
+    },
+    "mediumSlideBundleWidthThreshold": {
+      "value": 304.8,
+      "meaning": "width between a medium and a large slide bundle (mm)"
+    },
+    "cmVoidPlanarFaceNormalParallelTolerance": {
+      "value": 20.0,
+      "meaning": "angle within which a face normal counts as parallel to the void's accessible direction (deg)"
+    }
+  }
+}

@@ -80,7 +80,7 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
   if (instances.length === 0) {
     return (
       <div className="p-4 text-center text-xs text-muted-foreground">
-        No detected features yet. Refresh Analysis extracts the part&apos;s features; each one then takes its required tolerances here.
+        No detected features yet. Apply Scenario analyses the part and extracts its features; each one then takes its required tolerances here.
       </div>
     );
   }

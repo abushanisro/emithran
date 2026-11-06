@@ -46,6 +46,9 @@ export const PLASTIC_VARIABLE_KEYS = [
   'flowRatioThresholdEasyFlow', 'flowRatioThresholdMediumFlow',
   'minimumPercentClampForceEasyFlow', 'minimumPercentClampForceMediumFlow', 'minimumPercentClampForceHardFlow',
   'conventionalRunnerMaxPressureReductionFactor', 'hotRunnerMaxPressureReductionFactor', 'minInjectionPressure',
+  // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
+  'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilonForSlides', 'drawDirectionOrthogonalEpsilonForLifters',
+  'cmAutoIncludeManualFlashTrimming',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -125,6 +128,22 @@ export interface PlasticReference {
   defaultToolLifeShots: number;
   /** digital_factory_settings_usa, Default profile. USA only: no other location is on file. */
   toolroomRatesUsa: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number };
+  /**
+   * Variables that decide which catalog operation a recognised feature needs. Optional, unlike the rest of the reference: a database without them
+   * still costs the part, and the operations the missing variable would decide are reported undecided (plastic-catalog-operation-resolver.ts).
+   */
+  featureRules: FeatureRules;
+}
+
+export interface FeatureRules {
+  /** variables maxNoCoreInsertDiameter (mm): an obscured hole this small or smaller is made with an insert and needs no core. */
+  maxNoCoreInsertDiameterMm: number | null;
+  /** variable drawDirectionOrthogonalEpsilonForSlides (deg): how far from square to the pull a feature's axis may be and still be served by a slide (side core). */
+  slideEpsilonDeg: number | null;
+  /** variable drawDirectionOrthogonalEpsilonForLifters (deg): the same for a lifter. */
+  lifterEpsilonDeg: number | null;
+  /** variable cmAutoIncludeManualFlashTrimming: manual flash trimming is included by default for parts with no internal cutouts (compression molding). */
+  autoManualFlashTrimming: boolean | null;
 }
 
 interface PlasticReferenceRows {
@@ -158,6 +177,10 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     const v = vars.get(k);
     if (v == null || v <= 0) { missing.push(`variables: ${k}`); return NaN; }
     return v;
+  };
+  const optionalPositive = (k: string): number | null => {
+    const v = vars.get(k);
+    return v != null && v > 0 ? v : null;
   };
   const table = (k: string) => {
     const t = rows.lookups[k];
@@ -282,6 +305,12 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       toolLifeShotsByType,
       defaultToolLifeShots,
       toolroomRatesUsa,
+      featureRules: {
+        maxNoCoreInsertDiameterMm: optionalPositive('maxNoCoreInsertDiameter'),
+        slideEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForSlides'),
+        lifterEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForLifters'),
+        autoManualFlashTrimming: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(text.get('cmAutoIncludeManualFlashTrimming')?.trim().toLowerCase()),
+      },
     },
     missing: [],
   };

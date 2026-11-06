@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from sheet_metal.feature_extractor import SheetMetalFeatureExtractor
 from shared.draft_angle_geometry import analyze_draft_angles
+from injection_molding.recognition.core import recognize_core
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,11 @@ class InjectionMoldedFeatureExtractor:
     # not functional holes or bosses.
     FILLET_MAX_RADIUS_MM = 2.0
 
+    # Draft thresholds of this domain (the same two numbers the legacy draft analysis passes): a wall under 0.3 deg is undrafted, over 5 deg is
+    # overdrafted. Passed to the recognition core, which holds no thresholds of its own; the backend will send the staged reference values.
+    UNDRAFTED_DEG = 0.3
+    MAX_DRAFT_DEG = 5.0
+
     def extract(
         self,
         shape: Any,
@@ -59,6 +65,7 @@ class InjectionMoldedFeatureExtractor:
         pocket_count: int = 0,
         face_map: Optional[List[Dict]] = None,
         face_map_tri_total: int = 0,
+        pull_direction_override: Optional[Tuple[float, float, float]] = None,
     ) -> Dict[str, Any]:
         """
         raw_cylinders_full: pre-computed 9+-tuple cylinder list from _detect_holes_real
@@ -131,6 +138,10 @@ class InjectionMoldedFeatureExtractor:
             all_draft_faces_hm = im_dfm_groups.pop("_all_draft_faces", [])
         ribs = self._detect_ribs(wall_planes, modal_thickness)
         rib_data_hm = ribs.pop("rib_data", [])
+
+        # Geometric recognition over every surface (plane, cylinder, cone, free-form): the census, the mold-opening direction and draft/undercut on
+        # all faces. Additive: the legacy fields below are unchanged until the backend moves to it.
+        recognition_core = self._recognition_core(shape, bbox_dims, pull_direction_override, ribs)
 
         logger.info(
             f"[InjectionMolded] wall={modal_thickness:.2f}mm "
@@ -207,8 +218,22 @@ class InjectionMoldedFeatureExtractor:
                 wall_samples=self._collect_wall_samples(wall_planes, modal_thickness),
                 nominal_wall_mm=modal_thickness,
             ),
-            "extraction_version": "im_v5_heatmap",
+            "recognition_core": recognition_core,
+            "extraction_version": "im_v6_recognition_core",
         }
+
+    def _recognition_core(
+        self, shape: Any, bbox_dims: List[float], pull_override: Optional[Tuple[float, float, float]], ribs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """The recognition core's result, or a visible failure: an error here never takes the legacy analysis down with it, but it is never silent."""
+        try:
+            return recognize_core(
+                shape, bbox_dims, self.UNDRAFTED_DEG, self.MAX_DRAFT_DEG, pull_override,
+                legacy_rib_groups=ribs.get("rib_groups", []), legacy_rib_confidence=float(ribs.get("rib_confidence", 0.0)),
+            )
+        except Exception as e:  # noqa: BLE001 - reported in the result and logged, see above
+            logger.exception("[InjectionMolded] recognition core failed")
+            return {"version": "plastic_recognition_core_v1", "status": "failed", "error": f"{type(e).__name__}: {e}"}
 
     # ── Phase 2: wall uniformity ──────────────────────────────────────────────
 

@@ -3,6 +3,7 @@ import { HydroformingReferenceService } from './costing/hydroforming/hydroformin
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
 import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
+import { PlasticCatalogOperationsService, type PlasticFeatureGraph } from './costing/plastic-molding/operation/plastic-catalog-operations.service';
 import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
 import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-operation-resolver';
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
@@ -40,6 +41,7 @@ import type { MachiningCostInput, MachineClassId } from './costing/machining/pro
 import { machiningFeatureCounts } from './costing/machining/operation/machining-feature-counts';
 import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-rule';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
+import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { resolveGdtCallouts } from './costing/shared/physics/gdt-callouts';
 import { detectDrawingCadMismatches, type FactMismatch } from './costing/shared/physics/drawing-cad-consistency';
@@ -58,6 +60,8 @@ import type { OperationLine } from './costing/machining/operation/operation-sequ
 import { splitDeepHoleOccurrences, resolveDeepHoleRules } from './costing/machining/operation/deep-hole-routing';
 import { splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
 import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-routing';
+import { undercutCountFromDraftSummary } from './costing/plastic-molding/draft-signals';
+import { sideActionSignals } from './costing/plastic-molding/side-action-signals';
 import { computeInjectionMoldedCostSummary } from './costing/plastic-molding/process/cost-injection-molding-engine';
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
@@ -258,6 +262,7 @@ export class BOMItemsService {
     private readonly sandCostService: SandCostService,
     private readonly featureToleranceService: FeatureToleranceService,
     private readonly smCatalogOperations: SheetMetalCatalogOperationsService,
+    private readonly plasticCatalogOperations: PlasticCatalogOperationsService,
     private readonly hydroformingReference: HydroformingReferenceService,
   ) { }
 
@@ -2215,12 +2220,14 @@ export class BOMItemsService {
   ): void {
     const noMachine = new Set<string>();
     for (const line of result.processLines) {
-      if (line.rateSource === 'no_db_rate') noMachine.add(line.machineClass.replace(/_/g, ' '));
+      // A line whose gap is explained (physicsGap: e.g. the material cannot be molded, so no press can be sized) is not a missing machine.
+      if (line.rateSource === 'no_db_rate' && !line.physicsGap) noMachine.add(line.machineClass.replace(/_/g, ' '));
     }
     if (noMachine.size > 0) {
       result.warnings.push(
-        `No machine in HR Rates for ${location} for: ${[...noMachine].join(', ')} — these operations carry ` +
-        `no machine cost. Add the machines to memory/ and seed them to cost them.`,
+        `No suitable machine in HR Rates for ${location} for: ${[...noMachine].join(', ')} — these operations carry no machine cost. ` +
+        `Either no machine of that class is on file (add it to memory/ and seed it), or none passes the capability check for this part ` +
+        `(see the machine selection reasons).`,
       );
     }
   }
@@ -3112,7 +3119,7 @@ export class BOMItemsService {
     if (!hasCostModel(family)) {
       return this.unpricedSummary({
         costingInputs, batchSize, family, missingInputs: ['partFamily'],
-        warnings: [`No cost model for part family "${family}": run Refresh Analysis (CAD feature extraction) first.`],
+        warnings: [`No cost model for part family "${family}": press Apply Scenario (it extracts the CAD features first).`],
       });
     }
 
@@ -3120,7 +3127,7 @@ export class BOMItemsService {
     if (item.file3dPath && family !== 'sheet_metal' && !hasMeasuredGeometry(item)) {
       return this.unpricedSummary({
         costingInputs, batchSize, family, missingInputs: ['geometry'],
-        warnings: ['The part has no measured volume or bounding box: run Refresh Analysis (CAD feature extraction) first.'],
+        warnings: ['The part has no measured volume or bounding box: press Apply Scenario (it extracts the CAD features first).'],
       });
     }
 
@@ -3181,7 +3188,7 @@ export class BOMItemsService {
     if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
     const {
       materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
-      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, clampProperties,
+      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, stockForm, matlState, clampProperties,
       // cureTimeMinFromMaterial deliberately NOT destructured here: this
       // primary quote path has no per-item Compression Molding / RIM process
       // dispatch yet (only getRouteComparison() exposes those as alternate
@@ -4196,6 +4203,8 @@ export class BOMItemsService {
         plasticReferenceMissing: activePlasticRef.missing,
         location,
         materialType,
+        materialStockForm: stockForm,
+        materialMatlState: matlState,
         volume: (item.volume ?? 0) as number,
         surfaceArea: (item.surfaceArea ?? 0) as number,
         wallThicknessNominalMm: effectiveWallMm,
@@ -4237,7 +4246,10 @@ export class BOMItemsService {
           bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
           // Phase 2 signals — null when CAD engine is pre-Phase 2 (safe: router applies
           // conservative defaults and records routingWarnings when signals are null)
-          undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
+          // Features that need a side action when the recognised graph can say; else the draft analysis's face count.
+          undercutCount: sideActionSignals(summary.plasticFeatureGraph)?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
+          slideBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideBundles ?? null,
+          slideOrLifterBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideOrLifterBundles ?? null,
           partingComplexity: (summary.partingComplexity as number | null) ?? null,
           // Phase 3: insert candidates from CAD blind-hole OD matching
           insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
@@ -4245,6 +4257,13 @@ export class BOMItemsService {
       };
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);
+      imResult.warnings.push(...await this.plasticCatalogOperations.attach({
+        lines: imResult.processLines,
+        graph: (summary.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,
+        rules: activePlasticRef.reference?.featureRules ?? null,
+        family,
+        accessToken,
+      }));
       imResult.drawingCadConsistency = drawingCadConsistency;
 
       // Clamp / shot sizing against the selected press is computed by the engine
@@ -5730,6 +5749,8 @@ export class BOMItemsService {
       specificHeatMeltJgC: rcSpecificHeatMeltJgC, thermalConductivityMeltWMK: rcThermalConductivityMeltWMK,
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
       materialType: rcMaterialType,
+      stockForm: rcStockForm,
+      matlState: rcMatlState,
       clampProperties: rcClampProperties,
       densityOfMeltKgM3: rcDensityOfMeltKgM3,
     } = await this.resolveMaterialForFamily({
@@ -6151,7 +6172,16 @@ export class BOMItemsService {
               family,
               accessToken,
             })
-          : [];
+          : family === 'plastic_molded'
+            // Injection, structural foam, reaction injection and compression routes: each line resolves against its own process's catalog rows.
+            ? await this.plasticCatalogOperations.attach({
+                lines: route.processLines,
+                graph: ((fg?.summary as any)?.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,
+                rules: (await this.plasticReferenceService.getReference()).reference?.featureRules ?? null,
+                family,
+                accessToken,
+              })
+            : [];
         // Inherited tapping runs on THIS route's primary machine — surface that
         // machine on the Tapping line, not the "class default (tapping)" panel.
         if (mhrRates.tapping.source !== 'mhr_database') {
@@ -6168,7 +6198,8 @@ export class BOMItemsService {
         }
         return warnings;
       }));
-      dto.comparisonWarnings.push(...routeWarnings.flat());
+      // The routes share one feature graph, so a note about it (the types not assessed yet) comes back once per route: say it once.
+      dto.comparisonWarnings.push(...new Set(routeWarnings.flat()));
       this.appendRateWarnings(
         { processLines: dto.routes.flatMap((r) => r.processLines), warnings: dto.comparisonWarnings },
         location,
@@ -6317,7 +6348,9 @@ export class BOMItemsService {
           ? (summary.ribCount as number)
           : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
         bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
-        undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
+        undercutCount: sideActionSignals(summary.plasticFeatureGraph)?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
+        slideBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideBundles ?? null,
+        slideOrLifterBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideOrLifterBundles ?? null,
         partingComplexity: (summary.partingComplexity as number | null) ?? null,
         insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
       };
@@ -6369,7 +6402,7 @@ export class BOMItemsService {
         wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
         plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-        location, materialType: rcMaterialType,
+        location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
         cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
         deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
         materialClamp: rcClampProperties,
@@ -6494,7 +6527,11 @@ export class BOMItemsService {
         // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
         cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
       });
-      const compressionCapable = mhrRates.compressionMolding.source === 'mhr_database';
+      // A route is a real alternative only on a material the dataset flags for that process, and only where a real machine rate resolved.
+      const processCompat = await this.plasticReferenceService.getProcessCompatibility(this.databaseService.getClient(accessToken), grade);
+      const compatGap = (process: MoldingProcess) => processCompatibilityGap(processCompat, process, grade);
+      const compressionGap = compatGap('compression');
+      const compressionCapable = mhrRates.compressionMolding.source === 'mhr_database' && compressionGap == null;
       imRoutes.push({
         routeId: 'im-compression-molding',
         routeLabel: mhrRates.compressionMolding.machineName
@@ -6518,8 +6555,8 @@ export class BOMItemsService {
           cuttingCapable: compressionCapable, pressBrakeCapable: compressionCapable, overallCapable: compressionCapable,
           confidence: compressionCapable ? 'medium' : 'low',
           estimatedTonnage: null,
-          reasonCodes: compressionCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
-          warnings: compressionCapable ? [] : ['No real compression_molding machine rate resolved for this location'],
+          reasonCodes: compressionCapable ? [] : [compressionGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
+          warnings: compressionCapable ? [] : [compressionGap ?? 'No real compression_molding machine rate resolved for this location'],
         },
         warnings: [...compressionResult.warnings, ...comparisonWarnings], ratesSource: RATES_SOURCE_LABEL,
       } satisfies RouteResultDto);
@@ -6532,7 +6569,8 @@ export class BOMItemsService {
         // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
         cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
       });
-      const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database';
+      const rimGap = compatGap('reaction_injection');
+      const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database' && rimGap == null;
       imRoutes.push({
         routeId: 'im-reaction-injection-molding',
         routeLabel: mhrRates.reactionInjectionMolding.machineName
@@ -6560,13 +6598,13 @@ export class BOMItemsService {
           // physics as Injection Molding (buildPartRequirements) — see that
           // function's comment on why RIM reuses the IM clamp formula as-is.
           estimatedTonnage: mhrRates.reactionInjectionMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
-          reasonCodes: rimCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
+          reasonCodes: rimCapable ? [] : [rimGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
           // Real reason from selectMachine() — distinguishes "no machine of
           // this class exists" from "real machines exist but none fit this
           // part's clamp/footprint requirement", now that RIM is capability-
           // gated instead of always-generic.
           warnings: rimCapable ? [] : [
-            mhrRates.reactionInjectionMolding.selection?.balanced?.reasons?.[0]
+            rimGap ?? mhrRates.reactionInjectionMolding.selection?.balanced?.reasons?.[0]
               ?? 'No real reaction_injection_molding machine rate resolved for this location',
           ],
         },
@@ -6578,7 +6616,7 @@ export class BOMItemsService {
         wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
         plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-        location, materialType: rcMaterialType,
+        location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
         cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
         mhrRate: mhrRates.structuralFoamMolding, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
         machineClampTonnes: sfmCandidate?.capability?.maxTonnage ?? null,
@@ -6594,7 +6632,8 @@ export class BOMItemsService {
       };
       const structuralFoamCost = computeInjectionMoldedCostSummary(structuralFoamInput);
       structuralFoamCost.warnings.push(...comparisonWarnings);
-      const structuralFoamCapable = mhrRates.structuralFoamMolding.source === 'mhr_database';
+      const foamGap = compatGap('injection_or_foam');
+      const structuralFoamCapable = mhrRates.structuralFoamMolding.source === 'mhr_database' && foamGap == null;
       imRoutes.push({
         routeId: 'im-structural-foam-molding',
         routeLabel: mhrRates.structuralFoamMolding.machineName
@@ -6623,9 +6662,9 @@ export class BOMItemsService {
           // injectionMoldingRequirement() physics as Injection Molding
           // (buildPartRequirements) — see that function's comment.
           estimatedTonnage: mhrRates.structuralFoamMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
-          reasonCodes: structuralFoamCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
+          reasonCodes: structuralFoamCapable ? [] : [foamGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
           warnings: structuralFoamCapable ? [] : [
-            mhrRates.structuralFoamMolding.selection?.balanced?.reasons?.[0]
+            foamGap ?? mhrRates.structuralFoamMolding.selection?.balanced?.reasons?.[0]
               ?? 'No real structural_foam_molding machine rate resolved for this location',
           ],
         },

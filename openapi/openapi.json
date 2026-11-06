@@ -39,8 +39,59 @@
         "properties": {},
         "type": "object"
       },
+      "ApplyCustomRouteStepDto": {
+        "properties": {},
+        "type": "object"
+      },
       "ApplyRouteDto": {
         "properties": {},
+        "type": "object"
+      },
+      "ApplyScenarioDto": {
+        "properties": {
+          "annualVolume": {
+            "description": "Written to the item before the batch size is resolved from it.",
+            "type": "number"
+          },
+          "batchSize": {
+            "description": "A number fixes the batch size; null returns it to the one derived from the annual volume; omitted leaves it as it is.",
+            "nullable": true,
+            "type": "object"
+          },
+          "expectedRevision": {
+            "description": "The revision of the applied scenario the caller read. When another apply has moved it since, the request is refused (409 scenario_revision_conflict). Omitted: not checked.",
+            "type": "number"
+          },
+          "location": {
+            "description": "The Digital Factory. Required: an apply prices and persists against it.",
+            "type": "string"
+          },
+          "machineOverrides": {
+            "description": "Machines picked in the Workflow Builder, saved after the route is written.",
+            "items": {
+              "$ref": "#/components/schemas/ScenarioMachineOverrideDto"
+            },
+            "type": "array"
+          },
+          "materialGrade": {
+            "description": "The material grade to cost. Its Raw Material cost record is made (or kept when still right) from the engine's results.",
+            "type": "string"
+          },
+          "productionLifeYears": {
+            "type": "number"
+          },
+          "route": {
+            "$ref": "#/components/schemas/ScenarioRouteDto"
+          },
+          "scenarioPatch": {
+            "description": "Other scenario keys to merge in one step (processRouting, dieCastingProcess, currency and ask price...). appliedScenario is reserved.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "location",
+          "route"
+        ],
         "type": "object"
       },
       "AutoFillResponseDto": {
@@ -7750,6 +7801,48 @@
         ],
         "type": "object"
       },
+      "ScenarioMachineOverrideDto": {
+        "properties": {
+          "mhrRecordId": {
+            "description": "The machine to force for that process line; null clears the override",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ScenarioRouteDto": {
+        "properties": {
+          "baseCuttingRouteId": {
+            "description": "mode 'custom': the engine-computed cutting route the Workflow Builder route is based on",
+            "type": "string"
+          },
+          "mode": {
+            "description": "auto: the engine's recommendation. keep: the route already applied (the engine's recommendation when there is none). route: a chosen route (routeId). custom: a Workflow Builder route (baseCuttingRouteId and steps).",
+            "enum": [
+              "auto",
+              "keep",
+              "route",
+              "custom"
+            ],
+            "type": "string"
+          },
+          "routeId": {
+            "description": "mode 'route': the chosen route's id",
+            "type": "string"
+          },
+          "steps": {
+            "description": "mode 'custom': the steps, in order",
+            "items": {
+              "$ref": "#/components/schemas/ApplyCustomRouteStepDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "type": "object"
+      },
       "SelectedBomDto": {
         "properties": {
           "id": {
@@ -7843,6 +7936,30 @@
         },
         "required": [
           "rate",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "SetPullDirectionDto": {
+        "properties": {
+          "axis": {
+            "description": "The axis along which the mold opens. To return to the automatic choice, remove the pull direction.",
+            "enum": [
+              "x",
+              "y",
+              "z"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why the engineer overrides the automatic choice. Required, and kept in the audit trail.",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "axis",
           "reason"
         ],
         "type": "object"
@@ -13048,6 +13165,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/analysis-runs": {
+      "post": {
+        "operationId": "BOMItemsController_runAnalysis_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What ran, and the analysis status after it"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Make the item's analysis current: run what analysis-status says is missing (CAD features, drawing, casting analysis) and nothing else",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/analysis-status": {
       "get": {
         "operationId": "BOMItemsController_getAnalysisStatus_v1",
@@ -13360,6 +13506,35 @@
           }
         ],
         "summary": "Deterministic cost breakdown — material + process lines, no LLM",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/cost-table": {
+      "get": {
+        "operationId": "BOMItemsController_getCostTable_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cost table; a column the cost model has no data for is declared modelled: false with the reason"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's applied cost as a table: cost objects (part, material, process groups, processes, logistics, procured parts, tooling) by column, in USD",
         "tags": [
           "BOM Items"
         ]
@@ -14187,6 +14362,99 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/pull-direction": {
+      "delete": {
+        "operationId": "BomItemPullDirectionController_clear_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return the part to the automatic pull direction and analyse it again. Audited.",
+        "tags": [
+          "Plastic molding"
+        ]
+      },
+      "get": {
+        "operationId": "BomItemPullDirectionController_get_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's pull direction: the engineer's axis with the reason, who and when, or none (the engine chooses).",
+        "tags": [
+          "Plastic molding"
+        ]
+      },
+      "put": {
+        "operationId": "BomItemPullDirectionController_set_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPullDirectionDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fix the pull axis of the part (with the reason) and analyse it again along it. Audited.",
+        "tags": [
+          "Plastic molding"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/reanalyze": {
       "post": {
         "operationId": "BOMItemsController_reanalyze_v1",
@@ -14522,6 +14790,49 @@
         "summary": "Set one plant variable for this part (with the reason). The cost is recalculated with it. Audited.",
         "tags": [
           "Sand casting"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/scenario-applications": {
+      "post": {
+        "description": "One apply at a time per item, against the revision the caller read (409 scenario_revision_conflict / scenario_apply_in_progress). The outcome is stored in scenario_overrides.appliedScenario: revision (successful applies), status applying | applied | failed, the reason when failed. Not one database transaction: a failure keeps the earlier writes and says so; applying again converges.",
+        "operationId": "BOMItemsController_applyScenario_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyScenarioDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The applied scenario state, what ran, and what was written"
+          },
+          "409": {
+            "description": "analysis_not_ready, scenario_revision_conflict or scenario_apply_in_progress"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Apply a scenario as one operation: make the analysis current, write the scenario, the material cost record and the route, and store the outcome",
+        "tags": [
+          "BOM Items"
         ]
       }
     },

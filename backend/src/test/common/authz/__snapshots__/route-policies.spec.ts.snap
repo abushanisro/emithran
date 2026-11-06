@@ -8,6 +8,7 @@ org:member      DELETE /api/v1/bom-items/:bomItemId/process-specifications  Proc
 org:member      DELETE /api/v1/bom-items/:id  BOMItemsController.remove
 org:member      DELETE /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.clear
 org:admin       DELETE /api/v1/bom-items/:id/force  BOMItemsController.forceRemove
+org:member      DELETE /api/v1/bom-items/:id/pull-direction  BomItemPullDirectionController.clear
 org:member      DELETE /api/v1/bom-items/:id/sand-variable-overrides/:variable  SandVariableOverridesController.clear
 org:member      DELETE /api/v1/boms/:id  BOMsController.remove
 org:admin       DELETE /api/v1/calculators/:id  CalculatorsController.remove
@@ -79,6 +80,7 @@ org:viewer      GET /api/v1/bom-items/:id/cad-analysis  BOMItemsController.getBO
 org:viewer      GET /api/v1/bom-items/:id/cad-analysis/history  BOMItemsController.getBOMItemAnalysisHistory
 org:viewer      GET /api/v1/bom-items/:id/candidate-routes  BOMItemsController.getCandidateRoutes
 org:viewer      GET /api/v1/bom-items/:id/cost-summary  BOMItemsController.getCostSummary
+org:viewer      GET /api/v1/bom-items/:id/cost-table  BOMItemsController.getCostTable
 org:viewer      GET /api/v1/bom-items/:id/dependencies  BOMItemsController.checkDeleteDependencies
 org:viewer      GET /api/v1/bom-items/:id/dfm-scores  BOMItemsController.getDFMScores
 org:viewer      GET /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.get
@@ -94,6 +96,7 @@ org:viewer      GET /api/v1/bom-items/:id/material-intelligence  BOMItemsControl
 org:viewer      GET /api/v1/bom-items/:id/material-strengths  BOMItemsController.getMaterialStrengths
 org:viewer      GET /api/v1/bom-items/:id/nre  BOMItemsController.getNre
 org:viewer      GET /api/v1/bom-items/:id/pmi-records  BOMItemsController.getPmiRecords
+org:viewer      GET /api/v1/bom-items/:id/pull-direction  BomItemPullDirectionController.get
 org:viewer      GET /api/v1/bom-items/:id/route-comparison  BOMItemsController.getRouteComparison
 org:viewer      GET /api/v1/bom-items/:id/sand-dfm  BOMItemsController.getSandDfm
 org:viewer      GET /api/v1/bom-items/:id/sand-snapshots  SandSnapshotsController.list
@@ -289,6 +292,7 @@ org:member      POST /api/v1/balloon-diagrams  ProjectReportsController.createBa
 org:member      POST /api/v1/balloon-diagrams/:id/annotations  ProjectReportsController.addAnnotation
 org:member      POST /api/v1/benchmark-sessions  BenchmarkSessionsController.create
 org:member      POST /api/v1/bom-items  BOMItemsController.create
+org:member      POST /api/v1/bom-items/:id/analysis-runs  BOMItemsController.runAnalysis
 org:member      POST /api/v1/bom-items/:id/cad-analyses  BOMItemsController.analyzeBOMItemCAD
 org:member      POST /api/v1/bom-items/:id/calculator-inputs  BOMItemsController.resolveCalculatorInputs
 org:member      POST /api/v1/bom-items/:id/cost-override  BOMItemsController.setCostOverride
@@ -301,6 +305,7 @@ org:member      POST /api/v1/bom-items/:id/pmi-records/review  BOMItemsControlle
 org:member      POST /api/v1/bom-items/:id/reanalyze  BOMItemsController.reanalyze
 org:member      POST /api/v1/bom-items/:id/route-applications  BOMItemsController.applyRoute
 org:member      POST /api/v1/bom-items/:id/sand-snapshots  SandSnapshotsController.create
+org:member      POST /api/v1/bom-items/:id/scenario-applications  BOMItemsController.applyScenario
 org:member      POST /api/v1/bom-items/:id/step-conversions  BOMItemsController.convertStepFile
 org:member      POST /api/v1/bom-items/autofill-analyses  BOMItemsController.analyzeForAutoFill
 org:member      POST /api/v1/bom-items/autofill-analysis-jobs  BOMItemsController.startAnalyzeForAutoFill
@@ -417,6 +422,7 @@ org:member      PUT /api/v1/bom-items/:bomItemId/process-specifications  Process
 org:member      PUT /api/v1/bom-items/:id  BOMItemsController.update
 org:member      PUT /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.set
 org:member      PUT /api/v1/bom-items/:id/feature-tolerances/:featureKey  BOMItemsController.setFeatureTolerances
+org:member      PUT /api/v1/bom-items/:id/pull-direction  BomItemPullDirectionController.set
 org:member      PUT /api/v1/bom-items/:id/sand-variable-overrides/:variable  SandVariableOverridesController.set
 org:member      PUT /api/v1/bom-items/:id/tolerance-policy  BOMItemsController.setTolerancePolicy
 org:member      PUT /api/v1/boms/:id  BOMsController.update

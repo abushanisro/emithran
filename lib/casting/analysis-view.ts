@@ -53,8 +53,8 @@ export function failureText(code: string | null): string {
 /** The state of a part's casting analysis from its list (newest first). */
 export function analysisState(list: readonly CastingAnalysisSummary[] | undefined, now: number): AnalysisState {
   const newest = list?.[0];
-  // Not asked for here: Refresh Analysis starts it with the CAD features, so there is one place to run an analysis.
-  if (!newest) return { kind: 'none', label: 'Not requested', detail: 'Run Refresh Analysis to start it.', requestLabel: null };
+  // Not asked for here: Apply Scenario starts it with the CAD features, so there is one place to run an analysis.
+  if (!newest) return { kind: 'none', label: 'Not requested', detail: 'Apply Scenario starts it.', requestLabel: null };
   if (newest.status === 'queued') {
     const waited = now - new Date(newest.createdAt).getTime();
     return {

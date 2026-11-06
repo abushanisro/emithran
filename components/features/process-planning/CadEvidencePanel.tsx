@@ -30,9 +30,6 @@ interface CadEvidencePanelProps {
   sheetThickness?: number;
   /** Real setup-axis directions, when the engine proved any. */
   axes?: Array<[number, number, number]>;
-  /** Re-run the CAD analysis of this part (the page's Refresh Analysis). */
-  onReanalyse: () => void;
-  reanalysing: boolean;
   onClose: () => void;
 }
 
@@ -42,7 +39,7 @@ interface CadEvidencePanelProps {
  * Read-only; face ids are only ever indices into this part's own face_map.
  */
 export function CadEvidencePanel({
-  evidence, fileUrl, modelError, fileName, fileType, faceMap, sheetThickness, axes, onReanalyse, reanalysing, onClose,
+  evidence, fileUrl, modelError, fileName, fileType, faceMap, sheetThickness, axes, onClose,
 }: CadEvidencePanelProps) {
   const { highlight } = evidence;
   const faceIds = useMemo(() => highlight?.node.occurrences.flatMap((o) => o.face_ids) ?? [], [highlight]);
@@ -72,12 +69,9 @@ export function CadEvidencePanel({
       {!highlight ? (
         <div className="flex flex-col items-start gap-3 p-4 text-sm">
           <p>
-            This part was analysed before the CAD engine recorded the faces behind this value. Re-analyse the part to
-            record them, then click the eye again.
+            This part was analysed before the CAD engine recorded the faces behind this value. Apply Scenario analyses it
+            again and records them; then click the eye again.
           </p>
-          <Button type="button" size="sm" onClick={onReanalyse} disabled={reanalysing}>
-            {reanalysing ? 'Re-analysing…' : 'Re-analyse part'}
-          </Button>
         </div>
       ) : !fileUrl ? (
         modelError ? (

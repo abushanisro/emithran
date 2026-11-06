@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../../../common/database/database.service';
-import { readAllRows, type RowPage } from '../../../../../common/database/read-all-rows';
 import { RateResolutionService } from '../../../services/rate-resolution.service';
 import { SheetMetalLookupService } from '../lookup/sheet-metal-lookup.service';
+import { catalogRowsByProcess } from '../../shared/catalog-rows-by-process';
 import { cachedBatch, cachedRead } from '../../shared/core/request-cache';
 import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
@@ -66,7 +66,7 @@ export class SheetMetalCatalogOperationsService {
     if (canonicalIds.length === 0) return [];
 
     const [catalog, kinds, variables] = await Promise.all([
-      this.catalogRowsByProcess(client, canonicalIds),
+      catalogRowsByProcess(client, canonicalIds),
       this.loadKinds(),
       this.smLookup.getNumericVariables(['minPunchingThicknessFactor', 'turretMaxPercentNibbledPeriemter']),
     ]);
@@ -99,35 +99,6 @@ export class SheetMetalCatalogOperationsService {
       if (operations.length > 0) line.catalogOperations = operations;
     }
     return [];
-  }
-
-  /**
-   * The catalog operation strings of each process, read once per process per request (a route comparison
-   * attaches every route and the routes share most processes). Organization-scoped under RLS, so it stays
-   * in the request-scoped cache, never in a cross-request one.
-   */
-  private async catalogRowsByProcess(
-    client: ReturnType<DatabaseService['getClient']>,
-    canonicalIds: readonly string[],
-  ): Promise<Map<string, string[]> | { error: string }> {
-    try {
-      const rows = await cachedBatch<string[]>('sm-catalog-operations', canonicalIds, async (missing) => {
-        const res = await readAllRows<{ canonical_process_id: string; raw_compound_string: string }>((from, to) =>
-          client.from('process_taxonomy_operations')
-            .select('canonical_process_id, raw_compound_string')
-            .in('canonical_process_id', missing)
-            .order('id')
-            .range(from, to) as unknown as PromiseLike<RowPage<{ canonical_process_id: string; raw_compound_string: string }>>);
-        if (res.error) throw new Error(res.error.message);
-        // a process with no catalog rows is a real answer too: remember it as empty, not as unasked
-        const byProcess = new Map<string, string[]>(missing.map((id) => [id, []]));
-        for (const r of res.data) byProcess.get(r.canonical_process_id)?.push(r.raw_compound_string);
-        return byProcess;
-      });
-      return rows;
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : String(e) };
-    }
   }
 
   /**

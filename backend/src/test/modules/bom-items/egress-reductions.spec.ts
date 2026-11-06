@@ -2,6 +2,7 @@
 // reuse, the path-only file lookup, clearing a stale thumbnail, and the
 // memoised reference lookups. Mocked-dependency pattern as in
 // bom-items.currency.spec.ts.
+import { type PlasticCatalogOperationsService } from '../../../modules/bom-items/costing/plastic-molding/operation/plastic-catalog-operations.service';
 import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
 import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
 import type { CastingReferenceService } from '../../../modules/bom-items/costing/casting/casting-reference.service';
@@ -31,6 +32,7 @@ function buildService(database: unknown = {}) {
     {} as SandCostService,
     {} as FeatureToleranceService,
     {} as SheetMetalCatalogOperationsService,
+    {} as PlasticCatalogOperationsService,
     {} as HydroformingReferenceService,
   );
 }

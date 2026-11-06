@@ -224,6 +224,8 @@ export class AutoFillService {
     // caller explicitly set one; absent, the real geometric classifier chain
     // runs exactly as it always has.
     familyHint?: string,
+    // The engineer's mold-opening axis (x | y | z) for a plastic part; absent, the engine chooses it.
+    pullDirection?: string,
   ): Promise<AutoFillResponseDto> {
     // 1. The CAD engine is the only source of geometry and features. When it
     // cannot analyse the file there is nothing real to return, so the request
@@ -233,10 +235,10 @@ export class AutoFillService {
     // which the process heuristic below then labelled "Machining" at 0.6
     // confidence, plus a made-up make/buy, item type, cycle time and
     // confidence score, all returned as a normal 200. The upload form filled
-    // itself from that, and Refresh Analysis wrote it over a real analysis.
+    // itself from that, and a re-analysis wrote it over a real analysis.
     let cadResult: any;
     try {
-      cadResult = await this.callCADEngineStateless(fileBuffer, fileName, forceReanalysis, familyHint);
+      cadResult = await this.callCADEngineStateless(fileBuffer, fileName, forceReanalysis, familyHint, pullDirection);
     } catch (e) {
       const reason = (e.response?.data?.detail as string | undefined) || e.message;
       this.logger.warn(`CAD engine could not analyse ${fileName} (${reason})`);
@@ -502,6 +504,8 @@ export class AutoFillService {
           undercutFaceCount:    cadMI?.features?.undercut_face_count ?? 0,
           partingComplexity:    cadMI?.features?.parting_complexity ?? null,
           avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
+          // The recognised features (holes, faces, ribs) the catalog operations are resolved from; null on an older CAD engine.
+          plasticFeatureGraph:  cadMI?.features?.recognition_core?.feature_graph ?? null,
         } : {}),
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
         // (cadMI.features). Detection + highlighting only; process routing and
@@ -1026,6 +1030,7 @@ export class AutoFillService {
     fileName: string,
     forceReanalysis = false,
     familyHint?: string,
+    pullDirection?: string,
   ): Promise<any> {
     const ext = path.extname(fileName).toLowerCase().replace('.', '') || 'step';
     const contentTypeMap: Record<string, string> = {
@@ -1051,6 +1056,10 @@ export class AutoFillService {
     // real geometric classifier chain is what runs by default.
     if (familyHint) {
       form.append('family_hint', familyHint);
+    }
+    // The engineer's pull axis: the engine analyses the part along it instead of choosing one (cad-engine main.py pull_direction).
+    if (pullDirection) {
+      form.append('pull_direction', pullDirection);
     }
 
     const response = await cadEngineHttp.post(

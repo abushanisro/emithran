@@ -39,6 +39,9 @@ export interface InjectionMoldingSignals {
   // Phase 2+ signals — the routing rules for these exist NOW so the tree is
   // complete; extraction feeds them later. null until the CAD engine measures.
   undercutCount: number | null;
+  /** Recognised side-action bundles only a slide can serve, and bundles a lifter or a slide could serve (see side-action-signals.ts). Absent: not recognised. */
+  slideBundleCount?: number | null;
+  slideOrLifterBundleCount?: number | null;
   insertCount: number | null;
   textFeatureCount: number | null;  // molded-in text/logos → pad print/laser mark NOT needed
   assemblyFeatureCount: number | null; // snap fits / weld ribs → welding or assembly

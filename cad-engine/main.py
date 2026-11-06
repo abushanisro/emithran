@@ -16,7 +16,7 @@ import hashlib
 import hmac
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -539,6 +539,7 @@ def analyze_geometry_advanced(
     force_reanalysis: bool = Form(False),
     user_processes: str = Form(""),
     family_hint: str = Form(""),
+    pull_direction: str = Form(""),
     _auth: None = Security(require_api_key),
     _slot: None = Depends(analysis_slot),
 ) -> Dict[str, Any]:
@@ -567,6 +568,8 @@ def analyze_geometry_advanced(
     file_validator: FileValidator = request.app.state.file_validator
 
     logger.info(f"Received advanced analysis request: {file.filename} with strategy: {strategy}")
+
+    pull_axis_vector = _pull_axis_vector(pull_direction)  # refused before any file work when it is not x, y or z
 
     # Parse user_processes JSON if provided
     parsed_processes = []
@@ -617,6 +620,7 @@ def analyze_geometry_advanced(
 
         try:
             response = analyze_part(
+                pull_direction=pull_axis_vector,
                 shape=shape, step_path=step_path, filename=file.filename, file_hash=file_hash,
                 memory_optimizer=memory_optimizer, component_cache=request.app.state.component_cache,
                 face_graph_max_faces=config.face_graph_max_faces, strategy=strategy,
@@ -631,6 +635,17 @@ def analyze_geometry_advanced(
 
     finally:
         cleanup_files(step_path)
+
+
+def _pull_axis_vector(axis: str) -> Optional[Tuple[float, float, float]]:
+    """The mold-opening axis the engineer fixed ('x' | 'y' | 'z'), as a unit vector; None for the automatic choice. Anything else is refused, never guessed."""
+    a = (axis or "").strip().lower()
+    if not a:
+        return None
+    vectors = {"x": (1.0, 0.0, 0.0), "y": (0.0, 1.0, 0.0), "z": (0.0, 0.0, 1.0)}
+    if a not in vectors:
+        raise HTTPException(status_code=422, detail="pull_direction must be x, y or z")
+    return vectors[a]
 
 
 class NestHoleIn(BaseModel):

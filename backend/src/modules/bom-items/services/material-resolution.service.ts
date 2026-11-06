@@ -19,6 +19,8 @@ import { escapeLikePattern, ilikeContains } from '../../../common/db/postgrest-f
 interface MatchedMaterialRow {
   id: string;
   material: string | null; materialGrade: string | null; materialGroup: string | null; materialType: string | null;
+  /** raw_materials.stock_form / matl_state: what the material is supplied as (e.g. Granules, Liquid Resin (SLA)). */
+  stockForm: string | null; matlState: string | null;
   astmStandard: string | null; dinStandard: string | null; enStandard: string | null; jisStandard: string | null;
   hasCost: boolean;
   shape: string | null; locCost: number | null; indiaCost: number | null; densityKgM3: number | null;
@@ -235,7 +237,7 @@ export class MaterialResolutionService {
     //
     // id/material/material_group/*_standard: identity columns the ranker
     // needs to score a candidate (materialCol above is only the COST column).
-    const selectCols = `${materialCol}, id, grade, material_group, material_type, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, name, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, yield_strength_mpa, yield_tensile_strength, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
+    const selectCols = `${materialCol}, id, grade, material_group, material_type, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, name, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, yield_strength_mpa, yield_tensile_strength, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c, stock_form, matl_state` +
       (cureTimeColumnAvailable ? `, cure_time_min` : '') +
       (imColumnsAvailable ? `, im_injection_pressure_max_mpa, im_flow_length_ratio, im_density_of_melt_kg_m3, im_reference_material` : '');
 
@@ -379,6 +381,8 @@ export class MaterialResolutionService {
         materialGrade: (row.name as string | null) ?? null,
         materialGroup: (row.material_group as string | null) ?? null,
         materialType: (row.material_type as string | null) ?? null,
+        stockForm: (row.stock_form as string | null) ?? null,
+        matlState: (row.matl_state as string | null) ?? null,
         astmStandard: (row.astm_standard as string | null) ?? null,
         dinStandard: (row.din_standard as string | null) ?? null,
         enStandard: (row.en_standard as string | null) ?? null,
@@ -532,6 +536,9 @@ export class MaterialResolutionService {
     cureTimeSource: 'db' | 'unavailable' | 'column_not_migrated';
     /** raw_materials.material_type of the matched row (e.g. ABS, Nylon); null when no row matched. */
     materialType: string | null;
+    /** What the matched row is supplied as (raw_materials.stock_form / matl_state); null when not recorded or no row matched. */
+    stockForm: string | null;
+    matlState: string | null;
     /** Reference clamp properties (migration 831); nulls when not on file for this material. */
     clampProperties: MaterialClampProperties;
   }> {
@@ -621,6 +628,8 @@ export class MaterialResolutionService {
               ? 'db'
               : (cureTimeColumnAvailable ? 'unavailable' : 'column_not_migrated'),
             materialType: best.materialType,
+            stockForm: best.stockForm,
+            matlState: best.matlState,
             clampProperties: {
               injectionPressureMaxMpa: best.imInjectionPressureMaxMpa,
               flowLengthRatio: best.imFlowLengthRatio,
@@ -661,6 +670,8 @@ export class MaterialResolutionService {
       cureTimeMinFromMaterial: null,
       cureTimeSource: 'unavailable',
       materialType: null,
+      stockForm: null,
+      matlState: null,
       clampProperties: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null },
     };
   }

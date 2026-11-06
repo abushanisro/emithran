@@ -4,6 +4,7 @@ import { useUser } from '@auth0/nextjs-auth0'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { apiConfig } from '@/lib/api/config'
+import { devAuthBypassEnabled } from '@/lib/auth/dev-bypass'
 import { signOutForInactivity } from '@/lib/auth/session-idle/browser'
 import { isSessionIdleBody } from '@/lib/auth/session-idle/policy'
 import { sessionSource } from '@/lib/auth/session-source'
@@ -72,7 +73,8 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return
-    if (!auth0User) {
+    // Local development bypass: no Auth0 session is needed, the API says who this is (its configured dev account).
+    if (!auth0User && !devAuthBypassEnabled()) {
       setMe({ state: 'failed' })
       appReadiness.resetAuth()
       return
@@ -117,7 +119,7 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextType = {
     user,
-    loading: isLoading || (!!auth0User && me.state === 'loading'),
+    loading: isLoading || ((!!auth0User || devAuthBypassEnabled()) && me.state === 'loading'),
     accessDenied: me.state === 'denied',
     signIn,
     ssoAvailable: sso !== null,

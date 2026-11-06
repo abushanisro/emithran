@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { devAuthBypassEnabled } from '@/lib/auth/dev-bypass';
 import { sessionAccessToken } from '@/lib/server/auth';
 import { forwardRequest, forwardSecretProblem, upstreamUrl } from '@/lib/server/bff/forward';
 import { isAllowedOrigin } from '@/lib/server/bff/origin';
@@ -26,7 +27,9 @@ async function handle(req: NextRequest, ctx: RouteContext<'/api/v1/[...path]'>):
   if (!url) return refuse(400, 'INVALID_PATH', 'Invalid API path');
 
   const token = await sessionAccessToken();
-  if (!token) return refuse(401, 'UNAUTHORIZED', 'Authentication required');
+  // Local development bypass (lib/auth/dev-bypass.ts): without a session the call goes on with no token, and a non-production API that opted in
+  // acts as its dev account. In any other setting a missing session is refused here, as before.
+  if (!token && !devAuthBypassEnabled()) return refuse(401, 'UNAUTHORIZED', 'Authentication required');
 
   try {
     return await forwardRequest(req, url, token);

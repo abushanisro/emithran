@@ -103,6 +103,20 @@ export type InvestmentCastingFeatureType =
   | 'SlideBundle'
   | 'Void';
 
+export type PlasticMoldingFeatureType =
+  | 'ComboVoid'
+  | 'CurvedSurface'
+  | 'CurvedWall'
+  | 'LifterBundle'
+  | 'MultiStepHole'
+  | 'PartingLine'
+  | 'PlanarFace'
+  | 'Rib'
+  | 'SharpEdge'
+  | 'SimpleHole'
+  | 'SlideBundle'
+  | 'Void';
+
 /** Real operation names the reference catalog pairs with each feature type. */
 export const REFERENCE_FEATURE_OPERATIONS: {
   readonly sheet_metal: Readonly<Record<SheetMetalFeatureType, readonly string[]>>;
@@ -110,6 +124,7 @@ export const REFERENCE_FEATURE_OPERATIONS: {
   readonly die_casting: Readonly<Record<DieCastingFeatureType, readonly string[]>>;
   readonly sand_casting: Readonly<Record<SandCastingFeatureType, readonly string[]>>;
   readonly investment_casting: Readonly<Record<InvestmentCastingFeatureType, readonly string[]>>;
+  readonly plastic_molding: Readonly<Record<PlasticMoldingFeatureType, readonly string[]>>;
 } = {
   "sheet_metal": {
     "Blank": [
@@ -1107,12 +1122,70 @@ export const REFERENCE_FEATURE_OPERATIONS: {
       "Soluble Wax Coring:Wax Core",
       "Wax Leach"
     ]
+  },
+  "plastic_molding": {
+    "ComboVoid": [
+      "As Molded",
+      "ComboVoidLifter",
+      "ComboVoidNoCore",
+      "ComboVoidSideCore",
+      "ComboVoidUnscrewMandrel",
+      "No Cost Feature"
+    ],
+    "CurvedSurface": [
+      "As Molded"
+    ],
+    "CurvedWall": [
+      "As Molded"
+    ],
+    "LifterBundle": [
+      "Lifters"
+    ],
+    "MultiStepHole": [
+      "As Molded",
+      "MstepLifter",
+      "MstepNoCore",
+      "MstepSideCore",
+      "MstepUnscrewMandrel",
+      "No Cost Feature"
+    ],
+    "PartingLine": [
+      "Manual Flash Trimming",
+      "No Cost Feature"
+    ],
+    "PlanarFace": [
+      "As Molded"
+    ],
+    "Rib": [
+      "As Molded"
+    ],
+    "SharpEdge": [
+      "As Molded"
+    ],
+    "SimpleHole": [
+      "As Molded",
+      "HoleLifter",
+      "HoleNoCore",
+      "HoleSideCore",
+      "HoleUnscrewMandrel",
+      "No Cost Feature"
+    ],
+    "SlideBundle": [
+      "Slides"
+    ],
+    "Void": [
+      "As Molded",
+      "No Cost Feature",
+      "VoidLifter",
+      "VoidNoCore",
+      "VoidSideCore"
+    ]
   }
 } as const;
 
 /** True when `operation` is a real catalog pairing for `featureType` in `domain`. */
 export function isReferenceOperation(
-  domain: 'sheet_metal' | 'machining' | 'die_casting' | 'sand_casting' | 'investment_casting',
+  domain: 'sheet_metal' | 'machining' | 'die_casting' | 'sand_casting' | 'investment_casting' | 'plastic_molding',
   featureType: string,
   operation: string,
 ): boolean {
