@@ -25,7 +25,7 @@ export function CostTablePanel({ itemId, refreshKey, display }: { itemId: string
         <Table2 className="h-3 w-3" /> Open Excel view
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="h-[94vh] w-[98vw] max-w-[98vw] gap-0 p-0 sm:max-w-[98vw]">
+        <DialogContent className="flex h-[94vh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[98vw]">
           <DialogTitle className="sr-only">Part details</DialogTitle>
           <DialogDescription className="sr-only">The part's applied cost as a sheet.</DialogDescription>
           {open && <PartDetailsSheet itemId={itemId} refreshKey={refreshKey} display={display} inDialog />}
