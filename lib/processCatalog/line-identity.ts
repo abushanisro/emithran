@@ -45,3 +45,18 @@ export function resolveLineIdentity(input: {
 export function keepsSavedOperation(savedMachineClass: string | null | undefined, selectedMachineClass: string): boolean {
   return !!savedMachineClass && savedMachineClass === selectedMachineClass;
 }
+
+/**
+ * The line a new or changed line would duplicate: another line of the part on the same machine class carrying the same operation. One operation is one
+ * line; the way to cost it again is to edit that line. Matching ignores case and surrounding space; the line being edited is not its own duplicate.
+ */
+export function findDuplicateOperation(
+  existing: ReadonlyArray<{ id?: string | null; opNbr?: number | null; machineClass?: string | null; operation?: string | null }>,
+  candidate: { id?: string | null; machineClass: string; operation: string },
+): { opNbr: number | null } | null {
+  const norm = (v: string | null | undefined) => (v ?? '').trim().toLowerCase();
+  if (!norm(candidate.machineClass) || !norm(candidate.operation)) return null;
+  const hit = existing.find((p) => p.id !== candidate.id && norm(p.machineClass) === norm(candidate.machineClass) && norm(p.operation) === norm(candidate.operation));
+  return hit ? { opNbr: hit.opNbr ?? null } : null;
+}
+

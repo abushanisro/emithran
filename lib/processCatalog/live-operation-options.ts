@@ -171,3 +171,28 @@ export function effectiveOperation(input: {
   if (input.savedApplies && input.savedOperation && offered(input.savedOperation)) return input.savedOperation;
   return '';
 }
+
+/**
+ * The Operation choices the dialog offers, in every state of the part's cost: still loading (no lines), loaded and empty, or populated; for a new line or a
+ * saved one. Always the part's own operations first (when its cost is live), then the whole catalog of the category, then the saved operation when it
+ * is not among them. The catalog operations share the first of: the live line of the category, the saved line being edited, the category's own
+ * operation (its process-catalog name), so a new line is offered them too.
+ */
+export function operationChoices(input: {
+  lines: readonly LiveOperationLine[] | undefined;
+  machineClasses: ReadonlySet<string>;
+  featureTypeByOperation: ReadonlyMap<string, string>;
+  catalogOperations: readonly CatalogOperation[];
+  /** The saved line's operation as the live lines name it ('' for a new line). */
+  savedOperation: string;
+  /** The saved operation still applies (its machine class is unchanged). */
+  savedApplies: boolean;
+  /** The category's own operation name in the process catalog, for a line with nothing else to attach to. */
+  categoryOperation: string | null;
+}): LiveOperationOption[] {
+  const base = liveOperationOptions(input.lines ?? [], input.machineClasses, input.featureTypeByOperation, input.catalogOperations, input.savedOperation || input.categoryOperation);
+  const saved = input.savedOperation;
+  if (!input.savedApplies || !saved || base.some((o) => o.value === saved)) return base;
+  return [...base, { value: saved, label: `${saved} (saved on this line)`, detail: null, cycleTimeMin: 0, lineProcess: saved }];
+}
+

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { effectiveOperation, liveOperationOptions, resolveSavedOperation } from '@/lib/processCatalog/live-operation-options';
+import { findDuplicateOperation } from '@/lib/processCatalog/line-identity';
+import { effectiveOperation, liveOperationOptions, operationChoices, resolveSavedOperation } from '@/lib/processCatalog/live-operation-options';
 
 // Line shapes as the cost engine emits them: the inspection engine names its
 // line "Inspection" and carries a per-feature breakdown; the machining engine
@@ -187,5 +188,88 @@ describe('liveOperationOptions with the category catalog', () => {
   it('a live line of the category still wins over the saved line as the one the operations share', () => {
     const opts = liveOperationOptions([injection], new Set(['injection_molding']), new Map(), catalog, 'Something Else');
     expect(opts.find((o) => o.value === 'Slides // Undercut')!.lineProcess).toBe('Injection Molding');
+  });
+});
+
+describe('operationChoices: the Operation list in every state of the part\'s cost', () => {
+  const classes = new Set(['injection_molding']);
+  const catalog = [
+    { operationCategory: 'As Molded', featureType: 'Rib' },
+    { operationCategory: 'HoleSideCore', featureType: 'SimpleHole' },
+    { operationCategory: 'Slides', featureType: 'Undercut' },
+  ];
+  const wholeCatalog = ['As Molded // Rib', 'HoleSideCore // SimpleHole', 'Slides // Undercut'];
+  const live = [{
+    process: 'Injection Molding', machineClass: 'injection_molding', cycleTimeMin: 0.16,
+    catalogOperations: [{ operations: ['As Molded'], featureType: 'Rib', count: 4, status: 'ok' }],
+  }];
+  const choose = (over: Partial<Parameters<typeof operationChoices>[0]>) => operationChoices({
+    lines: live, machineClasses: classes, featureTypeByOperation: new Map(), catalogOperations: catalog,
+    savedOperation: '', savedApplies: false, categoryOperation: 'Injection Molding', ...over,
+  });
+  const values = (o: ReturnType<typeof choose>) => o.map((x) => x.value);
+
+  describe.each([
+    ['loading (no cost lines yet)', undefined],
+    ['loaded and empty', []],
+    ['populated', live],
+  ] as const)('%s', (_state, lines) => {
+    it('a NEW line is offered the whole catalog of the category', () => {
+      expect(wholeCatalog.every((v) => values(choose({ lines })).includes(v))).toBe(true);
+    });
+
+    it('a SAVED line is offered the whole catalog and keeps its saved operation visible and selectable', () => {
+      const opts = choose({ lines, savedOperation: 'Injection Molding', savedApplies: true });
+      expect(wholeCatalog.every((v) => values(opts).includes(v))).toBe(true);
+      expect(opts.find((o) => o.value === 'Injection Molding')).toBeDefined();
+    });
+
+    it('lists nothing twice', () => {
+      const v = values(choose({ lines, savedOperation: 'Injection Molding', savedApplies: true }));
+      expect(new Set(v).size).toBe(v.length);
+    });
+
+    it('every catalog operation is attached to a line of the part (the live one, else the saved one, else the category\'s own operation)', () => {
+      const attached = choose({ lines }).filter((o) => o.notOnPart || wholeCatalog.includes(o.value));
+      expect(attached.every((o) => o.lineProcess === 'Injection Molding')).toBe(true);
+    });
+  });
+
+  it('the operations this part needs come first, with their counts, only when its cost is live', () => {
+    expect(values(choose({ lines: live }))[0]).toBe('As Molded // Rib');
+    expect(choose({ lines: live })[0]!.label).toBe('As Molded // Rib [4]');
+    expect(choose({ lines: [] }).every((o) => o.notOnPart)).toBe(true);
+  });
+
+  it('a saved operation that no longer applies (the machine class changed) is not offered as saved', () => {
+    expect(values(choose({ lines: [], savedOperation: 'Old Line', savedApplies: false }))).not.toContain('Old Line');
+  });
+
+  it('a category with no catalog operations and no live line offers nothing, as before (the list is not forced)', () => {
+    expect(choose({ lines: [], catalogOperations: [] })).toEqual([]);
+  });
+});
+
+describe('findDuplicateOperation: one operation is one line', () => {
+  const existing = [
+    { id: 'a', opNbr: 10, machineClass: 'injection_molding', operation: 'Injection Molding' },
+    { id: 'b', opNbr: 20, machineClass: 'deburring', operation: 'Deburring' },
+  ];
+
+  it('a new line with the operation of an existing line of the same machine class is a duplicate, and says which', () => {
+    expect(findDuplicateOperation(existing, { machineClass: 'injection_molding', operation: ' injection molding ' })).toEqual({ opNbr: 10 });
+  });
+
+  it('another operation, or the same operation on another machine class, is not', () => {
+    expect(findDuplicateOperation(existing, { machineClass: 'injection_molding', operation: 'HoleSideCore // SimpleHole' })).toBeNull();
+    expect(findDuplicateOperation(existing, { machineClass: 'structural_foam_molding', operation: 'Injection Molding' })).toBeNull();
+  });
+
+  it('the line being edited is not its own duplicate', () => {
+    expect(findDuplicateOperation(existing, { id: 'a', machineClass: 'injection_molding', operation: 'Injection Molding' })).toBeNull();
+  });
+
+  it('a line with no machine class or no operation cannot be judged', () => {
+    expect(findDuplicateOperation(existing, { machineClass: '', operation: 'Injection Molding' })).toBeNull();
   });
 });
