@@ -92,6 +92,8 @@ test-results/
 # Proprietary costing reference data (machine and labour rates, material prices). Kept locally for the
 # tests (the generators that used it were retired); never committed.
 /memory/
+# a symlink or file named memory (a worktree's link to the reference data) is not ignored by the line above: `git add -A` committed one (#237)
+/memory
 
 # Scratch output of casting-worker/check.sh
 .cache/
