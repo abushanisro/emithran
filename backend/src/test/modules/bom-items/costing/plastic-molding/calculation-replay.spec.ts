@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { PLASTIC_ENGINE_BUILD } from '../../../../../modules/bom-items/costing/plastic-molding/engine-build.generated';
 import { canonicalReferenceRows, resolvePlasticReference } from '../../../../../modules/bom-items/costing/plastic-molding/plastic-reference';
 import { replayPlasticLine } from '../../../../../modules/bom-items/costing/plastic-molding/calculation-replay';
 import type { CalculationSnapshot } from '../../../../../modules/bom-items/costing/plastic-molding/calculation-snapshot';
@@ -114,14 +115,16 @@ describe('replaying a saved plastic calculation from what is persisted', () => {
     it('a reproduction names every check it made, in order, and what it stood on', () => {
       const { saved, snapshot } = saveLine(part());
       const r = replayPlasticLine(snapshot, storedRows(), saved);
-      expect(r.audit.map((a) => a.split(':')[0])).toEqual(['inputs', 'engine contract', 'formulas', 'reference rows', 'recomputed', 'compared']);
-      expect(r.audit[3]).toContain('the stored copy (not the live data)');
-      expect(r.audit[3]).toContain(snapshot.referenceData.fingerprint);
-      expect(r.audit[2]).toContain('F-04 v1');
-      expect(r.audit[5]).toMatch(/5 amounts, all equal/);
+      expect(r.audit.map((a) => a.split(':')[0])).toEqual(['inputs', 'engine contract', 'engine build', 'formulas', 'reference rows', 'recomputed', 'compared']);
+      expect(r.audit[4]).toContain('the stored copy (not the live data)');
+      expect(r.audit[4]).toContain(snapshot.referenceData.fingerprint);
+      expect(r.audit[3]).toContain('F-04 v1');
+      expect(r.audit[2]).toContain('identical code');
+      expect(r.audit[6]).toMatch(/5 amounts, all equal/);
       expect(r.evidence).toEqual({
         referenceSource: 'stored', snapshotFingerprint: snapshot.referenceData.fingerprint, storedRowsFingerprint: snapshot.referenceData.fingerprint,
-        fingerprintVerified: true, formulaVersionsMatch: true, engineVersionRecorded: 'emithran-cost-1', engineVersionNow: 'emithran-cost-1', inputsRecorded: true,
+        fingerprintVerified: true, formulaVersionsMatch: true, engineVersionRecorded: 'emithran-cost-1', engineVersionNow: 'emithran-cost-1',
+        engineBuildRecorded: PLASTIC_ENGINE_BUILD.codeHash, engineBuildNow: PLASTIC_ENGINE_BUILD.codeHash, engineBuildMatches: true, inputsRecorded: true,
       });
     });
 
@@ -148,6 +151,39 @@ describe('replaying a saved plastic calculation from what is persisted', () => {
       const liveMoved = resolvePlasticReference({ variables: moved.variables, lookups: moved.lookups, ...(moved.gppsMaterial ? { gppsMaterial: moved.gppsMaterial } : {}) }).reference!;
       const smuggled = { ...snapshot, inputs: { ...snapshot.inputs, plasticReference: liveMoved, plasticReferenceMissing: ['x'] } };
       expect(replayPlasticLine(smuggled as unknown as CalculationSnapshot, storedRows(), saved).reproduced).toBe(true);
+    });
+
+    describe('the engine build: the actual code, not a label', () => {
+      it('a calculation records the hash of the code that made it', () => {
+        const { snapshot } = saveLine(part());
+        expect(snapshot.engineBuild).toEqual({ codeHash: PLASTIC_ENGINE_BUILD.codeHash, files: PLASTIC_ENGINE_BUILD.files });
+        expect(snapshot.engineBuild!.codeHash).toMatch(/^[0-9a-f]{24}$/);
+      });
+
+      it('different code with the same contract version is told apart: the number is reproduced, and the trail says it was reproduced by different code', () => {
+        const { saved, snapshot } = saveLine(part());
+        const r = replayPlasticLine({ ...snapshot, engineBuild: { codeHash: 'f'.repeat(24), files: 40 } }, storedRows(), saved);
+        expect(r.reproduced).toBe(true);
+        expect(r.evidence).toMatchObject({ engineBuildMatches: false, engineBuildRecorded: 'f'.repeat(24), engineBuildNow: PLASTIC_ENGINE_BUILD.codeHash });
+        expect(r.audit.find((a) => a.startsWith('engine build'))).toContain('DIFFERENT code');
+        expect(r.audit[r.audit.length - 1]).toContain('reproduced by different code');
+      });
+
+      it('with different code and a different number, the build difference is named as a possible cause', () => {
+        const { saved, snapshot } = saveLine(part());
+        const r = replayPlasticLine({ ...snapshot, engineBuild: { codeHash: 'f'.repeat(24), files: 40 } }, storedRows(), { ...saved, totalCost: saved.totalCost + 0.05 });
+        expect(r.reproduced).toBe(false);
+        expect(r.reasons[r.reasons.length - 1]).toContain('the engine build differs');
+        expect(r.reasons[0]).toMatch(/^totalCost: saved/);
+      });
+
+      it('a calculation saved before the build was recorded says so, and does not claim the same code', () => {
+        const { saved, snapshot } = saveLine(part());
+        const { engineBuild: _drop, ...older } = snapshot;
+        const r = replayPlasticLine(older as CalculationSnapshot, storedRows(), saved);
+        expect(r.evidence).toMatchObject({ engineBuildRecorded: null, engineBuildMatches: null });
+        expect(r.audit.find((a) => a.startsWith('engine build'))).toContain('not recorded');
+      });
     });
 
     it('the replay module has no way to reach live data: it imports no database, no service and no reference loader (a structural guarantee, not a convention)', () => {

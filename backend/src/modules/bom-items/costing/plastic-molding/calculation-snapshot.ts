@@ -10,8 +10,13 @@ export const CALCULATION_SNAPSHOT_SCHEMA = 'plastic_calc_snapshot_v1';
 export interface CalculationSnapshot {
   schema: typeof CALCULATION_SNAPSHOT_SCHEMA;
   referenceData: { sourceVersion: string; fingerprint: string };
-  /** persisted-process-cost.ts COST_ENGINE_CONTRACT_VERSION at the time. */
+  /** persisted-process-cost.ts COST_ENGINE_CONTRACT_VERSION at the time: a version string someone maintains. */
   engineVersion: string;
+  /**
+   * The identifier of the engine's actual code: a hash of every runtime source file it imports (engine-build.generated.ts). Not maintained by hand, so
+   * two different implementations cannot share it. Absent on a calculation saved before it was recorded.
+   */
+  engineBuild?: { codeHash: string; files: number };
   formulas: Array<{ id: string; version: number; state: ValidationState }>;
   state: ValidationState;
   complete: boolean;
@@ -35,12 +40,14 @@ export function buildCalculationSnapshot(
   validation: QuoteValidation,
   reference: { sourceVersion: string; datasetFingerprint: string },
   engineVersion: string,
+  engineBuild: { codeHash: string; files: number },
   inputs: Record<string, unknown>,
 ): CalculationSnapshot {
   return {
     schema: CALCULATION_SNAPSHOT_SCHEMA,
     referenceData: { sourceVersion: reference.sourceVersion, fingerprint: reference.datasetFingerprint },
     engineVersion,
+    engineBuild: { codeHash: engineBuild.codeHash, files: engineBuild.files },
     formulas: validation.formulas.map((f) => ({ id: f.id, version: f.version, state: f.state })),
     state: validation.state,
     complete: validation.complete,
