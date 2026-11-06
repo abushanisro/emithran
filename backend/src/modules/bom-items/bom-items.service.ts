@@ -41,6 +41,7 @@ import type { MachiningCostInput, MachineClassId } from './costing/machining/pro
 import { machiningFeatureCounts } from './costing/machining/operation/machining-feature-counts';
 import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-rule';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
+import { injectionMoldabilityGap } from '../raw-materials/material-moldability';
 import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { resolveGdtCallouts } from './costing/shared/physics/gdt-callouts';
@@ -6412,6 +6413,16 @@ export class BOMItemsService {
         usdToLocal: rcUsdToLocal,
         realResinInputs: rcRealResinInputs,
       };
+      // What is wrong with the material itself is said once, on the comparison (materialNote), not again on every press tier.
+      const materialNote = injectionMoldabilityGap({
+        grade, stockForm: rcStockForm, matlState: rcMatlState,
+        injectionPressureMaxMpa: rcClampProperties?.injectionPressureMaxMpa ?? null,
+        flowLengthRatio: rcClampProperties?.flowLengthRatio ?? null,
+        meltingTempC: rcRealResinInputs?.meltingTempC ?? null,
+        moldTempC: rcRealResinInputs?.moldTempC ?? null,
+        densityOfMeltKgM3: rcRealResinInputs?.densityOfMeltKgM3 ?? null,
+        cureTimeMin: null,
+      });
       // Each tier offers the press with the lowest cost per part among its
       // capable real presses, costed by the engine itself: no utilization sweet
       // spot or score weights (the mold is the same whichever press runs it). A
@@ -6452,7 +6463,10 @@ export class BOMItemsService {
       const imRoutes: RouteResultDto[] = realTiers.map(({ tier, ev, cost }) => {
         const cand = ev.candidate;
         cost.warnings.push(...comparisonWarnings);
-        if (!ev.capable) cost.warnings.push(...ev.blockReasons.map((r) => `⚠ ${r}`));
+        // With a material gap, the press-level "not derivable" reasons are that same gap repeated: the note carries it.
+        const repeatsMaterialGap = (r: string) => materialNote != null && /^(Clamp force|Shot size) not derivable/.test(r);
+        const tierReasons = ev.blockReasons.filter((r) => !repeatsMaterialGap(r));
+        if (!ev.capable) cost.warnings.push(...tierReasons.map((r) => `⚠ ${r}`));
 
         const capable = ev.capable;
         const routeLabel = `${tier.tierLabel} — ${cand.machineName}`;
@@ -6480,7 +6494,7 @@ export class BOMItemsService {
             confidence: cand.capabilitySource === 'imported' ? 'high' : 'medium',
             estimatedTonnage: cand.capability.maxTonnage,
             reasonCodes: capable ? [] : ['DIMENSIONS_UNAVAILABLE' as const],
-            warnings: ev.blockReasons,
+            warnings: tierReasons,
           },
           warnings: cost.warnings, ratesSource: cost.ratesSource,
           sustainability: cost.sustainability ? {
@@ -6697,7 +6711,7 @@ export class BOMItemsService {
         materialCost: medRoute?.materialCost ?? 0,
         materialGrade: grade ?? '', grossWeightKg: imGrossKg, materialCostPerKg, materialSource,
         currency: locInfo.code, currencySymbol: locInfo.symbol,
-        routes: imRoutes, comparisonWarnings,
+        routes: imRoutes, comparisonWarnings, materialNote,
         drawingCadConsistency,
       });
     }

@@ -4151,6 +4151,12 @@ function RouteSelectionDialog({
           </p>
         </DialogHeader>
 
+        {isIM && comparison.data?.materialNote && (
+          <div role="alert" className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs leading-snug text-amber-700 dark:text-amber-400">
+            <span className="font-medium">Material: </span>{comparison.data.materialNote.reason}
+          </div>
+        )}
+
         {isSheetMetal ? (
           <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(300px,380px)_minmax(0,1fr)_minmax(250px,300px)] divide-y md:divide-y-0 md:divide-x divide-border/60">
             <RouteCompareList
