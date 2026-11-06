@@ -20,6 +20,7 @@
 // self-de-gate, so gate_trimming is not routed for those gate types.
 
 import { buildCalculationSnapshot } from '../calculation-snapshot';
+import { PLASTIC_ENGINE_BUILD } from '../engine-build.generated';
 import { buildQuoteValidation } from '../quote-validation';
 import { COST_ENGINE_CONTRACT_VERSION } from '../../shared/core/persisted-process-cost';
 import { RATES_SOURCE_LABEL } from '../../shared/core/default-rates.constants';
@@ -676,7 +677,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
     unsupportedFormulas({ tooling: toolingResult != null, routed }),
   );
-  if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, input as unknown as Record<string, unknown>);
+  if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, PLASTIC_ENGINE_BUILD, input as unknown as Record<string, unknown>);
 
   return {
     materialCost,

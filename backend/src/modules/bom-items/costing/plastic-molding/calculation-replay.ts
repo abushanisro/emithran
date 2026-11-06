@@ -11,6 +11,7 @@ import { snapshotDrift } from './calculation-snapshot';
 import { PLASTIC_FORMULAS } from './formula-registry';
 import { canonicalReferenceRows, resolvePlasticReference, restoreReferenceRows, type CanonicalReferenceRows } from './plastic-reference';
 import { computeInjectionMoldedCostSummary, type InjectionMoldingCostInput } from './process/cost-injection-molding-engine';
+import { PLASTIC_ENGINE_BUILD } from './engine-build.generated';
 import { fingerprintRows } from './reference-fingerprint';
 import { COST_ENGINE_CONTRACT_VERSION } from '../shared/core/persisted-process-cost';
 
@@ -28,6 +29,10 @@ export interface ReplayEvidence {
   formulaVersionsMatch: boolean;
   engineVersionRecorded: string;
   engineVersionNow: string;
+  /** The hash of the engine's code the calculation was made with (null when it was not recorded), the one running now, and whether they are the same code. */
+  engineBuildRecorded: string | null;
+  engineBuildNow: string;
+  engineBuildMatches: boolean | null;
   inputsRecorded: boolean;
 }
 
@@ -54,6 +59,9 @@ export function replayPlasticLine(snapshot: CalculationSnapshot, storedRows: Can
     formulaVersionsMatch: false,
     engineVersionRecorded: snapshot.engineVersion,
     engineVersionNow: COST_ENGINE_CONTRACT_VERSION,
+    engineBuildRecorded: snapshot.engineBuild?.codeHash ?? null,
+    engineBuildNow: PLASTIC_ENGINE_BUILD.codeHash,
+    engineBuildMatches: snapshot.engineBuild ? snapshot.engineBuild.codeHash === PLASTIC_ENGINE_BUILD.codeHash : null,
     inputsRecorded: !!snapshot.inputs && Object.keys(snapshot.inputs).length > 0,
   };
   const audit: string[] = [];
@@ -67,6 +75,13 @@ export function replayPlasticLine(snapshot: CalculationSnapshot, storedRows: Can
     return fail(`the engine contract is now ${COST_ENGINE_CONTRACT_VERSION} (calculated with ${snapshot.engineVersion}): the code that made this number is not available to replay`);
   }
   audit.push(`engine contract: ${snapshot.engineVersion}, the recorded one`);
+  // The code itself: the contract version is a label, the build is a hash of the files that run. A different build is disclosed, not hidden, and does
+  // not by itself stop a replay: if the recomputation equals the saved amounts, newer code has reproduced the number, and the trail says so.
+  audit.push(evidence.engineBuildMatches === null
+    ? 'engine build: not recorded with this calculation (it cannot be said whether the same code made it)'
+    : evidence.engineBuildMatches
+      ? `engine build: identical code (${PLASTIC_ENGINE_BUILD.codeHash}, ${PLASTIC_ENGINE_BUILD.files} files)`
+      : `engine build: DIFFERENT code (recorded ${evidence.engineBuildRecorded}, now ${PLASTIC_ENGINE_BUILD.codeHash})`);
 
   // The data is checked below against the stored rows; here only the formulas.
   const formulaDrift = snapshotDrift(snapshot, { referenceFingerprint: snapshot.referenceData.fingerprint, formulaVersions: FORMULA_VERSIONS }).reasons;
@@ -102,6 +117,12 @@ export function replayPlasticLine(snapshot: CalculationSnapshot, storedRows: Can
     if (was == null || now == null || Math.abs(was - now) > EPS) reasons.push(`${k}: saved ${was ?? 'none'}, recomputed ${now ?? 'none'}`);
   }
   audit.push(reasons.length === 0 ? `compared: ${compared} amounts, all equal to the saved ones` : `compared: ${compared} amounts, ${reasons.length} differ`);
+  if (evidence.engineBuildMatches === false) {
+    audit.push(reasons.length === 0
+      ? 'note: reproduced by different code: the number is the same, the code is not'
+      : 'note: the engine code differs from the code that made this number, which may be the cause of the difference');
+    if (reasons.length > 0) reasons.push(`the engine build differs (recorded ${evidence.engineBuildRecorded}, now ${PLASTIC_ENGINE_BUILD.codeHash}): the difference may be the cause`);
+  }
   return { reproduced: reasons.length === 0, reasons, replayed, evidence, audit };
 }
 
