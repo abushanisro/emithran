@@ -37,6 +37,7 @@ from OCC.Core.BRep import BRep_Tool  # type: ignore
 from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
 from OCC.Core.Standard import Standard_Failure  # type: ignore
 
+from shared.error_reporting import report_failure
 from shared.part_family import ALL_FAMILIES, CASTING_FAMILY_DOMAIN, MILLED, PLASTIC_MOLDED, SHEET_METAL
 
 logger = logging.getLogger(__name__)
@@ -757,9 +758,8 @@ class AdvancedCADMemoryOptimizer:
                 f"thin_wall_ratio={thin_wall_ratio} "
                 f"reasons={classification_reasons}"
             )
-        except Exception as e:
-            logger.warning(f"[mfg_intel] extraction failed: {e}")
-            manufacturing_intelligence = {'error': str(e)}
+        except Exception:
+            manufacturing_intelligence = {'error': report_failure("Manufacturing-intelligence extraction", logger)}
 
         return {
             'manufacturing_intelligence': manufacturing_intelligence,

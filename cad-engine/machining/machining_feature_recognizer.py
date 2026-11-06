@@ -114,6 +114,7 @@ from typing import Dict, List, Optional, Tuple
 # Metal's real `from machining.machining_feature_recognizer import
 # _TAP_DRILL_RANGES` / `MachiningFeature` / etc.), keeps working unchanged.
 from .feature_models import MachiningFeatureType, MachiningFeature, MachiningFeatureTree
+from shared.error_reporting import report_failure
 from shared.part_family import MILLED, TURNED_FAMILIES
 from shared.machining_geometry import (
     TAP_DRILL_RANGES as _TAP_DRILL_RANGES,
@@ -205,8 +206,8 @@ class MachiningFeatureRecognizer:
                 f"faces, area {cov['claimed_area_fraction']}, "
                 f"multiply-claimed={len(cov['multiply_claimed_faces'])}"
             )
-        except Exception as exc:
-            tree.warnings.append(f"Face coverage accounting failed: {exc}")
+        except Exception:
+            tree.warnings.append(report_failure("Face coverage accounting", logger))
 
         # Polygon rings (hex / square sockets and bosses), as candidates only --
         # see detect_polygon_rings. Every face is eligible (a socket's walls
@@ -217,8 +218,8 @@ class MachiningFeatureRecognizer:
                 {k: (list(v) if isinstance(v, tuple) else v) for k, v in ring.items()}
                 for ring in detect_polygon_rings(shape, set(), part_bbox=_part_bounding_box(shape))
             ]
-        except Exception as exc:
-            tree.warnings.append(f"Polygon ring detection failed: {exc}")
+        except Exception:
+            tree.warnings.append(report_failure("Polygon ring detection", logger))
 
         n_with_ids = sum(1 for f in tree.features if f.face_ids)
         sample = tree.features[0].face_ids[:5] if tree.features else []
@@ -237,8 +238,8 @@ class MachiningFeatureRecognizer:
 
         try:
             bbox = _part_bounding_box(shape)
-        except Exception as exc:
-            warnings.append(f"Bounding box failed: {exc}")
+        except Exception:
+            warnings.append(report_failure("Bounding box", logger))
             return MachiningFeatureTree(family=family, features=[], warnings=warnings)
 
         main_axis = self._dominant_cylinder_axis(shape)
@@ -544,8 +545,8 @@ class MachiningFeatureRecognizer:
 
         try:
             bbox = _part_bounding_box(shape)
-        except Exception as exc:
-            warnings.append(f"Bounding box failed: {exc}")
+        except Exception:
+            warnings.append(report_failure("Bounding box", logger))
             return MachiningFeatureTree(family=MILLED, features=[], warnings=warnings)
 
         # For milled parts the machining datum is the largest planar face.
@@ -805,9 +806,9 @@ class MachiningFeatureRecognizer:
         try:
             from .face_classification import detect_cutout_rings
             cutouts = detect_cutout_rings(shape, claimed_face_ids, datum_axis, part_bbox=bbox)
-        except Exception as exc:
+        except Exception:
             cutouts = []
-            warnings.append(f"Cutout ring detection failed: {exc}")
+            warnings.append(report_failure("Cutout ring detection", logger))
         for cutout_idx, cutout in enumerate(cutouts):
             features.append(MachiningFeature(
                 id=f"cutout_{cutout_idx}",
@@ -826,9 +827,9 @@ class MachiningFeatureRecognizer:
         try:
             from .face_classification import classify_and_group_milled_faces
             regions = classify_and_group_milled_faces(shape, claimed_face_ids)
-        except Exception as exc:
+        except Exception:
             regions = []
-            warnings.append(f"Face classification failed: {exc}")
+            warnings.append(report_failure("Face classification", logger))
         for region_idx, region in enumerate(regions):
             ftype = region["feature_type"]
             features.append(MachiningFeature(
