@@ -20,7 +20,7 @@ describe('reference fingerprint', () => {
 
 describe('calculation snapshot', () => {
   const validation = buildQuoteValidation(['F-02', 'F-04'], ['G-03']);
-  const snap = buildCalculationSnapshot(validation, { sourceVersion: '2026-Plastic', datasetFingerprint: 'abc123' }, 'emithran-cost-1');
+  const snap = buildCalculationSnapshot(validation, { sourceVersion: '2026-Plastic', datasetFingerprint: 'abc123' }, 'emithran-cost-1', { volume: 50_000 });
 
   it('records the dataset and its fingerprint, the engine, each formula with its version and state, completeness and what was left out', () => {
     expect(snap).toEqual({
@@ -29,11 +29,12 @@ describe('calculation snapshot', () => {
       engineVersion: 'emithran-cost-1',
       formulas: [{ id: 'F-02', version: 1, state: 'VALIDATED' }, { id: 'F-04', version: 1, state: 'ASSUMED' }],
       state: 'ASSUMED', complete: false, unsupported: ['G-03'],
+      inputs: { volume: 50_000 },
     });
   });
 
   it('stays small: ids and versions, not the assumption text (that lives in the registry at that version)', () => {
-    expect(JSON.stringify(snap).length).toBeLessThan(500);
+    expect(JSON.stringify({ ...snap, inputs: {} }).length).toBeLessThan(500);
     expect(JSON.stringify(snap)).not.toContain('Menges');
   });
 

@@ -12,6 +12,7 @@
     "public.lhr_benchmark_rates",
     "public.lhr_wage_benchmarks",
     "public.lookup_table_policy",
+    "public.reference_data_snapshots",
     "public.machining_reference_data",
     "public.material_aliases",
     "public.material_categories",

@@ -676,7 +676,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
     unsupportedFormulas({ tooling: toolingResult != null, routed }),
   );
-  if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION);
+  if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, input as unknown as Record<string, unknown>);
 
   return {
     materialCost,

@@ -150,12 +150,33 @@ export interface FeatureRules {
   autoManualFlashTrimming: boolean | null;
 }
 
-interface PlasticReferenceRows {
+export interface PlasticReferenceRows {
   variables: ReadonlyArray<{ key: string; value: string | number | null }>;
   /** The GPPS reference material row (raw), or undefined when not staged. */
   gppsMaterial?: Record<string, unknown>;
   /** lookup_table key -> its staged rows. */
   lookups: Readonly<Record<string, ReadonlyArray<Record<string, unknown>> | undefined>>;
+}
+
+/**
+ * The staged rows in the one canonical form that is fingerprinted and stored (reference_data_snapshots.rows): variables sorted by key, the GPPS row or
+ * null. resolvePlasticReference(restoreReferenceRows(canonicalReferenceRows(r))) equals resolvePlasticReference(r), so a stored copy rebuilds the
+ * same reference the calculation read.
+ */
+export interface CanonicalReferenceRows {
+  variables: Array<{ key: string; value: string | number | null }>;
+  lookups: Record<string, ReadonlyArray<Record<string, unknown>> | undefined>;
+  gppsMaterial: Record<string, unknown> | null;
+}
+export function canonicalReferenceRows(rows: PlasticReferenceRows): CanonicalReferenceRows {
+  return {
+    variables: [...rows.variables].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)),
+    lookups: { ...rows.lookups },
+    gppsMaterial: rows.gppsMaterial ?? null,
+  };
+}
+export function restoreReferenceRows(c: CanonicalReferenceRows): PlasticReferenceRows {
+  return { variables: c.variables, lookups: c.lookups, ...(c.gppsMaterial ? { gppsMaterial: c.gppsMaterial } : {}) };
 }
 
 const num = (v: unknown): number | null => {
@@ -298,7 +319,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
   return {
     reference: {
       sourceVersion: PLASTIC_REFERENCE_SOURCE_VERSION,
-      datasetFingerprint: fingerprintRows({ variables: [...rows.variables].sort((a, b) => (a.key < b.key ? -1 : 1)), lookups: rows.lookups, gppsMaterial: rows.gppsMaterial ?? null }),
+      datasetFingerprint: fingerprintRows(canonicalReferenceRows(rows)),
       clampForceSafetyFactor,
       clampModel,
       cycleModel,
