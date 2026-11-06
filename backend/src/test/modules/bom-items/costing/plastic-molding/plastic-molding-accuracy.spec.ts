@@ -30,7 +30,7 @@ const ABS_CLAMP = realMaterialClamp('ABS');
 const ABS_RESIN = realResinInputs('ABS');
 
 const rate = (machineClass: string, usd: number, name: string | null) =>
-  ({ rate: usd, source: 'mhr_database' as const, machineClass, machineName: name, commodityCode: null });
+  ({ rate: usd, labourRate: 30, source: 'mhr_database' as const, machineClass, machineName: name, commodityCode: null });
 
 function absPart(overrides: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCostInput {
   return {
@@ -139,7 +139,7 @@ describe('press setup', () => {
     const line = withSetup.processLines.find((l) => l.process === 'Injection Molding')!;
     expect(line.setupTimeMin).toBe(120);
     expect(line.setupTimeSource).toBe('machine');
-    expect(line.setupCost).toBeCloseTo((2 * base.mhrRate.rate) / 250, 2);
+    expect(line.setupCost).toBeCloseTo((2 * (base.mhrRate.rate + 30)) / 250, 2); // the press and its one operator
     expect(findRouteDataGaps(withSetup.processLines)).toEqual([]);
 
     const without = computeInjectionMoldedCostSummary({ ...base, batchSize: 250, mhrRate: { ...base.mhrRate, setupTimeHr: null } });
@@ -163,13 +163,13 @@ describe('cost summary: worked ABS part', () => {
     expect(r.processLines.every((l) => !l.physicsGap)).toBe(true);
   });
 
-  it('prices material 56.16 g x 3.046 = 0.1711 -> 0.17, machine 20.69 s x 29.18 USD/h = 0.1677 -> 0.17, total 0.34', () => {
+  it('prices material 56.16 g x 3.046 = 0.1711 -> 0.17, press and operator 20.69 s x (29.18 + 30) USD/h = 0.3401 -> 0.34, total 0.51', () => {
     expect(r.grossWeightKg).toBeCloseTo(0.05616, 6);
     expect(im.cycleTimeSec).toBe(20.69);
     expect(r.materialCost).toBe(0.17);
-    expect(r.processLines[0]!.runCost).toBe(0.17);
-    expect(r.totalProcessCost).toBe(0.17);
-    expect(r.totalCost).toBe(0.34);
+    expect(r.processLines[0]!.runCost).toBe(0.34);
+    expect(r.totalProcessCost).toBe(0.34);
+    expect(r.totalCost).toBe(0.51);
   });
 
   it('tooling, USA, 10,000/yr x 3 yr: mold BOM 2,140 + labour 2,398.67 = 4,538.67, one mold (ABS 144,000 shots), 0.1513 per part', () => {
@@ -259,5 +259,28 @@ describe('press capability (active-quote selector): shot size gates a press', ()
 
   it('a shot that cannot be derived (no melt density) means the press cannot be sized: not capable, never passed unchecked', () => {
     expect(isCapable(press(132, 37.69), need(null))).toBe(false);
+  });
+});
+
+describe('press labour', () => {
+  it('charges the operators as well as the press, in the cycle and the setup, and keeps the two apart on the line', () => {
+    const base = absPart();
+    const crewOfTwo = computeInjectionMoldedCostSummary({ ...base, batchSize: 250, mhrRate: { ...base.mhrRate, setupTimeHr: 2, labourRate: 34.48, operators: 2 } });
+    const line = crewOfTwo.processLines.find((l) => l.process === 'Injection Molding')!;
+    const machinePerHr = base.mhrRate.rate;
+    const labourPerHr = 34.48 * 2;
+    const hours = crewOfTwo.injectionMolding!.cycleTimeSec / 3600 + 2 / 250;
+    expect(line.operators).toBe(2);
+    expect(line.labourRate).toBe(34.48);
+    expect(line.machineCostPerPart).toBeCloseTo(hours * machinePerHr, 2);
+    expect(line.laborCostPerPart).toBeCloseTo(hours * labourPerHr, 2);
+    expect(line.totalCost).toBeCloseTo(hours * (machinePerHr + labourPerHr), 2);
+    expect(line.setupCost + line.runCost).toBeCloseTo(line.totalCost, 2);
+  });
+
+  it('a press with no labour rate on file leaves the line a gap instead of a free operator', () => {
+    const base = absPart();
+    const noLabour = computeInjectionMoldedCostSummary({ ...base, mhrRate: { ...base.mhrRate, setupTimeHr: 2, labourRate: null } });
+    expect(findRouteDataGaps(noLabour.processLines).map((g) => g.reason).join(' ')).toContain('No labour rate on file');
   });
 });
