@@ -19,7 +19,7 @@ export function PartDetailsSheet({ itemId, refreshKey, display, inDialog = false
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={cn("flex flex-col gap-2 p-3", expanded ? "fixed inset-0 z-50 bg-background" : "h-full min-h-0", inDialog && "pr-10")}>
+    <div className={cn("flex min-w-0 flex-col gap-2 p-3", expanded ? "fixed inset-0 z-50 bg-background" : "h-full min-h-0", inDialog && "pr-10")}>
       <div className="flex shrink-0 items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">{table?.rows[0]?.name ?? "Part"} — Part details</h3>
@@ -43,7 +43,8 @@ export function PartDetailsSheet({ itemId, refreshKey, display, inDialog = false
       )}
       {table && (
         <>
-          <div className="min-h-0 flex-1 overflow-auto rounded border border-border/60">
+          {/* The sheet is wider than the window: it scrolls sideways inside this box, with the scrollbars always drawn (a trackpad hides overlay ones). */}
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded border border-border/60 [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-corner]:bg-muted [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted">
             <CostTable table={table} columns="all" display={display} />
           </div>
           <details className="shrink-0 text-[11px] text-muted-foreground">
