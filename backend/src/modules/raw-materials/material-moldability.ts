@@ -107,6 +107,15 @@ export function moldingFeedstockFilter(): string {
 }
 
 /**
+ * The PostgREST `or` filter that keeps the materials the molding engine can cost: an injection pressure on file (thermoplastics, the injection model)
+ * or a cure time (silicone and thermosets, the cure model). The catalog still holds older rows of the same grades with neither: offering one only
+ * ends in a quote that cannot be priced, so the picker does not offer it.
+ */
+export function moldingCostableFilter(): string {
+  return 'im_injection_pressure_max_mpa.not.is.null,cure_time_min.not.is.null';
+}
+
+/**
  * The process groups whose picker offers only molding feedstock (see moldingFeedstockFilter). Their material group (Plastic & Rubber) also holds
  * 3D-printing resins and powders and stock shapes, which no molding route can use.
  */
