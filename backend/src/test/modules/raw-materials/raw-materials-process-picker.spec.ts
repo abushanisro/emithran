@@ -1,5 +1,5 @@
 import { RawMaterialsService } from '../../../modules/raw-materials/raw-materials.service';
-import { moldingFeedstockFilter } from '../../../modules/raw-materials/material-moldability';
+import { moldingCostableFilter, moldingFeedstockFilter } from '../../../modules/raw-materials/material-moldability';
 
 // A recording stand-in for the PostgREST query builder: every call is kept, and awaiting it answers with `rows`.
 function recordingClient(rows: unknown[], links: Record<string, string[]>) {
@@ -32,6 +32,12 @@ describe('the material picker for a process group', () => {
     await serviceOver(client).findAll({ processGroup: 'Plastic Molding' } as never);
     expect(calls).toContainEqual(['in', ['material_group', ['Plastic & Rubber']]]);
     expect(calls).toContainEqual(['or', [moldingFeedstockFilter()]]);
+  });
+
+  it('and only the grades the engine can cost: an older catalog row with no injection pressure and no cure time is not offered', async () => {
+    const { client, calls } = recordingClient([], links);
+    await serviceOver(client).findAll({ processGroup: 'Plastic Molding' } as never);
+    expect(calls).toContainEqual(['or', [moldingCostableFilter()]]);
   });
 
   it('does not filter any other process by form', async () => {
