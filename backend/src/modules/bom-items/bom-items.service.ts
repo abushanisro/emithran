@@ -198,6 +198,19 @@ export interface LotBlockers {
   hiddenLotCount: number;
 }
 
+/** The money of a process line in another currency: every amount the line states, converted by one function. */
+function convertLineMoney(l: ProcessLineCost, conv: (n: number) => number) {
+  return {
+    setupCost: conv(l.setupCost),
+    runCost: conv(l.runCost),
+    totalCost: conv(l.totalCost),
+    hourlyRate: conv(l.hourlyRate),
+    labourRate: l.labourRate != null ? conv(l.labourRate) : l.labourRate,
+    ...(l.machineCostPerPart != null ? { machineCostPerPart: conv(l.machineCostPerPart) } : {}),
+    ...(l.laborCostPerPart != null ? { laborCostPerPart: conv(l.laborCostPerPart) } : {}),
+  };
+}
+
 @Injectable()
 export class BOMItemsService {
   private readonly logger = new Logger(BOMItemsService.name);
@@ -1083,11 +1096,7 @@ export class BOMItemsService {
       materialCostPerKg: conv(dto.materialCostPerKg),
       processLines: dto.processLines.map((l) => ({
         ...l,
-        setupCost: conv(l.setupCost),
-        runCost: conv(l.runCost),
-        totalCost: conv(l.totalCost),
-        hourlyRate: conv(l.hourlyRate),
-        labourRate: l.labourRate != null ? conv(l.labourRate) : l.labourRate,
+        ...convertLineMoney(l, conv),
         machineSelection: this.convertMachineSelectionCost(l.machineSelection, conv),
         machineChoice: l.machineChoice
           ? { ...l.machineChoice, candidates: l.machineChoice.candidates.map((c) => ({ ...c, perPartCost: c.perPartCost != null ? conv(c.perPartCost) : null })) }
@@ -1141,11 +1150,7 @@ export class BOMItemsService {
         ...route,
         processLines: route.processLines.map((l) => ({
           ...l,
-          setupCost: conv(l.setupCost),
-          runCost: conv(l.runCost),
-          totalCost: conv(l.totalCost),
-          hourlyRate: conv(l.hourlyRate),
-          labourRate: l.labourRate != null ? conv(l.labourRate) : l.labourRate,
+          ...convertLineMoney(l, conv),
           machineSelection: this.convertMachineSelectionCost(l.machineSelection, conv),
         })),
         materialCost: conv(route.materialCost),

@@ -269,11 +269,14 @@ describe('press labour', () => {
     const line = crewOfTwo.processLines.find((l) => l.process === 'Injection Molding')!;
     const machinePerHr = base.mhrRate.rate;
     const labourPerHr = 34.48 * 2;
-    const hours = crewOfTwo.injectionMolding!.cycleTimeSec / 3600 + 2 / 250;
+    const cycleHours = crewOfTwo.injectionMolding!.cycleTimeSec / 3600;
+    const hours = cycleHours + 2 / 250;
     expect(line.operators).toBe(2);
     expect(line.labourRate).toBe(34.48);
-    expect(line.machineCostPerPart).toBeCloseTo(hours * machinePerHr, 2);
-    expect(line.laborCostPerPart).toBeCloseTo(hours * labourPerHr, 2);
+    // The split is the cycle's; the setup is stated once, for the machine and the crew together.
+    expect(line.machineCostPerPart).toBeCloseTo(cycleHours * machinePerHr, 2);
+    expect(line.laborCostPerPart).toBeCloseTo(cycleHours * labourPerHr, 2);
+    expect(line.setupCost).toBeCloseTo((2 / 250) * (machinePerHr + labourPerHr), 2);
     expect(line.totalCost).toBeCloseTo(hours * (machinePerHr + labourPerHr), 2);
     expect(line.setupCost + line.runCost).toBeCloseTo(line.totalCost, 2);
   });
