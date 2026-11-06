@@ -96,9 +96,27 @@ const UNCOSTED_OPERATION_LABELS: Record<string, string> = {
   weight_check: 'Weight Check',
 };
 
+/**
+ * What memory/Plastic Modeling holds for an operation that the cost model does not read yet (staged, so a model that read it could cost the
+ * operation). An operation absent here has nothing in the reference: its warning says "no sourced data". Keep this in step with the model: when
+ * an operation starts being costed it leaves UNCOSTED_OPERATION_LABELS; when the model reads one of these, it leaves this list.
+ */
+const UNREAD_REFERENCE_DATA: Partial<Record<keyof typeof UNCOSTED_OPERATION_LABELS, string>> = {
+  side_action: 'slide and lifter sizes, volumes, cycle rate and the hydraulic ejector cost (tblSlideSizes, the slide* and lifter* variables, costPerHydraulicEjector)',
+  core_unscrewing: 'the unscrewing mechanism cost (costPerUnscrewingMechanism)',
+  insert_loading: 'the in-mold insert loading time and insert cost (cmInsertManualLoadingTime, defaultInsertCost)',
+  insert_installation: 'the insert install rate (insertInstallRate)',
+  gate_trimming: 'the manual trim rate and trim stock allowance (manualTrimRate, trimStockAllowance)',
+  dimensional_inspection: 'the CMM hours for inspecting slides and lifters (cmmInspectionAdder, cmmInspectionMultiplier)',
+};
+const UNREAD_BY_LABEL = new Map(Object.entries(UNREAD_REFERENCE_DATA).map(([key, data]) => [UNCOSTED_OPERATION_LABELS[key], data]));
+
 function uncostedOpWarning(label: string, detail?: string): string {
-  return `⚠ ${label} required${detail ? ` (${detail})` : ''} — not costed: no sourced time/rate ` +
-    'data exists for this operation yet; excluded from Direct Process Costs rather than estimated.';
+  const unread = UNREAD_BY_LABEL.get(label);
+  const why = unread
+    ? `the reference holds ${unread}, which the cost model does not read yet`
+    : 'no sourced time/rate data exists for this operation yet';
+  return `⚠ ${label} required${detail ? ` (${detail})` : ''} — not costed: ${why}; excluded from Direct Process Costs rather than estimated.`;
 }
 
 // Hot-tip and sub gates self-de-gate; no vestige trimming needed.
