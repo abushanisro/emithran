@@ -28,6 +28,7 @@ function buildService(database: unknown = {}) {
     none, none, none, none, none, none, none, none, none, none,
     {} as SecondaryProcessService,
     {} as PlasticReferenceService,
+    {} as never, // PlasticRouteComparisonService
     {} as CastingReferenceService,
     {} as SandCostService,
     {} as FeatureToleranceService,

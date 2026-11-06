@@ -40,6 +40,7 @@ function buildService() {
     {} as unknown as MachineDiscoveryService,
     {} as unknown as SecondaryProcessService,
     {} as unknown as PlasticReferenceService,
+    {} as never, // PlasticRouteComparisonService
     {} as unknown as CastingReferenceService,
     {} as unknown as SandCostService,
     {} as unknown as FeatureToleranceService,

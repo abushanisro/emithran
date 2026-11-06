@@ -41,6 +41,7 @@ import type { MachiningCostInput, MachineClassId } from './costing/machining/pro
 import { machiningFeatureCounts } from './costing/machining/operation/machining-feature-counts';
 import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-rule';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
+import { PlasticRouteComparisonService } from './costing/plastic-molding/plastic-route-comparison.service';
 import { injectionMoldabilityGap } from '../raw-materials/material-moldability';
 import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
 import { SecondaryProcessService } from './services/secondary-process.service';
@@ -259,6 +260,7 @@ export class BOMItemsService {
     private readonly machineDiscoveryService: MachineDiscoveryService,
     private readonly secondaryProcessService: SecondaryProcessService,
     private readonly plasticReferenceService: PlasticReferenceService,
+    private readonly plasticRouteComparison: PlasticRouteComparisonService,
     private readonly castingReferenceService: CastingReferenceService,
     private readonly sandCostService: SandCostService,
     private readonly featureToleranceService: FeatureToleranceService,
@@ -5744,6 +5746,16 @@ export class BOMItemsService {
     // called resolveUtsMpa(grade) (the hardcoded fallback table) directly,
     // independently of this resolver's real raw_materials lookup, and could
     // silently disagree with it.
+    const resolvedMaterial = await this.resolveMaterialForFamily({
+        accessToken,
+        grade,
+        family,
+        materialCol: locInfo.materialCol,
+        rates,
+        locCurrencyCode: locInfo.code,
+        location,
+        warnings: comparisonWarnings,
+      });
     const {
       materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa: rcShearStrengthMpa,
       meltingTempC: rcMeltingTempC, moldTempC: rcMoldTempC, ejectionTempC: rcEjectionTempC,
@@ -5754,16 +5766,7 @@ export class BOMItemsService {
       matlState: rcMatlState,
       clampProperties: rcClampProperties,
       densityOfMeltKgM3: rcDensityOfMeltKgM3,
-    } = await this.resolveMaterialForFamily({
-        accessToken,
-        grade,
-        family,
-        materialCol: locInfo.materialCol,
-        rates,
-        locCurrencyCode: locInfo.code,
-        location,
-        warnings: comparisonWarnings,
-      });
+    } = resolvedMaterial;
     // Real per-grade Injection Molding thermal/cure-time properties — same
     // resolved material row as materialCostPerKg/materialDensityKgM3 above.
     const rcRealResinInputs = {
@@ -6331,389 +6334,16 @@ export class BOMItemsService {
       };
     }
     if (family === 'plastic_molded') {
-      const imBboxRC = [
-        ((item as any).maxLength ?? 0) as number,
-        ((item as any).maxWidth ?? 0) as number,
-        ((item as any).maxHeight ?? 0) as number,
-      ].sort((a, b) => b - a);
-      // CAD nominal wall only (see the active quote).
-      const effectiveWallMmRC = (summary.wallThicknessNominalMm ?? 0) as number;
-      const projectedAreaMm2 = imBboxRC[0] * imBboxRC[1] > 0 ? imBboxRC[0] * imBboxRC[1] : null;
-      const partVolumeMm3 = (item.volume ?? 0) as number;
-
-      const imSignals = {
-        projectedAreaMm2,
-        wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
-        wallThicknessMaxMm: (summary.wallThicknessMaxMm as number) > 0 ? (summary.wallThicknessMaxMm as number) : null,
-        ribCount: (summary.ribCount as number) > 0
-          ? (summary.ribCount as number)
-          : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
-        bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
-        undercutCount: sideActionSignals(summary.plasticFeatureGraph)?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
-        slideBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideBundles ?? null,
-        slideOrLifterBundleCount: sideActionSignals(summary.plasticFeatureGraph)?.slideOrLifterBundles ?? null,
-        partingComplexity: (summary.partingComplexity as number | null) ?? null,
-        insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
-      };
-
-      const plasticRefSet = await this.plasticReferenceService.getReference();
-      const plasticRef = plasticRefSet.reference;
-      // Presses are pre-selected on a single-cavity basis (cavities depend on the
-      // press); each tier's engine run then sizes cavities against its real press.
-      const imReq: Omit<IMSelectionRequirements, 'clampModel'> = {
-        projectedAreaMm2,
-        cavityCount: 1,
-        // Same shot rule the engine uses (shot-size.ts), cold runner, one cavity.
-        shotGppsGPerCavity: shotGppsGramsPerCavity({
-          shotWeightKg: shotWeightKgPerPart((partVolumeMm3 / 1e9) * materialDensityKgM3, 'cold'),
-          meltDensityKgM3: rcDensityOfMeltKgM3,
-          reference: plasticRef,
-        }),
-        material: rcClampProperties,
-        materialLabel: grade ?? 'this material',
-        runner: 'cold',
-        partLengthMm: imBboxRC[0] > 0 ? imBboxRC[0] : null,  // largest bbox dim
-        partWidthMm: imBboxRC[1] > 0 ? imBboxRC[1] : null,
-        partHeightMm: imBboxRC[2] > 0 ? imBboxRC[2] : null,
-        // Tool height estimate: bbox max + 100mm tooling allowance (conservative)
-        estimatedToolHeightMm: imBboxRC[0] > 0 ? imBboxRC[0] + 100 : null,
-      };
-
-      // Fetch machine pool and run tier-based 4-constraint selection.
-      // Each tier (Small ≤120T / Standard 121–350T / Large 351T+) picks the best
-      // real HR Rates press in range. A tier with no real press — or whose press
-      // has no real clamp/shot capacity on file — is NOT offered: there is no
-      // synthetic press, rate multiplier or stand-in clamp/shot spec.
-      const pool = await fetchMachinePool(this.databaseService.getClient(accessToken), location);
-      if (!plasticRef) {
-        comparisonWarnings.push(`Injection presses not evaluated: Plastic reference data missing (${plasticRefSet.missing.join('; ')}).`);
-      }
-      const tiers = (plasticRef ? selectIMmachinesByTier(pool, {
-        ...imReq,
-        clampModel: plasticRef.clampModel,
-      }) : []);
-      const sfmCandidate = mhrRates.structuralFoamMolding.selection?.balanced?.candidate;
-      const pressRecordsRC = await this.plasticReferenceService.getPressRecords(
-        this.databaseService.getClient(accessToken),
-        [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? ''],
-      );
-      const rcUsdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
-      const imCommon: Omit<InjectionMoldingCostInput, 'mhrRate' | 'machineClampTonnes' | 'machineShotCapacityG' | 'pressTiming'> = {
-        volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
-        wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
-        materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
-        plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-        location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
-        cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
-        deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
-        materialClamp: rcClampProperties,
-        annualVolume: annualVolume ?? undefined, productionLifeYears,
-        bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
-        currencySymbol: locInfo.symbol,
-        usdToLocal: rcUsdToLocal,
-        realResinInputs: rcRealResinInputs,
-      };
-      // What is wrong with the material itself is said once, on the comparison (materialNote), not again on every press tier.
-      const materialNote = injectionMoldabilityGap({
-        grade, stockForm: rcStockForm, matlState: rcMatlState,
-        injectionPressureMaxMpa: rcClampProperties?.injectionPressureMaxMpa ?? null,
-        flowLengthRatio: rcClampProperties?.flowLengthRatio ?? null,
-        meltingTempC: rcRealResinInputs?.meltingTempC ?? null,
-        moldTempC: rcRealResinInputs?.moldTempC ?? null,
-        densityOfMeltKgM3: rcRealResinInputs?.densityOfMeltKgM3 ?? null,
-        cureTimeMin: null,
+      const plastic = await this.plasticRouteComparison.compare({
+        item, summary, grade, mhrRates, rates, location, batchSize, annualVolume, productionLifeYears, accessToken,
+        locationInfo: locInfo, comparisonWarnings, material: resolvedMaterial,
       });
-      // Each tier offers the press with the lowest cost per part among its
-      // capable real presses, costed by the engine itself: no utilization sweet
-      // spot or score weights (the mold is the same whichever press runs it). A
-      // tier with no capable press shows its largest press as not feasible, with
-      // the reasons.
-      const realTiers = tiers.flatMap((tier) => {
-        const real = tier.candidates.filter((e) => e.candidate.machineId && e.candidate.capability.maxTonnage != null && e.candidate.capability.shotCapacityGrams != null);
-        if (real.length === 0) {
-          comparisonWarnings.push(`No ${tier.tierLabel} injection press with clamp tonnage and shot size in HR Rates for ${location} — that size is not offered.`);
-          return [];
-        }
-        const capablePresses = real.filter((e) => e.capable);
-        const costed = (capablePresses.length > 0 ? capablePresses : [real[0]!]).map((ev) => {
-          const cand = ev.candidate;
-          const cost = computeInjectionMoldedCostSummary({
-            ...imCommon,
-            mhrRate: {
-              rate: cand.hourlyRate, source: 'mhr_database',
-              machineClass: 'injection_molding', machineName: cand.machineName, commodityCode: cand.commodityCode,
-              // The press's own setup time, so the molding line carries it (without it the route is never fully costed and cannot be applied).
-              setupTimeHr: cand.setupTimeHr ?? null,
-            },
-            machineClampTonnes: cand.capability.maxTonnage, machineShotCapacityG: cand.capability.shotCapacityGrams,
-            pressTiming: cand.machineId ? pressRecordsRC.get(cand.machineId) ?? null : null,
-            goodPartYield: cand.machineId ? pressRecordsRC.get(cand.machineId)?.goodPartYield ?? null : null,
-          });
-          const complete = cost.processLines.every((l) => !l.physicsGap);
-          return { tier, ev, cost, complete };
-        });
-        costed.sort((a, b) => (a.complete !== b.complete ? (a.complete ? -1 : 1) : a.cost.totalCost - b.cost.totalCost));
-        return [costed[0]!];
-      });
-
-      const TIER_ROUTE_IDS: Record<string, 'im-small-50t' | 'im-standard-200t' | 'im-large-500t'> = {
-        small:  'im-small-50t',
-        medium: 'im-standard-200t',
-        large:  'im-large-500t',
-      };
-
-      const imRoutes: RouteResultDto[] = realTiers.map(({ tier, ev, cost }) => {
-        const cand = ev.candidate;
-        cost.warnings.push(...comparisonWarnings);
-        // With a material gap, the press-level "not derivable" reasons are that same gap repeated: the note carries it.
-        const repeatsMaterialGap = (r: string) => materialNote != null && /^(Clamp force|Shot size) not derivable/.test(r);
-        const tierReasons = ev.blockReasons.filter((r) => !repeatsMaterialGap(r));
-        if (!ev.capable) cost.warnings.push(...tierReasons.map((r) => `⚠ ${r}`));
-
-        const capable = ev.capable;
-        const routeLabel = `${tier.tierLabel} — ${cand.machineName}`;
-
-        return {
-          routeId: TIER_ROUTE_IDS[tier.tierId]!,
-          routeLabel,
-          processFamily: 'cutting',
-          toolingVolumeNote: null,
-          autoRoutable: true, // cutting-family route: always eligible, as before
-          processLines: cost.processLines, materialCost: cost.materialCost, abrasiveCost: 0,
-          totalProcessCost: cost.totalProcessCost,
-          isFeasible: capable,
-          dataComplete: findRouteDataGaps(cost.processLines).length === 0,
-          dataGaps: findRouteDataGaps(cost.processLines),
-          totalCost: capable ? cost.totalCost : null,
-          cycleTimes: {
-            cuttingMin: cost.cycleTimes.laserMin, pressBrakeMin: cost.cycleTimes.pressBrakeMin,
-            tappingMin: cost.cycleTimes.tappingMin, deburrMin: cost.cycleTimes.deburrMin,
-            totalMin: cost.cycleTimes.totalMin,
-          },
-          badges: { lowestCost: false, fastest: false, bestQuality: false },
-          capability: {
-            cuttingCapable: capable, pressBrakeCapable: capable, overallCapable: capable,
-            confidence: cand.capabilitySource === 'imported' ? 'high' : 'medium',
-            estimatedTonnage: cand.capability.maxTonnage,
-            reasonCodes: capable ? [] : ['DIMENSIONS_UNAVAILABLE' as const],
-            warnings: tierReasons,
-          },
-          warnings: cost.warnings, ratesSource: cost.ratesSource,
-          sustainability: cost.sustainability ? {
-            totalCo2Kg: cost.sustainability.totalCo2Kg,
-            totalProcessEnergyKwh: cost.sustainability.totalProcessEnergyKwh,
-            wasteCostInr: cost.sustainability.wasteCostInr,
-            sustainabilityScore: cost.sustainability.sustainabilityScore,
-          } : undefined,
-          // Real per-part clamp/shot sizing behind this tier — the same
-          // evaluateIMCandidate() numbers that decided capability/scoring
-          // above, now exposed so the frontend can show the actual tonnage
-          // math instead of just the pass/fail badge.
-          injectionMolding: {
-            clampRequiredT: ev.clampRequiredT ?? null,
-            clampMachineT: ev.clampMachineT,
-            clampUtilPct: ev.clampUtil != null ? Math.round(ev.clampUtil * 1000) / 10 : null,
-            shotRequiredG: ev.shotRequiredG ?? null,
-            shotMachineG: ev.shotMachineG ?? null,
-            shotUtilPct: ev.shotUtil != null ? Math.round(ev.shotUtil * 1000) / 10 : null,
-            cavityCount: cost.injectionMolding?.cavityCount ?? 1,
-            gateType: cost.injectionMolding?.gateType ?? 'edge',
-            machineDataSource: 'imported',
-          },
-        } satisfies RouteResultDto;
-      });
-
-      // Real, distinct manufacturing PROCESSES (not IMM size tiers) — added
-      // as additional candidate routes so a real user can see and compare
-      // them, closing the process-duplicate-audit finding (2026-09-02) that
-      // these two previously had no route through which a real quote could
-      // ever reflect their own real machine class. Deliberately NOT folded
-      // into the tier-comparison scoring above (bestQuality's clamp-
-      // utilization sweet-spot logic is injection-molding-specific and
-      // meaningless for a compression press) — only pushed into the flat
-      // route list so lowestCost/fastest badges (computed generically below
-      // over the whole array) correctly consider them too.
-      const netWeightKgRC = (Math.max(partVolumeMm3, 0) / 1e9) * materialDensityKgM3;
-      const compressionMaterialCost = this.r2(netWeightKgRC * materialCostPerKg);
-      const compressionResult = computeCompressionMoldingCost({
-        batchSize,
-        partWeightKg: netWeightKgRC > 0 ? netWeightKgRC : undefined,
-        rate: mhrRates.compressionMolding,
-        // Real per-grade cure_time_min — same resolved material row as
-        // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
-        cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
-      });
-      // A route is a real alternative only on a material the dataset flags for that process, and only where a real machine rate resolved.
-      const processCompat = await this.plasticReferenceService.getProcessCompatibility(this.databaseService.getClient(accessToken), grade);
-      const compatGap = (process: MoldingProcess) => processCompatibilityGap(processCompat, process, grade);
-      const compressionGap = compatGap('compression');
-      const compressionCapable = mhrRates.compressionMolding.source === 'mhr_database' && compressionGap == null;
-      imRoutes.push({
-        routeId: 'im-compression-molding',
-        routeLabel: mhrRates.compressionMolding.machineName
-          ? `Compression Molding — ${mhrRates.compressionMolding.machineName}`
-          : 'Compression Molding',
-        processFamily: 'cutting',
-        toolingVolumeNote: null,
-        autoRoutable: true, // cutting-family route: always eligible, as before
-        processLines: compressionResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
-        totalProcessCost: this.r2(compressionResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
-        isFeasible: compressionCapable,
-        dataComplete: findRouteDataGaps(compressionResult.processLines).length === 0,
-        dataGaps: findRouteDataGaps(compressionResult.processLines),
-        totalCost: compressionCapable ? this.r2(compressionMaterialCost + compressionResult.processLines.reduce((s, l) => s + l.totalCost, 0)) : null,
-        cycleTimes: {
-          cuttingMin: 0, pressBrakeMin: this.r2(compressionResult.cuttingMin), tappingMin: 0, deburrMin: 0,
-          totalMin: this.r2(compressionResult.cuttingMin),
-        },
-        badges: { lowestCost: false, fastest: false, bestQuality: false },
-        capability: {
-          cuttingCapable: compressionCapable, pressBrakeCapable: compressionCapable, overallCapable: compressionCapable,
-          confidence: compressionCapable ? 'medium' : 'low',
-          estimatedTonnage: null,
-          reasonCodes: compressionCapable ? [] : [compressionGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
-          warnings: compressionCapable ? [] : [compressionGap ?? 'No real compression_molding machine rate resolved for this location'],
-        },
-        warnings: [...compressionResult.warnings, ...comparisonWarnings], ratesSource: RATES_SOURCE_LABEL,
-      } satisfies RouteResultDto);
-
-      const rimResult = computeReactionInjectionMoldingCost({
-        batchSize,
-        partWeightKg: netWeightKgRC > 0 ? netWeightKgRC : undefined,
-        rate: mhrRates.reactionInjectionMolding,
-        // Real per-grade cure/reaction time — same resolved material row as
-        // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
-        cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
-      });
-      const rimGap = compatGap('reaction_injection');
-      const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database' && rimGap == null;
-      imRoutes.push({
-        routeId: 'im-reaction-injection-molding',
-        routeLabel: mhrRates.reactionInjectionMolding.machineName
-          ? `Reaction Injection Molding — ${mhrRates.reactionInjectionMolding.machineName}`
-          : 'Reaction Injection Molding',
-        processFamily: 'cutting',
-        toolingVolumeNote: null,
-        autoRoutable: true, // cutting-family route: always eligible, as before
-        processLines: rimResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
-        totalProcessCost: this.r2(rimResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
-        isFeasible: rimCapable,
-        dataComplete: findRouteDataGaps(rimResult.processLines).length === 0,
-        dataGaps: findRouteDataGaps(rimResult.processLines),
-        totalCost: rimCapable ? this.r2(compressionMaterialCost + rimResult.processLines.reduce((s, l) => s + l.totalCost, 0)) : null,
-        cycleTimes: {
-          cuttingMin: 0, pressBrakeMin: this.r2(rimResult.cuttingMin), tappingMin: 0, deburrMin: 0,
-          totalMin: this.r2(rimResult.cuttingMin),
-        },
-        badges: { lowestCost: false, fastest: false, bestQuality: false },
-        capability: {
-          cuttingCapable: rimCapable, pressBrakeCapable: rimCapable, overallCapable: rimCapable,
-          confidence: rimCapable ? 'medium' : 'low',
-          // Real per-machine clamp tonnage now that RIM's identical-schema
-          // machines are gated by the same injectionMoldingRequirement()
-          // physics as Injection Molding (buildPartRequirements) — see that
-          // function's comment on why RIM reuses the IM clamp formula as-is.
-          estimatedTonnage: mhrRates.reactionInjectionMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
-          reasonCodes: rimCapable ? [] : [rimGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
-          // Real reason from selectMachine() — distinguishes "no machine of
-          // this class exists" from "real machines exist but none fit this
-          // part's clamp/footprint requirement", now that RIM is capability-
-          // gated instead of always-generic.
-          warnings: rimCapable ? [] : [
-            rimGap ?? mhrRates.reactionInjectionMolding.selection?.balanced?.reasons?.[0]
-              ?? 'No real reaction_injection_molding machine rate resolved for this location',
-          ],
-        },
-        warnings: [...rimResult.warnings, ...comparisonWarnings], ratesSource: RATES_SOURCE_LABEL,
-      } satisfies RouteResultDto);
-
-      const structuralFoamInput: InjectionMoldingCostInput = {
-        volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
-        wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
-        materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
-        plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
-        location, materialType: rcMaterialType, materialStockForm: rcStockForm, materialMatlState: rcMatlState,
-        cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
-        mhrRate: mhrRates.structuralFoamMolding, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
-        machineClampTonnes: sfmCandidate?.capability?.maxTonnage ?? null,
-        machineShotCapacityG: sfmCandidate?.capability?.shotCapacityGrams ?? null,
-        pressTiming: sfmCandidate?.machineId ? pressRecordsRC.get(sfmCandidate.machineId) ?? null : null,
-        goodPartYield: sfmCandidate?.machineId ? pressRecordsRC.get(sfmCandidate.machineId)?.goodPartYield ?? null : null,
-        materialClamp: rcClampProperties,
-        annualVolume: annualVolume ?? undefined, productionLifeYears,
-        bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
-        currencySymbol: locInfo.symbol,
-        usdToLocal: rcUsdToLocal,
-        realResinInputs: rcRealResinInputs,
-      };
-      const structuralFoamCost = computeInjectionMoldedCostSummary(structuralFoamInput);
-      structuralFoamCost.warnings.push(...comparisonWarnings);
-      const foamGap = compatGap('injection_or_foam');
-      const structuralFoamCapable = mhrRates.structuralFoamMolding.source === 'mhr_database' && foamGap == null;
-      imRoutes.push({
-        routeId: 'im-structural-foam-molding',
-        routeLabel: mhrRates.structuralFoamMolding.machineName
-          ? `Structural Foam Molding — ${mhrRates.structuralFoamMolding.machineName}`
-          : 'Structural Foam Molding',
-        processFamily: 'cutting',
-        toolingVolumeNote: null,
-        autoRoutable: true, // cutting-family route: always eligible, as before
-        processLines: structuralFoamCost.processLines, materialCost: structuralFoamCost.materialCost, abrasiveCost: 0,
-        totalProcessCost: structuralFoamCost.totalProcessCost,
-        isFeasible: structuralFoamCapable,
-        dataComplete: findRouteDataGaps(structuralFoamCost.processLines).length === 0,
-        dataGaps: findRouteDataGaps(structuralFoamCost.processLines),
-        totalCost: structuralFoamCapable ? structuralFoamCost.totalCost : null,
-        cycleTimes: {
-          cuttingMin: structuralFoamCost.cycleTimes.laserMin, pressBrakeMin: structuralFoamCost.cycleTimes.pressBrakeMin,
-          tappingMin: structuralFoamCost.cycleTimes.tappingMin, deburrMin: structuralFoamCost.cycleTimes.deburrMin,
-          totalMin: structuralFoamCost.cycleTimes.totalMin,
-        },
-        badges: { lowestCost: false, fastest: false, bestQuality: false },
-        capability: {
-          cuttingCapable: structuralFoamCapable, pressBrakeCapable: structuralFoamCapable, overallCapable: structuralFoamCapable,
-          confidence: structuralFoamCapable ? 'medium' : 'low',
-          // Real per-machine clamp tonnage now that Structural Foam Molding's
-          // identical-schema machines are gated by the same
-          // injectionMoldingRequirement() physics as Injection Molding
-          // (buildPartRequirements) — see that function's comment.
-          estimatedTonnage: mhrRates.structuralFoamMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
-          reasonCodes: structuralFoamCapable ? [] : [foamGap ? 'MATERIAL_NOT_COMPATIBLE' as any : 'NO_REAL_MACHINE_RATE' as any],
-          warnings: structuralFoamCapable ? [] : [
-            foamGap ?? mhrRates.structuralFoamMolding.selection?.balanced?.reasons?.[0]
-              ?? 'No real structural_foam_molding machine rate resolved for this location',
-          ],
-        },
-        warnings: structuralFoamCost.warnings, ratesSource: structuralFoamCost.ratesSource,
-        sustainability: structuralFoamCost.sustainability ? {
-          totalCo2Kg: structuralFoamCost.sustainability.totalCo2Kg,
-          totalProcessEnergyKwh: structuralFoamCost.sustainability.totalProcessEnergyKwh,
-          wasteCostInr: structuralFoamCost.sustainability.wasteCostInr,
-          sustainabilityScore: structuralFoamCost.sustainability.sustainabilityScore,
-        } : undefined,
-      } satisfies RouteResultDto);
-
-      const capableRoutes = imRoutes.filter((r) => r.capability.overallCapable);
-      if (capableRoutes.length > 0) {
-        const feasibleRoutes = capableRoutes.filter((r) => r.isFeasible && r.totalCost != null);
-        if (feasibleRoutes.length > 0) {
-          const minFeasibleCost = Math.min(...feasibleRoutes.map((r) => r.totalCost!));
-          feasibleRoutes.forEach((r) => { r.badges.lowestCost = r.totalCost === minFeasibleCost; });
-        }
-        capableRoutes.reduce((a, b) => a.cycleTimes.totalMin < b.cycleTimes.totalMin ? a : b).badges.fastest = true;
-        // No bestQuality badge for molding routes: the reference data gives no
-        // quality measure between presses (the former clamp-utilization sweet
-        // spot and score were invented).
-      }
-
-      const imGrossKg = (partVolumeMm3 / 1e9) * materialDensityKgM3 * (1 + MATERIAL_OVERHEAD_PCT / 100);
-      const medRoute = imRoutes.find((r) => r.routeId === 'im-standard-200t') ?? imRoutes[0];
       return attachToRoutes({
         bomItemId: id, batchSize,
-        materialCost: medRoute?.materialCost ?? 0,
-        materialGrade: grade ?? '', grossWeightKg: imGrossKg, materialCostPerKg, materialSource,
+        materialCost: plastic.materialCost,
+        materialGrade: grade ?? '', grossWeightKg: plastic.grossWeightKg, materialCostPerKg, materialSource,
         currency: locInfo.code, currencySymbol: locInfo.symbol,
-        routes: imRoutes, comparisonWarnings, materialNote,
+        routes: plastic.routes, comparisonWarnings: plastic.comparisonWarnings, materialNote: plastic.materialNote,
         drawingCadConsistency,
       });
     }
