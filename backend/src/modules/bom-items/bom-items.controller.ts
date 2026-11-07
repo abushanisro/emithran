@@ -35,7 +35,7 @@ import { promisify } from 'util';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import * as path from 'path';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { BOMItemsService } from './bom-items.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
 import { AnalysisStatusService } from './services/analysis-status.service';
@@ -79,6 +79,7 @@ import { ScenarioApplicationService } from './services/scenario-application.serv
 import { CostTableService } from './services/cost-table.service';
 import type { CostTable } from './costing/shared/cost-table';
 import { ApplyScenarioDto, type ScenarioApplicationResult } from './dto/apply-scenario.dto';
+import { PlasticDfmService, MOLDING_PROCESS_NAMES } from './costing/plastic-molding/dfm/plastic-dfm.service';
 import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
 import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
@@ -120,6 +121,7 @@ export class BOMItemsController {
     private readonly secondaryProcessService: SecondaryProcessService,
     private readonly nreService: NreService,
     private readonly dfmScoringService: DFMScoringService,
+    private readonly plasticDfm: PlasticDfmService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     private readonly databaseService: DatabaseService,
     private readonly exchangeRateService: ExchangeRateService,
@@ -477,6 +479,18 @@ export class BOMItemsController {
   @ApiOperation({ summary: 'Set the Tolerance Policy for Auto categories: assume_achieved | uniform {values} | cad {replaceBelow}' })
   async setTolerancePolicy(@Param('id') id: string, @Body() policy: unknown, @AccessToken() token: string) {
     return this.featureToleranceService.setPolicy(id, policy, token);
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/plastic-dfm')
+  @ApiOperation({ summary: 'Design-for-molding checks of a plastic part against the staged rule data, for its material; findings carry the faces to highlight' })
+  @ApiQuery({ name: 'process', required: false, enum: MOLDING_PROCESS_NAMES })
+  @ApiResponse({ status: 200, description: 'The findings, the rules that passed and the rules that could not be judged (with why)' })
+  async getPlasticDfm(@Param('id') id: string, @Query('process') process: string | undefined, @CurrentUser() user: User, @AccessToken() token: string) {
+    const chosen = MOLDING_PROCESS_NAMES.find((p) => p === process) ?? 'Injection Molding';
+    if (process && chosen !== process) throw new BadRequestException(`process must be one of: ${MOLDING_PROCESS_NAMES.join(', ')}`);
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    return this.plasticDfm.evaluate({ featureGraph: item.featureGraph, grade: item.materialGrade ?? null, process: chosen, client: this.databaseService.getClient(token) });
   }
 
   @OrgRole('viewer')

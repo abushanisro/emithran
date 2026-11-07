@@ -270,6 +270,7 @@ export function invalidateBOMItemUpdateQueries(queryClient: QueryClient, data: B
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'cost-summary'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'route-comparison'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'dfm-scores'] });
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'plastic-dfm'] });
 }
 
 export function useUpdateBOMItem() {
@@ -452,6 +453,45 @@ export function useDFMScores(bomItemId?: string) {
     queryKey: ['bom-items', bomItemId, 'dfm-scores'],
     queryFn: async () => apiClient.get<DFMScoresResponse>(`/bom-items/${bomItemId}/dfm-scores`),
     enabled: useAuthEnabledWith(!!bomItemId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export type PlasticDfmSeverity = 'Critical' | 'Major' | 'Minor';
+export interface PlasticDfmFinding {
+  rule: string;
+  title: string;
+  severity: PlasticDfmSeverity;
+  measured: number;
+  threshold: number;
+  comparison: '<' | '>';
+  unit: string | null;
+  note: string | null;
+  count: number;
+  featureIds: string[];
+  faces: number[];
+  label: string;
+}
+export interface PlasticDfmView {
+  status: 'ok' | 'no_analysis' | 'unavailable';
+  result: {
+    rulesetVersion: string;
+    process: string;
+    materialType: string | null;
+    findings: PlasticDfmFinding[];
+    passed: string[];
+    notEvaluated: Array<{ rule: string; reason: string }>;
+  } | null;
+  reasons: string[];
+}
+
+/** The design-for-molding checks of a plastic part against the staged rule data, for its current material (evaluated when asked, so a material change is reflected). */
+export function usePlasticDfm(bomItemId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['bom-items', bomItemId, 'plastic-dfm'],
+    queryFn: async () => apiClient.get<PlasticDfmView>(`/bom-items/${bomItemId}/plastic-dfm`),
+    enabled: useAuthEnabledWith(!!bomItemId && enabled),
     staleTime: 0,
     refetchOnWindowFocus: false,
   });

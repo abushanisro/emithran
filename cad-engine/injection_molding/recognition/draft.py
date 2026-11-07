@@ -32,6 +32,7 @@ def analyze_draft(meshes: Sequence[FaceMesh], pull: Vec, undrafted_deg: float, m
         area_by_class = {c: 0.0 for c in CLASS_ORDER}
         face_draft_sum = 0.0
         face_draft_area = 0.0
+        face_min_draft = None
         for t, covered in zip(f.triangles, flags[f.index]):
             dot = abs(t.normal[0] * pull[0] + t.normal[1] * pull[1] + t.normal[2] * pull[2])
             # A floor, lid or parting face needs no draft and is skipped, unless it is covered: the underside of an overhang is an undercut however
@@ -51,6 +52,7 @@ def analyze_draft(meshes: Sequence[FaceMesh], pull: Vec, undrafted_deg: float, m
             if not covered:
                 face_draft_sum += deg * t.area
                 face_draft_area += t.area
+                face_min_draft = deg if face_min_draft is None else min(face_min_draft, deg)
         wall_area = sum(area_by_class.values())
         if wall_area <= 0.0:
             continue
@@ -63,6 +65,12 @@ def analyze_draft(meshes: Sequence[FaceMesh], pull: Vec, undrafted_deg: float, m
         faces.append({
             "face_id": f.index, "surface": f.surface, "class": cls, "wall_area_mm2": round(wall_area, 3),
             "avg_draft_deg": round(face_draft_sum / face_draft_area, 2) if face_draft_area > 0 else None,
+            # The draft the DFM draft rule judges the face by. A planar face has one draft everywhere, so its least is exact. A curved face is tessellated and each
+            # flat triangle's normal is tilted off the surface (a 3 deg cone reads 2.6 deg at its worst triangle), so its least is partly mesh error: it is judged on
+            # its area-weighted average instead, and `draft_basis` says which was used.
+            "judged_draft_deg": (round(face_min_draft, 3) if f.surface == "plane" else round(face_draft_sum / face_draft_area, 3)) if face_draft_area > 0 else None,
+            "draft_basis": "least" if f.surface == "plane" else "average",
+            "min_draft_deg": round(face_min_draft, 3) if face_min_draft is not None else None,
             "undercut_fraction": round(area_by_class["undercut"] / wall_area, 3),
         })
     wall_total = sum(totals.values())

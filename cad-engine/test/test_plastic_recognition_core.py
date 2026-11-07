@@ -160,6 +160,16 @@ class TestDraft:
         assert out["faces_by_class"]["drafted"] == 1
         assert out["faces_by_class"]["undercut"] == 0
 
+    def test_a_face_is_judged_by_the_draft_it_has_and_the_basis_is_stated(self):
+        # a curved face is judged on its average (its least draft is partly tessellation error: a 3 deg cone reads 2.6 at its worst triangle)
+        cone = [f for f in self.wall_draft(self.frustum(3.0))["faces"] if f["class"] == "drafted"][0]
+        assert cone["draft_basis"] == "average" and cone["judged_draft_deg"] == pytest.approx(3.0, abs=0.3)
+        assert cone["min_draft_deg"] <= cone["avg_draft_deg"] + 1e-6
+        # a planar face has one draft everywhere, so its least is exact: the four vertical walls of a box have none
+        planar = [f for f in self.wall_draft(box(40, 40, 50))["faces"] if f["surface"] == "plane" and f["class"] == "undrafted"]
+        assert len(planar) == 4
+        assert planar and all(f["draft_basis"] == "least" and f["judged_draft_deg"] == pytest.approx(0.0, abs=0.01) for f in planar)
+
     def test_a_free_form_bspline_wall_is_measured_too(self):
         shape = BRepBuilderAPI_NurbsConvert(self.frustum(3.0), True).Shape()
         assert {f.surface for f in meshes(shape)} >= {"bspline"}

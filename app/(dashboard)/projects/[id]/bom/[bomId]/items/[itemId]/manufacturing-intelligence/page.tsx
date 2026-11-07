@@ -77,6 +77,7 @@ import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
+import { PlasticDfmFindings } from '@/components/features/manufacturing-intelligence/PlasticDfmFindings';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
 import { invalidateBOMItemUpdateQueries, useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
@@ -7175,7 +7176,7 @@ function ValidationTab({
 
 // ── DesignGuidanceTab ─────────────────────────────────────────────────────────
 
-function DesignGuidanceTab({ fg }: { fg: FeatureGraph | null }) {
+function DesignGuidanceTab({ fg, plastic }: { fg: FeatureGraph | null; plastic?: { itemId: string; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined }) {
   const warnings = (fg?.dfmWarnings ?? []);
 
   const severityConfig = {
@@ -7195,6 +7196,7 @@ function DesignGuidanceTab({ fg }: { fg: FeatureGraph | null }) {
 
   return (
     <div className="p-3 space-y-2">
+      {plastic && <PlasticDfmFindings itemId={plastic.itemId} onSelectHighlight={plastic.onSelectHighlight} />}
       {warnings.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
           <span className="text-lg">✅</span>
@@ -8606,7 +8608,7 @@ function GeometricCostDriversPanel({
       {/* Design / DFM tab */}
       {tab === 'design' && (
         <div className="flex-1 overflow-y-auto min-h-0">
-          <DesignGuidanceTab fg={fg} />
+          <DesignGuidanceTab fg={fg} plastic={isIM ? { itemId: item.id, onSelectHighlight } : undefined} />
         </div>
       )}
     </div>
