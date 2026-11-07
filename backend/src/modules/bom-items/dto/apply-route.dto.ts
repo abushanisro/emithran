@@ -1,3 +1,4 @@
+import { OTHER_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/molding-route-projection';
 import { IsString, IsOptional, IsInt, Min, IsIn, IsArray, ArrayMinSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { RouteId } from './route-comparison.dto';
@@ -21,6 +22,8 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...getFormingRouteIds(),
   ...getMachiningRouteIds(),
   'injection-molding', 'im-small-50t', 'im-standard-200t', 'im-large-500t',
+  // The other molding processes, each priced by its own engine in the route comparison; apply still refuses one that is not feasible (material or process not compatible, no machine rate)
+  ...OTHER_MOLDING_ROUTE_IDS,
   ...DIE_CASTING_PROCESSES.map(dieCastingRouteId),
 ];
 

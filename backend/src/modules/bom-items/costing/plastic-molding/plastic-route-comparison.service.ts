@@ -425,6 +425,7 @@ export class PlasticRouteComparisonService {
         ],
       },
       warnings: structuralFoamCost.warnings, ratesSource: structuralFoamCost.ratesSource,
+      ...(structuralFoamCost.tooling ? { tooling: structuralFoamCost.tooling } : {}),
       sustainability: structuralFoamCost.sustainability ? {
         totalCo2Kg: structuralFoamCost.sustainability.totalCo2Kg,
         totalProcessEnergyKwh: structuralFoamCost.sustainability.totalProcessEnergyKwh,
