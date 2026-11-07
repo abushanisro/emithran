@@ -1,0 +1,13 @@
+/**
+ * Which registered formula (formula-registry.ts: id, version, validation state) stands behind a field of a plastic-molding calculator. The engine puts it on the
+ * calculation trace, so a number carries the state of the formula that made it, and the written report (plastic-calculator-report.ts) shows the same. The
+ * compression and reaction injection calculators are not in the registry yet, so their fields have none: their Cure Time and Cycle Time are not F-09 and F-08.
+ */
+const INJECTION: Record<string, string> = { 'Cooling Time': 'F-04', 'Fill Time': 'F-05', 'Pack Time': 'F-06', 'Press Dry Cycle Time': 'F-07', 'Cycle Time': 'F-08' };
+
+/** By the calculator's key in plastic-molding-calculators.json, then the field's name. */
+export const REGISTRY_FORMULA_OF_FIELD: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  injection: INJECTION,
+  structural_foam: INJECTION,
+  injection_lsr: { 'Cure Time': 'F-09', 'Fill Time': 'F-05', 'Press Dry Cycle Time': 'F-07', 'Cycle Time': 'F-08' },
+};

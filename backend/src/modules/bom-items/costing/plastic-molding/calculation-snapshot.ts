@@ -18,6 +18,11 @@ export interface CalculationSnapshot {
    */
   engineBuild?: { codeHash: string; files: number };
   formulas: Array<{ id: string; version: number; state: ValidationState }>;
+  /**
+   * The stored calculators that computed the cycle time, with a fingerprint of their formulas (calculators/plastic-cycle-time.ts): a replay refuses when the formulas now in
+   * force differ. Absent on a calculation saved before the cycle time was calculator-driven.
+   */
+  calculators?: Array<{ name: string; version: number | null; fingerprint: string }>;
   state: ValidationState;
   complete: boolean;
   /** G-ids of what the quote left out. */
@@ -31,7 +36,8 @@ export interface CalculationSnapshot {
 
 /** The engine input in the form that is stored: JSON-safe, without the reference data (stored by fingerprint) and without the machine selection log. */
 export function replayableInputs(input: Record<string, unknown>): Record<string, unknown> {
-  const { plasticReference: _ref, plasticReferenceMissing: _missing, mhrRate, ...rest } = input as { plasticReference?: unknown; plasticReferenceMissing?: unknown; mhrRate?: Record<string, unknown> } & Record<string, unknown>;
+  // The calculators are the formulas, identified by the snapshot's `calculators` fingerprints, not data of the part.
+  const { plasticReference: _ref, plasticReferenceMissing: _missing, calculators: _calculators, mhrRate, ...rest } = input as { plasticReference?: unknown; plasticReferenceMissing?: unknown; calculators?: unknown; mhrRate?: Record<string, unknown> } & Record<string, unknown>;
   const { selection: _selection, ...rate } = mhrRate ?? {};
   return JSON.parse(JSON.stringify({ ...rest, ...(mhrRate ? { mhrRate: rate } : {}) })) as Record<string, unknown>;
 }
@@ -42,6 +48,7 @@ export function buildCalculationSnapshot(
   engineVersion: string,
   engineBuild: { codeHash: string; files: number },
   inputs: Record<string, unknown>,
+  calculators: ReadonlyArray<{ name: string; version: number | null; fingerprint: string }> = [],
 ): CalculationSnapshot {
   return {
     schema: CALCULATION_SNAPSHOT_SCHEMA,
@@ -49,6 +56,7 @@ export function buildCalculationSnapshot(
     engineVersion,
     engineBuild: { codeHash: engineBuild.codeHash, files: engineBuild.files },
     formulas: validation.formulas.map((f) => ({ id: f.id, version: f.version, state: f.state })),
+    ...(calculators.length > 0 ? { calculators: calculators.map((c) => ({ name: c.name, version: c.version, fingerprint: c.fingerprint })) } : {}),
     state: validation.state,
     complete: validation.complete,
     unsupported: validation.unsupported.map((u) => u.id),

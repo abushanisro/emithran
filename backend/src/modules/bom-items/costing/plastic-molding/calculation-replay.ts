@@ -13,6 +13,8 @@ import { canonicalReferenceRows, resolvePlasticReference, restoreReferenceRows, 
 import { computeInjectionMoldedCostSummary, type InjectionMoldingCostInput } from './process/cost-injection-molding-engine';
 import { PLASTIC_ENGINE_BUILD } from './engine-build.generated';
 import { fingerprintRows } from './reference-fingerprint';
+import { calculatorFingerprint } from './calculators/plastic-cycle-time';
+import { plasticMoldingCalculatorsByName } from './calculators/plastic-molding-calculator-spec';
 import { COST_ENGINE_CONTRACT_VERSION } from '../shared/core/persisted-process-cost';
 
 /** The money of a saved line (process_cost_records), per part, in the currency it was saved in. */
@@ -97,8 +99,21 @@ export function replayPlasticLine(snapshot: CalculationSnapshot, storedRows: Can
   const { reference } = resolvePlasticReference(restoreReferenceRows(storedRows));
   if (!reference) return fail('the stored reference rows no longer resolve to a complete reference');
 
+  // The formulas are the stored calculators as this engine build holds them (the spec), never the live database. A calculation that recorded which calculators it ran
+  // is refused when their formulas now in force differ; one saved before the cycle time was calculator-driven is recomputed with them, and the parity test is what says
+  // they give the numbers the earlier in-code formulas gave.
+  const calculators = plasticMoldingCalculatorsByName();
+  for (const recorded of snapshot.calculators ?? []) {
+    const now = calculators[recorded.name];
+    if (!now) return fail(`the calculator "${recorded.name}" it ran is not in this engine build`);
+    if (calculatorFingerprint(now) !== recorded.fingerprint) return fail(`the formulas of "${recorded.name}" have changed since this calculation (fingerprint ${recorded.fingerprint}, now ${calculatorFingerprint(now)}): the formulas it used are not available to replay`);
+  }
+  audit.push(snapshot.calculators?.length
+    ? `calculators: ${snapshot.calculators.map((c) => `${c.name} (formulas ${c.fingerprint})`).join(', ')}, the same formulas as recorded`
+    : 'calculators: none recorded (saved before the cycle time was calculator-driven); recomputed with the stored calculators of this build');
+
   // The reference is always the one resolved from the stored rows: anything a snapshot's inputs might carry under these keys is overwritten.
-  const result = computeInjectionMoldedCostSummary({ ...snapshot.inputs, plasticReference: reference, plasticReferenceMissing: [] } as unknown as InjectionMoldingCostInput);
+  const result = computeInjectionMoldedCostSummary({ ...snapshot.inputs, calculators, plasticReference: reference, plasticReferenceMissing: [] } as unknown as InjectionMoldingCostInput);
   const line = result.processLines.find((l) => l.calculationSnapshot !== undefined);
   if (!line) return fail('the recomputation produced no molding line');
   audit.push('recomputed: the molding line from the recorded inputs');

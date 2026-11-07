@@ -6,6 +6,7 @@ import type { ReferenceCalculators } from '../costing/shared/calculators/referen
 import type { DomainCalculatorSpec } from '../costing/shared/calculators/domain-calculator-spec';
 import { loadHeatTreatmentCalculatorSpec } from '../costing/heat/calculators/heat-treatment-calculator-spec';
 import { loadSandCastingCalculatorSpec } from '../costing/casting/sand/calculators/sand-casting-calculator-spec';
+import { loadPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
 @Injectable()
 export class CalculatorCatalogService {
@@ -147,6 +148,37 @@ export class CalculatorCatalogService {
   loadSandCastingCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return cachedRead('sand-casting-calculators', async () => {
       const spec = loadSandCastingCalculatorSpec();
+      const client = this.databaseService.getClient(accessToken);
+      const { data: calcs } = await client
+        .from('calculators')
+        .select('id, name, version')
+        .in('name', spec.calculators.map((c) => c.name))
+        .is('user_id', null)
+        .is('retired_at', null);
+      const ids = (calcs ?? []).map((c: any) => c.id);
+      if (ids.length === 0) return {};
+      const { data: fields } = await client
+        .from('calculator_fields')
+        .select('calculator_id, field_name, display_label, field_type, unit, default_value, display_order, data_source, source_table, source_field')
+        .in('calculator_id', ids)
+        .order('display_order');
+      const out: ReferenceCalculators = {};
+      for (const c of spec.calculators) {
+        const row = (calcs ?? []).find((x: any) => x.name === c.name);
+        const fs = (fields ?? []).filter((f: any) => f.calculator_id === row?.id);
+        if (row && fs.length) out[c.name] = { calculatorId: row.id, name: row.name, version: row.version ?? 1, fields: fs };
+      }
+      return out;
+    });
+  }
+
+  /**
+   * The plastic-molding cycle-time calculators (migration 975) keyed by their own name: the LSR variant has no catalog operation, so they cannot all be keyed by one.
+   * The global, current calculator of each spec name with its fields; one not in the database is absent, so the cycle that needs it is a named gap (run migration 975).
+   */
+  loadPlasticMoldingCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return cachedRead('plastic-molding-calculators', async () => {
+      const spec = loadPlasticMoldingCalculatorSpec();
       const client = this.databaseService.getClient(accessToken);
       const { data: calcs } = await client
         .from('calculators')

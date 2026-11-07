@@ -9,6 +9,7 @@ import type { InjectionMoldingCostInput } from '../../../../../modules/bom-items
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../../../../../modules/bom-items/costing/plastic-molding/shot-size';
 import type { MachineCandidate } from '../../../../../modules/bom-items/dto/machine-selection.dto';
 import { allRealPresses, realMaterialClamp, realPlasticReference, realResinInputs } from './real-plastic-reference';
+import { plasticMoldingCalculatorsByName } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
 const REF = realPlasticReference();
 const PRESSES = allRealPresses();
@@ -43,7 +44,7 @@ function quote(over: Partial<InjectionMoldingCostInput> = {}, pressName = pick()
     mhrRate: { rate: p.mhrUsd, labourRate: 30, source: 'mhr_database', machineClass: 'injection_molding', machineName: p.name, commodityCode: null },
     deburrRate: { rate: 0, source: 'mhr_database', machineClass: 'deburring', machineName: null, commodityCode: null },
     inspectionRate: { rate: 0, source: 'mhr_database', machineClass: 'cmm', machineName: null, commodityCode: null },
-    machineClampTonnes: p.maxTonnage, machineShotCapacityG: p.shotCapacityGrams, pressTiming: p.timing, goodPartYield: p.goodPartYield,
+    machineClampTonnes: p.maxTonnage, machineShotCapacityG: p.shotCapacityGrams, pressTiming: p.timing, goodPartYield: p.goodPartYield, calculators: plasticMoldingCalculatorsByName(),
     materialClamp: CLAMP, realResinInputs: RESIN, materialType: 'Nylon', plasticReference: REF, location: 'USA',
     bboxMaxMm: PART.lengthMm, bboxMidMm: PART.widthMm,
     signals: { projectedAreaMm2: AREA, undercutCount: 1, partingComplexity: 0.3, gateType: 'edge' },

@@ -14,6 +14,7 @@
 import { computeCompressionMoldingCost } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
+import { plasticMoldingCalculatorsByName } from '../../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
 const realMachineRate = (machineClass: string): MHRRateInput => ({
   rate: 1200,
@@ -59,12 +60,14 @@ const noMachineSelectedRate = (machineClass: string): MHRRateInput => ({
 describe('computeCompressionMoldingCost — real cure-time folding', () => {
   it('material WITH real cure time → cycle time = real press motion + real cure time, disclosure warning names it', () => {
     const withoutCure = computeCompressionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 100,
       partWeightKg: 0.5,
       rate: realMachineRate('compression_molding'),
       cureTimeMinFromMaterial: null,
     });
     const withCure = computeCompressionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 100,
       partWeightKg: 0.5,
       rate: realMachineRate('compression_molding'),
@@ -77,6 +80,7 @@ describe('computeCompressionMoldingCost — real cure-time folding', () => {
 
   it('material WITHOUT real cure time → cycle time reflects only real press motion, honest gap disclosed, never fabricated', () => {
     const result = computeCompressionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 100,
       partWeightKg: 0.5,
       rate: realMachineRate('compression_molding'),
@@ -89,6 +93,7 @@ describe('computeCompressionMoldingCost — real cure-time folding', () => {
 
   it('machine itself has no real press_cycle_time_s → underlying $0 warning fires, no redundant cure-time warning added', () => {
     const result = computeCompressionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 100,
       partWeightKg: 0.5,
       rate: noCycleTimeMachineRate('compression_molding'),
@@ -108,6 +113,7 @@ describe('computeCompressionMoldingCost — real cure-time folding', () => {
     // four USA rows DID carry a real press_cycle_time_s and the actual cause was
     // a zero thickness capability rejecting every candidate (migration 713).
     const result = computeCompressionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 100,
       partWeightKg: 0.5,
       rate: noMachineSelectedRate('compression_molding'),
@@ -122,12 +128,14 @@ describe('computeCompressionMoldingCost — real cure-time folding', () => {
 describe('computeReactionInjectionMoldingCost — real cure/reaction-time folding', () => {
   it('material WITH real cure time → cycle time = real dry-cycle + real reaction/cure time', () => {
     const withoutCure = computeReactionInjectionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 50,
       partWeightKg: 1.2,
       rate: realMachineRate('reaction_injection_molding'),
       cureTimeMinFromMaterial: null,
     });
     const withCure = computeReactionInjectionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 50,
       partWeightKg: 1.2,
       rate: realMachineRate('reaction_injection_molding'),
@@ -139,6 +147,7 @@ describe('computeReactionInjectionMoldingCost — real cure/reaction-time foldin
 
   it('material WITHOUT real cure time → honest gap disclosure, no fabricated constant', () => {
     const result = computeReactionInjectionMoldingCost({
+      calculators: plasticMoldingCalculatorsByName(),
       batchSize: 50,
       partWeightKg: 1.2,
       rate: realMachineRate('reaction_injection_molding'),

@@ -29,6 +29,9 @@
 
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
+import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
+import { runPressCycleTime } from '../calculators/plastic-cycle-time';
+import { RIM_CALCULATOR } from '../calculators/plastic-cycle-time-seeds';
 
 interface ReactionInjectionMoldingCostInput {
   batchSize: number;
@@ -40,6 +43,8 @@ interface ReactionInjectionMoldingCostInput {
   // Real per-material cure_time_min (raw_materials, migration 619). null
   // when this specific grade has no real cure-time data on file.
   cureTimeMinFromMaterial?: number | null;
+  /** The stored cycle-time calculators by name (migration 975): the dry cycle plus cure time is computed by "Reaction Injection Molding - Cycle Time". Absent = a named gap, no cycle. */
+  calculators?: ReferenceCalculators | null;
   dlrPerHr?: number;
   qairPerHr?: number;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
@@ -52,12 +57,12 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
   // mechanical motion + cure, both real) — same non-invasive pattern as
   // Compression Molding's own engine; press-stroke-engine.ts itself stays
   // untouched.
-  const effectiveRate: MHRRateInput = {
-    ...input.rate,
-    pressCycleTimeS: input.rate.pressCycleTimeS != null
-      ? input.rate.pressCycleTimeS + (realCureTimeSec ?? 0)
-      : input.rate.pressCycleTimeS,
-  };
+  // The dry cycle plus cure time is the stored calculator's (calculators/plastic-cycle-time.ts): the engine seeds its inputs and passes its result on.
+  const cycle = runPressCycleTime(
+    { pressCycleTimeS: input.rate.pressCycleTimeS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null, process: 'rim' },
+    input.calculators ?? null, RIM_CALCULATOR,
+  );
+  const effectiveRate: MHRRateInput = { ...input.rate, pressCycleTimeS: cycle.derivable ? cycle.cycleSec : null };
 
   const result = computePressStrokeCost('Reaction Injection Molding', 'reaction_injection_molding', {
     numberOfStrokes: 1,
@@ -73,7 +78,18 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
     // engines' comments).
   });
 
-  if (input.rate.pressCycleTimeS != null) {
+  if (cycle.derivable) {
+    const line = result.processLines[0];
+    if (line) {
+      line.calculationTrace = cycle.trace;
+      if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
+      if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
+    }
+  } else if (input.rate.pressCycleTimeS != null) {
+    result.warnings.push(`Reaction Injection Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
+  }
+
+  if (cycle.derivable) {
     result.warnings.push(
       realCureTimeSec != null
         ? `Reaction Injection Molding cycle time includes real cure/reaction time (${input.cureTimeMinFromMaterial} min) ` +

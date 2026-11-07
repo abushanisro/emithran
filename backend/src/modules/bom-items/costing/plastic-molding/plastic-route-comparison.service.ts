@@ -6,6 +6,7 @@ import type { BOMItemResponseDto } from '../../dto/bom-item-response.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
 import type { RateResolutionService } from '../../services/rate-resolution.service';
 import type { MaterialResolutionService } from '../../services/material-resolution.service';
+import { CalculatorCatalogService } from '../../services/calculator-catalog.service';
 import { PlasticReferenceService } from './lookup/plastic-reference.service';
 import { injectionMoldabilityGap } from '../../../raw-materials/material-moldability';
 import { buildMoldingCommonInput, partBboxLongestFirst, type MoldingSummary } from './molding-input';
@@ -84,6 +85,7 @@ export class PlasticRouteComparisonService {
   constructor(
     private readonly database: DatabaseService,
     private readonly plasticReference: PlasticReferenceService,
+    private readonly calculatorCatalog: CalculatorCatalogService,
   ) {}
 
   async compare(input: PlasticComparisonInput): Promise<PlasticComparison> {
@@ -95,6 +97,8 @@ export class PlasticRouteComparisonService {
       stockForm: rcStockForm, matlState: rcMatlState, clampProperties: rcClampProperties, densityOfMeltKgM3: rcDensityOfMeltKgM3,
     } = input.material;
     const family = 'plastic_molded';
+    // The stored cycle-time calculators (migration 975): every molding route's cycle time is computed by its own process's calculator.
+    const calculators = await this.calculatorCatalog.loadPlasticMoldingCalculators(accessToken);
     // The real per-grade thermal inputs, from the same resolved material row as the cost per kg and density.
     const rcRealResinInputs = {
       meltingTempC: input.material.meltingTempC, moldTempC: input.material.moldTempC, ejectionTempC: input.material.ejectionTempC,
@@ -154,6 +158,7 @@ export class PlasticRouteComparisonService {
         materialMatlState: rcMatlState, materialClamp: rcClampProperties, realResinInputs: rcRealResinInputs,
       },
       plasticReference: { plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing },
+      calculators,
       currencySymbol: locInfo.symbol, usdToLocal: rcUsdToLocal,
       deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
       cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
@@ -282,6 +287,7 @@ export class PlasticRouteComparisonService {
       // Real per-grade cure_time_min — same resolved material row as
       // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+      calculators,
     });
     // A route is a real alternative only on a material the dataset flags for that process, and only where a real machine rate resolved.
     const processCompat = await this.plasticReference.getProcessCompatibility(client, grade);
@@ -324,6 +330,7 @@ export class PlasticRouteComparisonService {
       // Real per-grade cure/reaction time — same resolved material row as
       // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+      calculators,
     });
     const rimGap = compatGap('reaction_injection');
     const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database' && rimGap == null;

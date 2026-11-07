@@ -7,7 +7,8 @@ import {
   COMPRESSION_CALCULATOR, INJECTION_CALCULATOR, LSR_CALCULATOR, RIM_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR,
   injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds,
 } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time-seeds';
-import { computeCycleTime, type CycleTimeInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
+import { runInjectionCycleTime } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time';
+import { computeCycleTime, type CycleTimeInput } from './legacy-cycle-time-oracle';
 import { computeCompressionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import { runReferenceCalculator, type ReferenceCalculators } from '../../../../../modules/bom-items/costing/shared/calculators/reference-calculator';
@@ -67,7 +68,7 @@ describe('plastic molding calculator spec', () => {
 });
 
 // ── parity: the stored calculators give exactly the numbers the engines give today ──────────────────────────────────
-describe('injection and structural foam: the calculator gives the engine\'s numbers', () => {
+describe('injection and structural foam: the calculator gives the numbers of the frozen oracle (the in-code math it replaced)', () => {
   const presses = allRealPresses().filter((_, i) => i % 6 === 0);
   const resins = realMaterialNames().filter((_, i) => i % 4 === 0);
   const walls = [0.8, 1.5, 2.5, 4.2];
@@ -97,6 +98,15 @@ describe('injection and structural foam: the calculator gives the engine\'s numb
         expect(r.outputs['Cooling Time']).toBe(engine.coolSec);
         expect(r.outputs['Fill Time']).toBe(engine.fillSec);
         expect(r.outputs['Pack Time']).toBe(engine.packSec);
+        // and the engine's own path (seeds, stored calculator, trace) gives the same numbers for both injection and structural foam
+        for (const process of ['injection', 'structural_foam'] as const) {
+          const viaEngine = runInjectionCycleTime(input, BY_NAME, process);
+          if (!viaEngine.derivable) throw new Error(viaEngine.missing.join());
+          expect(viaEngine.totalCycleSec).toBe(engine.totalCycleSec);
+          expect(viaEngine.coolSec).toBe(engine.coolSec);
+          expect(viaEngine.fillSec).toBe(engine.fillSec);
+          expect(viaEngine.packSec).toBe(engine.packSec);
+        }
         compared += 1;
       }
     }
@@ -192,16 +202,21 @@ describe('compression and reaction injection: the calculator gives the engine\'s
   const presses = [3, 7.5, 12.25, 41.6, 95];
 
   it.each([
-    ['compression', COMPRESSION_CALCULATOR, (p: number, c: number | null) => computeCompressionMoldingCost(input(p, c))],
-    ['rim', RIM_CALCULATOR, (p: number, c: number | null) => computeReactionInjectionMoldingCost(input(p, c))],
+    ['compression', COMPRESSION_CALCULATOR, (p: number, c: number | null) => computeCompressionMoldingCost({ ...input(p, c), calculators: BY_NAME })],
+    ['rim', RIM_CALCULATOR, (p: number, c: number | null) => computeReactionInjectionMoldingCost({ ...input(p, c), calculators: BY_NAME })],
   ] as const)('%s: press (or dry) cycle plus cure time, with and without a cure time on file', (process, name, engine) => {
     let withCure = 0, withoutCure = 0;
     for (const press of presses) for (const cure of [...new Set(cures)]) {
       const seeded = pressCycleTimeSeeds({ pressCycleTimeS: press, cureTimeMin: cure, process });
       if (!('seeds' in seeded)) throw new Error('seeds expected');
       const r = run(name, seeded.seeds);
-      // the engine reports minutes per part; the calculator seconds
-      expect(r.value! / 60).toBeCloseTo(engine(press, cure).cuttingMin, 12);
+      // the oracle: what the engine did before the calculators: the press cycle plus the cure time when one is on file, over 60, for one stroke
+      const legacyMin = (press + (cure != null ? cure * 60 : 0)) / 60;
+      expect(r.value! / 60).toBeCloseTo(legacyMin, 12);
+      // and the engine, running the stored calculator, reports the same minutes per part (and carries the run on its line)
+      const viaEngine = engine(press, cure);
+      expect(viaEngine.cuttingMin).toBeCloseTo(legacyMin, 12);
+      expect(viaEngine.processLines[0]!.calculationTrace?.some((t) => t.fieldName === 'Cycle Time')).toBe(true);
       cure == null || !(cure > 0) ? (withoutCure += 1) : (withCure += 1);
     }
     expect(withCure).toBeGreaterThan(3);

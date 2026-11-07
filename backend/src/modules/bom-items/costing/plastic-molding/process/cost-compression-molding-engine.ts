@@ -40,6 +40,9 @@
 
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
+import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
+import { runPressCycleTime } from '../calculators/plastic-cycle-time';
+import { COMPRESSION_CALCULATOR } from '../calculators/plastic-cycle-time-seeds';
 
 interface CompressionMoldingCostInput {
   batchSize: number;
@@ -54,6 +57,8 @@ interface CompressionMoldingCostInput {
   // came from. null when this specific grade has no real cure-time data on
   // file — never fabricated, never a generic thermoset average.
   cureTimeMinFromMaterial?: number | null;
+  /** The stored cycle-time calculators by name (migration 975): the press cycle plus cure time is computed by "Compression Molding - Cycle Time". Absent = a named gap, no cycle. */
+  calculators?: ReferenceCalculators | null;
   dlrPerHr?: number;
   qairPerHr?: number;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
@@ -69,12 +74,12 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
   // itself is also unresolved (rate.pressCycleTimeS null), stays null —
   // computePressStrokeCost's own existing $0 + "no real press_cycle_time_s
   // on file" warning path is unaffected.
-  const effectiveRate: MHRRateInput = {
-    ...input.rate,
-    pressCycleTimeS: input.rate.pressCycleTimeS != null
-      ? input.rate.pressCycleTimeS + (realCureTimeSec ?? 0)
-      : input.rate.pressCycleTimeS,
-  };
+  // The press cycle plus cure time is the stored calculator's (calculators/plastic-cycle-time.ts): the engine seeds its inputs and passes its result on.
+  const cycle = runPressCycleTime(
+    { pressCycleTimeS: input.rate.pressCycleTimeS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null, process: 'compression' },
+    input.calculators ?? null, COMPRESSION_CALCULATOR,
+  );
+  const effectiveRate: MHRRateInput = { ...input.rate, pressCycleTimeS: cycle.derivable ? cycle.cycleSec : null };
 
   const result = computePressStrokeCost('Compression Molding', 'compression_molding', {
     numberOfStrokes: 1,
@@ -96,7 +101,18 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
     // (materialCost is a top-level field, not part of processLines).
   });
 
-  if (input.rate.pressCycleTimeS != null) {
+  if (cycle.derivable) {
+    const line = result.processLines[0];
+    if (line) {
+      line.calculationTrace = cycle.trace;
+      if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
+      if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
+    }
+  } else if (input.rate.pressCycleTimeS != null) {
+    result.warnings.push(`Compression Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
+  }
+
+  if (cycle.derivable) {
     result.warnings.push(
       realCureTimeSec != null
         ? `Compression Molding cycle time includes real cure time (${input.cureTimeMinFromMaterial} min) for this material, plus real press open/close motion.`

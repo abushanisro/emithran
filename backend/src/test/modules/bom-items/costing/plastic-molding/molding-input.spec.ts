@@ -42,7 +42,7 @@ describe('buildMoldingCommonInput', () => {
     grade: 'Generic ABS, 30% Glass', family: 'plastic_molded', location: 'USA', batchSize: 250, annualVolume: 1000, productionLifeYears: 5,
     material: { materialCostPerKg: 3.9, materialDensityKgM3: 1280, materialSource: 'db' as const, materialType: 'ABS', materialStockForm: null, materialMatlState: null },
     plasticReference: { plasticReference: null, plasticReferenceMissing: [] },
-    currencySymbol: '$', usdToLocal: 1, deburrRate: rate('deburring'), inspectionRate: rate('cmm'), cavityCountOverride: null,
+    currencySymbol: '$', usdToLocal: 1, deburrRate: rate('deburring'), inspectionRate: rate('cmm'), cavityCountOverride: null, calculators: null,
   };
 
   it('carries the part, its sorted box, the wall and the scenario, and leaves the press to the caller', () => {
