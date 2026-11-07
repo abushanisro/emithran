@@ -3,7 +3,7 @@ import type { ProcessLineCost } from '../../../../../modules/bom-items/dto/cost-
 
 // The staged catalog rows of each molding process (process_taxonomy_operations): compression has no core or lifter operation for a hole.
 const CATALOG: Record<string, string[]> = {
-  inj: ['Injection Molding:As Molded//SimpleHole', 'Injection Molding:HoleSideCore//SimpleHole', 'Injection Molding:HoleLifter//SimpleHole', 'Injection Molding:HoleNoCore//SimpleHole', 'Injection Molding:As Molded//PlanarFace'],
+  inj: ['Injection Molding:As Molded//SimpleHole', 'Injection Molding:HoleSideCore//SimpleHole', 'Injection Molding:HoleLifter//SimpleHole', 'Injection Molding:HoleNoCore//SimpleHole', 'Injection Molding:As Molded//PlanarFace', 'Injection Molding:Slides//SlideBundle'],
   rim: ['Reaction Injection Molding:As Molded//SimpleHole', 'Reaction Injection Molding:HoleSideCore//SimpleHole', 'Reaction Injection Molding:HoleNoCore//SimpleHole', 'Reaction Injection Molding:As Molded//PlanarFace'],
   sfm: ['Structural Foam Molding:As Molded//SimpleHole', 'Structural Foam Molding:HoleSideCore//SimpleHole', 'Structural Foam Molding:HoleNoCore//SimpleHole', 'Structural Foam Molding:As Molded//PlanarFace'],
   cm: ['Compression Molding:As Molded//SimpleHole', 'Compression Molding:As Molded//PlanarFace'],
@@ -63,10 +63,22 @@ describe('PlasticCatalogOperationsService', () => {
 
   it('names what is not assessed yet, and attaches nothing without the graph', async () => {
     const lines = [line('injection_molding')];
-    const warnings = await service().attach({ lines, graph, rules, family: 'plastic_molded', accessToken: 't' });
+    const { warnings } = await service().attach({ lines, graph, rules, family: 'plastic_molded', accessToken: 't' });
     expect(warnings.join(' ')).toContain('Void, PartingLine');
     const l2 = [line('injection_molding')];
-    expect(await service().attach({ lines: l2, graph: null, rules, family: 'plastic_molded', accessToken: 't' })).toEqual([]);
+    expect(await service().attach({ lines: l2, graph: null, rules, family: 'plastic_molded', accessToken: 't' })).toEqual({ warnings: [], featureRecognition: null });
     expect(l2[0].catalogOperations).toBeUndefined();
+  });
+
+  it('returns each route\'s own recognition: compression reports what it cannot make, injection does not', async () => {
+    const withSlide: PlasticFeatureGraph = { ...graph, items: [...graph.items, { id: 'sb', feature_type: 'SlideBundle', variant: null, attributes: { count: 1 }, occurrences: [{ face_ids: [3] }] }] };
+    const svc = service();
+    const inj = await svc.attach({ lines: [line('injection_molding')], graph: withSlide, rules, family: 'plastic_molded', accessToken: 't' });
+    const cm = await svc.attach({ lines: [line('compression_molding')], graph: withSlide, rules, family: 'plastic_molded', accessToken: 't' });
+    expect(inj.featureRecognition).toMatchObject({ process: 'Injection Molding' });
+    // injection has side cores and a slide: nothing is incompatible (the hole's core is undecided, not impossible)
+    expect(inj.featureRecognition?.incompatibilities).toEqual([]);
+    expect(cm.featureRecognition).toMatchObject({ process: 'Compression Molding' });
+    expect(cm.featureRecognition?.incompatibilities.map((i) => `${i.featureType}:${i.kind}`).sort()).toEqual(['SimpleHole:no_operation_can_make', 'SlideBundle:not_in_process_vocabulary']);
   });
 });

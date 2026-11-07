@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { RouteResultDto, ProcessLineCost } from '@/lib/api/hooks/useBOMItems';
+import type { RouteResultDto, ProcessLineCost, ProcessIncompatibility } from '@/lib/api/hooks/useBOMItems';
 
 // Recursive route-tree model for the Workflow Builder's multi-route picker
 // (reference USA Digital Factory style: many parallel route rows, each
@@ -38,6 +38,9 @@ export interface RouteNode {
   toolingVolumeNote: string | null;
   feasible: boolean;
   infeasibleReason: string | null;
+  // Molding routes: the recognised features this route's own process cannot make (RouteResultDto.featureRecognition). Informational: it does not
+  // change feasibility, cost or the recommendation. Empty for every other route and for every step row.
+  processIncompatibilities: ProcessIncompatibility[];
   cost: number | null;
   cycleTimeMin: number | null;
   machineName: string | null;
@@ -75,6 +78,12 @@ const routeResultSchema = z.object({
   cycleTimes: z.object({ totalMin: z.number() }),
   badges: z.object({ lowestCost: z.boolean(), fastest: z.boolean(), bestQuality: z.boolean() }),
   capability: z.object({ warnings: z.array(z.string()) }).passthrough(),
+  featureRecognition: z.object({
+    incompatibilities: z.array(z.object({
+      featureType: z.string(), variant: z.string(), count: z.number(), featureIds: z.array(z.string()),
+      kind: z.enum(['not_in_process_vocabulary', 'no_operation_can_make']), reason: z.string(),
+    })),
+  }).nullable().optional(),
 });
 
 export class RouteTreeValidationError extends Error {
@@ -95,6 +104,7 @@ function leafNode(routeId: string, line: ProcessLineCost, index: number): RouteN
     toolingVolumeNote: null,
     feasible: true,
     infeasibleReason: null,
+    processIncompatibilities: [],
     cost: line.totalCost,
     cycleTimeMin: line.cycleTimeMin,
     machineName: line.machineName ?? null,
@@ -132,6 +142,7 @@ export function adaptRoutesToTree(routes: RouteResultDto[]): RouteNode[] {
     toolingVolumeNote: route.toolingVolumeNote,
     feasible: route.isFeasible,
     infeasibleReason: route.isFeasible ? null : (route.capability.warnings.join('; ') || 'Not capable for this part'),
+    processIncompatibilities: route.featureRecognition?.incompatibilities ?? [],
     cost: route.totalCost,
     cycleTimeMin: route.cycleTimes.totalMin,
     machineName: route.processLines[0]?.machineName ?? null,

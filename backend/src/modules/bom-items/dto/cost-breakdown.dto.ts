@@ -3,6 +3,7 @@ import type { CostingInputs } from '../costing/shared/physics/costing-inputs';
 import type { CatalogOperation } from '../costing/sheet-metal/operation/catalog-operation-resolver';
 import type { GdtCallout } from '../costing/shared/physics/gdt-callouts';
 import type { FactMismatch } from '../costing/shared/physics/drawing-cad-consistency';
+import type { RouteFeatureRecognition } from '../costing/plastic-molding/operation/route-feature-recognition';
 
 /**
  * The costing inputs this response was actually computed at, together with where
@@ -499,6 +500,9 @@ export interface CostSummaryDto {
   // part-level fact (not per process line) — see
   // costing/shared/physics/drawing-cad-consistency.ts.
   drawingCadConsistency?: FactMismatch[];
+
+  /** Molding only: what the applied route's own process can do with the part's recognised features (informational; changes no cost). */
+  featureRecognition?: RouteFeatureRecognition | null;
 
   // Material
   materialCost: number;

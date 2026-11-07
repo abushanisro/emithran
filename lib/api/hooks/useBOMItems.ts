@@ -1353,6 +1353,27 @@ export interface RouteResultDto {
   routeComplexityScore?: number;
   /** Real clamp-tonnage/shot-capacity sizing detail — set only on IM tonnage-tier routes. */
   injectionMolding?: RouteInjectionMoldingDetail;
+  /** Molding routes: what this route's own process can do with the part's recognised features. Informational; changes no cost. */
+  featureRecognition?: RouteFeatureRecognition | null;
+}
+
+/** A recognised feature the route's process cannot make (mirrors backend ProcessIncompatibility). */
+export interface ProcessIncompatibility {
+  featureType: string;
+  variant: string;
+  count: number;
+  featureIds: string[];
+  kind: 'not_in_process_vocabulary' | 'no_operation_can_make';
+  reason: string;
+}
+
+/** Mirrors backend RouteFeatureRecognition (costing/plastic-molding/operation/route-feature-recognition.ts). */
+export interface RouteFeatureRecognition {
+  process: string;
+  vocabulary: string[];
+  recognised: { featureType: string; count: number }[];
+  incompatibilities: ProcessIncompatibility[];
+  notAssessed: string[];
 }
 
 /**

@@ -4213,13 +4213,15 @@ export class BOMItemsService {
       };
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);
-      imResult.warnings.push(...await this.plasticCatalogOperations.attach({
+      const catalogOps = await this.plasticCatalogOperations.attach({
         lines: imResult.processLines,
         graph: (summary.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,
         rules: activePlasticRef.reference?.featureRules ?? null,
         family,
         accessToken,
-      }));
+      });
+      imResult.warnings.push(...catalogOps.warnings);
+      imResult.featureRecognition = catalogOps.featureRecognition;
       imResult.drawingCadConsistency = drawingCadConsistency;
 
       // Clamp / shot sizing against the selected press is computed by the engine
@@ -6120,25 +6122,29 @@ export class BOMItemsService {
       // catalog and kind reads are shared through the request cache, not awaited route by route.
       const routeWarnings = await Promise.all(dto.routes.map(async (route) => {
         this.attachMachineSelections(route.processLines, mhrRates);
-        const warnings = family === 'sheet_metal'
-          ? await this.smCatalogOperations.attach({
-              lines: route.processLines,
-              features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
-              threads,
-              thicknessMm: sheetThicknessMm,
-              family,
-              accessToken,
-            })
-          : family === 'plastic_molded'
-            // Injection, structural foam, reaction injection and compression routes: each line resolves against its own process's catalog rows.
-            ? await this.plasticCatalogOperations.attach({
-                lines: route.processLines,
-                graph: ((fg?.summary as any)?.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,
-                rules: (await this.plasticReferenceService.getReference()).reference?.featureRules ?? null,
-                family,
-                accessToken,
-              })
-            : [];
+        let warnings: string[] = [];
+        if (family === 'sheet_metal') {
+          warnings = await this.smCatalogOperations.attach({
+            lines: route.processLines,
+            features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
+            threads,
+            thicknessMm: sheetThicknessMm,
+            family,
+            accessToken,
+          });
+        } else if (family === 'plastic_molded') {
+          // Injection, structural foam, reaction injection and compression routes: each line resolves against its own process's catalog rows,
+          // and the route carries what its own process can do with the recognised features.
+          const plastic = await this.plasticCatalogOperations.attach({
+            lines: route.processLines,
+            graph: ((fg?.summary as any)?.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,
+            rules: (await this.plasticReferenceService.getReference()).reference?.featureRules ?? null,
+            family,
+            accessToken,
+          });
+          route.featureRecognition = plastic.featureRecognition;
+          warnings = plastic.warnings;
+        }
         // Inherited tapping runs on THIS route's primary machine — surface that
         // machine on the Tapping line, not the "class default (tapping)" panel.
         if (mhrRates.tapping.source !== 'mhr_database') {
