@@ -57,6 +57,17 @@ vulnerabilities:
       tunnel only dials out with a token and parses no untrusted JOSE input from visitors. Re-check when cloudflared ships a
       build with go-jose >= 4.1.6 (Dependabot will propose it).
     expired_at: 2026-12-15
+  - id: CVE-2026-78661
+    paths:
+      - "usr/local/bin/cloudflared"
+    statement: >-
+      golang.org/x/net v0.61.0 (GO-2026-6860, html parser quadratic text coalescing, DoS) in the cloudflared binary. The module is
+      listed in the build info but the vulnerable package is not linked: zero golang.org/x/net/html symbols in the binary and
+      govulncheck binary mode reports 0 affected vulnerabilities. No cloudflared release builds with x/net >= 0.62.0 yet (2026.10.7
+      is the latest). Evidence and reproduction: docs/security-findings/CVE-2026-78661-cloudflared.md. Covers this CVE only, not
+      GO-2026-6866 / CVE-2026-97045. Short expiry on purpose: re-run the evidence for any new cloudflared digest, and drop this
+      entry when a release ships x/net >= 0.62.0 (Dependabot will propose it).
+    expired_at: 2026-12-07
   - id: CVE-2026-115905
     paths:
       - "opt/conda/lib/python3.14/site-packages/rattler/rattler.abi3.so"
