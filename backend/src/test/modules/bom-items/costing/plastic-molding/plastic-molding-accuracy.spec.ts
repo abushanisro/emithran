@@ -170,13 +170,15 @@ describe('cost summary: worked ABS part', () => {
     expect(r.processLines.every((l) => !l.physicsGap)).toBe(true);
   });
 
-  it('prices material 56.16 g x 3.046 = 0.1711 -> 0.17, press and operator 20.69 s x (29.18 + 30) USD/h = 0.3401 -> 0.34, total 0.51', () => {
+  it('prices material 56.16 g x 3.046 = 0.171063, press and operator 20.69 s x (29.18 + 30) USD/h = 0.340125, total 0.511188: to the millionth, not to the cent', () => {
     expect(r.grossWeightKg).toBeCloseTo(0.05616, 6);
     expect(im.cycleTimeSec).toBe(20.69);
-    expect(r.materialCost).toBe(0.17);
-    expect(r.processLines[0]!.runCost).toBe(0.34);
-    expect(r.totalProcessCost).toBe(0.34);
-    expect(r.totalCost).toBe(0.51);
+    const material = 0.05616 * 3.046;
+    const run = (20.69 * (29.18 + 30)) / 3600;
+    expect(r.materialCost).toBeCloseTo(material, 6);
+    expect(r.processLines[0]!.runCost).toBeCloseTo(run, 6);
+    expect(r.totalProcessCost).toBeCloseTo(run, 6);
+    expect(r.totalCost).toBeCloseTo(material + run, 6);
   });
 
   it('tooling, USA, 10,000/yr x 3 yr: mold BOM 2,140 + labour 2,398.67 = 4,538.67, one mold (ABS 144,000 shots), 0.1513 per part', () => {
@@ -206,10 +208,10 @@ describe('cost summary: worked ABS part', () => {
 });
 
 describe('regressions', () => {
-  it('a 4 g part keeps its milligrams: material at 300/kg is 4.4928 g x 300 = 1.35, not 4 g x 300 = 1.20', () => {
+  it('a 4 g part keeps its milligrams: material at 300/kg is 4.4928 g x 300 = 1.34784, not 4 g x 300 = 1.20', () => {
     const r = computeInjectionMoldedCostSummary(absPart({ volume: 4000, materialCostPerKg: 300, signals: { projectedAreaMm2: 1000, undercutCount: 0 } }));
     expect(r.grossWeightKg).toBeCloseTo(0.0044928, 6);
-    expect(r.materialCost).toBe(1.35);
+    expect(r.materialCost).toBeCloseTo(0.0044928 * 300, 6);
     expect(r.injectionMolding!.runnerScrapKg).toBeCloseTo(0.0003328, 6);
   });
 
