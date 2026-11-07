@@ -79,7 +79,7 @@ import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { invalidateBOMItemUpdateQueries, useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -9521,6 +9521,7 @@ export default function ManufacturingIntelligencePage() {
   }, [heatmapSources, fg, dfmScores, heatmapLayer, costHeatmapWeights, toleranceHeatmapWeights, sustainabilityHeatmapWeights, item?.holeCount, item?.bendCount, item?.sheetThicknessMm]);
 
   const [recalculating, setRecalculating] = useState(false);
+  const [rerunningDfm, setRerunningDfm] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
 
   // NOTE: this page deliberately does NOT auto-capture a 3D thumbnail (unlike
@@ -9542,6 +9543,22 @@ export default function ManufacturingIntelligencePage() {
       toast.error('Failed to download cost report');
     } finally {
       setDownloadingReport(false);
+    }
+  };
+
+  // Re-runs the CAD analysis on the stored 3D file (the backend's POST /reanalyze), so a part analysed before the engine
+  // learned to record something (the faces behind a measurement, say) gets it, then refreshes the item and its costs.
+  const handleRerunDfm = async () => {
+    if (rerunningDfm) return;
+    setRerunningDfm(true);
+    try {
+      const updated = await apiClient.post<BOMItem>(`/bom-items/${itemId}/reanalyze`, undefined, { timeout: 180_000 });
+      invalidateBOMItemUpdateQueries(queryClient, updated);
+      toast.success('CAD analysis re-run');
+    } catch (e: unknown) {
+      toast.error(e instanceof ApiError ? e.getUserMessage() : 'Could not re-run the CAD analysis');
+    } finally {
+      setRerunningDfm(false);
     }
   };
 
@@ -9727,8 +9744,12 @@ export default function ManufacturingIntelligencePage() {
         <Calculator className={`h-3 w-3 ${recalculating ? 'animate-spin' : ''}`} />
         Recalculate Cost
       </button>
-      <button disabled className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border opacity-40 cursor-not-allowed shrink-0">
-        <ShieldCheck className="h-3 w-3" />
+      <button
+        onClick={() => { void handleRerunDfm(); }}
+        disabled={rerunningDfm || !item.file3dPath}
+        className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+      >
+        <ShieldCheck className={`h-3 w-3 ${rerunningDfm ? 'animate-pulse' : ''}`} />
         Re-run DFM
       </button>
       <button disabled className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border opacity-40 cursor-not-allowed shrink-0">
