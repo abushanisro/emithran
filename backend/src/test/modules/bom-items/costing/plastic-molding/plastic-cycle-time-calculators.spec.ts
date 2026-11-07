@@ -1,0 +1,243 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+import { loadPlasticMoldingCalculatorSpec, plasticMoldingCalculatorsByName, plasticMoldingCalculatorsFromSpec } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
+import { buildPlasticMoldingCalculatorsMigrationSql } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators-migration';
+import {
+  COMPRESSION_CALCULATOR, INJECTION_CALCULATOR, LSR_CALCULATOR, RIM_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR,
+  injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds,
+} from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time-seeds';
+import { computeCycleTime, type CycleTimeInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
+import { computeCompressionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-compression-molding-engine';
+import { computeReactionInjectionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-reaction-injection-molding-engine';
+import { runReferenceCalculator, type ReferenceCalculators } from '../../../../../modules/bom-items/costing/shared/calculators/reference-calculator';
+import type { MHRRateInput } from '../../../../../modules/bom-items/costing/shared/core/cost-engine';
+import { allRealPresses, realCureTimeMin, realFillFactorRows, realMaterialNames, realOperationCatalog, realPlasticReference, realResinInputs } from './real-plastic-reference';
+
+const MODEL = realPlasticReference().cycleModel;
+const BY_NAME = plasticMoldingCalculatorsByName();
+const BY_OPERATION = plasticMoldingCalculatorsFromSpec();
+
+/** The calculator of a name, run on seeds, as the engine will run it. */
+function run(name: string, seeds: Record<string, import('../../../../../modules/bom-items/costing/shared/calculators/reference-calculator').CalcSeed>) {
+  const calculators: ReferenceCalculators = { [name]: BY_NAME[name]! };
+  return runReferenceCalculator(calculators, name, seeds);
+}
+
+describe('plastic molding calculator spec', () => {
+  const spec = loadPlasticMoldingCalculatorSpec();
+
+  it('has one cycle-time calculator for each of the four molding processes, and an LSR helper no catalog operation maps to', () => {
+    expect(spec.processGroup).toBe('Plastic Molding');
+    expect(spec.calculators.filter((c) => !c.helper).map((c) => c.operations[0]).sort()).toEqual(
+      ['Compression Molding', 'Injection Molding', 'Reaction Injection Molding', 'Structural foam molding']);
+    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR]);
+  });
+
+  it('every operation it computes is a process of the reference catalog (digital_factory_operations.csv)', () => {
+    const catalog = Object.keys(realOperationCatalog()).map((p) => p.toLowerCase());
+    for (const c of spec.calculators.filter((x) => !x.helper)) expect(catalog).toContain(c.operations[0]!.toLowerCase());
+  });
+
+  it('every input says where its value comes from, and every calculated field is a formula over earlier fields', () => {
+    for (const c of spec.calculators) {
+      for (const f of c.fields) expect(Boolean(f.formula) !== Boolean(f.source)).toBe(true);
+      expect(c.fields[c.fields.length - 1]!.name).toBe('Cycle Time');
+    }
+  });
+
+  it('structural foam is the injection calculator with the same fields: the physics is the same and cannot drift apart', () => {
+    const inj = spec.calculators.find((c) => c.name === INJECTION_CALCULATOR)!;
+    const sfm = spec.calculators.find((c) => c.name === STRUCTURAL_FOAM_CALCULATOR)!;
+    expect(sfm.fields).toEqual(inj.fields);
+    expect(sfm.description).toContain('NOT modelled');
+  });
+
+  it('the committed migration is exactly what the generator writes from the spec', () => {
+    const committed = readFileSync(join(__dirname, '../../../../../../migrations/975_plastic_molding_calculators.sql'), 'utf8');
+    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql());
+  });
+
+  it('the calculator descriptions say what is not modelled, so no one reads them as complete', () => {
+    const text = (n: string) => spec.calculators.find((c) => c.name === n)!.description;
+    expect(text(INJECTION_CALCULATOR)).toMatch(/Not modelled.*ejector travel.*plasticizing/s);
+    expect(text(COMPRESSION_CALCULATOR)).toMatch(/charging, preheat, flash trimming/);
+    expect(text(RIM_CALCULATOR)).toMatch(/Phase 3/);
+  });
+});
+
+// ── parity: the stored calculators give exactly the numbers the engines give today ──────────────────────────────────
+describe('injection and structural foam: the calculator gives the engine\'s numbers', () => {
+  const presses = allRealPresses().filter((_, i) => i % 6 === 0);
+  const resins = realMaterialNames().filter((_, i) => i % 4 === 0);
+  const walls = [0.8, 1.5, 2.5, 4.2];
+  const layouts: Array<[number, number]> = [[1, 1], [2, 1], [4, 2], [8, 3], [16, 4]];
+  const volumes = [4_000, 55_000, 310_000];
+
+  it('agrees to the last digit across real presses, real resins, walls, cavity layouts and shot sizes', () => {
+    let derivable = 0, notDerivable = 0, compared = 0;
+    for (const press of presses) for (const resin of resins) {
+      const real = realResinInputs(resin);
+      for (const wall of walls) for (const [cav, gates] of layouts) for (const vol of volumes) {
+        const input: CycleTimeInput = { wallMm: wall, isLsr: false, real, model: MODEL, press: press.timing, shotMeltVolumeMm3: vol * cav, cavityCount: cav, gatesPerCavity: gates };
+        const engine = computeCycleTime(input);
+        const seeded = injectionCycleTimeSeeds(input);
+        if (!engine.derivable) {
+          notDerivable += 1;
+          // not derivable for the engine: the seeds must say so too (never a number the engine would not give)
+          expect('missing' in seeded).toBe(true);
+          continue;
+        }
+        derivable += 1;
+        expect('seeds' in seeded).toBe(true);
+        if (!('seeds' in seeded)) continue;
+        const r = run(INJECTION_CALCULATOR, seeded.seeds);
+        expect(r.missing).toEqual([]);
+        expect(r.value).toBe(engine.totalCycleSec);
+        expect(r.outputs['Cooling Time']).toBe(engine.coolSec);
+        expect(r.outputs['Fill Time']).toBe(engine.fillSec);
+        expect(r.outputs['Pack Time']).toBe(engine.packSec);
+        compared += 1;
+      }
+    }
+    // the grid is real: it exercises both outcomes
+    expect(derivable).toBeGreaterThan(1000);
+    expect(notDerivable).toBeGreaterThan(0);
+    expect(compared).toBe(derivable);
+  });
+
+  it('structural foam, which reuses the injection model, gives the same numbers through its own calculator', () => {
+    const input: CycleTimeInput = { wallMm: 3, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: presses[0]!.timing, shotMeltVolumeMm3: 90_000, cavityCount: 2, gatesPerCavity: 1 };
+    const engine = computeCycleTime(input);
+    const seeded = injectionCycleTimeSeeds(input);
+    if (!engine.derivable || !('seeds' in seeded)) throw new Error('fixture must be derivable');
+    expect(run(STRUCTURAL_FOAM_CALCULATOR, seeded.seeds).value).toBe(engine.totalCycleSec);
+    expect(injectionCalculatorName(false, 'structural_foam')).toBe(STRUCTURAL_FOAM_CALCULATOR);
+  });
+
+  it('is reached through the operation the catalog names (the mapping), not only by name', () => {
+    expect(BY_OPERATION['Injection Molding']!.name).toBe(INJECTION_CALCULATOR);
+    expect(BY_OPERATION['Structural foam molding']!.name).toBe(STRUCTURAL_FOAM_CALCULATOR);
+    expect(BY_OPERATION['Compression Molding']!.name).toBe(COMPRESSION_CALCULATOR);
+    expect(BY_OPERATION['Reaction Injection Molding']!.name).toBe(RIM_CALCULATOR);
+  });
+
+  it('names the same missing inputs the engine does, and never fills one', () => {
+    const base: CycleTimeInput = { wallMm: 2, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: presses[0]!.timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1 };
+    for (const broken of [
+      { ...base, wallMm: null },
+      { ...base, press: { injectionRateMm3PerS: null, dryCycleTimeS: base.press!.dryCycleTimeS } },
+      { ...base, press: { injectionRateMm3PerS: base.press!.injectionRateMm3PerS, dryCycleTimeS: 0 } },
+      { ...base, shotMeltVolumeMm3: null },
+      { ...base, real: { ...base.real!, thermalConductivityMeltWMK: null } },
+    ] as CycleTimeInput[]) {
+      const engine = computeCycleTime(broken);
+      const seeded = injectionCycleTimeSeeds(broken);
+      expect(engine.derivable).toBe(false);
+      expect('missing' in seeded && seeded.missing).toEqual(!engine.derivable ? engine.missing : []);
+    }
+  });
+
+  it('a temperature set with no Menges solution is missing, not a cycle', () => {
+    const real = { ...realResinInputs(resins[0]!), ejectionTempC: 10_000 };
+    const input: CycleTimeInput = { wallMm: 2, isLsr: false, real, model: MODEL, press: presses[0]!.timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1 };
+    expect(computeCycleTime(input).derivable).toBe(false);
+    const seeded = injectionCycleTimeSeeds(input);
+    expect('missing' in seeded && seeded.missing.join(' ')).toContain('no Menges solution');
+  });
+
+  it('the trace gives every input with its source, the fill factors with the lookup-table row, and every formula', () => {
+    const input: CycleTimeInput = { wallMm: 2.5, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: presses[0]!.timing, shotMeltVolumeMm3: 90_000, cavityCount: 4, gatesPerCavity: 2 };
+    const seeded = injectionCycleTimeSeeds(input);
+    if (!('seeds' in seeded)) throw new Error('fixture must be derivable');
+    const r = run(INJECTION_CALCULATOR, seeded.seeds);
+    const inputs = r.trace.filter((t) => t.kind === 'input');
+    expect(inputs.length).toBe(14);
+    expect(inputs.every((t) => typeof t.source === 'string' && t.source.length > 0)).toBe(true);
+    expect(inputs.filter((t) => t.stepType === 'lookup').map((t) => t.fieldName)).toEqual(['Fill Factor for Cavities', 'Fill Factor for Gates']);
+    expect(r.lookups['Fill Factor for Cavities']).toEqual({ table: 'injectionTimeAdjustmentFactors', row: { attribute: 'Cavities Per Mold', number: 5 } });
+    expect(r.lookups['Fill Factor for Gates']).toEqual({ table: 'injectionTimeAdjustmentFactors', row: { attribute: 'Gates Per Cavity', number: 2 } });
+    const formulas = r.trace.filter((t) => t.kind === 'calculated');
+    expect(formulas.map((t) => t.fieldName)).toEqual(['Mold Wall Temperature', 'Thermal Diffusivity', 'Cooling Time', 'Fill Time', 'Pack to Cooling Ratio', 'Pack Time Minimum', 'Pack Time', 'Cycle Time']);
+    expect(formulas.every((t) => typeof t.formula === 'string' && t.formula.length > 0)).toBe(true);
+  });
+});
+
+describe('liquid silicone: the LSR calculator gives the engine\'s numbers', () => {
+  it('agrees with the engine (cure instead of cooling, no pack phase)', () => {
+    const presses = allRealPresses().filter((_, i) => i % 9 === 0);
+    let compared = 0;
+    for (const press of presses) for (const wall of [0.5, 1, 2, 3.5]) for (const [cav, gates] of [[1, 1], [4, 2], [16, 3]] as Array<[number, number]>) {
+      const input: CycleTimeInput = { wallMm: wall, isLsr: true, real: null, model: MODEL, press: press.timing, shotMeltVolumeMm3: 40_000 * cav, cavityCount: cav, gatesPerCavity: gates };
+      const engine = computeCycleTime(input);
+      const seeded = injectionCycleTimeSeeds(input);
+      if (!engine.derivable) { expect('missing' in seeded).toBe(true); continue; }
+      if (!('seeds' in seeded)) throw new Error('seeds must exist when the engine derives a cycle');
+      const r = run(injectionCalculatorName(true, 'injection'), seeded.seeds);
+      expect(r.value).toBe(engine.totalCycleSec);
+      expect(r.outputs['Cure Time']).toBe(engine.coolSec);
+      compared += 1;
+    }
+    expect(compared).toBeGreaterThan(50);
+  });
+});
+
+describe('compression and reaction injection: the calculator gives the engine\'s numbers', () => {
+  const rate = (pressCycleTimeS: number | null) =>
+    ({ rate: 60, source: 'mhr_database', machineClass: 'x', machineName: 'M', commodityCode: null, pressCycleTimeS, setupTimeHr: 0.5 }) as unknown as MHRRateInput;
+  const input = (pressCycleTimeS: number | null, cureTimeMin: number | null) =>
+    ({ batchSize: 1000, partWeightKg: 0.2, rate: rate(pressCycleTimeS), cureTimeMinFromMaterial: cureTimeMin });
+
+  const cures = realMaterialNames().map((n) => realCureTimeMin(n));
+  const presses = [3, 7.5, 12.25, 41.6, 95];
+
+  it.each([
+    ['compression', COMPRESSION_CALCULATOR, (p: number, c: number | null) => computeCompressionMoldingCost(input(p, c))],
+    ['rim', RIM_CALCULATOR, (p: number, c: number | null) => computeReactionInjectionMoldingCost(input(p, c))],
+  ] as const)('%s: press (or dry) cycle plus cure time, with and without a cure time on file', (process, name, engine) => {
+    let withCure = 0, withoutCure = 0;
+    for (const press of presses) for (const cure of [...new Set(cures)]) {
+      const seeded = pressCycleTimeSeeds({ pressCycleTimeS: press, cureTimeMin: cure, process });
+      if (!('seeds' in seeded)) throw new Error('seeds expected');
+      const r = run(name, seeded.seeds);
+      // the engine reports minutes per part; the calculator seconds
+      expect(r.value! / 60).toBeCloseTo(engine(press, cure).cuttingMin, 12);
+      cure == null || !(cure > 0) ? (withoutCure += 1) : (withCure += 1);
+    }
+    expect(withCure).toBeGreaterThan(3);
+    expect(withoutCure).toBeGreaterThan(0);
+  });
+
+  it('a machine with no cycle time on file is missing, as it is for the engine (no cycle is invented)', () => {
+    for (const process of ['compression', 'rim'] as const) {
+      const seeded = pressCycleTimeSeeds({ pressCycleTimeS: null, cureTimeMin: 3, process });
+      expect('missing' in seeded && seeded.missing[0]).toContain('press_cycle_time_s');
+    }
+    expect(computeCompressionMoldingCost(input(null, 3)).processLines[0]!.cycleTimeMin).toBe(0);
+  });
+
+  it('a grade with no cure time says so in the trace and is understated, not given a typical time', () => {
+    const seeded = pressCycleTimeSeeds({ pressCycleTimeS: 20, cureTimeMin: null, process: 'compression' });
+    if (!('seeds' in seeded)) throw new Error('seeds expected');
+    const r = run(COMPRESSION_CALCULATOR, seeded.seeds);
+    expect(r.value).toBe(20);
+    expect(r.trace.find((t) => t.fieldName === 'Material Cure Time')?.source).toContain('not included');
+  });
+});
+
+describe('the written report of the calculators', () => {
+  it('docs/plastic-modeling/cycle-time-calculators.md is exactly what the generator writes (it cannot go stale)', () => {
+    const { buildPlasticCalculatorReport } = jest.requireActual('../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-calculator-report') as typeof import('../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-calculator-report');
+    const doc = readFileSync(join(__dirname, '../../../../../../../docs/plastic-modeling/cycle-time-calculators.md'), 'utf8');
+    expect(doc).toBe(buildPlasticCalculatorReport({ spec: loadPlasticMoldingCalculatorSpec(), catalog: realOperationCatalog(), fillFactorRows: realFillFactorRows() }));
+  });
+
+  it('shows each process\'s own feature lookup table and calculation', () => {
+    const doc = readFileSync(join(__dirname, '../../../../../../../docs/plastic-modeling/cycle-time-calculators.md'), 'utf8');
+    for (const process of ['Injection Molding', 'Structural Foam Molding', 'Compression Molding', 'Reaction Injection Molding']) {
+      expect(doc).toContain(`## ${process}`);
+      expect(doc).toContain(`Operations the reference lists for ${process}`);
+    }
+    expect(doc).toContain('| PartingLine | Manual Flash Trimming |'); // compression only
+  });
+});

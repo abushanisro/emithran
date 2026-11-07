@@ -133,3 +133,21 @@ export function realOperationCatalog(): Record<string, string[]> {
   for (const r of rows) (byProcess[r.process!] ??= []).push(r.processName!);
   return byProcess;
 }
+
+/** The names of every material in materials_final.csv (the reference resin list). */
+export function realMaterialNames(): string[] {
+  return read('materials_final.csv').map((r) => r['name']!).filter((n) => n);
+}
+
+/** A reference material's thermoset cure time in minutes (cureTimeMin), or null when the grade has none (as raw_materials.cure_time_min carries it). */
+export function realCureTimeMin(name: string): number | null {
+  const row = read('materials_final.csv').find((r) => r['name'] === name);
+  const v = row?.['processingParameters.cureTimeMin'];
+  return v === undefined || v === '' ? null : Number(v);
+}
+
+/** The injectionTimeAdjustmentFactors rows (cavities per mold and gates per cavity brackets), in file order. */
+export function realFillFactorRows(): Array<{ attribute: string; number: number; factor: number }> {
+  return read('lookup/injectionTimeAdjustmentFactors__records.csv').map((r) => ({ attribute: r['attribute']!, number: Number(r['number']), factor: Number(r['adjustment_factor']) }));
+}
+
