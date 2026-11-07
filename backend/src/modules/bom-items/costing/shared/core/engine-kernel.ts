@@ -418,6 +418,15 @@ export function isRouteDataComplete(lines: readonly RouteDataGapLine[]): boolean
 // priced with, so a volume that genuinely changes the economics changes the
 // winner, and one that does not, does not.
 
+/**
+ * Whether the route's own process can make the part, as a verdict separate from capability and feasibility: 'incompatible' only when the process's reference
+ * definition rules a feature of this part out (a confirmed fact, never a feature the CAD has not assessed yet). Whoever decides it (for molding,
+ * plastic-molding/operation/route-compatibility.ts) sets it; ranking only reads it.
+ */
+export interface RouteCompatibilityVerdict {
+  status: 'compatible' | 'incompatible';
+}
+
 export interface RankableRoute {
   routeId: string;
   totalCost: number | null;
@@ -443,6 +452,11 @@ export interface RankableRoute {
    * concept, and undefined means "no evidence against this route".
    */
   producesBlank?: boolean;
+  /**
+   * 'incompatible' when the route's process cannot make a feature of this part (see RouteCompatibilityVerdict). Optional: families that do not decide it
+   * leave it unset, and unset or null means "no evidence against this route".
+   */
+  compatibility?: RouteCompatibilityVerdict | null;
 }
 
 /**
@@ -459,6 +473,7 @@ export function selectRecommendedRoute<T extends RankableRoute>(routes: readonly
       r.capability.overallCapable &&
       r.isFeasible &&
       r.producesBlank !== false &&
+      r.compatibility?.status !== 'incompatible' &&
       r.dataComplete &&
       typeof r.totalCost === 'number',
   );

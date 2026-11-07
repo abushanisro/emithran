@@ -4215,6 +4215,7 @@ function RouteSelectionDialog({
               onSelect={(node) => { setCuttingRouteId(node.id); }}
               recommendedIds={isIM && comparison.data?.recommendedRouteId ? [comparison.data.recommendedRouteId] : []}
               topRecommendedLabel="Recommended"
+              noCompatibleMessage={isIM ? comparison.data?.noCompatibleProcessMessage ?? null : null}
               sortMode={sortMode}
               onSortModeChange={setSortMode}
               currencySymbol={currencySymbol}

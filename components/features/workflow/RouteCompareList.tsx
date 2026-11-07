@@ -54,6 +54,8 @@ export interface RouteCompareListProps {
   cuttingGroupMeta?: { title: string; description: string };
   /** Badge on the first recommended route. Sheet metal's is its CAD-based pick; a family whose recommendation is the cheapest capable route says so. */
   topRecommendedLabel?: string;
+  /** Shown above the list when every route is incompatible (the backend's own message). No route is recommended or pre-selected then. */
+  noCompatibleMessage?: string | null;
 }
 
 function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'violet' | 'red'; children: React.ReactNode }) {
@@ -73,7 +75,7 @@ function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'viole
 
 export function RouteCompareList({
   nodes, selectedId, onSelect, recommendedIds, sortMode, onSortModeChange, currencySymbol,
-  isLoading = false, errorMessage = null, cuttingGroupMeta, topRecommendedLabel = 'CAD-optimal',
+  isLoading = false, errorMessage = null, cuttingGroupMeta, topRecommendedLabel = 'CAD-optimal', noCompatibleMessage = null,
 }: RouteCompareListProps) {
   const groupId = useId();
   const listRef = useRef<HTMLDivElement>(null);
@@ -81,7 +83,7 @@ export function RouteCompareList({
   // Routes that can be used come first in every group; the ones that cannot stay listed below, muted, with the reason.
   const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds), cuttingGroupMeta).map((g) => ({
     ...g,
-    nodes: [...g.nodes.filter((n) => n.feasible), ...g.nodes.filter((n) => !n.feasible)],
+    nodes: [...g.nodes.filter((n) => n.feasible && !n.incompatible), ...g.nodes.filter((n) => !n.feasible || n.incompatible)],
   }));
   const costScale = maxRouteCost(nodes);
   const selectableIds = groups.flatMap((g) => g.nodes.filter((n) => n.selectable).map((n) => n.id));
@@ -136,6 +138,13 @@ export function RouteCompareList({
           ))}
         </div>
       </div>
+
+      {noCompatibleMessage && (
+        <div role="alert" className="flex shrink-0 items-start gap-2 border-b border-red-500/30 bg-red-500/10 px-4 py-2.5 text-[12px] font-medium text-red-300">
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>{noCompatibleMessage}</span>
+        </div>
+      )}
 
       {/* Frozen column header — NN/g: keep the labels for numeric columns in
           view while the rows scroll, so a figure is never read unlabelled */}
@@ -221,6 +230,7 @@ export function RouteCompareList({
                         {node.badges.lowestCost && <Badge tone="emerald">Lowest cost</Badge>}
                         {node.badges.fastest && <Badge tone="violet">Fastest</Badge>}
                         {node.badges.bestQuality && <Badge tone="amber">Best quality</Badge>}
+                        {node.incompatible && <Badge tone="red">Incompatible</Badge>}
                         {!node.feasible && <span className="inline-flex items-center rounded-full border border-border px-1.5 py-px text-[10px] font-medium leading-4 text-muted-foreground">Not usable</span>}
                       </div>
 
@@ -263,7 +273,7 @@ export function RouteCompareList({
                           <p className="flex items-start gap-1 font-medium">
                             <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
                             <span>
-                              This process cannot make {node.processIncompatibilities.length === 1 ? 'a feature' : `${String(node.processIncompatibilities.length)} features`} of this part
+                              {node.incompatible ? 'Incompatible: not recommended. ' : ''}This process cannot make {node.processIncompatibilities.length === 1 ? 'a feature' : `${String(node.processIncompatibilities.length)} features`} of this part
                             </span>
                           </p>
                           <ul className="mt-0.5 space-y-0.5 pl-4 text-muted-foreground">
@@ -274,6 +284,16 @@ export function RouteCompareList({
                             ))}
                           </ul>
                         </div>
+                      )}
+                      {node.compatibilityWarnings.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-[11px] leading-snug text-muted-foreground">
+                          {node.compatibilityWarnings.map((w) => (
+                            <li key={w} className="flex items-start gap-1">
+                              <Info className="mt-px h-3 w-3 shrink-0" />
+                              <span>{w}</span>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                       {node.toolingVolumeNote && (
                         <p className={cn(

@@ -1355,6 +1355,16 @@ export interface RouteResultDto {
   injectionMolding?: RouteInjectionMoldingDetail;
   /** Molding routes: what this route's own process can do with the part's recognised features. Informational; changes no cost. */
   featureRecognition?: RouteFeatureRecognition | null;
+  /** Molding routes: whether this route's process can make the part. 'incompatible' bars the route from the recommendation and the badges; `warnings` are features not assessed yet (never an exclusion). */
+  compatibility?: RouteCompatibility | null;
+}
+
+/** Mirrors backend RouteCompatibility (costing/plastic-molding/operation/route-compatibility.ts). */
+export interface RouteCompatibility {
+  status: 'compatible' | 'incompatible';
+  incompatibilities: ProcessIncompatibility[];
+  notAssessed: string[];
+  warnings: string[];
 }
 
 /** A recognised feature the route's process cannot make (mirrors backend ProcessIncompatibility). */
@@ -1431,6 +1441,8 @@ export interface RouteComparisonDto {
    * Automatic routing applies this. Manual routing ignores it.
    */
   recommendedRouteId: string | null;
+  /** Set when every route is incompatible (no route is recommended and none is chosen in its place). Show it as is. */
+  noCompatibleProcessMessage?: string | null;
   materialCost: number;
   materialGrade: string;
   grossWeightKg: number;

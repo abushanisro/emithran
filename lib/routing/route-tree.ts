@@ -41,6 +41,10 @@ export interface RouteNode {
   // Molding routes: the recognised features this route's own process cannot make (RouteResultDto.featureRecognition). Informational: it does not
   // change feasibility, cost or the recommendation. Empty for every other route and for every step row.
   processIncompatibilities: ProcessIncompatibility[];
+  // True when a confirmed incompatibility bars this route from the recommendation (RouteResultDto.compatibility). The route stays listed, with the reason.
+  incompatible: boolean;
+  // Features not assessed from the CAD yet: shown as warnings, never a reason to exclude the route.
+  compatibilityWarnings: string[];
   cost: number | null;
   cycleTimeMin: number | null;
   machineName: string | null;
@@ -78,6 +82,7 @@ const routeResultSchema = z.object({
   cycleTimes: z.object({ totalMin: z.number() }),
   badges: z.object({ lowestCost: z.boolean(), fastest: z.boolean(), bestQuality: z.boolean() }),
   capability: z.object({ warnings: z.array(z.string()) }).passthrough(),
+  compatibility: z.object({ status: z.enum(['compatible', 'incompatible']), warnings: z.array(z.string()) }).nullable().optional(),
   featureRecognition: z.object({
     incompatibilities: z.array(z.object({
       featureType: z.string(), variant: z.string(), count: z.number(), featureIds: z.array(z.string()),
@@ -105,6 +110,8 @@ function leafNode(routeId: string, line: ProcessLineCost, index: number): RouteN
     feasible: true,
     infeasibleReason: null,
     processIncompatibilities: [],
+    incompatible: false,
+    compatibilityWarnings: [],
     cost: line.totalCost,
     cycleTimeMin: line.cycleTimeMin,
     machineName: line.machineName ?? null,
@@ -143,6 +150,8 @@ export function adaptRoutesToTree(routes: RouteResultDto[]): RouteNode[] {
     feasible: route.isFeasible,
     infeasibleReason: route.isFeasible ? null : (route.capability.warnings.join('; ') || 'Not capable for this part'),
     processIncompatibilities: route.featureRecognition?.incompatibilities ?? [],
+    incompatible: route.compatibility?.status === 'incompatible',
+    compatibilityWarnings: route.compatibility?.warnings ?? [],
     cost: route.totalCost,
     cycleTimeMin: route.cycleTimes.totalMin,
     machineName: route.processLines[0]?.machineName ?? null,
