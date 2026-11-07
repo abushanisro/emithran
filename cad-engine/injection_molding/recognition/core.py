@@ -15,6 +15,7 @@ from .pull_direction import choose_pull_direction
 from .rules import staged_rules
 from .side_actions import combine_and_bundle, find_voids
 from .vec import Vec
+from .wall_thickness import measure_wall_thickness
 from shared.feature_vocabulary import feature_types, require_feature_type
 
 VERSION = "plastic_recognition_core_v1"
@@ -85,6 +86,7 @@ def recognize_core(
             ],
         },
         "draft": analyze_draft(meshes, pull.vector, undrafted_deg, max_draft_deg),
+        "wall": measure_wall_thickness(meshes, max(0.1, diagonal * 0.001)),
         "features": holes,
         "face_features": faces,
         "side_actions": side,

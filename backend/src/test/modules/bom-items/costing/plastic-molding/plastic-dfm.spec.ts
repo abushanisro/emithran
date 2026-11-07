@@ -4,7 +4,7 @@ import { realDfmReference } from './real-plastic-reference';
 // The DFM engine against the real staged rule data (memory/Plastic Modeling): the thresholds are the data's, never the code's.
 
 const REF = realDfmReference();
-const part = (over: Partial<PlasticDfmPart> = {}): PlasticDfmPart => ({ draftFaces: [], holes: [], ...over });
+const part = (over: Partial<PlasticDfmPart> = {}): PlasticDfmPart => ({ draftFaces: [], holes: [], wallFaces: [], ...over });
 const draft = (face: number, deg: number, cls = 'drafted') => ({ face, deg, basis: 'least', cls });
 const find = (r: ReturnType<typeof evaluatePlasticDfm>, rule: string) => r.findings.filter((f) => f.rule === rule);
 
@@ -86,11 +86,10 @@ describe('evaluatePlasticDfm: what is not measured is said, never passed', () =>
 
   it('lists each rule the analysis cannot judge with its reason', () => {
     const why = Object.fromEntries(r.notEvaluated.map((n) => [n.rule, n.reason]));
-    expect(why['ThinSection']).toMatch(/wall at each face/);
-    expect(why['ThickSection']).toMatch(/wall at each face/);
+    expect(why['ThinWallAroundHole']).toMatch(/wall between a hole/);
     expect(why['SharpInternalEdge']).toMatch(/radius/);
     expect(why['HighFlowRatio']).toMatch(/gate/);
-    expect(r.passed).not.toContain('ThinSection');
+    expect(r.passed).not.toContain('ThinWallAroundHole');
   });
 
   it('every rule of the data is accounted for: a finding, a pass, or a stated reason', () => {
@@ -119,5 +118,31 @@ describe('evaluatePlasticDfm: what is not measured is said, never passed', () =>
     const x = evaluatePlasticDfm(part({ holes: [{ id: 'h', through: true, diameterMm: 3, depthMm: 30, faces: [1] }] }), 'Injection Molding', 'ABS', off);
     expect(x.notEvaluated.find((n) => n.rule === 'HighHoleLengthToDiameterRatio')!.reason).toMatch(/not enabled/);
     expect(find(x, 'HighHoleLengthToDiameterRatio')).toEqual([]);
+  });
+});
+
+describe('evaluatePlasticDfm: thin and thick section, located by face and graded by the material', () => {
+  // staged: nylon minimum 0.762 and maximum 2.921 mm; ABS 1.143 and 3.556 (Protolabs' published wall ranges)
+  const wallFaces = [{ face: 1, mm: 0.5 }, { face: 2, mm: 1.5 }, { face: 3, mm: 3.2 }, { face: 4, mm: 6 }];
+
+  it('judges each face against the minimum and the maximum of the material, and carries the faces', () => {
+    const r = evaluatePlasticDfm(part({ wallFaces }), 'Injection Molding', 'Nylon', REF);
+    const thin = find(r, 'ThinSection');
+    expect(thin.map((x) => [x.severity, x.threshold, x.faces])).toEqual([['Major', 0.762, [1]]]);
+    const thick = find(r, 'ThickSection');
+    expect(thick.map((x) => [x.severity, x.threshold, x.count, x.faces.sort(), x.measured])).toEqual([['Major', 2.921, 2, [3, 4], 6]]);
+    expect(thick[0]!.label).toBe('Max Wall Thickness: 2 faces, worst 6.0 mm (above major limit 2.9)');
+  });
+
+  it('a material with other limits is judged by its own: 3.2 mm is thick for nylon and not for ABS', () => {
+    const r = evaluatePlasticDfm(part({ wallFaces: [{ face: 3, mm: 3.2 }] }), 'Injection Molding', 'ABS', REF);
+    expect(find(r, 'ThickSection')).toEqual([]);
+    expect(r.passed).toContain('ThickSection');
+  });
+
+  it('a part with no wall per face is not evaluated for it (not passed)', () => {
+    const r = evaluatePlasticDfm(part({ wallFaces: null }), 'Injection Molding', 'Nylon', REF);
+    expect(r.notEvaluated.find((n) => n.rule === 'ThinSection')!.reason).toMatch(/per face/);
+    expect(r.passed).not.toContain('ThinSection');
   });
 });
