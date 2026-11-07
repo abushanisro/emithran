@@ -160,6 +160,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A migration the base branch already has is never edited (the runner refuses a changed file, which stops every newer migration): a change is a new migration.
+      - name: Applied migrations are not edited
+        if: github.event_name == 'pull_request'
+        run: bash backend/scripts/check-migrations-immutable.sh "${{ github.base_ref }}"
       # Applies the migrations under test to a throwaway Postgres (pinned by digest) and runs their assertions.
       - run: bash backend/test/sql/run.sh
 
