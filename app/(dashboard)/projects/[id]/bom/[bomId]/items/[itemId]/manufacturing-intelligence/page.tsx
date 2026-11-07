@@ -6795,11 +6795,12 @@ function BlankDevOptionsDialog({
 // ── ValidationTab ─────────────────────────────────────────────────────────────
 
 function ValidationTab({
-  fg, item, file3dUrl, batchSize, factory = 'USA', onSelectHighlight,
+  fg, item, file3dUrl, onFile3dUrlExpired, batchSize, factory = 'USA', onSelectHighlight,
 }: {
   fg: FeatureGraph | null;
   item: BOMItem;
   file3dUrl?: string | null;
+  onFile3dUrlExpired?: (() => void) | undefined;
   batchSize?: number | undefined;
   factory?: string | undefined;
   onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
@@ -6900,6 +6901,7 @@ function ValidationTab({
               {file3dUrl && item.file3dPath?.toLowerCase().endsWith('.stl') ? (
                 <PartDimensionViewer
                   fileUrl={file3dUrl}
+                  {...(onFile3dUrlExpired ? { onLoadError: onFile3dUrlExpired } : {})}
                   maxLength={item.maxLength ?? null}
                   maxWidth={item.maxWidth ?? null}
                   maxHeight={item.maxHeight ?? null}
@@ -7713,7 +7715,7 @@ function BlankStockSection({
 function AnalysisTabsPanel({
   projectId,
   item, fg, batchSize, productionLife, factory, selectedMachiningFeatureKey, onMachiningFeatureSelect,
-  file3dUrl, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
+  file3dUrl, onFile3dUrlExpired, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
   onSelectHighlight, onShowEvidence, activeEvidenceLabel,
 }: {
   projectId: string;
@@ -7722,6 +7724,8 @@ function AnalysisTabsPanel({
   selectedMachiningFeatureKey?: string | null;
   onMachiningFeatureSelect?: (key: string | null) => void;
   file3dUrl?: string | null;
+  /** The signed URL of the model stopped working (they last an hour): ask for a new one. */
+  onFile3dUrlExpired?: () => void;
   activeTab: RightTabKey;
   onTabChange: (tab: RightTabKey) => void;
   treeProcessNames: string[];
@@ -7861,7 +7865,7 @@ function AnalysisTabsPanel({
         )}
 
         {tab === 'validation' && item && (
-          <ValidationTab fg={fg} item={item} file3dUrl={file3dUrl ?? null}
+          <ValidationTab fg={fg} item={item} file3dUrl={file3dUrl ?? null} onFile3dUrlExpired={onFile3dUrlExpired}
             batchSize={batchSize} factory={factory} onSelectHighlight={onSelectHighlight} />
         )}
 
@@ -10069,6 +10073,7 @@ export default function ManufacturingIntelligencePage() {
     item, fg, batchSize, productionLife, factory,
     selectedMachiningFeatureKey, onMachiningFeatureSelect: setSelectedMachiningFeatureKey,
     file3dUrl,
+    onFile3dUrlExpired: () => { setFile3dUrlError(null); setFile3dUrlRetryToken((n) => n + 1); },
     activeTab: rightTab, onTabChange: setRightTab,
     treeProcessNames, vendorHotspotContext,
     onSelectHighlight, onShowEvidence: setCadEvidence, activeEvidenceLabel: cadEvidence?.fieldLabel ?? null,

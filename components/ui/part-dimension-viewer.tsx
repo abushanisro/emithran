@@ -211,6 +211,8 @@ interface PartDimensionViewerProps {
   maxHeight?: number | null;
   canvasWidth?: number;
   canvasHeight?: number;
+  /** Called when the model could not be fetched (a signed URL that has expired is the usual cause): the owner of the URL can ask for a new one. Called once per failure run, never in a loop. */
+  onLoadError?: () => void;
 }
 
 const DEFAULT_W = 210;
@@ -218,8 +220,10 @@ const DEFAULT_H = 158;
 
 export function PartDimensionViewer({
   fileUrl, maxLength, maxWidth, maxHeight,
-  canvasWidth = DEFAULT_W, canvasHeight = DEFAULT_H,
+  canvasWidth = DEFAULT_W, canvasHeight = DEFAULT_H, onLoadError,
 }: PartDimensionViewerProps) {
+  // A new URL is asked for once after a failure; if that one fails too the file itself is the problem and the message stays (no retry loop).
+  const refreshes = useRef(0);
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [screenBBox, setScreenBBox] = useState<ScreenBBox | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -250,9 +254,13 @@ export function PartDimensionViewer({
           geo.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
         }
 
+        refreshes.current = 0;
         setGeometry(geo);
       })
-      .catch(() => setLoadError(true));
+      .catch(() => {
+        setLoadError(true);
+        if (onLoadError && refreshes.current < 1) { refreshes.current += 1; onLoadError(); }
+      });
 
     return () => { /* STLLoader has no abort; stale responses ignored via state check */ };
   }, [fileUrl]);
