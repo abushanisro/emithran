@@ -67,6 +67,7 @@ import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-
 import { undercutCountFromDraftSummary } from './costing/plastic-molding/draft-signals';
 import { sideActionSignals } from './costing/plastic-molding/side-action-signals';
 import { computeInjectionMoldedCostSummary } from './costing/plastic-molding/process/cost-injection-molding-engine';
+import { driverImpacts } from './costing/plastic-molding/cost-driver-sensitivity';
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/plastic-molding/process/cost-injection-molding-engine';
@@ -1105,6 +1106,7 @@ export class BOMItemsService {
       })),
       totalProcessCost: conv(dto.totalProcessCost),
       totalCost: conv(dto.totalCost),
+      ...(dto.driverImpacts ? { driverImpacts: dto.driverImpacts.map((d) => ({ ...d, deltaPerPart: conv(d.deltaPerPart), lines: d.lines.map((l) => ({ ...l, deltaPerPart: conv(l.deltaPerPart) })) })) } : {}),
       blankSpec: dto.blankSpec ? { ...dto.blankSpec, wasteCost: conv(dto.blankSpec.wasteCost) } : dto.blankSpec,
       sustainability: { ...dto.sustainability, wasteCostInr: conv(dto.sustainability.wasteCostInr) },
       costOverrides: dto.costOverrides
@@ -4214,6 +4216,8 @@ export class BOMItemsService {
         goodPartYield: pressRecord?.goodPartYield ?? null,
       };
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
+      // What each CAD driver is worth: the same engine, run again with one driver moved one step.
+      imResult.driverImpacts = driverImpacts(imInput, imResult);
       imResult.warnings.push(...materialWarnings);
       const catalogOps = await this.plasticCatalogOperations.attach({
         lines: imResult.processLines,
