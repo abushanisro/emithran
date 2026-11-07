@@ -227,8 +227,8 @@ describe('migration 821 matches the engine', () => {
     expect(rows.map((r) => [r.process, r.cls]).sort()).toEqual(SURFACE_PROCESSES.map((p) => [p.process, p.machineClass]).sort());
   });
 
-  it('marks modeled exactly the processes the engine costs (821, then 898 and 979 on top)', () => {
-    const later = ['898_surface_treatment_batch_load_processes.sql', '979_surface_treatment_provisional_processes.sql'].flatMap((f) => {
+  it('marks modeled exactly the processes the engine costs (821, then 898, 979 and 980 on top)', () => {
+    const later = ['898_surface_treatment_batch_load_processes.sql', '979_surface_treatment_provisional_processes.sql', '980_surface_treatment_powder_coating.sql'].flatMap((f) => {
       const text = fs.readFileSync(path.resolve(__dirname, '../../../../../../migrations/' + f), 'utf-8');
       const block = text.slice(text.indexOf('WITH ref'), text.indexOf('UPDATE process_taxonomy'));
       return [...block.matchAll(/\(\$str\$([^$]+)\$str\$, \$str\$([^$]+)\$str\$, (true|false)\)/g)].map((m) => [m[1], m[3] === 'true'] as [string, boolean]);
@@ -249,13 +249,15 @@ describe('provisional surface models', () => {
     ...machines('vibratory_finishing_machines.csv', 'Vibratory Finishing', [null, null, null]),
     ...machines('shot_blast_machines.csv', 'Shot Blast', [null, null, null]),
     ...machines('degrease_machines.csv', 'Degrease', [null, null, null]),
+    ...machines('powder_coat_cart_machines.csv', 'Powder Coat Cart', [null, null, null]),
+    ...machines('conveyor_powder_coating_machines.csv', 'Conveyor Powder Coating', [null, null, null]),
   ];
   const block: SecondaryPartFacts = { bboxMm: { length: 200, width: 100, height: 50 }, surfaceAreaMm2: 60000, weightKg: 1, wallThicknessMm: 5, materialCutCode: null, materialTypeName: null, features: [], batchSize: 100 };
   const run = (process: string, part = block) => computeSurfaceTreatments(part, reference, provPool).find((r) => r.process === process)!;
   const step = (r: ReturnType<typeof run>, label: string) => r.trace.find((t) => t.label === label)!;
 
   it('every line is flagged provisional and its warning names the figure and its published range', () => {
-    for (const p of ['Oven Cure', 'Conveyor Oven Cure', 'Black Oxide', 'Vibratory Finishing', 'Shot Blast', 'Degrease']) {
+    for (const p of ['Oven Cure', 'Conveyor Oven Cure', 'Black Oxide', 'Vibratory Finishing', 'Shot Blast', 'Degrease', 'Powder Coat Cart', 'Conveyor Powder Coating']) {
       const r = run(p);
       expect(r.status).toBe('costed');
       expect(r.provisional).toBe(true);
@@ -354,6 +356,26 @@ describe('provisional surface models', () => {
     expect(wide.status).toBe('costed');
   });
 
+  it('powder spray: grams = area x thickness x specific gravity / transfer efficiency, time = grams / gun flow; the cart adds load and unload by weight', () => {
+    const area = 60000 / 1e6 * v('defaultFractionOfSurfaceAreaPowderCoated');
+    const grams = (area * 75 * 1.5) / v('powderCoatSprayEfficiency');
+    for (const p of ['Powder Coat Cart', 'Conveyor Powder Coating']) {
+      const r = run(p);
+      expect(step(r, 'Powder sprayed').value).toBeCloseTo(grams, 1);
+      expect(step(r, 'Film thickness').value).toBe(75);
+      expect(r.warnings.join(' ')).toMatch(/published range 50-100 µm/);
+    }
+    const sprayS = (grams / v('defaultPowderCoatingTopCoatFlowRate')) * 60;
+    const handling = parseCsv('lookup/powderCoatHandling.csv').map((x) => ({ kg: Number(x['Weight (kg)']), t: Number(x['Load Time (s)']) + Number(x['Unload Time (s)']) })).sort((a, b) => a.kg - b.kg).find((x) => 1 <= x.kg)!.t;
+    const cart = run('Powder Coat Cart');
+    expect(step(cart, 'Load and unload').value).toBe(handling);
+    const adj = Number(reference.variables.get('cycleTimeAdjustmentFactor') ?? 1);
+    const eff = Number(reference.variables.get('defaultMachineEfficiency') ?? 1);
+    expect(cart.cycleTimeSec! * cart.machine!.goodPartYield * eff / adj).toBeCloseTo(sprayS + handling, 1);
+    const conv = run('Conveyor Powder Coating');
+    expect(conv.cycleTimeSec! * conv.machine!.goodPartYield * eff / adj).toBeCloseTo(sprayS, 1);
+  });
+
   it('missing data stays a named gap: no batch size, no part size', () => {
     for (const p of ['Oven Cure', 'Black Oxide', 'Vibratory Finishing', 'Shot Blast']) {
       expect(run(p, { ...block, batchSize: null }).status).toBe('gap');
@@ -365,7 +387,7 @@ describe('provisional surface models', () => {
 describe('provisional surface models without a machine to price on', () => {
   it('an empty pool is a gap that says no machine has a complete rate (not that the part does not fit); black oxide rows have a blank labor rate in memory/', () => {
     const block2: SecondaryPartFacts = { bboxMm: { length: 100, width: 50, height: 20 }, surfaceAreaMm2: 9000, weightKg: 0.1, wallThicknessMm: 2, materialCutCode: null, materialTypeName: null, features: [], batchSize: 100 };
-    for (const r of computeSurfaceTreatments(block2, reference, []).filter((x) => ['Oven Cure', 'Conveyor Oven Cure', 'Black Oxide', 'Vibratory Finishing', 'Shot Blast', 'Degrease'].includes(x.process))) {
+    for (const r of computeSurfaceTreatments(block2, reference, []).filter((x) => ['Oven Cure', 'Conveyor Oven Cure', 'Black Oxide', 'Vibratory Finishing', 'Shot Blast', 'Degrease', 'Powder Coat Cart', 'Conveyor Powder Coating'].includes(x.process))) {
       expect(r.status).toBe('gap');
       expect(r.reason).toMatch(/complete rate is on file/);
     }

@@ -656,13 +656,78 @@ function degrease(base: Base, part: SecondaryPartFacts, ref: SecondaryReference,
   }, ref, part.batchSize);
 }
 
+/** Powder spray: grams of powder = area x film thickness x specific gravity / transfer efficiency; time = grams / gun flow rate. */
+function powderSpray(part: SecondaryPartFacts, ref: SecondaryReference): { sec: number; trace: SecondaryTraceStep[]; warnings: string[] } | string {
+  const frac = variable(ref, 'defaultFractionOfSurfaceAreaPowderCoated'), eff = variable(ref, 'powderCoatSprayEfficiency'), flow = variable(ref, 'defaultPowderCoatingTopCoatFlowRate');
+  if (frac == null || eff == null || flow == null || eff <= 0 || flow <= 0) return 'The powder coating variables are not staged: run migration 819.';
+  if (part.surfaceAreaMm2 == null || part.surfaceAreaMm2 <= 0) return 'Part surface area is needed.';
+  const t = PROVISIONAL.powderFilmThicknessUm, sg = PROVISIONAL.powderSpecificGravity;
+  const areaM2 = (part.surfaceAreaMm2 / 1e6) * frac;
+  const grams = (areaM2 * t.value * sg.value) / eff;   // 1 µm x 1 g/cm³ = 1 g/m²
+  return {
+    sec: (grams / flow) * 60,
+    trace: [
+      { label: 'Coated area', value: Number(areaM2.toFixed(5)), unit: 'm²', source: `CAD surface area × ${frac} (defaultFractionOfSurfaceAreaPowderCoated)` },
+      provisionalTrace('Film thickness', t),
+      provisionalTrace('Powder specific gravity', sg),
+      { label: 'Powder sprayed', value: Number(grams.toFixed(2)), unit: 'g', source: `area × thickness × specific gravity / transfer efficiency ${eff} (powderCoatSprayEfficiency)` },
+      { label: 'Gun flow rate', value: flow, unit: 'g/min', source: `${SRC_VAR} (defaultPowderCoatingTopCoatFlowRate)` },
+    ],
+    warnings: [provisionalWarning('the film thickness', t), provisionalWarning('the powder specific gravity', sg), 'Top coat only: the clear coat and the powder cost per kg are not priced.'],
+  };
+}
+
+function powderCoatCart(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('powder coat booth'));
+  const bbox = part.bboxMm;
+  if (!bbox) return notCosted(base, 'gap', 'Part size is needed to fit the booth.');
+  const table = ref.lookups.get('powderCoatHandling');
+  if (!table) return notCosted(base, 'gap', 'powderCoatHandling is not staged: run migration 819.');
+  if (part.weightKg == null || part.weightKg <= 0) return notCosted(base, 'gap', 'Part weight is needed for the load and unload time (powderCoatHandling): choose a material first.');
+  const row = table.map((r) => ({ kg: num(r['Weight (kg)']), load: num(r['Load Time (s)']), unload: num(r['Unload Time (s)']) }))
+    .filter((r): r is { kg: number; load: number; unload: number } => r.kg != null && r.load != null && r.unload != null)
+    .sort((a, b) => a.kg - b.kg).find((r) => part.weightKg! <= r.kg);
+  if (!row) return notCosted(base, 'gap', 'No powderCoatHandling row covers this part weight.');
+  const spray = powderSpray(part, ref);
+  if (typeof spray === 'string') return notCosted(base, 'gap', spray);
+  const [L, W, H] = sorted(bbox);
+  const m = pickMachine(base.process, pool.filter((x) => {
+    const b = [num(x.specs.booth_length_mm), num(x.specs.booth_width_mm), num(x.specs.booth_height_mm)];
+    const kg = num(x.specs.cart_weight_limit_kg);
+    return b.every((v) => v != null) && maxPartsInBox([L, W, H], (b as number[]).sort((p, q) => q - p) as [number, number, number]) > 0 && (kg == null || part.weightKg! <= kg);
+  }), ref);
+  if (!m) return notCosted(base, 'gap', 'No powder coat booth takes this part.');
+  return costed(base, m, {
+    perPartSec: spray.sec + row.load + row.unload,
+    trace: [...spray.trace, { label: 'Load and unload', value: row.load + row.unload, unit: 's', source: `${SRC_LOOKUP('powderCoatHandling')} (≤ ${row.kg} kg)` }],
+    warnings: [...spray.warnings, 'Cart spacing and oven cure are not part of this line (see Oven Cure).'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+}
+
+function conveyorPowderCoating(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('conveyor powder booth'));
+  if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed to fit the booth opening.');
+  const spray = powderSpray(part, ref);
+  if (typeof spray === 'string') return notCosted(base, 'gap', spray);
+  const [, W, H] = sorted(part.bboxMm);
+  const m = pickMachine(base.process, pool.filter((x) => {
+    const w = num(x.specs.opening_width_mm), h = num(x.specs.max_nesting_height_mm);
+    return (w == null || W <= w) && (h == null || H <= h);
+  }), ref);
+  if (!m) return notCosted(base, 'gap', 'No conveyor powder booth opening takes this part.');
+  return costed(base, m, {
+    perPartSec: spray.sec, trace: spray.trace,
+    warnings: [...spray.warnings, 'Loading and unloading are the Conveyor Part Loading / Unloading operations; one gun is assumed.'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+}
+
 /** Why each remaining process cannot be timed from the reference data. */
 const UNDEFINED: Record<string, string> = {
   'Conveyor Conversion Coating': 'The reference has no machine file for this process.',
-  'Conveyor Powder Coating': 'No line speed or spray time for the conveyor booth is in the reference data.',
   'Mask-Bench': 'Which features are masked is a drawing requirement, not a CAD fact.',
   'Mask-Spray': 'Which surfaces are masked is a drawing requirement, not a CAD fact.',
-  'Powder Coat Cart': 'The coating thickness and spray time rule are not in the reference data (only flow rates and handling times are).',
   'Screen Printing': 'The printed area is a drawing requirement, not a CAD fact.',
 };
 
@@ -692,6 +757,8 @@ const MODELS: Record<string, Model> = {
   'Vibratory Finishing': vibratoryFinishing,
   'Shot Blast': shotBlast,
   'Degrease': degrease,
+  'Powder Coat Cart': powderCoatCart,
+  'Conveyor Powder Coating': conveyorPowderCoating,
 };
 
 /** The processes this engine can cost. The process catalog marks exactly these
