@@ -78,9 +78,10 @@ import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
 import { PlasticDfmFindings } from '@/components/features/manufacturing-intelligence/PlasticDfmFindings';
+import { isSupersededPlasticCheck, isSupersededPlasticWarning, plasticDfmReadiness } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { invalidateBOMItemUpdateQueries, useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact } from '@/lib/api/hooks/useBOMItems';
+import { invalidateBOMItemUpdateQueries, useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, type PlasticDfmView, usePlasticDfm } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -6404,27 +6405,29 @@ function DieCastingFeatureTreePanel({
 // absent, bends x 2 + holes / 20 + threads x 5 against 10/30. Invented weights
 // and thresholds; the real drivers are listed instead.
 
-function deriveReadiness(item: BOMItem): { label: string; ready: boolean } {
-  const hasCritical = (item.featureGraph?.dfmWarnings ?? []).some((w) => w.severity === 'critical');
+function deriveReadiness(item: BOMItem, plasticDfm: PlasticDfmView | undefined): { label: string; ready: boolean } {
+  const hasCritical = (item.featureGraph?.dfmWarnings ?? []).filter((w) => !isSupersededPlasticWarning(w)).some((w) => w.severity === 'critical')
+    || plasticDfmReadiness(plasticDfm).critical;
   if (hasCritical) return { label: 'DFM Issues Found', ready: false };
   if (!costedGrade(item)) return { label: 'Material Pending', ready: false };
   if (!item.file2dPath && !item.drawingIntelligence) return { label: 'Drawing Required', ready: false };
   return { label: 'Ready for RFQ', ready: true };
 }
 
-function buildRiskFlags(item: BOMItem): string[] {
+function buildRiskFlags(item: BOMItem, plasticDfm: PlasticDfmView | undefined): string[] {
   const flags: string[] = [];
   if (!costedGrade(item)) flags.push('Material not confirmed');
   if (item.tightestToleranceMm != null && item.tightestToleranceMm < 0.1)
     flags.push(`Tightest tolerance ±${item.tightestToleranceMm} mm`);
   if ((item.holeCount ?? 0) > 200) flags.push(`${item.holeCount ?? 0} holes — high pierce count`);
   if ((item.bendCount ?? 0) > 40) flags.push(`${item.bendCount ?? 0} bends`);
-  for (const w of item.featureGraph?.dfmWarnings ?? []) {
+  for (const w of (item.featureGraph?.dfmWarnings ?? []).filter((x) => !isSupersededPlasticWarning(x))) {
     if (w.severity === 'critical' || w.severity === 'warning') flags.push(w.message);
   }
-  for (const v of item.featureGraph?.validationResults ?? []) {
+  for (const v of (item.featureGraph?.validationResults ?? []).filter((x) => !isSupersededPlasticCheck(x))) {
     if (!v.passed && v.severity !== 'info') flags.push(v.check);
   }
+  flags.push(...plasticDfmReadiness(plasticDfm).flags);
   return flags;
 }
 
@@ -6441,8 +6444,9 @@ function PartDetailTab({
   const fg = item.featureGraph;
   const di = item.drawingIntelligence;
 
-  const readiness = deriveReadiness(item);
-  const flags = buildRiskFlags(item);
+  const { data: plasticDfm } = usePlasticDfm(item.id, (item.familyClassification ?? item.featureGraph?.classification?.family) === 'plastic_molded');
+  const readiness = deriveReadiness(item, plasticDfm);
+  const flags = buildRiskFlags(item, plasticDfm);
 
   const holeCount = item.holeCount ?? fg?.summary?.holeCount ?? 0;
   const bendCount = item.bendCount ?? fg?.summary?.bendCount ?? 0;
@@ -6862,7 +6866,7 @@ function ValidationTab({
   const routeSummary = featureOps.length > 0 ? featureOps.join(' → ') : null;
   const surfaceFinishStr = item.surfaceFinishRa != null ? `Ra ${item.surfaceFinishRa} µm` : null;
 
-  const checks = (fg?.validationResults ?? []);
+  const checks = (fg?.validationResults ?? []).filter((c) => !isSupersededPlasticCheck(c));
   const score = fg?.manufacturabilityScore;
 
   const severityIcon = (passed: boolean, severity: string) => {
@@ -7177,7 +7181,8 @@ function ValidationTab({
 // ── DesignGuidanceTab ─────────────────────────────────────────────────────────
 
 function DesignGuidanceTab({ fg, plastic }: { fg: FeatureGraph | null; plastic?: { itemId: string; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined }) {
-  const warnings = (fg?.dfmWarnings ?? []);
+  // On a molded part the fixed-threshold warnings the rule-based engine replaced are not shown (an analysis stored before the change still holds them).
+  const warnings = (fg?.dfmWarnings ?? []).filter((w) => !plastic || !isSupersededPlasticWarning(w));
 
   const severityConfig = {
     critical: { icon: '❌', cls: 'border-red-500/30 bg-red-500/10', labelCls: 'text-red-400 bg-red-500/20', textCls: 'text-red-100', mutedCls: 'text-red-300/70', label: 'CRITICAL' },
@@ -7197,12 +7202,12 @@ function DesignGuidanceTab({ fg, plastic }: { fg: FeatureGraph | null; plastic?:
   return (
     <div className="p-3 space-y-2">
       {plastic && <PlasticDfmFindings itemId={plastic.itemId} onSelectHighlight={plastic.onSelectHighlight} />}
-      {warnings.length === 0 ? (
+      {warnings.length === 0 ? (plastic ? null : (
         <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
           <span className="text-lg">✅</span>
           <p className="text-xs text-center">No DFM warnings — design looks manufacturable.</p>
         </div>
-      ) : (
+      )) : (
         warnings.map((w) => {
           const cfg = severityConfig[w.severity] ?? severityConfig.info;
           return (

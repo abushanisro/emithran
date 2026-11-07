@@ -659,9 +659,7 @@ export class AutoFillService {
     // ── Injection Molding DFM ──────────────────────────────────────────────────
     if (isIM && cadMI?.features) {
       const f = cadMI.features;
-      const undrafted: number = f.undrafted_face_count ?? 0;
       const undercut: number = f.undercut_face_count ?? 0;
-      const thinViolations: number = f.thin_wall_violation_count ?? 0;
       const wallNominal: number = f.wall_thickness_nominal_mm ?? 0;
       const uniformityRatio: number = f.wall_uniformity_ratio ?? 0;
       const partingComplexity: number = f.parting_complexity ?? 0;
@@ -669,18 +667,8 @@ export class AutoFillService {
       const filletCount: number = f.fillet_count ?? 0;
       const insertCount: number = f.insert_candidate_count ?? 0;
 
-      // 1. Draft angle — faces with < 0.3° are ejection risks
-      if (undrafted > 0) {
-        warnings.push({
-          id: `dfm_im_draft_${id++}`,
-          severity: undrafted > 5 ? 'critical' : 'warning',
-          category: 'draft_angle',
-          message: `${undrafted} face(s) have < 0.3° draft angle — ejection damage risk.`,
-          recommendation:
-            'Add ≥ 0.5° draft on all pull-axis surfaces. Textured finishes require ≥ 1.5°. ' +
-            'Insufficient draft causes the part to stick to the core on ejection.',
-        });
-      }
+      // Draft, thin and thick wall, and the nominal wall range are judged by the rule-based engine (plastic-molding/dfm/plastic-dfm.ts) against the staged
+      // thresholds of the part's material, per face; the fixed numbers that stood here (0.3 degrees, 60 % of nominal, 1.0 to 6.0 mm) are gone.
 
       // 2. Undercuts — side-action or lifter required
       if (undercut > 0) {
@@ -692,45 +680,6 @@ export class AutoFillService {
           recommendation:
             'Redesign feature to eliminate undercut or budget for side-action tooling ' +
             '($2,000–$8,000 per direction). Side actions increase cycle time by ~10–15%.',
-        });
-      }
-
-      // 3. Thin wall zones below 60% of nominal
-      if (thinViolations > 0) {
-        warnings.push({
-          id: `dfm_im_thin_wall_${id++}`,
-          severity: 'warning',
-          category: 'thin_wall',
-          message: `${thinViolations} zone(s) below 60% of nominal wall (${wallNominal > 0 ? wallNominal.toFixed(1) + ' mm' : 'unknown'}).`,
-          recommendation:
-            'Thin zones cause short shots, sink marks, and differential shrinkage. ' +
-            'Maintain wall thickness within 40–60% of nominal for uniform fill and cooling.',
-        });
-      }
-
-      // 4. Nominal wall below minimum fill threshold
-      if (wallNominal > 0 && wallNominal < 1.0) {
-        warnings.push({
-          id: `dfm_im_wall_min_${id++}`,
-          severity: 'critical',
-          category: 'thin_wall',
-          message: `Nominal wall ${wallNominal.toFixed(2)} mm is below 1.0 mm — incomplete fill likely.`,
-          recommendation:
-            'Increase wall to ≥ 1.0 mm (engineering resins: 1.5–3.5 mm optimal). ' +
-            'Walls below 1 mm require high injection pressure and are prone to knit lines.',
-        });
-      }
-
-      // 5. Nominal wall above sink mark threshold
-      if (wallNominal > 6.0) {
-        warnings.push({
-          id: `dfm_im_wall_max_${id++}`,
-          severity: 'warning',
-          category: 'thin_wall',
-          message: `Nominal wall ${wallNominal.toFixed(1)} mm exceeds 6.0 mm — sink marks and long cycle time expected.`,
-          recommendation:
-            'Core out thick sections. Target 2.5–4.0 mm for structural plastics. ' +
-            'Each mm above 4 mm adds ~5 s cooling time. Consider hollow ribbed design.',
         });
       }
 
@@ -786,18 +735,6 @@ export class AutoFillService {
         });
       }
 
-      // 10. All checks passed — confirm with gate / venting reminder
-      if (warnings.length === 0) {
-        warnings.push({
-          id: `dfm_im_pass_${id++}`,
-          severity: 'info',
-          category: 'general',
-          message: 'No critical DFM issues detected for injection molding.',
-          recommendation:
-            'Confirm gate location (gate area ≥ 1 mm² per 10 cm³ part volume), ' +
-            'venting at last-fill extremities (0.025 mm land), and ejector pin layout with toolmaker before cutting steel.',
-        });
-      }
 
       return warnings;
     }
@@ -849,22 +786,9 @@ export class AutoFillService {
     // ── Injection Molding validation checks ───────────────────────────────────
     if (isIM && cadMI?.features) {
       const f = cadMI.features;
-      const undrafted: number = f.undrafted_face_count ?? 0;
       const undercut: number = f.undercut_face_count ?? 0;
-      const wallNominal: number = f.wall_thickness_nominal_mm ?? 0;
       const uniformityRatio: number = f.wall_uniformity_ratio ?? 0;
-      const thinViolations: number = f.thin_wall_violation_count ?? 0;
       const partingComplexity: number = f.parting_complexity ?? 0;
-
-      checks.push({
-        id: 'check_im_draft',
-        check: 'Draft angles ≥ 0.5° on all faces',
-        passed: undrafted === 0,
-        severity: undrafted === 0 ? 'info' : undrafted > 5 ? 'critical' : 'warning',
-        actualValue: undrafted === 0 ? 'All faces drafted' : `${undrafted} undrafted face(s)`,
-        threshold: '0 undrafted faces',
-        ...(undrafted > 0 ? { recommendation: 'Add ≥ 0.5° draft on all pull-axis surfaces.' } : {}),
-      });
 
       checks.push({
         id: 'check_im_undercut',
@@ -876,23 +800,6 @@ export class AutoFillService {
         ...(undercut > 0 ? { recommendation: 'Eliminate undercuts or design in side-action tooling.' } : {}),
       });
 
-      if (wallNominal > 0) {
-        const wallOk = wallNominal >= 1.0 && wallNominal <= 6.0;
-        checks.push({
-          id: 'check_im_wall_range',
-          check: 'Wall thickness in moldable range (1.0–6.0 mm)',
-          passed: wallOk,
-          severity: wallOk ? 'info' : wallNominal < 1.0 ? 'critical' : 'warning',
-          actualValue: `${wallNominal.toFixed(1)} mm`,
-          threshold: '1.0–6.0 mm',
-          ...(wallOk ? {} : {
-            recommendation: wallNominal < 1.0
-              ? 'Increase wall to ≥ 1.0 mm to ensure complete fill.'
-              : 'Core out thick sections to < 6.0 mm to prevent sink marks.',
-          }),
-        });
-      }
-
       const uniformityOk = uniformityRatio <= 0.40;
       checks.push({
         id: 'check_im_wall_uniformity',
@@ -902,17 +809,6 @@ export class AutoFillService {
         actualValue: `${(uniformityRatio * 100).toFixed(0)}% variation`,
         threshold: '≤ 40% of nominal',
         ...(uniformityOk ? {} : { recommendation: 'Uniform walls minimise warpage and differential shrinkage.' }),
-      });
-
-      const thinOk = thinViolations === 0;
-      checks.push({
-        id: 'check_im_thin_zones',
-        check: 'No zones below 60% of nominal wall',
-        passed: thinOk,
-        severity: thinOk ? 'info' : 'warning',
-        actualValue: thinOk ? 'None detected' : `${thinViolations} zone(s)`,
-        threshold: '0 thin zones',
-        ...(thinOk ? {} : { recommendation: 'Increase thin zones to ≥ 60% of nominal wall thickness.' }),
       });
 
       const partingOk = partingComplexity < 0.50;
