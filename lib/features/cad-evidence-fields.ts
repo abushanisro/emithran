@@ -17,6 +17,9 @@ const EVIDENCE_BY_FIELD: Readonly<Record<string, string>> = {
   'Punch Count': 'pierce_count',
   'Nibble Length': 'cut_length',
   'Tool Changes': 'hole_diameters',
+  'Nominal Wall Thickness': 'wall_thickness',
+  'Shot Melt Volume': 'part_volume',
+  'Part Volume': 'part_volume',
 };
 
 /** "Nibble Length (mm)" -> "Nibble Length": live calculator fields carry their unit in the name. */

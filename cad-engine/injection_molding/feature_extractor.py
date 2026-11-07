@@ -82,8 +82,12 @@ class InjectionMoldedFeatureExtractor:
             modal_thickness, _dominant_face, thickness_conf, geom_debug = sheet_geometry
         else:
             modal_thickness, _dominant_face, thickness_conf, geom_debug = (
-                self._sm._extract_sheet_metal_geometry(shape, bbox_dims)
+                self._sm._extract_sheet_metal_geometry(shape, bbox_dims, collect_modal_pairs=True)
             )
+        # The faces the nominal wall was measured on: the antiparallel pairs that voted for it (kept out of the debug dict that is returned as is).
+        modal_pairs = geom_debug.pop("modal_pairs", None) or []
+        geom_debug.pop("modal_pair_face_ids", None)
+        modal_pair_count = geom_debug.pop("modal_pair_count", 0)
         hist_debug = geom_debug.get("thickness_histogram", {})
         thin_band_max = max(modal_thickness * 2.0, 6.0)
         thin_bins = sorted(float(k) for k in hist_debug.keys() if float(k) <= thin_band_max)
@@ -210,6 +214,7 @@ class InjectionMoldedFeatureExtractor:
             "feature_graph_v2": self._build_im_feature_graph(
                 im_dfm_groups, face_map or [], face_map_tri_total,
                 inserts.get("insert_candidates", []),
+                measurements=self._evidence_measurements(shape, modal_thickness, modal_pairs, modal_pair_count, face_map or []),
             ),
             # Per-feature spatial data for localized heatmap blobs on the 3D viewer
             "heatmap_features": self._build_heatmap_features(
@@ -645,6 +650,7 @@ class InjectionMoldedFeatureExtractor:
         face_map: List[Dict],
         face_map_tri_total: int,
         insert_candidates: List[Dict],
+        measurements: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Build feature_graph_v2 for injection molded DFM groups so the 3D viewer
@@ -707,10 +713,66 @@ class InjectionMoldedFeatureExtractor:
                     "stl_tri_total": face_map_tri_total or None,
                 },
                 "features": features,
+                # Quantities with the faces they were measured on (the same shape sheet metal's graph uses), for the calculator's CAD eye.
+                **({"measurements": measurements} if measurements else {}),
             }
         except Exception as e:
             logger.warning(f"[InjectionMolded] feature_graph_v2 build failed: {e}")
             return None
+
+    # ── Evidence for calculator inputs ────────────────────────────────────────
+
+    @staticmethod
+    def _evidence_measurements(
+        shape: Any,
+        wall_mm: float,
+        modal_pairs: List[Any],
+        modal_pair_count: int,
+        face_map: List[Dict],
+    ) -> Dict[str, Any]:
+        """
+        The CAD quantities a molding calculator takes as inputs, each with the faces it was measured on, so the cost dialog can show only
+        those faces (feature_graph_v2.measurements; the frontend's lib/features/field-highlight.ts reads them by key).
+
+          wall_thickness  the nominal wall: the antiparallel planar face pairs whose separation voted for it (one occurrence per pair, the two
+                          faces and the separation); `reconciles` says whether every listed pair lies in the reported thickness' bin.
+          part_volume     the solid's volume (mm3): the whole body, so every face.
+
+        A quantity whose faces were not recorded (a precomputed wall passed in, no face map) is simply absent: the UI then asks for a re-analysis
+        and never highlights a guess.
+        """
+        out: Dict[str, Any] = {}
+        if modal_pairs:
+            out["wall_thickness"] = {
+                "value": round(float(wall_mm), 3),
+                "unit": "mm",
+                "method": "separation of the antiparallel planar face pairs that voted for the modal wall thickness (area-weighted, 0.05 mm bins)",
+                "occurrences": [
+                    {"kind": "wall_pair", "face_ids": [int(a), int(b)], "length_mm": float(d)} for a, b, d, _area in modal_pairs
+                ],
+                # The occurrences are capped, so they account for the value only when none was dropped.
+                "reconciles": len(modal_pairs) == modal_pair_count,
+            }
+        face_ids = [int(f["face_id"]) for f in face_map if "face_id" in f]
+        if face_ids:
+            try:
+                from OCC.Core.BRepGProp import brepgprop  # type: ignore
+                from OCC.Core.GProp import GProp_GProps  # type: ignore
+
+                props = GProp_GProps()
+                brepgprop.VolumeProperties(shape, props)
+                volume = abs(float(props.Mass()))
+                if volume > 0:
+                    out["part_volume"] = {
+                        "value": round(volume, 2),
+                        "unit": "mm3",
+                        "method": "volume of the solid (every face bounds it)",
+                        "occurrences": [{"kind": "body", "face_ids": face_ids}],
+                        "reconciles": True,
+                    }
+            except Exception as e:  # volume is evidence only: never fail the analysis for it
+                logger.warning(f"[InjectionMolded] part volume evidence failed: {e}")
+        return out
 
     # ── Heatmap feature extraction ────────────────────────────────────────────
 

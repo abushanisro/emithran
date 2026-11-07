@@ -80,6 +80,8 @@ export type CycleTimeResult =
       moldMotionSec: number;
       totalCycleSec: number;
       trace: CalculationTraceStep[];
+      /** Per input read from a reference lookup table, the table and the row it came from (the cost dialog outlines it). */
+      lookups: Record<string, { table: string; row: Record<string, string | number> }>;
       /** The stored calculator that computed it (calculators.id and version), and a fingerprint of the formulas it ran, so a saved calculation can say which. */
       calculator: { id: string | null; version: number | null; name: string; fingerprint: string };
     }

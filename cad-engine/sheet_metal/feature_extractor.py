@@ -871,9 +871,16 @@ class SheetMetalFeatureExtractor:
         self,
         shape: Any,
         bbox_dims: List[float],
+        collect_modal_pairs: bool = False,
     ) -> Tuple[float, Any, float, Dict[str, Any]]:
         """
         Topology-based extraction of (thickness_mm, dominant_face, confidence, debug).
+
+        collect_modal_pairs: also put in `debug["modal_pairs"]` the antiparallel face pairs that voted for the modal
+        thickness, as [face_ordinal_a, face_ordinal_b, separation_mm, combined_area_mm2], where the ordinal is the
+        face's TopExp explorer index (the one the viewer's face_map and every feature's face_ids use). These are
+        the faces the reported thickness was measured on. Off by default, so sheet metal's debug output is unchanged;
+        the plastic extractor turns it on to show the wall's faces behind a calculator input.
 
         Algorithm:
           1. Walk all planar faces once.
@@ -928,9 +935,13 @@ class SheetMetalFeatureExtractor:
 
         # ── 1. Collect planar faces ───────────────────────────────────────────
         planar: List[Tuple[Any, Tuple[float, float, float], float, float, Tuple[float, float, float]]] = []
+        # The explorer ordinal of each planar face (parallel to `planar`): one per explorer step, whatever the step does.
+        planar_ordinals: List[int] = []
+        face_ordinal = -1
 
         explorer = TopExp_Explorer(shape, TopAbs_FACE)
         while explorer.More():
+            face_ordinal += 1
             try:
                 face = topods.Face(explorer.Current())
                 adaptor = BRepAdaptor_Surface(face)
@@ -978,6 +989,7 @@ class SheetMetalFeatureExtractor:
                             (float(cg.X()), float(cg.Y()), float(cg.Z())),
                         )
                     )
+                    planar_ordinals.append(face_ordinal)
             except Exception:
                 pass
             explorer.Next()
@@ -997,6 +1009,7 @@ class SheetMetalFeatureExtractor:
         hist: Dict[float, float] = defaultdict(float)        # bin_key → total_pair_area
         hist_count: Dict[float, int] = defaultdict(int)      # bin_key → pair count
         pairs = []  # (dist, combined_area, face_i, centroid_i, centroid_j)
+        pair_members: List[Tuple[int, int, float]] = []  # (index i, index j, bin_key) of each entry of `pairs`, for the faces behind the modal bin
 
         for i in range(len(planar)):
             fi, ni, di, ai, ci = planar[i]
@@ -1015,6 +1028,8 @@ class SheetMetalFeatureExtractor:
                 hist[bin_key] += pair_area
                 hist_count[bin_key] += 1
                 pairs.append((dist, pair_area, fi, ci, cj))
+                if collect_modal_pairs:
+                    pair_members.append((i, j, bin_key))
 
         if not hist:
             fallback_debug["planar_face_count"] = len(planar)
@@ -1119,6 +1134,17 @@ class SheetMetalFeatureExtractor:
             "dominant_pair_area": round(best_pair_area, 0),
             "dominant_centrality": best_centrality,
         }
+        if collect_modal_pairs:
+            # The pairs that voted for the reported thickness: its modal bin, largest first. Capped so a part with
+            # hundreds of parallel faces does not make a payload of them (the face set stays complete, see below).
+            in_bin = sorted(
+                ((planar_ordinals[i], planar_ordinals[j], round(pairs[k][0], 3), round(pairs[k][1], 1))
+                 for k, (i, j, bk) in enumerate(pair_members) if bk == modal_thickness),
+                key=lambda p: -p[3],
+            )
+            geo_debug["modal_pair_count"] = len(in_bin)
+            geo_debug["modal_pair_face_ids"] = sorted({o for p in in_bin for o in p[:2]})
+            geo_debug["modal_pairs"] = [list(p) for p in in_bin[:300]]
 
         logger.debug(
             f"[SheetMetal] planar={len(planar)} pairs={len(pairs)} "

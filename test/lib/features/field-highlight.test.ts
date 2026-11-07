@@ -25,6 +25,8 @@ const graph: FeatureGraphV2 = {
       occurrences: [{ kind: 'hole', face_ids: [6] }, { kind: 'initial_pierce', face_ids: [0, 1] }],
     },
     flat_pattern_area: { value: 5000, unit: 'mm2', reconciles: true, occurrences: [{ face_ids: [2, 3, 8, 9] }] },
+    wall_thickness: { value: 2.5, unit: 'mm', reconciles: true, occurrences: [{ face_ids: [4, 5], length_mm: 2.5 }, { face_ids: [10, 11], length_mm: 2.5 }] },
+    part_volume: { value: 28962.5, unit: 'mm3', reconciles: true, occurrences: [{ face_ids: [0, 1, 2, 3, 4, 5] }] },
   },
 };
 
@@ -79,6 +81,27 @@ describe('resolveFieldHighlight', () => {
   it('no evidence key, or an unknown one, gives no highlight', () => {
     expect(resolveFieldHighlight(undefined, graph)).toBeNull();
     expect(resolveFieldHighlight('cutting_speed', graph)).toBeNull();
+  });
+});
+
+describe('molding calculator inputs', () => {
+  it('the nominal wall highlights only the face pairs that voted for it', () => {
+    const h = resolveFieldHighlight('wall_thickness', graph)!;
+    expect(faces(h.node)).toEqual([4, 5, 10, 11]);
+    expect(h.measured).toEqual({ value: 2.5, unit: 'mm', label: 'wall thickness' });
+  });
+
+  it('the part volume highlights the whole body, and a different input value is flagged, not hidden', () => {
+    const h = resolveFieldHighlight('part_volume', graph)!;
+    expect(faces(h.node)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(checkAgainstInput(h, 31000).reconciles).toBe(false);
+    expect(checkAgainstInput(h, 28962.5).reconciles).toBe(true);
+  });
+
+  it('an analysis without those measurements stays plain', () => {
+    const old = { ...graph, measurements: {} };
+    expect(resolveFieldHighlight('wall_thickness', old)).toBeNull();
+    expect(resolveFieldHighlight('part_volume', old)).toBeNull();
   });
 });
 

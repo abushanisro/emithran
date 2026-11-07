@@ -7,7 +7,7 @@ import {
   COMPRESSION_CALCULATOR, INJECTION_CALCULATOR, LSR_CALCULATOR, RIM_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR,
   injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds,
 } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time-seeds';
-import { runInjectionCycleTime } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time';
+import { calculatorFingerprint, runInjectionCycleTime } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time';
 import { computeCycleTime, type CycleTimeInput } from './legacy-cycle-time-oracle';
 import { computeCompressionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-compression-molding-engine';
 import { runReferenceCalculator, type ReferenceCalculators } from '../../../../../modules/bom-items/costing/shared/calculators/reference-calculator';
@@ -55,7 +55,7 @@ describe('plastic molding calculator spec', () => {
 
   it('the committed migration 976 is exactly what the generator writes from the spec, for the calculators above version 1 (975 is history and is not edited)', () => {
     const committed = readFileSync(join(__dirname, '../../../../../../migrations/976_plastic_rim_fill_time_calculator.sql'), 'utf8');
-    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql());
+    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql(976));
     // only the reaction injection calculator changed, and its version is raised
     expect(spec.calculators.filter((c) => (c.version ?? 1) > 1).map((c) => c.name)).toEqual([RIM_CALCULATOR]);
     expect(committed).toContain('version = 2');
@@ -63,6 +63,26 @@ describe('plastic molding calculator spec', () => {
     const quoted = (name: string) => '$q$' + name + '$q$';
     expect(committed).not.toContain(quoted(INJECTION_CALCULATOR));
     expect(readFileSync(join(__dirname, '../../../../../../migrations/975_plastic_molding_calculators.sql'), 'utf8')).toContain(quoted(INJECTION_CALCULATOR));
+  });
+
+  it('the committed migration 977 is what the generator writes: the fill-factor inputs of injection, structural foam and LSR name their reference table, and nothing else changes', () => {
+    const committed = readFileSync(join(__dirname, '../../../../../../migrations/977_plastic_fill_factor_lookup_tables.sql'), 'utf8');
+    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql(977));
+    const written = spec.calculators.filter((c) => c.migration === 977).map((c) => c.name).sort();
+    expect(written).toEqual([INJECTION_CALCULATOR, LSR_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR].sort());
+    // no calculator is in two migrations, and none of these three has a new version: their formulas did not change
+    expect(spec.calculators.filter((c) => c.migration === 977 && (c.version ?? 1) !== 1)).toEqual([]);
+    for (const name of written) expect(committed).toContain(`$q$${name}$q$`);
+    expect(committed).not.toContain(`$q$${RIM_CALCULATOR}$q$`);
+    // exactly the two fill factors of each carry a table, and it is the staged one
+    const tabled = spec.calculators.flatMap((c) => c.fields.filter((f) => f.sourceTable).map((f) => `${c.key}:${f.name}:${f.dataSource}:${f.sourceTable}.${f.sourceField}`));
+    expect(tabled.sort()).toEqual(['injection', 'injection_lsr', 'structural_foam'].flatMap((k) => ['Fill Factor for Cavities', 'Fill Factor for Gates'].map((n) => `${k}:${n}:machining_lookup:injectionTimeAdjustmentFactors.adjustment_factor`)).sort());
+  });
+
+  it('the calculators the formulas run on are the same with or without the table metadata (a fingerprint covers formulas, units and field names)', () => {
+    const inj = plasticMoldingCalculatorsByName()[INJECTION_CALCULATOR]!;
+    expect(inj.fields.filter((f) => f.source_table).map((f) => f.field_name)).toEqual(['Fill Factor for Cavities', 'Fill Factor for Gates']);
+    expect(calculatorFingerprint({ ...inj, fields: inj.fields.map((f) => ({ ...f, data_source: null, source_table: null, source_field: null })) })).toBe(calculatorFingerprint(inj));
   });
 
   it('the calculator descriptions say what is not modelled, so no one reads them as complete', () => {

@@ -34,6 +34,14 @@ export interface DomainSpecField {
   formula?: string;
   /** Where an input (a field without a formula) comes from; see DomainFieldSource. */
   source?: DomainFieldSource;
+  /**
+   * The reference table an input is read from, for the cost dialog's eye button (calculator_fields.data_source, source_table, source_field). Opt-in per field: a field
+   * without them is written as before (all three NULL), so the migrations generated for other domains do not change. data_source must be one the table allows
+   * ('machining_lookup' = a table staged in machining_reference_data, whichever dataset).
+   */
+  dataSource?: string;
+  sourceTable?: string;
+  sourceField?: string;
 }
 
 export interface DomainSpecCalculator {
@@ -54,6 +62,8 @@ export interface DomainSpecCalculator {
    * ships as a new migration for that calculator (calculators.version, migration 428: "bumped when a calculator's fields/formulas change").
    */
   version?: number;
+  /** The migration that last wrote this calculator (a calculator in use is changed by a new migration, never by editing the one that created it). */
+  migration?: number;
   /** The calculated field that is the calculator's result. Default "Cycle Time" (seconds), which an operation's calculator must have. */
   output?: string;
   /** Further calculated fields the engine reads besides the output (named in the spec, so the engine does not guess). */
@@ -125,9 +135,9 @@ export function domainFieldToRow(f: DomainSpecField, order: number): ReferenceCa
     default_value: f.formula ?? null,
     unit: f.unit,
     display_order: order,
-    data_source: null,
-    source_table: null,
-    source_field: null,
+    data_source: f.dataSource ?? null,
+    source_table: f.sourceTable ?? null,
+    source_field: f.sourceField ?? null,
   };
 }
 

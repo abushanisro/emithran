@@ -11,6 +11,9 @@ export const CAD_EVIDENCE_KEYS = [
   'bend_line_length',
   'flat_pattern_area',
   'hole_diameters',
+  // Plastic molding: the nominal wall (the antiparallel face pairs that voted for it) and the solid's volume (the whole body).
+  'wall_thickness',
+  'part_volume',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];
@@ -27,6 +30,9 @@ const EVIDENCE_BY_FIELD: Readonly<Record<string, CadEvidenceKey>> = {
   'Punch Count': 'pierce_count',
   'Nibble Length': 'cut_length',
   'Tool Changes': 'hole_diameters',
+  'Nominal Wall Thickness': 'wall_thickness',
+  'Shot Melt Volume': 'part_volume',
+  'Part Volume': 'part_volume',
 };
 
 /** "Nibble Length (mm)" -> "Nibble Length": live calculator fields carry their unit in the name. */

@@ -85,14 +85,20 @@
           "unit": null,
           "source": {
             "lookup": "injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Cavities Per Mold and Number >= cavities per mold (first bracket)"
-          }
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "injectionTimeAdjustmentFactors",
+          "sourceField": "adjustment_factor"
         },
         {
           "name": "Fill Factor for Gates",
           "unit": null,
           "source": {
             "lookup": "injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Gates Per Cavity and Number >= gates per cavity (first bracket)"
-          }
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "injectionTimeAdjustmentFactors",
+          "sourceField": "adjustment_factor"
         },
         {
           "name": "Press Dry Cycle Time",
@@ -148,7 +154,8 @@
           "unit": "s",
           "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
-      ]
+      ],
+      "migration": 977
     },
     {
       "key": "injection_lsr",
@@ -183,14 +190,20 @@
           "unit": null,
           "source": {
             "lookup": "injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Cavities Per Mold and Number >= cavities per mold (first bracket)"
-          }
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "injectionTimeAdjustmentFactors",
+          "sourceField": "adjustment_factor"
         },
         {
           "name": "Fill Factor for Gates",
           "unit": null,
           "source": {
             "lookup": "injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Gates Per Cavity and Number >= gates per cavity (first bracket)"
-          }
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "injectionTimeAdjustmentFactors",
+          "sourceField": "adjustment_factor"
         },
         {
           "name": "Press Dry Cycle Time",
@@ -241,7 +254,8 @@
           "unit": "s",
           "formula": "floor(({Fill Time} + {Cure Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
-      ]
+      ],
+      "migration": 977
     },
     {
       "key": "structural_foam",
@@ -326,14 +340,20 @@
           "unit": null,
           "source": {
             "lookup": "injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Cavities Per Mold and Number >= cavities per mold (first bracket)"
-          }
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "injectionTimeAdjustmentFactors",
+          "sourceField": "adjustment_factor"
         },
         {
           "name": "Fill Factor for Gates",
           "unit": null,
           "source": {
             "lookup": "injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Gates Per Cavity and Number >= gates per cavity (first bracket)"
-          }
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "injectionTimeAdjustmentFactors",
+          "sourceField": "adjustment_factor"
         },
         {
           "name": "Press Dry Cycle Time",
@@ -389,7 +409,8 @@
           "unit": "s",
           "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
-      ]
+      ],
+      "migration": 977
     },
     {
       "key": "compression",
@@ -489,7 +510,8 @@
           "formula": "({Machine Dry Cycle Time} + {Fill Time} + {Cure Time}) / {Cavities per Mold}"
         }
       ],
-      "version": 2
+      "version": 2,
+      "migration": 976
     }
   ]
 }

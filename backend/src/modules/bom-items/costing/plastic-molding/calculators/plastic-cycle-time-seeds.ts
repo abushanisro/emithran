@@ -36,7 +36,7 @@ function commonSeeds(input: CycleTimeInput, missing: string[]): Record<string, C
   if (positive(dry)) seeds['Press Dry Cycle Time'] = { value: dry, source: 'Press reference record: time.dryCycleTimeS (Euromap 6, mold open and close)' };
   else missing.push('press dry cycle time (dryCycleTimeS)');
 
-  if (positive(input.shotMeltVolumeMm3)) seeds['Shot Melt Volume'] = { value: input.shotMeltVolumeMm3, source: 'Part volume x cavities + runner, at the material melt density' };
+  if (positive(input.shotMeltVolumeMm3)) seeds['Shot Melt Volume'] = { value: input.shotMeltVolumeMm3, source: 'CAD part volume x cavities + runner, at the material melt density' };
   else missing.push('shot melt volume (part volume and melt density)');
 
   const cavities = Math.max(input.cavityCount, 1);

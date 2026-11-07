@@ -6,6 +6,8 @@ import {
   MACHINING_REFERENCE_SOURCE_VERSION,
 } from '../bom-items/costing/machining/lookup/machining-lookup-tables';
 import { dieCastingLookupTableNames } from '../bom-items/costing/casting/calculators/die-casting-calculator-spec';
+import { plasticLookupTableNames } from '../bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
+import { PLASTIC_REFERENCE_SOURCE_VERSION } from '../bom-items/costing/plastic-molding/plastic-reference';
 import { castingMaterialsAsTable, castingTableQuery, castingVariablesAsTable, type CastingFlatTable } from '../bom-items/costing/casting/casting-lookup-tables';
 import * as ExcelJS from 'exceljs';
 import { readWorkbook } from '../../common/heavy-work/heavy-work';
@@ -312,9 +314,14 @@ export class ProcessesService {
 
 
   async getMachiningLookupTableByName(table: string, outputColumn: string | undefined): Promise<any> {
-    if (!machiningLookupTableNames().includes(table)) {
-      throw new BadRequestException(`"${table}" is not a machining calculator lookup table`);
+    // A table a machining calculator reads (the machining dataset), or one a plastic molding calculator reads (the plastic dataset, staged in the same table under its own
+    // source version). Nothing else is served: the name is checked against what the calculators declare, never passed through.
+    const isMachining = machiningLookupTableNames().includes(table);
+    const isPlastic = !isMachining && plasticLookupTableNames().includes(table);
+    if (!isMachining && !isPlastic) {
+      throw new BadRequestException(`"${table}" is not a lookup table of a machining or plastic molding calculator`);
     }
+    const sourceVersion = isPlastic ? PLASTIC_REFERENCE_SOURCE_VERSION : MACHINING_REFERENCE_SOURCE_VERSION;
     const db = this.databaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     let flat;
     if (table === 'variables') {
@@ -331,7 +338,7 @@ export class ProcessesService {
         .from('machining_reference_data')
         .select('raw')
         .eq('category', 'lookup_table')
-        .eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
+        .eq('source_version', sourceVersion)
         .eq('key', table)
         .maybeSingle();
       if (error) throw new InternalServerErrorException(`Failed to read ${table}: ${error.message}`);
