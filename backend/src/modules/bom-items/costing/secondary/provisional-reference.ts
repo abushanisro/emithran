@@ -27,6 +27,11 @@ export const PROVISIONAL = {
     value: 45, unit: 'min', range: [30, 120],
     source: 'Equipment-supplier and STERC figures of 30-60 min for deburring (up to 2 h for hardened steel); one blog gives 1-4 h by media. No authoritative per-media table exists. Depends on media type, part material and hardness.',
   },
+  // Induction hardening: a single-shot cycle heats and quenches one part in seconds, not hours.
+  inductionHardenScanSec: {
+    value: 6, unit: 's', range: [4, 8],
+    source: 'Induction-hardening supplier and trade literature: single-shot cycles of 4-8 s, typically about 6 s for a small shaft or pin. A long part scanned along its length, or a large case depth, takes longer: this underestimates them.',
+  },
 } as const satisfies Record<string, ProvisionalValue>;
 
 /** The line a trace shows for a provisional input. */

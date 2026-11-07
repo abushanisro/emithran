@@ -20,3 +20,16 @@ Sources of the figures: Columbia Coatings TGIC polyester data sheets (10 min at 
 
 ## Data gap that blocks Black Oxide today
 Every row of `memory/SurfaceTreatment/Machine/black_oxide_machines.csv` has a blank `Labor Rate` and a blank `Wage Grade Name`. A machine without a labor rate is not costed (a blank is not zero), so Black Oxide shows "No black oxide machine with a complete rate is on file" until the file gives a labor rate or a wage grade. Nothing else is missing for it.
+
+# Provisional heat services
+
+`memory/Heat treatment/Machine` has a service row (Unit Weight Cost, Min Batch Cost, Min Batch Weight) for most heat services but none for four of them, although `processes.csv` names a default machine for each and `memory/Countries data` has a machine-economics row for each. Those four rows equal a sibling service's row (same footprint, same overhead rate), so they are priced from the sibling and flagged `provisional`:
+
+| Process | Priced as | Note on the line |
+|---|---|---|
+| Stress Relief | the Standard Temper service | a stress relief holds near 620 °C for about 1 h per 25 mm of section plus the furnace cycle, longer than a temper: may understate |
+| Stainless Steel Harden | the Vacuum Air Harden service | a martensitic stainless hardens near 1010 °C with a gas quench; its temper is separate and not included |
+| Vacuum Air Harden with High Temper | the Vacuum Air Harden service plus the Vacuum Temper service | hardening then the high temper, each from its own row; the temper is billed as its own minimum batch |
+| Induction Harden | timed per part: handling (tblHandlingTimes) + scan 6 s (published 4-8 s) on the Vacuum Air Harden economics row; no weight charge | case depth and coil tooling are not priced |
+
+Open: the metal heat services still price a polymer part (Age uses `defaultAgingTime`). Whether they should be "not applicable" for a plastic is an engineer's decision; the secondary engine needs the material type (#279) to make it.

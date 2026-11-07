@@ -106,8 +106,55 @@ describe('heat treatment on the reference data', () => {
     expect(r.trace.find((t) => t.label === 'Hold Temperature (°C)')?.value).toBe(1163);
   });
 
-  it('processes with no reference machine are disclosed gaps', () => {
-    for (const p of ['Induction Harden', 'Stress Relief']) expect(run(steelPart).get(p)!.status).toBe('gap');
+  describe('the four services the reference gives economics for but no price (provisional)', () => {
+    const r = run(steelPart);
+    const svc = (name: string) => Number(parseCsv(`Machine/${name}`).at(0)!['Unit Weight Cost (USD / kg)']);
+    const batchKg = 1.13 * 100;
+
+    it('Stress Relief is priced as Standard Temper (the same machine-economics row in memory/Countries data), flagged provisional', () => {
+      const sr = r.get('Stress Relief')!;
+      expect(sr.status).toBe('costed');
+      expect(sr.provisional).toBe(true);
+      expect(sr.materialUsdPerPart).toBeCloseTo((batchKg * svc('standardTemper.csv')) / 100, 3);
+      expect(sr.materialUsdPerPart).toBeCloseTo(r.get('Standard Temper')!.materialUsdPerPart, 6);
+      expect(sr.reason).toMatch(/^Provisional estimate, not reference data/);
+      expect(sr.warnings.join(' ')).toMatch(/equals Standard Temper/);
+    });
+
+    it('Stainless Steel Harden is priced as Vacuum Air Harden and says its temper is not included', () => {
+      const ss = r.get('Stainless Steel Harden')!;
+      expect(ss.provisional).toBe(true);
+      expect(ss.materialUsdPerPart).toBeCloseTo((batchKg * svc('defaultVacuumAirHarden.csv')) / 100, 3);
+      expect(ss.warnings.join(' ')).toMatch(/temper is a separate operation/);
+    });
+
+    it('Vacuum Air Harden with High Temper is the Vacuum Air Harden service plus the Vacuum Temper service', () => {
+      const v = r.get('Vacuum Air Harden with High Temper')!;
+      const h = r.get('Vacuum Air Harden')!; const t = r.get('Vacuum Temper')!;
+      expect(v.provisional).toBe(true);
+      expect(v.materialUsdPerPart).toBeCloseTo(h.materialUsdPerPart + t.materialUsdPerPart, 4);
+      expect(v.costPerPartUsd).toBeCloseTo(h.costPerPartUsd! + t.costPerPartUsd!, 3);
+      expect(v.trace.some((x) => x.label.startsWith('Harden:'))).toBe(true);
+      expect(v.trace.some((x) => x.label.startsWith('Temper:'))).toBe(true);
+    });
+
+    it('Induction Harden is timed per part (handling + the provisional scan), with no weight charge', () => {
+      const ih = r.get('Induction Harden')!;
+      expect(ih.status).toBe('costed');
+      expect(ih.provisional).toBe(true);
+      expect(ih.materialUsdPerPart).toBe(0);
+      expect(ih.trace.find((x) => x.label === 'Induction scan and quench')?.value).toBe(6);
+      expect(ih.warnings.join(' ')).toMatch(/published range 4-8 s/);
+      // seconds, not furnace hours: far below the vacuum-furnace service price
+      expect(ih.costPerPartUsd!).toBeLessThan(r.get('Vacuum Air Harden')!.costPerPartUsd!);
+    });
+
+    it('a reference-priced service is never flagged provisional; with no sibling service the line is a named gap', () => {
+      expect(r.get('Vacuum Air Harden')!.provisional).toBeUndefined();
+      const noSibling = new Map(computeHeatTreatments(steelPart, reference, machines.filter((m) => m.machineClass !== classOf('Standard Temper')), calculators).map((x) => [x.process, x]));
+      expect(noSibling.get('Stress Relief')!.status).toBe('gap');
+      expect(noSibling.get('Stress Relief')!.reason).toMatch(/priced as Standard Temper/);
+    });
   });
 
   it('reads the process and case depth from a drawing callout', () => {
