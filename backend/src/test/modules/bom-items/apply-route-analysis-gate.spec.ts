@@ -44,3 +44,38 @@ describe('applying a route requires the part to be analysed', () => {
     expect(getRouteComparison).toHaveBeenCalled();
   });
 });
+
+/** Automatic routing never falls back: with every route ruled out by an incompatible feature, it says so and chooses nothing. */
+describe('applying "auto" when every route is incompatible', () => {
+  const ready = { cad: 'ready', drawing: 'not_required', casting: 'not_required', ready: true, missing: [] };
+  const incompatible = (label: string) => ({
+    routeId: label, routeLabel: label, isFeasible: true,
+    compatibility: { status: 'incompatible', notAssessed: [], warnings: [], incompatibilities: [{ featureType: 'SlideBundle', variant: '', count: 2, featureIds: ['s'], kind: 'not_in_process_vocabulary', reason: 'The reference lists no SlideBundle for it.' }] },
+  });
+
+  function service(comparison: object) {
+    const getRouteComparison = jest.fn().mockResolvedValue(comparison);
+    const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
+    Object.assign(c, {
+      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }), getRouteComparison },
+      analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
+      audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
+    });
+    return c;
+  }
+  const dto = { routeId: 'auto', location: 'USA' } as never;
+  const user = { id: 'u' } as never;
+
+  it('refuses with the product message and each route\'s exact feature and reason', async () => {
+    const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: 'No compatible manufacturing process found.', routes: [incompatible('Compression Molding'), incompatible('Other')] });
+    const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;
+    expect(error.message).toContain('No compatible manufacturing process found.');
+    expect(error.message).toContain('Compression Molding: 2 x SlideBundle (The reference lists no SlideBundle for it.)');
+  });
+
+  it('a null recommendation for another reason keeps its own message', async () => {
+    const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [] });
+    const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;
+    expect(error.message).toContain('No route is both feasible and fully costed');
+  });
+});

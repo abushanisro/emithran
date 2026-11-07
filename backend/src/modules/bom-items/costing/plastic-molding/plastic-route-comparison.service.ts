@@ -61,6 +61,24 @@ export interface PlasticComparison {
   grossWeightKg: number;
 }
 
+/**
+ * The Lowest cost and Fastest badges of the molding routes, over the routes that are physically capable and not confirmed incompatible (a route whose process
+ * cannot make a feature of the part is never presented as the best). Idempotent: it clears both badges first, so it can run again once compatibility is known
+ * (bom-items.service attaches it after the catalog operations), and a badge can never name a route the recommendation excludes.
+ * No bestQuality badge for molding routes: the reference data gives no quality measure between presses (the former clamp-utilization sweet spot and score were invented).
+ */
+export function assignMoldingRouteBadges(routes: RouteResultDto[]): void {
+  for (const r of routes) { r.badges.lowestCost = false; r.badges.fastest = false; }
+  const capableRoutes = routes.filter((r) => r.capability.overallCapable && r.compatibility?.status !== 'incompatible');
+  if (capableRoutes.length === 0) return;
+  const feasibleRoutes = capableRoutes.filter((r) => r.isFeasible && r.totalCost != null);
+  if (feasibleRoutes.length > 0) {
+    const minFeasibleCost = Math.min(...feasibleRoutes.map((r) => r.totalCost!));
+    feasibleRoutes.forEach((r) => { r.badges.lowestCost = r.totalCost === minFeasibleCost; });
+  }
+  capableRoutes.reduce((a, b) => a.cycleTimes.totalMin < b.cycleTimes.totalMin ? a : b).badges.fastest = true;
+}
+
 @Injectable()
 export class PlasticRouteComparisonService {
   constructor(
@@ -404,18 +422,7 @@ export class PlasticRouteComparisonService {
       } : undefined,
     } satisfies RouteResultDto);
 
-    const capableRoutes = imRoutes.filter((r) => r.capability.overallCapable);
-    if (capableRoutes.length > 0) {
-      const feasibleRoutes = capableRoutes.filter((r) => r.isFeasible && r.totalCost != null);
-      if (feasibleRoutes.length > 0) {
-        const minFeasibleCost = Math.min(...feasibleRoutes.map((r) => r.totalCost!));
-        feasibleRoutes.forEach((r) => { r.badges.lowestCost = r.totalCost === minFeasibleCost; });
-      }
-      capableRoutes.reduce((a, b) => a.cycleTimes.totalMin < b.cycleTimes.totalMin ? a : b).badges.fastest = true;
-      // No bestQuality badge for molding routes: the reference data gives no
-      // quality measure between presses (the former clamp-utilization sweet
-      // spot and score were invented).
-    }
+    assignMoldingRouteBadges(imRoutes);
 
     const imGrossKg = (partVolumeMm3 / 1e9) * materialDensityKgM3 * (1 + MATERIAL_OVERHEAD_PCT / 100);
 

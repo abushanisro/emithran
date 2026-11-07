@@ -88,6 +88,11 @@ export class RouteApplicationService {
 
     // 2. Resolve 'auto' to the engine's own recommendation, from THIS comparison.
     const routeId = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
+    if (!routeId && comparison.noCompatibleProcessMessage) {
+      // Every route is ruled out by a feature its process cannot make: say so, with each route's reason, and choose nothing.
+      const reasons = comparison.routes.flatMap((r) => (r.compatibility?.incompatibilities ?? []).map((i) => `${r.routeLabel}: ${i.count} x ${i.featureType} (${i.reason})`));
+      throw new BadRequestException(`${comparison.noCompatibleProcessMessage} ${reasons.join(' ')}`.trim());
+    }
     if (!routeId) {
       throw new BadRequestException(
         'No route is both feasible and fully costed for this part, so none can be applied automatically. ' +

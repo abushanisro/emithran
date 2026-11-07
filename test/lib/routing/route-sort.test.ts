@@ -23,6 +23,9 @@ function node(overrides: Partial<RouteNode> & Pick<RouteNode, 'id'>): RouteNode 
     toolingVolumeNote: null,
     feasible: true,
     infeasibleReason: null,
+    processIncompatibilities: [],
+    incompatible: false,
+    compatibilityWarnings: [],
     cost: 1,
     cycleTimeMin: 1,
     machineName: null,
@@ -198,3 +201,25 @@ describe('maxRouteCost', () => {
     expect(maxRouteCost([])).toBeNull();
   });
 });
+
+describe('selectTopRoutes with compatibility (mirrors the backend recommendation)', () => {
+  const compat = (status: 'compatible' | 'incompatible') => ({ compatibility: { status } });
+
+  it('never ranks an incompatible route, even the cheapest', () => {
+    const top = selectTopRoutes([
+      rankable({ routeId: 'cheap', totalCost: 1, ...compat('incompatible') }),
+      rankable({ routeId: 'b', totalCost: 2, ...compat('compatible') }),
+      rankable({ routeId: 'c', totalCost: 3 }),
+    ], 3).map((r) => r.routeId);
+    expect(top).toEqual(['b', 'c']);
+  });
+
+  it('with every route incompatible there is no top route and nothing is padded in', () => {
+    expect(selectTopRoutes([rankable({ routeId: 'a', ...compat('incompatible') }), rankable({ routeId: 'b', ...compat('incompatible') })], 3)).toEqual([]);
+  });
+
+  it('a route with no verdict, or a null one, is ranked as before', () => {
+    expect(selectTopRoutes([rankable({ routeId: 'a', totalCost: 2 }), rankable({ routeId: 'b', totalCost: 1, compatibility: null })], 3).map((r) => r.routeId)).toEqual(['b', 'a']);
+  });
+});
+
