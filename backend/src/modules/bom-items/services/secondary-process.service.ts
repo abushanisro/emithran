@@ -61,6 +61,26 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/**
+ * The recognised features a feature-counting operation (CMM probe touches) reads, one entry per feature. A molded part's recognised features are in the plastic feature
+ * graph (its feature_graph_v2 holds only the draft finding, so reading that left the CMM with nothing to measure). The graph keeps each surface type as ONE aggregate item
+ * ("planarface-all": one occurrence listing 131 faces); the probe-touch table counts touches per feature, and a face is a feature of that vocabulary, so an aggregate is
+ * expanded to one occurrence per face. Holes and voids are items of their own, one occurrence each, and are kept as they are.
+ */
+export function partFeatures(fg: any, family: string): Array<{ id: string; feature_type: string; occurrences: unknown[] }> {
+  const items: any[] = family === 'plastic_molded' && Array.isArray(fg?.summary?.plasticFeatureGraph?.items)
+    ? fg.summary.plasticFeatureGraph.items
+    : (fg?.feature_graph_v2?.features ?? []);
+  return items
+    .filter((f: any) => f?.id && f?.feature_type && Array.isArray(f?.occurrences))
+    .map((f: any) => {
+      const aggregate = family === 'plastic_molded' && typeof f.id === 'string' && f.id.endsWith('-all');
+      if (!aggregate) return f;
+      const faces: unknown[] = f.occurrences.flatMap((o: any) => (Array.isArray(o?.face_ids) ? o.face_ids : []));
+      return { ...f, occurrences: faces.map((face) => ({ face_ids: [face] })) };
+    });
+}
+
 @Injectable()
 export class SecondaryProcessService {
   private readonly references = new Map<string, SecondaryReference>();
@@ -230,9 +250,9 @@ export class SecondaryProcessService {
     const fg = item.featureGraph ?? {};
     const family: string = fg?.classification?.family ?? 'unknown';
     const grade = item.materialGrade ?? item.material ?? null;
-    const { cutCode, materialGroup } = grade
+    const { cutCode, materialType } = grade
       ? await this.materials.resolveCutCode(accessToken, grade, family)
-      : { cutCode: null, materialGroup: null };
+      : { cutCode: null, materialType: null };
     const dims = [item.maxLength, item.maxWidth, item.maxHeight].map((v) => num(v));
     const wall = num(fg?.summary?.wallThicknessNominalMm) ?? (family === 'sheet_metal' ? num(item.sheetThicknessMm ?? fg?.summary?.sheetThicknessMm) : null);
 
@@ -242,10 +262,12 @@ export class SecondaryProcessService {
       weightKg: num(item.weight) && num(item.weight)! > 0 ? num(item.weight) : null,
       wallThicknessMm: wall,
       materialCutCode: cutCode,
-      materialTypeName: materialGroup,
+      // The reference tables (aging time, hold temperature, conversion coating, laser engraving) are keyed by the material TYPE (Steel, Aluminum, Nylon); the material group
+      // (Ferrous & Non-Ferrous, Plastic & Rubber) matches none of their rows, so every lookup by it was a gap.
+      materialTypeName: materialType,
       isMachined: family === 'unknown' ? null : isMachiningFamily(family),
       surfaceCallout: surfaceCalloutOf(item),
-      features: (fg?.feature_graph_v2?.features ?? []).filter((f: any) => f?.id && f?.feature_type && Array.isArray(f?.occurrences)),
+      features: partFeatures(fg, family),
       batchSize,
     };
 
@@ -292,7 +314,7 @@ export class SecondaryProcessService {
       location,
       batchSize,
       materialCutCode: cutCode,
-      materialTypeName: materialGroup,
+      materialTypeName: materialType,
       dataWarnings,
       surfaceLines: surfaceResults.map(withLocal),
       heatTreatmentLines: heatResults.map(withLocal),

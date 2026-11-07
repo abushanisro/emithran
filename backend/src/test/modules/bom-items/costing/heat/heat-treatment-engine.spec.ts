@@ -139,6 +139,30 @@ describe('heat treatment calculators', () => {
     expect(r.calculator!.provenance['Aging Time']).toMatch(/tblMaterialAgingTime/);
   });
 
+  it('a material type the aging table does not list is aged for the time the reference defines (defaultAgingTime), and says so', () => {
+    const tabled = run(steelPart).get('Age')!;
+    const nylon = run({ ...steelPart, materialTypeName: 'Nylon' }).get('Age')!;
+    expect(nylon.status).toBe('costed');
+    expect(nylon.calculator!.inputs['Aging Time']).toBe(Number(reference.variables.get('defaultAgingTime')));
+    expect(nylon.calculator!.provenance['Aging Time']).toMatch(/defaultAgingTime: Nylon is not in .*tblMaterialAgingTime/);
+    // the table's own row is still what a listed type is aged by
+    expect(tabled.calculator!.provenance['Aging Time']).toMatch(/tblMaterialAgingTime\.csv\) *\(Steel\)|tblMaterialAgingTime.*Steel/);
+  });
+
+  it('with no defaultAgingTime in the reference an unlisted type is a stated gap, never a made-up time', () => {
+    const noDefault: SecondaryReference = { ...reference, variables: new Map([...reference.variables].filter(([k]) => k !== 'defaultAgingTime')) };
+    const r = new Map(computeHeatTreatments({ ...steelPart, materialTypeName: 'Nylon' }, noDefault, machines, calculators).map((x) => [x.process, x])).get('Age')!;
+    expect(r.status).toBe('gap');
+    expect(r.reason).toMatch(/no defaultAgingTime variable/);
+  });
+
+  it('the group of a material (Plastic & Rubber) matches no aging row: the lookup is by the material TYPE, which is why the service passes the type', () => {
+    const byGroup = run({ ...steelPart, materialTypeName: 'Plastic & Rubber' }).get('Age')!;
+    expect(byGroup.calculator!.provenance['Aging Time']).toMatch(/defaultAgingTime/);   // a group is never a row of the table
+    expect((reference.lookups.get('tblMaterialAgingTime') ?? []).map((r) => r['Material Type'])).not.toContain('Plastic & Rubber');
+    expect((reference.lookups.get('tblMaterialAgingTime') ?? []).map((r) => r['Material Type'])).toContain('Steel');
+  });
+
   it('the cycle time is the calculator formula, and follows the part (not a per-part case)', () => {
     const small = run({ ...steelPart, weightKg: 0.05 }).get('Straighten')!;
     const large = run({ ...steelPart, weightKg: 400 }).get('Straighten')!;
