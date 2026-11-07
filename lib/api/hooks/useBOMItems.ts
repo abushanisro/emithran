@@ -665,6 +665,7 @@ export interface UnsupportedOperationGap {
   machineClass: string;
   reason: string;
   requiredCapability?: string;
+  requiredAction?: string;
 }
 export type PhysicsGap = LookupGap | UnsupportedOperationGap;
 

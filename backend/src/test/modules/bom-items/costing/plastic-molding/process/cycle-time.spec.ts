@@ -95,7 +95,7 @@ describe('the injection cycle time, by the stored calculator', () => {
     for (const calculators of [null, undefined, {}]) {
       const r = runInjectionCycleTime(base, calculators, 'injection');
       expect(r.derivable).toBe(false);
-      if (!r.derivable) expect(r.missing.join(' ')).toContain('a calculator for "Injection Molding - Cycle Time"');
+      if (!r.derivable) expect(r.missing.join(' ')).toContain('the stored calculator "Injection Molding - Cycle Time" is not in this database');
     }
   });
 

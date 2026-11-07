@@ -120,7 +120,7 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
           <div className="text-[11px] text-muted-foreground">Reason: {gap.reason}</div>
           <div className="text-[11px] text-muted-foreground border-t border-red-500/20 pt-1.5">
             <span className="font-semibold text-foreground/80">Required Action: </span>
-            this process needs new calculator capability{gap.requiredCapability ? ` (${gap.requiredCapability})` : ''} — an engineering task, not a missing data row.
+            {gap.requiredAction ?? `this process needs new calculator capability${gap.requiredCapability ? ` (${gap.requiredCapability})` : ''} — an engineering task, not a missing data row.`}
           </div>
         </>
       )}

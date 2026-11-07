@@ -447,7 +447,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         gatesPerCavity: plasticRef.defaultGatesPerCavity,
       }, input.calculators ?? null, mhrRate.machineClass === 'structural_foam_molding' ? 'structural_foam' : 'injection')
     : { derivable: false, missing: [`Plastic reference data (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')})`] };
-  const cycleGapReason = cycle.derivable ? null : `Cycle time not derivable: missing ${cycle.missing.join('; ')}.`;
+  const cycleGapReason = cycle.derivable ? null : cycle.calculatorProblem ? `Cycle time not derivable: ${cycle.calculatorProblem}.` : `Cycle time not derivable: missing ${cycle.missing.join('; ')}.`;
   if (cycleGapReason) warnings.push(cycleGapReason);
 
   // ── Route the part ─────────────────────────────────────────────────────────
@@ -528,6 +528,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       gapType: 'unsupported_operation', process: processLabel, machineClass: mhrRate.machineClass,
       reason: gapReason,
       requiredCapability: sizing.materialGap ? 'An injection-molding material' : sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : yieldGapReason ? 'Press good-part yield' : 'Labour rate (HR Rates)',
+      // A stored calculator that is absent or too old is fixed by applying the migrations, not by engineering work or a data row.
+      ...(!sizing.materialGap && !sizing.unverifiedReason && !cycle.derivable && cycle.calculatorProblem ? { requiredAction: `Apply migrations 975 and 976 to this database (npm run db:migrate): ${cycle.calculatorProblem}.` } : {}),
     };
   }
   if (cycle.derivable) {
