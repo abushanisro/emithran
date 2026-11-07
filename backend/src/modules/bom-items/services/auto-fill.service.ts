@@ -25,6 +25,7 @@ import { machiningFeatureCounts } from '../costing/machining/operation/machining
 import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
 import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 import { currentFeatureGraphVersion } from '../analysis-status';
+import { plasticCostDrivers } from '../costing/plastic-molding/plastic-cost-drivers';
 
 export interface RawGeometry {
   volume: number;
@@ -400,6 +401,38 @@ export class AutoFillService {
     }
 
     const cadMI = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
+    const imSummary = isInjectionMolded ? {
+          // Phase 1 — wall thickness
+          wallThicknessNominalMm: cadMI?.features?.wall_thickness_nominal_mm ?? 0,
+          wallThicknessMinMm:     cadMI?.features?.wall_thickness_min_mm ?? 0,
+          wallThicknessMaxMm:     cadMI?.features?.wall_thickness_max_mm ?? 0,
+          // Phase 1 — cylindrical features (hole/boss lumped)
+          holeOrBossCount:        cadMI?.features?.hole_or_boss_count ?? 0,
+          filletCount:            cadMI?.features?.fillet_count ?? 0,
+          // Phase 1 — rib proxy (pocket-floor count, kept for backward compat)
+          ribCountProxy:          cadMI?.features?.rib_count_proxy ?? 0,
+          // Phase 4 — real rib count (antiparallel wall-face pairs at rib separation)
+          // Falls back to rib_count_proxy when CAD engine is pre-Phase 4.
+          ribCount:               cadMI?.features?.rib_count ?? cadMI?.features?.rib_count_proxy ?? 0,
+          // Phase 2 — wall uniformity (null when CAD engine is pre-Phase 2)
+          wallThicknessStdDevMm:    cadMI?.features?.wall_thickness_std_dev_mm ?? null,
+          thinWallViolationCount:   cadMI?.features?.thin_wall_violation_count ?? 0,
+          thickWallViolationCount:  cadMI?.features?.thick_wall_violation_count ?? 0,
+          wallUniformityRatio:      cadMI?.features?.wall_uniformity_ratio ?? null,
+          // Phase 2 — blind feature split
+          throughHoleCount:     cadMI?.features?.through_hole_count ?? 0,
+          blindFeatureCount:    cadMI?.features?.blind_feature_count ?? 0,
+          // Phase 3 — insert candidates (blind holes at standard insert OD sizes)
+          insertCandidateCount: cadMI?.features?.insert_candidate_count ?? 0,
+          // Phase 2 — draft angles
+          undraftedFaceCount:   cadMI?.features?.undrafted_face_count ?? 0,
+          draftedFaceCount:     cadMI?.features?.drafted_face_count ?? 0,
+          undercutFaceCount:    cadMI?.features?.undercut_face_count ?? 0,
+          partingComplexity:    cadMI?.features?.parting_complexity ?? null,
+          avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
+          // The recognised features (holes, faces, ribs) the catalog operations are resolved from; null on an older CAD engine.
+          plasticFeatureGraph:  cadMI?.features?.recognition_core?.feature_graph ?? null,
+    } : {};
     const featureGraph = {
       extractedAt: new Date().toISOString(),
       classification: {
@@ -430,7 +463,11 @@ export class AutoFillService {
         flatPatternHolesMm: geo.flatPatternHolesMm,
         flatPatternHolesUnplaced: geo.flatPatternHolesUnplaced,
         flatPatternOutlineSource: geo.flatPatternOutlineSource,
-        costDrivers,
+        // A molded part's drivers are the molding cost model's own inputs (what each one does is on the driver); the sheet-metal drivers above would read
+        // its holes as drill points.
+        costDrivers: isInjectionMolded
+          ? plasticCostDrivers({ volumeMm3: geo.volume, surfaceAreaMm2: geo.surfaceArea, boundingBox: geo.boundingBox, summary: { ...imSummary, holeCount: geo.holeCount, holeDiameters: geo.holeDiameters } })
+          : costDrivers,
         holeDiameters:      geo.holeDiameters ?? [],
         holeGroups:         (geo.holeGroups ?? []).map((g) => ({
           ...g,
@@ -475,38 +512,7 @@ export class AutoFillService {
         // output (cadMI.features). Phase 1 fields are always present; Phase 2 fields
         // are present when extraction_version >= im_v2_phase2 and fall back to safe
         // defaults (0 / null) so older CAD engine responses keep working unchanged.
-        ...(isInjectionMolded ? {
-          // Phase 1 — wall thickness
-          wallThicknessNominalMm: cadMI?.features?.wall_thickness_nominal_mm ?? 0,
-          wallThicknessMinMm:     cadMI?.features?.wall_thickness_min_mm ?? 0,
-          wallThicknessMaxMm:     cadMI?.features?.wall_thickness_max_mm ?? 0,
-          // Phase 1 — cylindrical features (hole/boss lumped)
-          holeOrBossCount:        cadMI?.features?.hole_or_boss_count ?? 0,
-          filletCount:            cadMI?.features?.fillet_count ?? 0,
-          // Phase 1 — rib proxy (pocket-floor count, kept for backward compat)
-          ribCountProxy:          cadMI?.features?.rib_count_proxy ?? 0,
-          // Phase 4 — real rib count (antiparallel wall-face pairs at rib separation)
-          // Falls back to rib_count_proxy when CAD engine is pre-Phase 4.
-          ribCount:               cadMI?.features?.rib_count ?? cadMI?.features?.rib_count_proxy ?? 0,
-          // Phase 2 — wall uniformity (null when CAD engine is pre-Phase 2)
-          wallThicknessStdDevMm:    cadMI?.features?.wall_thickness_std_dev_mm ?? null,
-          thinWallViolationCount:   cadMI?.features?.thin_wall_violation_count ?? 0,
-          thickWallViolationCount:  cadMI?.features?.thick_wall_violation_count ?? 0,
-          wallUniformityRatio:      cadMI?.features?.wall_uniformity_ratio ?? null,
-          // Phase 2 — blind feature split
-          throughHoleCount:     cadMI?.features?.through_hole_count ?? 0,
-          blindFeatureCount:    cadMI?.features?.blind_feature_count ?? 0,
-          // Phase 3 — insert candidates (blind holes at standard insert OD sizes)
-          insertCandidateCount: cadMI?.features?.insert_candidate_count ?? 0,
-          // Phase 2 — draft angles
-          undraftedFaceCount:   cadMI?.features?.undrafted_face_count ?? 0,
-          draftedFaceCount:     cadMI?.features?.drafted_face_count ?? 0,
-          undercutFaceCount:    cadMI?.features?.undercut_face_count ?? 0,
-          partingComplexity:    cadMI?.features?.parting_complexity ?? null,
-          avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
-          // The recognised features (holes, faces, ribs) the catalog operations are resolved from; null on an older CAD engine.
-          plasticFeatureGraph:  cadMI?.features?.recognition_core?.feature_graph ?? null,
-        } : {}),
+        ...imSummary,
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
         // (cadMI.features). Detection + highlighting only; process routing and
         // costing are a later phase (see the Die Casting Phase 1 plan).
