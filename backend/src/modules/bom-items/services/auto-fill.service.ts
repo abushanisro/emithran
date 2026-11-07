@@ -432,6 +432,13 @@ export class AutoFillService {
           avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
           // The recognised features (holes, faces, ribs) the catalog operations are resolved from; null on an older CAD engine.
           plasticFeatureGraph:  cadMI?.features?.recognition_core?.feature_graph ?? null,
+          // The wall at each face (the diameter of the largest ball inside the material touching it): what the DFM thin and thick section rules grade and highlight.
+          // Null on a CAD engine that does not measure it.
+          plasticWallFaces: Array.isArray(cadMI?.features?.recognition_core?.wall?.faces)
+            ? (cadMI.features.recognition_core.wall.faces as Array<Record<string, unknown>>)
+                .filter((f) => typeof f['thickness_mm'] === 'number')
+                .map((f) => ({ face: f['face_id'] as number, mm: f['thickness_mm'] as number }))
+            : null,
           // The draft of each wall face the analysis judged (id, the draft it is judged by, on what basis, its class): what the DFM draft rule grades and highlights.
           // Null on an older CAD engine, which does not record it.
           plasticDraftFaces: Array.isArray(cadMI?.features?.recognition_core?.draft?.faces)

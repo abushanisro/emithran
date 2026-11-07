@@ -53,3 +53,9 @@ Guidance the data does not define, from secondary sources only (not enabled as r
 2. CAD measurements it needs and does not have: wall thickness for every face pair (not only the modal one), edge radii, hole length and diameter classes, distance from holes to walls.
 3. The Design / DFM tab: each finding clickable, highlighting its faces; the finding's text placed on the model at its position.
 4. Remove the hard-coded thresholds once the engine covers the rule, showing before and after for each part.
+
+## 6. Status
+
+- Stage 1 (#269): the data-driven engine, draft angle and hole length to diameter, the findings' faces highlighted from the Design / DFM tab.
+- Stage 2: wall thickness at every face (the diameter of the largest ball inside the material touching the face, from the recognition mesh), so ThinSection and ThickSection are judged by material and located. Measured on parts of 1,000 to 4,500 triangles in 0.2 to 2 seconds. Its limits: a thickness is good to about the mesh deflection (reported as `resolution_mm`); a face is read by its largest ball, so a thin zone inside a face that is thicker elsewhere is not located below the face; 2 to 8 percent of sample rays leave through no surface on an open mesh and give no number for that sample.
+- Not yet: ThinWallAroundHole, SharpInternalEdge and SharpExternalEdge (edge radii), HighFlowRatio (no gate), the undercut kinds, regrind, and the text written on the model.

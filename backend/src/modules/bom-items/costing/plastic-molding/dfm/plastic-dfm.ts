@@ -50,12 +50,15 @@ export interface PlasticDfmReference {
 }
 
 export interface DraftFace { face: number; deg: number; basis: string; cls: string }
+/** The wall at a face: the diameter of the largest ball inside the material that touches it (mm). */
+export interface WallFace { face: number; mm: number }
 export interface MeasuredHole { id: string; through: boolean; diameterMm: number; depthMm: number; faces: number[] }
 
 /** What the analysis of the part holds. A null is a measurement the analysis did not make (an older CAD engine), which makes its rules not evaluated. */
 export interface PlasticDfmPart {
   draftFaces: DraftFace[] | null;
   holes: MeasuredHole[] | null;
+  wallFaces: WallFace[] | null;
 }
 
 const num = (v: unknown): number | null => {
@@ -109,8 +112,6 @@ function severityOf(value: number, l: Limits): { severity: DfmSeverity; threshol
 
 /** Rules whose measurement the analysis does not make yet, and why. They stay in the list so a gap is visible and is never a silent pass. */
 const NOT_MEASURED: Readonly<Record<string, string>> = {
-  ThinSection: 'the analysis measures the nominal wall of the part, not the wall at each face: a thin zone cannot be located',
-  ThickSection: 'the analysis measures the nominal wall of the part, not the wall at each face: a thick zone cannot be located',
   ThinWallAroundHole: 'needs the wall between a hole and its neighbours, which is not measured',
   SharpInternalEdge: 'the radius of the edges is not measured (the analysis lists SharpEdge as not assessed)',
   SharpExternalEdge: 'the radius of the edges is not measured (the analysis lists SharpEdge as not assessed)',
@@ -139,7 +140,15 @@ const holeMeasure = (through: boolean, size: 'Small' | 'Large'): Measure => (p, 
 /** A rule can have a row for each hole size class: the measure is per class, and the rule is judged once for each. */
 const SIZE_CLASSES: ReadonlyArray<'Small' | 'Large'> = ['Small', 'Large'];
 
+/** The wall at each face, as the thin and thick section rules read it: the same measurement, graded against a minimum and a maximum. */
+const wallMeasure: Measure = (p) =>
+  p.wallFaces
+    ? p.wallFaces.map((w) => ({ value: w.mm, featureId: null, faces: [w.face], what: `face ${w.face}` }))
+    : { reason: 'the analysis has no wall thickness per face (a CAD engine older than the per-face wall measurement)' };
+
 const MEASURES: Readonly<Record<string, Measure>> = {
+  ThinSection: wallMeasure,
+  ThickSection: wallMeasure,
   // A wall face is judged by the draft it has (the least for a planar face, the average for a curved one: draft.py states why). A face covered from the side it faces
   // is an undercut, which is not a draft shortfall and has its own rules.
   InsufficientDraftAngle: (p) =>
