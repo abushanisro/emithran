@@ -48,7 +48,7 @@ export interface RealResinInputs {
   densityOfMeltKgM3: number | null;
 }
 
-interface ResinThermalProps {
+export interface ResinThermalProps {
   alpha: number; // thermal diffusivity, mm²/s
   Tm: number;    // melt temperature, C
   Tw: number;    // mold wall temperature, C
@@ -77,18 +77,24 @@ export function resinThermalProps(real: RealResinInputs | null | undefined, mold
   return { props: { alpha, Tm: r.meltingTempC!, Tw: r.moldTempC! + moldTemperatureIncreaseC, Te: r.ejectionTempC! } };
 }
 
+/** True when the Menges equation has a solution for this wall and these temperatures (the eject temperature lies between the mold wall and the melt). */
+export function hasMengesSolution(wallMm: number, props: ResinThermalProps): boolean {
+  const { alpha, Tm, Tw, Te } = props;
+  if (!(wallMm > 0) || !(alpha > 0) || Te - Tw <= 0) return false;
+  return (4 / Math.PI) * (Tm - Tw) / (Te - Tw) > 1;
+}
+
 /** Menges cooling time (s), or null when the temperatures admit no solution (Te <= Tw or Te >= Tm). */
 export function computeCoolingTimeSec(wallMm: number, props: ResinThermalProps): number | null {
   const { alpha, Tm, Tw, Te } = props;
-  if (!(wallMm > 0) || !(alpha > 0) || Te - Tw <= 0) return null;
+  if (!hasMengesSolution(wallMm, props)) return null;
   const lnArg = (4 / Math.PI) * (Tm - Tw) / (Te - Tw);
-  if (lnArg <= 1) return null;
   const tCool = (wallMm * wallMm / (Math.PI * Math.PI * alpha)) * Math.log(lnArg);
   return Math.round(tCool * 10) / 10;
 }
 
 /** The factor of the first bracket whose upper bound covers the value (the last covers the rest). */
-function bracketFactor(rows: ReadonlyArray<{ upTo: number; factor: number }>, value: number): number {
+export function bracketFactor(rows: ReadonlyArray<{ upTo: number; factor: number }>, value: number): number {
   return (rows.find((r) => value <= r.upTo) ?? rows[rows.length - 1]!).factor;
 }
 
@@ -138,7 +144,7 @@ export type CycleTimeResult =
     }
   | { derivable: false; missing: string[] };
 
-export function computeCycleTime(input: {
+export interface CycleTimeInput {
   /** CAD nominal wall thickness; null/0 = not measured. */
   wallMm: number | null;
   isLsr: boolean;
@@ -149,7 +155,9 @@ export function computeCycleTime(input: {
   shotMeltVolumeMm3: number | null;
   cavityCount: number;
   gatesPerCavity: number;
-}): CycleTimeResult {
+}
+
+export function computeCycleTime(input: CycleTimeInput): CycleTimeResult {
   const missing: string[] = [];
   const wall = input.wallMm != null && input.wallMm > 0 ? input.wallMm : null;
   if (wall == null) missing.push('nominal wall thickness (CAD)');
