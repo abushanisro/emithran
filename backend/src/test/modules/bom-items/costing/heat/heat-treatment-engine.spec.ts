@@ -157,6 +157,15 @@ describe('heat treatment on the reference data', () => {
     });
   });
 
+  it('Age and Hot Isostatic Pressing are not applicable to a plastic: a metal heat treatment is not a gap to fill', () => {
+    const plastic = run({ ...steelPart, materialCutCode: 41.11, materialTypeName: 'Plastic & Rubber' });
+    for (const p of ['Age', 'Hot Isostatic Pressing']) {
+      expect(plastic.get(p)!.status).toBe('not_applicable');
+      expect(plastic.get(p)!.reason).toMatch(/plastic or rubber/);
+    }
+    expect(run(steelPart).get('Hot Isostatic Pressing')!.status).toBe('costed');
+  });
+
   it('reads the process and case depth from a drawing callout', () => {
     expect(matchHeatTreatmentCallout('Carburize and harden, case depth 0.8 mm')).toBe('Carburize');
     expect(matchHeatTreatmentCallout('Vacuum air harden with high temper')).toBe('Vacuum Air Harden with High Temper');

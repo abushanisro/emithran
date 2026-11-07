@@ -416,8 +416,10 @@ const loadbarFits = (part: SecondaryPartFacts, pool: SecondaryMachine[], areaLim
   pool.flatMap((m) => loadbarFit(part, m, areaLimit) ?? []);
 
 function anodize(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
-  const type = anodizeTypeFromCallout(part.surfaceCallout);
-  if (!type) return notCosted(base, 'gap', 'The anodizing type (Type I, IB, IC, II or III) is needed from the drawing surface callout: each line runs one type.');
+  const stated = anodizeTypeFromCallout(part.surfaceCallout);
+  // The reference runs one line per type and defines no default: with no type on the drawing the most common, Type II
+  // (sulfuric acid, MIL-A-8625), is assumed, and the line is provisional and says so.
+  const type = stated ?? 'Type II';
   if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed to load the loadbar.');
   if (part.surfaceAreaMm2 == null || part.surfaceAreaMm2 <= 0) return notCosted(base, 'gap', 'Part surface area is needed (each loadbar has a maximum load surface area).');
   const batch = part.batchSize;
@@ -429,11 +431,12 @@ function anodize(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, 
   const r = costed(base, fit.m, {
     perPartSec: (fit.windowHr * 3600) / fit.n,
     trace: [
-      { label: 'Anodizing type', value: type, source: 'drawing surface callout' },
+      { label: 'Anodizing type', value: type, source: stated ? 'drawing surface callout' : 'ASSUMED: the drawing names no type (Type II is the most common)' },
       { label: 'Load window time', value: fit.windowHr, unit: 'hr', source: `line ${fit.m.name} (one loadbar per window)` },
       { label: 'Parts per loadbar', value: fit.n, source: `loadbar window, spacing factor ${fit.f}, limited by ${fit.by}` },
     ],
     highlight: 'whole_part',
+    ...(stated ? {} : { provisional: true, warnings: ['Provisional: the drawing names no anodizing type, so Type II is assumed (the reference defines no default). Type I is thinner and cheaper, Type III hard anodize costs more: name the type on the drawing.'] }),
   }, ref, batch);
   // The line charge for a batch never falls below the line minimum batch cost.
   const minBatch = num(fit.m.specs.min_batch_cost_usd);
@@ -723,12 +726,57 @@ function conveyorPowderCoating(base: Base, part: SecondaryPartFacts, ref: Second
   }, ref, part.batchSize);
 }
 
+function screenPrinting(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('screen printing'));
+  if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed for the printed area.');
+  const colors = variable(ref, 'defaultNumScreenPrintColors'), colorMult = variable(ref, 'screenPrintColorMultiplier');
+  const sizes = ref.lookups.get('screenPrintSizeMult');
+  if (colors == null || colorMult == null || !sizes) return notCosted(base, 'gap', 'The screen printing variables are not staged: run migration 819.');
+  const m = pickMachine(base.process, pool.filter((x) => num(x.specs.application_cost_usd_per_m2) != null), ref);
+  if (!m) return notCosted(base, 'gap', 'No screen printing machine with an application cost is on file.');
+  // The printed region is not a CAD fact: the part's largest face (its two longest sizes) is assumed.
+  const [L, W] = sorted(part.bboxMm);
+  const row = sizes.map((r) => ({ len: num(r['Length (mm)']), wid: num(r['Width (mm)']), mult: num(r['Multiplier']) }))
+    .filter((r): r is { len: number; wid: number; mult: number } => r.len != null && r.wid != null && r.mult != null)
+    .sort((a, b) => a.len - b.len).find((r) => L <= r.len && W <= r.wid);
+  if (!row) return notCosted(base, 'gap', 'No screenPrintSizeMult row covers the printed size.');
+  const perM2 = num(m.specs.application_cost_usd_per_m2)!;
+  const colorFactor = 1 + colorMult * (colors - 1);
+  const areaM2 = (L * W) / 1e6;
+  const usd = areaM2 * perM2 * row.mult * colorFactor;
+  const out = priced(base, m, usd, [
+    { label: 'Printed area', value: Number(areaM2.toFixed(5)), unit: 'm²', source: `ASSUMED: the part's largest face, ${L.toFixed(0)} × ${W.toFixed(0)} mm` },
+    { label: 'Application cost', value: perM2, unit: 'USD/m²', source: `machine ${m.name}` },
+    { label: 'Size multiplier', value: row.mult, source: SRC_LOOKUP('screenPrintSizeMult') },
+    { label: 'Colors', value: colors, source: `${SRC_VAR} (defaultNumScreenPrintColors; each extra color adds ${colorMult})` },
+  ], ['Provisional: the printed area is not a CAD fact; the part\'s largest face is assumed. The graphic complexity multiplier is not applied. State the printed area and colors on the drawing.']);
+  return { ...out, provisional: true, reason: `Provisional estimate, not reference data: ${out.warnings[0]}` };
+}
+
+function maskBench(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('mask bench'));
+  const holes = part.features.filter((f) => /hole/i.test(String(f.feature_type)));
+  const n = holes.reduce((a, f) => a + f.occurrences.length, 0);
+  if (n === 0) return notCosted(base, 'not_applicable', 'The part has no detected hole to plug: the reference masks holes on the bench (maskBenchMaxPlugSize), and nothing else is a CAD fact.');
+  const m = pickMachine(base.process, pool.filter((x) => num(x.specs.mask_plug_time_s) != null), ref);
+  if (!m) return notCosted(base, 'gap', 'No mask bench with a plug time is on file.');
+  const plug = num(m.specs.mask_plug_time_s)!;
+  const maxSize = variable(ref, 'maskBenchMaxPlugSize');
+  return costed(base, m, {
+    perPartSec: n * plug,
+    trace: [
+      { label: 'Holes to plug', value: n, source: 'CAD hole features' },
+      { label: 'Plug time', value: plug, unit: 's', source: `machine ${m.name} (mask_plug_time_s)` },
+    ],
+    warnings: [`Provisional: every detected hole is plugged once; the reference plugs holes under ${maxSize ?? '—'} mm and needs a second plug for a long hole, but the hole size and depth are not read here.`],
+    highlight: 'features', featureIds: holes.map((f) => f.id), provisional: true,
+  }, ref, part.batchSize);
+}
+
 /** Why each remaining process cannot be timed from the reference data. */
 const UNDEFINED: Record<string, string> = {
   'Conveyor Conversion Coating': 'The reference has no machine file for this process.',
-  'Mask-Bench': 'Which features are masked is a drawing requirement, not a CAD fact.',
   'Mask-Spray': 'Which surfaces are masked is a drawing requirement, not a CAD fact.',
-  'Screen Printing': 'The printed area is a drawing requirement, not a CAD fact.',
 };
 
 type Model = (base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]) => SecondaryProcessResult;
@@ -759,6 +807,8 @@ const MODELS: Record<string, Model> = {
   'Degrease': degrease,
   'Powder Coat Cart': powderCoatCart,
   'Conveyor Powder Coating': conveyorPowderCoating,
+  'Screen Printing': screenPrinting,
+  'Mask-Bench': maskBench,
 };
 
 /** The processes this engine can cost. The process catalog marks exactly these

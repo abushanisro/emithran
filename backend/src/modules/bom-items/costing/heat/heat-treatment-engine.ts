@@ -187,7 +187,11 @@ function straighten(base: Base, part: HeatTreatmentFacts, ref: SecondaryReferenc
   return costed(base, m, { perPartSec: r.run.sec!, trace: calcTrace(r.run), highlight: 'whole_part', calculator: r.record }, ref, part.batchSize);
 }
 
+/** Aging and HIP act on metal; a plastic or rubber part has no aging time or hold temperature. */
+const isPolymer = (part: HeatTreatmentFacts) => part.materialTypeName === 'Plastic & Rubber';
+
 function age(base: Base, part: HeatTreatmentFacts, ref: SecondaryReference, pool: SecondaryMachine[], calculators: ReferenceCalculators | null | undefined): SecondaryProcessResult {
+  if (isPolymer(part)) return notCosted(base, 'not_applicable', `${base.process} is a metal heat treatment; the material is a plastic or rubber.`);
   const allowance = variable(ref, 'agingPartNestingAllowance');
   const table = ref.lookups.get('tblMaterialAgingTime');
   if (allowance == null || !table) return notCosted(base, 'gap', 'Aging reference data is not staged: run migration 823.');
@@ -216,6 +220,7 @@ function age(base: Base, part: HeatTreatmentFacts, ref: SecondaryReference, pool
 }
 
 function hip(base: Base, part: HeatTreatmentFacts, ref: SecondaryReference, pool: SecondaryMachine[], calculators: ReferenceCalculators | null | undefined): SecondaryProcessResult {
+  if (isPolymer(part)) return notCosted(base, 'not_applicable', `${base.process} is a metal heat treatment; the material is a plastic or rubber.`);
   const props = ref.lookups.get('tblMaterialTypeProperties');
   const v = (k: string) => variable(ref, k);
   const room = v('defaultRoomTemperature'), avgHeat = v('averageHeatingRate'), avgCool = v('averageCoolingRate'), avgHold = v('averageHoldTime');

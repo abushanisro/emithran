@@ -38,12 +38,18 @@ Open: the metal heat services still price a polymer part (Age uses `defaultAging
 
 Powder figures: general industrial film 2-4 mil (50-100 µm) per Powder Coated Tough, Products Finishing and UnionFab guides; specific gravity 1.0-2.0 with 1.5 in the worked coverage examples (a supplier data sheet gives the real value for a chosen powder). Top coat only; the powder price per kg and the clear coat are not priced.
 
-## Still not costed, and what each needs
-| Operation | Missing |
+## Rules for what the drawing does not state (all provisional)
+| Operation | Rule |
 |---|---|
-| Anodize | the anodizing type, from the drawing callout |
-| Black Oxide | a labor rate or wage grade in `black_oxide_machines.csv` |
-| Conveyor Conversion Coating | a machine file in `memory/SurfaceTreatment/Machine` |
-| Mask-Bench, Mask-Spray, Screen Printing | which features or area are masked or printed (a drawing requirement) |
-| Age, Hot Isostatic Pressing | no aging time / hold temperature for the material type (polymers have none); not a process for a molded plastic |
-| CMM Inspection | see the secondary-operations gaps doc (#279) |
+| Anodize | no type on the drawing: Type II is assumed (the reference runs one line per type and defines no default) |
+| Screen Printing | printed region = the part's largest face; application cost × size multiplier (`screenPrintSizeMult`) × color factor; the complexity multiplier is not applied |
+| Mask-Bench | one plug per detected CAD hole at the bench plug time; a part with no hole is not applicable |
+| Black Oxide | its labor rate is the "2 - Metal" wage grade's (migration 981; `surface_treatment_wage_grades.csv` puts Black Oxide on that grade and every other machine of the grade carries 29.95 in the USA) |
+| Age, Hot Isostatic Pressing | not applicable to a plastic or rubber part (metal heat treatments) |
+
+## Still not costed
+| Operation | Why |
+|---|---|
+| Conveyor Conversion Coating | `memory/SurfaceTreatment` has no machine file; `Countries data` has economics rows only for other countries, with machine length 0 and no line length to derive a speed from |
+| Mask-Spray | the sprayed area is not a CAD fact and the reference gives no default |
+| CMM Inspection | the Back cover's only detected feature (`im_undrafted`) has no row in `CMMInspectionProbeTouches` (Curved Surface, Curved Wall, Planar Face, Pocket, Simple Hole) |

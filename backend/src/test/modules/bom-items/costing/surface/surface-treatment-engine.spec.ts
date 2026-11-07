@@ -114,9 +114,10 @@ describe('surface treatment on the reference data', () => {
     expect(r.trace.find((t) => t.label === 'Part spacing')?.value).toBe(spacing);
   });
 
-  it('anodize without a type on the drawing is a gap naming the missing type', () => {
+  it('anodize without a type on the drawing assumes Type II and says so (provisional)', () => {
     const r = byProcess().get('Anodize')!;
-    expect(r.status).toBe('gap');
+    expect(r.status).toBe('costed');
+    expect(r.provisional).toBe(true);
     expect(r.reason).toMatch(/anodizing type/);
   });
 
@@ -227,8 +228,8 @@ describe('migration 821 matches the engine', () => {
     expect(rows.map((r) => [r.process, r.cls]).sort()).toEqual(SURFACE_PROCESSES.map((p) => [p.process, p.machineClass]).sort());
   });
 
-  it('marks modeled exactly the processes the engine costs (821, then 898, 979 and 980 on top)', () => {
-    const later = ['898_surface_treatment_batch_load_processes.sql', '979_surface_treatment_provisional_processes.sql', '980_surface_treatment_powder_coating.sql'].flatMap((f) => {
+  it('marks modeled exactly the processes the engine costs (821, then 898, 979, 980 and 982 on top)', () => {
+    const later = ['898_surface_treatment_batch_load_processes.sql', '979_surface_treatment_provisional_processes.sql', '980_surface_treatment_powder_coating.sql', '982_surface_treatment_mask_and_screen.sql'].flatMap((f) => {
       const text = fs.readFileSync(path.resolve(__dirname, '../../../../../../migrations/' + f), 'utf-8');
       const block = text.slice(text.indexOf('WITH ref'), text.indexOf('UPDATE process_taxonomy'));
       return [...block.matchAll(/\(\$str\$([^$]+)\$str\$, \$str\$([^$]+)\$str\$, (true|false)\)/g)].map((m) => [m[1], m[3] === 'true'] as [string, boolean]);
@@ -251,6 +252,9 @@ describe('provisional surface models', () => {
     ...machines('degrease_machines.csv', 'Degrease', [null, null, null]),
     ...machines('powder_coat_cart_machines.csv', 'Powder Coat Cart', [null, null, null]),
     ...machines('conveyor_powder_coating_machines.csv', 'Conveyor Powder Coating', [null, null, null]),
+    ...machines('screen_printing_machines.csv', 'Screen Printing', [null, null, null]),
+    ...machines('mask_bench_machine.csv', 'Mask-Bench', [null, null, null]),
+    ...machines('anodizing_machines.csv', 'Anodize', ['Loadbar Window Length (mm)', 'Loadbar Window Width (mm)', 'Loadbar Window Height (mm)']),
   ];
   const block: SecondaryPartFacts = { bboxMm: { length: 200, width: 100, height: 50 }, surfaceAreaMm2: 60000, weightKg: 1, wallThicknessMm: 5, materialCutCode: null, materialTypeName: null, features: [], batchSize: 100 };
   const run = (process: string, part = block) => computeSurfaceTreatments(part, reference, provPool).find((r) => r.process === process)!;
@@ -392,5 +396,65 @@ describe('provisional surface models without a machine to price on', () => {
       expect(r.reason).toMatch(/complete rate is on file/);
     }
     expect(parseCsv('Machine/black_oxide_machines.csv').every((m) => m['Labor Rate (USD / hr)'] === '' && m['Wage Grade Name'] === '')).toBe(true);
+  });
+});
+
+describe('provisional rules for what the drawing does not state', () => {
+  const part: SecondaryPartFacts = { bboxMm: { length: 200, width: 100, height: 50 }, surfaceAreaMm2: 60000, weightKg: 1, wallThicknessMm: 5, materialCutCode: null, materialTypeName: null, features: [], batchSize: 100 };
+  const provPool: SecondaryMachine[] = [
+    ...machines('screen_printing_machines.csv', 'Screen Printing', [null, null, null]),
+    ...machines('mask_bench_machine.csv', 'Mask-Bench', [null, null, null]),
+    ...machines('anodizing_machines.csv', 'Anodize', ['Loadbar Window Length (mm)', 'Loadbar Window Width (mm)', 'Loadbar Window Height (mm)']),
+  ];
+  const run = (process: string, p = part) => computeSurfaceTreatments(p, reference, provPool).find((r) => r.process === process)!;
+
+  it('anodize with no type on the drawing assumes Type II, flagged provisional; a stated type is reference-priced', () => {
+    const a = run('Anodize');
+    expect(a.status).toBe('costed');
+    expect(a.provisional).toBe(true);
+    expect(a.trace.find((t) => t.label === 'Anodizing type')?.value).toBe('Type II');
+    expect(a.warnings.join(' ')).toMatch(/names no anodizing type/);
+    const stated = run('Anodize', { ...part, surfaceCallout: 'Anodize Type III' });
+    expect(stated.provisional).toBeUndefined();
+    expect(stated.trace.find((t) => t.label === 'Anodizing type')?.value).toBe('Type III');
+  });
+
+  it('screen printing: largest face x application cost x size multiplier x color factor, the printed region assumed and said so', () => {
+    const r = run('Screen Printing');
+    const m = provPool.find((x) => x.name === 'Manual Screen Printing' || x.name === r.machine!.name)!;
+    const perM2 = Number(m.specs.application_cost_usd_per_m2);
+    const mult = parseCsv('lookup/screenPrintSizeMult.csv').map((x) => ({ l: Number(x['Length (mm)']), w: Number(x['Width (mm)']), m: Number(x['Multiplier']) })).find((x) => 200 <= x.l && 100 <= x.w)!.m;
+    expect(r.status).toBe('costed');
+    expect(r.provisional).toBe(true);
+    expect(r.costPerPartUsd).toBeCloseTo((0.2 * 0.1) * perM2 * mult * (1 + v('screenPrintColorMultiplier') * (v('defaultNumScreenPrintColors') - 1)), 3);
+    expect(r.warnings.join(' ')).toMatch(/largest face is assumed/);
+  });
+
+  it('mask bench: one plug per detected hole at the bench plug time; no hole is not applicable, not a blank', () => {
+    const holes = { id: 'h1', feature_type: 'simple_hole', occurrences: [{}, {}, {}] };
+    const r = run('Mask-Bench', { ...part, features: [holes] });
+    const m = provPool.find((x) => x.name === r.machine!.name)!;
+    expect(r.status).toBe('costed');
+    expect(r.provisional).toBe(true);
+    expect(r.trace.find((t) => t.label === 'Holes to plug')?.value).toBe(3);
+    const adj = Number(reference.variables.get('cycleTimeAdjustmentFactor') ?? 1);
+    const eff = Number(reference.variables.get('defaultMachineEfficiency') ?? 1);
+    expect(r.cycleTimeSec! * r.machine!.goodPartYield * eff / adj).toBeCloseTo(3 * Number(m.specs.mask_plug_time_s), 1);
+    expect(run('Mask-Bench').status).toBe('not_applicable');
+  });
+
+  it('Black Oxide has a wage grade in memory/ and every other machine of that grade carries one labor rate (migration 981 gives it)', () => {
+    const grades = new Map(parseCsv('surface_treatment_wage_grades.csv').map((x) => [x['Process Name']!, x['Wage Grade Name']!]));
+    expect(grades.get('Black Oxide')).toBe('2 - Metal');
+    expect(parseCsv('Machine/black_oxide_machines.csv').every((x) => x['Labor Rate (USD / hr)'] === '')).toBe(true);
+    const rates = new Set<string>();
+    for (const [proc, grade] of grades) {
+      if (grade !== '2 - Metal' || proc === 'Black Oxide') continue;
+      const file = fs.readdirSync(path.join(ROOT, 'Machine')).find((f) => f.startsWith(proc.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').replace(/^(.*)$/, '$1')));
+      if (!file) continue;
+      for (const row of parseCsv(`Machine/${file}`)) rates.add(row['Labor Rate (USD / hr)'] ?? row['Labor Rate (USD/hr)'] ?? '');
+    }
+    expect([...rates]).toEqual(['29.95']);
+    expect(fs.readFileSync(path.resolve(__dirname, '../../../../../../migrations/981_black_oxide_wage_grade_labor_rate.sql'), 'utf-8')).toMatch(/HAVING count\(DISTINCT usd_labor_rate_per_hr\) = 1/);
   });
 });
