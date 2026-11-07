@@ -77,6 +77,7 @@ import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
+import { PartSummaryTab } from '@/components/features/manufacturing-intelligence/PartSummaryTab';
 import { PlasticDfmFindings } from '@/components/features/manufacturing-intelligence/PlasticDfmFindings';
 import { isSupersededPlasticCheck, isSupersededPlasticWarning, plasticDfmReadiness } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
@@ -303,7 +304,7 @@ const RIGHT_TABS = [
   { key: 'copilot',       label: '✦ Copilot'   },
   { key: 'cost',          label: 'Cost'         },
   { key: 'validation',    label: 'Validation'   },
-  { key: 'part_summary',  label: 'Part Info'    },
+  { key: 'part_summary',  label: 'Part Summary' },
   { key: 'sustainability', label: 'Sustain'     },
   { key: 'detail',        label: 'Detail'       },
   { key: 'investment',    label: 'Invest'       },
@@ -7737,12 +7738,6 @@ function AnalysisTabsPanel({
 }) {
   const tab = activeTab;
   const setTab = onTabChange;
-  const cls = fg?.classification;
-  const machiningSummary: Record<string, number> | null = fg?.machining_features?.feature_summary ?? null;
-  // See the same derivation in the Investment panel above: null, not 0, when
-  // volume or production life is unresolved.
-  const lifetimeVol = productionLife === null || item.annualVolume == null
-    ? null : item.annualVolume * productionLife;
   // Same fix as SustainabilityTab — omitting location silently defaulted to
   // 'USA' (useCostSummary's own fallback), running a second, wasted full
   // cost computation on every load/Apply regardless of the real Digital
@@ -7768,97 +7763,7 @@ function AnalysisTabsPanel({
 
       <div className="flex-1 overflow-y-auto min-h-0">
         {tab === 'part_summary' && (
-          <>
-            {cls && (
-              <Section title="Classification">
-                <div className="flex items-center justify-between pb-1">
-                  <code className="text-[11px] font-semibold font-mono tracking-tight">{familyLabel(cls.family)}</code>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${confidenceCls(cls.confidence ?? 0)}`}>
-                    {cls.confidence != null ? `${Math.round(cls.confidence * 100)}%` : '—'}
-                  </span>
-                </div>
-                {machiningSummary ? (
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {Object.entries(machiningSummary)
-                      .filter(([, count]) => count > 0)
-                      .map(([type, count]) => (
-                        <span key={type} className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
-                          {count} {type.replace(/_/g, ' ')}
-                        </span>
-                      ))}
-                  </div>
-                ) : cls.signals?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {cls.signals.map((s, i) => (
-                      <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded">{s}</span>
-                    ))}
-                  </div>
-                )}
-                {cls.classificationSignals && (
-                  <div className="mt-2 divide-y divide-border/30">
-                    {(['flatness', 'hole_count', 'planar_face_fraction', 'cyl_axis_alignment', 'rotational_face_ratio'] as const)
-                      .filter((k) => cls.classificationSignals![k] != null)
-                      .map((k) => {
-                        const val = cls.classificationSignals![k];
-                        const display = k === 'planar_face_fraction' || k === 'cyl_axis_alignment' || k === 'rotational_face_ratio' || k === 'flatness'
-                          ? `${(Number(val) * 100).toFixed(0)}%`
-                          : String(val);
-                        const label = k === 'flatness' ? 'Flatness' : k === 'hole_count' ? 'Hole Count' : k === 'planar_face_fraction' ? 'Planar Faces' : k === 'cyl_axis_alignment' ? 'Cyl Alignment' : 'Rot Ratio';
-                        return (
-                          <div key={k} className="flex items-baseline py-0.5 gap-2">
-                            <span className="text-[9px] text-muted-foreground w-20 shrink-0">{label}</span>
-                            <span className="text-[10px] font-mono tabular-nums">{display}</span>
-                          </div>
-                        );
-                      })}
-                    {cls.classificationReasons?.map((r, i) => (
-                      <p key={i} className="text-[9px] text-muted-foreground pt-1 leading-relaxed">{r}</p>
-                    ))}
-                    {cls.classificationSignals.classification_version && (
-                      <p className="text-[9px] text-muted-foreground/50 pt-0.5">v{cls.classificationSignals.classification_version}</p>
-                    )}
-                  </div>
-                )}
-              </Section>
-            )}
-            <Section title="Part Geometry">
-              {(() => {
-                const finishKg = item.weight ?? null;
-                const roughKg = summaryForPartTab?.materialRemoval?.billetWeightKg ?? (() => {
-                  if (finishKg == null) return null;
-                  const fam: string = fg?.classification?.family ?? '';
-                  if (fam === 'turned') return finishKg * 2.5;
-                  if (fam === 'mill_turn')  return finishKg * 2.0;
-                  if (fam === 'milled') return finishKg * 1.5;
-                  if (fam === 'sheet_metal') return finishKg;
-                  return finishKg * 1.1;
-                })();
-                return (
-                  <>
-                    <Row label="Rough Mass (kg)" value={roughKg != null ? fmt(roughKg, 3) : '—'} />
-                    <Row label="Finish Mass (kg)" value={finishKg != null ? fmt(finishKg, 3) : '—'} />
-                  </>
-                );
-              })()}
-              <Row label="Length (mm)" value={item.maxLength != null ? fmt(item.maxLength, 1) : '—'} />
-              <Row label="Width (mm)" value={item.maxWidth != null ? fmt(item.maxWidth, 1) : '—'} />
-              <Row label="Height (mm)" value={item.maxHeight != null ? fmt(item.maxHeight, 1) : '—'} />
-              <Row label="Surface Area (mm²)" value={item.surfaceArea != null ? fmtInt(item.surfaceArea) : '—'} />
-              <Row label="Volume (mm³)" value={item.volume != null ? fmtInt(item.volume) : '—'} />
-            </Section>
-            <Section title="Factory / Production">
-              <Row label="Primary" value={factory} />
-              <Row label="Secondary" value="n/a" />
-              <Row label="Toolshop" value="n/a" />
-              <Row label="Annual Volume" value={item.annualVolume == null ? 'Not on file' : fmtInt(item.annualVolume)} />
-              {/* The values this part is actually being costed at, from the
-                  engine's own echo — not this component's request state, which
-                  is legitimately unset for any input the user has not chosen. */}
-              <Row label="Batch Size" value={effBatchSize === null ? '—' : fmtInt(effBatchSize)} />
-              <Row label="Production Life" value={effProductionLife === null ? '—' : `${effProductionLife} yr`} />
-              <Row label="Lifetime Volume" value={lifetimeVol === null ? 'Not on file' : fmtInt(lifetimeVol)} />
-            </Section>
-          </>
+          <PartSummaryTab itemId={item.id} uncostedWarnings={(summaryForPartTab?.warnings ?? []).filter((w) => /not costed/i.test(w))} />
         )}
 
         {tab === 'cost' && (

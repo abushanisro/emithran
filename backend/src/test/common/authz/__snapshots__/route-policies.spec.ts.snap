@@ -95,6 +95,7 @@ org:viewer      GET /api/v1/bom-items/:id/manufacturing-implications  BOMItemsCo
 org:viewer      GET /api/v1/bom-items/:id/material-intelligence  BOMItemsController.getMaterialIntelligence
 org:viewer      GET /api/v1/bom-items/:id/material-strengths  BOMItemsController.getMaterialStrengths
 org:viewer      GET /api/v1/bom-items/:id/nre  BOMItemsController.getNre
+org:viewer      GET /api/v1/bom-items/:id/part-summary  BOMItemsController.getPartSummary
 org:viewer      GET /api/v1/bom-items/:id/plastic-dfm  BOMItemsController.getPlasticDfm
 org:viewer      GET /api/v1/bom-items/:id/pmi-records  BOMItemsController.getPmiRecords
 org:viewer      GET /api/v1/bom-items/:id/pull-direction  BomItemPullDirectionController.get

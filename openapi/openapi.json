@@ -14306,6 +14306,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/part-summary": {
+      "get": {
+        "operationId": "BOMItemsController_getPartSummary_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The part summary (USD)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's summary: component, production and material information, the cost by category and by process, and the costs and targets. A projection of the applied cost table; a value the model does not hold is null with its reason",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/plastic-dfm": {
       "get": {
         "operationId": "BOMItemsController_getPlasticDfm_v1",
