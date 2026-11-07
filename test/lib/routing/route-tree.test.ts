@@ -120,4 +120,20 @@ describe('adaptRoutesToTree', () => {
     expect(tree[2]!.processIncompatibilities).toEqual([]);
     expect(tree[0]!.children.every((c) => c.processIncompatibilities.length === 0)).toBe(true);
   });
+
+  it('marks an incompatible route and carries unassessed-feature warnings as warnings only', () => {
+    const tree = adaptRoutesToTree([
+      route({ routeId: 'im-compression-molding', compatibility: { status: 'incompatible', incompatibilities: [], notAssessed: [], warnings: [] } }),
+      route({ routeId: 'im-small', compatibility: { status: 'compatible', incompatibilities: [], notAssessed: ['SharpEdge'], warnings: ['SharpEdge is not assessed from the CAD yet, so Injection Molding is not excluded or confirmed for it.'] } }),
+      route({ routeId: 'sm-laser' }),
+    ]);
+    expect(tree[0]).toMatchObject({ incompatible: true, compatibilityWarnings: [] });
+    // unassessed: warned, not excluded, and still feasible and priced
+    expect(tree[1]).toMatchObject({ incompatible: false, feasible: true, cost: 210 });
+    expect(tree[1]!.compatibilityWarnings).toEqual(['SharpEdge is not assessed from the CAD yet, so Injection Molding is not excluded or confirmed for it.']);
+    // no verdict: nothing held against it
+    expect(tree[2]).toMatchObject({ incompatible: false, compatibilityWarnings: [] });
+    expect(tree[0]!.children.every((c) => !c.incompatible && c.compatibilityWarnings.length === 0)).toBe(true);
+  });
 });
+
