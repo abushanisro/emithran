@@ -68,6 +68,7 @@ import { undercutCountFromDraftSummary } from './costing/plastic-molding/draft-s
 import { sideActionSignals } from './costing/plastic-molding/side-action-signals';
 import { computeInjectionMoldedCostSummary } from './costing/plastic-molding/process/cost-injection-molding-engine';
 import { driverImpacts } from './costing/plastic-molding/cost-driver-sensitivity';
+import { appliedOtherMoldingRouteId, projectMoldingRoute, type OtherMoldingRouteId } from './costing/plastic-molding/molding-route-projection';
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/plastic-molding/process/cost-injection-molding-engine';
@@ -2964,6 +2965,13 @@ export class BOMItemsService {
    * The part's quote: its family route (computeCostSummary) plus the shared
    * secondary operations (heat / surface / other) selected for it.
    */
+  /** The other molding process (Structural Foam, Compression, Reaction Injection) the part's active saved rows were applied from, or null (injection tiers and every other case). */
+  private async appliedOtherMoldingRouteId(id: string, accessToken: string): Promise<OtherMoldingRouteId | null> {
+    const { data, error } = await this.databaseService.getClient(accessToken).from('process_cost_records').select('notes').eq('bom_item_id', id).eq('is_active', true);
+    if (error) return null;
+    return appliedOtherMoldingRouteId(((data ?? []) as Array<{ notes: string | null }>).map((r) => r.notes));
+  }
+
   @Traced('cost_summary')
   async getCostSummary(
     id: string,
@@ -3201,16 +3209,8 @@ export class BOMItemsService {
     // numbers, never a vague "mismatch" with nothing to act on.
     materialWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
     if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
-    const {
-      materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
-      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, stockForm, matlState, clampProperties,
-      // cureTimeMinFromMaterial deliberately NOT destructured here: this
-      // primary quote path has no per-item Compression Molding / RIM process
-      // dispatch yet (only getRouteComparison() exposes those as alternate
-      // routes today — a known, disclosed architecture gap, out of Phase 1
-      // scope). Destructuring an unused field here would misleadingly imply
-      // it's wired when it isn't.
-    } = await this.resolveMaterialForFamily({
+    // The whole resolved material is kept: a part whose applied route is another molding process is priced by that process's engine in the route comparison, from this row.
+    const resolvedMaterial = await this.resolveMaterialForFamily({
         accessToken,
         grade,
         family,
@@ -3220,6 +3220,10 @@ export class BOMItemsService {
         location,
         warnings: materialWarnings,
       });
+    const {
+      materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
+      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, stockForm, matlState, clampProperties,
+    } = resolvedMaterial;
     // Real per-grade Injection Molding thermal properties (Phase 1
     // materials-data foundation, 2026-09-02) — same resolved material row as
     // materialCostPerKg/materialDensityKgM3 above, never a second lookup.
@@ -4219,6 +4223,16 @@ export class BOMItemsService {
       // What each CAD driver is worth: the same engine, run again with one driver moved one step.
       imResult.driverImpacts = driverImpacts(imInput, imResult);
       imResult.warnings.push(...materialWarnings);
+      // The applied route decides the process the part is priced in: another molding process (Structural Foam, Compression, Reaction Injection) is priced by its own engine
+      // in the route comparison, and the summary adopts that route, so the Cost tab, the saved rows and the comparison state one price.
+      const appliedOther = await this.appliedOtherMoldingRouteId(id, accessToken);
+      if (appliedOther) {
+        const comparison = await this.plasticRouteComparison.compare({
+          item, summary, grade, mhrRates, rates, location, batchSize, annualVolume, productionLifeYears, accessToken,
+          locationInfo: locInfo, comparisonWarnings: [], material: resolvedMaterial,
+        });
+        projectMoldingRoute(imResult, comparison.routes.find((r) => r.routeId === appliedOther), appliedOther);
+      }
       const catalogOps = await this.plasticCatalogOperations.attach({
         lines: imResult.processLines,
         graph: (summary.plasticFeatureGraph ?? null) as PlasticFeatureGraph | null,

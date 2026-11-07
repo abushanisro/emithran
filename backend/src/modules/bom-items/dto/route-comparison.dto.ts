@@ -1,4 +1,4 @@
-import type { ProcessLineCost, ResolvedCostingInputsDto, RouteResultSustainability } from "./cost-breakdown.dto";
+import type { ProcessLineCost, ResolvedCostingInputsDto, RouteResultSustainability, ToolingCostDto } from "./cost-breakdown.dto";
 import type { CapabilityReasonCode } from '../costing/shared/capability/machine-capability';
 import type { RouteDataGap } from '../costing/shared/core/engine-kernel';
 import type { FactMismatch } from '../costing/shared/physics/drawing-cad-consistency';
@@ -136,6 +136,8 @@ export interface RouteResultDto {
   warnings: string[];
   ratesSource: string;
   sustainability?: RouteResultSustainability;
+  /** The mold of the route, when its engine prices one (injection tiers and structural foam run on the injection engine); absent when the process has no staged mold-cost model (compression, reaction injection). */
+  tooling?: ToolingCostDto;
   setupCount?: number;
   machineCapabilityWarnings?: string[];
   routeComplexityScore?: number;  // 0–100: holes + pockets + threads + setups + GD&T

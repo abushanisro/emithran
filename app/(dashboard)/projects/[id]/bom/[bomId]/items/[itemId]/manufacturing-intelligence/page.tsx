@@ -77,6 +77,7 @@ import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
+import { moldingRouteSelectability } from '@/lib/routing/molding-route-selectability';
 import { PartSummaryTab } from '@/components/features/manufacturing-intelligence/PartSummaryTab';
 import { PlasticDfmFindings } from '@/components/features/manufacturing-intelligence/PlasticDfmFindings';
 import { isSupersededPlasticCheck, isSupersededPlasticWarning, plasticDfmReadiness } from '@/lib/dfm/plastic-superseded';
@@ -3485,13 +3486,7 @@ function TreeRow({
 // of these real machines, never on an Inspection/manual-rate row.
 const IM_MACHINE_CLASSES = new Set(['injection_molding', 'compression_molding', 'reaction_injection_molding', 'structural_foam_molding']);
 
-// The 3 real Injection Molding route ids apply-route.dto.ts's VALID_ROUTE_IDS
-// actually accepts (backend/src/modules/bom-items/dto/apply-route.dto.ts) —
-// one real registered engine (injection_molding machine class), 3 real
-// tonnage tiers. Kept in sync by inspection, same as REAL_PROCESS_ORDER above;
-// a 4th tier or a validated compression/RIM/structural-foam apply path needs
-// this list updated alongside that DTO array, never independently guessed.
-const IM_DIRECT_APPLY_ROUTE_IDS = new Set(['im-small-50t', 'im-standard-200t', 'im-large-500t']);
+// Which molding routes can be set is moldingRouteSelectability (lib/routing/molding-route-selectability.ts): every molding process the apply endpoint accepts, when the part can be made by it and it is priced.
 
 
 // ── Dynamic route step model (sheet_metal only — real, DB-driven, no
@@ -3753,12 +3748,11 @@ function RouteSelectionDialog({
             };
           }
         }
-        if (isIM && !IM_DIRECT_APPLY_ROUTE_IDS.has(node.id)) {
-          return {
-            ...node,
-            selectable: false,
-            selectionNote: 'Different manufacturing process — shown for cost comparison only. Material/process compatibility has not been verified for this part; consult engineering before switching processes.',
-          };
+        if (isIM) {
+          const dto = allRoutesForTree.find((r) => r.routeId === node.id);
+          if (!dto) return { ...node, selectable: false, selectionNote: 'This route was not priced for the part.' };
+          const { selectable, note } = moldingRouteSelectability(dto);
+          return { ...node, selectable, ...(note ? { selectionNote: note } : {}) };
         }
         return node;
       });
@@ -4086,7 +4080,7 @@ function RouteSelectionDialog({
   // registered milling/turning engines the comparison priced).
   const isCompleteRouteApplicable = (routeId: string | null): boolean => {
     if (!routeId) return false;
-    if (isIM) return IM_DIRECT_APPLY_ROUTE_IDS.has(routeId);
+    if (isIM) { const dto = allRoutesForTree.find((r) => r.routeId === routeId); return !!dto && moldingRouteSelectability(dto).selectable; }
     if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     // A die-casting process route: feasible ones only, the same rule apply-route
     // enforces (an infeasible row still says why).
@@ -4229,7 +4223,7 @@ function RouteSelectionDialog({
                 description: 'Each die-casting process priced as the full quote for this part (casting, its machining after casting, finishing). The recommended one is the cheapest feasible, die and coreboxes included.',
               } : isIM ? {
                 title: 'Molding process',
-                description: 'Real, priced alternatives for this part. Only the injection tonnage tiers can be set here — Compression/Reaction Injection/Structural Foam Molding are shown for cost comparison only (see the note on each row).',
+                description: 'Real, priced alternatives for this part. Any molding process can be set when the part\'s material and features can be made by it and it is priced; a process that cannot says why on its row.',
               } : {
                 title: 'Machine',
                 description: 'One real, priced route per catalog machine for this part. Machines that cannot produce it stay listed with the reason.',
