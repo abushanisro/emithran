@@ -482,6 +482,7 @@ export interface PlasticDfmView {
     findings: PlasticDfmFinding[];
     passed: string[];
     notEvaluated: Array<{ rule: string; reason: string }>;
+    notes: string[];
   } | null;
   reasons: string[];
 }

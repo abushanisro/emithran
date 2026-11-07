@@ -36,7 +36,7 @@ describe('evaluatePlasticDfm: draft angle, graded by the data', () => {
 
   it('writes the finding on the model in the data\'s words and numbers', () => {
     const r = evaluatePlasticDfm(part({ draftFaces: [draft(1, 0.2), draft(2, 0.3)] }), 'Injection Molding', 'ABS', REF);
-    expect(find(r, 'InsufficientDraftAngle')[0]!.label).toBe('Draft Angle: 2 faces, worst 0.20 degrees (below major limit 0.50)');
+    expect(find(r, 'InsufficientDraftAngle')[0]!.label).toBe('Draft Angle: 2 faces, worst 0.2 degrees (below major limit 0.5)');
     expect(find(r, 'InsufficientDraftAngle')[0]!.note).toMatch(/draft angle/i);
   });
 });
@@ -131,7 +131,7 @@ describe('evaluatePlasticDfm: thin and thick section, located by face and graded
     expect(thin.map((x) => [x.severity, x.threshold, x.faces])).toEqual([['Major', 0.762, [1]]]);
     const thick = find(r, 'ThickSection');
     expect(thick.map((x) => [x.severity, x.threshold, x.count, x.faces.sort(), x.measured])).toEqual([['Major', 2.921, 2, [3, 4], 6]]);
-    expect(thick[0]!.label).toBe('Max Wall Thickness: 2 faces, worst 6.0 mm (above major limit 2.9)');
+    expect(thick[0]!.label).toBe('Max Wall Thickness: 2 faces, worst 6 mm (above major limit 2.921)');
   });
 
   it('a material with other limits is judged by its own: 3.2 mm is thick for nylon and not for ABS', () => {
@@ -144,5 +144,26 @@ describe('evaluatePlasticDfm: thin and thick section, located by face and graded
     const r = evaluatePlasticDfm(part({ wallFaces: null }), 'Injection Molding', 'Nylon', REF);
     expect(r.notEvaluated.find((n) => n.rule === 'ThinSection')!.reason).toMatch(/per face/);
     expect(r.passed).not.toContain('ThinSection');
+  });
+});
+
+describe('evaluatePlasticDfm: a thickness below the mesh resolution is mesh, not wall', () => {
+  const wallFaces = [{ face: 1, mm: 0.004 }, { face: 2, mm: 0.15 }, { face: 3, mm: 0.5 }, { face: 4, mm: 1.5 }];
+
+  it('is not judged, and the result says how many were left out and why', () => {
+    const r = evaluatePlasticDfm(part({ wallFaces, wallResolutionMm: 0.2 }), 'Injection Molding', 'Nylon', REF);
+    expect(find(r, 'ThinSection').map((x) => [x.faces, x.measured])).toEqual([[[3], 0.5]]);
+    expect(r.notes).toEqual(['2 faces read thinner than the 0.2 mm the wall was measured at (slivers and edges of the mesh): they are not judged for thin or thick section.']);
+  });
+
+  it('judges every face when the analysis did not say its resolution (nothing is dropped on a guess)', () => {
+    const r = evaluatePlasticDfm(part({ wallFaces }), 'Injection Molding', 'Nylon', REF);
+    expect(find(r, 'ThinSection')[0]!.faces.sort()).toEqual([1, 2, 3]);
+    expect(r.notes).toEqual([]);
+  });
+
+  it('a value just over its limit is not printed as equal to it', () => {
+    const r = evaluatePlasticDfm(part({ wallFaces: [{ face: 1, mm: 2.93 }] }), 'Injection Molding', 'Nylon', REF);
+    expect(find(r, 'ThickSection')[0]!.label).toBe('Max Wall Thickness: 2.93 mm (above major limit 2.921)');
   });
 });

@@ -39,6 +39,8 @@ export interface PlasticDfmResult {
   passed: string[];
   /** Rules that could not be judged, with why. */
   notEvaluated: Array<{ rule: string; reason: string }>;
+  /** What limits the result: measurements left out of it, and why. */
+  notes: string[];
 }
 
 export interface PlasticDfmReference {
@@ -59,6 +61,8 @@ export interface PlasticDfmPart {
   draftFaces: DraftFace[] | null;
   holes: MeasuredHole[] | null;
   wallFaces: WallFace[] | null;
+  /** The mesh deflection the wall was measured at (mm): a thickness below it is mesh, not wall, and is not judged. Null when the analysis did not say. */
+  wallResolutionMm?: number | null;
 }
 
 const num = (v: unknown): number | null => {
@@ -126,7 +130,8 @@ const NOT_MEASURED: Readonly<Record<string, string>> = {
 interface Measured { value: number; featureId: string | null; faces: number[]; what: string }
 type Measure = (p: PlasticDfmPart, ref: PlasticDfmReference, process: string) => Measured[] | { reason: string };
 
-const fmt = (n: number) => (Math.abs(n) >= 100 ? n.toFixed(0) : n.toFixed(Math.abs(n) < 1 ? 2 : 1));
+/** A number as written on a finding: up to three decimals, none trailing, so a value just over its limit is never printed as equal to it (2.93 against 2.921). */
+const fmt = (n: number) => String(Number(n.toFixed(Math.abs(n) >= 100 ? 0 : 3)));
 
 /** The hole rules each look at holes of one size class and one kind (through or blind). */
 const holeMeasure = (through: boolean, size: 'Small' | 'Large'): Measure => (p, ref) => {
@@ -143,7 +148,7 @@ const SIZE_CLASSES: ReadonlyArray<'Small' | 'Large'> = ['Small', 'Large'];
 /** The wall at each face, as the thin and thick section rules read it: the same measurement, graded against a minimum and a maximum. */
 const wallMeasure: Measure = (p) =>
   p.wallFaces
-    ? p.wallFaces.map((w) => ({ value: w.mm, featureId: null, faces: [w.face], what: `face ${w.face}` }))
+    ? p.wallFaces.filter((w) => p.wallResolutionMm == null || w.mm >= p.wallResolutionMm).map((w) => ({ value: w.mm, featureId: null, faces: [w.face], what: `face ${w.face}` }))
     : { reason: 'the analysis has no wall thickness per face (a CAD engine older than the per-face wall measurement)' };
 
 const MEASURES: Readonly<Record<string, Measure>> = {
@@ -163,7 +168,9 @@ export function evaluatePlasticDfm(part: PlasticDfmPart, process: MoldingProcess
   // mention is on: reading "not listed" as "off" would switch off the draft rule on a table that never mentions it.
   const disabled = new Set(ref.adviceRules.filter((r) => text(r['enabled']).toLowerCase() === 'false').map((r) => text(r['advice_rule_name'])));
   const rules = [...new Set(ref.severity.map((r) => text(r['Rule Name'])).filter(Boolean))].sort();
-  const out: PlasticDfmResult = { rulesetVersion: ref.version, process, materialType, findings: [], passed: [], notEvaluated: [] };
+  const out: PlasticDfmResult = { rulesetVersion: ref.version, process, materialType, findings: [], passed: [], notEvaluated: [], notes: [] };
+  const unresolved = part.wallFaces && part.wallResolutionMm != null ? part.wallFaces.filter((w) => w.mm < part.wallResolutionMm!).length : 0;
+  if (unresolved > 0) out.notes.push(`${unresolved} face${unresolved === 1 ? '' : 's'} read thinner than the ${fmt(part.wallResolutionMm!)} mm the wall was measured at (slivers and edges of the mesh): they are not judged for thin or thick section.`);
 
   const judge = (rule: string, rows: readonly Row[], measured: Measured[], custom?: { field: string; value: string }): { violated: boolean } | { reason: string } => {
     const limits = limitsFor(rows, process, materialType, custom);

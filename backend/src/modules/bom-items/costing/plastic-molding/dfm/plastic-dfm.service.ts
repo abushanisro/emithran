@@ -14,7 +14,7 @@ export interface PlasticDfmView {
 }
 
 /** The analysis of a plastic part as the DFM engine reads it (feature_graph.summary). */
-interface PlasticSummary { plasticDraftFaces?: unknown; plasticWallFaces?: unknown; plasticFeatureGraph?: Parameters<typeof holesOfPlasticGraph>[0] }
+interface PlasticSummary { plasticDraftFaces?: unknown; plasticWallFaces?: unknown; plasticWallResolutionMm?: unknown; plasticFeatureGraph?: Parameters<typeof holesOfPlasticGraph>[0] }
 
 /**
  * The design-for-molding checks of an item's analysis against the staged rule data (manufacturabilitySeverity, adviceRules, smallHoleDiamBorder), for the item's material
@@ -65,7 +65,7 @@ export class PlasticDfmService {
     const materialType = await this.materialType(req.client, req.grade);
     const draftFaces = Array.isArray(summary.plasticDraftFaces) ? (summary.plasticDraftFaces as DraftFace[]) : null;
     const wallFaces = Array.isArray(summary.plasticWallFaces) ? (summary.plasticWallFaces as WallFace[]) : null;
-    const result = evaluatePlasticDfm({ draftFaces, wallFaces, holes: holesOfPlasticGraph(summary.plasticFeatureGraph) }, req.process, materialType, ref);
+    const result = evaluatePlasticDfm({ draftFaces, wallFaces, wallResolutionMm: typeof summary.plasticWallResolutionMm === 'number' ? summary.plasticWallResolutionMm : null, holes: holesOfPlasticGraph(summary.plasticFeatureGraph) }, req.process, materialType, ref);
     const reasons = materialType ? [] : [`"${req.grade ?? '(no material)'}" has no single material type in Raw Materials: the rules that differ by material are judged by the general limits of ${req.process}`];
     return { status: 'ok', result, reasons };
   }
