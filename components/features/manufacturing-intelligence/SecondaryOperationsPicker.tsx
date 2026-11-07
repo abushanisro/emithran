@@ -76,6 +76,7 @@ export function SecondaryOperationsPicker({
                           <span className="block truncate">
                             {o.process}
                             {o.fromDrawing && <span className="ml-1 text-[9px] text-brand-400">from drawing</span>}
+                            {o.provisional && <span className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">provisional</span>}
                           </span>
                           {o.selected && (
                             <span className="block truncate text-[10px] text-muted-foreground">

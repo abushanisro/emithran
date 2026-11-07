@@ -18,9 +18,10 @@
 // immersion) is a disclosed 'gap' naming what is missing, never an estimate.
 
 import {
-  costed, notCosted, pickMachine, variable, num, sorted, envelopeCapable, partsPerLoad,
+  costed, notCosted, pickMachine, variable, num, sorted, envelopeCapable, partsPerLoad, maxPartsInBox,
   type SecondaryMachine, type SecondaryPartFacts, type SecondaryProcessResult, type SecondaryReference, type SecondaryTraceStep,
 } from '../secondary/secondary-process-engine';
+import { PROVISIONAL, provisionalTrace, provisionalWarning } from '../secondary/provisional-reference';
 export { SURFACE_TREATMENT_SOURCE_VERSION } from './surface-treatment-source';
 
 const SRC_VAR = 'memory/SurfaceTreatment/surface_treatment_variables.csv';
@@ -466,20 +467,203 @@ function wetCoatLine(base: Base, part: SecondaryPartFacts, ref: SecondaryReferen
   }, ref, part.batchSize);
 }
 
+
+// ── provisional models ──────────────────────────────────────────────────────
+// The reference defines the machines and some stage times of these processes but not
+// the rule that turns them into a time per part. Each model below combines what the
+// reference does define with a stated rule or a published figure
+// (provisional-reference.ts); the line is flagged `provisional`, never presented as reference data.
+
+/** Parts of one batch load: loads needed, and the machine seconds per part they spend. */
+const perPartFromLoads = (loadSec: number, perLoad: number, batch: number) => (Math.ceil(batch / perLoad) * loadSec) / batch;
+
+/** An empty pool means no machine of the class has a complete rate on file (a machine missing its labour rate, crew or setup is left out when machines are loaded), not that the part does not fit one. */
+const noMachineRate = (what: string) =>
+  `No ${what} machine with a complete rate is on file for this location (a machine row missing its labour rate, wage grade, crew or setup time is not costed); add the missing value to the machine file in memory/SurfaceTreatment/Machine.`;
+
+function ovenCure(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const bbox = part.bboxMm;
+  if (!bbox) return notCosted(base, 'gap', 'Part size is needed to load the oven.');
+  const batch = part.batchSize;
+  if (batch == null || batch <= 0) return notCosted(base, 'gap', 'Batch size is needed to count oven loads.');
+  const f = variable(ref, 'powderCoatCartSpacingFactor');
+  if (f == null) return notCosted(base, 'gap', 'powderCoatCartSpacingFactor is not staged: run migration 819.');
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('cure oven'));
+  const fitted = pool.flatMap((m) => {
+    const L = num(m.specs.oven_length_mm), W = num(m.specs.oven_width_mm), H = num(m.specs.oven_height_mm);
+    if (L == null || W == null || H == null) return [];
+    const r = partsPerLoad({ partMm: sorted(bbox), windowMm: [L, W, H], spacingFactor: f });
+    return r.count > 0 ? [{ m, n: r.count }] : [];
+  });
+  const fit = pickFit(base.process, fitted, ref);
+  if (!fit) return notCosted(base, 'gap', 'No cure oven takes this part.');
+  const dwell = PROVISIONAL.powderCureDwellMin;
+  return costed(base, fit.m, {
+    perPartSec: perPartFromLoads(dwell.value * 60, fit.n, batch),
+    trace: [
+      provisionalTrace('Cure dwell per load', dwell),
+      { label: 'Parts per oven load', value: fit.n, source: `oven ${fit.m.name}, spacing factor ${f} (powderCoatCartSpacingFactor)` },
+      { label: 'Oven loads', value: Math.ceil(batch / fit.n), source: `ceil(${batch} / ${fit.n})` },
+    ],
+    warnings: [provisionalWarning('the cure dwell per oven load', dwell), 'Oven heat-up and cool-down are not in the reference and are not priced.'],
+    highlight: 'whole_part',
+    provisional: true,
+  }, ref, batch);
+}
+
+function conveyorOvenCure(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const trace: SecondaryTraceStep[] = [];
+  const pitch = conveyorPitch(part, ref, trace);
+  if (typeof pitch === 'string') return notCosted(base, 'gap', pitch);
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('conveyor cure oven'));
+  const [, W, H] = sorted(part.bboxMm!);
+  const m = pickMachine(base.process, pool.filter((x) => {
+    const w = num(x.specs.opening_width_mm), h = num(x.specs.max_nesting_height_mm), len = num(x.specs.oven_length_mm);
+    return len != null && (w == null || W <= w) && (h == null || H <= h);
+  }), ref);
+  if (!m) return notCosted(base, 'gap', 'No conveyor oven opening takes this part.');
+  const ovenLen = num(m.specs.oven_length_mm)!;
+  const dwell = PROVISIONAL.powderCureDwellMin;
+  const speed = ovenLen / (dwell.value * 60); // the part must spend the dwell inside the oven
+  trace.push(provisionalTrace('Cure dwell', dwell));
+  trace.push({ label: 'Line speed', value: Number(speed.toFixed(3)), unit: 'mm/s', source: `oven length ${ovenLen} mm / dwell ${dwell.value} min (machine ${m.name})` });
+  return costed(base, m, {
+    perPartSec: pitch / speed, trace,
+    warnings: [provisionalWarning('the cure dwell in the conveyor oven', dwell)],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+}
+
+function blackOxide(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const bbox = part.bboxMm;
+  if (!bbox) return notCosted(base, 'gap', 'Part size is needed to load the bath.');
+  const batch = part.batchSize;
+  if (batch == null || batch <= 0) return notCosted(base, 'gap', 'Batch size is needed to count bath loads.');
+  const clean = variable(ref, 'defaultBlackOxidePartCleanTime'), pre = variable(ref, 'defaultPreBlackOxideRinse');
+  const post = variable(ref, 'defaultPostBlackOxideRinseTime'), supp = variable(ref, 'defaultBlackOxideSupplementaryFinishTime');
+  const stages = variable(ref, 'defaultNumberOfBlackOxideStages'), gap = variable(ref, 'defaultBlackOxidePartSpacing');
+  if ([clean, pre, post, supp, stages, gap].some((v) => v == null)) return notCosted(base, 'gap', 'The black oxide stage variables are not staged: run migration 819.');
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('black oxide'));
+  const fitted = pool.flatMap((m) => {
+    const L = num(m.specs.bath_length_mm), W = num(m.specs.bath_width_mm), H = num(m.specs.bath_height_mm);
+    if (L == null || W == null || H == null) return [];
+    // the reference spacing is a length added to each side of the part
+    const r = partsPerLoad({ partMm: sorted(bbox).map((d) => d + gap!) as [number, number, number], windowMm: [L, W, H], spacingFactor: 0, partKg: part.weightKg, weightLimitKg: num(m.specs.max_allowable_weight_kg) });
+    return r.count > 0 ? [{ m, n: r.count, by: r.governedBy }] : [];
+  });
+  const fit = pickFit(base.process, fitted, ref);
+  if (!fit) return notCosted(base, 'gap', 'No black oxide bath takes this part.');
+  const transfer = num(fit.m.specs.transfer_time_s) ?? 0;
+  const immersion = PROVISIONAL.blackOxideImmersionMin;
+  const loadSec = clean! + pre! + immersion.value * 60 + post! + supp! + transfer * stages!;
+  return costed(base, fit.m, {
+    perPartSec: perPartFromLoads(loadSec, fit.n, batch),
+    trace: [
+      { label: 'Clean, rinse and finish', value: clean! + pre! + post! + supp!, unit: 's', source: `${SRC_VAR} (clean ${clean}, pre-rinse ${pre}, post-rinse ${post}, supplementary finish ${supp})` },
+      provisionalTrace('Blackening immersion', immersion),
+      { label: 'Transfers', value: transfer * stages!, unit: 's', source: `${stages} stages × ${transfer} s (machine ${fit.m.name})` },
+      { label: 'Parts per bath load', value: fit.n, source: `bath ${fit.m.name}, ${gap} mm spacing, limited by ${fit.by}` },
+      { label: 'Bath loads', value: Math.ceil(batch / fit.n), source: `ceil(${batch} / ${fit.n})` },
+    ],
+    warnings: [provisionalWarning('the blackening immersion', immersion), 'Black oxide is a steel (and cast iron) finish: the material is not checked here.'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, batch);
+}
+
+function vibratoryFinishing(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const bbox = part.bboxMm;
+  if (!bbox) return notCosted(base, 'gap', 'Part size is needed to fill the container.');
+  const batch = part.batchSize;
+  if (batch == null || batch <= 0) return notCosted(base, 'gap', 'Batch size is needed to count container loads.');
+  const ratio = variable(ref, 'defaultVibratoryFinishingMediaRatio'), fill = variable(ref, 'vibratoryFinishingContainerFillPercent');
+  if (ratio == null || fill == null) return notCosted(base, 'gap', 'The vibratory finishing media ratio and fill are not staged: run migration 819.');
+  // The CAD facts carry no solid volume: the bounding box stands in for it, which can only
+  // overstate the space a part takes (fewer parts per load, a higher price).
+  const partVol = bbox.length * bbox.width * bbox.height;
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('vibratory finishing'));
+  const fitted = pool.flatMap((m) => {
+    const vol = num(m.specs.container_volume_mm3);
+    if (vol == null || vol <= 0) return [];
+    let n = Math.floor((vol * fill / 100) / (partVol * (1 + ratio)));
+    const limit = num(m.specs.weight_limit_kg);
+    if (limit != null && part.weightKg != null && part.weightKg > 0) n = Math.min(n, Math.floor(limit / part.weightKg));
+    return n > 0 ? [{ m, n }] : [];
+  });
+  const fit = pickFit(base.process, fitted, ref);
+  if (!fit) return notCosted(base, 'gap', 'No vibratory container takes this part.');
+  const cycle = PROVISIONAL.vibratoryFinishingCycleMin;
+  return costed(base, fit.m, {
+    perPartSec: perPartFromLoads(cycle.value * 60, fit.n, batch),
+    trace: [
+      provisionalTrace('Finishing cycle per load', cycle),
+      { label: 'Parts per container load', value: fit.n, source: `container ${fit.m.name}, ${fill}% fill, media ${ratio}:1 by volume, part volume = bounding box` },
+      { label: 'Container loads', value: Math.ceil(batch / fit.n), source: `ceil(${batch} / ${fit.n})` },
+    ],
+    warnings: [provisionalWarning('the finishing cycle', cycle), 'Part volume is the bounding box (no solid volume in the CAD facts): the parts per load are understated for a compact part.'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, batch);
+}
+
+function shotBlast(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const bbox = part.bboxMm;
+  if (!bbox) return notCosted(base, 'gap', 'Part size is needed to hang the part.');
+  const batch = part.batchSize;
+  if (batch == null || batch <= 0) return notCosted(base, 'gap', 'Batch size is needed to count blast loads.');
+  const cycles = variable(ref, 'shotBlastNumberOfBlastCyclesPartsOnHanger');
+  if (cycles == null) return notCosted(base, 'gap', 'shotBlastNumberOfBlastCyclesPartsOnHanger is not staged: run migration 819.');
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('shot blast'));
+  const fitted = pool.flatMap((m) => {
+    const L = num(m.specs.chamber_length_mm), W = num(m.specs.chamber_width_mm), H = num(m.specs.chamber_height_mm);
+    const cycle = num(m.specs.blast_cycle_time_s), hangers = num(m.specs.number_hanger_positions);
+    if (L == null || W == null || H == null || cycle == null || hangers == null) return [];
+    let n = Math.min(hangers, maxPartsInBox(sorted(bbox), [L, W, H].sort((a, b) => b - a) as [number, number, number]));
+    const cap = num(m.specs.weight_capacity_kg);
+    if (cap != null && part.weightKg != null && part.weightKg > 0) n = Math.min(n, Math.floor(cap / part.weightKg));
+    return n > 0 ? [{ m, n, cycle }] : [];
+  });
+  const fit = pickFit(base.process, fitted, ref);
+  if (!fit) return notCosted(base, 'gap', 'No shot blast chamber takes this part.');
+  return costed(base, fit.m, {
+    perPartSec: perPartFromLoads(fit.cycle * cycles, fit.n, batch),
+    trace: [
+      { label: 'Blast cycle', value: fit.cycle, unit: 's', source: `machine ${fit.m.name} (blast_cycle_time_s) × ${cycles} cycle(s) on a hanger (shotBlastNumberOfBlastCyclesPartsOnHanger)` },
+      { label: 'Parts per hanger load', value: fit.n, source: `min(hanger positions, chamber fit, weight capacity) on ${fit.m.name}` },
+      { label: 'Blast loads', value: Math.ceil(batch / fit.n), source: `ceil(${batch} / ${fit.n})` },
+    ],
+    warnings: ['Provisional: the machine\'s per-area and per-perimeter blast allowances are not applied (the reference does not say how they combine with the blast cycle); the price is the cycle time per hanger load.'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, batch);
+}
+
+function degrease(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const trace: SecondaryTraceStep[] = [];
+  const pitch = conveyorPitch(part, ref, trace);
+  if (typeof pitch === 'string') return notCosted(base, 'gap', pitch);
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('parts washer'));
+  const [, W, H] = sorted(part.bboxMm!);
+  const m = pickMachine(base.process, pool.filter((x) => {
+    const w = num(x.specs.conveyor_window_width_mm), h = num(x.specs.conveyor_window_height_mm), v = num(x.specs.conveyor_speed_limit_mm_per_s);
+    const kg = num(x.specs.conveyor_weight_limit_kg);
+    return v != null && v > 0 && (w == null || W <= w) && (h == null || H <= h) && (kg == null || part.weightKg == null || part.weightKg <= kg);
+  }), ref);
+  if (!m) return notCosted(base, 'gap', 'No parts washer opening takes this part.');
+  const speed = num(m.specs.conveyor_speed_limit_mm_per_s)!;
+  trace.push({ label: 'Line speed', value: speed, unit: 'mm/s', source: `machine ${m.name} (conveyor_speed_limit_mm_per_s, the washer's maximum)` });
+  return costed(base, m, {
+    perPartSec: pitch / speed, trace,
+    warnings: ['Provisional: the washer\'s conveyor speed limit is taken as its line speed and the part pitch is the same conveyor rule as the other conveyor lines; the reference gives no wash-time rule. A slower line, for a heavily soiled part, costs more.'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+}
+
 /** Why each remaining process cannot be timed from the reference data. */
 const UNDEFINED: Record<string, string> = {
-  'Black Oxide': 'The blackening immersion time is not in the reference data (only rinse, clean and transfer times are).',
   'Conveyor Conversion Coating': 'The reference has no machine file for this process.',
-  'Conveyor Oven Cure': 'No cure time or line speed for the conveyor oven is in the reference data.',
   'Conveyor Powder Coating': 'No line speed or spray time for the conveyor booth is in the reference data.',
-  'Degrease': 'The conveyor pitch rule for the washer is not in the reference data (only handling time by weight and tank capacity are).',
   'Mask-Bench': 'Which features are masked is a drawing requirement, not a CAD fact.',
   'Mask-Spray': 'Which surfaces are masked is a drawing requirement, not a CAD fact.',
-  'Oven Cure': 'No cure time is in the reference data.',
   'Powder Coat Cart': 'The coating thickness and spray time rule are not in the reference data (only flow rates and handling times are).',
   'Screen Printing': 'The printed area is a drawing requirement, not a CAD fact.',
-  'Shot Blast': 'The machines carry a blast cycle time, hanger positions and per-area / per-perimeter allowances, but the reference does not define how they combine per hanger load.',
-  'Vibratory Finishing': 'No tumbling time is in the reference data (media compatibility and container sizes are).',
 };
 
 type Model = (base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]) => SecondaryProcessResult;
@@ -502,6 +686,12 @@ const MODELS: Record<string, Model> = {
   'Passivation': passivation,
   'Anodize': anodize,
   'Wet Coat Line': wetCoatLine,
+  'Oven Cure': ovenCure,
+  'Conveyor Oven Cure': conveyorOvenCure,
+  'Black Oxide': blackOxide,
+  'Vibratory Finishing': vibratoryFinishing,
+  'Shot Blast': shotBlast,
+  'Degrease': degrease,
 };
 
 /** The processes this engine can cost. The process catalog marks exactly these

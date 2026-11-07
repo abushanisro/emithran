@@ -738,6 +738,8 @@ export interface SecondaryOptionDto {
   machineName: string | null;
   /** Cycle time per part in seconds; null when not costed. */
   cycleTimeSec: number | null;
+  /** The price rests on a published figure or a stated rule that is not reference data (the reason and the cost trace name it). Absent for a reference-priced line. */
+  provisional?: boolean;
 }
 
 export interface SecondaryOperationsDto {

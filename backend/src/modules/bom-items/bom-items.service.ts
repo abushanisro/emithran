@@ -5581,6 +5581,7 @@ export class BOMItemsService {
         fromDrawing: drawing[g].includes(r.process), selected,
         machineName: r.machine?.name ?? null,
         cycleTimeSec: r.status === 'costed' ? r.cycleTimeSec : null,
+        ...(r.provisional ? { provisional: true } : {}),
       };
     });
     const dto: SecondaryOperationsDto = {

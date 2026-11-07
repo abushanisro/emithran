@@ -1,0 +1,22 @@
+# Provisional surface-treatment models
+
+Six Surface Treatment processes have machines in `memory/SurfaceTreatment/Machine` but no rule in `memory/` for the time per part. They are costed from the machines and variables on file plus one stated rule or published figure each. Every such line is flagged `provisional` (a "provisional" badge in the secondary-operations list; the reason, the cost trace and the warnings name the figure, its source and its published range). They are not reference data: replace the figure in `backend/src/modules/bom-items/costing/secondary/provisional-reference.ts` when the reference defines one. Migration 979 marks the six `production`.
+
+| Process | Model | From memory/ | Provisional input |
+|---|---|---|---|
+| Oven Cure | one dwell per oven load; parts per load by the oven box and `powderCoatCartSpacingFactor` | oven dimensions, rates | cure dwell **15 min** (published 10-45 min) |
+| Conveyor Oven Cure | line speed = oven length / dwell; cycle = conveyor pitch / speed | oven length, opening, pitch variables | cure dwell **15 min** (10-45 min) |
+| Black Oxide | per bath load: clean + pre-rinse + immersion + post-rinse + supplementary finish + transfer × stages | the four stage times, 7 stages, transfer time, spacing 20 mm, bath size, weight limit | immersion **15 min** (5-60 min; sources conflict) |
+| Vibratory Finishing | one cycle per container load; parts per load = volume × fill / (part volume × (1 + media ratio)), capped by weight limit | container volume, fill 95 %, media ratio 3, weight limit | cycle **45 min** (30-120 min; low confidence) |
+| Shot Blast | blast cycle per hanger load (1 cycle on a hanger); parts per load = min(hanger positions, chamber fit, weight capacity) | blast cycle, hangers, chamber, capacity | the combination rule; the per-area and per-perimeter allowances are **not applied** |
+| Degrease | cycle = conveyor pitch / washer speed limit | speed limit, window, weight limit, pitch variables | the washer's maximum speed is taken as its line speed |
+
+Sources of the figures: Columbia Coatings TGIC polyester data sheets (10 min at 400 °F metal temperature) and Products Finishing "Oven Dwell Time" (dwell starts when the metal reaches temperature, so heavy parts need 30 min or more and are underestimated); Hubbard-Hall Black-Magic Infusion bulletins (5-20 min), Birchwood Technologies (30-60 min), STERC (15-30 min); equipment-supplier and STERC figures for vibratory deburring (30-60 min, up to 2 h for hardened steel).
+
+## Known limits (stated on each line)
+- Vibratory part volume is the bounding box (the CAD facts carry no solid volume): parts per load are understated for a compact part.
+- Oven heat-up and cool-down are not in the reference and are not priced.
+- Black oxide is a steel and cast-iron finish; the material is not checked yet (the material type reaches the secondary engine only after the cut-code PR, #279).
+
+## Data gap that blocks Black Oxide today
+Every row of `memory/SurfaceTreatment/Machine/black_oxide_machines.csv` has a blank `Labor Rate` and a blank `Wage Grade Name`. A machine without a labor rate is not costed (a blank is not zero), so Black Oxide shows "No black oxide machine with a complete rate is on file" until the file gives a labor rate or a wage grade. Nothing else is missing for it.

@@ -1007,6 +1007,8 @@ export interface SecondaryOptionDto {
   selected: boolean;
   machineName: string | null;
   cycleTimeSec: number | null;
+  /** Priced from a published figure or a stated rule, not reference data. */
+  provisional?: boolean;
 }
 
 /** Mirrors the backend's SecondaryOperationsDto (cost-breakdown.dto.ts). */
