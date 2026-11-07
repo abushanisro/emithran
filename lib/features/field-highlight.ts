@@ -32,6 +32,8 @@ const SOURCE_BY_EVIDENCE: Record<string, Source> = {
   bend_count: { kind: 'bends' },
   hole_diameters: { kind: 'tool_changes' },
   flat_pattern_area: { kind: 'measurement', key: 'flat_pattern_area', label: 'flat pattern area' },
+  wall_thickness: { kind: 'measurement', key: 'wall_thickness', label: 'wall thickness' },
+  part_volume: { kind: 'measurement', key: 'part_volume', label: 'part volume' },
 };
 
 /**

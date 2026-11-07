@@ -534,6 +534,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   }
   if (cycle.derivable) {
     line.calculationTrace = cycle.trace;
+    if (Object.keys(cycle.lookups).length > 0) line.lookupMatches = cycle.lookups;
     // The stored calculator behind this line: the cost dialog opens it, filled with the inputs above, and runs the same formulas.
     if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
     if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;

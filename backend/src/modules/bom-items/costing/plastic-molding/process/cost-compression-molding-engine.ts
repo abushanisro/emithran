@@ -101,6 +101,7 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
     const line = result.processLines[0];
     if (line) {
       line.calculationTrace = cycle.trace;
+      if (Object.keys(cycle.lookups).length > 0) line.lookupMatches = cycle.lookups;
       if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
       if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
     }

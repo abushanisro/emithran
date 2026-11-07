@@ -1652,6 +1652,13 @@ export function ProcessCostDialog({
         newInputs[fieldName] = value;
         newProvenance[fieldName] = engineSeed.provenance[fieldName] ?? 'Cost engine input for this part';
       }
+      // The row of each reference table the line used, so the eye outlines it.
+      if (Object.keys(engineSeed.lookupMatches ?? {}).length > 0) {
+        setCalculatorMatchedRowKeys((prev) => ({
+          ...prev,
+          ...Object.fromEntries(Object.entries(engineSeed.lookupMatches).map(([f, m]) => [f, m.row])),
+        }));
+      }
     }
 
     setCalculatorInputs(newInputs);
@@ -3588,6 +3595,8 @@ export function ProcessCostDialog({
                           !!field.sourceField?.startsWith('from_') ||
                           // Real sm_lookup_* cost-engine tables, DB-marked or resolved in application code.
                           (field.dataSource === SM_LOOKUP_DATA_SOURCE && !!field.sourceField) ||
+                          // A calculator field that names its reference table (the plastic fill factors).
+                          (field.dataSource === MACHINING_LOOKUP_DATA_SOURCE && !!field.sourceTable) ||
                           (field.fieldName === DESLAG_ALLOWANCE_FIELD && selectedMachineClass === 'deburring') ||
                           isTurretReferenceField(field.fieldName, selectedMachineClass) ||
                           isWaterjetReferenceField(field.fieldName, selectedMachineClass) ||

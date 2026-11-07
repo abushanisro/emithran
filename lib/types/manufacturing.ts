@@ -352,7 +352,7 @@ export interface FaceGraph {
   edge_graph: { a: number; b: number; convexity: 'convex' | 'concave' | 'smooth'; dihedral_deg: number }[];
 }
 
-export type MeasurementKey = 'pierce_count' | 'bend_line_length' | 'flat_pattern_area';
+export type MeasurementKey = 'pierce_count' | 'bend_line_length' | 'flat_pattern_area' | 'wall_thickness' | 'part_volume';
 
 export interface FeatureMeasurement {
   value: number;

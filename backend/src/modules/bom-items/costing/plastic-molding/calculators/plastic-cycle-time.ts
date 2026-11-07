@@ -7,12 +7,13 @@
  * fingerprint of the calculator's formulas, which a saved calculation records so that a replay can tell whether the same formulas are in force.
  */
 import { createHash } from 'crypto';
-import { runReferenceCalculator, type ReferenceCalculatorDef, type ReferenceCalculators } from '../../shared/calculators/reference-calculator';
+import { runReferenceCalculator, type LookupMatch, type ReferenceCalculatorDef, type ReferenceCalculators } from '../../shared/calculators/reference-calculator';
 import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
 import { formulaById } from '../formula-registry';
 import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
+import { cadEvidenceKey } from '../../shared/cad-evidence';
 import { injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, COMPRESSION_CALCULATOR, RIM_CALCULATOR } from './plastic-cycle-time-seeds';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
@@ -29,12 +30,16 @@ function keyOf(name: string): string | undefined {
   return loadPlasticMoldingCalculatorSpec().calculators.find((c) => c.name === name)?.key;
 }
 
-/** The trace with each step tied to the registered formula behind it, when there is one: its id, version and validation state travel with the number. */
+/**
+ * The trace with each step tied to the registered formula behind it, when there is one (its id, version and validation state travel with the number), and each input
+ * measured on the part's CAD faces carrying the evidence key the cost dialog uses to show only those faces (cad-evidence.ts: the input's source must be CAD extraction).
+ */
 export function withRegistryFormulas(trace: readonly CalculationTraceStep[], calculatorName: string): CalculationTraceStep[] {
   const ids = REGISTRY_FORMULA_OF_FIELD[keyOf(calculatorName) ?? ''] ?? {};
   return trace.map((t) => {
     const f = ids[t.fieldName] ? formulaById(ids[t.fieldName]!) : undefined;
-    return f ? { ...t, formulaId: f.id, formulaVersion: f.version, state: f.state } : t;
+    const evidence = t.kind === 'input' ? cadEvidenceKey(t.fieldName, t.source ?? undefined) : undefined;
+    return { ...t, ...(f ? { formulaId: f.id, formulaVersion: f.version, state: f.state } : {}), ...(evidence ? { evidence } : {}) };
   });
 }
 
@@ -79,13 +84,14 @@ export function runInjectionCycleTime(input: CycleTimeInput, calculators: Refere
     moldMotionSec: seeded.seeds['Press Dry Cycle Time']!.value,
     totalCycleSec: run.value,
     trace: withRegistryFormulas(run.trace, name),
+    lookups: run.lookups,
     calculator: { id: run.calculatorId, version: run.calculatorVersion, name, fingerprint: calculatorFingerprint(def) },
   };
 }
 
 /** What a compression or reaction injection cycle needs from its calculator: the cycle (s) and the run, or why there is none. */
 export type PressCycle =
-  | { derivable: true; cycleSec: number; trace: CalculationTraceStep[]; calculator: { id: string | null; version: number | null; name: string; fingerprint: string } }
+  | { derivable: true; cycleSec: number; trace: CalculationTraceStep[]; lookups: Record<string, LookupMatch>; calculator: { id: string | null; version: number | null; name: string; fingerprint: string } }
   | { derivable: false; missing: string[]; /** Set when the stored calculator itself is absent or too old: the migrations to apply, not data to add. */ calculatorProblem?: string };
 
 function runPress(name: string, seeded: ReturnType<typeof pressCycleTimeSeeds>, calculators: ReferenceCalculators | null | undefined): PressCycle {
@@ -95,7 +101,7 @@ function runPress(name: string, seeded: ReturnType<typeof pressCycleTimeSeeds>, 
   const def = found.def;
   const run = runReferenceCalculator(calculators, name, seeded.seeds);
   if (run.missing.length > 0 || run.value == null) return { derivable: false, missing: run.missing.length > 0 ? run.missing : [`${name} produced no cycle time`] };
-  return { derivable: true, cycleSec: run.value, trace: withRegistryFormulas(run.trace, name), calculator: { id: run.calculatorId, version: run.calculatorVersion, name, fingerprint: calculatorFingerprint(def) } };
+  return { derivable: true, cycleSec: run.value, trace: withRegistryFormulas(run.trace, name), lookups: run.lookups, calculator: { id: run.calculatorId, version: run.calculatorVersion, name, fingerprint: calculatorFingerprint(def) } };
 }
 
 /** The cycle of a compression press (press open/close time plus cure time), by the stored calculator. */
