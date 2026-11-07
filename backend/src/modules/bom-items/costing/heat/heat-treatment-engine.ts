@@ -194,15 +194,18 @@ function age(base: Base, part: HeatTreatmentFacts, ref: SecondaryReference, pool
   if (part.batchSize == null || part.batchSize <= 0) return notCosted(base, 'gap', 'Batch size is needed to count oven loads.');
   if (!part.materialTypeName) return notCosted(base, 'gap', 'The material type is needed for its aging time (tblMaterialAgingTime).');
   const row = table.find((r) => r['Material Type'] === part.materialTypeName);
-  const hours = row ? num(row['Aging Time (hr)']) : null;
-  if (hours == null) return notCosted(base, 'gap', `No aging time for material type "${part.materialTypeName}" in ${SRC_LOOKUP('tblMaterialAgingTime')}.`);
+  const tabled = row ? num(row['Aging Time (hr)']) : null;
+  // The reference defines the fallback itself: defaultAgingTime, "default aging time if Material Type does not exist in tblMaterialAgingTime".
+  const fallback = tabled == null ? variable(ref, 'defaultAgingTime') : null;
+  const hours = tabled ?? fallback;
+  if (hours == null) return notCosted(base, 'gap', `No aging time for material type "${part.materialTypeName}" in ${SRC_LOOKUP('tblMaterialAgingTime')}, and no defaultAgingTime variable.`);
   const dims = sorted(part.bboxMm).map((d) => d + allowance) as [number, number, number];
   const fitted = pool.map((m) => ({ m, n: m.maxXmm && m.maxYmm && m.maxZmm ? maxPartsInBox(dims, [m.maxXmm, m.maxYmm, m.maxZmm].sort((a, b) => b - a) as [number, number, number]) : 0 })).filter((x) => x.n > 0);
   const m = pickMachine(base.process, fitted.map((x) => x.m), ref);
   if (!m) return notCosted(base, 'gap', 'No aging oven takes this part.');
   const perLoad = fitted.find((x) => x.m === m)!.n;
   const seeds = {
-    'Aging Time': seed(hours, `${SRC_LOOKUP('tblMaterialAgingTime')} (${part.materialTypeName})`),
+    'Aging Time': seed(hours, tabled != null ? `${SRC_LOOKUP('tblMaterialAgingTime')} (${part.materialTypeName})` : `${SRC_VAR} (defaultAgingTime: ${part.materialTypeName} is not in ${SRC_LOOKUP('tblMaterialAgingTime')})`),
     'Parts per Oven Load': seed(perLoad, `part + ${allowance} mm nesting allowance in ${m.maxXmm}×${m.maxYmm}×${m.maxZmm} mm`),
     'Batch Size': seed(part.batchSize, 'batch size'),
   };
