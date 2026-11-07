@@ -45,6 +45,17 @@ npm run db:migrate -- --env prd --confirm       # production needs the flag
 Rollback: redeploy the previous commit with the same command (images are rebuilt from the repo); migrations are forward-only, so a
 bad migration is fixed by a new migration.
 
+**A migration is never edited once it is on `main`.** The runner records each file's checksum and refuses to go on past one that differs (`956_sand_casting_calculators.sql was
+changed after it was applied`), so nothing newer is applied until the database is repaired. CI fails a pull request that modifies, renames or deletes a migration `main` has
+(`backend/scripts/check-migrations-immutable.sh`). A change is a new migration; a generated calculator migration raises the calculator's `version` in its spec.
+
+To repair a database that applied an earlier version of an edited migration (it must be idempotent: the generated calculator migrations are, which they say in their header):
+back it up (`pg_dump`), read the diff of the file since the version that was applied, re-apply the current file with `psql -f`, set that file's `checksum` in
+`public.schema_migrations` to the current one (`checksumOf` in `backend/src/common/migrations/migration-plan.ts`), and run `npm run db:migrate -- --env <name> --dry-run` to confirm
+that only the genuinely pending migrations remain. A migration numbered at or below `backend/migrations/BASELINE.json`'s `upToNumber` is assumed to be inside the baseline
+the database was loaded from and is never run by the runner: a baseline older than such a migration lacks its effects (heat treatment's 907 was missing from the local
+baseline), and the migration, if it is idempotent, is applied by hand.
+
 ## What is enforced where
 
 | Control | Where | Standard |
@@ -62,7 +73,7 @@ bad migration is fixed by a new migration.
 | Upload content checks, zip limits, no path traversal | `cad-uploads/check-upload.ts`, `common/archive/expand-archive.ts` | ASVS V12 |
 | Secrets in history, vulnerable dependencies, container and config scans, SAST | `.github/workflows/security.yml` | OWASP A06, OpenSSF |
 | Actions pinned by commit SHA, read-only token, bumps proposed weekly | `ci.yml`, `security.yml`, `.github/dependabot.yml` | OpenSSF Scorecard |
-| Migrations tracked, immutable once applied, aimed at the right environment | `backend/scripts/migrate.ts` | change control |
+| Migrations tracked, immutable once applied (CI fails an edit), aimed at the right environment | `backend/scripts/migrate.ts`, `backend/scripts/check-migrations-immutable.sh` | change control |
 
 ## Cloudflare setup (dashboard; once per environment)
 
