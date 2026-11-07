@@ -15,6 +15,7 @@ import { computeCompressionMoldingCost } from '../../../../../../modules/bom-ite
 import { computeReactionInjectionMoldingCost } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 import { plasticMoldingCalculatorsByName } from '../../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
+import { realRimMachines } from '../real-plastic-reference';
 
 const realMachineRate = (machineClass: string): MHRRateInput => ({
   rate: 1200,
@@ -125,34 +126,58 @@ describe('computeCompressionMoldingCost — real cure-time folding', () => {
   });
 });
 
-describe('computeReactionInjectionMoldingCost — real cure/reaction-time folding', () => {
-  it('material WITH real cure time → cycle time = real dry-cycle + real reaction/cure time', () => {
-    const withoutCure = computeReactionInjectionMoldingCost({
-      calculators: plasticMoldingCalculatorsByName(),
-      batchSize: 50,
-      partWeightKg: 1.2,
-      rate: realMachineRate('reaction_injection_molding'),
-      cureTimeMinFromMaterial: null,
-    });
-    const withCure = computeReactionInjectionMoldingCost({
-      calculators: plasticMoldingCalculatorsByName(),
-      batchSize: 50,
-      partWeightKg: 1.2,
-      rate: realMachineRate('reaction_injection_molding'),
-      cureTimeMinFromMaterial: 6,
-    });
+describe('computeReactionInjectionMoldingCost: dry cycle + fill + real cure/reaction time', () => {
+  const RIM = realRimMachines()[0]!;
+  // the part: 80,000 mm3 (CAD volume); the machine fills at its staged 100,000 mm3/s: 0.8 s
+  const fill = { partVolumeMm3: 80_000, injectionRateMm3PerS: RIM.injectionRateMm3PerS };
+  const run = (over: Record<string, unknown>) => computeReactionInjectionMoldingCost({
+    calculators: plasticMoldingCalculatorsByName(), batchSize: 50, partWeightKg: 1.2, rate: realMachineRate('reaction_injection_molding'),
+    cureTimeMinFromMaterial: null, ...fill, ...over,
+  });
+
+  it('material WITH real cure time → cycle time = dry cycle + fill + real reaction/cure time', () => {
+    const withoutCure = run({ cureTimeMinFromMaterial: null });
+    const withCure = run({ cureTimeMinFromMaterial: 6 });
     expect(withCure.cuttingMin).toBeCloseTo(withoutCure.cuttingMin + 6, 5);
     expect(withCure.warnings.some((w) => w.includes('real cure/reaction time (6 min)'))).toBe(true);
+    // minutes per part = (dry + fill + cure) / 60
+    const dry = realMachineRate('reaction_injection_molding').pressCycleTimeS!;
+    expect(withCure.cuttingMin).toBeCloseTo((dry + 80_000 / RIM.injectionRateMm3PerS + 6 * 60) / 60, 9);
+  });
+
+  it('the fill is the part volume (mm3) over the machine injection rate (mm3/s), in seconds: a larger part fills longer, a faster machine shorter', () => {
+    const base = run({}).cuttingMin * 60;
+    expect(run({ partVolumeMm3: 160_000 }).cuttingMin * 60 - base).toBeCloseTo(0.8, 9);
+    expect(run({ injectionRateMm3PerS: RIM.injectionRateMm3PerS * 2 }).cuttingMin * 60 - base).toBeCloseTo(-0.4, 9);
   });
 
   it('material WITHOUT real cure time → honest gap disclosure, no fabricated constant', () => {
-    const result = computeReactionInjectionMoldingCost({
-      calculators: plasticMoldingCalculatorsByName(),
-      batchSize: 50,
-      partWeightKg: 1.2,
-      rate: realMachineRate('reaction_injection_molding'),
-      cureTimeMinFromMaterial: null,
-    });
-    expect(result.warnings.some((w) => w.includes('no real fill-time-from-volume or') && w.includes('chemical cure/reaction-time data on file'))).toBe(true);
+    const result = run({ cureTimeMinFromMaterial: null });
+    expect(result.warnings.some((w) => w.includes('fill time') && w.includes('no real cure/reaction-time data on file'))).toBe(true);
+  });
+
+  it.each([
+    ['no part volume', { partVolumeMm3: null }, 'part volume'],
+    ['a zero part volume', { partVolumeMm3: 0 }, 'part volume'],
+    ['a negative part volume', { partVolumeMm3: -5 }, 'part volume'],
+    ['no injection rate', { injectionRateMm3PerS: null }, 'machine injection rate'],
+    ['a zero injection rate', { injectionRateMm3PerS: 0 }, 'machine injection rate'],
+    ['a non-finite injection rate', { injectionRateMm3PerS: Number.NaN }, 'machine injection rate'],
+  ])('%s: the cycle is a named gap (no time, no calculator run), never a default fill', (_label, over, named) => {
+    const result = run(over);
+    expect(result.cuttingMin).toBe(0);
+    expect(result.processLines[0]?.calculatorId).toBeUndefined();
+    expect(result.warnings.some((w) => w.includes('cycle time not derivable') && w.includes(named))).toBe(true);
+    // the machine has its cycle time, so the "no press_cycle_time_s on file" message would be wrong and is not given
+    expect(result.warnings.some((w) => w.includes('no real press_cycle_time_s on file'))).toBe(false);
+  });
+
+  it('the line carries the calculator and the fill step with its registered formula', () => {
+    const line = run({ cureTimeMinFromMaterial: 6 }).processLines[0]!;
+    expect(line.calculatorId).toBe('Reaction Injection Molding - Cycle Time');
+    expect(line.calculatorVersion).toBe(2);
+    expect(line.calculationTrace!.find((t) => t.fieldName === 'Fill Time')).toMatchObject({ formulaId: 'F-19', state: 'ASSUMED', unit: 's' });
+    expect(line.calculationTrace!.find((t) => t.fieldName === 'Part Volume')).toMatchObject({ unit: 'mm³', value: 80_000 });
+    expect(line.calculationTrace!.find((t) => t.fieldName === 'Machine Injection Rate')).toMatchObject({ unit: 'mm³/s' });
   });
 });

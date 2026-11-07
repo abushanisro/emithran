@@ -30,8 +30,7 @@
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
-import { runPressCycleTime } from '../calculators/plastic-cycle-time';
-import { RIM_CALCULATOR } from '../calculators/plastic-cycle-time-seeds';
+import { runRimCycleTime } from '../calculators/plastic-cycle-time';
 
 interface ReactionInjectionMoldingCostInput {
   batchSize: number;
@@ -43,7 +42,10 @@ interface ReactionInjectionMoldingCostInput {
   // Real per-material cure_time_min (raw_materials, migration 619). null
   // when this specific grade has no real cure-time data on file.
   cureTimeMinFromMaterial?: number | null;
-  /** The stored cycle-time calculators by name (migration 975): the dry cycle plus cure time is computed by "Reaction Injection Molding - Cycle Time". Absent = a named gap, no cycle. */
+  /** The CAD net part volume (mm3) and the machine's staged injection rate (mm3/s): the fill time is the one over the other (formula registry F-19). Absent = no fill time, so a named gap. */
+  partVolumeMm3?: number | null;
+  injectionRateMm3PerS?: number | null;
+  /** The stored cycle-time calculators by name (migrations 975, 976): the dry cycle plus fill plus cure time is computed by "Reaction Injection Molding - Cycle Time". Absent = a named gap, no cycle. */
   calculators?: ReferenceCalculators | null;
   dlrPerHr?: number;
   qairPerHr?: number;
@@ -58,10 +60,10 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
   // Compression Molding's own engine; press-stroke-engine.ts itself stays
   // untouched.
   // The dry cycle plus cure time is the stored calculator's (calculators/plastic-cycle-time.ts): the engine seeds its inputs and passes its result on.
-  const cycle = runPressCycleTime(
-    { pressCycleTimeS: input.rate.pressCycleTimeS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null, process: 'rim' },
-    input.calculators ?? null, RIM_CALCULATOR,
-  );
+  const cycle = runRimCycleTime({
+    machineCycleTimeS: input.rate.pressCycleTimeS ?? null, partVolumeMm3: input.partVolumeMm3 ?? null,
+    injectionRateMm3PerS: input.injectionRateMm3PerS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null,
+  }, input.calculators ?? null);
   const effectiveRate: MHRRateInput = { ...input.rate, pressCycleTimeS: cycle.derivable ? cycle.cycleSec : null };
 
   const result = computePressStrokeCost('Reaction Injection Molding', 'reaction_injection_molding', {
@@ -86,17 +88,18 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
       if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
     }
   } else if (input.rate.pressCycleTimeS != null) {
+    // The machine has its cycle time: it is the fill inputs or the calculator that are missing, so the press function's "no press_cycle_time_s on file" would be wrong.
+    result.warnings = result.warnings.filter((w) => !w.includes('no real press_cycle_time_s on file'));
     result.warnings.push(`Reaction Injection Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
   }
 
   if (cycle.derivable) {
     result.warnings.push(
       realCureTimeSec != null
-        ? `Reaction Injection Molding cycle time includes real cure/reaction time (${input.cureTimeMinFromMaterial} min) ` +
-          'for this material, plus the real machine dry-cycle (mechanical open/close motion).'
-        : 'Reaction Injection Molding cycle time reflects only the real machine dry-cycle ' +
-          '(mechanical open/close motion, no material) — no real fill-time-from-volume or ' +
-          'chemical cure/reaction-time data on file for this material; total cycle time is ' +
+        ? `Reaction Injection Molding cycle time = machine dry cycle + fill time (part volume over the machine injection rate, F-19) + real cure/reaction time (${input.cureTimeMinFromMaterial} min) ` +
+          'for this material. Runner volume, mix-head purge and handling are not modelled.'
+        : 'Reaction Injection Molding cycle time = machine dry cycle + fill time (part volume over the machine injection rate, F-19) ' +
+          '— no real cure/reaction-time data on file for this material; total cycle time is ' +
           'understated until real data is sourced, not fabricated to fill the gap.',
     );
   }

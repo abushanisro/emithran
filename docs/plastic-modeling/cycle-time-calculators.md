@@ -182,9 +182,9 @@ Compression cycle = press open/close time (the staged press_cycle_time_s: platen
 
 ## Reaction Injection Molding
 
-Calculator **Reaction Injection Molding - Cycle Time**, mapped to the catalog operation `Reaction Injection Molding` (4 fields).
+Calculator **Reaction Injection Molding - Cycle Time**, mapped to the catalog operation `Reaction Injection Molding` (9 fields).
 
-RIM cycle = the machine's dry cycle (mold open/close with no material, staged as press_cycle_time_s) + the material's cure or reaction time. Fill time from the staged injection rate (volume / injectionRateMm3PerS) is approved but not yet part of this calculator or of the engine (Phase 3, with unit validation); mixing and handling are not modelled because the reference holds no formula.
+RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open/close with no material (staged as press_cycle_time_s). Fill Time = Total Shot Volume / Machine Injection Rate (formula registry F-19, ASSUMED: the staged rate over the shot volume is the approved simplification; the reference states no RIM fill formula), with Total Shot Volume = Part Volume x Cavities per Mold in mm3 and the rate in mm3/s, so the result is in seconds. Cure Time = the material's cure or reaction time. Cycle Time = (Dry cycle + Fill + Cure) / Cavities per Mold, per part; the RIM engine prices one part per press cycle (1 cavity). Not modelled, because the reference has no volume or formula: runner and sprue volume, mix-head purge, viscosity, flow resistance, the injection profile, and part handling. A missing or invalid part volume or injection rate makes the cycle a named gap, never a default.
 
 ### Feature lookup table
 
@@ -207,9 +207,14 @@ RIM cycle = the machine's dry cycle (mold open/close with no material, staged as
 | # | Field | Unit | Input, or formula | Registry |
 |---|---|---|---|---|
 | 1 | Machine Dry Cycle Time | s | Machine record: press_cycle_time_s (time.dryCycleTimeS: mold open/close, no material) |  |
-| 2 | Material Cure Time | min | Material reference: cureTimeMin (raw_materials.cure_time_min; absent for a grade with none on file: seeded 0 and said in the trace, the cycle is then understated) |  |
-| 3 | Cure Time | s | `{Material Cure Time} * 60` |  |
-| 4 | Cycle Time | s | `{Machine Dry Cycle Time} + {Cure Time}` |  |
+| 2 | Part Volume | mm³ | CAD: volume (net part volume, mm3) |  |
+| 3 | Cavities per Mold |  | Cost engine: the RIM engine prices one part per press cycle: 1 |  |
+| 4 | Machine Injection Rate | mm³/s | Machine record: rates.injectionRateMm3PerS |  |
+| 5 | Material Cure Time | min | Material reference: cureTimeMin (raw_materials.cure_time_min; absent for a grade with none on file: seeded 0 and said in the trace, the cycle is then understated) |  |
+| 6 | Total Shot Volume | mm³ | `{Part Volume} * {Cavities per Mold}` |  |
+| 7 | Fill Time | s | `{Total Shot Volume} / {Machine Injection Rate}` | F-19 v1, ASSUMED |
+| 8 | Cure Time | s | `{Material Cure Time} * 60` |  |
+| 9 | Cycle Time | s | `({Machine Dry Cycle Time} + {Fill Time} + {Cure Time}) / {Cavities per Mold}` |  |
 
 ## Not modelled (registry entries marked UNSUPPORTED)
 

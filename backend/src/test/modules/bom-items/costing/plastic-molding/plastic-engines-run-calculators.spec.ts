@@ -127,21 +127,29 @@ describe('compression and reaction injection lines are driven by their calculato
   const rateOf = (pressCycleTimeS: number | null) =>
     ({ rate: 60, source: 'mhr_database', machineClass: 'x', machineName: 'M', commodityCode: null, pressCycleTimeS, setupTimeHr: 0.5 }) as unknown as MHRRateInput;
   const input = (cure: number | null) => ({ batchSize: 1000, partWeightKg: 0.2, rate: rateOf(20), cureTimeMinFromMaterial: cure });
+  // RIM: an 80,000 mm3 part on a machine that injects 100,000 mm3/s fills in 0.8 s
+  const rimFill = { partVolumeMm3: 80_000, injectionRateMm3PerS: 100_000 };
 
-  it.each([
-    ['compression', 'Compression Molding - Cycle Time', (cure: number | null, calculators: typeof CALCULATORS | null) => computeCompressionMoldingCost({ ...input(cure), calculators })],
-    ['rim', 'Reaction Injection Molding - Cycle Time', (cure: number | null, calculators: typeof CALCULATORS | null) => computeReactionInjectionMoldingCost({ ...input(cure), calculators })],
-  ] as const)('%s: the line carries the calculator and its run, and the cycle is press time plus cure', (_p, name, run) => {
-    const r = run(3, CALCULATORS);
+  it('compression: the line carries the calculator and its run, and the cycle is press time plus cure', () => {
+    const r = computeCompressionMoldingCost({ ...input(3), calculators: CALCULATORS });
     const line = r.processLines[0]!;
-    expect(line.calculatorId).toBe(name);
+    expect(line.calculatorId).toBe('Compression Molding - Cycle Time');
     expect(line.calculationTrace!.find((t) => t.fieldName === 'Cycle Time')!.value).toBe(200); // 20 s + 3 min x 60
     expect(r.cuttingMin).toBeCloseTo(200 / 60, 12);
   });
 
+  it('rim: the line carries the calculator (version 2) and its run, and the cycle is dry cycle + fill + cure', () => {
+    const r = computeReactionInjectionMoldingCost({ ...input(3), ...rimFill, calculators: CALCULATORS });
+    const line = r.processLines[0]!;
+    expect(line.calculatorId).toBe('Reaction Injection Molding - Cycle Time');
+    expect(line.calculatorVersion).toBe(2);
+    expect(line.calculationTrace!.find((t) => t.fieldName === 'Cycle Time')!.value).toBeCloseTo(200.8, 9); // 20 + 0.8 + 180
+    expect(r.cuttingMin).toBeCloseTo(200.8 / 60, 12);
+  });
+
   it.each([
     ['compression', (calculators: null) => computeCompressionMoldingCost({ ...input(3), calculators })],
-    ['rim', (calculators: null) => computeReactionInjectionMoldingCost({ ...input(3), calculators })],
+    ['rim', (calculators: null) => computeReactionInjectionMoldingCost({ ...input(3), ...rimFill, calculators })],
   ] as const)('%s: with no calculator the cycle is a named gap, not a number', (_p, run) => {
     const r = run(null);
     expect(r.cuttingMin).toBe(0);

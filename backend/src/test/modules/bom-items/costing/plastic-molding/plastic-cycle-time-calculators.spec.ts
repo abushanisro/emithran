@@ -5,15 +5,14 @@ import { loadPlasticMoldingCalculatorSpec, plasticMoldingCalculatorsByName, plas
 import { buildPlasticMoldingCalculatorsMigrationSql } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators-migration';
 import {
   COMPRESSION_CALCULATOR, INJECTION_CALCULATOR, LSR_CALCULATOR, RIM_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR,
-  injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds,
+  injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds,
 } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time-seeds';
 import { runInjectionCycleTime } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time';
 import { computeCycleTime, type CycleTimeInput } from './legacy-cycle-time-oracle';
 import { computeCompressionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-compression-molding-engine';
-import { computeReactionInjectionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import { runReferenceCalculator, type ReferenceCalculators } from '../../../../../modules/bom-items/costing/shared/calculators/reference-calculator';
 import type { MHRRateInput } from '../../../../../modules/bom-items/costing/shared/core/cost-engine';
-import { allRealPresses, realCureTimeMin, realFillFactorRows, realMaterialNames, realOperationCatalog, realPlasticReference, realResinInputs } from './real-plastic-reference';
+import { allRealPresses, realCureTimeMin, realFillFactorRows, realMaterialNames, realOperationCatalog, realPlasticReference, realResinInputs, realRimMachines } from './real-plastic-reference';
 
 const MODEL = realPlasticReference().cycleModel;
 const BY_NAME = plasticMoldingCalculatorsByName();
@@ -54,16 +53,24 @@ describe('plastic molding calculator spec', () => {
     expect(sfm.description).toContain('NOT modelled');
   });
 
-  it('the committed migration is exactly what the generator writes from the spec', () => {
-    const committed = readFileSync(join(__dirname, '../../../../../../migrations/975_plastic_molding_calculators.sql'), 'utf8');
+  it('the committed migration 976 is exactly what the generator writes from the spec, for the calculators above version 1 (975 is history and is not edited)', () => {
+    const committed = readFileSync(join(__dirname, '../../../../../../migrations/976_plastic_rim_fill_time_calculator.sql'), 'utf8');
     expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql());
+    // only the reaction injection calculator changed, and its version is raised
+    expect(spec.calculators.filter((c) => (c.version ?? 1) > 1).map((c) => c.name)).toEqual([RIM_CALCULATOR]);
+    expect(committed).toContain('version = 2');
+    // the plain injection calculator's name is a part of the RIM one's, so the name as it is quoted in the SQL is what is looked for
+    const quoted = (name: string) => '$q$' + name + '$q$';
+    expect(committed).not.toContain(quoted(INJECTION_CALCULATOR));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/975_plastic_molding_calculators.sql'), 'utf8')).toContain(quoted(INJECTION_CALCULATOR));
   });
 
   it('the calculator descriptions say what is not modelled, so no one reads them as complete', () => {
     const text = (n: string) => spec.calculators.find((c) => c.name === n)!.description;
     expect(text(INJECTION_CALCULATOR)).toMatch(/Not modelled.*ejector travel.*plasticizing/s);
     expect(text(COMPRESSION_CALCULATOR)).toMatch(/charging, preheat, flash trimming/);
-    expect(text(RIM_CALCULATOR)).toMatch(/Phase 3/);
+    expect(text(RIM_CALCULATOR)).toMatch(/F-19/);
+    expect(text(RIM_CALCULATOR)).toMatch(/runner and sprue volume/);
   });
 });
 
@@ -192,29 +199,23 @@ describe('liquid silicone: the LSR calculator gives the engine\'s numbers', () =
   });
 });
 
-describe('compression and reaction injection: the calculator gives the engine\'s numbers', () => {
+describe('compression: the calculator gives the numbers the engine gave', () => {
   const rate = (pressCycleTimeS: number | null) =>
     ({ rate: 60, source: 'mhr_database', machineClass: 'x', machineName: 'M', commodityCode: null, pressCycleTimeS, setupTimeHr: 0.5 }) as unknown as MHRRateInput;
-  const input = (pressCycleTimeS: number | null, cureTimeMin: number | null) =>
-    ({ batchSize: 1000, partWeightKg: 0.2, rate: rate(pressCycleTimeS), cureTimeMinFromMaterial: cureTimeMin });
-
+  const input = (pressCycleTimeS: number | null, cureTimeMin: number | null) => ({ batchSize: 1000, partWeightKg: 0.2, rate: rate(pressCycleTimeS), cureTimeMinFromMaterial: cureTimeMin });
   const cures = realMaterialNames().map((n) => realCureTimeMin(n));
   const presses = [3, 7.5, 12.25, 41.6, 95];
 
-  it.each([
-    ['compression', COMPRESSION_CALCULATOR, (p: number, c: number | null) => computeCompressionMoldingCost({ ...input(p, c), calculators: BY_NAME })],
-    ['rim', RIM_CALCULATOR, (p: number, c: number | null) => computeReactionInjectionMoldingCost({ ...input(p, c), calculators: BY_NAME })],
-  ] as const)('%s: press (or dry) cycle plus cure time, with and without a cure time on file', (process, name, engine) => {
+  it('press open/close time plus cure time, with and without a cure time on file', () => {
     let withCure = 0, withoutCure = 0;
     for (const press of presses) for (const cure of [...new Set(cures)]) {
-      const seeded = pressCycleTimeSeeds({ pressCycleTimeS: press, cureTimeMin: cure, process });
+      const seeded = pressCycleTimeSeeds({ pressCycleTimeS: press, cureTimeMin: cure });
       if (!('seeds' in seeded)) throw new Error('seeds expected');
-      const r = run(name, seeded.seeds);
+      const r = run(COMPRESSION_CALCULATOR, seeded.seeds);
       // the oracle: what the engine did before the calculators: the press cycle plus the cure time when one is on file, over 60, for one stroke
       const legacyMin = (press + (cure != null ? cure * 60 : 0)) / 60;
       expect(r.value! / 60).toBeCloseTo(legacyMin, 12);
-      // and the engine, running the stored calculator, reports the same minutes per part (and carries the run on its line)
-      const viaEngine = engine(press, cure);
+      const viaEngine = computeCompressionMoldingCost({ ...input(press, cure), calculators: BY_NAME });
       expect(viaEngine.cuttingMin).toBeCloseTo(legacyMin, 12);
       expect(viaEngine.processLines[0]!.calculationTrace?.some((t) => t.fieldName === 'Cycle Time')).toBe(true);
       cure == null || !(cure > 0) ? (withoutCure += 1) : (withCure += 1);
@@ -224,19 +225,76 @@ describe('compression and reaction injection: the calculator gives the engine\'s
   });
 
   it('a machine with no cycle time on file is missing, as it is for the engine (no cycle is invented)', () => {
-    for (const process of ['compression', 'rim'] as const) {
-      const seeded = pressCycleTimeSeeds({ pressCycleTimeS: null, cureTimeMin: 3, process });
-      expect('missing' in seeded && seeded.missing[0]).toContain('press_cycle_time_s');
-    }
+    const seeded = pressCycleTimeSeeds({ pressCycleTimeS: null, cureTimeMin: 3 });
+    expect('missing' in seeded && seeded.missing[0]).toContain('press_cycle_time_s');
     expect(computeCompressionMoldingCost(input(null, 3)).processLines[0]!.cycleTimeMin).toBe(0);
   });
 
   it('a grade with no cure time says so in the trace and is understated, not given a typical time', () => {
-    const seeded = pressCycleTimeSeeds({ pressCycleTimeS: 20, cureTimeMin: null, process: 'compression' });
+    const seeded = pressCycleTimeSeeds({ pressCycleTimeS: 20, cureTimeMin: null });
     if (!('seeds' in seeded)) throw new Error('seeds expected');
     const r = run(COMPRESSION_CALCULATOR, seeded.seeds);
     expect(r.value).toBe(20);
     expect(r.trace.find((t) => t.fieldName === 'Material Cure Time')?.source).toContain('not included');
+  });
+});
+
+describe('reaction injection (version 2): dry cycle + fill + cure, the fill being volume (mm3) over the machine rate (mm3/s)', () => {
+  const RIM = realRimMachines();
+  const cures = [...new Set(realMaterialNames().map((n) => realCureTimeMin(n)))];
+  const volumes = [150, 4_000, 80_000, 650_000, 4_200_000, 25_000_000];
+
+  it('equals dry + volume/rate + cure for every real RIM machine, volume and cure time, in seconds', () => {
+    let n = 0;
+    for (const m of RIM) for (const volume of volumes) for (const cure of cures) {
+      const seeded = rimCycleTimeSeeds({ machineCycleTimeS: m.dryCycleTimeS, partVolumeMm3: volume, injectionRateMm3PerS: m.injectionRateMm3PerS, cureTimeMin: cure });
+      if (!('seeds' in seeded)) throw new Error('seeds expected');
+      const r = run(RIM_CALCULATOR, seeded.seeds);
+      // independent arithmetic: seconds = mm3 / (mm3/s); the cure in minutes is converted once
+      const fill = volume / m.injectionRateMm3PerS;
+      const cureSec = cure != null && cure > 0 ? cure * 60 : 0;
+      expect(r.outputs['Fill Time']).toBeCloseTo(fill, 12);
+      expect(r.value).toBeCloseTo(m.dryCycleTimeS + fill + cureSec, 9);
+      n += 1;
+    }
+    expect(n).toBe(RIM.length * volumes.length * cures.length);
+    expect(n).toBeGreaterThan(40);
+  });
+
+  it('is the old cycle (dry + cure) plus exactly the fill: the rest is unchanged', () => {
+    const m = RIM[0]!;
+    const before = (cure: number) => m.dryCycleTimeS + cure * 60;
+    const seeded = rimCycleTimeSeeds({ machineCycleTimeS: m.dryCycleTimeS, partVolumeMm3: 1_000_000, injectionRateMm3PerS: m.injectionRateMm3PerS, cureTimeMin: 4 });
+    if (!('seeds' in seeded)) throw new Error('seeds expected');
+    expect(run(RIM_CALCULATOR, seeded.seeds).value! - before(4)).toBeCloseTo(1_000_000 / m.injectionRateMm3PerS, 9);
+  });
+
+  it('names a missing, zero, negative or non-finite volume, rate or dry cycle: never defaulted', () => {
+    const ok = { machineCycleTimeS: 10, partVolumeMm3: 5_000, injectionRateMm3PerS: 100_000, cureTimeMin: 3 };
+    for (const [over, named] of [
+      [{ partVolumeMm3: null }, 'part volume'], [{ partVolumeMm3: 0 }, 'part volume'], [{ partVolumeMm3: -1 }, 'part volume'], [{ partVolumeMm3: Number.POSITIVE_INFINITY }, 'part volume'],
+      [{ injectionRateMm3PerS: null }, 'machine injection rate'], [{ injectionRateMm3PerS: 0 }, 'machine injection rate'], [{ injectionRateMm3PerS: -3 }, 'machine injection rate'], [{ injectionRateMm3PerS: Number.NaN }, 'machine injection rate'],
+      [{ machineCycleTimeS: null }, 'machine dry cycle time'], [{ machineCycleTimeS: 0 }, 'machine dry cycle time'],
+    ] as Array<[Partial<typeof ok>, string]>) {
+      const seeded = rimCycleTimeSeeds({ ...ok, ...over });
+      expect('missing' in seeded && seeded.missing.join(' ')).toContain(named);
+    }
+  });
+
+  it('names every missing input at once', () => {
+    const seeded = rimCycleTimeSeeds({ machineCycleTimeS: null, partVolumeMm3: null, injectionRateMm3PerS: null, cureTimeMin: null });
+    expect('missing' in seeded && seeded.missing).toHaveLength(3);
+  });
+
+  it('shows units on the trace so the fill can be read: mm3, mm3/s, seconds', () => {
+    const seeded = rimCycleTimeSeeds({ machineCycleTimeS: 10, partVolumeMm3: 80_000, injectionRateMm3PerS: 100_000, cureTimeMin: 3 });
+    if (!('seeds' in seeded)) throw new Error('seeds expected');
+    const r = run(RIM_CALCULATOR, seeded.seeds);
+    const unit = (name: string) => r.trace.find((t) => t.fieldName === name)?.unit;
+    expect({ volume: unit('Part Volume'), rate: unit('Machine Injection Rate'), shot: unit('Total Shot Volume'), fill: unit('Fill Time'), cycle: unit('Cycle Time') })
+      .toEqual({ volume: 'mm³', rate: 'mm³/s', shot: 'mm³', fill: 's', cycle: 's' });
+    expect(r.outputs['Total Shot Volume']).toBe(80_000);
+    expect(r.outputs['Fill Time']).toBeCloseTo(0.8, 12);
   });
 });
 

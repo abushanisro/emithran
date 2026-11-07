@@ -49,6 +49,11 @@ export interface DomainSpecCalculator {
   operations: string[];
   /** True for a calculator that computes no catalog operation; required exactly when `operations` is empty. */
   helper?: boolean;
+  /**
+   * calculators.version, 1 when absent. A calculator already in use is never edited in place under the same version: a change to its fields or formulas raises this and
+   * ships as a new migration for that calculator (calculators.version, migration 428: "bumped when a calculator's fields/formulas change").
+   */
+  version?: number;
   /** The calculated field that is the calculator's result. Default "Cycle Time" (seconds), which an operation's calculator must have. */
   output?: string;
   /** Further calculated fields the engine reads besides the output (named in the spec, so the engine does not guess). */
@@ -130,7 +135,7 @@ export function domainFieldToRow(f: DomainSpecField, order: number): ReferenceCa
 export function domainCalculatorsAsReference(spec: DomainCalculatorSpec): ReferenceCalculators {
   const out: ReferenceCalculators = {};
   for (const c of spec.calculators) {
-    const def = { calculatorId: c.name, name: c.name, version: 1, fields: c.fields.map((f, i) => domainFieldToRow(f, i + 1)) };
+    const def = { calculatorId: c.name, name: c.name, version: c.version ?? 1, fields: c.fields.map((f, i) => domainFieldToRow(f, i + 1)) };
     for (const op of c.operations) out[op] = def;
   }
   return out;
@@ -140,7 +145,7 @@ export function domainCalculatorsAsReference(spec: DomainCalculatorSpec): Refere
 export function domainCalculatorsByName(spec: DomainCalculatorSpec): Record<string, ReferenceCalculatorDef> {
   const out: Record<string, ReferenceCalculatorDef> = {};
   for (const c of spec.calculators) {
-    out[c.name] = { calculatorId: c.name, name: c.name, version: 1, fields: c.fields.map((f, i) => domainFieldToRow(f, i + 1)) };
+    out[c.name] = { calculatorId: c.name, name: c.name, version: c.version ?? 1, fields: c.fields.map((f, i) => domainFieldToRow(f, i + 1)) };
   }
   return out;
 }

@@ -146,9 +146,10 @@ export class PlasticRouteComparisonService {
       clampModel: plasticRef.clampModel,
     }) : []);
     const sfmCandidate = mhrRates.structuralFoamMolding.selection?.balanced?.candidate;
+    const rimCandidate = mhrRates.reactionInjectionMolding.selection?.balanced?.candidate;
     const pressRecordsRC = await this.plasticReference.getPressRecords(
       client,
-      [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? ''],
+      [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? '', rimCandidate?.machineId ?? ''],
     );
     const rcUsdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
     const imCommon = buildMoldingCommonInput({
@@ -330,6 +331,9 @@ export class PlasticRouteComparisonService {
       // Real per-grade cure/reaction time — same resolved material row as
       // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+      // The fill time is the CAD part volume (mm3) over the selected machine's staged injection rate (mm3/s): formula registry F-19.
+      partVolumeMm3: partVolumeMm3 > 0 ? partVolumeMm3 : null,
+      injectionRateMm3PerS: rimCandidate?.machineId ? pressRecordsRC.get(rimCandidate.machineId)?.injectionRateMm3PerS ?? null : null,
       calculators,
     });
     const rimGap = compatGap('reaction_injection');

@@ -13,7 +13,7 @@ import { formulaById } from '../formula-registry';
 import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
-import { injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds } from './plastic-cycle-time-seeds';
+import { injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, COMPRESSION_CALCULATOR, RIM_CALCULATOR } from './plastic-cycle-time-seeds';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
 export function calculatorFingerprint(def: ReferenceCalculatorDef): string {
@@ -66,16 +66,23 @@ export type PressCycle =
   | { derivable: true; cycleSec: number; trace: CalculationTraceStep[]; calculator: { id: string | null; version: number | null; name: string; fingerprint: string } }
   | { derivable: false; missing: string[] };
 
-/** The cycle of a compression or reaction injection press (press or dry cycle plus cure time), by the stored calculator. */
-export function runPressCycleTime(
-  input: { pressCycleTimeS: number | null; cureTimeMin: number | null; process: 'compression' | 'rim' },
-  calculators: ReferenceCalculators | null | undefined,
-  name: string,
-): PressCycle {
-  const seeded = pressCycleTimeSeeds(input);
+function runPress(name: string, seeded: ReturnType<typeof pressCycleTimeSeeds>, calculators: ReferenceCalculators | null | undefined): PressCycle {
   if ('missing' in seeded) return { derivable: false, missing: seeded.missing };
   const run = runReferenceCalculator(calculators, name, seeded.seeds);
   const def = calculators?.[name];
   if (run.missing.length > 0 || run.value == null || !def) return { derivable: false, missing: run.missing.length > 0 ? run.missing : [`${name} produced no cycle time`] };
-  return { derivable: true, cycleSec: run.value, trace: run.trace, calculator: { id: run.calculatorId, version: run.calculatorVersion, name, fingerprint: calculatorFingerprint(def) } };
+  return { derivable: true, cycleSec: run.value, trace: withRegistryFormulas(run.trace, name), calculator: { id: run.calculatorId, version: run.calculatorVersion, name, fingerprint: calculatorFingerprint(def) } };
+}
+
+/** The cycle of a compression press (press open/close time plus cure time), by the stored calculator. */
+export function runCompressionCycleTime(input: { pressCycleTimeS: number | null; cureTimeMin: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(COMPRESSION_CALCULATOR, pressCycleTimeSeeds(input), calculators);
+}
+
+/** The cycle of a reaction injection molding (dry cycle + fill + cure time), by the stored calculator. */
+export function runRimCycleTime(
+  input: { machineCycleTimeS: number | null; partVolumeMm3: number | null; injectionRateMm3PerS: number | null; cureTimeMin: number | null },
+  calculators: ReferenceCalculators | null | undefined,
+): PressCycle {
+  return runPress(RIM_CALCULATOR, rimCycleTimeSeeds(input), calculators);
 }
