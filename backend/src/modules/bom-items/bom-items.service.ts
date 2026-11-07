@@ -4197,6 +4197,7 @@ export class BOMItemsService {
       const activePlasticRef = await this.plasticReferenceService.getReference();
       const imInput: InjectionMoldingCostInput = {
         ...buildMoldingCommonInput({
+          calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
           item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
           material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
           plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },

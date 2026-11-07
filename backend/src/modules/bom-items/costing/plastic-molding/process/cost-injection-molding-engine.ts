@@ -40,8 +40,9 @@ import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
+import { runInjectionCycleTime } from '../calculators/plastic-cycle-time';
+import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
 import {
-  computeCycleTime,
   type CycleTimeResult,
   type GateType,
   type PressTiming,
@@ -213,6 +214,11 @@ export interface InjectionMoldingCostInput {
   // (absent = cycle time not derivable) and its good-part yield (cost per good
   // part = cost / yield; absent = the line is incomplete).
   pressTiming?: PressTiming | null;
+  /**
+   * The stored cycle-time calculators by name (calculators/plastic-molding-calculators.json, migration 975), loaded from the database: the cycle time is computed by the
+   * calculator, as for heat treatment and machining. Absent = no calculator, so the cycle is a named gap, never a number. Not part of a saved calculation's inputs.
+   */
+  calculators?: ReferenceCalculators | null;
   goodPartYield?: number | null;
   // The selected press's real clamp tonnage (t) and shot capacity (g), from its
   // machine record. Absent = no press: cavities are not sized and the molding
@@ -429,7 +435,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
 
   // ── Cycle time: material, press and reference only (cycle-time.ts) ──────────
   const cycle: CycleTimeResult = plasticRef
-    ? computeCycleTime({
+    ? runInjectionCycleTime({
         wallMm: wallThicknessNominalMm > 0 ? wallThicknessNominalMm : null,
         isLsr,
         real: input.realResinInputs,
@@ -439,7 +445,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         cavityCount,
         // No per-part gate-count signal: the reference defaultNumberOfGatesPerCavity.
         gatesPerCavity: plasticRef.defaultGatesPerCavity,
-      })
+      }, input.calculators ?? null, mhrRate.machineClass === 'structural_foam_molding' ? 'structural_foam' : 'injection')
     : { derivable: false, missing: [`Plastic reference data (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')})`] };
   const cycleGapReason = cycle.derivable ? null : `Cycle time not derivable: missing ${cycle.missing.join('; ')}.`;
   if (cycleGapReason) warnings.push(cycleGapReason);
@@ -524,7 +530,12 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       requiredCapability: sizing.materialGap ? 'An injection-molding material' : sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : yieldGapReason ? 'Press good-part yield' : 'Labour rate (HR Rates)',
     };
   }
-  if (cycle.derivable) line.calculationTrace = cycle.trace;
+  if (cycle.derivable) {
+    line.calculationTrace = cycle.trace;
+    // The stored calculator behind this line: the cost dialog opens it, filled with the inputs above, and runs the same formulas.
+    if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
+    if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
+  }
   processLines.push(line);
 
   if (routed.has('gate_trimming')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
@@ -677,7 +688,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
     unsupportedFormulas({ tooling: toolingResult != null, routed }),
   );
-  if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, PLASTIC_ENGINE_BUILD, input as unknown as Record<string, unknown>);
+  if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, PLASTIC_ENGINE_BUILD, input as unknown as Record<string, unknown>, cycle.derivable ? [cycle.calculator] : []);
 
   return {
     materialCost,

@@ -67,6 +67,8 @@ export interface MoldingCommonFacts {
   productionLifeYears: number;
   /** The scenario's cavity count, resolved by the caller (resolveScenarioCavityCount). */
   cavityCountOverride: number | null;
+  /** The stored cycle-time calculators by name (calculators/plastic-molding-calculators.json), loaded from the database; the cycle time is computed by them. */
+  calculators: InjectionMoldingCostInput['calculators'];
 }
 
 export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInput {
@@ -87,6 +89,7 @@ export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInp
     deburrRate: f.deburrRate,
     inspectionRate: f.inspectionRate,
     cavityCountOverride: f.cavityCountOverride,
+    calculators: f.calculators,
     // Tooling amortisation: both come from the canonical costing-input resolver, never re-read from the item.
     annualVolume: f.annualVolume ?? undefined,
     productionLifeYears: f.productionLifeYears,

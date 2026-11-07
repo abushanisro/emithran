@@ -7,6 +7,7 @@ import type { CalculationSnapshot } from '../../../../../modules/bom-items/costi
 import { computeInjectionMoldedCostSummary, type InjectionMoldingCostInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import { fingerprintRows } from '../../../../../modules/bom-items/costing/plastic-molding/reference-fingerprint';
 import { realMaterialClamp, realPlasticReference, realPress, realReferenceRows, realResinInputs } from './real-plastic-reference';
+import { plasticMoldingCalculatorsByName } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
 // A saved calculation is reconstructable from what is persisted alone: the snapshot JSON as the database returns it, and the stored reference rows.
 // Nothing below touches the live reference object, the part or the press: it all goes through JSON, as it does through process_cost_records and
@@ -20,7 +21,7 @@ const part = (over: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCo
   volume: 50_000, surfaceArea: 40_000, wallThicknessNominalMm: 2, materialGrade: 'ABS', materialCostPerKg: 3.046, materialDensityKgM3: 1040, materialSource: 'db',
   batchSize: 250, family: 'plastic_molded', mhrRate: { ...rate('injection_molding', PRESS.mhrUsd, 'Arburg Allrounder 420 C 1300 - 350'), setupTimeHr: 2 },
   deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null), machineClampTonnes: PRESS.maxTonnage, machineShotCapacityG: PRESS.shotCapacityGrams,
-  pressTiming: PRESS.timing, goodPartYield: PRESS.goodPartYield, materialClamp: realMaterialClamp('ABS'), realResinInputs: realResinInputs('ABS'), materialType: 'ABS',
+  pressTiming: PRESS.timing, goodPartYield: PRESS.goodPartYield, calculators: plasticMoldingCalculatorsByName(), materialClamp: realMaterialClamp('ABS'), realResinInputs: realResinInputs('ABS'), materialType: 'ABS',
   plasticReference: REF, location: 'USA', annualVolume: 100_000, productionLifeYears: 3, signals: { projectedAreaMm2: 10_000, undercutCount: 2, partingComplexity: 0.4 },
   ...over,
 });
@@ -115,12 +116,14 @@ describe('replaying a saved plastic calculation from what is persisted', () => {
     it('a reproduction names every check it made, in order, and what it stood on', () => {
       const { saved, snapshot } = saveLine(part());
       const r = replayPlasticLine(snapshot, storedRows(), saved);
-      expect(r.audit.map((a) => a.split(':')[0])).toEqual(['inputs', 'engine contract', 'engine build', 'formulas', 'reference rows', 'recomputed', 'compared']);
+      expect(r.audit.map((a) => a.split(':')[0])).toEqual(['inputs', 'engine contract', 'engine build', 'formulas', 'reference rows', 'calculators', 'recomputed', 'compared']);
       expect(r.audit[4]).toContain('the stored copy (not the live data)');
       expect(r.audit[4]).toContain(snapshot.referenceData.fingerprint);
       expect(r.audit[3]).toContain('F-04 v1');
+      expect(r.audit[5]).toContain('Injection Molding - Cycle Time');
+      expect(r.audit[5]).toContain('the same formulas as recorded');
       expect(r.audit[2]).toContain('identical code');
-      expect(r.audit[6]).toMatch(/5 amounts, all equal/);
+      expect(r.audit[7]).toMatch(/5 amounts, all equal/);
       expect(r.evidence).toEqual({
         referenceSource: 'stored', snapshotFingerprint: snapshot.referenceData.fingerprint, storedRowsFingerprint: snapshot.referenceData.fingerprint,
         fingerprintVerified: true, formulaVersionsMatch: true, engineVersionRecorded: 'emithran-cost-1', engineVersionNow: 'emithran-cost-1',

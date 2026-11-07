@@ -12,6 +12,7 @@ import {
 } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import { realMaterialClamp, realPlasticReference, realPress, realResinInputs } from '../real-plastic-reference';
+import { plasticMoldingCalculatorsByName } from '../../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
 const REF = realPlasticReference();
 
@@ -47,6 +48,7 @@ function input(material: keyof typeof MATERIALS, press: Press, name: string, ove
     machineClampTonnes: press.maxTonnage,
     machineShotCapacityG: press.shotCapacityGrams,
     pressTiming: press.timing,
+    calculators: plasticMoldingCalculatorsByName(),
     goodPartYield: press.goodPartYield,
     materialClamp: realMaterialClamp(m.reference),
     realResinInputs: realResinInputs(m.reference),
@@ -77,7 +79,7 @@ describe('computeInjectionMoldedCostSummary', () => {
     expect(im.flowClass).toBe('easy'); // PP flow ratio 290
     expect(im.cycleTimeSec).toBeGreaterThan(0);
     const line = r.processLines.find((l) => l.process === 'Injection Molding')!;
-    expect(line.calculationTrace?.map((t) => t.fieldName)).toContain('Mold Open/Close Time');
+    expect(line.calculationTrace?.map((t) => t.fieldName)).toContain('Press Dry Cycle Time');
     expect(line.hourlyRate).toBeCloseTo(MID.mhrUsd, 6);
   });
 

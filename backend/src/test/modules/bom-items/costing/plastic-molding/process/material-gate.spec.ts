@@ -7,6 +7,7 @@
 import { computeInjectionMoldedCostSummary } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import { realMaterialClamp, realPlasticReference, realPress, realResinInputs } from '../real-plastic-reference';
+import { plasticMoldingCalculatorsByName } from '../../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
 const REF = realPlasticReference();
 const MID = realPress('Arburg Allrounder 420 C 1300 - 350');
@@ -18,7 +19,7 @@ const base = (over: Partial<InjectionMoldingCostInput>): InjectionMoldingCostInp
   materialGrade: 'Generic ABS', materialCostPerKg: 3.046, materialDensityKgM3: 1040,
   mhrRate: rate('injection_molding', MID.mhrUsd, 'Arburg Allrounder 420 C 1300 - 350'),
   deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null),
-  machineClampTonnes: MID.maxTonnage, machineShotCapacityG: MID.shotCapacityGrams, pressTiming: MID.timing, goodPartYield: MID.goodPartYield,
+  machineClampTonnes: MID.maxTonnage, machineShotCapacityG: MID.shotCapacityGrams, pressTiming: MID.timing, goodPartYield: MID.goodPartYield, calculators: plasticMoldingCalculatorsByName(),
   materialClamp: realMaterialClamp('ABS'), realResinInputs: realResinInputs('ABS'), materialType: 'ABS',
   materialStockForm: 'Granules', materialMatlState: 'Base Polymer',
   plasticReference: REF, location: 'USA', signals: { projectedAreaMm2: 8000, undercutCount: 0 }, annualVolume: 12_003, productionLifeYears: 5,

@@ -5,6 +5,7 @@
  */
 import { PLASTIC_FORMULAS, formulaById } from '../formula-registry';
 import type { DomainCalculatorSpec, DomainFieldSource, DomainSpecCalculator } from '../../shared/calculators/domain-calculator-spec';
+import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
 
 export interface ReportInput {
   spec: DomainCalculatorSpec;
@@ -13,17 +14,6 @@ export interface ReportInput {
   /** injectionTimeAdjustmentFactors rows: attribute, number, adjustment factor. */
   fillFactorRows: Array<{ attribute: string; number: number; factor: number }>;
 }
-
-/**
- * The registered formula behind a field (id, state), by calculator and field name: the injection model's registry entries F-04 to F-09. The compression and
- * reaction injection calculators are not in the registry yet, so their fields show none (their Cure Time and Cycle Time are not F-09 and F-08).
- */
-const INJECTION_FORMULAS: Record<string, string> = { 'Cooling Time': 'F-04', 'Fill Time': 'F-05', 'Pack Time': 'F-06', 'Press Dry Cycle Time': 'F-07', 'Cycle Time': 'F-08' };
-const FORMULA_OF_FIELD: Record<string, Record<string, string>> = {
-  injection: INJECTION_FORMULAS,
-  structural_foam: INJECTION_FORMULAS,
-  injection_lsr: { 'Cure Time': 'F-09', 'Fill Time': 'F-05', 'Press Dry Cycle Time': 'F-07', 'Cycle Time': 'F-08' },
-};
 
 const PROCESS_OF_OPERATION: Record<string, string> = {
   'Injection Molding': 'Injection Molding', 'Structural foam molding': 'Structural Foam Molding',
@@ -57,7 +47,7 @@ function featureTable(process: string, rows: readonly string[]): string[] {
 function calculationTable(c: DomainSpecCalculator): string[] {
   const out = ['| # | Field | Unit | Input, or formula | Registry |', '|---|---|---|---|---|'];
   c.fields.forEach((f, i) => {
-    const id = FORMULA_OF_FIELD[c.key]?.[f.name];
+    const id = REGISTRY_FORMULA_OF_FIELD[c.key]?.[f.name];
     const entry = id ? formulaById(id) : undefined;
     const registry = entry ? `${entry.id} v${entry.version}, ${entry.state}` : '';
     const how = f.formula ? `\`${cell(f.formula)}\`` : sourceText(f.source!);

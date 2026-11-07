@@ -12,7 +12,9 @@
 
 import { requiredClampForce } from '../../../../../modules/bom-items/costing/plastic-molding/clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../../../../../modules/bom-items/costing/plastic-molding/shot-size';
-import { computeCoolingTimeSec, computeCycleTime, resinThermalProps } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
+import { resinThermalProps } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
+import { runInjectionCycleTime } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time';
+import { plasticMoldingCalculatorsByName } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 import { computeInjectionMoldedCostSummary } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import { expectSetupContract } from '../shared/setup-contract';
@@ -38,6 +40,7 @@ function absPart(overrides: Partial<InjectionMoldingCostInput> = {}): InjectionM
     materialCostPerKg: 3.046, materialDensityKgM3: 1040, materialSource: 'db', batchSize: 1000, family: 'plastic_molded',
     mhrRate: rate('injection_molding', MID.mhrUsd, PRESS_NAME), deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null),
     machineClampTonnes: MID.maxTonnage, machineShotCapacityG: MID.shotCapacityGrams, pressTiming: MID.timing, goodPartYield: MID.goodPartYield,
+    calculators: plasticMoldingCalculatorsByName(),
     materialClamp: ABS_CLAMP, realResinInputs: ABS_RESIN, materialType: 'ABS', plasticReference: REF, location: 'USA',
     signals: { projectedAreaMm2: 10_000, undercutCount: 0 },
     ...overrides,
@@ -107,22 +110,26 @@ describe('cooling and cycle time', () => {
     const t = resinThermalProps(ABS_RESIN, REF.cycleModel.moldTemperatureIncreaseC);
     if (!('props' in t)) throw new Error(t.missing.join());
     expect(t.props.alpha).toBeCloseTo(0.0797238, 6);
-    expect(computeCoolingTimeSec(2, t.props)).toBe(13.6);
+    const c = runInjectionCycleTime({ wallMm: 2, isLsr: false, real: ABS_RESIN, model: REF.cycleModel, press: MID.timing, shotMeltVolumeMm3: 60_000, cavityCount: 1, gatesPerCavity: 1 }, plasticMoldingCalculatorsByName(), 'injection');
+    if (!c.derivable) throw new Error(c.missing.join());
+    expect(c.coolSec).toBe(13.6);
   });
 
   it('cooling grows with wall squared: 4 mm is 4x the 2 mm time (54.3 s)', () => {
-    const t = resinThermalProps(ABS_RESIN, 0);
-    if (!('props' in t)) throw new Error('thermal');
-    expect(computeCoolingTimeSec(4, t.props)).toBe(54.3);
+    // the molding mold-temperature increase is part of the reference: the 54.3 s is at the reference increase of 0 C
+    const model = { ...REF.cycleModel, moldTemperatureIncreaseC: 0 };
+    const c = runInjectionCycleTime({ wallMm: 4, isLsr: false, real: ABS_RESIN, model, press: MID.timing, shotMeltVolumeMm3: 60_000, cavityCount: 1, gatesPerCavity: 1 }, plasticMoldingCalculatorsByName(), 'injection');
+    if (!c.derivable) throw new Error(c.missing.join());
+    expect(c.coolSec).toBe(54.3);
   });
 
   it('cycle = fill 0.29 + pack 4.8 + cool 13.6 + dry 2.0 = 20.69 s', () => {
     // fill: 56.16 g / 885 kg/m3 = 63,457.6 mm3 / 130,000 = 0.4881 s x 1.0 (1 cavity) x 0.6 (1 gate) = 0.2929 -> 0.29
     // pack: max(2, 0.35 x 13.6 = 4.76 -> 4.8)
-    const c = computeCycleTime({
+    const c = runInjectionCycleTime({
       wallMm: 2, isLsr: false, real: ABS_RESIN, model: REF.cycleModel, press: MID.timing,
       shotMeltVolumeMm3: (0.05616 / 885) * 1e9, cavityCount: 1, gatesPerCavity: 1,
-    });
+    }, plasticMoldingCalculatorsByName(), 'injection');
     if (!c.derivable) throw new Error(c.missing.join());
     expect(c.fillSec).toBe(0.29);
     expect(c.packSec).toBe(4.8);
