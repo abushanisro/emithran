@@ -79,6 +79,8 @@ import { ScenarioApplicationService } from './services/scenario-application.serv
 import { CostTableService } from './services/cost-table.service';
 import type { CostTable } from './costing/shared/cost-table';
 import { ApplyScenarioDto, type ScenarioApplicationResult } from './dto/apply-scenario.dto';
+import { PartSummaryService } from './services/part-summary.service';
+import type { PartSummary } from './costing/shared/part-summary';
 import { PlasticDfmService, MOLDING_PROCESS_NAMES } from './costing/plastic-molding/dfm/plastic-dfm.service';
 import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
 import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
@@ -122,6 +124,7 @@ export class BOMItemsController {
     private readonly nreService: NreService,
     private readonly dfmScoringService: DFMScoringService,
     private readonly plasticDfm: PlasticDfmService,
+    private readonly partSummaries: PartSummaryService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     private readonly databaseService: DatabaseService,
     private readonly exchangeRateService: ExchangeRateService,
@@ -293,6 +296,14 @@ export class BOMItemsController {
   @ApiResponse({ status: 200, description: 'Analysis status' })
   async getAnalysisStatus(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<AnalysisStatus> {
     return this.analysisStatusService.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/part-summary')
+  @ApiOperation({ summary: "The part's summary: component, production and material information, the cost by category and by process, and the costs and targets. A projection of the applied cost table; a value the model does not hold is null with its reason" })
+  @ApiResponse({ status: 200, description: 'The part summary (USD)' })
+  async getPartSummary(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<PartSummary> {
+    return this.partSummaries.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
   }
 
   @OrgRole('viewer')

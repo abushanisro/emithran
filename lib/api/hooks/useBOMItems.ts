@@ -271,6 +271,7 @@ export function invalidateBOMItemUpdateQueries(queryClient: QueryClient, data: B
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'route-comparison'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'dfm-scores'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'plastic-dfm'] });
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'part-summary'] });
 }
 
 export function useUpdateBOMItem() {
@@ -452,6 +453,38 @@ export function useDFMScores(bomItemId?: string) {
   return useQuery({
     queryKey: ['bom-items', bomItemId, 'dfm-scores'],
     queryFn: async () => apiClient.get<DFMScoresResponse>(`/bom-items/${bomItemId}/dfm-scores`),
+    enabled: useAuthEnabledWith(!!bomItemId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export type PartSummaryCostCategoryKey = 'material' | 'labor' | 'overhead' | 'setup' | 'investment' | 'other';
+/** The part's summary (backend costing/shared/part-summary.ts): a projection of the applied cost table. Amounts are USD; a null is a value the model does not hold, with its reason in notModelled. */
+export interface PartSummary {
+  currency: 'USD';
+  basis: 'applied' | 'none';
+  component: { roughMassKg: number | null; finishMassKg: number | null; lengthMm: number | null; widthMm: number | null; heightMm: number | null; surfaceAreaMm2: number | null; volumeMm3: number | null };
+  production: {
+    digitalFactory: { primary: string | null; secondary: string | null; toolshop: string | null };
+    annualVolume: number | null; batchSize: number | null; productionLifeYears: number | null; lifetimeVolume: number | null;
+  };
+  material: { catalog: string | null; name: string | null; stock: string | null; composition: string | null; utilizationPct: number | null; unitCostUsdPerKg: number | null };
+  costByCategory: Array<{ key: PartSummaryCostCategoryKey; label: string; usd: number; pct: number | null }>;
+  costByProcess: Array<{ process: string; usd: number; pct: number | null }>;
+  costs: {
+    piecePartCostUsd: number | null; fullyBurdenedCostUsd: number | null; totalCapitalInvestmentsUsd: number | null;
+    targetCostUsd: number | null; varianceToTargetCostPct: number | null; targetMassKg: number | null; varianceToTargetMassPct: number | null;
+  };
+  notModelled: Partial<Record<'secondaryFactory' | 'toolshop' | 'stock' | 'fullyBurdenedCost' | 'targetCost' | 'targetMass', string>>;
+  uncosted: string[];
+}
+
+/** The Part Summary tab's data. Refetched on each visit (staleTime 0): what Apply wrote is what it shows. */
+export function usePartSummary(bomItemId: string | undefined) {
+  return useQuery({
+    queryKey: ['bom-items', bomItemId, 'part-summary'],
+    queryFn: async () => apiClient.get<PartSummary>(`/bom-items/${bomItemId}/part-summary`),
     enabled: useAuthEnabledWith(!!bomItemId),
     staleTime: 0,
     refetchOnWindowFocus: false,
