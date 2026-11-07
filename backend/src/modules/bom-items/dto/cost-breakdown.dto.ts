@@ -625,6 +625,18 @@ export interface CostSummaryDto {
   // the other process's cost for comparison (bom-items.service casting branch).
   dieCastingProcess?: DieCastingProcessChoiceDto;
 
+  // Molded parts: what each CAD cost driver is worth, by running the engine again with only that driver moved one step (plastic-molding/cost-driver-sensitivity.ts).
+  // Amounts are per part, in this summary's currency.
+  driverImpacts?: Array<{
+    driver: string;
+    step: string;
+    unit: string;
+    baselineValue: number;
+    variantValue: number;
+    deltaPerPart: number;
+    lines: Array<{ line: string; deltaPerPart: number }>;
+  }>;
+
   // Tooling cost — always separate from pieceCostUsd.
   // Present only when family === 'plastic_molded' and annualVolume / productionLifeYears provided.
   tooling?: ToolingCostDto;

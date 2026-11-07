@@ -52,7 +52,7 @@ export function plasticCostDrivers(f: PlasticCostDriverFacts): PlasticCostDriver
   const side = sideActionSignals(s.plasticFeatureGraph);
 
   if (positive(f.volumeMm3)) add({ name: 'Part volume', unit: 'mm³', value: f.volumeMm3, group: 'Material and shot', use: 'priced', feeds: 'Part weight and material cost; shot volume and fill time', evidence: 'part_volume' });
-  if (positive(f.surfaceAreaMm2)) add({ name: 'Surface area', unit: 'mm²', value: f.surfaceAreaMm2, group: 'Material and shot', use: 'not_priced', feeds: 'Reserved for gate trimming and finishing, which are not priced yet' });
+  if (positive(f.surfaceAreaMm2)) add({ name: 'Surface area', unit: 'mm²', value: f.surfaceAreaMm2, group: 'Material and shot', use: 'not_priced', feeds: 'Finishing hours (finishingHrsPerSqMeter is keyed by surface area) and gate trimming, which are not priced yet' });
 
   if (positive(s.wallThicknessNominalMm)) add({ name: 'Nominal wall thickness', unit: 'mm', value: s.wallThicknessNominalMm, group: 'Cycle time', use: 'priced', feeds: 'Cooling and pack time of the cycle-time calculator', evidence: 'wall_thickness' });
   if (positive(s.wallThicknessMinMm)) add({ name: 'Thinnest wall', unit: 'mm', value: s.wallThicknessMinMm, group: 'Cycle time', use: 'dfm', feeds: 'Recorded with the route; not a cycle-time input' });

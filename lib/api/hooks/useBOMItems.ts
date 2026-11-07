@@ -869,7 +869,19 @@ export interface QuoteValidation {
   unsupported: Array<{ id: string; name: string; stagedData: string }>;
 }
 
+export interface DriverImpact {
+  driver: string;
+  step: string;
+  unit: string;
+  baselineValue: number;
+  variantValue: number;
+  deltaPerPart: number;
+  lines: Array<{ line: string; deltaPerPart: number }>;
+}
+
 export interface CostSummaryDto {
+  /** Molded parts: what each CAD cost driver is worth (the engine run again with only that driver moved one step), per part, in this summary's currency. */
+  driverImpacts?: DriverImpact[];
   // Scenario readiness — false when no material is applied; frontend blocks cost display
   scenarioReady?: boolean;
   missingInputs?: string[];

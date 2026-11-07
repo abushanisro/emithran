@@ -80,7 +80,7 @@ import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-i
 import { PlasticDfmFindings } from '@/components/features/manufacturing-intelligence/PlasticDfmFindings';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { invalidateBOMItemUpdateQueries, useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { invalidateBOMItemUpdateQueries, useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -8208,6 +8208,26 @@ function FeatureDetailPanel({ metadata }: { metadata: FeatureMetadata | null }) 
 // ── GeometricCostDriversPanel ──────────────────────────────────────────────────
 
 
+const money = (n: number, symbol: string) => `${n < 0 ? '-' : '+'}${symbol}${Math.abs(n).toFixed(Math.abs(n) < 0.1 ? 3 : 2)}`;
+
+/** What the driver is worth: the cost engine run again with only this driver moved one step. Zero is shown as zero: the cost model does not read that driver. */
+function DriverImpactLine({ impact, currencySymbol }: { impact: DriverImpact | undefined; currencySymbol: string }) {
+  if (!impact) return null;
+  const moved = impact.lines.length > 0;
+  return (
+    <div className="mt-0.5 text-[9px] leading-tight text-muted-foreground" title="The cost engine run again on this part with only this driver changed by the step shown; amounts are per part">
+      <span className="font-medium text-foreground">{impact.step}</span>
+      {' → '}
+      {moved
+        ? <>
+            <span className="font-medium text-foreground tabular-nums">{money(impact.deltaPerPart, currencySymbol)}</span>/part
+            {' ('}{impact.lines.map((l) => `${l.line} ${money(l.deltaPerPart, currencySymbol)}`).join(', ')}{')'}
+          </>
+        : 'no change in price'}
+    </div>
+  );
+}
+
 const COST_DRIVER_USE_LABEL = { priced: 'Priced', not_priced: 'Needed, not priced yet', dfm: 'Finding only' } as const;
 const COST_DRIVER_USE_CLASS = {
   priced: 'text-emerald-600 dark:text-emerald-400',
@@ -8216,7 +8236,8 @@ const COST_DRIVER_USE_CLASS = {
 } as const;
 
 /** A molded part's cost drivers, by section: each value as the CAD analysis measured it, and what the cost model does with it. */
-function PlasticCostDriverList({ drivers }: { drivers: CostDriver[] }) {
+function PlasticCostDriverList({ drivers, impacts, currencySymbol }: { drivers: CostDriver[]; impacts: DriverImpact[]; currencySymbol: string }) {
+  const impactOf = new Map(impacts.map((d) => [d.driver, d]));
   const groups = new Map<string, CostDriver[]>();
   for (const d of drivers) groups.set(d.group!, [...(groups.get(d.group!) ?? []), d]);
   return (
@@ -8234,6 +8255,7 @@ function PlasticCostDriverList({ drivers }: { drivers: CostDriver[] }) {
                 <span className={`shrink-0 font-medium ${cd.use ? COST_DRIVER_USE_CLASS[cd.use] : ''}`}>{cd.use ? COST_DRIVER_USE_LABEL[cd.use] : ''}</span>
                 <span className="text-muted-foreground">{cd.feeds}</span>
               </div>
+              <DriverImpactLine impact={impactOf.get(cd.name)} currencySymbol={currencySymbol} />
             </div>
           ))}
         </div>
@@ -8244,7 +8266,7 @@ function PlasticCostDriverList({ drivers }: { drivers: CostDriver[] }) {
 
 function GeometricCostDriversPanel({
   tree, summary, fg, selectedId, onSelect, maximized, onMaximize,
-  selectedHoleGroup, selectedBend, dfmWarnings, item, onSelectHighlight,
+  selectedHoleGroup, selectedBend, dfmWarnings, item, onSelectHighlight, driverImpacts, currencySymbol,
 }: {
   tree: ProcessTreeNode;
   summary: FeatureGraphSummary;
@@ -8258,6 +8280,8 @@ function GeometricCostDriversPanel({
   dfmWarnings: DFMWarning[];
   item: BOMItem;
   onSelectHighlight: (node: FeatureNodeV2 | null) => void;
+  driverImpacts?: DriverImpact[] | undefined;
+  currencySymbol?: string | undefined;
 }) {
   type GCDTab = 'geo' | 'cost' | 'props' | 'detail' | 'design';
   const [tab, setTab] = useState<GCDTab>('geo');
@@ -8483,7 +8507,7 @@ function GeometricCostDriversPanel({
       {tab === 'cost' && (
         <div className="flex-1 overflow-y-auto divide-y divide-border/40">
           {typedCostDrivers.length > 0 && typedCostDrivers.every((cd) => cd.group) ? (
-            <PlasticCostDriverList drivers={typedCostDrivers} />
+            <PlasticCostDriverList drivers={typedCostDrivers} impacts={driverImpacts ?? []} currencySymbol={currencySymbol ?? '$'} />
           ) : typedCostDrivers.length > 0 ? (
             typedCostDrivers.map((cd, i) => (
               <div key={i} className="flex items-baseline px-3 py-1.5 gap-2">
@@ -10050,7 +10074,7 @@ export default function ManufacturingIntelligencePage() {
     onSelectHighlight, onShowEvidence: setCadEvidence, activeEvidenceLabel: cadEvidence?.fieldLabel ?? null,
   };
   const treeProps = { item, fg, tree, expanded: expandedNodes, selectedId: selectedNodeId, onToggle: toggleNode, onSelect: handleTreeSelect, factory, maximized, onMaximize: maximize };
-  const driversProps = { tree, summary, fg, selectedId: selectedNodeId, onSelect: setSelectedNodeId, maximized, onMaximize: maximize, selectedHoleGroup, selectedBend, dfmWarnings: fg?.dfmWarnings ?? [], item, onSelectHighlight };
+  const driversProps = { tree, summary, fg, selectedId: selectedNodeId, onSelect: setSelectedNodeId, maximized, onMaximize: maximize, selectedHoleGroup, selectedBend, dfmWarnings: fg?.dfmWarnings ?? [], item, onSelectHighlight, driverImpacts: pageCostSummary?.driverImpacts, currencySymbol: pageCostSummary?.currencySymbol };
 
   // ── Maximized view ──────────────────────────────────────────────────────────
   if (maximized) {
