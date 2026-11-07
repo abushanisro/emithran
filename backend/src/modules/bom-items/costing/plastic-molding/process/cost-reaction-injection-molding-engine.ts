@@ -90,7 +90,7 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
   } else if (input.rate.pressCycleTimeS != null) {
     // The machine has its cycle time: it is the fill inputs or the calculator that are missing, so the press function's "no press_cycle_time_s on file" would be wrong.
     result.warnings = result.warnings.filter((w) => !w.includes('no real press_cycle_time_s on file'));
-    result.warnings.push(`Reaction Injection Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
+    result.warnings.push(cycle.calculatorProblem ? `Reaction Injection Molding cycle time not derivable: ${cycle.calculatorProblem}.` : `Reaction Injection Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
   }
 
   if (cycle.derivable) {

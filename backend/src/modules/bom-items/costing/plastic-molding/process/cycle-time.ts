@@ -83,7 +83,7 @@ export type CycleTimeResult =
       /** The stored calculator that computed it (calculators.id and version), and a fingerprint of the formulas it ran, so a saved calculation can say which. */
       calculator: { id: string | null; version: number | null; name: string; fingerprint: string };
     }
-  | { derivable: false; missing: string[] };
+  | { derivable: false; missing: string[]; /** Set when the stored calculator itself is absent or too old: the migrations to apply, not data to add. */ calculatorProblem?: string };
 
 export interface CycleTimeInput {
   /** CAD nominal wall thickness; null/0 = not measured. */

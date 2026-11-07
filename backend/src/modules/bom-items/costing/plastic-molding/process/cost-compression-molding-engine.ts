@@ -107,7 +107,7 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
   } else if (input.rate.pressCycleTimeS != null) {
     // The machine has its cycle time: it is the calculator that is missing, so the press function's "no press_cycle_time_s on file" would be wrong.
     result.warnings = result.warnings.filter((w) => !w.includes('no real press_cycle_time_s on file'));
-    result.warnings.push(`Compression Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
+    result.warnings.push(cycle.calculatorProblem ? `Compression Molding cycle time not derivable: ${cycle.calculatorProblem}.` : `Compression Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
   }
 
   if (cycle.derivable) {

@@ -4,6 +4,8 @@ Generated from `plastic-molding-calculators.json` (migration 975), `memory/Plast
 
 Each of the four molding processes has one cycle-time calculator, stored in the database and mapped to its catalog operation in `process_calculator_mappings`, the way heat treatment, machining and die casting have theirs. A calculator is a list of fields: inputs, each with where its value comes from, and formulas over earlier fields, ending in **Cycle Time** (seconds). The cost engine supplies the inputs and the calculator holds the formulas.
 
+**If a molding line says the calculator "is not in this database".** The calculators are rows in the database, created by migration 975 and updated by 976 (the reaction injection calculator, version 2). A database that has not had them applied has no calculator to run, so the cycle time is a named gap, never a number, and the Select Calculator list has nothing to offer for the line. Apply them with `npm run db:migrate -- --env <local|stage|prd>` (add `--dry-run` first to see what is pending; production needs `--confirm`). The backend logs once, at the first request, which calculators are missing.
+
 **Reading the feature tables.** The reference catalog lists, per process, the operations each feature type can need (`As Molded`, a core, a lifter, a slide, flash trimming). No feature enters any cycle-time formula today: the cycle depends on the material, the press, the wall and the shot size. The time slides and lifters add is not modelled because the reference stages their sizes and rates but no formula (G-03).
 
 ## Injection Molding

@@ -26,7 +26,8 @@ const sourceText = (s: DomainFieldSource): string => {
   return `${label[kind] ?? kind}: ${value}`;
 };
 
-const cell = (v: string) => v.replace(/\|/g, '\\|');
+/** A value in a markdown table cell: the backslash is escaped first, then the pipe, so a backslash before a pipe cannot cancel the escape (CodeQL js/incomplete-sanitization). */
+const cell = (v: string) => v.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 
 function featureTable(process: string, rows: readonly string[]): string[] {
   const byFeature = new Map<string, string[]>();
@@ -63,6 +64,8 @@ export function buildPlasticCalculatorReport(input: ReportInput): string {
   out.push('Generated from `plastic-molding-calculators.json` (migration 975), `memory/Plastic Modeling/process/digital_factory_operations.csv`, `memory/Plastic Modeling/lookup/injectionTimeAdjustmentFactors` and the formula registry. Do not edit by hand: `npx ts-node --transpile-only scripts/generate-plastic-calculator-report.ts`; a test fails when this file is stale.');
   out.push('');
   out.push('Each of the four molding processes has one cycle-time calculator, stored in the database and mapped to its catalog operation in `process_calculator_mappings`, the way heat treatment, machining and die casting have theirs. A calculator is a list of fields: inputs, each with where its value comes from, and formulas over earlier fields, ending in **Cycle Time** (seconds). The cost engine supplies the inputs and the calculator holds the formulas.');
+  out.push('');
+  out.push('**If a molding line says the calculator "is not in this database".** The calculators are rows in the database, created by migration 975 and updated by 976 (the reaction injection calculator, version 2). A database that has not had them applied has no calculator to run, so the cycle time is a named gap, never a number, and the Select Calculator list has nothing to offer for the line. Apply them with `npm run db:migrate -- --env <local|stage|prd>` (add `--dry-run` first to see what is pending; production needs `--confirm`). The backend logs once, at the first request, which calculators are missing.');
   out.push('');
   out.push('**Reading the feature tables.** The reference catalog lists, per process, the operations each feature type can need (`As Molded`, a core, a lifter, a slide, flash trimming). No feature enters any cycle-time formula today: the cycle depends on the material, the press, the wall and the shot size. The time slides and lifters add is not modelled because the reference stages their sizes and rates but no formula (G-03).');
   out.push('');

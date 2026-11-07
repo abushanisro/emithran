@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
 import { cachedRead } from '../costing/shared/core/request-cache';
 import { loadDieCastingCalculatorSpec } from '../costing/casting/calculators/die-casting-calculator-spec';
@@ -10,6 +10,23 @@ import { loadPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/cal
 
 @Injectable()
 export class CalculatorCatalogService {
+  private readonly logger = new Logger(CalculatorCatalogService.name);
+  /** Domains whose missing calculators were already logged: said once per process, not on every request. */
+  private readonly reportedMissing = new Set<string>();
+
+  /**
+   * A domain's calculators that the spec names and the database does not hold: the migration that creates them has not been applied to this database, so every line that needs
+   * one is a named gap. Logged once, with what to do, so the cause is found in the log and not by reading a cost dialog.
+   */
+  private reportMissingCalculators(domain: string, expected: readonly string[], found: ReadonlySet<string>): void {
+    const missing = expected.filter((name) => !found.has(name));
+    if (missing.length === 0) return;
+    const key = `${domain}:${missing.join('|')}`;
+    if (this.reportedMissing.has(key)) return;
+    this.reportedMissing.add(key);
+    this.logger.warn(`${domain} calculators missing from this database: ${missing.join(', ')}. The migration that creates them has not been applied (npm run db:migrate); until then every line that needs one is a named gap.`);
+  }
+
   constructor(private readonly databaseService: DatabaseService) {}
 
   /**
@@ -122,7 +139,11 @@ export class CalculatorCatalogService {
         .is('user_id', null)
         .is('retired_at', null);
       const ids = (calcs ?? []).map((c: any) => c.id);
-      if (ids.length === 0) return {};
+      const operational = spec.calculators.filter((c) => c.operations.length > 0).map((c) => c.name);
+      if (ids.length === 0) {
+        this.reportMissingCalculators(spec.domain, operational, new Set());
+        return {};
+      }
       const { data: fields } = await client
         .from('calculator_fields')
         .select('calculator_id, field_name, display_label, field_type, unit, default_value, display_order, data_source, source_table, source_field')
@@ -136,6 +157,7 @@ export class CalculatorCatalogService {
         const def = { calculatorId: row.id, name: row.name, version: row.version ?? 1, fields: fs };
         for (const op of c.operations) out[op] = def;
       }
+      this.reportMissingCalculators(spec.domain, operational, new Set(Object.values(out).map((d) => d.name)));
       return out;
     });
   }
@@ -187,7 +209,10 @@ export class CalculatorCatalogService {
         .is('user_id', null)
         .is('retired_at', null);
       const ids = (calcs ?? []).map((c: any) => c.id);
-      if (ids.length === 0) return {};
+      if (ids.length === 0) {
+        this.reportMissingCalculators('Plastic molding', spec.calculators.map((c) => c.name), new Set());
+        return {};
+      }
       const { data: fields } = await client
         .from('calculator_fields')
         .select('calculator_id, field_name, display_label, field_type, unit, default_value, display_order, data_source, source_table, source_field')
@@ -199,6 +224,7 @@ export class CalculatorCatalogService {
         const fs = (fields ?? []).filter((f: any) => f.calculator_id === row?.id);
         if (row && fs.length) out[c.name] = { calculatorId: row.id, name: row.name, version: row.version ?? 1, fields: fs };
       }
+      this.reportMissingCalculators('Plastic molding', spec.calculators.map((c) => c.name), new Set(Object.keys(out)));
       return out;
     });
   }

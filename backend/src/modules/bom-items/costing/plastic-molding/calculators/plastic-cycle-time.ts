@@ -38,14 +38,36 @@ export function withRegistryFormulas(trace: readonly CalculationTraceStep[], cal
   });
 }
 
+/** The migrations that create and update the plastic-molding calculators: what to apply to a database that lacks them or holds an older version. */
+export const PLASTIC_CALCULATOR_MIGRATIONS = '975 and 976';
+
+/**
+ * The stored calculator of a name, when it is in the database AND is the version this engine was written for; otherwise why not. A calculator that is not there means the
+ * migrations were not applied to this database; one older than the engine expects (the reaction injection calculator at version 1, without the fill time) would compute a
+ * cycle without what the engine now seeds, so it is refused, never run quietly.
+ */
+export function requirePlasticCalculator(calculators: ReferenceCalculators | null | undefined, name: string): { def: ReferenceCalculatorDef } | { problem: string } {
+  const def = calculators?.[name];
+  if (!def) {
+    return { problem: `the stored calculator "${name}" is not in this database: migrations ${PLASTIC_CALCULATOR_MIGRATIONS} (the plastic molding cycle-time calculators) have not been applied to it, so no cycle time can be computed (run npm run db:migrate)` };
+  }
+  const wanted = loadPlasticMoldingCalculatorSpec().calculators.find((c) => c.name === name)?.version ?? 1;
+  if ((def.version ?? 1) < wanted) {
+    return { problem: `the stored calculator "${name}" in this database is version ${def.version ?? 1}, and this engine needs version ${wanted}: migrations ${PLASTIC_CALCULATOR_MIGRATIONS} have not all been applied to it (run npm run db:migrate)` };
+  }
+  return { def };
+}
+
 /** The cycle time of an injection, structural foam or LSR molding, by the stored calculator; or the inputs and the calculator that are missing. */
 export function runInjectionCycleTime(input: CycleTimeInput, calculators: ReferenceCalculators | null | undefined, process: 'injection' | 'structural_foam'): CycleTimeResult {
   const seeded = injectionCycleTimeSeeds(input);
   if ('missing' in seeded) return { derivable: false, missing: seeded.missing };
   const name = injectionCalculatorName(input.isLsr, process);
+  const found = requirePlasticCalculator(calculators, name);
+  if ('problem' in found) return { derivable: false, missing: [found.problem], calculatorProblem: found.problem };
+  const def = found.def;
   const run = runReferenceCalculator(calculators, name, seeded.seeds);
-  const def = calculators?.[name];
-  if (run.missing.length > 0 || run.value == null || !def) return { derivable: false, missing: run.missing.length > 0 ? run.missing : [`${name} produced no cycle time`] };
+  if (run.missing.length > 0 || run.value == null) return { derivable: false, missing: run.missing.length > 0 ? run.missing : [`${name} produced no cycle time`] };
   const cool = run.outputs[input.isLsr ? 'Cure Time' : 'Cooling Time'];
   const fill = run.outputs['Fill Time'];
   if (cool == null || fill == null) return { derivable: false, missing: [`${name} produced no ${cool == null ? 'cooling' : 'fill'} time`] };
@@ -64,13 +86,15 @@ export function runInjectionCycleTime(input: CycleTimeInput, calculators: Refere
 /** What a compression or reaction injection cycle needs from its calculator: the cycle (s) and the run, or why there is none. */
 export type PressCycle =
   | { derivable: true; cycleSec: number; trace: CalculationTraceStep[]; calculator: { id: string | null; version: number | null; name: string; fingerprint: string } }
-  | { derivable: false; missing: string[] };
+  | { derivable: false; missing: string[]; /** Set when the stored calculator itself is absent or too old: the migrations to apply, not data to add. */ calculatorProblem?: string };
 
 function runPress(name: string, seeded: ReturnType<typeof pressCycleTimeSeeds>, calculators: ReferenceCalculators | null | undefined): PressCycle {
   if ('missing' in seeded) return { derivable: false, missing: seeded.missing };
+  const found = requirePlasticCalculator(calculators, name);
+  if ('problem' in found) return { derivable: false, missing: [found.problem], calculatorProblem: found.problem };
+  const def = found.def;
   const run = runReferenceCalculator(calculators, name, seeded.seeds);
-  const def = calculators?.[name];
-  if (run.missing.length > 0 || run.value == null || !def) return { derivable: false, missing: run.missing.length > 0 ? run.missing : [`${name} produced no cycle time`] };
+  if (run.missing.length > 0 || run.value == null) return { derivable: false, missing: run.missing.length > 0 ? run.missing : [`${name} produced no cycle time`] };
   return { derivable: true, cycleSec: run.value, trace: withRegistryFormulas(run.trace, name), calculator: { id: run.calculatorId, version: run.calculatorVersion, name, fingerprint: calculatorFingerprint(def) } };
 }
 

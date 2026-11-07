@@ -59,7 +59,7 @@ describe('the injection line is driven by its stored calculator', () => {
       expect(line.calculatorId).toBeUndefined();
       expect(line.cycleTimeMin).toBe(0);
       const gap = line.physicsGap;
-      expect(gap && 'reason' in gap ? gap.reason : '').toContain('a calculator for "Injection Molding - Cycle Time"');
+      expect(gap && 'reason' in gap ? gap.reason : '').toContain('the stored calculator "Injection Molding - Cycle Time" is not in this database');
       expect(r.warnings.join(' ')).toContain('Cycle time not derivable');
     }
   });
@@ -154,6 +154,6 @@ describe('compression and reaction injection lines are driven by their calculato
     const r = run(null);
     expect(r.cuttingMin).toBe(0);
     expect(r.processLines[0]?.calculatorId).toBeUndefined();
-    expect(r.warnings.join(' ')).toContain('a calculator for');
+    expect(r.warnings.join(' ')).toContain('is not in this database');
   });
 });

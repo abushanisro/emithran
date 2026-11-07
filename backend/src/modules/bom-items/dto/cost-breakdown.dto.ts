@@ -196,6 +196,8 @@ export interface UnsupportedOperationGap {
   machineClass: string;
   reason: string;
   requiredCapability?: string;
+  /** What to do, when it is not new engineering: e.g. the migrations to apply when a stored calculator is not in the database. Shown instead of the engineering-task wording. */
+  requiredAction?: string;
 }
 export type PhysicsGap = LookupGap | UnsupportedOperationGap;
 
