@@ -119,6 +119,21 @@ describe('secondary processes on the reference data', () => {
     expect(sample.label).toMatch(/batch ≤ 280/);
   });
 
+  it('CMM: a molded part (a DFM finding only in its feature list) measures its CAD-counted holes as Simple Holes, provisional', () => {
+    const molded = { ...block, features: [{ id: 'im_undrafted', feature_type: 'im_undrafted', occurrences: [{}, {}] }], holeCount: 28 };
+    const r = byProcess(molded).get('CMM Inspection')!;
+    expect(r.status).toBe('costed');
+    expect(r.provisional).toBe(true);
+    expect(r.trace.find((t) => t.label === 'Probe touches per part')?.value).toBe(28 * 4);   // Simple Hole: 4 touches
+    expect(r.reason).toMatch(/^Provisional estimate, not reference data/);
+    // with measurable features the hole count is not used, and the line is reference-priced
+    const normal = byProcess({ ...block, holeCount: 28 }).get('CMM Inspection')!;
+    expect(normal.provisional).toBeUndefined();
+    expect(normal.trace.find((t) => t.label === 'Probe touches per part')?.value).toBe(57);
+    // nothing measurable and no holes: still a gap
+    expect(byProcess({ ...molded, holeCount: 0 }).get('CMM Inspection')!.status).toBe('gap');
+  });
+
   it('CMM: no batch size means no sample size, disclosed as a gap', () => {
     expect(byProcess({ ...block, batchSize: null }).get('CMM Inspection')!.status).toBe('gap');
   });

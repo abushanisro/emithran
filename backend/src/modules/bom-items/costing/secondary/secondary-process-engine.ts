@@ -68,6 +68,8 @@ export interface SecondaryPartFacts {
   /** The drawing surface-treatment callout text (e.g. "Anodize Type II"), when stated. */
   surfaceCallout?: string | null;
   features: ReadonlyArray<SecondaryFeature>;
+  /** Holes the CAD summary counts (any family), when the part's feature list holds no measurable feature. */
+  holeCount?: number | null;
   batchSize: number | null;
 }
 
@@ -380,6 +382,16 @@ function cmm(base: { process: string; machineClass: string }, part: SecondaryPar
   }
   const warnings = unmeasured.size > 0
     ? [`No probe-touch count in the reference for: ${[...unmeasured].join(', ')} (not measured).`] : [];
+  // A molded or cast part's feature list holds DFM findings, not measurable features. Its holes are still a CAD
+  // fact (the summary's hole count), measured as the table's Simple Hole: provisional, and the line says so.
+  let provisional = false;
+  const holeTouches = touchTable.get('simplehole');
+  if (touches === 0 && part.holeCount != null && part.holeCount > 0 && holeTouches != null) {
+    touches = part.holeCount * holeTouches;
+    provisional = true;
+    trace.push({ label: `Simple Hole ×${part.holeCount}`, value: touches, unit: 'touches', source: `${SRC_LOOKUP('CMMInspectionProbeTouches')} (${holeTouches}/feature); holes counted from the CAD summary` });
+    warnings.push('Provisional: the part has no measurable feature in its feature list, so only its CAD-counted holes are measured (the reference gives touches for holes, planar and curved faces, pockets); faces and other features are not.');
+  }
   if (touches === 0) {
     return notCosted(base, 'gap', 'No detected feature has a probe-touch count in the reference, so there is nothing to measure.', { warnings });
   }
@@ -407,6 +419,7 @@ function cmm(base: { process: string; machineClass: string }, part: SecondaryPar
     perPartSec: (measureSec * sample) / part.batchSize,
     batchExtraSec: touches * progSecPerTouch,
     trace, warnings, highlight: 'features', featureIds,
+    ...(provisional ? { provisional: true } : {}),
   }, ref, part.batchSize);
 }
 

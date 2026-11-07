@@ -268,6 +268,7 @@ export class SecondaryProcessService {
       isMachined: family === 'unknown' ? null : isMachiningFamily(family),
       surfaceCallout: surfaceCalloutOf(item),
       features: partFeatures(fg, family),
+      holeCount: num(fg?.summary?.holeCount),
       batchSize,
     };
 

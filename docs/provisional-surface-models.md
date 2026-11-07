@@ -45,6 +45,7 @@ Powder figures: general industrial film 2-4 mil (50-100 µm) per Powder Coated T
 | Screen Printing | printed region = the part's largest face; application cost × size multiplier (`screenPrintSizeMult`) × color factor; the complexity multiplier is not applied |
 | Mask-Bench | one plug per detected CAD hole at the bench plug time; a part with no hole is not applicable |
 | Black Oxide | its labor rate is the "2 - Metal" wage grade's (migration 981; `surface_treatment_wage_grades.csv` puts Black Oxide on that grade and every other machine of the grade carries 29.95 in the USA) |
+| CMM Inspection | a part whose feature list holds only DFM findings (a molded or cast part) measures its CAD-counted holes (`summary.holeCount`) as the table's Simple Hole, 4 touches each; faces and other features are not measured |
 | Age, Hot Isostatic Pressing | not applicable to a plastic or rubber part (metal heat treatments) |
 
 ## Still not costed
@@ -52,4 +53,3 @@ Powder figures: general industrial film 2-4 mil (50-100 µm) per Powder Coated T
 |---|---|
 | Conveyor Conversion Coating | `memory/SurfaceTreatment` has no machine file; `Countries data` has economics rows only for other countries, with machine length 0 and no line length to derive a speed from |
 | Mask-Spray | the sprayed area is not a CAD fact and the reference gives no default |
-| CMM Inspection | the Back cover's only detected feature (`im_undrafted`) has no row in `CMMInspectionProbeTouches` (Curved Surface, Curved Wall, Planar Face, Pocket, Simple Hole) |
