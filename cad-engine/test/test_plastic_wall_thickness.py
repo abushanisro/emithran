@@ -8,7 +8,7 @@ from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder  
 from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt  # noqa: E402
 
 from injection_molding.recognition.mesh import tessellate_faces  # noqa: E402
-from injection_molding.recognition.wall_thickness import measure_wall_thickness  # noqa: E402
+from injection_molding.recognition.wall_thickness import measure_wall_thickness, samples_per_face  # noqa: E402
 
 
 def _box(x, y, z, dx, dy, dz):
@@ -50,3 +50,21 @@ def test_a_thick_boss_is_found_thicker_than_the_wall():
 def test_the_resolution_and_the_misses_are_reported_and_nothing_is_guessed_for_an_empty_part():
     out = measure_wall_thickness([], 0.2)
     assert out["faces"] == [] and out["rays"] == 0 and out["resolution_mm"] == 0.2
+
+
+def test_a_face_is_never_judged_by_one_point_however_many_faces_the_part_has():
+    # the Back cover: 959 faces, 19,283 triangles. A budget divided over the faces left ONE sample each, and a small curved face read 0.36 mm from its largest triangle
+    # while other points of the same face read 1.9 mm: about 30 percent of its thin faces were that noise.
+    assert samples_per_face(959, 19_283) >= 4
+    assert samples_per_face(959, 19_283) <= 6
+    # a very large mesh gets fewer, never fewer than three
+    assert samples_per_face(5_000, 2_000_000) == 3
+    # a small part gets the most
+    assert samples_per_face(11, 400) == 6
+
+
+def test_every_face_of_a_part_is_sampled_at_several_points():
+    tray = BRepAlgoAPI_Cut(_box(-50, -30, 0, 100, 60, 15), _box(-47.5, -27.5, 2.5, 95, 55, 15)).Shape()
+    meshes = tessellate_faces(tray, linear_deflection=0.1)
+    out = measure_wall_thickness(meshes, 0.1)
+    assert all(f["samples"] >= 3 for f in out["faces"])

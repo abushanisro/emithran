@@ -25,10 +25,12 @@ from .mesh import FaceMesh
 _START_INSIDE_MM = 1e-3
 _MIN_HIT_MM = 1e-3
 # Most rays to cast for the whole part, and the most (ray x triangle) tests to spend on them: a larger mesh gets fewer samples per face, never a truncated face list.
-_MAX_RAYS = 6000
-_WORK_BUDGET = 6e8
-_MAX_SAMPLES_PER_FACE = 8
-_CHUNK = 24
+# A face is judged by several points: one point of a small curved face can sit where the wall reads very differently from the rest of it (a face read 0.36 mm from its
+# one largest triangle and 1.9 mm at other points of the same face). The budget is rays x triangles, and a larger mesh gets fewer samples per face, never fewer than _MIN.
+_MAX_RAYS = 40000
+_WORK_BUDGET = 1.5e9
+_MAX_SAMPLES_PER_FACE = 6
+_MIN_SAMPLES_PER_FACE = 3
 _MAX_SHRINKS = 8
 
 
@@ -124,6 +126,15 @@ def _area_centroid_on_face(face: FaceMesh, offset: int, V0: np.ndarray, E1: np.n
     return None
 
 
+def samples_per_face(n_faces: int, n_triangles: int) -> int:
+    """
+    Points sampled on each face: as many as the ray budget allows (a ray costs about the number of triangles), between _MIN_SAMPLES_PER_FACE and _MAX_SAMPLES_PER_FACE. A planar
+    face also gets three edge midpoints per sample, so each sample counts as four rays.
+    """
+    budget_rays = min(_MAX_RAYS, int(_WORK_BUDGET // max(1, n_triangles)))
+    return max(_MIN_SAMPLES_PER_FACE, min(_MAX_SAMPLES_PER_FACE, budget_rays // (4 * max(1, n_faces))))
+
+
 def _samples(face: FaceMesh, k: int) -> List[int]:
     """Up to k triangles of the face: the largest first, then others spread along the face's triangle order, so a long curved face is not sampled at one end only."""
     n = len(face.triangles)
@@ -173,8 +184,7 @@ def measure_wall_thickness(meshes: Sequence[FaceMesh], resolution_mm: float) -> 
         offsets[f.index] = cursor
         cursor += len(f.triangles)
     populated = [f for f in meshes if f.triangles]
-    per_face = max(1, min(_MAX_SAMPLES_PER_FACE, _MAX_RAYS // (4 * max(1, len(populated)))))
-    per_face = max(1, min(per_face, int(_WORK_BUDGET // max(1, n_tri)) // (4 * max(1, len(populated)))))
+    per_face = samples_per_face(len(populated), n_tri)
     for f in populated:
         for i in _samples(f, per_face):
             g = offsets[f.index] + i
@@ -207,37 +217,41 @@ def measure_wall_thickness(meshes: Sequence[FaceMesh], resolution_mm: float) -> 
     best_max: Dict[int, float] = {}
     count: Dict[int, int] = {}
     missed = 0
-    for start in range(0, len(rays), _CHUNK):
-        chunk = rays[start:start + _CHUNK]
-        idx = np.asarray([g for _, g in chunk])
-        rows = slice(start, start + len(chunk))
-        d = -PN[rows]                                            # (R,3) into the material
-        o = P[rows] + d * _START_INSIDE_MM
-        # Moller-Trumbore, every ray against every triangle.
-        p = np.cross(d[:, None, :], E2[None, :, :])              # (R,N,3)
-        det = np.einsum("nj,rnj->rn", E1, p)
-        ok = np.abs(det) > 1e-12
-        inv = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
-        s = o[:, None, :] - V0[None, :, :]
-        u = np.einsum("rnj,rnj->rn", s, p) * inv
-        q = np.cross(s, E1[None, :, :])
-        v = np.einsum("rj,rnj->rn", d, q) * inv
-        t = np.einsum("nj,rnj->rn", E2, q) * inv
-        # a surface the ray leaves the material through faces along the ray; the triangle it started on is not a hit
-        leaves = np.einsum("rj,nj->rn", d, N) > 0
-        hit = ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > _MIN_HIT_MM) & leaves
-        hit[np.arange(len(chunk)), idx] = False
-        t = np.where(hit, t, np.inf)
-        nearest = t.min(axis=1) + _START_INSIDE_MM
-        centres = P[rows]
-        for k, ((face_id, _), th) in enumerate(zip(chunk, nearest)):
-            if not np.isfinite(th):
-                missed += 1
-                continue
-            th = 2.0 * _shrink_ball(centres[k], PN[start + k], float(th) / 2.0, V0, E1, E2, tri_min, tri_max)
-            best_min[face_id] = min(best_min.get(face_id, float("inf")), float(th))
-            best_max[face_id] = max(best_max.get(face_id, 0.0), float(th))
-            count[face_id] = count.get(face_id, 0) + 1
-    # The thickness of a face is its largest ball: where the face sits on the thickness of the wall at all, even if some sample points of it (near an edge) read smaller.
+    for k, (face_id, own) in enumerate(rays):
+        d = -PN[k]                                              # into the material
+        o = P[k] + d * _START_INSIDE_MM
+        # the triangles whose bounding box the ray passes through (slab test), then the exact ray-triangle test on those only
+        with np.errstate(divide="ignore", invalid="ignore"):
+            inv_d = np.where(np.abs(d) > 1e-12, 1.0 / np.where(np.abs(d) > 1e-12, d, 1.0), np.inf)
+            t1 = (tri_min - o) * inv_d
+            t2 = (tri_max - o) * inv_d
+        parallel = np.abs(d) <= 1e-12
+        inside_slab = (o >= tri_min - 1e-9) & (o <= tri_max + 1e-9)
+        t_near = np.where(parallel, -np.inf, np.minimum(t1, t2)).max(axis=1)
+        t_far = np.where(parallel, np.inf, np.maximum(t1, t2)).min(axis=1)
+        cand = np.nonzero((t_far >= np.maximum(t_near, 0.0)) & np.all(np.where(parallel, inside_slab, True), axis=1))[0]
+        th = float("inf")
+        if cand.size:
+            e1, e2, v0c = E1[cand], E2[cand], V0[cand]
+            pvec = np.cross(d, e2)
+            det = np.einsum("nj,nj->n", e1, pvec)
+            ok = np.abs(det) > 1e-12
+            invdet = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
+            svec = o - v0c
+            u = np.einsum("nj,nj->n", svec, pvec) * invdet
+            qvec = np.cross(svec, e1)
+            v = (qvec @ d) * invdet
+            t = np.einsum("nj,nj->n", e2, qvec) * invdet
+            # a surface the ray leaves the material through faces along the ray; the triangle it started on is not a hit
+            hit = ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > _MIN_HIT_MM) & ((N[cand] @ d) > 0) & (cand != own)
+            if hit.any():
+                th = float(t[hit].min()) + _START_INSIDE_MM
+        if not np.isfinite(th):
+            missed += 1
+            continue
+        th = 2.0 * _shrink_ball(P[k], PN[k], th / 2.0, V0, E1, E2, tri_min, tri_max)
+        best_min[face_id] = min(best_min.get(face_id, float("inf")), th)
+        best_max[face_id] = max(best_max.get(face_id, 0.0), th)
+        count[face_id] = count.get(face_id, 0) + 1
     faces = [{"face_id": fid, "thickness_mm": round(best_max[fid], 3), "min_mm": round(best_min[fid], 3), "samples": count[fid]} for fid in sorted(best_min)]
     return {"method": "inward ray to the first exit", "resolution_mm": round(resolution_mm, 3), "rays": len(rays), "missed": missed, "faces": faces}
