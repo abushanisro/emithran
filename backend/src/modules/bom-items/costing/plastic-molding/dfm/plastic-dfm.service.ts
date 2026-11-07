@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbClient } from '../../../../../common/db/postgrest-client';
 import { escapeLikePattern, quoteFilterValue } from '../../../../../common/db/postgrest-filter';
 import { PLASTIC_REFERENCE_SOURCE_VERSION } from '../plastic-reference';
-import { evaluatePlasticDfm, holesOfPlasticGraph, type DraftFace, type MoldingProcessName, type PlasticDfmReference, type PlasticDfmResult } from './plastic-dfm';
+import { evaluatePlasticDfm, holesOfPlasticGraph, type DraftFace, type WallFace, type MoldingProcessName, type PlasticDfmReference, type PlasticDfmResult } from './plastic-dfm';
 
 export const MOLDING_PROCESS_NAMES: readonly MoldingProcessName[] = ['Injection Molding', 'Compression Molding', 'Reaction Injection Molding', 'Structural Foam Molding'];
 
@@ -14,7 +14,7 @@ export interface PlasticDfmView {
 }
 
 /** The analysis of a plastic part as the DFM engine reads it (feature_graph.summary). */
-interface PlasticSummary { plasticDraftFaces?: unknown; plasticFeatureGraph?: Parameters<typeof holesOfPlasticGraph>[0] }
+interface PlasticSummary { plasticDraftFaces?: unknown; plasticWallFaces?: unknown; plasticFeatureGraph?: Parameters<typeof holesOfPlasticGraph>[0] }
 
 /**
  * The design-for-molding checks of an item's analysis against the staged rule data (manufacturabilitySeverity, adviceRules, smallHoleDiamBorder), for the item's material
@@ -64,7 +64,8 @@ export class PlasticDfmService {
     if (!ref) return { status: 'unavailable', result: null, reasons: missing };
     const materialType = await this.materialType(req.client, req.grade);
     const draftFaces = Array.isArray(summary.plasticDraftFaces) ? (summary.plasticDraftFaces as DraftFace[]) : null;
-    const result = evaluatePlasticDfm({ draftFaces, holes: holesOfPlasticGraph(summary.plasticFeatureGraph) }, req.process, materialType, ref);
+    const wallFaces = Array.isArray(summary.plasticWallFaces) ? (summary.plasticWallFaces as WallFace[]) : null;
+    const result = evaluatePlasticDfm({ draftFaces, wallFaces, holes: holesOfPlasticGraph(summary.plasticFeatureGraph) }, req.process, materialType, ref);
     const reasons = materialType ? [] : [`"${req.grade ?? '(no material)'}" has no single material type in Raw Materials: the rules that differ by material are judged by the general limits of ${req.process}`];
     return { status: 'ok', result, reasons };
   }
