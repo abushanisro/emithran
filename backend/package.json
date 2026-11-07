@@ -46,6 +46,8 @@
     "local:down": "bash scripts/local-data.sh down",
     "local:reset": "bash scripts/local-data.sh reset",
     "openapi": "ts-node -r tsconfig-paths/register scripts/openapi.ts",
+    "engine-build": "ts-node -r tsconfig-paths/register scripts/engine-build-id.ts",
+    "engine-build:check": "ts-node -r tsconfig-paths/register scripts/engine-build-id.ts --check",
     "openapi:check": "ts-node -r tsconfig-paths/register scripts/openapi.ts --check",
     "auth0:check": "ts-node -r tsconfig-paths/register scripts/auth0-check.ts",
     "eval:copilot-injection": "ts-node -r tsconfig-paths/register scripts/copilot-injection-eval.ts",

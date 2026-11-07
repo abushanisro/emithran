@@ -20,13 +20,14 @@ describe('reference fingerprint', () => {
 
 describe('calculation snapshot', () => {
   const validation = buildQuoteValidation(['F-02', 'F-04'], ['G-03']);
-  const snap = buildCalculationSnapshot(validation, { sourceVersion: '2026-Plastic', datasetFingerprint: 'abc123' }, 'emithran-cost-1', { volume: 50_000 });
+  const snap = buildCalculationSnapshot(validation, { sourceVersion: '2026-Plastic', datasetFingerprint: 'abc123' }, 'emithran-cost-1', { codeHash: 'abc123def456abc123def456', files: 40 }, { volume: 50_000 });
 
   it('records the dataset and its fingerprint, the engine, each formula with its version and state, completeness and what was left out', () => {
     expect(snap).toEqual({
       schema: CALCULATION_SNAPSHOT_SCHEMA,
       referenceData: { sourceVersion: '2026-Plastic', fingerprint: 'abc123' },
       engineVersion: 'emithran-cost-1',
+      engineBuild: { codeHash: 'abc123def456abc123def456', files: 40 },
       formulas: [{ id: 'F-02', version: 1, state: 'VALIDATED' }, { id: 'F-04', version: 1, state: 'ASSUMED' }],
       state: 'ASSUMED', complete: false, unsupported: ['G-03'],
       inputs: { volume: 50_000 },
