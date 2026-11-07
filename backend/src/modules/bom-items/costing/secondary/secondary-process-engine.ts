@@ -98,6 +98,8 @@ export interface SecondaryProcessResult {
   warnings: string[];
   /** The database calculator that computed this line, with the inputs it ran on (for the cost dialog). */
   calculator?: SecondaryCalculatorRun;
+  /** True when the line rests on a published figure that is not in the reference (see provisional-reference.ts): the price is provisional, and the trace and warnings say which input. */
+  provisional?: boolean;
 }
 
 export interface SecondaryCalculatorRun {
@@ -225,6 +227,7 @@ export interface Timing {
   highlight: SecondaryProcessResult['highlight'];
   featureIds?: string[];
   calculator?: SecondaryCalculatorRun;
+  provisional?: boolean;
 }
 
 export function costed(
@@ -274,7 +277,9 @@ export function costed(
   return {
     ...base,
     status: 'costed',
-    reason: 'Costed from the reference formula and the selected machine.',
+    reason: t.provisional
+      ? `Provisional estimate, not reference data: ${warnings.filter((w) => w.startsWith('Provisional')).join(' ')}`
+      : 'Costed from the reference formula and the selected machine.',
     machine: { id: m.id, name: m.name, mhrUsd: m.mhrUsd, lhrUsd: m.lhrUsd, operators: m.operators, setupHr: m.setupHr, goodPartYield: m.goodPartYield },
     cycleTimeSec: Number(sec.toFixed(3)),
     setupMin: Number(setupMin.toFixed(3)),
@@ -285,6 +290,7 @@ export function costed(
     trace,
     warnings,
     ...(t.calculator ? { calculator: t.calculator } : {}),
+    ...(t.provisional ? { provisional: true } : {}),
   };
 }
 

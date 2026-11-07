@@ -27,6 +27,8 @@ export interface SecondaryProcessLine {
   featureIds: string[];
   trace: SecondaryTraceStep[];
   warnings: string[];
+  /** Priced from a published figure or a stated rule, not reference data. */
+  provisional?: boolean;
   local: { currency: string; machineRate: number | null; laborRate: number | null; costPerPart: number | null };
 }
 

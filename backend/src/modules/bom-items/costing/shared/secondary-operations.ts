@@ -34,6 +34,7 @@ export interface SecondaryResultLike {
   machine: { id: string; name: string; operators: number } | null;
   cycleTimeSec: number | null;
   setupMin: number | null;
+  provisional?: boolean;
   local: { machineRate: number | null; laborRate: number | null; costPerPart: number | null };
 }
 
