@@ -2,6 +2,7 @@ import type { ProcessLineCost, ResolvedCostingInputsDto, RouteResultSustainabili
 import type { CapabilityReasonCode } from '../costing/shared/capability/machine-capability';
 import type { RouteDataGap } from '../costing/shared/core/engine-kernel';
 import type { FactMismatch } from '../costing/shared/physics/drawing-cad-consistency';
+import type { RouteFeatureRecognition } from '../costing/plastic-molding/operation/route-feature-recognition';
 
 // Was a closed string-literal union of exactly the route ids known at the
 // time (3 sheet-metal-cutting + CNC/injection-molding families). Widened to
@@ -139,6 +140,11 @@ export interface RouteResultDto {
   routeComplexityScore?: number;  // 0–100: holes + pockets + threads + setups + GD&T
   /** Real clamp-tonnage/shot-capacity sizing detail — set only on IM tonnage-tier routes. See RouteInjectionMoldingDetail. */
   injectionMolding?: RouteInjectionMoldingDetail;
+  /**
+   * Molding routes only: what THIS route's process can do with the part's recognised features: the feature types the reference lists for it, the features
+   * it cannot make (process incompatibilities), and the types not assessed yet. Informational: it changes no cost, no cycle time, and not the route's feasibility.
+   */
+  featureRecognition?: RouteFeatureRecognition | null;
 }
 
 export interface RouteComparisonDto {

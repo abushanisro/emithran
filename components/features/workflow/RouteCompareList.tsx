@@ -258,6 +258,23 @@ export function RouteCompareList({
                           <span>{node.selectionNote}</span>
                         </p>
                       )}
+                      {node.processIncompatibilities.length > 0 && (
+                        <div className="mt-1.5 text-[11px] leading-snug text-amber-300/90">
+                          <p className="flex items-start gap-1 font-medium">
+                            <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+                            <span>
+                              This process cannot make {node.processIncompatibilities.length === 1 ? 'a feature' : `${String(node.processIncompatibilities.length)} features`} of this part
+                            </span>
+                          </p>
+                          <ul className="mt-0.5 space-y-0.5 pl-4 text-muted-foreground">
+                            {node.processIncompatibilities.map((i) => (
+                              <li key={`${i.featureType}:${i.variant}:${i.featureIds.join(',')}`}>
+                                <span className="text-foreground/80">{i.count} × {i.featureType}{i.variant ? ` (${i.variant})` : ''}</span>: {i.reason}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       {node.toolingVolumeNote && (
                         <p className={cn(
                           'mt-1 text-[11px] leading-snug',

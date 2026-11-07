@@ -106,4 +106,18 @@ describe('adaptRoutesToTree', () => {
     const tree = adaptRoutesToTree([route()]);
     expect(tree[0]!.toolingVolumeNote).toBeNull();
   });
+
+  it('carries the features a molding route\'s own process cannot make, without touching feasibility, cost or badges', () => {
+    const incompatibility = { featureType: 'SlideBundle', variant: '', count: 1, featureIds: ['sb'], kind: 'not_in_process_vocabulary' as const, reason: 'The reference lists no SlideBundle for Compression Molding.' };
+    const tree = adaptRoutesToTree([
+      route({ routeId: 'im-compression-molding', featureRecognition: { process: 'Compression Molding', vocabulary: [], recognised: [], incompatibilities: [incompatibility], notAssessed: [] } }),
+      route({ routeId: 'im-small', featureRecognition: null }),
+      route({ routeId: 'sm-laser' }),
+    ]);
+    expect(tree[0]!.processIncompatibilities).toEqual([incompatibility]);
+    expect(tree[0]).toMatchObject({ feasible: true, cost: 210, badges: { lowestCost: true } });
+    expect(tree[1]!.processIncompatibilities).toEqual([]);
+    expect(tree[2]!.processIncompatibilities).toEqual([]);
+    expect(tree[0]!.children.every((c) => c.processIncompatibilities.length === 0)).toBe(true);
+  });
 });

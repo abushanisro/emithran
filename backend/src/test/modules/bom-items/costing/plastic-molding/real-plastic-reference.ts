@@ -122,3 +122,14 @@ export function allRealPresses(): Array<{
     goodPartYield: Number(row['yields.goodPartYield']),
   }));
 }
+
+/**
+ * The operation catalog of each molding process as the reference states it (memory/Plastic Modeling/process/digital_factory_operations.csv): the compound strings
+ * ("Compression Molding:As Molded//CurvedSurface") that migrations stage as process_taxonomy_operations, grouped by process.
+ */
+export function realOperationCatalog(): Record<string, string[]> {
+  const rows = parseCsv(readFileSync(join(DIR, 'process', 'digital_factory_operations.csv'), 'utf8'));
+  const byProcess: Record<string, string[]> = {};
+  for (const r of rows) (byProcess[r.process!] ??= []).push(r.processName!);
+  return byProcess;
+}
