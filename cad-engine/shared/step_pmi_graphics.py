@@ -14,10 +14,14 @@ are read (the mesh is in mm); anything else is reported in `unresolved`, not sca
 """
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Dict, List, Optional
 
 from shared.step_pmi_dimensions import _REF, _statements
+from shared.error_reporting import report_failure
+
+logger = logging.getLogger(__name__)
 
 MAX_POINTS = 400_000  # a PMI set larger than this is reported, not shipped
 
@@ -126,8 +130,8 @@ def read_step_pmi_graphics(step_text: str) -> Dict[str, Any]:
                     drawn = _triangles(item, pts)
                     triangles.extend(drawn)
                     glyph_triangle_counts.append(len(drawn) // 9)
-            except (IndexError, ValueError) as exc:
-                unresolved.append(f"#{item_id} {name}: {exc}")
+            except (IndexError, ValueError):
+                unresolved.append(f"#{item_id} {name}: {report_failure('Drawing this item', logger)}")
         if curves or triangles:
             graphics.append({
                 "callout": name,

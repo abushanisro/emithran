@@ -44,6 +44,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
+from shared.error_reporting import report_failure
+
 logger = logging.getLogger(__name__)
 
 # Every semantic tolerance in a Part 21 file is instantiated through an entity
@@ -226,9 +228,8 @@ def read_step_gdt(step_path: str) -> Dict[str, Any]:
         result["graphics"] = drawn["graphics"]
         result["unresolved"] = list(result.get("unresolved", [])) + drawn["unresolved"]
         result["unresolved"] = list(result.get("unresolved", [])) + extra["unresolved"]
-    except Exception as exc:  # disclosed, never guessed
-        logger.warning(f"[step_pmi] dimension read failed: {exc}")
-        result["unresolved"] = list(result.get("unresolved", [])) + [f"dimensions: {exc}"]
+    except Exception:  # disclosed, never guessed
+        result["unresolved"] = list(result.get("unresolved", [])) + [f"dimensions: {report_failure('Reading the dimensions', logger)}"]
     return result
 
 
@@ -274,6 +275,5 @@ def _read_step_gdt_entities(step_path: str, raw: bytes) -> Dict[str, Any]:
                 "name": tol.Name().ToCString() if tol.Name() is not None else None,
             })
         return {"status": "read", "gdt_callouts": callouts, "unresolved": unresolved}
-    except Exception as exc:  # disclosed, never guessed
-        logger.warning(f"[step_pmi] GD&T read failed: {exc}")
-        return {"status": "error", "gdt_callouts": [], "unresolved": [str(exc)]}
+    except Exception:  # disclosed, never guessed
+        return {"status": "error", "gdt_callouts": [], "unresolved": [report_failure("Reading the GD&T", logger)]}

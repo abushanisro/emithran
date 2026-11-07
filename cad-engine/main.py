@@ -14,7 +14,6 @@ import logging
 import tempfile
 import hashlib
 import hmac
-import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from contextlib import asynccontextmanager
@@ -48,6 +47,7 @@ from shared.exceptions import (
     UnknownPartError,
 )
 from shared import telemetry
+from shared.error_reporting import report_failure
 from shared import sldprt_converter
 from shared.drawing_analyzer import router as drawing_router
 
@@ -190,9 +190,7 @@ async def require_api_key(api_key: str = Security(_api_key_header)):
 def _internal_error(operation: str, status_code: int = 500) -> HTTPException:
     """An error response for the exception being handled: the traceback goes to the log under a fresh error id, the caller gets
     only the id. Exception text can carry file paths, library internals or customer content, so it never goes into the response."""
-    error_id = uuid.uuid4().hex
-    logger.error("%s failed (error %s)", operation, error_id, exc_info=True)
-    return HTTPException(status_code=status_code, detail=f"{operation} failed (error {error_id}).")
+    return HTTPException(status_code=status_code, detail=report_failure(operation, logger))
 
 
 # 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)

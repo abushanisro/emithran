@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Tuple, Any, Dict, List, Optional
 
 from shared import telemetry
+from shared.error_reporting import report_failure
 from shared.memory_optimizer import AdvancedCADMemoryOptimizer
 from shared.part_family import MACHINING_FAMILIES
 
@@ -273,9 +274,8 @@ def analyze_part(
             _built = build_pmi_records(response["pmi"], engine_features(_mf))
             response["pmi"]["records"] = _built["records"]
             response["pmi"]["records_summary"] = _built["summary"]
-        except Exception as _rexc:
-            logger.warning(f"[step_pmi] records failed: {_rexc}")
-            response["pmi"]["unresolved"] = list(response["pmi"].get("unresolved", [])) + [f"records: {_rexc}"]
+        except Exception:
+            response["pmi"]["unresolved"] = list(response["pmi"].get("unresolved", [])) + [f"records: {report_failure('Building the PMI records', logger)}"]
 
     # Component feature analysis (eMithran-style decomposition). The GCD adjacency walk is the bottleneck, so the
     # result is cached; "force reanalysis" skips the read but still refreshes the entry.

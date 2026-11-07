@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from sheet_metal.feature_extractor import SheetMetalFeatureExtractor
 from shared.draft_angle_geometry import analyze_draft_angles
+from shared.error_reporting import report_failure
 from injection_molding.recognition.core import recognize_core
 
 logger = logging.getLogger(__name__)
@@ -231,9 +232,8 @@ class InjectionMoldedFeatureExtractor:
                 shape, bbox_dims, self.UNDRAFTED_DEG, self.MAX_DRAFT_DEG, pull_override,
                 legacy_rib_groups=ribs.get("rib_groups", []), legacy_rib_confidence=float(ribs.get("rib_confidence", 0.0)),
             )
-        except Exception as e:  # noqa: BLE001 - reported in the result and logged, see above
-            logger.exception("[InjectionMolded] recognition core failed")
-            return {"version": "plastic_recognition_core_v1", "status": "failed", "error": f"{type(e).__name__}: {e}"}
+        except Exception:  # noqa: BLE001 - reported in the result (by id) and logged with its traceback, see above
+            return {"version": "plastic_recognition_core_v1", "status": "failed", "error": report_failure("Plastic recognition", logger)}
 
     # ── Phase 2: wall uniformity ──────────────────────────────────────────────
 
