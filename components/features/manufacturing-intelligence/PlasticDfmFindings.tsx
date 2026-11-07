@@ -28,7 +28,7 @@ export function PlasticDfmFindings({ itemId, onSelectHighlight }: { itemId: stri
   if (isLoading) return <p className="text-[11px] text-muted-foreground">Checking the part against the rule data…</p>;
   if (error || !data) return <p className="text-[11px] text-muted-foreground">The rule-based checks could not be loaded.</p>;
   if (data.status !== 'ok' || !data.result) return <p className="text-[11px] text-muted-foreground">{data.reasons.join(' ') || 'No rule-based checks yet.'}</p>;
-  const { findings, passed, notEvaluated, process, materialType } = data.result;
+  const { findings, passed, notEvaluated, notes, process, materialType } = data.result;
 
   const select = (f: PlasticDfmFinding) => {
     const key = `${f.rule}_${f.severity}_${f.featureIds.join(',')}`;
@@ -43,7 +43,7 @@ export function PlasticDfmFindings({ itemId, onSelectHighlight }: { itemId: stri
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rule-based checks</h3>
         <span className="text-[10px] text-muted-foreground truncate" title="The rule data is chosen by the process and the material type">{process} · {materialType ?? 'general limits'}</span>
       </div>
-      {data.reasons.map((r) => <p key={r} className="text-[10px] text-amber-500">{r}</p>)}
+      {[...data.reasons, ...(notes ?? [])].map((r) => <p key={r} className="text-[10px] text-amber-500">{r}</p>)}
       {findings.length === 0 && <p className="text-[11px] text-muted-foreground">No rule that could be measured is violated ({passed.length} passed).</p>}
       {findings.map((f) => {
         const cls = SEVERITY_CLASS[f.severity];

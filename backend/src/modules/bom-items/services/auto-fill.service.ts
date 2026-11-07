@@ -434,6 +434,7 @@ export class AutoFillService {
           plasticFeatureGraph:  cadMI?.features?.recognition_core?.feature_graph ?? null,
           // The wall at each face (the diameter of the largest ball inside the material touching it): what the DFM thin and thick section rules grade and highlight.
           // Null on a CAD engine that does not measure it.
+          plasticWallResolutionMm: typeof cadMI?.features?.recognition_core?.wall?.resolution_mm === 'number' ? cadMI.features.recognition_core.wall.resolution_mm : null,
           plasticWallFaces: Array.isArray(cadMI?.features?.recognition_core?.wall?.faces)
             ? (cadMI.features.recognition_core.wall.faces as Array<Record<string, unknown>>)
                 .filter((f) => typeof f['thickness_mm'] === 'number')
