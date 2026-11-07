@@ -554,7 +554,9 @@ class AdvancedCADMemoryOptimizer:
             sheet_geometry = None
             thin_wall_ratio = 0.0
             try:
-                sheet_geometry = SheetMetalFeatureExtractor()._extract_sheet_metal_geometry(shape, dims_list)
+                # The face pairs behind the modal wall are collected in this one scan: the molding extractor reuses this result (sheet_geometry) and
+                # records them as the evidence of its nominal wall thickness; nothing else reads them.
+                sheet_geometry = SheetMetalFeatureExtractor()._extract_sheet_metal_geometry(shape, dims_list, collect_modal_pairs=True)
                 _geo_debug = sheet_geometry[3]
                 _tight_frac = _geo_debug.get('tight_area_frac', 0.0)
                 _area_ratio = _geo_debug.get('area_ratio', 0.0)

@@ -113,3 +113,20 @@ def test_sheet_metal_output_is_unchanged_unless_the_pairs_are_asked_for():
     assert asked["modal_pair_count"] > 0 and asked["modal_pair_face_ids"]
     # asking for them changes nothing else
     assert {k: v for k, v in asked.items() if not k.startswith("modal_pair")} == default
+
+
+def test_the_analysis_path_records_the_wall_faces_too():
+    """The optimizer scans the wall once and hands that result to the molding extractor; the pairs must be collected in that scan (found on a real part:
+    the part volume was recorded, the wall was not)."""
+    from shared.memory_optimizer import AdvancedCADMemoryOptimizer
+
+    shape = _ribbed_tray()
+    opt = AdvancedCADMemoryOptimizer.__new__(AdvancedCADMemoryOptimizer)
+    dims = _dims(shape)
+    bbox = {"min_x": -50, "min_y": -30, "min_z": 0, "max_x": 50, "max_y": 30, "max_z": 15, "x": dims[0], "y": dims[1], "z": dims[2], "length": dims[0], "width": dims[1], "height": dims[2]}
+    out = opt._analyze_manufacturing_features(shape, bbox, 28962.5, family_hint="plastic_molded")
+    features = out["manufacturing_intelligence"]["features"]
+    graph = features["feature_graph_v2"]
+    assert features["wall_thickness_nominal_mm"] == pytest.approx(2.5)
+    wall = graph["measurements"]["wall_thickness"]
+    assert wall["occurrences"] and all(len(o["face_ids"]) == 2 for o in wall["occurrences"])
