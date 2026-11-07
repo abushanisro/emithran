@@ -1,0 +1,31 @@
+process_group,memory_folder,memory_files,ledger_production,ledger_thin,ledger_not_modeled,ledger_non_mfg,ledger_unwired,active_calculator_mappings,machines_seeded_usa,engine_code_found
+2 Mold Molding,2 Mold Molding,3,0,0,0,1,0,0,0,none found
+Additive Manufacturing,Additive Manufacturing,26,0,0,11,1,0,0,102,none found
+Assembly,Assembly,33,0,0,20,1,0,0,60,none found
+Assembly Molding,Assembly molding,25,0,0,2,0,0,0,254,none found
+Assembly Plastic Molding,Assembly plastic molding,27,0,0,2,0,0,0,97,none found
+Bar and Tube Fabrication,Bar and tube fab,52,0,0,32,2,0,0,277,none found
+Casting,Casting,51,0,0,26,1,0,0,465,shared casting code only; no process-specific engine found
+Casting Investment,Casting Investment,47,0,0,24,1,0,0,112,shared casting code only; no process-specific engine found
+Composites,Composites,16,0,0,10,1,0,0,87,none found
+Die Casting,Die Casting,64,11,0,0,1,0,11,237,"engine: costing/casting (hpdc-engine, gdc-engine)"
+Forging,Forging,30,0,0,10,2,0,0,202,none found
+Heat Treatment,Heat treatment,26,0,0,22,0,0,0,27,engine: costing/heat
+Machining,Machining,142,7,33,0,3,0,102,326,engine: costing/machining
+Multi-Spindle Machining,Multi-Spindle Maching,8,0,0,0,1,0,0,1,none found
+Other Secondary Processes,Secondary process,24,1,0,11,0,0,1,51,engine: costing/secondary (+ chemical-milling)
+PCB,PCBA,46,0,0,31,2,0,0,208,separate module: modules/electronics-costing (not in the process ledger)
+Part Assembly,Part Assembly,23,0,0,9,0,0,0,25,none found
+Plastic Molding,Plastic Modeling,89,4,0,0,0,0,4,127,"engine: costing/plastic-molding (injection, RIM, structural foam, compression)"
+Powder Metal,Powder metal,12,0,0,2,0,0,0,16,none found
+Rapid Prototyping,Rapid prototyping,12,0,0,5,0,0,0,25,none found
+Roto & Blow Molding,Roto & blow molding,17,0,0,5,0,0,0,19,none found
+Sand Casting,Sand casting,52,0,0,25,0,0,0,507,engine: costing/casting/sand + modules/sand-casting
+Sheet Metal,Sheetmetal,148,22,0,41,2,2,24,324,engine: costing/sheet-metal
+Sheet Metal - Hydroforming,Sheetmetal Hydroforming,28,0,0,2,3,0,2,56,engine: costing/hydroforming
+Sheet Metal Roll Forming,Sheet metal roll forming,34,0,0,9,1,0,0,125,none found
+Sheet Metal Stretch Forming,Sheet metal stretch forming,12,0,0,4,1,0,0,32,none found
+Sheet Metal Transfer Die,Sheet metal transfer die,34,0,0,2,1,0,0,57,none found
+Sheet Plastic,Sheet Plastic,26,0,0,5,0,0,0,79,none found
+Stock Machining,Stock Maching,13,0,0,1,1,0,0,13,machining engine covers stock forms (stock-price.ts); not separately modelled
+Surface Treatment,SurfaceTreatment,51,21,0,12,0,0,21,184,engine: costing/surface
