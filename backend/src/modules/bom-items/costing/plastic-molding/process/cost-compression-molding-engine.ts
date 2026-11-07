@@ -41,8 +41,7 @@
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
-import { runPressCycleTime } from '../calculators/plastic-cycle-time';
-import { COMPRESSION_CALCULATOR } from '../calculators/plastic-cycle-time-seeds';
+import { runCompressionCycleTime } from '../calculators/plastic-cycle-time';
 
 interface CompressionMoldingCostInput {
   batchSize: number;
@@ -75,10 +74,7 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
   // computePressStrokeCost's own existing $0 + "no real press_cycle_time_s
   // on file" warning path is unaffected.
   // The press cycle plus cure time is the stored calculator's (calculators/plastic-cycle-time.ts): the engine seeds its inputs and passes its result on.
-  const cycle = runPressCycleTime(
-    { pressCycleTimeS: input.rate.pressCycleTimeS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null, process: 'compression' },
-    input.calculators ?? null, COMPRESSION_CALCULATOR,
-  );
+  const cycle = runCompressionCycleTime({ pressCycleTimeS: input.rate.pressCycleTimeS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null }, input.calculators ?? null);
   const effectiveRate: MHRRateInput = { ...input.rate, pressCycleTimeS: cycle.derivable ? cycle.cycleSec : null };
 
   const result = computePressStrokeCost('Compression Molding', 'compression_molding', {
@@ -109,6 +105,8 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
       if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
     }
   } else if (input.rate.pressCycleTimeS != null) {
+    // The machine has its cycle time: it is the calculator that is missing, so the press function's "no press_cycle_time_s on file" would be wrong.
+    result.warnings = result.warnings.filter((w) => !w.includes('no real press_cycle_time_s on file'));
     result.warnings.push(`Compression Molding cycle time not derivable: missing ${cycle.missing.join('; ')}.`);
   }
 

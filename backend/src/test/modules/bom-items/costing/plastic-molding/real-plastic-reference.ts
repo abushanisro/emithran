@@ -151,3 +151,10 @@ export function realFillFactorRows(): Array<{ attribute: string; number: number;
   return read('lookup/injectionTimeAdjustmentFactors__records.csv').map((r) => ({ attribute: r['attribute']!, number: Number(r['number']), factor: Number(r['adjustment_factor']) }));
 }
 
+/** The reaction injection machines of machine/reaction_injection_molding_machines.csv: the staged injection rate (mm3/s) and dry cycle (s) the RIM fill time and cycle read. */
+export function realRimMachines(): Array<{ name: string; injectionRateMm3PerS: number; dryCycleTimeS: number }> {
+  return read('machine/reaction_injection_molding_machines.csv').map((r) => ({
+    name: r['name']!, injectionRateMm3PerS: Number(r['rates.injectionRateMm3PerS']), dryCycleTimeS: Number(r['time.dryCycleTimeS']),
+  }));
+}
+

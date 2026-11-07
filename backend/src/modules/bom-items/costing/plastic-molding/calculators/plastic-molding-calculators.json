@@ -428,7 +428,7 @@
     {
       "key": "rim",
       "name": "Reaction Injection Molding - Cycle Time",
-      "description": "RIM cycle = the machine's dry cycle (mold open/close with no material, staged as press_cycle_time_s) + the material's cure or reaction time. Fill time from the staged injection rate (volume / injectionRateMm3PerS) is approved but not yet part of this calculator or of the engine (Phase 3, with unit validation); mixing and handling are not modelled because the reference holds no formula.",
+      "description": "RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open/close with no material (staged as press_cycle_time_s). Fill Time = Total Shot Volume / Machine Injection Rate (formula registry F-19, ASSUMED: the staged rate over the shot volume is the approved simplification; the reference states no RIM fill formula), with Total Shot Volume = Part Volume x Cavities per Mold in mm3 and the rate in mm3/s, so the result is in seconds. Cure Time = the material's cure or reaction time. Cycle Time = (Dry cycle + Fill + Cure) / Cavities per Mold, per part; the RIM engine prices one part per press cycle (1 cavity). Not modelled, because the reference has no volume or formula: runner and sprue volume, mix-head purge, viscosity, flow resistance, the injection profile, and part handling. A missing or invalid part volume or injection rate makes the cycle a named gap, never a default.",
       "operations": [
         "Reaction Injection Molding"
       ],
@@ -441,11 +441,42 @@
           }
         },
         {
+          "name": "Part Volume",
+          "unit": "mm³",
+          "source": {
+            "cad": "volume (net part volume, mm3)"
+          }
+        },
+        {
+          "name": "Cavities per Mold",
+          "unit": null,
+          "source": {
+            "engine": "the RIM engine prices one part per press cycle: 1"
+          }
+        },
+        {
+          "name": "Machine Injection Rate",
+          "unit": "mm³/s",
+          "source": {
+            "machine": "rates.injectionRateMm3PerS"
+          }
+        },
+        {
           "name": "Material Cure Time",
           "unit": "min",
           "source": {
             "material": "cureTimeMin (raw_materials.cure_time_min; absent for a grade with none on file: seeded 0 and said in the trace, the cycle is then understated)"
           }
+        },
+        {
+          "name": "Total Shot Volume",
+          "unit": "mm³",
+          "formula": "{Part Volume} * {Cavities per Mold}"
+        },
+        {
+          "name": "Fill Time",
+          "unit": "s",
+          "formula": "{Total Shot Volume} / {Machine Injection Rate}"
         },
         {
           "name": "Cure Time",
@@ -455,9 +486,10 @@
         {
           "name": "Cycle Time",
           "unit": "s",
-          "formula": "{Machine Dry Cycle Time} + {Cure Time}"
+          "formula": "({Machine Dry Cycle Time} + {Fill Time} + {Cure Time}) / {Cavities per Mold}"
         }
-      ]
+      ],
+      "version": 2
     }
   ]
 }

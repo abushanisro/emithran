@@ -89,20 +89,40 @@ export function injectionCycleTimeSeeds(input: CycleTimeInput): SeedResult {
 }
 
 /**
- * Seeds for the compression and reaction injection calculators: the machine's press (or dry) cycle time and the material's cure time in minutes. A grade with no
- * cure time on file is seeded 0, as the engine always has (it then costs the press motion alone and says the cycle is understated): never a typical value.
+ * Seeds for the compression calculator: the machine's press open/close time and the material's cure time in minutes. A grade with no cure time on file is seeded 0, as
+ * the engine always has (it then costs the press motion alone and says the cycle is understated): never a typical value.
  */
-export function pressCycleTimeSeeds(input: { pressCycleTimeS: number | null; cureTimeMin: number | null; process: 'compression' | 'rim' }): SeedResult {
-  const machineField = input.process === 'rim' ? 'Machine Dry Cycle Time' : 'Press Open/Close Time';
-  if (!positive(input.pressCycleTimeS)) return { missing: [input.process === 'rim' ? 'machine dry cycle time (press_cycle_time_s)' : 'press open/close time (press_cycle_time_s)'] };
-  const hasCure = positive(input.cureTimeMin);
+export function pressCycleTimeSeeds(input: { pressCycleTimeS: number | null; cureTimeMin: number | null }): SeedResult {
+  if (!positive(input.pressCycleTimeS)) return { missing: ['press open/close time (press_cycle_time_s)'] };
+  return { seeds: { 'Press Open/Close Time': { value: input.pressCycleTimeS, source: 'Machine record: press_cycle_time_s' }, 'Material Cure Time': cureSeed(input.cureTimeMin) } };
+}
+
+function cureSeed(cureTimeMin: number | null): CalcSeed {
+  const hasCure = positive(cureTimeMin);
+  return {
+    value: hasCure ? cureTimeMin! : 0,
+    source: hasCure ? 'Material reference (raw_materials.cure_time_min)' : 'No cure time on file for this material grade: not included, so the cycle is understated (not a default)',
+  };
+}
+
+/**
+ * Seeds for the reaction injection calculator: the machine's dry cycle (s), the part volume (mm3), the machine's injection rate (mm3/s) and the material's cure time (min).
+ * Units are the staged ones and are stated on the fields: the shot volume in mm3 over the rate in mm3/s gives seconds. A missing, zero, negative or non-finite volume,
+ * rate or dry cycle is named, never defaulted: the fill time has no value without them. No runner volume is staged for RIM, so none is added.
+ */
+export function rimCycleTimeSeeds(input: { machineCycleTimeS: number | null; partVolumeMm3: number | null; injectionRateMm3PerS: number | null; cureTimeMin: number | null }): SeedResult {
+  const missing: string[] = [];
+  if (!positive(input.machineCycleTimeS)) missing.push('machine dry cycle time (press_cycle_time_s)');
+  if (!positive(input.partVolumeMm3)) missing.push('part volume (CAD volume, mm3)');
+  if (!positive(input.injectionRateMm3PerS)) missing.push('machine injection rate (injectionRateMm3PerS, mm3/s)');
+  if (missing.length > 0) return { missing };
   return {
     seeds: {
-      [machineField]: { value: input.pressCycleTimeS, source: 'Machine record: press_cycle_time_s' },
-      'Material Cure Time': {
-        value: hasCure ? input.cureTimeMin! : 0,
-        source: hasCure ? 'Material reference (raw_materials.cure_time_min)' : 'No cure time on file for this material grade: not included, so the cycle is understated (not a default)',
-      },
+      'Machine Dry Cycle Time': { value: input.machineCycleTimeS!, source: 'Machine record: press_cycle_time_s (time.dryCycleTimeS)' },
+      'Part Volume': { value: input.partVolumeMm3!, source: 'CAD net part volume (mm3)' },
+      'Cavities per Mold': { value: 1, source: 'Cost engine: the RIM engine prices one part per press cycle' },
+      'Machine Injection Rate': { value: input.injectionRateMm3PerS!, source: `Machine record: ${REF}/machine/reaction_injection_molding_machines.csv rates.injectionRateMm3PerS (mm3/s)` },
+      'Material Cure Time': cureSeed(input.cureTimeMin),
     },
   };
 }

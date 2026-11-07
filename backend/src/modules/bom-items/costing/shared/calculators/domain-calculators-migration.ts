@@ -1,4 +1,4 @@
-import { domainFieldToRow, type DomainCalculatorSpec } from './domain-calculator-spec';
+import { domainFieldToRow, type DomainCalculatorSpec, type DomainSpecCalculator } from './domain-calculator-spec';
 
 export interface DomainMigrationText {
   number: number;
@@ -18,7 +18,9 @@ const q = (v: string | number | null | undefined) =>
  * still equals it. Idempotent: calculators are matched by name, their fields
  * replaced, and the catalog rows of the domain linked to them.
  */
-export function buildDomainCalculatorsMigrationSql(spec: DomainCalculatorSpec, text: DomainMigrationText): string {
+export function buildDomainCalculatorsMigrationSql(spec: DomainCalculatorSpec, text: DomainMigrationText, only?: (c: DomainSpecCalculator) => boolean): string {
+  // `only` writes the migration for the calculators that changed since an earlier one (a calculator in use is not edited in its first migration).
+  const calculators = only ? spec.calculators.filter(only) : spec.calculators;
   const out: string[] = [];
   out.push(`-- ${text.number}: ${text.title}
 --
@@ -42,7 +44,7 @@ ${text.rootCause.split('\n').map((l) => `-- ${l}`.trimEnd()).join('\n')}
 BEGIN;
 `);
 
-  for (const c of spec.calculators) {
+  for (const c of calculators) {
     const rows = c.fields.map((f, i) => domainFieldToRow(f, i + 1));
     out.push(`
 -- ${c.name}
@@ -51,11 +53,11 @@ DECLARE v_id UUID;
 BEGIN
   SELECT id INTO v_id FROM public.calculators WHERE name = ${q(c.name)} AND user_id IS NULL AND retired_at IS NULL;
   IF v_id IS NULL THEN
-    INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, ${q(c.name)}, 'process', 'single', false, true, true, ${q(c.description)})
+    INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description${c.version != null ? ', version' : ''})
+    VALUES (NULL, ${q(c.name)}, 'process', 'single', false, true, true, ${q(c.description)}${c.version != null ? `, ${c.version}` : ''})
     RETURNING id INTO v_id;
   ELSE
-    UPDATE public.calculators SET calc_category = 'process', description = ${q(c.description)}, updated_at = now() WHERE id = v_id;
+    UPDATE public.calculators SET calc_category = 'process', description = ${q(c.description)}${c.version != null ? `, version = ${c.version}` : ''}, updated_at = now() WHERE id = v_id;
   END IF;
 
   DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
@@ -72,7 +74,7 @@ $calc$;
 `);
   }
 
-  const expected = spec.calculators.map((c) => `(${q(c.name)}, ${c.fields.length}, ${c.operations.length})`).join(',\n    ');
+  const expected = calculators.map((c) => `(${q(c.name)}, ${c.fields.length}, ${c.operations.length})`).join(',\n    ');
   out.push(`
 -- Post-check: every calculator exists once, with all its fields, linked to every operation it computes.
 DO $post$

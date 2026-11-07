@@ -255,6 +255,25 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'VALIDATED', implementedIn: 'process/cost-injection-molding-engine.ts',
   },
 
+  {
+    id: 'F-19', version: 1, name: 'Reaction injection molding fill time',
+    expression: 't = (V_part x n_cavities) / Q_machine  [s]; V in mm3, Q in mm3/s',
+    outputUnit: 's',
+    inputs: [
+      { name: 'V_part part volume', unit: 'mm3', source: 'CAD net part volume (mm3)' },
+      { name: 'n_cavities', unit: 'count', source: 'cost engine: the RIM engine prices one part per press cycle (1)' },
+      { name: 'Q_machine injection rate', unit: 'mm3/s', source: `${MEM}/machine/reaction_injection_molding_machines.csv: rates.injectionRateMm3PerS` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/machine/reaction_injection_molding_machines.csv: rates.injectionRateMm3PerS (the staged rate; the reference states no RIM fill formula)`,
+    assumptions: [
+      'Fill time is the shot volume over the staged machine injection rate: the approved simplification, not a reference formula.',
+      'Runner and sprue volume, mix-head purge, material viscosity, flow resistance and the injection profile are not modelled; no runner volume is staged for RIM.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-molding-calculators.json',
+    note: 'Calculator "Reaction Injection Molding - Cycle Time" (F-19 is its Fill Time). A missing or invalid volume or rate makes the cycle a named gap, never a default.',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
     ['G-01', 'Mold base selection and plate-by-plate steel', 'tblStandardMoldBaseSizes; tool material price and density (AISI P20 1.86 USD/kg, 7850 kg/m3); plate thickness variables; tblCavity/CorePlateDepthBorder; tblEdgeMoldBorderX/Y'],
