@@ -432,6 +432,13 @@ export class AutoFillService {
           avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
           // The recognised features (holes, faces, ribs) the catalog operations are resolved from; null on an older CAD engine.
           plasticFeatureGraph:  cadMI?.features?.recognition_core?.feature_graph ?? null,
+          // The draft of each wall face the analysis judged (id, the draft it is judged by, on what basis, its class): what the DFM draft rule grades and highlights.
+          // Null on an older CAD engine, which does not record it.
+          plasticDraftFaces: Array.isArray(cadMI?.features?.recognition_core?.draft?.faces)
+            ? (cadMI.features.recognition_core.draft.faces as Array<Record<string, unknown>>)
+                .filter((f) => typeof f['judged_draft_deg'] === 'number')
+                .map((f) => ({ face: f['face_id'] as number, deg: f['judged_draft_deg'] as number, basis: f['draft_basis'] as string, cls: f['class'] as string }))
+            : null,
     } : {};
     const featureGraph = {
       extractedAt: new Date().toISOString(),

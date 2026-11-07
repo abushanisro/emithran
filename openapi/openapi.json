@@ -14306,6 +14306,49 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/plastic-dfm": {
+      "get": {
+        "operationId": "BOMItemsController_getPlasticDfm_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process",
+            "required": false,
+            "schema": {
+              "enum": [
+                "Injection Molding",
+                "Compression Molding",
+                "Reaction Injection Molding",
+                "Structural Foam Molding"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The findings, the rules that passed and the rules that could not be judged (with why)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Design-for-molding checks of a plastic part against the staged rule data, for its material; findings carry the faces to highlight",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/pmi-records": {
       "get": {
         "operationId": "BOMItemsController_getPmiRecords_v1",

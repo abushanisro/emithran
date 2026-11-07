@@ -158,3 +158,15 @@ export function realRimMachines(): Array<{ name: string; injectionRateMm3PerS: n
   }));
 }
 
+
+/** The staged DFM rule data as the DFM engine reads it: the severity and advice rows of lookup/, and smallHoleDiamBorder of the variables (memory/Plastic Modeling). */
+export function realDfmReference(): { severity: Array<Record<string, string>>; adviceRules: Array<Record<string, string>>; smallHoleDiamBorderMm: number | null; version: string } {
+  const small = read('variables/digital_factory_variables.csv').find((r) => r['variableName'] === 'smallHoleDiamBorder');
+  return {
+    severity: read('lookup/manufacturabilitySeverity__records.csv'),
+    // the CSV's own columns are the staged table's (advice_rule_name, enabled)
+    adviceRules: read('lookup/adviceRules.csv'),
+    smallHoleDiamBorderMm: small ? Number(small['stringValue']) : null,
+    version: 'test',
+  };
+}
