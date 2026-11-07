@@ -21,6 +21,17 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN DELETE FROM public.reference_data_snapshots; ASSERT false, 'a snapshot is never removed';
   EXCEPTION WHEN check_violation THEN NULL; END;
+  -- 974: nor a truncate (a row trigger does not fire for TRUNCATE)
+  BEGIN TRUNCATE public.reference_data_snapshots; ASSERT false, 'a snapshot table is never truncated';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  SELECT count(*) INTO n FROM public.reference_data_snapshots; ASSERT n = 1, 'the row survived the refused truncate';
+END $$;
+
+-- 974: the API roles do not even hold the privilege
+DO $$
+BEGIN
+  ASSERT NOT has_table_privilege('service_role', 'public.reference_data_snapshots', 'TRUNCATE'), 'service_role cannot truncate';
+  ASSERT NOT has_table_privilege('authenticated', 'public.reference_data_snapshots', 'TRUNCATE'), 'authenticated cannot truncate';
 END $$;
 
 -- who may do what
