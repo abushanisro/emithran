@@ -28,12 +28,14 @@ export interface RankableRoute {
   dataComplete: boolean;
   isFeasible: boolean;
   producesBlank?: boolean;
+  /** 'incompatible' (a feature the route's process cannot make) bars a route from the ranking; absent or null means nothing is known against it. */
+  compatibility?: { status: 'compatible' | 'incompatible' } | null;
 }
 
 /**
  * Mirrors the backend's selectRecommendedRoute (engine-kernel.ts) exactly —
- * same eligibility gate (capable, feasible, produces its own blank, fully
- * costed), same cheapest-then-fastest-then-id tie-break.
+ * same eligibility gate (capable, feasible, produces its own blank, compatible
+ * with its process, fully costed), same cheapest-then-fastest-then-id tie-break.
  */
 function rankEligible<T extends RankableRoute>(routes: readonly T[]): T[] {
   const eligible = routes.filter(
@@ -41,6 +43,7 @@ function rankEligible<T extends RankableRoute>(routes: readonly T[]): T[] {
       r.capability.overallCapable &&
       r.isFeasible &&
       r.producesBlank !== false &&
+      r.compatibility?.status !== 'incompatible' &&
       r.dataComplete &&
       typeof r.totalCost === 'number',
   );

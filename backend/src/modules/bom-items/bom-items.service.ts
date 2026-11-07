@@ -41,7 +41,8 @@ import type { MachiningCostInput, MachineClassId } from './costing/machining/pro
 import { machiningFeatureCounts } from './costing/machining/operation/machining-feature-counts';
 import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-rule';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
-import { PlasticRouteComparisonService } from './costing/plastic-molding/plastic-route-comparison.service';
+import { PlasticRouteComparisonService, assignMoldingRouteBadges } from './costing/plastic-molding/plastic-route-comparison.service';
+import { routeCompatibility, noCompatibleProcess, NO_COMPATIBLE_PROCESS_MESSAGE } from './costing/plastic-molding/operation/route-compatibility';
 import { buildMoldingCommonInput } from './costing/plastic-molding/molding-input';
 import { injectionMoldabilityGap } from '../raw-materials/material-moldability';
 import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
@@ -6143,6 +6144,7 @@ export class BOMItemsService {
             accessToken,
           });
           route.featureRecognition = plastic.featureRecognition;
+          route.compatibility = routeCompatibility(plastic.featureRecognition);
           warnings = plastic.warnings;
         }
         // Inherited tapping runs on THIS route's primary machine — surface that
@@ -6163,6 +6165,8 @@ export class BOMItemsService {
       }));
       // The routes share one feature graph, so a note about it (the types not assessed yet) comes back once per route: say it once.
       dto.comparisonWarnings.push(...new Set(routeWarnings.flat()));
+      // Compatibility is known only now: the badges are decided again over the compatible routes, so a badge never names a route the recommendation excludes.
+      if (family === 'plastic_molded') assignMoldingRouteBadges(dto.routes);
       this.appendRateWarnings(
         { processLines: dto.routes.flatMap((r) => r.processLines), warnings: dto.comparisonWarnings },
         location,
@@ -6207,6 +6211,8 @@ export class BOMItemsService {
         recommendedRouteId: selectRecommendedRoute(
           normalized.routes.filter((r) => r.autoRoutable && VALID_ROUTE_IDS.includes(r.routeId)),
         )?.routeId ?? null,
+        // Every route incompatible: nothing is recommended and nothing is chosen in its place; the message says so.
+        noCompatibleProcessMessage: noCompatibleProcess(normalized.routes) ? NO_COMPATIBLE_PROCESS_MESSAGE : null,
         resolvedInputs: costingInputs,
       };
     };

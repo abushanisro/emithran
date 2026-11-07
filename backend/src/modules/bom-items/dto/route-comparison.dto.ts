@@ -3,6 +3,7 @@ import type { CapabilityReasonCode } from '../costing/shared/capability/machine-
 import type { RouteDataGap } from '../costing/shared/core/engine-kernel';
 import type { FactMismatch } from '../costing/shared/physics/drawing-cad-consistency';
 import type { RouteFeatureRecognition } from '../costing/plastic-molding/operation/route-feature-recognition';
+import type { RouteCompatibility } from '../costing/plastic-molding/operation/route-compatibility';
 
 // Was a closed string-literal union of exactly the route ids known at the
 // time (3 sheet-metal-cutting + CNC/injection-molding families). Widened to
@@ -145,6 +146,12 @@ export interface RouteResultDto {
    * it cannot make (process incompatibilities), and the types not assessed yet. Informational: it changes no cost, no cycle time, and not the route's feasibility.
    */
   featureRecognition?: RouteFeatureRecognition | null;
+  /**
+   * Molding routes only: whether this route's process can make the part, from featureRecognition (route-compatibility.ts). 'incompatible' (a confirmed
+   * incompatibility) bars the route from the recommendation and from the Lowest cost and Fastest badges; features not assessed yet are warnings only.
+   * Null/absent: nothing is known against the route.
+   */
+  compatibility?: RouteCompatibility | null;
 }
 
 export interface RouteComparisonDto {
@@ -161,6 +168,11 @@ export interface RouteComparisonDto {
    * the user chose is never replaced by it. See selectRecommendedRoute().
    */
   recommendedRouteId: RouteId | null;
+  /**
+   * Set (to NO_COMPATIBLE_PROCESS_MESSAGE) when every route is incompatible: recommendedRouteId is then null and no route is chosen in its place.
+   * Null/absent in every other case, including a null recommendation for another reason (missing data, no capable machine).
+   */
+  noCompatibleProcessMessage?: string | null;
   materialCost: number;
   materialGrade: string;
   grossWeightKg: number;
