@@ -24,7 +24,7 @@ import {
   RawMaterialCostCalculationEngine,
   RawMaterialCostInput,
 } from '../engines/raw-material-cost-calculation.engine';
-import { orIlikeContains } from '../../../common/db/postgrest-filter';
+import { escapeLikePattern, orIlikeContains, quoteFilterValue } from '../../../common/db/postgrest-filter';
 
 @Injectable()
 export class RawMaterialCostService {
@@ -563,24 +563,32 @@ export class RawMaterialCostService {
     country: string,
   ): Promise<MaterialPriceLookup> {
     const g = materialName.trim();
-    const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
-    // Each token goes in through orIlikeContains (quoted whole, LIKE wildcards escaped), so commas and parens in a name ("Steel,")
-    // stay literal instead of becoming OR separators or grouping.
-    const orClause = (tokens.length > 1 ? tokens : [g]).map((t) => orIlikeContains(['name', 'grade'], t)).join(',');
     const local = MATERIAL_PRICE_COLUMNS[country];
     const columns = local && local.col !== 'cost_india' ? `${local.col}, cost_india, density` : 'cost_india, density';
-    const { data, error } = await this.databaseService
-      .getClient(accessToken)
-      .from('raw_materials')
-      .select(columns)
-      .or(orClause)
+    const client = this.databaseService.getClient(accessToken);
+    const fail = (message: string): never => {
+      this.logger.error(`Material price lookup failed for "${materialName}" (${country}): ${message}`, 'RawMaterialCostService');
+      throw new InternalServerErrorException(`Failed to look up a price for "${materialName}": ${message}`);
+    };
+
+    // 1. The grade by its own name: a row that IS the material. (The lookup used to match any row whose name contains ANY word of the grade, take five of them in no order, and
+    //    price the first: "Generic Nylon, Type 11 40% Glass" was priced as "Generic Aluminum, AA 3105", 5.864 USD/kg for 11.486.)
+    const exactValue = quoteFilterValue(escapeLikePattern(g));
+    const exact = await client.from('raw_materials').select(`name, grade, ${columns}`)
+      .or(`name.ilike.${exactValue},grade.ilike.${exactValue}`)
       .not('density', 'is', null)
-      .limit(5);
-    if (error) {
-      this.logger.error(`Material price lookup failed for "${materialName}" (${country}): ${error.message}`, 'RawMaterialCostService');
-      throw new InternalServerErrorException(`Failed to look up a price for "${materialName}": ${error.message}`);
-    }
-    return pickRegionalMaterialPrice((data ?? []) as unknown as Record<string, unknown>[], country);
+      .limit(20);
+    if (exact.error) fail(exact.error.message);
+    const exactRows = orderExactNameFirst((exact.data ?? []) as unknown as Array<Record<string, unknown>>, g);
+    if (exactRows.length > 0) return pickRegionalMaterialPrice(exactRows, country);
+
+    // 2. No row is called that: a row that contains EVERY word of the grade (each word in the name or the grade), never one that contains any one of them.
+    const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
+    let query = client.from('raw_materials').select(`name, grade, ${columns}`).not('density', 'is', null);
+    for (const t of tokens.length > 1 ? tokens : [g]) query = query.or(orIlikeContains(['name', 'grade'], t));
+    const { data, error } = await query.limit(5);
+    if (error) fail(error.message);
+    return pickRegionalMaterialPrice(orderExactNameFirst((data ?? []) as unknown as Array<Record<string, unknown>>, g), country);
   }
 }
 
@@ -616,6 +624,13 @@ export interface MaterialPriceLookup {
   priceSource: MaterialPriceSource;
   /** Present when priceSource is 'fallback_india': what was used instead, for the record's notes. */
   warning?: string;
+}
+
+/** The candidate rows with the ones whose name IS the material first (case-insensitive), the rest in the order given: the first priced row is then the material itself. */
+export function orderExactNameFirst(rows: ReadonlyArray<Record<string, unknown>>, materialName: string): Array<Record<string, unknown>> {
+  const want = materialName.trim().toLowerCase();
+  const isNamed = (r: Record<string, unknown>) => typeof r['name'] === 'string' && (r['name'] as string).trim().toLowerCase() === want;
+  return [...rows.filter(isNamed), ...rows.filter((r) => !isNamed(r))];
 }
 
 /** Picks the price for `country` from candidate raw_materials rows, flagging any India substitution. */
