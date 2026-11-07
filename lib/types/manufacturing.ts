@@ -20,6 +20,10 @@ export interface CostDriver {
   value: number;
   driverType?: CostDriverType;
   quantity?: number;
+  /** Molded parts: the section it is listed under, what the cost model does with it, and the sentence that says so (backend plastic-cost-drivers.ts). */
+  group?: string;
+  use?: 'priced' | 'not_priced' | 'dfm';
+  feeds?: string;
 }
 
 /** Legacy process-slot category used by ManufacturingFeatureBase */

@@ -123,7 +123,7 @@ import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
 import { isBend, isBlankProfile, isExtrudedHole, isPlainHole, type FeatureGraphEntryLike } from '@/lib/features/feature-graph';
 import { cutLengthHighlight } from '@/lib/features/cut-length-highlight';
 import { CadEvidencePanel, type CadEvidence } from '@/components/features/process-planning/CadEvidencePanel';
-import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, HoleGroup, HoleGroupLocation, FeatureNodeV2, FaceMapEntry, DFMScoresResponse } from '@/lib/types/manufacturing';
+import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, DFMSeverity, HoleGroup, HoleGroupLocation, FeatureNodeV2, FaceMapEntry, DFMScoresResponse } from '@/lib/types/manufacturing';
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { useAuth } from '@/lib/providers/auth-context';
@@ -8205,6 +8205,41 @@ function FeatureDetailPanel({ metadata }: { metadata: FeatureMetadata | null }) 
 
 // ── GeometricCostDriversPanel ──────────────────────────────────────────────────
 
+
+const COST_DRIVER_USE_LABEL = { priced: 'Priced', not_priced: 'Needed, not priced yet', dfm: 'Finding only' } as const;
+const COST_DRIVER_USE_CLASS = {
+  priced: 'text-emerald-600 dark:text-emerald-400',
+  not_priced: 'text-amber-600 dark:text-amber-400',
+  dfm: 'text-muted-foreground',
+} as const;
+
+/** A molded part's cost drivers, by section: each value as the CAD analysis measured it, and what the cost model does with it. */
+function PlasticCostDriverList({ drivers }: { drivers: CostDriver[] }) {
+  const groups = new Map<string, CostDriver[]>();
+  for (const d of drivers) groups.set(d.group!, [...(groups.get(d.group!) ?? []), d]);
+  return (
+    <>
+      {[...groups.entries()].map(([group, rows]) => (
+        <div key={group}>
+          <div className="px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</div>
+          {rows.map((cd) => (
+            <div key={cd.name} className="px-3 py-1" title={cd.feeds}>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[10px] text-muted-foreground flex-1 truncate">{cd.name}</span>
+                <span className="text-xs font-medium tabular-nums">{fmt(cd.value, cd.value < 10 && !Number.isInteger(cd.value) ? 2 : 0)} {cd.unit}</span>
+              </div>
+              <div className="flex gap-2 text-[9px] leading-tight">
+                <span className={`shrink-0 font-medium ${cd.use ? COST_DRIVER_USE_CLASS[cd.use] : ''}`}>{cd.use ? COST_DRIVER_USE_LABEL[cd.use] : ''}</span>
+                <span className="text-muted-foreground">{cd.feeds}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
 function GeometricCostDriversPanel({
   tree, summary, fg, selectedId, onSelect, maximized, onMaximize,
   selectedHoleGroup, selectedBend, dfmWarnings, item, onSelectHighlight,
@@ -8445,7 +8480,9 @@ function GeometricCostDriversPanel({
       {/* Cost Drivers tab */}
       {tab === 'cost' && (
         <div className="flex-1 overflow-y-auto divide-y divide-border/40">
-          {typedCostDrivers.length > 0 ? (
+          {typedCostDrivers.length > 0 && typedCostDrivers.every((cd) => cd.group) ? (
+            <PlasticCostDriverList drivers={typedCostDrivers} />
+          ) : typedCostDrivers.length > 0 ? (
             typedCostDrivers.map((cd, i) => (
               <div key={i} className="flex items-baseline px-3 py-1.5 gap-2">
                 <span className="text-[10px] text-muted-foreground flex-1 truncate">{cd.name}</span>
