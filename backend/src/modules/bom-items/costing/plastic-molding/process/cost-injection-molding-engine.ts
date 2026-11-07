@@ -51,7 +51,11 @@ import {
 
 function r2(n: number): number { return Math.round(n * 100) / 100; }
 function r4(n: number): number { return Math.round(n * 1e4) / 1e4; }
-/** Weights are kept to the milligram: a 1 g part must not round to the nearest gram. */
+/**
+ * Six decimals: weights to the milligram (a 1 g part must not round to the nearest gram), and per-part money and the line's cycle, as the database keeps them
+ * (process_cost_records.total_cost_per_part is numeric(12,6)). Rounding money to a cent threw away up to half a cent on every line (17 % of a 0.03 labor line), and cut the
+ * line's cycle to 0.6 s steps (a 6.22 s cycle was saved as 6.0 s). Display rounds, not the model.
+ */
 function r6(n: number): number { return Math.round(n * 1e6) / 1e6; }
 
 // ── Constants not replaced by Phase 4 cycle-time engine ───────────────────────
@@ -309,12 +313,12 @@ function makeLine(
   const totalCost = setupCost + runPerPart(rate.rate + labourPerHr);
   return {
     process,
-    setupCost: r2(setupCost),
-    runCost: r2(totalCost - setupCost),
-    totalCost: r2(totalCost),
-    machineCostPerPart: r2(runPerPart(rate.rate)),
-    laborCostPerPart: r2(runPerPart(labourPerHr)),
-    cycleTimeMin: r2(cycleTimeMin),
+    setupCost: r6(setupCost),
+    runCost: r6(totalCost - setupCost),
+    totalCost: r6(totalCost),
+    machineCostPerPart: r6(runPerPart(rate.rate)),
+    laborCostPerPart: r6(runPerPart(labourPerHr)),
+    cycleTimeMin: r6(cycleTimeMin),
     hourlyRate: rate.rate,
     labourRate: rate.labourRate ?? null,
     operators,
@@ -483,7 +487,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   const perGood = yieldFrac ?? 1;
 
   // ── Material: shot weight = part + runner/sprue allowance, per good part ────
-  const materialCost = r2((shotWeightKg * materialCostPerKg) / perGood);
+  const materialCost = r6((shotWeightKg * materialCostPerKg) / perGood);
 
   // ── Cost every routed operation, in route order ─────────────────────────────
   let setupMin = 0;      // batch-amortized station time (drying + mold setup)
@@ -571,9 +575,9 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (routed.has('weight_check')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.weight_check));
 
   // ── Totals ──────────────────────────────────────────────────────────────────
-  const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
-  const totalCost        = r2(materialCost + totalProcessCost);
-  const totalMin         = r2(processLines.reduce((s, l) => s + l.cycleTimeMin, 0));
+  const totalProcessCost = r6(processLines.reduce((s, l) => s + l.totalCost, 0));
+  const totalCost        = r6(materialCost + totalProcessCost);
+  const totalMin         = r6(processLines.reduce((s, l) => s + l.cycleTimeMin, 0));
 
   const sustainability = computeSustainability(
     materialGrade, materialCostPerKg, netWeightKg, shotWeightKg, batchSize, processLines,
@@ -703,8 +707,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     totalProcessCost,
     totalCost,
     cycleTimes: {
-      laserMin:      r2(moldingMin),                   // in-cycle molding time
-      pressBrakeMin: r2(setupMin),                     // batch-amortized setup time
+      laserMin:      r6(moldingMin),                   // in-cycle molding time
+      pressBrakeMin: r6(setupMin),                     // batch-amortized setup time
       tappingMin:    0,                                // unused for this family
       deburrMin:     r2(secondaryMin + inspectionMin), // secondary + inspection
       totalMin,
