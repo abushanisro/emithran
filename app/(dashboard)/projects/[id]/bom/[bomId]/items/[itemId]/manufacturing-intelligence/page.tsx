@@ -129,6 +129,7 @@ import { cutLengthHighlight } from '@/lib/features/cut-length-highlight';
 import { CadEvidencePanel, type CadEvidence } from '@/components/features/process-planning/CadEvidencePanel';
 import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, DFMSeverity, HoleGroup, HoleGroupLocation, FeatureNodeV2, FaceMapEntry, DFMScoresResponse } from '@/lib/types/manufacturing';
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
+import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { useAuth } from '@/lib/providers/auth-context';
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -10214,11 +10215,7 @@ export default function ManufacturingIntelligencePage() {
                           <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
                             <AlertCircle className="h-8 w-8 opacity-30" />
                             <span className="text-sm">
-                              {!item.file3dPath
-                                ? 'No 3D model attached'
-                                : file3dUrlError
-                                  ? file3dUrlError
-                                  : 'Loading 3D model…'}
+                              {modelViewerMessage(item, file3dUrlError)}
                             </span>
                             {item.file3dPath && file3dUrlError && (
                               <button
