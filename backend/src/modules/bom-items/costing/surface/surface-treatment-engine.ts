@@ -416,8 +416,10 @@ const loadbarFits = (part: SecondaryPartFacts, pool: SecondaryMachine[], areaLim
   pool.flatMap((m) => loadbarFit(part, m, areaLimit) ?? []);
 
 function anodize(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
-  const type = anodizeTypeFromCallout(part.surfaceCallout);
-  if (!type) return notCosted(base, 'gap', 'The anodizing type (Type I, IB, IC, II or III) is needed from the drawing surface callout: each line runs one type.');
+  const stated = anodizeTypeFromCallout(part.surfaceCallout);
+  // The reference runs one line per type and defines no default: with no type on the drawing the most common, Type II
+  // (sulfuric acid, MIL-A-8625), is assumed, and the line is provisional and says so.
+  const type = stated ?? 'Type II';
   if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed to load the loadbar.');
   if (part.surfaceAreaMm2 == null || part.surfaceAreaMm2 <= 0) return notCosted(base, 'gap', 'Part surface area is needed (each loadbar has a maximum load surface area).');
   const batch = part.batchSize;
@@ -429,11 +431,12 @@ function anodize(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, 
   const r = costed(base, fit.m, {
     perPartSec: (fit.windowHr * 3600) / fit.n,
     trace: [
-      { label: 'Anodizing type', value: type, source: 'drawing surface callout' },
+      { label: 'Anodizing type', value: type, source: stated ? 'drawing surface callout' : 'ASSUMED: the drawing names no type (Type II is the most common)' },
       { label: 'Load window time', value: fit.windowHr, unit: 'hr', source: `line ${fit.m.name} (one loadbar per window)` },
       { label: 'Parts per loadbar', value: fit.n, source: `loadbar window, spacing factor ${fit.f}, limited by ${fit.by}` },
     ],
     highlight: 'whole_part',
+    ...(stated ? {} : { provisional: true, warnings: ['Provisional: the drawing names no anodizing type, so Type II is assumed (the reference defines no default). Type I is thinner and cheaper, Type III hard anodize costs more: name the type on the drawing.'] }),
   }, ref, batch);
   // The line charge for a batch never falls below the line minimum batch cost.
   const minBatch = num(fit.m.specs.min_batch_cost_usd);
@@ -656,14 +659,150 @@ function degrease(base: Base, part: SecondaryPartFacts, ref: SecondaryReference,
   }, ref, part.batchSize);
 }
 
+/** Powder spray: grams of powder = area x film thickness x specific gravity / transfer efficiency; time = grams / gun flow rate. */
+function powderSpray(part: SecondaryPartFacts, ref: SecondaryReference): { sec: number; trace: SecondaryTraceStep[]; warnings: string[] } | string {
+  const frac = variable(ref, 'defaultFractionOfSurfaceAreaPowderCoated'), eff = variable(ref, 'powderCoatSprayEfficiency'), flow = variable(ref, 'defaultPowderCoatingTopCoatFlowRate');
+  if (frac == null || eff == null || flow == null || eff <= 0 || flow <= 0) return 'The powder coating variables are not staged: run migration 819.';
+  if (part.surfaceAreaMm2 == null || part.surfaceAreaMm2 <= 0) return 'Part surface area is needed.';
+  const t = PROVISIONAL.powderFilmThicknessUm, sg = PROVISIONAL.powderSpecificGravity;
+  const areaM2 = (part.surfaceAreaMm2 / 1e6) * frac;
+  const grams = (areaM2 * t.value * sg.value) / eff;   // 1 µm x 1 g/cm³ = 1 g/m²
+  return {
+    sec: (grams / flow) * 60,
+    trace: [
+      { label: 'Coated area', value: Number(areaM2.toFixed(5)), unit: 'm²', source: `CAD surface area × ${frac} (defaultFractionOfSurfaceAreaPowderCoated)` },
+      provisionalTrace('Film thickness', t),
+      provisionalTrace('Powder specific gravity', sg),
+      { label: 'Powder sprayed', value: Number(grams.toFixed(2)), unit: 'g', source: `area × thickness × specific gravity / transfer efficiency ${eff} (powderCoatSprayEfficiency)` },
+      { label: 'Gun flow rate', value: flow, unit: 'g/min', source: `${SRC_VAR} (defaultPowderCoatingTopCoatFlowRate)` },
+    ],
+    warnings: [provisionalWarning('the film thickness', t), provisionalWarning('the powder specific gravity', sg), 'Top coat only: the clear coat and the powder cost per kg are not priced.'],
+  };
+}
+
+function powderCoatCart(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('powder coat booth'));
+  const bbox = part.bboxMm;
+  if (!bbox) return notCosted(base, 'gap', 'Part size is needed to fit the booth.');
+  const table = ref.lookups.get('powderCoatHandling');
+  if (!table) return notCosted(base, 'gap', 'powderCoatHandling is not staged: run migration 819.');
+  if (part.weightKg == null || part.weightKg <= 0) return notCosted(base, 'gap', 'Part weight is needed for the load and unload time (powderCoatHandling): choose a material first.');
+  const row = table.map((r) => ({ kg: num(r['Weight (kg)']), load: num(r['Load Time (s)']), unload: num(r['Unload Time (s)']) }))
+    .filter((r): r is { kg: number; load: number; unload: number } => r.kg != null && r.load != null && r.unload != null)
+    .sort((a, b) => a.kg - b.kg).find((r) => part.weightKg! <= r.kg);
+  if (!row) return notCosted(base, 'gap', 'No powderCoatHandling row covers this part weight.');
+  const spray = powderSpray(part, ref);
+  if (typeof spray === 'string') return notCosted(base, 'gap', spray);
+  const [L, W, H] = sorted(bbox);
+  const m = pickMachine(base.process, pool.filter((x) => {
+    const b = [num(x.specs.booth_length_mm), num(x.specs.booth_width_mm), num(x.specs.booth_height_mm)];
+    const kg = num(x.specs.cart_weight_limit_kg);
+    return b.every((v) => v != null) && maxPartsInBox([L, W, H], (b as number[]).sort((p, q) => q - p) as [number, number, number]) > 0 && (kg == null || part.weightKg! <= kg);
+  }), ref);
+  if (!m) return notCosted(base, 'gap', 'No powder coat booth takes this part.');
+  return costed(base, m, {
+    perPartSec: spray.sec + row.load + row.unload,
+    trace: [...spray.trace, { label: 'Load and unload', value: row.load + row.unload, unit: 's', source: `${SRC_LOOKUP('powderCoatHandling')} (≤ ${row.kg} kg)` }],
+    warnings: [...spray.warnings, 'Cart spacing and oven cure are not part of this line (see Oven Cure).'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+}
+
+function conveyorPowderCoating(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('conveyor powder booth'));
+  if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed to fit the booth opening.');
+  const spray = powderSpray(part, ref);
+  if (typeof spray === 'string') return notCosted(base, 'gap', spray);
+  const [, W, H] = sorted(part.bboxMm);
+  const m = pickMachine(base.process, pool.filter((x) => {
+    const w = num(x.specs.opening_width_mm), h = num(x.specs.max_nesting_height_mm);
+    return (w == null || W <= w) && (h == null || H <= h);
+  }), ref);
+  if (!m) return notCosted(base, 'gap', 'No conveyor powder booth opening takes this part.');
+  return costed(base, m, {
+    perPartSec: spray.sec, trace: spray.trace,
+    warnings: [...spray.warnings, 'Loading and unloading are the Conveyor Part Loading / Unloading operations; one gun is assumed.'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+}
+
+function screenPrinting(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('screen printing'));
+  if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed for the printed area.');
+  const colors = variable(ref, 'defaultNumScreenPrintColors'), colorMult = variable(ref, 'screenPrintColorMultiplier');
+  const sizes = ref.lookups.get('screenPrintSizeMult');
+  if (colors == null || colorMult == null || !sizes) return notCosted(base, 'gap', 'The screen printing variables are not staged: run migration 819.');
+  const m = pickMachine(base.process, pool.filter((x) => num(x.specs.application_cost_usd_per_m2) != null), ref);
+  if (!m) return notCosted(base, 'gap', 'No screen printing machine with an application cost is on file.');
+  // The printed region is not a CAD fact: the part's largest face (its two longest sizes) is assumed.
+  const [L, W] = sorted(part.bboxMm);
+  const row = sizes.map((r) => ({ len: num(r['Length (mm)']), wid: num(r['Width (mm)']), mult: num(r['Multiplier']) }))
+    .filter((r): r is { len: number; wid: number; mult: number } => r.len != null && r.wid != null && r.mult != null)
+    .sort((a, b) => a.len - b.len).find((r) => L <= r.len && W <= r.wid);
+  if (!row) return notCosted(base, 'gap', 'No screenPrintSizeMult row covers the printed size.');
+  const perM2 = num(m.specs.application_cost_usd_per_m2)!;
+  const colorFactor = 1 + colorMult * (colors - 1);
+  const areaM2 = (L * W) / 1e6;
+  const usd = areaM2 * perM2 * row.mult * colorFactor;
+  const out = priced(base, m, usd, [
+    { label: 'Printed area', value: Number(areaM2.toFixed(5)), unit: 'm²', source: `ASSUMED: the part's largest face, ${L.toFixed(0)} × ${W.toFixed(0)} mm` },
+    { label: 'Application cost', value: perM2, unit: 'USD/m²', source: `machine ${m.name}` },
+    { label: 'Size multiplier', value: row.mult, source: SRC_LOOKUP('screenPrintSizeMult') },
+    { label: 'Colors', value: colors, source: `${SRC_VAR} (defaultNumScreenPrintColors; each extra color adds ${colorMult})` },
+  ], ['Provisional: the printed area is not a CAD fact; the part\'s largest face is assumed. The graphic complexity multiplier is not applied. State the printed area and colors on the drawing.']);
+  return { ...out, provisional: true, reason: `Provisional estimate, not reference data: ${out.warnings[0]}` };
+}
+
+function maskBench(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('mask bench'));
+  const holes = part.features.filter((f) => /hole/i.test(String(f.feature_type)));
+  const n = holes.reduce((a, f) => a + f.occurrences.length, 0);
+  if (n === 0) return notCosted(base, 'not_applicable', 'The part has no detected hole to plug: the reference masks holes on the bench (maskBenchMaxPlugSize), and nothing else is a CAD fact.');
+  const m = pickMachine(base.process, pool.filter((x) => num(x.specs.mask_plug_time_s) != null), ref);
+  if (!m) return notCosted(base, 'gap', 'No mask bench with a plug time is on file.');
+  const plug = num(m.specs.mask_plug_time_s)!;
+  const maxSize = variable(ref, 'maskBenchMaxPlugSize');
+  return costed(base, m, {
+    perPartSec: n * plug,
+    trace: [
+      { label: 'Holes to plug', value: n, source: 'CAD hole features' },
+      { label: 'Plug time', value: plug, unit: 's', source: `machine ${m.name} (mask_plug_time_s)` },
+    ],
+    warnings: [`Provisional: every detected hole is plugged once; the reference plugs holes under ${maxSize ?? '—'} mm and needs a second plug for a long hole, but the hole size and depth are not read here.`],
+    highlight: 'features', featureIds: holes.map((f) => f.id), provisional: true,
+  }, ref, part.batchSize);
+}
+
+function maskSpray(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('mask spray booth'));
+  const layers = variable(ref, 'defaultNumMaskantLayers');
+  if (layers == null) return notCosted(base, 'gap', 'defaultNumMaskantLayers is not staged: run migration 819.');
+  const dias = part.holeDiametersMm ?? [];
+  if (dias.length === 0) return notCosted(base, 'not_applicable', 'The part has no CAD-counted hole to mask; the reference does not say which other surfaces are masked.');
+  if (part.wallThicknessMm == null || part.wallThicknessMm <= 0) return notCosted(base, 'gap', 'The wall thickness is needed for the depth of a hole to mask.');
+  const m = pickMachine(base.process, pool.filter((x) => num(x.specs.spray_rate_mm2_per_s) != null && num(x.specs.spray_rate_mm2_per_s)! > 0), ref);
+  if (!m) return notCosted(base, 'gap', 'No mask spray booth with a spray rate is on file.');
+  const rate = num(m.specs.spray_rate_mm2_per_s)!;
+  // Masked area = the bore of every CAD-counted hole (pi x diameter x wall); the depth of a hole is not read.
+  const areaMm2 = dias.reduce((a, d) => a + Math.PI * d * part.wallThicknessMm!, 0);
+  const progHr = num(m.specs.programming_time_hr) ?? 0;
+  return costed(base, m, {
+    perPartSec: (areaMm2 * layers) / rate,
+    batchExtraSec: progHr * 3600,
+    trace: [
+      { label: 'Masked area', value: Number(areaMm2.toFixed(1)), unit: 'mm²', source: `ASSUMED: the bore of ${dias.length} CAD-counted holes (π × diameter × wall ${part.wallThicknessMm} mm)` },
+      { label: 'Maskant layers', value: layers, source: `${SRC_VAR} (defaultNumMaskantLayers)` },
+      { label: 'Spray rate', value: rate, unit: 'mm²/s', source: `machine ${m.name}` },
+      { label: 'Programming (once per batch)', value: progHr, unit: 'hr', source: `machine ${m.name}` },
+    ],
+    warnings: ['Provisional: only the bores of the CAD-counted holes are masked (the reference does not say which surfaces are), each as wall thickness deep. The tack time between layers and the maskant material are not priced.'],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+}
+
 /** Why each remaining process cannot be timed from the reference data. */
 const UNDEFINED: Record<string, string> = {
   'Conveyor Conversion Coating': 'The reference has no machine file for this process.',
-  'Conveyor Powder Coating': 'No line speed or spray time for the conveyor booth is in the reference data.',
-  'Mask-Bench': 'Which features are masked is a drawing requirement, not a CAD fact.',
-  'Mask-Spray': 'Which surfaces are masked is a drawing requirement, not a CAD fact.',
-  'Powder Coat Cart': 'The coating thickness and spray time rule are not in the reference data (only flow rates and handling times are).',
-  'Screen Printing': 'The printed area is a drawing requirement, not a CAD fact.',
 };
 
 type Model = (base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]) => SecondaryProcessResult;
@@ -692,6 +831,11 @@ const MODELS: Record<string, Model> = {
   'Vibratory Finishing': vibratoryFinishing,
   'Shot Blast': shotBlast,
   'Degrease': degrease,
+  'Powder Coat Cart': powderCoatCart,
+  'Conveyor Powder Coating': conveyorPowderCoating,
+  'Screen Printing': screenPrinting,
+  'Mask-Bench': maskBench,
+  'Mask-Spray': maskSpray,
 };
 
 /** The processes this engine can cost. The process catalog marks exactly these

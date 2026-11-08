@@ -27,6 +27,20 @@ export const PROVISIONAL = {
     value: 45, unit: 'min', range: [30, 120],
     source: 'Equipment-supplier and STERC figures of 30-60 min for deburring (up to 2 h for hardened steel); one blog gives 1-4 h by media. No authoritative per-media table exists. Depends on media type, part material and hardness.',
   },
+  // Induction hardening: a single-shot cycle heats and quenches one part in seconds, not hours.
+  inductionHardenScanSec: {
+    value: 6, unit: 's', range: [4, 8],
+    source: 'Induction-hardening supplier and trade literature: single-shot cycles of 4-8 s, typically about 6 s for a small shaft or pin. A long part scanned along its length, or a large case depth, takes longer: this underestimates them.',
+  },
+  // Powder film build: general industrial work specifies 2-4 mil; the density is the powder's specific gravity.
+  powderFilmThicknessUm: {
+    value: 75, unit: 'µm', range: [50, 100],
+    source: 'Trade guides (Powder Coated Tough / Products Finishing / UnionFab): general industrial work 2-4 mil (50-100 µm), outdoor furniture 3-6 mil, heavy-duty structural 4-6 mil. 75 µm (3 mil) is the middle of the general range; a drawing that states a thickness replaces it.',
+  },
+  powderSpecificGravity: {
+    value: 1.5, unit: 'g/cm³', range: [1.0, 2.0],
+    source: 'Powder-coating coverage charts span specific gravity 1.0-2.0 and the worked examples use 1.5. A supplier data sheet gives the real value for a chosen powder.',
+  },
 } as const satisfies Record<string, ProvisionalValue>;
 
 /** The line a trace shows for a provisional input. */

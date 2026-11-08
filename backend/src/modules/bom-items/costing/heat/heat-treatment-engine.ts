@@ -30,6 +30,7 @@ import {
   costed, notCosted, pickMachine, variable, num, sorted, maxPartsInBox,
   type SecondaryCalculatorRun, type SecondaryMachine, type SecondaryPartFacts, type SecondaryProcessResult, type SecondaryReference, type SecondaryTraceStep,
 } from '../secondary/secondary-process-engine';
+import { PROVISIONAL, provisionalTrace, provisionalWarning } from '../secondary/provisional-reference';
 import { runReferenceCalculator, type ReferenceCalcRun, type CalcSeed, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
 
 export const HEAT_TREATMENT_SOURCE_VERSION = '2026-HeatTreat';
@@ -275,6 +276,81 @@ function hip(base: Base, part: HeatTreatmentFacts, ref: SecondaryReference, pool
   }, ref, part.batchSize);
 }
 
+// ── provisional services: processes the reference gives economics for but no price ──
+// memory/Countries data holds a machine-economics row for Induction Harden, Stainless Steel Harden,
+// Stress Relief and Vacuum Air Harden with High Temper, but memory/Heat treatment/Machine has no
+// service row (Unit Weight Cost, Min Batch Cost, Min Batch Weight) for them. Their economics rows
+// are the same as a sibling service's (same footprint, same overhead rate), so they are priced as
+// that sibling's service, flagged provisional, and the line says so.
+
+const provisionalNote = (r: SecondaryProcessResult, note: string): SecondaryProcessResult => {
+  if (r.status !== 'costed') return r;
+  const warnings = [`Provisional: ${note}`, ...r.warnings];
+  return { ...r, provisional: true, reason: `Provisional estimate, not reference data: ${warnings[0]}`, warnings };
+};
+
+/** The sibling's machines the economics row equals, as the pool this process prices on. */
+const poolOf = (all: ReadonlyArray<SecondaryMachine>, process: string) => all.filter((m) => m.machineClass === classOf(process));
+
+type PooledModel = (base: Base, part: HeatTreatmentFacts, ref: SecondaryReference, all: ReadonlyArray<SecondaryMachine>, calculators: ReferenceCalculators | null | undefined) => SecondaryProcessResult;
+
+const asSibling = (sibling: string, note: string): PooledModel => (base, part, ref, all, calculators) => {
+  const pool = poolOf(all, sibling);
+  if (pool.length === 0) return notCosted(base, 'gap', `${base.process} is priced as ${sibling}, which has no service in the reference data for this location.`);
+  const r = byWeight(base, part, ref, pool, calculators);
+  return provisionalNote(r, `${base.process} has no service price in the reference; its machine-economics row equals ${sibling}'s, so it is priced as the ${sibling} service. ${note}`);
+};
+
+/** Harden, then temper: the two reference services added. */
+const hardenAndTemper: PooledModel = (base, part, ref, all, calculators) => {
+  const parts = ['Vacuum Air Harden', 'Vacuum Temper'].map((p) => ({ p, r: poolOf(all, p).length ? byWeight({ ...base, process: base.process }, part, ref, poolOf(all, p), calculators) : null }));
+  const missing = parts.find((x) => x.r == null || x.r.status !== 'costed');
+  if (missing) return notCosted(base, 'gap', `${base.process} is a Vacuum Air Harden and a Vacuum Temper: ${missing.p} is not priced (${missing.r?.reason ?? 'no service in the reference data for this location'}).`);
+  const [h, t] = [parts[0]!.r!, parts[1]!.r!];
+  const add = (a: number | null, b: number | null) => (a == null || b == null ? null : Number((a + b).toFixed(4)));
+  return provisionalNote({
+    ...h,
+    process: base.process, machineClass: base.machineClass,
+    cycleTimeSec: add(h.cycleTimeSec, t.cycleTimeSec), setupMin: add(h.setupMin, t.setupMin),
+    materialUsdPerPart: (h.materialUsdPerPart ?? 0) + (t.materialUsdPerPart ?? 0),
+    costPerPartUsd: add(h.costPerPartUsd, t.costPerPartUsd),
+    trace: [
+      ...h.trace.map((s) => ({ ...s, label: `Harden: ${s.label}` })),
+      ...t.trace.map((s) => ({ ...s, label: `Temper: ${s.label}` })),
+    ],
+    warnings: [],
+    calculator: undefined,
+  }, `${base.process} has no service price in the reference; it is the Vacuum Air Harden service plus the Vacuum Temper service (hardening, then the high temper), each priced from its own reference row. The temper is billed as its own minimum batch.`);
+};
+
+/** A seconds-per-part process on its sibling furnace's economics: no weight charge, no furnace load. */
+const induction: PooledModel = (base, part, ref, all) => {
+  const pool = poolOf(all, 'Vacuum Air Harden');
+  if (pool.length === 0) return notCosted(base, 'gap', 'Induction Harden is timed on the Vacuum Air Harden economics row, which has no machine for this location.');
+  if (part.weightKg == null || part.weightKg <= 0) return notCosted(base, 'gap', 'Part weight is needed for the handling time: choose a material first.');
+  const hs = handlingSeconds(ref, part.weightKg);
+  if (hs == null) return notCosted(base, 'gap', 'tblHandlingTimes is not staged or covers no row for this weight.');
+  const m = pickMachine(base.process, pool, ref)!;
+  const scan = PROVISIONAL.inductionHardenScanSec;
+  const r = costed(base, m, {
+    perPartSec: hs.sec + scan.value,
+    trace: [
+      { label: 'Handling', value: hs.sec, unit: 's', source: hs.source },
+      provisionalTrace('Induction scan and quench', scan),
+    ],
+    warnings: [provisionalWarning('the induction cycle per part', scan)],
+    highlight: 'whole_part', provisional: true,
+  }, ref, part.batchSize);
+  return provisionalNote(r, 'Induction Harden has no service price in the reference; it is timed per part (handling plus the induction cycle) on the machine-economics row it shares with Vacuum Air Harden. Case depth and coil tooling are not priced.');
+};
+
+const POOLED: Record<string, PooledModel> = {
+  'Stress Relief': asSibling('Standard Temper', 'A stress relief holds near 620 °C for about 1 h per 25 mm of section plus the furnace cycle, longer than a temper: this may understate it.'),
+  'Stainless Steel Harden': asSibling('Vacuum Air Harden', 'A martensitic stainless hardens near 1010 °C with a gas quench; its temper is a separate operation and is not included.'),
+  'Vacuum Air Harden with High Temper': hardenAndTemper,
+  'Induction Harden': induction,
+};
+
 type Model = (base: Base, part: HeatTreatmentFacts, ref: SecondaryReference, pool: SecondaryMachine[], calculators: ReferenceCalculators | null | undefined) => SecondaryProcessResult;
 const MODELS: Record<string, Model> = {
   'Carburize': carburize,
@@ -294,6 +370,8 @@ export function computeHeatTreatments(
 ): SecondaryProcessResult[] {
   return HEAT_TREATMENT_PROCESSES.map((base) => {
     const pool = machines.filter((m) => m.machineClass === base.machineClass);
+    const pooled = POOLED[base.process];
+    if (pool.length === 0 && pooled) return pooled(base, part, ref, machines, calculators);
     if (pool.length === 0) return notCosted(base, 'gap', `The reference has no machine or service for ${base.process}.`);
     return (MODELS[base.process] ?? ((b, p, r, pl, c) => byWeight(b, p, r, pl, c)))(base, part, ref, pool, calculators);
   });

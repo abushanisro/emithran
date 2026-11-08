@@ -268,6 +268,8 @@ export class SecondaryProcessService {
       isMachined: family === 'unknown' ? null : isMachiningFamily(family),
       surfaceCallout: surfaceCalloutOf(item),
       features: partFeatures(fg, family),
+      holeCount: num(fg?.summary?.holeCount),
+      holeDiametersMm: Array.isArray(fg?.summary?.holeDiameters) ? (fg.summary.holeDiameters as unknown[]).map((d) => num(d)).filter((d): d is number => d != null && d > 0) : null,
       batchSize,
     };
 
