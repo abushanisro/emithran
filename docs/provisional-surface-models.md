@@ -47,7 +47,6 @@ Powder figures: general industrial film 2-4 mil (50-100 µm) per Powder Coated T
 | Black Oxide | its labor rate is the "2 - Metal" wage grade's (migration 981; `surface_treatment_wage_grades.csv` puts Black Oxide on that grade and every other machine of the grade carries 29.95 in the USA) |
 | CMM Inspection | a part whose feature list holds only DFM findings (a molded or cast part) measures its CAD-counted holes (`summary.holeCount`) as the table's Simple Hole, 4 touches each; faces and other features are not measured |
 | Mask-Spray | masked area = the bores of the CAD-counted holes (π × diameter × wall thickness); time = area × maskant layers / booth spray rate, programming once per batch; tack time and maskant material not priced |
-| Age, Hot Isostatic Pressing | not applicable to a plastic or rubber part (metal heat treatments) |
 
 ## Still not costed
 | Operation | Why |
