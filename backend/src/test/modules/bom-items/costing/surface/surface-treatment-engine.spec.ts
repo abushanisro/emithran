@@ -228,8 +228,8 @@ describe('migration 821 matches the engine', () => {
     expect(rows.map((r) => [r.process, r.cls]).sort()).toEqual(SURFACE_PROCESSES.map((p) => [p.process, p.machineClass]).sort());
   });
 
-  it('marks modeled exactly the processes the engine costs (821, then 898, 979, 980 and 982 on top)', () => {
-    const later = ['898_surface_treatment_batch_load_processes.sql', '979_surface_treatment_provisional_processes.sql', '980_surface_treatment_powder_coating.sql', '982_surface_treatment_mask_and_screen.sql'].flatMap((f) => {
+  it('marks modeled exactly the processes the engine costs (821, then 898, 979, 980, 982 and 983 on top)', () => {
+    const later = ['898_surface_treatment_batch_load_processes.sql', '979_surface_treatment_provisional_processes.sql', '980_surface_treatment_powder_coating.sql', '982_surface_treatment_mask_and_screen.sql', '983_surface_treatment_mask_spray.sql'].flatMap((f) => {
       const text = fs.readFileSync(path.resolve(__dirname, '../../../../../../migrations/' + f), 'utf-8');
       const block = text.slice(text.indexOf('WITH ref'), text.indexOf('UPDATE process_taxonomy'));
       return [...block.matchAll(/\(\$str\$([^$]+)\$str\$, \$str\$([^$]+)\$str\$, (true|false)\)/g)].map((m) => [m[1], m[3] === 'true'] as [string, boolean]);
@@ -254,6 +254,7 @@ describe('provisional surface models', () => {
     ...machines('conveyor_powder_coating_machines.csv', 'Conveyor Powder Coating', [null, null, null]),
     ...machines('screen_printing_machines.csv', 'Screen Printing', [null, null, null]),
     ...machines('mask_bench_machine.csv', 'Mask-Bench', [null, null, null]),
+    ...machines('mask_spray_machines.csv', 'Mask-Spray', [null, null, null]),
     ...machines('anodizing_machines.csv', 'Anodize', ['Loadbar Window Length (mm)', 'Loadbar Window Width (mm)', 'Loadbar Window Height (mm)']),
   ];
   const block: SecondaryPartFacts = { bboxMm: { length: 200, width: 100, height: 50 }, surfaceAreaMm2: 60000, weightKg: 1, wallThicknessMm: 5, materialCutCode: null, materialTypeName: null, features: [], batchSize: 100 };
@@ -404,6 +405,7 @@ describe('provisional rules for what the drawing does not state', () => {
   const provPool: SecondaryMachine[] = [
     ...machines('screen_printing_machines.csv', 'Screen Printing', [null, null, null]),
     ...machines('mask_bench_machine.csv', 'Mask-Bench', [null, null, null]),
+    ...machines('mask_spray_machines.csv', 'Mask-Spray', [null, null, null]),
     ...machines('anodizing_machines.csv', 'Anodize', ['Loadbar Window Length (mm)', 'Loadbar Window Width (mm)', 'Loadbar Window Height (mm)']),
   ];
   const run = (process: string, p = part) => computeSurfaceTreatments(p, reference, provPool).find((r) => r.process === process)!;
@@ -441,6 +443,21 @@ describe('provisional rules for what the drawing does not state', () => {
     const eff = Number(reference.variables.get('defaultMachineEfficiency') ?? 1);
     expect(r.cycleTimeSec! * r.machine!.goodPartYield * eff / adj).toBeCloseTo(3 * Number(m.specs.mask_plug_time_s), 1);
     expect(run('Mask-Bench').status).toBe('not_applicable');
+  });
+
+  it('mask spray: bore area of the CAD-counted holes x maskant layers / spray rate, programming once per batch; no hole is not applicable', () => {
+    const withHoles: SecondaryPartFacts = { ...part, wallThicknessMm: 2, holeDiametersMm: [4, 6] };
+    const r = run('Mask-Spray', withHoles);
+    const m = provPool.find((x) => x.name === r.machine!.name)!;
+    const area = Math.PI * 4 * 2 + Math.PI * 6 * 2;
+    expect(r.status).toBe('costed');
+    expect(r.provisional).toBe(true);
+    expect(r.trace.find((t) => t.label === 'Masked area')?.value).toBeCloseTo(area, 0);
+    const adj = Number(reference.variables.get('cycleTimeAdjustmentFactor') ?? 1);
+    const eff = Number(reference.variables.get('defaultMachineEfficiency') ?? 1);
+    expect(r.cycleTimeSec! * r.machine!.goodPartYield * eff / adj).toBeCloseTo((area * v('defaultNumMaskantLayers')) / Number(m.specs.spray_rate_mm2_per_s), 2);
+    expect(r.setupMin).toBeCloseTo(r.machine!.setupHr * 60 + Number(m.specs.programming_time_hr) * 60, 1);
+    expect(run('Mask-Spray').status).toBe('not_applicable');
   });
 
   it('Black Oxide has a wage grade in memory/ and every other machine of that grade carries one labor rate (migration 981 gives it)', () => {

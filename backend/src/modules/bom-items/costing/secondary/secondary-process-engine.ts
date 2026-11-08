@@ -70,6 +70,8 @@ export interface SecondaryPartFacts {
   features: ReadonlyArray<SecondaryFeature>;
   /** Holes the CAD summary counts (any family), when the part's feature list holds no measurable feature. */
   holeCount?: number | null;
+  /** The CAD summary's hole diameters (mm), one per hole. */
+  holeDiametersMm?: ReadonlyArray<number> | null;
   batchSize: number | null;
 }
 
