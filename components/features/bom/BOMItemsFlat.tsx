@@ -454,6 +454,9 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
             // by role here means a control added later is covered without
             // having to remember to stop propagation in it.
             if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return;
+            // A child's card is rendered inside its parent's card, so the click would bubble up and open the
+            // parent after the child. The card that was clicked is the only one that handles it.
+            e.stopPropagation();
             onViewItem?.(item, 'intelligence');
           }}
           className={[
