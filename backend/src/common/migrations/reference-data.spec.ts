@@ -13,8 +13,11 @@ const manifest = JSON.parse(fs.readFileSync(path.join(migrationsDir, 'REFERENCE_
   noNewRowsAfter: number;
   reference: string[];
   shared: Record<string, string>;
+  /** Migrations after the cut-off that still write reference rows, each with the reason and the condition for removing the entry. */
+  exceptions: Record<string, string>;
 };
 const protectedTables = new Set([...manifest.reference, ...Object.keys(manifest.shared)]);
+const afterCutoff = (f: string) => f.endsWith('.sql') && (migrationNumber(f) ?? 0) > manifest.noNewRowsAfter && migrationNumber(f) !== 999;
 const qualified = (t: string) => (t.includes('.') ? t : `public.${t}`);
 
 /** The rows a migration writes into reference or shared tables: `file: VERB table`. Procedural bodies are not inspected. */
@@ -33,11 +36,25 @@ describe('reference data stays out of new migrations', () => {
   });
 
   it('no migration after the cut-off writes rows into a reference or shared table', () => {
-    const newer = fs
-      .readdirSync(migrationsDir)
-      .filter((f) => f.endsWith('.sql') && (migrationNumber(f) ?? 0) > manifest.noNewRowsAfter && migrationNumber(f) !== 999);
+    const newer = fs.readdirSync(migrationsDir).filter((f) => afterCutoff(f) && !(f in manifest.exceptions));
     const writes = newer.flatMap((f) => referenceWrites(f, fs.readFileSync(path.join(migrationsDir, f), 'utf8')));
     expect(writes).toEqual([]);
+  });
+
+  it('each exception is a real migration after the cut-off with a stated reason and a condition for removal, so the list cannot hold a vague or stale entry', () => {
+    const files = new Set(fs.readdirSync(migrationsDir).filter(afterCutoff));
+    expect(Object.keys(manifest.exceptions).length).toBeGreaterThan(0);
+    for (const [file, reason] of Object.entries(manifest.exceptions)) {
+      expect(files.has(file)).toBe(true);
+      expect(reason.length).toBeGreaterThan(80);
+      expect(reason).toMatch(/Remove this entry when/);
+    }
+  });
+
+  it('an exception only covers the migration it names: the same write in another file is still caught', () => {
+    const writes = referenceWrites('978_plastic_material_cut_codes.sql', 'UPDATE raw_materials SET cut_code = 1;');
+    expect(writes).toEqual(['978_plastic_material_cut_codes.sql: UPDATE public.raw_materials']);
+    expect('984_other.sql' in manifest.exceptions).toBe(false);
   });
 
   it('would catch one (the check is not vacuous)', () => {

@@ -48,6 +48,12 @@ Powder figures: general industrial film 2-4 mil (50-100 µm) per Powder Coated T
 | CMM Inspection | a part whose feature list holds only DFM findings (a molded or cast part) measures its CAD-counted holes (`summary.holeCount`) as the table's Simple Hole, 4 touches each; faces and other features are not measured |
 | Mask-Spray | masked area = the bores of the CAD-counted holes (π × diameter × wall thickness); time = area × maskant layers / booth spray rate, programming once per batch; tack time and maskant material not priced |
 
+## Owed to the reference-data package
+
+The catalog flags (`process_taxonomy.roadmap_status = 'production'`, `process_calculator_mappings.is_active = true`) for the processes modeled here are reference data. A migration may not write them (`common/migrations/reference-data.spec.ts`), so they are not set. Nothing the user sees reads them: the Secondary operations list comes from the engine, not from the catalog. They belong in the reference-data package, for: Black Oxide, Conveyor Oven Cure, Degrease, Oven Cure, Shot Blast, Vibratory Finishing, Powder Coat Cart, Conveyor Powder Coating, Screen Printing, Mask-Bench and Mask-Spray. The engine's own list (`SURFACE_MODELED_PROCESSES`) is the source of truth until then; a test proves the catalog never marks modeled a process the engine does not cost.
+
+Two migrations that write reference rows still exist and are listed with their reasons in `backend/migrations/REFERENCE_DATA.json` under `exceptions`: 978 (the cut codes of the plastic materials) and 981 (the Black Oxide labor rate). Each entry says when to remove it.
+
 ## Still not costed
 | Operation | Why |
 |---|---|
