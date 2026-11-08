@@ -4360,20 +4360,15 @@ function MatPropRow({ label, value }: { label: string; value: React.ReactNode })
 }
 
 function MaterialPickerDialog({
-  open, onClose, onSelect, processGroup,
+  open, onClose, onSelect,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (grade: string) => void;
-  /** The part's process group: only its materials are listed (migration 879). */
-  processGroup: string | null;
 }) {
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [classFilter, setClassFilter] = useState('');
-  // The part's process limits the list to its linked material groups (migration 879);
-  // this switch lifts that so every process group is available.
-  const [showAllGroups, setShowAllGroups] = useState(false);
   const [selected, setSelected] = useState<RawMaterial | null>(null);
 
   // Search is ranked SERVER-side (GET /raw-materials?search=) by the same
@@ -4391,9 +4386,7 @@ function MaterialPickerDialog({
   // page), and their option lists come from the catalog's own filter options so a
   // chosen filter never shrinks the list it was chosen from.
   const { data: filterOptions } = useRawMaterialFilterOptions();
-  const scope = processGroup && !showAllGroups ? { processGroup } : {};
   const serverFilters = {
-    ...scope,
     ...(groupFilter ? { materialGroup: groupFilter } : {}),
     ...(classFilter ? { materialClass: classFilter } : {}),
   };
@@ -4404,8 +4397,7 @@ function MaterialPickerDialog({
   );
   const isLoading = isSearching ? searchFetching && !searchData : catalogLoading;
   const materials: RawMaterial[] = isSearching ? (searchData?.items ?? []) : (catalog?.items ?? []);
-  const linkedGroups = catalog?.processMaterialGroups ?? [];
-  const groups = scope.processGroup && linkedGroups.length > 0 ? linkedGroups : (filterOptions?.materialGroups ?? []);
+  const groups = filterOptions?.materialGroups ?? [];
   const classes = filterOptions?.materialClasses ?? [];
   const total = isSearching ? (searchData?.total ?? materials.length) : (catalog?.total ?? materials.length);
 
@@ -4476,19 +4468,6 @@ function MaterialPickerDialog({
         <DialogHeader className="px-5 pt-4 pb-3 border-b shrink-0">
           <DialogTitle>Material Database</DialogTitle>
           <p className="text-xs text-muted-foreground">Click a row to view all properties, then apply to this BOM item.</p>
-          {processGroup && (showAllGroups || catalog?.processMaterialGroups) && (
-            <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-              {showAllGroups
-                ? <>Showing every process group.</>
-                : linkedGroups.length > 0
-                  ? <>Materials for <span className="font-medium text-foreground">{processGroup}</span>: {linkedGroups.join(', ')}</>
-                  : <>No material group is linked to <span className="font-medium text-foreground">{processGroup}</span> yet; showing the whole database.</>}
-              <label className="inline-flex items-center gap-1 cursor-pointer text-foreground">
-                <input type="checkbox" checked={showAllGroups} onChange={(e) => { setShowAllGroups(e.target.checked); setGroupFilter(''); }} />
-                Show all process groups
-              </label>
-            </p>
-          )}
         </DialogHeader>
 
         {/* Search + filter */}
@@ -5351,7 +5330,7 @@ function CostGuidePanel({
                   <button
                     onMouseDown={(e) => { e.preventDefault(); setMatPickerOpen(true); setMatDropOpen(false); }}
                     className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 leading-none transition-colors"
-                    title={selectedProcessGroup ? `Browse ${selectedProcessGroup} materials` : "Browse the raw materials database"}
+                    title="Browse the raw materials database"
                   >
                     <Database className="h-3 w-3" />
                     Browse
@@ -5838,7 +5817,6 @@ function CostGuidePanel({
       </AlertDialog>
 
       <MaterialPickerDialog
-        processGroup={selectedProcessGroup}
         open={matPickerOpen}
         onClose={() => { setMatPickerOpen(false); }}
         onSelect={(grade) => {
