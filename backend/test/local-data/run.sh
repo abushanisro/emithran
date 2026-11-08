@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 TMP="$(mktemp -d)"; ID="localdata-$$"
 export COMPOSE_PROJECT_NAME="emithran-localtest-$$" LOCAL_PG_PORT=54392 LOCAL_API_PORT=3091 LOCAL_S3_PORT=8393 LOCAL_ENV_FILE="$TMP/.env" LOCAL_BACKUP_DIR="$TMP"
-cleanup() { bash scripts/local-data.sh reset --yes >/dev/null 2>&1 || true; docker rm -f "$ID-src" >/dev/null 2>&1 || true; docker network rm "$ID" >/dev/null 2>&1 || true; rm -rf "$TMP"; }
+cleanup() { [ -f "$TMP/backend.pid" ] && kill "$(cat "$TMP/backend.pid")" >/dev/null 2>&1 || true; bash scripts/local-data.sh reset --yes >/dev/null 2>&1 || true; docker rm -f "$ID-src" >/dev/null 2>&1 || true; docker network rm "$ID" >/dev/null 2>&1 || true; rm -rf "$TMP"; }
 trap cleanup EXIT
 IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
 docker network create "$ID" >/dev/null
@@ -30,7 +30,7 @@ CREATE TABLE public.project_team_members (
 CREATE TABLE public.calculators (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid, name text NOT NULL, calc_category text, calculator_type text,
   is_template boolean DEFAULT false, is_public boolean DEFAULT false, is_global boolean DEFAULT false, description text,
-  retired_at timestamptz, updated_at timestamptz DEFAULT now()
+  retired_at timestamptz, updated_at timestamptz DEFAULT now(), version integer DEFAULT 1
 );
 CREATE TABLE public.calculator_fields (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), calculator_id uuid NOT NULL REFERENCES public.calculators(id) ON DELETE CASCADE,
@@ -46,6 +46,16 @@ INSERT INTO public.process_calculator_mappings (process_group, process_route, op
 SELECT 'Sand Casting', n, n, false FROM unnest(ARRAY['Cleaning','CO2 Cured','Cooling','Core Refractory Coat','Degating','Finishing','Horizontal Automatic','Hot Box',
   'Isocure Gas','Manual Coremaking','Manual Floor Moldmaking','Manual Pit Moldmaking','Manual Std Moldmaking','Melting','Mold Refractory Coat','No Bake','Oil Core','Pour',
   'Refractory Coat Air Dry','Refractory Coat Oven Dry','Shakeout','Shell','Stock Core','Vertical Automatic','Visual Inspection']) AS n;
+-- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;
+-- the materials table as the real database has it (migration 352 adds cut_code): migration 978 writes the cut code of the plastics onto it
+CREATE TABLE public.raw_materials (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name varchar(255) NOT NULL, cut_code decimal(10,2));
+INSERT INTO public.raw_materials (name) VALUES ('Generic Nylon, Type 11 40% Glass');
+-- the machine table (00_stubs.sql has it), plus the columns migration 981 reads and writes: a Black Oxide machine with no labor rate, and two machines of its wage grade that agree on one
+ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN usd_labor_rate_per_hr numeric, ADD COLUMN usd_lhr_total numeric;
+INSERT INTO public.mhr_records (machine_class, location, usd_labor_rate_per_hr, usd_lhr_total) VALUES
+  ('surface_black_oxide', 'USA', NULL, NULL), ('surface_oven_cure', 'USA', 29.95, 29.95), ('surface_shot_blast', 'USA', 29.95, 29.95);
 -- the process cost table as the real database has it (migration 034 on): migration 970 adds columns to it and redefines the function that fills it
 CREATE TABLE public.process_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid, is_active boolean DEFAULT true);
 INSERT INTO public.projects (user_id, name) VALUES ('11111111-1111-4111-8111-111111111111','Alice project');
@@ -60,14 +70,16 @@ LOCAL_ENV_FILE="$TMP/.env" bash scripts/local-data.sh use >/dev/null
 fail=0
 for k in ALLOW_DEV_AUTH_BYPASS=true S3_FORCE_PATH_STYLE=true KEEP_ME=1; do grep -q "^$k$" "$TMP/.env" && echo "ok   .env has $k" || { echo "FAIL .env lacks $k"; fail=1; }; done
 npx ts-node -r tsconfig-paths/register -r reflect-metadata test/local-data/smoke.ts || fail=1
+# A process already on the backend's port would answer for it (with a stack that no longer exists): refuse to run beside one.
+if (exec 3<>/dev/tcp/127.0.0.1/4529) 2>/dev/null; then echo "FAIL port 4529 is already in use: stop that process and run again"; exit 1; fi
 # The real backend, built from source, in development mode against this stack, with NO Supabase setting at all (a clean copy of dist/, so the repo's .env cannot leak in).
 npx nest build >/dev/null 2>&1
 APP="$TMP/app/backend"; mkdir -p "$APP"; cp -r dist "$APP/dist"; cp package.json "$APP/"; ln -s "$PWD/node_modules" "$APP/node_modules"
-( cd "$APP" && env -i PATH="$PATH" HOME="$HOME" NODE_ENV=development APP_ENV=local BACKEND_PORT=4529 CAD_UPLOAD_RUNNER=off ELECTRONICS_QUEUE_DRIVER=memory \
+( cd "$APP" && exec env -i PATH="$PATH" HOME="$HOME" NODE_ENV=development APP_ENV=local BACKEND_PORT=4529 CAD_UPLOAD_RUNNER=off ELECTRONICS_QUEUE_DRIVER=memory \
     POSTGREST_URL="http://127.0.0.1:$LOCAL_API_PORT" DB_JWT_SECRET="$(grep '^DB_JWT_SECRET=' "$TMP/.env" | cut -d= -f2-)" \
     S3_BUCKET=emithran S3_REGION=us-east-1 S3_ENDPOINT="http://127.0.0.1:$LOCAL_S3_PORT" S3_FORCE_PATH_STYLE=true S3_ACCESS_KEY_ID=test S3_SECRET_ACCESS_KEY=testtesttest \
     AUTH0_DOMAIN=t.eu.auth0.com AUTH0_AUDIENCE=https://api.example.com AUTH0_CLAIM_NAMESPACE=https://example.com/ AUTH0_TRUSTED_CONNECTIONS=company-sso \
-    ALLOW_DEV_AUTH_BYPASS=true ADMIN_FALLBACK_EMAIL=alice@example.com node dist/main > "$TMP/backend.log" 2>&1 & echo $! > "$TMP/backend.pid" )
+    ALLOW_DEV_AUTH_BYPASS=true ADMIN_FALLBACK_EMAIL=alice@example.com node dist/main ) > "$TMP/backend.log" 2>&1 & echo $! > "$TMP/backend.pid"
 for _ in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:4529/api/health/live && break; sleep 1; done
 me="$(curl -s -m 10 http://127.0.0.1:4529/api/v1/auth/me)"
 kill "$(cat "$TMP/backend.pid")" 2>/dev/null || true

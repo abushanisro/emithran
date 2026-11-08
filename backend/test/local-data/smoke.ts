@@ -23,6 +23,16 @@ async function main(): Promise<void> {
     const names = ((await res.json()) as { name: string }[]).map((r) => r.name);
     must(names.some((n) => n.startsWith('918_')) && names.some((n) => n.startsWith('932_')), `got ${names.join(',')}`);
   });
+  await check('migration 975 linked the injection calculator to its Plastic Molding row, and 978 gave the seeded plastic its cut code', async () => {
+    const map = await (await api('/process_calculator_mappings?process_group=eq.Plastic%20Molding&operation=eq.Injection%20Molding&select=calculator_name,calculator_id', minter.forService())).json() as { calculator_name: string; calculator_id: string | null }[];
+    must(map.length === 1 && map[0]!.calculator_name === 'Injection Molding - Cycle Time' && map[0]!.calculator_id !== null, `mapping ${JSON.stringify(map)}`);
+    const mat = await (await api('/raw_materials?name=eq.Generic%20Nylon%2C%20Type%2011%2040%25%20Glass&select=cut_code', minter.forService())).json() as { cut_code: number | string | null }[];
+    must(mat.length === 1 && Number(mat[0]!.cut_code) === 41.11, `material ${JSON.stringify(mat)}`);
+  });
+  await check('migration 981 gave the Black Oxide machine the labor rate its wage grade carries', async () => {
+    const rows = await (await api('/mhr_records?machine_class=eq.surface_black_oxide&select=usd_labor_rate_per_hr,usd_lhr_total', minter.forService())).json() as { usd_labor_rate_per_hr: number | string | null; usd_lhr_total: number | string | null }[];
+    must(rows.length === 1 && Number(rows[0]!.usd_labor_rate_per_hr) === 29.95 && Number(rows[0]!.usd_lhr_total) === 29.95, `rows ${JSON.stringify(rows)}`);
+  });
   await check('the carried user directory is readable through migration 932 (same id as the source)', async () => {
     const res = await api('/rpc/directory_find_by_email', minter.forService(), { method: 'POST', body: JSON.stringify({ p_email: 'Alice@Example.com' }) });
     must(res.ok && (await res.json()) === '11111111-1111-4111-8111-111111111111', `HTTP ${res.status}`);
