@@ -5,7 +5,7 @@ import { buildPlasticMaterialCutCodesMigrationSql, cutCodeRows, parseCsv } from 
 
 // Migration 978 is generated from memory/Plastic Modeling/materials_final.csv; this proves the committed file is what the generator writes, and what it writes is the reference.
 
-const CSV = readFileSync(join(__dirname, '../../../../../../../memory/Plastic Modeling/materials_final.csv'), 'utf-8');
+const CSV = readFileSync(join(__dirname, '../../../../../../../memory/plastic modeling/materials_final.csv'), 'utf-8');
 const MIGRATION = readFileSync(join(__dirname, '../../../../../../migrations/978_plastic_material_cut_codes.sql'), 'utf-8');
 
 describe('migration 978: the cut code of each plastic material, from materials_final.csv', () => {

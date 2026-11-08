@@ -573,9 +573,8 @@ export class RawMaterialCostService {
 
     // 1. The grade by its own name: a row that IS the material. (The lookup used to match any row whose name contains ANY word of the grade, take five of them in no order, and
     //    price the first: "Generic Nylon, Type 11 40% Glass" was priced as "Generic Aluminum, AA 3105", 5.864 USD/kg for 11.486.)
-    const exactValue = quoteFilterValue(escapeLikePattern(g));
     const exact = await client.from('raw_materials').select(`name, grade, ${columns}`)
-      .or(`name.ilike.${exactValue},grade.ilike.${exactValue}`)
+      .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`)
       .not('density', 'is', null)
       .limit(20);
     if (exact.error) fail(exact.error.message);
