@@ -30,10 +30,10 @@ python-multipart==0.0.32
 
 # Telemetry (shared/telemetry.py): off unless OTEL_EXPORTER_OTLP_ENDPOINT is set. The SDK and API move together;
 # the FastAPI instrumentation is the matching 0.x (beta) release of the same train.
-opentelemetry-api==1.45.1
-opentelemetry-sdk==1.45.1
-opentelemetry-exporter-otlp-proto-http==1.45.1
-opentelemetry-instrumentation-fastapi==0.66b1
+opentelemetry-api==1.45.2
+opentelemetry-sdk==1.45.2
+opentelemetry-exporter-otlp-proto-http==1.45.2
+opentelemetry-instrumentation-fastapi==0.66b2
 
 # HTTP client for callbacks
 httpx==0.28.1
