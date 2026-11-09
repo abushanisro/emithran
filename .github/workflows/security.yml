@@ -84,7 +84,7 @@ jobs:
         run: |
           images=$(grep -hE '^FROM [^ ]+@sha256:|^\s*image: [^ ]+@sha256:' backend/Dockerfile Dockerfile.frontend cad-engine/Dockerfile ecad-engine/Dockerfile docker-compose.prod.yml \
             | sed -E 's/^FROM //; s/^\s*image: //; s/ AS .*//' | sort -u \
-            | grep -v '^continuumio/miniconda3:')  # cad-engine's base: the built image is scanned in the next step instead
+            | grep -vE '^(continuumio/miniconda3|python):')  # cad-engine's and ecad-engine's bases: their built images are scanned in the next steps instead
           test -n "$images"
           status=0
           for image in $images; do
@@ -102,6 +102,14 @@ jobs:
           docker save cad-engine:scan -o "$RUNNER_TEMP/cad-engine.tar"
           docker run --rm -v trivy-cache:/root/.cache -v "$PWD/.trivyignore.yaml":/.trivyignore.yaml:ro -v "$RUNNER_TEMP":/scan:ro "$TRIVY_IMAGE" image \
             --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --ignorefile /.trivyignore.yaml --input /scan/cad-engine.tar
+      # The pinned python:3.12-slim digest is reproducible, so its raw image carries the Debian packages of the day it was built and
+      # fails on any fix released since. ecad-engine/Dockerfile runs apt-get upgrade, so the image that ships is what is scanned.
+      - name: Built ecad-engine image
+        run: |
+          docker build -t ecad-engine:scan ecad-engine
+          docker save ecad-engine:scan -o "$RUNNER_TEMP/ecad-engine.tar"
+          docker run --rm -v trivy-cache:/root/.cache -v "$PWD/.trivyignore.yaml":/.trivyignore.yaml:ro -v "$RUNNER_TEMP":/scan:ro "$TRIVY_IMAGE" image \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --ignorefile /.trivyignore.yaml --input /scan/ecad-engine.tar
 
   policy:
     name: Deployment policy tests
