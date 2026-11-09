@@ -93,7 +93,7 @@
     "js-yaml": "5.5.0",
     "prettier": "^3.9.10",
     "typescript-eslint": "^8.72.1",
-    "vite": "7.3.7",
+    "vite": "8.3.6",
     "vitest": "5.0.5"
   },
   "overrides": {
