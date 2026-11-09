@@ -1,8 +1,10 @@
 # Keeps every pin current. Digest-pinned images, SHA-pinned actions and lock files only stay safe if something proposes the
-# bumps; without this they quietly age. Updates arrive as pull requests, so CI (ci.yml and security.yml) vets each one.
+# bumps; without this they quietly age. Updates arrive as pull requests, so CI (ci.yml and security.yml) vets each one. They open against
+# `develop` like every other change (docs/BRANCHING.md) and reach `main` with the next release.
 version: 2
 updates:
   - package-ecosystem: npm
+    target-branch: develop
     directory: /
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
@@ -10,6 +12,7 @@ updates:
       minor-and-patch: { update-types: [minor, patch] }
 
   - package-ecosystem: npm
+    target-branch: develop
     directory: /backend
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
@@ -17,6 +20,7 @@ updates:
       minor-and-patch: { update-types: [minor, patch] }
 
   - package-ecosystem: github-actions
+    target-branch: develop
     directory: /
     schedule: { interval: weekly }
     groups:
@@ -24,26 +28,33 @@ updates:
 
   # Base images pinned by digest in the Dockerfiles
   - package-ecosystem: docker
+    target-branch: develop
     directory: /
     schedule: { interval: weekly }
   - package-ecosystem: docker
+    target-branch: develop
     directory: /backend
     schedule: { interval: weekly }
   - package-ecosystem: docker
+    target-branch: develop
     directory: /cad-engine
     schedule: { interval: weekly }
   - package-ecosystem: docker
+    target-branch: develop
     directory: /ecad-engine
     schedule: { interval: weekly }
 
   # The cloudflared image pinned in docker-compose.prod.yml
   - package-ecosystem: docker-compose
+    target-branch: develop
     directory: /
     schedule: { interval: weekly }
 
   - package-ecosystem: pip
+    target-branch: develop
     directory: /cad-engine
     schedule: { interval: weekly }
   - package-ecosystem: pip
+    target-branch: develop
     directory: /ecad-engine
     schedule: { interval: weekly }

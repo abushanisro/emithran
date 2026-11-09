@@ -21,12 +21,12 @@ setting. GitHub does not read it from the repository: after changing it, apply i
 
 ```bash
 gh api -X PUT repos/abushanisro/emithran/rulesets/$(gh api repos/abushanisro/emithran/rulesets -q '.[] | select(.name=="main") | .id') \
-  --input .github/rulesets/main.json
+  --input .github/rulesets/main.json     # and the same with develop / develop.json; the branching model is in docs/BRANCHING.md
 ```
 
 - No deletion and no force push. A history rewrite (as for `memory/` on 2026-10-31) means disabling the ruleset for that push on purpose.
-- Changes land only through a pull request, squash-merged, with every review conversation resolved.
-- All `ci.yml` and `security.yml` jobs must pass on a branch that is up to date with `main`.
+- Changes land only through a pull request with every review conversation resolved: squash-merged into `develop`, and merged with a merge commit from `develop` into `main` (a release) so the two branches never diverge. The `main` and `develop` rulesets are otherwise identical.
+- All `ci.yml` and `security.yml` jobs must pass on a branch that is up to date with its target (`develop`, or `main` for a release or hotfix).
 - CodeQL must have analysed the change; a new high or critical alert blocks the merge.
 - Required approvals are 0 while there is one maintainer (GitHub does not let authors approve their own pull request); raise to 1
   when a second engineer joins. Repository admins may bypass only through a pull request, for emergencies.

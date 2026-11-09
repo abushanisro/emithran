@@ -33,7 +33,7 @@ backend / frontend ──► Supabase project for this environment (stage and pr
 | Reached by | localhost | Cloudflare Access (team only) | public |
 | e2e suites may run | yes | yes | **no** (the suites refuse) |
 
-Flow: pull request → CI (`ci.yml`, `security.yml`) → merge to `main` → deploy to **stage** → team QA sign-off → deploy to **prd**.
+Flow: pull request into `develop` → CI (`ci.yml`, `security.yml`) → squash-merge → deploy `develop` to **stage** → team QA sign-off → release pull request `develop` → `main` (merge commit) → deploy `main` to **prd** → tag. Details: [BRANCHING.md](BRANCHING.md).
 
 ```bash
 # on the host, per environment (env/<name>.env holds that environment's secrets; see env/README.md)
@@ -156,7 +156,7 @@ and compares every table's row count with the count taken at dump time; it exits
 
 ## GitHub settings (cannot be set from the repo)
 
-Branch protection on `main`: the ruleset in `.github/rulesets/main.json`, applied as described in [GOVERNANCE.md](GOVERNANCE.md#branch-protection); GitHub Environments
+Branch protection on `main` and `develop`: the rulesets in `.github/rulesets/`, applied as described in [GOVERNANCE.md](GOVERNANCE.md#branch-protection); GitHub Environments
 `stage` and `production` (production with required reviewers); secret scanning with push protection; Dependabot alerts; two-factor
 authentication for all members.
 
