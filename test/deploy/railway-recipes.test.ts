@@ -13,7 +13,10 @@ const seed = read('deploy/railway/seed-environment.sh');
 const common = read('deploy/railway/common.sh');
 const dataApi = read('deploy/railway/deploy-data-api.sh');
 const engine = read('deploy/railway/deploy-engine.sh');
-const scripts = { provision, seed, common, dataApi, engine };
+const backend = read('deploy/railway/deploy-backend.sh');
+const frontend = read('deploy/railway/deploy-frontend.sh');
+const probe = read('deploy/railway/probe-environment.sh');
+const scripts = { provision, seed, common, dataApi, engine, backend, frontend, probe };
 const imageOf = (text: string, pattern: RegExp) => pattern.exec(text)?.[0];
 
 describe('the jobs run the repo\'s own tools on the repo\'s own pinned images', () => {
@@ -160,6 +163,131 @@ describe('the data API and the engines are deployed from the repo\'s own definit
     expect(engine).toMatch(/already has a \$engine service/);
     expect(engine).toContain('require_env_values "$envfile" "${required[@]}"');
     expect(engine).toContain('removing the failed $created service');
+  });
+});
+
+describe('the backend is built from the repo\'s own Dockerfile and configured like its compose service', () => {
+  const compose = read('docker-compose.prod.yml');
+  const block = /^  backend:\n((?:    .*\n|\n)*)/m.exec(compose)![1]!;
+  const env = /    environment:\n((?:      .*\n)+)/.exec(block)![1]!;
+  const composeKeys = [...env.matchAll(/^      ([A-Z0-9_]+): (.*)$/gm)].map((m) => ({ key: m[1]!, value: m[2]! }));
+  const list = (name: string) => new RegExp(`${name}=\\(([^)]*)\\)`).exec(backend)![1]!.trim().split(/\s+/);
+
+  it('asks for exactly the values compose marks required, and nothing the compose service does not have', () => {
+    const required = composeKeys.filter((k) => k.value.includes(':?')).map((k) => k.key).sort();
+    expect([...list('plain_required'), ...list('secret_required')].sort()).toEqual(required);
+    const all = new Set(composeKeys.map((k) => k.key));
+    for (const key of [...list('plain_optional'), ...list('secret_optional')]) expect(all.has(key), `${key} is not a backend setting in compose`).toBe(true);
+  });
+
+  it('sends every secret through stdin and passes only non-secrets as variables', () => {
+    for (const key of [...list('plain_required'), ...list('plain_optional')]) expect(key).not.toMatch(/(KEY|TOKEN|SECRET|PASSWORD)(_ID)?$/);   // credentials by name; AI_*_DAILY_TOKENS is a usage quota, not one
+    expect(backend).toMatch(/env_value "\$envfile" "\$k" \| set_secret backend "\$environment" "\$k"/);
+    for (const key of ['DB_JWT_SECRET', 'BFF_FORWARD_SECRET', 'CAD_ENGINE_API_KEY', 'ECAD_ENGINE_API_KEY', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']) expect(list('secret_required')).toContain(key);
+  });
+
+  it('keeps the fixed values of the compose service', () => {
+    for (const [key, value] of [['NODE_ENV', 'production'], ['PORT', '4000'], ['TRUST_PROXY', '0'], ['NODE_OPTIONS', '--max-old-space-size=1434']] as const) {
+      expect(composeKeys.find((k) => k.key === key)?.value.replace(/"/g, '')).toBe(value);
+      expect(backend).toContain(`"${key}=${value}"`);
+    }
+    expect(backend).toContain('TRUST_CLOUDFLARE_HEADERS=true');
+  });
+
+  it('reaches PostgREST and the engines by their private address, on the ports compose uses', () => {
+    expect(backend).toContain('POSTGREST_URL=http://${{postgrest.RAILWAY_PRIVATE_DOMAIN}}:3000');
+    expect(backend).toContain('CAD_ENGINE_URL=http://${{cad-engine.RAILWAY_PRIVATE_DOMAIN}}:5055');
+    expect(backend).toContain('ECAD_ENGINE_URL=http://${{ecad-engine.RAILWAY_PRIVATE_DOMAIN}}:5100');
+    for (const url of ['http://postgrest:3000', 'http://cad-engine:5055', 'http://ecad-engine:5100']) expect(compose).toContain(url);
+  });
+
+  it('builds the repo\'s Dockerfile UNCHANGED: a build stage named core stands in for the named build context Railway cannot pass, and only the three paths the Dockerfile copies are shipped', () => {
+    expect(backend).toContain("printf 'FROM scratch AS core\\nCOPY core /\\n'; cat \"$REPO/backend/Dockerfile\"");
+    expect(backend).toContain('RAILWAY_DOCKERFILE_PATH=Dockerfile.railway');
+    const dockerfile = read('backend/Dockerfile');
+    expect(dockerfile).toContain('COPY --from=core Cargo.toml Cargo.lock ./');
+    expect(dockerfile).toContain('COPY --from=core crates ./crates');
+    expect([...dockerfile.matchAll(/COPY --from=core (\S+)/g)].map((m) => m[1]).sort()).toEqual(['Cargo.toml', 'crates'].sort());
+    expect(backend).toContain('cp "$REPO/core/Cargo.toml" "$REPO/core/Cargo.lock"');
+    expect(backend).toContain('cp -R "$REPO/core/crates"');
+    expect(compose).toMatch(/additional_contexts:\n\s+core: \.\/core/);
+  });
+
+  it('refuses to run twice or without its dependencies, and gives the backend no public domain', () => {
+    expect(backend).toMatch(/already has a backend service/);
+    expect(backend).toContain('for dep in postgres postgrest cad-engine ecad-engine');
+    expect(backend).not.toMatch(/railway domain/);
+  });
+});
+
+describe('the frontend is built from the repo\'s own Dockerfile.frontend and configured like its compose service', () => {
+  const compose = read('docker-compose.prod.yml');
+  const block = /^  frontend:\n((?:    .*\n|\n)*)/m.exec(compose)![1]!;
+  const env = /    environment:\n((?:      .*\n)+)/.exec(block)![1]!;
+  const args = /      args:\n((?:        .*\n)+)/.exec(block)![1]!;
+  const required = (text: string) => [...text.matchAll(/^\s+([A-Z0-9_]+): .*:\?/gm)].map((m) => m[1]!);
+  const list = (name: string) => new RegExp(`${name}=\\(([^)]*)\\)`).exec(frontend)![1]!.trim().split(/\s+/);
+
+  it('asks for exactly the values compose marks required (runtime and build-time), and nothing else', () => {
+    expect([...list('plain_required'), ...list('secret_required')].sort()).toEqual([...required(env), ...required(args)].sort());
+  });
+
+  it('sends every secret through stdin; the Auth0 client id, the URLs and the hosts are passed as plain variables', () => {
+    expect(frontend).toMatch(/env_value "\$envfile" "\$k" \| set_secret frontend "\$environment" "\$k"/);
+    for (const key of ['AUTH0_CLIENT_SECRET', 'AUTH0_SECRET', 'BFF_FORWARD_SECRET', 'CAD_ENGINE_API_KEY']) expect(list('secret_required')).toContain(key);
+    for (const key of list('plain_required')) expect(key).not.toMatch(/(KEY|TOKEN|SECRET|PASSWORD)(_ID)?$/);
+  });
+
+  it('passes the NEXT_PUBLIC_* values the Dockerfile declares as build arguments, compiled into the bundle per environment', () => {
+    const dockerfile = read('Dockerfile.frontend');
+    for (const arg of ['NEXT_PUBLIC_API_GATEWAY_URL', 'NEXT_PUBLIC_API_URL', 'NEXT_PUBLIC_MAX_UPLOAD_MB']) {
+      expect(dockerfile).toContain(`ARG ${arg}`);
+      expect(frontend).toContain(`"${arg}=`);
+    }
+    expect(frontend).toContain('"NEXT_PUBLIC_API_URL=$gateway/api/v1"');
+    expect(frontend).toContain('RAILWAY_DOCKERFILE_PATH=Dockerfile.frontend');
+  });
+
+  it('reaches the backend and the CAD engine by their private address, on the ports compose uses', () => {
+    expect(frontend).toContain('API_URL=http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:4000/api/v1');
+    expect(frontend).toContain('CAD_ENGINE_URL=http://${{cad-engine.RAILWAY_PRIVATE_DOMAIN}}:5055');
+    for (const url of ['http://backend:4000/api/v1', 'http://cad-engine:5055']) expect(compose).toContain(url);
+  });
+
+  it('uploads only what the build sees: every folder it leaves out is already in the repo\'s .dockerignore, and .dockerignore itself is shipped', () => {
+    const ignored = read('.dockerignore').split('\n').map((l) => l.trim());
+    for (const dir of list('upload_excludes')) expect(ignored, dir).toContain(dir);
+    expect(frontend).toContain('git -C "$REPO" ls-files -z');
+    expect(frontend).toContain('.dockerignore');
+  });
+
+  it('refuses to run twice or without its dependencies, and gives the frontend no public domain', () => {
+    expect(frontend).toMatch(/already has a frontend service/);
+    expect(frontend).toContain('for dep in backend cad-engine');
+    expect(frontend).not.toMatch(/railway domain/);
+  });
+});
+
+describe('the private-network probe', () => {
+  it('calls each service by its private name, on the ports compose uses, over plain HTTP with no credential', () => {
+    const job = read('deploy/railway/probe/probe.sh');
+    for (const target of ['/api/health/live', ':3000/', ':5055/health', ':5100/health']) expect(job).toContain(target);
+    expect(job).not.toMatch(/Authorization|api[-_]?key|secret|token|password/i);
+    expect(probe).toContain('${{$svc.RAILWAY_PRIVATE_DOMAIN}}');
+  });
+
+  it('reports which address families each name resolves to, because a service listening only on 0.0.0.0 is unreachable by an IPv6-only name', () => {
+    const job = read('deploy/railway/probe/probe.sh');
+    expect(job).toContain('getent ahostsv4');
+    expect(job).toContain('getent ahostsv6');
+  });
+
+  it('is one-shot, on the same pinned image as the other jobs, deleted afterwards, and refuses to run beside a leftover probe', () => {
+    expect(JSON.parse(read('deploy/railway/probe/railway.json'))).toEqual({ deploy: { restartPolicyType: 'NEVER' } });
+    expect(read('deploy/railway/probe/Dockerfile')).toContain(`FROM ${/postgres:17-alpine@sha256:[0-9a-f]{64}/.exec(read('backend/scripts/baseline-load.sh'))?.[0]}`);
+    expect(probe).toMatch(/trap cleanup EXIT/);
+    expect(probe).toContain('railway service delete --service "$created"');
+    expect(probe).toMatch(/already has a probe service/);
   });
 });
 
