@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -13,7 +14,11 @@ const seed = read('deploy/railway/seed-environment.sh');
 const common = read('deploy/railway/common.sh');
 const dataApi = read('deploy/railway/deploy-data-api.sh');
 const engine = read('deploy/railway/deploy-engine.sh');
-const scripts = { provision, seed, common, dataApi, engine };
+const backend = read('deploy/railway/deploy-backend.sh');
+const frontend = read('deploy/railway/deploy-frontend.sh');
+const probe = read('deploy/railway/probe-environment.sh');
+const tunnel = read('deploy/railway/deploy-tunnel.sh');
+const scripts = { provision, seed, common, dataApi, engine, backend, frontend, probe, tunnel };
 const imageOf = (text: string, pattern: RegExp) => pattern.exec(text)?.[0];
 
 describe('the jobs run the repo\'s own tools on the repo\'s own pinned images', () => {
@@ -160,6 +165,194 @@ describe('the data API and the engines are deployed from the repo\'s own definit
     expect(engine).toMatch(/already has a \$engine service/);
     expect(engine).toContain('require_env_values "$envfile" "${required[@]}"');
     expect(engine).toContain('removing the failed $created service');
+  });
+});
+
+describe('the backend is built from the repo\'s own Dockerfile and configured like its compose service', () => {
+  const compose = read('docker-compose.prod.yml');
+  const block = /^  backend:\n((?:    .*\n|\n)*)/m.exec(compose)![1]!;
+  const env = /    environment:\n((?:      .*\n)+)/.exec(block)![1]!;
+  const composeKeys = [...env.matchAll(/^      ([A-Z0-9_]+): (.*)$/gm)].map((m) => ({ key: m[1]!, value: m[2]! }));
+  const list = (name: string) => new RegExp(`${name}=\\(([^)]*)\\)`).exec(backend)![1]!.trim().split(/\s+/);
+
+  it('asks for exactly the values compose marks required, and nothing the compose service does not have', () => {
+    const required = composeKeys.filter((k) => k.value.includes(':?')).map((k) => k.key).sort();
+    expect([...list('plain_required'), ...list('secret_required')].sort()).toEqual(required);
+    const all = new Set(composeKeys.map((k) => k.key));
+    for (const key of [...list('plain_optional'), ...list('secret_optional')]) expect(all.has(key), `${key} is not a backend setting in compose`).toBe(true);
+  });
+
+  it('sends every secret through stdin and passes only non-secrets as variables', () => {
+    for (const key of [...list('plain_required'), ...list('plain_optional')]) expect(key).not.toMatch(/(KEY|TOKEN|SECRET|PASSWORD)(_ID)?$/);   // credentials by name; AI_*_DAILY_TOKENS is a usage quota, not one
+    expect(backend).toMatch(/env_value "\$envfile" "\$k" \| set_secret backend "\$environment" "\$k"/);
+    for (const key of ['DB_JWT_SECRET', 'BFF_FORWARD_SECRET', 'CAD_ENGINE_API_KEY', 'ECAD_ENGINE_API_KEY', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']) expect(list('secret_required')).toContain(key);
+  });
+
+  it('keeps the fixed values of the compose service', () => {
+    for (const [key, value] of [['NODE_ENV', 'production'], ['PORT', '4000'], ['TRUST_PROXY', '0'], ['NODE_OPTIONS', '--max-old-space-size=1434']] as const) {
+      expect(composeKeys.find((k) => k.key === key)?.value.replace(/"/g, '')).toBe(value);
+      expect(backend).toContain(`"${key}=${value}"`);
+    }
+    expect(backend).toContain('TRUST_CLOUDFLARE_HEADERS=true');
+  });
+
+  it('reaches PostgREST and the engines by their private address, on the ports compose uses', () => {
+    expect(backend).toContain('POSTGREST_URL=http://${{postgrest.RAILWAY_PRIVATE_DOMAIN}}:3000');
+    expect(backend).toContain('CAD_ENGINE_URL=http://${{cad-engine.RAILWAY_PRIVATE_DOMAIN}}:5055');
+    expect(backend).toContain('ECAD_ENGINE_URL=http://${{ecad-engine.RAILWAY_PRIVATE_DOMAIN}}:5100');
+    for (const url of ['http://postgrest:3000', 'http://cad-engine:5055', 'http://ecad-engine:5100']) expect(compose).toContain(url);
+  });
+
+  it('builds the repo\'s Dockerfile UNCHANGED: a build stage named core stands in for the named build context Railway cannot pass, and only the three paths the Dockerfile copies are shipped', () => {
+    expect(backend).toContain("printf 'FROM scratch AS core\\nCOPY core /\\n'; cat \"$REPO/backend/Dockerfile\"");
+    expect(backend).toContain('RAILWAY_DOCKERFILE_PATH=Dockerfile.railway');
+    const dockerfile = read('backend/Dockerfile');
+    expect(dockerfile).toContain('COPY --from=core Cargo.toml Cargo.lock ./');
+    expect(dockerfile).toContain('COPY --from=core crates ./crates');
+    expect([...dockerfile.matchAll(/COPY --from=core (\S+)/g)].map((m) => m[1]).sort()).toEqual(['Cargo.toml', 'crates'].sort());
+    expect(backend).toContain('cp "$REPO/core/Cargo.toml" "$REPO/core/Cargo.lock"');
+    expect(backend).toContain('cp -R "$REPO/core/crates"');
+    expect(compose).toMatch(/additional_contexts:\n\s+core: \.\/core/);
+  });
+
+  it('refuses to run twice or without its dependencies, and gives the backend no public domain', () => {
+    expect(backend).toMatch(/already has a backend service/);
+    expect(backend).toContain('for dep in postgres postgrest cad-engine ecad-engine');
+    expect(backend).not.toMatch(/railway domain/);
+  });
+});
+
+describe('the frontend is built from the repo\'s own Dockerfile.frontend and configured like its compose service', () => {
+  const compose = read('docker-compose.prod.yml');
+  const block = /^  frontend:\n((?:    .*\n|\n)*)/m.exec(compose)![1]!;
+  const env = /    environment:\n((?:      .*\n)+)/.exec(block)![1]!;
+  const args = /      args:\n((?:        .*\n)+)/.exec(block)![1]!;
+  const required = (text: string) => [...text.matchAll(/^\s+([A-Z0-9_]+): .*:\?/gm)].map((m) => m[1]!);
+  const list = (name: string) => new RegExp(`${name}=\\(([^)]*)\\)`).exec(frontend)![1]!.trim().split(/\s+/);
+
+  it('asks for exactly the values compose marks required (runtime and build-time), and nothing else', () => {
+    expect([...list('plain_required'), ...list('secret_required')].sort()).toEqual([...required(env), ...required(args)].sort());
+  });
+
+  it('sends every secret through stdin; the Auth0 client id, the URLs and the hosts are passed as plain variables', () => {
+    expect(frontend).toMatch(/env_value "\$envfile" "\$k" \| set_secret frontend "\$environment" "\$k"/);
+    for (const key of ['AUTH0_CLIENT_SECRET', 'AUTH0_SECRET', 'BFF_FORWARD_SECRET', 'CAD_ENGINE_API_KEY']) expect(list('secret_required')).toContain(key);
+    for (const key of list('plain_required')) expect(key).not.toMatch(/(KEY|TOKEN|SECRET|PASSWORD)(_ID)?$/);
+  });
+
+  it('passes the NEXT_PUBLIC_* values the Dockerfile declares as build arguments, compiled into the bundle per environment', () => {
+    const dockerfile = read('Dockerfile.frontend');
+    for (const arg of ['NEXT_PUBLIC_API_GATEWAY_URL', 'NEXT_PUBLIC_API_URL', 'NEXT_PUBLIC_MAX_UPLOAD_MB']) {
+      expect(dockerfile).toContain(`ARG ${arg}`);
+      expect(frontend).toContain(`"${arg}=`);
+    }
+    expect(frontend).toContain('"NEXT_PUBLIC_API_URL=$gateway/api/v1"');
+    expect(frontend).toContain('RAILWAY_DOCKERFILE_PATH=Dockerfile.frontend');
+  });
+
+  it('sets PORT to 3000 itself: Railway injects its own PORT (it listened on 8080) over the Dockerfile\'s ENV PORT=3000, and the tunnel and the probe call 3000', () => {
+    expect(read('Dockerfile.frontend')).toContain('ENV PORT=3000');
+    expect(frontend).toContain('--variables "PORT=3000"');
+  });
+
+  it('reaches the backend and the CAD engine by their private address, on the ports compose uses', () => {
+    expect(frontend).toContain('API_URL=http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:4000/api/v1');
+    expect(frontend).toContain('CAD_ENGINE_URL=http://${{cad-engine.RAILWAY_PRIVATE_DOMAIN}}:5055');
+    for (const url of ['http://backend:4000/api/v1', 'http://cad-engine:5055']) expect(compose).toContain(url);
+  });
+
+  it('uploads only what the build sees: every folder it leaves out is already in the repo\'s .dockerignore, and .dockerignore itself is shipped', () => {
+    const ignored = read('.dockerignore').split('\n').map((l) => l.trim());
+    for (const dir of list('upload_excludes')) expect(ignored, dir).toContain(dir);
+    expect(frontend).toContain('git -C "$REPO" ls-files -z');
+    expect(frontend).toContain('.dockerignore');
+  });
+
+  it('refuses to run twice or without its dependencies, and gives the frontend no public domain', () => {
+    expect(frontend).toMatch(/already has a frontend service/);
+    expect(frontend).toContain('for dep in backend cad-engine');
+    expect(frontend).not.toMatch(/railway domain/);
+  });
+});
+
+describe('the private-network probe', () => {
+  it('calls each service by its private name, on the ports compose uses, over plain HTTP with no credential', () => {
+    const job = read('deploy/railway/probe/probe.sh');
+    for (const target of ['/api/health/live', ':3000/', ':5055/health', ':5100/health']) expect(job).toContain(target);
+    expect(job).not.toMatch(/Authorization|api[-_]?key|secret|token|password/i);
+    expect(probe).toContain('${{$svc.RAILWAY_PRIVATE_DOMAIN}}');
+  });
+
+  it('reports which address families each name resolves to, because a service listening only on 0.0.0.0 is unreachable by an IPv6-only name', () => {
+    const job = read('deploy/railway/probe/probe.sh');
+    expect(job).toContain('getent ahostsv4');
+    expect(job).toContain('getent ahostsv6');
+  });
+
+  it('is one-shot, on the same pinned image as the other jobs, deleted afterwards, and refuses to run beside a leftover probe', () => {
+    expect(JSON.parse(read('deploy/railway/probe/railway.json'))).toEqual({ deploy: { restartPolicyType: 'NEVER' } });
+    expect(read('deploy/railway/probe/Dockerfile')).toContain(`FROM ${/postgres:17-alpine@sha256:[0-9a-f]{64}/.exec(read('backend/scripts/baseline-load.sh'))?.[0]}`);
+    expect(probe).toMatch(/trap cleanup EXIT/);
+    expect(probe).toContain('railway service delete --service "$created"');
+    expect(probe).toMatch(/already has a probe service/);
+  });
+});
+
+describe('the tunnel connector', () => {
+  const compose = read('docker-compose.prod.yml');
+
+  it('is the cloudflared image and command of the compose service, read from compose so there is one pin, with the token on stdin and no public domain', () => {
+    const pinned = /cloudflare\/cloudflared:[0-9.]+@sha256:[0-9a-f]{64}/.exec(compose)?.[0];
+    expect(pinned).toBeDefined();
+    expect(tunnel).toContain("grep -m1 -o 'cloudflare/cloudflared:[0-9.]*@sha256:[0-9a-f]\\{64\\}' \"$REPO/docker-compose.prod.yml\"");
+    expect(tunnel).toContain('CMD ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:2000", "run"]');
+    expect(compose).toContain('command: tunnel --no-autoupdate --metrics 127.0.0.1:2000 run');
+    expect(tunnel).toMatch(/env_value "\$envfile" TUNNEL_TOKEN \| set_secret tunnel "\$environment" TUNNEL_TOKEN/);
+    expect(tunnel).not.toMatch(/railway domain/);
+  });
+
+  it('needs a frontend and a backend to reach, refuses to run twice, and removes a connector that never registered', () => {
+    expect(tunnel).toContain('for dep in frontend backend');
+    expect(tunnel).toMatch(/already has a tunnel service/);
+    expect(tunnel).toContain('Registered tunnel connection');
+    expect(tunnel).toContain('removing the failed $created service');
+  });
+});
+
+describe('deploy/railway is runnable from a fresh clone', () => {
+  // This repository sets core.fileMode=false on some machines, which makes git ignore a chmod: the scripts were once committed as 100644 and
+  // `deploy/railway/seed-environment.sh` failed with "Permission denied" on a clean checkout. So the mode RECORDED in git is checked, not the file's.
+  const recorded = Object.fromEntries(
+    execFileSync('git', ['ls-files', '-s', 'deploy/railway'], { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').map((l) => {
+      const [mode, , , file] = l.split(/\s+/);
+      return [file!, mode!];
+    }),
+  );
+
+  it('records every script the runbook runs directly, and every stand-in command, as executable', () => {
+    const mustBeExecutable = Object.keys(recorded).filter((f) => /\.sh$/.test(f) && !f.endsWith('/common.sh')).concat(['deploy/railway/bootstrap/shims/docker', 'deploy/railway/bootstrap/shims/shasum', 'deploy/railway/bootstrap/shims/mktemp']);
+    expect(mustBeExecutable.length).toBeGreaterThan(8);
+    for (const file of mustBeExecutable) expect(recorded[file], file).toBe('100755');
+  });
+
+  it('copies the stand-in commands into the image with an explicit mode, so the image does not depend on the modes of the folder it was built from', () => {
+    expect(read('deploy/railway/bootstrap/Dockerfile')).toContain('COPY --chmod=0755 shims/docker shims/shasum shims/mktemp /usr/local/bin/');
+  });
+});
+
+describe('every job image runs as an unprivileged user (Trivy DS-0002: a container with no USER runs as root, and these hold database credentials)', () => {
+  const users: Record<string, string> = { bootstrap: 'postgres', migrate: 'node', roles: 'postgres', probe: 'postgres' };
+  for (const [job, user] of Object.entries(users)) {
+    it(`${job} runs as ${user}`, () => {
+      const lines = read(`deploy/railway/${job}/Dockerfile`).split('\n').filter((l) => /^USER /.test(l));
+      expect(lines).toEqual([`USER ${user}`]);
+    });
+  }
+
+  it('the bootstrap image has no need for root: /work, /baseline.dangling and the data folders exist and belong to postgres at build time', () => {
+    const dockerfile = read('deploy/railway/bootstrap/Dockerfile');
+    expect(dockerfile).toContain('mkdir /baseline.dangling /tmp/work && chown postgres:postgres /baseline.dangling /tmp/work && ln -s /tmp/work /work');
+    for (const dir of ['scripts', 'migrations', 'baseline']) expect(dockerfile).toContain(`COPY --chown=postgres:postgres ${dir} /${dir}`);
   });
 });
 
