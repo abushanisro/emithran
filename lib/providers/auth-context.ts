@@ -26,6 +26,18 @@ export interface AuthContextType {
   loading: boolean
   /** Signed in with the identity service but not invited to eMithran (backend answered 403). */
   accessDenied?: boolean
+  /**
+   * Signed in with the identity service, but the API could not answer who this is (not running, unreachable, 5xx). Not a sign-out:
+   * sending the person to sign in again would only loop, so the app says so and keeps retrying.
+   */
+  serviceUnavailable?: boolean
+  /**
+   * Signed in with Auth0, but the API refused the login (401 not for inactivity, or another 4xx). Signing in again resumes the same Auth0
+   * session and is refused again, so the app says so and offers sign-out.
+   */
+  loginRejected?: boolean
+  /** Asks the API again now (used by the "server unreachable" screen). */
+  retry?: () => void
   /** Leaves for Auth0's login page; credentials are never typed into this app. */
   signIn: () => Promise<never>
   /** Whether a company SSO connection is configured; the SSO button shows only then. */

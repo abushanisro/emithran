@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { AuthProblemScreen } from '@/components/auth/AuthProblemScreen';
 import { SessionCountdown } from './SessionCountdown';
 import { SessionIdleProvider } from './SessionIdleProvider';
 
@@ -29,7 +30,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, serviceUnavailable, loginRejected, retry } = useAuth();
   const { data: profile } = useProfile();
   const router = useRouter();
   const pathname = usePathname();
@@ -37,8 +38,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
-    // Only redirect after auth has fully loaded and there's definitively no user
-    if (!loading && !user) {
+    // Only redirect after auth has fully loaded and there's definitively no user. An unreachable server is not "no user": signing in
+    // again would land right back here, so that case stays on this page (below) until the server answers.
+    if (!loading && !user && !serviceUnavailable && !loginRejected) {
       // Store current URL for redirect after auth
       const currentUrl = window.location.pathname + window.location.search;
       if (currentUrl !== '/auth' && currentUrl !== '/') {
@@ -64,7 +66,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     }
 
     return undefined;
-  }, [user, loading, router]);
+  }, [user, loading, serviceUnavailable, loginRejected, router]);
 
   const getUserDisplayName = () => {
     const full = profile?.displayName || (user as any)?.user_metadata?.full_name;
@@ -84,6 +86,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       ?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     || user?.email?.[0]?.toUpperCase()
     || 'U';
+
+  if (!loading && !user && (serviceUnavailable || loginRejected)) {
+    return <AuthProblemScreen problem={serviceUnavailable ? 'unavailable' : 'rejected'} onRetry={retry} onSignOut={() => { void signOut() }} />;
+  }
 
   // Show loading during auth resolution or when about to redirect
   if (loading || (!user && !shouldRedirect)) {

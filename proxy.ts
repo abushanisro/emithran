@@ -27,7 +27,12 @@ export async function proxy(request: NextRequest) {
 
   // Auth0's handler serves /auth/login, /auth/callback, /auth/logout and /auth/profile, and keeps the session cookie rolling on every
   // other request. Our headers are then added to whatever it returns.
-  const authResponse = await getAuth0().middleware(request)
+  let authResponse: NextResponse
+  try {
+    authResponse = await getAuth0().middleware(request)
+  } catch (error) {
+    return setupErrorResponse(error)
+  }
   if (pathname.startsWith('/auth/') && !pathname.startsWith('/auth/callback/')) return authResponse
 
   const nonce = createNonce()
@@ -36,6 +41,20 @@ export async function proxy(request: NextRequest) {
   addSecurityHeaders(response, request, csp)
   addMonitoringHeaders(response, request, startTime)
   return response
+}
+
+/**
+ * Auth0 is not configured correctly (lib/auth0-config.ts). Say so plainly instead of a bare 500 or a redirect to the sign-in page.
+ * The setting names are shown in development only; production shows a generic page and the full message goes to the server log.
+ */
+function setupErrorResponse(error: unknown): NextResponse {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error(`[auth] ${message}`)
+  const detail = process.env.NODE_ENV === 'production' ? 'Please contact your administrator.' : message.replace(/[&<>]/g, '')
+  return new NextResponse(
+    `<!doctype html><meta charset="utf-8"><title>eMithran sign-in is not set up</title><body style="font-family:system-ui;max-width:40rem;margin:4rem auto;padding:0 1rem"><h1>Sign-in is not set up correctly</h1><pre style="white-space:pre-wrap">${detail}</pre>`,
+    { status: 503, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } },
+  )
 }
 
 /** A fresh, unguessable nonce per request: 128 random bits, base64. */
