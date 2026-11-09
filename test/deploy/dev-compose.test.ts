@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import yaml from 'js-yaml';
+import { loadYaml } from './load-yaml';
 import { describe, expect, it } from 'vitest';
 
 // The local development stack (docker-compose.yml). It is not hardened like docker-compose.prod.yml, so it must at least not be
 // reachable from the network the developer's machine is on.
 const text = fs.readFileSync(path.resolve(process.cwd(), 'docker-compose.yml'), 'utf8');
-const compose = yaml.load(text) as {
+const compose = loadYaml(text) as {
   services: Record<string, { ports?: string[]; networks?: string[]; environment?: Record<string, string> }>;
   networks: Record<string, { internal?: boolean }>;
 };

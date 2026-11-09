@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import yaml from 'js-yaml';
+import { loadYaml } from './load-yaml';
 import { describe, expect, it } from 'vitest';
 
 interface Step {
@@ -9,7 +9,7 @@ interface Step {
   run?: string;
   env?: Record<string, string>;
 }
-const workflow = yaml.load(fs.readFileSync(path.resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')) as {
+const workflow = loadYaml(fs.readFileSync(path.resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')) as {
   jobs: Record<string, { steps: Step[] }>;
 };
 

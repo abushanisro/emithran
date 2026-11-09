@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import yaml from 'js-yaml';
+import { loadYaml } from './load-yaml';
 import { describe, expect, it } from 'vitest';
 
 // Policy as code for the stage and production deployment (docs/DEPLOYMENT_SECURITY.md). Each rule below is a decision that
@@ -35,7 +35,7 @@ interface Compose {
   networks: Record<string, { internal?: boolean } | null>;
 }
 
-const compose = yaml.load(read('docker-compose.prod.yml')) as Compose;
+const compose = loadYaml(read('docker-compose.prod.yml')) as Compose;
 const services = Object.entries(compose.services);
 
 describe('docker-compose.prod.yml', () => {
@@ -271,7 +271,7 @@ describe('Dockerfiles', () => {
 });
 
 describe('docker-compose.data.yml (self-hosted data tier)', () => {
-  const data = yaml.load(read('docker-compose.data.yml')) as Compose;
+  const data = loadYaml(read('docker-compose.data.yml')) as Compose;
 
   it.each(Object.entries(data.services))('%s is locked down and private', (_name, s) => {
     expect(s.read_only).toBe(true);
