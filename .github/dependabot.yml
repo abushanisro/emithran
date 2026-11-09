@@ -16,6 +16,11 @@ updates:
     directory: /backend
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
+    # The @nestjs packages move together with @nestjs/core: @nestjs/swagger 12 needs Nest 12 (and is ESM-only), and merged against Nest 11 it
+    # broke every backend spec on main. A new major is a deliberate migration of all of them at once, not a single bump.
+    ignore:
+      - dependency-name: "@nestjs/*"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch: { update-types: [minor, patch] }
 

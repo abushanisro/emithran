@@ -30,6 +30,11 @@ describe('CI and security run for both long-lived branches', () => {
 describe('Dependabot opens every update against develop', () => {
   const config = yaml.load(read('.github/dependabot.yml')) as { updates: Array<{ 'package-ecosystem': string; directory: string; 'target-branch'?: string }> };
 
+  it('does not propose a major version of any @nestjs package for the backend: they move with @nestjs/core, and swagger 12 merged against Nest 11 broke every backend spec on main', () => {
+    const backend = (config.updates as Array<{ directory: string; 'package-ecosystem': string; ignore?: Array<{ 'dependency-name': string; 'update-types'?: string[] }> }>).find((u) => u['package-ecosystem'] === 'npm' && u.directory === '/backend');
+    expect(backend?.ignore).toContainEqual({ 'dependency-name': '@nestjs/*', 'update-types': ['version-update:semver-major'] });
+  });
+
   it('has updates, each with target-branch develop (a missing one would open against the default branch and, for a security update, bypass the rule)', () => {
     expect(config.updates.length).toBeGreaterThan(5);
     for (const u of config.updates) expect(`${u['package-ecosystem']} ${u.directory}: ${u['target-branch']}`).toMatch(/: develop$/);

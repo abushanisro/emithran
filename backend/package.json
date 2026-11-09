@@ -62,7 +62,7 @@
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
-    "@nestjs/swagger": "12.1.1",
+    "@nestjs/swagger": "11.4.8",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/throttler": "^5.1.1",
     "@opentelemetry/api": "1.10.0",
