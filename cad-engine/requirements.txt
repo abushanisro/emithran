@@ -33,7 +33,7 @@ python-multipart==0.0.32
 opentelemetry-api==1.45.1
 opentelemetry-sdk==1.45.1
 opentelemetry-exporter-otlp-proto-http==1.45.1
-opentelemetry-instrumentation-fastapi==0.66b1
+opentelemetry-instrumentation-fastapi==0.66b2
 
 # HTTP client for callbacks
 httpx==0.28.1
