@@ -13,10 +13,14 @@
 # Each job is a temporary Railway service, deleted afterwards (also when it fails), and the temporary folder that holds a copy of the
 # baseline (reference data and the user directory) is removed. Success is read from the job's log, not assumed from its exit.
 # Needs: the Railway CLI logged in, the project linked (or RAILWAY_PROJECT_ID), Docker is NOT needed. See deploy/railway/README.md.
-set -euo pipefail
+set -Eeuo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
+REPO="$repo"
+# shellcheck source=common.sh
+. "$here/common.sh"
+trap 'on_error $LINENO' ERR
 environment="${1:?usage: seed-environment.sh <staging|production> <baseline-dir | --migrate-only>}"
 baseline_arg="${2:?usage: seed-environment.sh <staging|production> <baseline-dir | --migrate-only>}"
 drop_dangling="${DROP_DANGLING:-1}"
@@ -42,10 +46,9 @@ if [ "$migrate_only" = 0 ]; then
 fi
 
 railway environment "$environment" >/dev/null
-services="$(railway service list --environment "$environment" 2>&1 || true)" # captured first: `| grep -q` would kill railway with SIGPIPE
-printf '%s\n' "$services" | grep -qE '^postgres( |$)' \
+service_exists "$environment" postgres \
   || { echo "$environment has no postgres service: run deploy/railway/provision-postgres.sh $environment first" >&2; exit 2; }
-project_id="${RAILWAY_PROJECT_ID:-$(railway status 2>&1 | awk '/Project ID:/{print $3; exit}')}"
+project_id="${RAILWAY_PROJECT_ID:-$(project_id_of)}"
 [ -n "$project_id" ] || { echo "cannot tell which Railway project this is: link it (railway link) or set RAILWAY_PROJECT_ID" >&2; exit 2; }
 
 work="$(mktemp -d)"

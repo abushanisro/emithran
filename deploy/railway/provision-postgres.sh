@@ -7,7 +7,7 @@
 # The database gets NO public address: other services reach it on Railway's private network through the reference variable
 # ${{postgres.DATABASE_URL}}. It refuses to run when the environment already has a service called postgres, so it never replaces data.
 # Needs: the Railway CLI, logged in (`railway login`), and the project linked or RAILWAY_PROJECT_ID set. See deploy/railway/README.md.
-set -euo pipefail
+set -Eeuo pipefail
 
 environment="${1:?usage: provision-postgres.sh <staging|production>}"
 case "$environment" in staging|production) ;; *) echo "environment must be staging or production, got: $environment" >&2; exit 2 ;; esac
@@ -21,10 +21,10 @@ command -v openssl >/dev/null || { echo "openssl is needed to generate the passw
 railway whoami >/dev/null 2>&1 || { echo "not logged in: run railway login" >&2; exit 2; }
 
 railway environment "$environment" >/dev/null
-# The listing is captured first: `railway ... | grep -q` closes the pipe early, kills railway with SIGPIPE, and under pipefail made this guard
-# read "no postgres here" and carry on.
+# The listing is captured first and searched with a here-string: `railway ... | grep -q` closes the pipe early, kills railway with SIGPIPE,
+# and under pipefail made this guard read "no postgres here" and carry on.
 services="$(railway service list --environment "$environment" 2>&1 || true)"
-if printf '%s\n' "$services" | grep -qE '^postgres( |$)'; then
+if grep -qE '^postgres( |$)' <<<"$services"; then
   echo "refusing: $environment already has a postgres service. This script only creates one." >&2
   exit 1
 fi
@@ -55,7 +55,7 @@ echo "waiting for postgres to accept connections..."
 for _ in $(seq 1 30); do
   sleep 10
   logs="$(railway service logs --service postgres --environment "$environment" 2>&1 || true)" # captured first: see the guard above
-  if printf '%s\n' "$logs" | grep -q "database system is ready to accept connections"; then
+  if grep -q "database system is ready to accept connections" <<<"$logs"; then
     echo "postgres is ready in $environment (private address only; no public proxy)."
     echo "next: deploy/railway/seed-environment.sh $environment <baseline-dir>"
     exit 0
