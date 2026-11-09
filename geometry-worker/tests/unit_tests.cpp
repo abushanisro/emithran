@@ -1,6 +1,6 @@
 // Checks the worker against hand-worked answers (Petrus D126): shapes whose volume, area and extents are known from the
 // formulas, written as real STEP files, read back through the same code the service runs. The fixtures are the ones the
-// NestJS e2e uses (backend/test/fixtures/cad, written with pythonocc 7.7.2): the parity test is that this worker reads them
+// NestJS e2e uses (backend/test/fixtures/cad, written with pythonocc 7.8.1): the parity test is that this worker reads them
 // exactly as the Python engine does.
 #include <cmath>
 #include <cstdlib>

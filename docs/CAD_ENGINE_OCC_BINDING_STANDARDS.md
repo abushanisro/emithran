@@ -1,7 +1,7 @@
 # cad-engine — OpenCASCADE (pythonocc-core) Binding Standards
 
-Applies to: `cad-engine/` (pythonocc-core `7.7.2`, pinned in `cad-engine/Dockerfile` via
-`conda install -c conda-forge pythonocc-core=7.7.2`).
+Applies to: `cad-engine/` (pythonocc-core `7.8.1.1`, pinned in `cad-engine/Dockerfile` via
+`conda install -c conda-forge pythonocc-core=7.8.1.1`).
 
 Every claim in this document was verified by direct execution against the actual installed
 `pythonocc-core==7.7.2` in this repo's `mithran` conda environment — not inferred from

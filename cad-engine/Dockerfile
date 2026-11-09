@@ -17,7 +17,7 @@ WORKDIR /app
 
 # Create conda environment with pythonocc-core
 RUN conda create -n cad-env python=3.11 -y && \
-    conda install -n cad-env -c conda-forge pythonocc-core=7.7.2 -y && \
+    conda install -n cad-env -c conda-forge pythonocc-core=7.8.1.1 -y && \
     conda clean -afy
 
 # conda's own base environment is never used to run the service (that is cad-env), but it ships in the image, so it is brought to

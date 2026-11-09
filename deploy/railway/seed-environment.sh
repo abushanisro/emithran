@@ -87,10 +87,10 @@ run_job() {
 }
 
 if [ "$migrate_only" = 0 ]; then
-  ctx="$work/bootstrap"; mkdir -p "$ctx/app/scripts" "$ctx/app/migrations"
+  ctx="$work/bootstrap"; mkdir -p "$ctx/scripts" "$ctx/migrations"
   cp -R "$here/bootstrap/." "$ctx/"
-  cp "$repo/backend/scripts/baseline-load.sh" "$ctx/app/scripts/"
-  cp "$repo/backend/migrations/930_postgres_compat.sql" "$ctx/app/migrations/"
+  cp "$repo/backend/scripts/baseline-load.sh" "$ctx/scripts/"
+  cp "$repo/backend/migrations/930_postgres_compat.sql" "$ctx/migrations/"
   cp -R "$baseline" "$ctx/baseline"
   # shellcheck disable=SC2016  # ${{...}} is Railway's reference syntax, resolved by Railway: it must reach the CLI unexpanded
   run_job bootstrap "$ctx" 'TARGET_URL=${{postgres.DATABASE_URL}}' "DROP_DANGLING=$drop_dangling" || true

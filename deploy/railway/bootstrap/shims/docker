@@ -8,7 +8,9 @@ while [ $# -gt 0 ]; do
     --rm|-i|-t|-it) shift ;;
     --add-host|--network) shift 2 ;;
     -e) export "$2"; shift 2 ;;
-    -v) src="${2%%:*}"; rest="${2#*:}"; dst="${rest%%:*}"; [ "$src" = "$dst" ] || ln -sfn "$src" "$dst"; shift 2 ;;
+    # a mount whose source and destination are already the same folder (compared by real path) needs nothing; otherwise link it (this needs write access to /)
+    -v) src="${2%%:*}"; rest="${2#*:}"; dst="${rest%%:*}"; real_src="$(cd -P "$src" 2>/dev/null && pwd)"; real_dst="$(cd -P "$dst" 2>/dev/null && pwd)"
+        [ -n "$real_src" ] && [ "$real_src" = "$real_dst" ] || ln -sfn "$src" "$dst"; shift 2 ;;
     -*) shift ;;
     *) shift; break ;;
   esac

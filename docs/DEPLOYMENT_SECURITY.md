@@ -164,6 +164,6 @@ authentication for all members.
 
 - **cloudflared** carries one HIGH CVE in its bundled go-jose with no upstream fix yet; `.trivyignore.yaml` records the exception and
   it expires on 2026-12-15 so it is re-checked.
-- The cad-engine image is `linux/amd64` only (`pythonocc-core` 7.7.2 is not published for aarch64).
+- The cad-engine image builds natively for `linux/amd64` and `linux/aarch64` (`pythonocc-core` 7.8.1 is published for both). The other engine images are still pinned `linux/amd64`.
 - The browser-side helper `lib/api/cad-engine.ts` still has two direct engine calls (`/convert/step-to-stl`, `/health`) that cannot
   work against a key-protected, private engine. The working path is the `/api/cad` proxy.
