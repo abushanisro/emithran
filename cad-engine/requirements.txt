@@ -56,4 +56,4 @@ PyMuPDF>=2.1
 pywin32>=306; sys_platform == "win32"
 
 # 2D polygon geometry (flat-pattern outline union, true nesting placement/collision)
-shapely>=2.0,<3.0
+shapely>=2.2.0,<3.0
