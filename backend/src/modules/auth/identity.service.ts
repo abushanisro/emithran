@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 
 import { DatabaseService } from '../../common/database/database.service';
 import { Auth0TokenVerifier, TokenRejected, type VerifiedLogin } from './auth0-token-verifier';
@@ -32,6 +32,7 @@ export interface IdentityPolicy {
  */
 @Injectable()
 export class IdentityService {
+  private readonly logger = new Logger(IdentityService.name);
   private readonly decisions = new Map<string, { userId: string; email: string; until: number }>();
   private readonly trustedConnections: string[];
 
@@ -52,7 +53,7 @@ export class IdentityService {
     try {
       login = await this.verifier.verify(token);
     } catch (error) {
-      if (error instanceof TokenRejected && error.isServiceFailure) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+      if (error instanceof TokenRejected && error.isServiceFailure) throw this.unavailable('the Auth0 token could not be verified', error);
       throw new UnauthorizedException('Invalid or expired token');
     }
 
@@ -78,6 +79,17 @@ export class IdentityService {
     };
   }
 
+  /**
+   * The 503 the person sees stays generic, but an operator must be able to tell a database that is down from Auth0 being unreachable:
+   * the cause is logged here (its message and code only; never the login's subject or email).
+   */
+  private unavailable(what: string, cause: unknown): ServiceUnavailableException {
+    const c = (typeof cause === 'object' && cause !== null ? cause : {}) as { message?: unknown; code?: unknown };
+    const message = typeof c.message === 'string' && c.message !== '' ? c.message : String(cause);
+    this.logger.error(`Sign-in unavailable: ${what}: ${message}${typeof c.code === 'string' && c.code !== '' ? ` (${c.code})` : ''}`);
+    return new ServiceUnavailableException('Sign-in is temporarily unavailable');
+  }
+
   private async resolve(login: VerifiedLogin): Promise<{ userId: string; email: string }> {
     const admin = this.db.getPrivilegedClient('identity: map an Auth0 login to an internal user (service-only functions)');
     // The database decides and records the decision (migration 947): a known sub resolves whatever its connection; a new one links
@@ -90,14 +102,14 @@ export class IdentityService {
       p_connection: login.connection ?? null,
       p_trusted_connections: this.trustedConnections,
     });
-    if (linked.error) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+    if (linked.error) throw this.unavailable('link_identity failed', linked.error);
     const userId = linked.data as string | null;
     if (!userId) throw new ForbiddenException('This account has not been invited to eMithran');
 
     // The allow-list check and the account's own email in one step (migration 938): the email bound into the request and the
     // database token is auth.users.email, never the token's claim, which an upstream change could make differ for a known sub.
     const account = await admin.rpc('identity_user_email', { p_user_id: userId });
-    if (account.error) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+    if (account.error) throw this.unavailable('identity_user_email failed', account.error);
     const email = account.data;
     if (typeof email !== 'string' || email === '') throw new ForbiddenException('This account has not been invited to eMithran');
     return { userId, email };
