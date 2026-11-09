@@ -10,7 +10,7 @@ endif()
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
 # Open CASCADE is linked dynamically (LGPL-2.1): the runtime image ships its shared libraries. Same major version as the
-# pythonocc-core the Python engine uses (7.7.2), so both read and measure STEP the same way (the parity test depends on it).
+# pythonocc-core the Python engine uses (7.8.1), so both read and measure STEP the same way (the parity test depends on it).
 find_package(OpenCASCADE REQUIRED)
 find_package(nlohmann_json REQUIRED)
 

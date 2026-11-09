@@ -1927,8 +1927,6 @@ class SheetMetalFeatureExtractor:
         from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Line  # type: ignore
         from OCC.Core.BRepGProp import brepgprop  # type: ignore
         from OCC.Core.GProp import GProp_GProps  # type: ignore
-
-        MAX_HASH = 2 ** 31 - 1
         max_dim = max(bbox_dims) if bbox_dims else 1.0
         min_flange_area = max(sheet_thickness * 20.0, (max_dim * 0.15) ** 2 * 0.5)
 
@@ -1950,7 +1948,7 @@ class SheetMetalFeatureExtractor:
                         props = GProp_GProps()
                         brepgprop.SurfaceProperties(face, props)
                         if props.Mass() >= min_flange_area:
-                            face_hash_to_idx[face.HashCode(MAX_HASH)] = len(planar_faces)
+                            face_hash_to_idx[hash(face)] = len(planar_faces)
                             planar_faces.append((face, (nx, ny, nz)))
             except Exception:
                 pass
@@ -1984,7 +1982,7 @@ class SheetMetalFeatureExtractor:
                 it = TopTools_ListIteratorOfListOfShape(adj_list)
                 candidate_idxs = []
                 while it.More():
-                    fh = topods.Face(it.Value()).HashCode(MAX_HASH)
+                    fh = hash(topods.Face(it.Value()))
                     it.Next()
                     fidx = face_hash_to_idx.get(fh)
                     if fidx is not None:
@@ -4121,8 +4119,6 @@ class SheetMetalFeatureExtractor:
         from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
         from OCC.Core.Bnd import Bnd_Box  # type: ignore
         from OCC.Core.TopoDS import topods  # type: ignore
-
-        MAX_HASH = 2 ** 31 - 1
         cx = cy = cz = 0.0
         if bbox_minmax:
             cx = (bbox_minmax['xmin'] + bbox_minmax['xmax']) / 2
@@ -4172,7 +4168,7 @@ class SheetMetalFeatureExtractor:
                                         adj_face = topods.Face(it.Value())
                                         it.Next()
                                         if not adj_face.IsSame(dominant_face):
-                                            fh = adj_face.HashCode(MAX_HASH)
+                                            fh = hash(adj_face)
                                             fid = face_id_map.get(fh)
                                             if fid is not None and fid not in slot_face_ids:
                                                 slot_face_ids.append(fid)

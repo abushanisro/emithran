@@ -882,7 +882,7 @@ class AdvancedCADMemoryOptimizer:
                 pass
             # Build face_id_map (hash → index) for slot edge-topology lookup
             try:
-                face_id_map[face.HashCode(2 ** 31 - 1)] = face_index
+                face_id_map[hash(face)] = face_index
             except Exception:
                 pass
             # Count triangles for face_map: face_id → {tri_start, tri_count}
