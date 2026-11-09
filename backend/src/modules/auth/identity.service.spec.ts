@@ -1,4 +1,4 @@
-import { ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 
 import { Auth0TokenVerifier, TokenRejected, type VerifiedLogin } from './auth0-token-verifier';
 import { IdentityService } from './identity.service';
@@ -22,6 +22,8 @@ function build(opts: { login?: VerifiedLogin | TokenRejected; linked?: unknown; 
 }
 
 describe('IdentityService', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   it('maps a verified login to the internal user and a database token', async () => {
     const { service, rpc, db } = build();
     const r = await service.authenticate('tok');
@@ -87,9 +89,53 @@ describe('IdentityService', () => {
   });
 
   it('503s when Auth0 keys or the database cannot be reached (never a 401/403 verdict on the person)', async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     await expect(build({ login: new TokenRejected('keys_unavailable', 'x') }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
     await expect(build({ linkError: true }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
     await expect(build({ accountError: true }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  describe('when sign-in is unavailable the operator can see why (the person still sees one generic message)', () => {
+    const logged = () => jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    afterEach(() => jest.restoreAllMocks());
+
+    it('logs the database error behind a failed link, with its code, and answers the same generic 503', async () => {
+      const spy = logged();
+      const b = build();
+      b.rpc.mockImplementation(async () => ({ data: null, error: { message: 'TypeError: fetch failed', code: 'PGRST000' } }));
+      await expect(b.service.authenticate('t')).rejects.toThrow('Sign-in is temporarily unavailable');
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0]![0]).toBe('Sign-in unavailable: link_identity failed: TypeError: fetch failed (PGRST000)');
+    });
+
+    it('logs which of the two database calls failed', async () => {
+      const spy = logged();
+      const b = build();
+      b.rpc.mockImplementation(async (fn: string) => (fn === 'link_identity' ? { data: USER, error: null } : { data: null, error: { message: 'permission denied' } }));
+      await expect(b.service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(spy.mock.calls[0]![0]).toBe('Sign-in unavailable: identity_user_email failed: permission denied');
+    });
+
+    it('logs an unreachable Auth0 key set', async () => {
+      const spy = logged();
+      await expect(build({ login: new TokenRejected('keys_unavailable', 'JWKS fetch timed out') }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(spy.mock.calls[0]![0]).toContain('the Auth0 token could not be verified: JWKS fetch timed out');
+    });
+
+    it('never writes the login subject or email into the log', async () => {
+      const spy = logged();
+      await expect(build({ linkError: true }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
+      const text = spy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(text).not.toContain('auth0|a');
+      expect(text).not.toContain('a@x.com');
+    });
+
+    it('does not log a refusal of the person (a 403 or 401 is a verdict, not an outage)', async () => {
+      const spy = logged();
+      await expect(build({ linked: null }).service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(build({ login: new TokenRejected('bad_signature', 'bad signature') }).service.authenticate('t')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   it('reuses a decision only for the configured lifetime, so a user removed from the allow-list loses access within it', async () => {
