@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import yaml from 'js-yaml';
+import { loadYaml } from './load-yaml';
 import { describe, expect, it } from 'vitest';
 
 // Policy as code for the monitoring stack (docs/ops/monitoring.md): what it may expose, what it may mount, and what a
@@ -26,7 +26,7 @@ interface Service {
   healthcheck?: unknown;
   deploy?: { resources?: { limits?: { memory?: string } } };
 }
-const compose = yaml.load(read('docker-compose.monitoring.yml')) as { services: Record<string, Service>; volumes: Record<string, unknown> };
+const compose = loadYaml(read('docker-compose.monitoring.yml')) as { services: Record<string, Service>; volumes: Record<string, unknown> };
 const services = Object.entries(compose.services);
 
 describe('docker-compose.monitoring.yml', () => {
@@ -102,9 +102,9 @@ describe('docker-compose.monitoring.yml', () => {
 
   it('is not a dependency of the app: no app compose file mentions the monitoring services', () => {
     for (const file of ['docker-compose.prod.yml', 'docker-compose.yml']) {
-      const appServices = Object.keys((yaml.load(read(file)) as { services: Record<string, unknown> }).services);
+      const appServices = Object.keys((loadYaml(read(file)) as { services: Record<string, unknown> }).services);
       expect(appServices.filter((n) => ['prometheus', 'grafana', 'blackbox', 'node-exporter'].includes(n)), file).toEqual([]);
-      const dependsOnMonitoring = JSON.stringify(Object.values((yaml.load(read(file)) as { services: Record<string, { depends_on?: unknown }> }).services).map((x) => x.depends_on ?? null));
+      const dependsOnMonitoring = JSON.stringify(Object.values((loadYaml(read(file)) as { services: Record<string, { depends_on?: unknown }> }).services).map((x) => x.depends_on ?? null));
       expect(dependsOnMonitoring, file).not.toMatch(/prometheus|grafana|blackbox/);
     }
   });
@@ -141,7 +141,7 @@ describe('Grafana dashboards and rules', () => {
   });
 
   it('every alert rule has a severity, a hold time, a summary and a response', () => {
-    const doc = yaml.load(read('monitoring/prometheus/rules/alerts.yml')) as { groups: { rules: { alert: string; for?: string; labels?: { severity?: string }; annotations?: { summary?: string; response?: string } }[] }[] };
+    const doc = loadYaml(read('monitoring/prometheus/rules/alerts.yml')) as { groups: { rules: { alert: string; for?: string; labels?: { severity?: string }; annotations?: { summary?: string; response?: string } }[] }[] };
     const rules = doc.groups.flatMap((g) => g.rules);
     expect(rules.length).toBeGreaterThanOrEqual(10);
     for (const r of rules) {
