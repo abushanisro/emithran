@@ -489,8 +489,6 @@ class InjectionMoldedFeatureExtractor:
         except Exception as e:
             logger.warning(f"[InjectionMolded] blind detection edge map failed: {e}")
             return _FALLBACK
-
-        MAX_HASH = 2 ** 31 - 1
         through_count = 0
         blind_count = 0
         blind_diameters_mm: List[float] = []  # Phase 3: diameters for insert matching
@@ -532,7 +530,7 @@ class InjectionMoldedFeatureExtractor:
                         )
                         while it.More() and not has_cap:
                             adj = topods.Face(it.Value())
-                            fh = adj.HashCode(MAX_HASH)
+                            fh = hash(adj)
                             if fh not in seen and not adj.IsSame(face):
                                 seen.add(fh)
                                 try:

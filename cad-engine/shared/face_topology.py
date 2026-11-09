@@ -32,7 +32,7 @@ class FaceTopology:
         topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, self._edge_faces)
         self._ordinal: Dict[int, int] = {}
         for i, f in enumerate(self._faces):
-            self._ordinal[f.HashCode(2 ** 31 - 1)] = i
+            self._ordinal[hash(f)] = i
         self._flat_normal_cache: Dict[int, Optional[Tuple[float, float, float]]] = {}
         self._neighbour_cache: Dict[int, Set[int]] = {}
 
@@ -52,7 +52,7 @@ class FaceTopology:
                 if self._edge_faces.Contains(edge):
                     it = TopTools_ListIteratorOfListOfShape(self._edge_faces.FindFromKey(edge))
                     while it.More():
-                        o = self._ordinal.get(it.Value().HashCode(2 ** 31 - 1))
+                        o = self._ordinal.get(hash(it.Value()))
                         if o is not None and o != ordinal:
                             out.add(o)
                         it.Next()

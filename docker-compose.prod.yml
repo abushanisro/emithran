@@ -202,8 +202,7 @@ services:
   # --- Engines: private. They parse untrusted uploaded files, so they get no internet and no published port. ---
   cad-engine:
     <<: *hardened
-    # pythonocc-core 7.7.2 is not published for linux/aarch64, so the image is amd64 everywhere (emulated on ARM dev machines).
-    platform: linux/amd64
+    # pythonocc-core 7.8.1 is published for linux/amd64 and linux/aarch64, so this image builds natively on both (no platform pin).
     build:
       context: ./cad-engine
       dockerfile: Dockerfile
