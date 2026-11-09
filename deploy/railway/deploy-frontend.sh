@@ -66,6 +66,8 @@ max_upload="$(env_value "$envfile" MAX_UPLOAD_MB)"; max_upload="${max_upload:-50
 vars=(
   --variables "RAILWAY_DOCKERFILE_PATH=Dockerfile.frontend"
   --variables "NODE_ENV=production"
+  # Railway injects its own PORT (8080 here), which overrides the `ENV PORT=3000` in Dockerfile.frontend; the tunnel and the probe expect 3000.
+  --variables "PORT=3000"
   --variables "NEXT_PUBLIC_API_GATEWAY_URL=$gateway"
   --variables "NEXT_PUBLIC_API_URL=$gateway/api/v1"
   --variables "NEXT_PUBLIC_MAX_UPLOAD_MB=$max_upload"

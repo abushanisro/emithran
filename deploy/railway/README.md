@@ -57,6 +57,8 @@ deploy/railway/probe-environment.sh staging          # from INSIDE the environme
 - **The backend** needs `core/` as a named build context, which Railway cannot pass: the build folder holds backend/ plus `core/{Cargo.toml,Cargo.lock,crates}`, and a
   `Dockerfile.railway` that is the repo's Dockerfile unchanged behind `FROM scratch AS core` / `COPY core /`, so `COPY --from=core` resolves to that stage.
 - **The frontend** builds from the repo root, so the upload is the tracked files minus the folders `.dockerignore` already excludes (11 MB instead of 83 MB).
+- **Set `PORT` on every service.** Railway injects its own `PORT` (the frontend listened on 8080), which overrides a Dockerfile's `ENV PORT`; every script sets it
+  to the port the other services call.
 - **Railway's Free plan allows 5 services per project** (`Free plan resource provision limit exceeded`). Staging's postgres, postgrest, two engines and backend are five.
   The frontend, the `cloudflared` tunnel service, the probe and a production environment need a paid plan.
 

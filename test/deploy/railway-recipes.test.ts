@@ -248,6 +248,11 @@ describe('the frontend is built from the repo\'s own Dockerfile.frontend and con
     expect(frontend).toContain('RAILWAY_DOCKERFILE_PATH=Dockerfile.frontend');
   });
 
+  it('sets PORT to 3000 itself: Railway injects its own PORT (it listened on 8080) over the Dockerfile\'s ENV PORT=3000, and the tunnel and the probe call 3000', () => {
+    expect(read('Dockerfile.frontend')).toContain('ENV PORT=3000');
+    expect(frontend).toContain('--variables "PORT=3000"');
+  });
+
   it('reaches the backend and the CAD engine by their private address, on the ports compose uses', () => {
     expect(frontend).toContain('API_URL=http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:4000/api/v1');
     expect(frontend).toContain('CAD_ENGINE_URL=http://${{cad-engine.RAILWAY_PRIVATE_DOMAIN}}:5055');
