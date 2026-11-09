@@ -1,0 +1,4 @@
+#!/bin/sh
+# baseline-load.sh calls `shasum -a 256 -c FILE`; Alpine has sha256sum.
+[ "$1" = "-a" ] && shift 2
+exec sha256sum "$@"

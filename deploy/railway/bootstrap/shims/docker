@@ -1,0 +1,16 @@
+#!/bin/sh
+# Stand-in for `docker run [options] IMAGE command...`, so backend/scripts/baseline-load.sh runs unmodified inside the container that already
+# is that image: it runs the command here, exports each -e value, and makes each -v source appear at its container path.
+[ "$1" = run ] && shift
+# shellcheck disable=SC2163  # `export "$2"` where $2 is a NAME=value string assigns and exports that variable
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --rm|-i|-t|-it) shift ;;
+    --add-host|--network) shift 2 ;;
+    -e) export "$2"; shift 2 ;;
+    -v) src="${2%%:*}"; rest="${2#*:}"; dst="${rest%%:*}"; [ "$src" = "$dst" ] || ln -sfn "$src" "$dst"; shift 2 ;;
+    -*) shift ;;
+    *) shift; break ;;
+  esac
+done
+exec "$@"
