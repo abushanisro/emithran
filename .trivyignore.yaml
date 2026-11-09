@@ -49,6 +49,30 @@ vulnerabilities:
       used in the build stages; both runtime images (backend/Dockerfile, Dockerfile.frontend) delete npm before they ship.
       Re-check when node:24-alpine ships an npm with the fixed undici (Dependabot will propose it).
     expired_at: 2026-12-15
+  - id: CVE-2026-76844
+    purls:
+      - "pkg:deb/debian/zlib1g@1.3.dfsg%2Breally1.3.1-1%2Bb1?arch=amd64&distro=debian-13.7&epoch=1"
+    statement: >-
+      zlib1g 1:1.3.dfsg+really1.3.1-1+b1 in the Debian 13.7 distroless base of cloudflare/cloudflared (pinned in docker-compose.prod.yml).
+      Debian fixes it in 1:1.3.dfsg+really1.3.1-1+deb13u1, but neither cloudflared 2026.10.5 nor 2026.10.7 ships that build and the
+      image has no package manager to upgrade it in. The library is present and never loaded: /usr/local/bin/cloudflared is
+      statically linked (no NEEDED entries, no libz reference) and is the only program the image runs, as user 65532. Matched by the
+      exact package build (1:1.3.dfsg+really1.3.1-1+b1, amd64, Debian 13.7), not by CVE alone: any other zlib build still fails the
+      scan, and the images we build upgrade past this one (apt-get upgrade in their Dockerfiles, scanned as built images), so they
+      never match. Re-check when cloudflared ships a base with zlib1g >= 1:1.3.dfsg+really1.3.1-1+deb13u1 (Dependabot will propose it).
+    expired_at: 2026-12-15
+  - id: CVE-2026-85091
+    purls:
+      - "pkg:deb/debian/zlib1g@1.3.dfsg%2Breally1.3.1-1%2Bb1?arch=amd64&distro=debian-13.7&epoch=1"
+    statement: >-
+      zlib1g 1:1.3.dfsg+really1.3.1-1+b1 in the Debian 13.7 distroless base of cloudflare/cloudflared (pinned in docker-compose.prod.yml).
+      Debian fixes it in 1:1.3.dfsg+really1.3.1-1+deb13u1, but neither cloudflared 2026.10.5 nor 2026.10.7 ships that build and the
+      image has no package manager to upgrade it in. The library is present and never loaded: /usr/local/bin/cloudflared is
+      statically linked (no NEEDED entries, no libz reference) and is the only program the image runs, as user 65532. Matched by the
+      exact package build (1:1.3.dfsg+really1.3.1-1+b1, amd64, Debian 13.7), not by CVE alone: any other zlib build still fails the
+      scan, and the images we build upgrade past this one (apt-get upgrade in their Dockerfiles, scanned as built images), so they
+      never match. Re-check when cloudflared ships a base with zlib1g >= 1:1.3.dfsg+really1.3.1-1+deb13u1 (Dependabot will propose it).
+    expired_at: 2026-12-15
   - id: CVE-2026-116587
     paths:
       - "usr/local/bin/cloudflared"
