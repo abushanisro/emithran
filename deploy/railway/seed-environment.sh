@@ -75,7 +75,8 @@ run_job() {
     || { tail -20 "$work/$name.build.log" >&2; echo "[$name] the build failed" >&2; return 1; }
   local state=""
   for _ in $(seq 1 120); do
-    state="$(railway service status --service "$name" --environment "$environment" 2>&1 | awk '/Status:/{print $2; exit}')"
+    status_text="$(railway service status --service "$name" --environment "$environment" 2>&1 || true)"
+    state="$(awk '/Status:/{print $2; exit}' <<<"$status_text")"
     case "$state" in STOPPED|FAILED|CRASHED|REMOVED) break ;; esac
     sleep 10
   done

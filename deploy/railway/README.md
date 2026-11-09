@@ -1,7 +1,7 @@
 # Railway environments
 
 How a Railway environment's database is created and seeded, and the rules that came out of doing it. Scripts: `provision-postgres.sh`,
-`seed-environment.sh`. Everything runs from your machine with the Railway CLI (`brew install railway`, then `railway login`).
+`seed-environment.sh`, `deploy-data-api.sh`, `deploy-engine.sh` (shared helpers in `common.sh`). Everything runs from your machine with the Railway CLI (`brew install railway`, then `railway login`).
 
 ## Rules
 
@@ -40,9 +40,33 @@ committed and is copied only into a temporary folder. The old database did not e
 (`capability_criteria` 30, `nomination_evaluation_criteria` 42). The loader stops on them by design; `DROP_DANGLING=1` (the script's default)
 sets them aside and loads the rest. They remain in the baseline file. Set `DROP_DANGLING=0` to stop instead.
 
+## Deploy the services
+
+After the database is seeded, in this order, each refusing to run twice and reading its settings from `env/stage.env` (staging) or
+`env/prd.env` (production), never printing a value:
+
+```bash
+deploy/railway/deploy-data-api.sh staging            # sets the authenticator password (private job), then PostgREST
+deploy/railway/deploy-engine.sh staging ecad-engine  # built from ecad-engine/Dockerfile
+deploy/railway/deploy-engine.sh staging cad-engine   # built from cad-engine/Dockerfile (conda + OpenCASCADE: heavy)
+```
+
+- **PostgREST** is the image pinned in `docker-compose.prod.yml` (read from it, so there is one pin) with that service's settings. It connects as
+  `authenticator` over the private address with TLS. `DB_JWT_SECRET` must be the value the backend uses (compose passes it to both).
+- **The engines** have no public domain; only the backend reaches them (`http://<engine>.railway.internal:<port>`). Their API key is the value the backend sends.
+- **Never run a bare `railway domain`**: without a subcommand it *creates* a public domain. List with `railway domain list`.
+
+Lessons the scripts encode (each was a real failure while building them, and a test now prevents it):
+
+- Never search `railway`'s output through a pipe whose reader can stop early (`| grep -q`, `| awk '{...; exit}'`): the writer dies with SIGPIPE and under
+  `pipefail` + `set -e` the script **exits silently**. Capture the text, then use a here-string.
+- Never run these scripts with `bash -x`: trace mode prints the secrets they handle. The scripts install an ERR trap that names the failing line instead.
+- `railway add` echoes every variable it is given, so secrets are set afterwards through stdin.
+
 ## What was verified, and what was not
 
-Verified on staging: Postgres 17 starts on its volume; the baseline loads (216 tables, 3 users, every row count matches); all 54
+Verified on staging: PostgREST connects as `authenticator` and loads the schema (234 relations, 94 functions); `ecad-engine` starts and serves on its port;
+no service has a public domain. Postgres 17 starts on its volume; the baseline loads (216 tables, 3 users, every row count matches); all 54
 migrations apply; a second run applies none; production without `CONFIRM_PRODUCTION=yes` is refused; the provisioner refuses an existing
 database; a bootstrap into a loaded database refuses and leaves nothing behind.
 
@@ -53,8 +77,11 @@ Not verified or not done:
   but the setting is not behaving as written. Check it before relying on a one-shot job for anything that is not idempotent.
 - **TLS to the database.** The runner uses TLS to any non-local host but does not verify the certificate unless `MIGRATE_DATABASE_SSL_CA`
   is set. Inside Railway's private network the Postgres template presents its own certificate. It is accepted as is.
-- **The rest of the stack** (`postgrest`, `backend`, `frontend`, `cad-engine`, `ecad-engine`, `cloudflared`), **file storage** (Cloudflare R2)
-  and **production**: not created yet.
+- **`backend`, `frontend` and `cloudflared`**: not deployed. The backend needs the file-storage values (Cloudflare R2: bucket, S3 keys, endpoint,
+  `TRUSTED_STORAGE_HOSTS`) and the frontend needs `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET`; none exist yet. `cloudflared` needs the tunnel's
+  published routes pointed at the Railway private addresses.
+- **`cad-engine`**: see the status in the pull request that added it; its image needs far more memory than a free or trial Railway plan allows.
+- **Production**: not created yet (duplicate the finished staging environment, then rotate every secret).
 
 ## Production
 

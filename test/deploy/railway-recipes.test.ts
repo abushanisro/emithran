@@ -10,6 +10,10 @@ const ROOT = process.cwd();
 const read = (p: string) => fs.readFileSync(path.resolve(ROOT, p), 'utf8');
 const provision = read('deploy/railway/provision-postgres.sh');
 const seed = read('deploy/railway/seed-environment.sh');
+const common = read('deploy/railway/common.sh');
+const dataApi = read('deploy/railway/deploy-data-api.sh');
+const engine = read('deploy/railway/deploy-engine.sh');
+const scripts = { provision, seed, common, dataApi, engine };
 const imageOf = (text: string, pattern: RegExp) => pattern.exec(text)?.[0];
 
 describe('the jobs run the repo\'s own tools on the repo\'s own pinned images', () => {
@@ -42,12 +46,25 @@ describe('the jobs run the repo\'s own tools on the repo\'s own pinned images', 
 
 describe('the scripts fail closed and keep secrets off the command line and the screen', () => {
   it('stop on any error, unset variable or failed pipe', () => {
-    for (const script of [provision, seed]) expect(script).toMatch(/^set -euo pipefail$/m);
+    for (const [name, script] of Object.entries(scripts)) {
+      if (name !== 'common') expect(script, name).toMatch(/^set -E?euo pipefail$/m);
+    }
+  });
+
+  it('say where they stopped: every script that exits on error installs the ERR trap from common.sh, so a failure is never silent (a SIGPIPE once made a script exit with no message)', () => {
+    expect(common).toMatch(/on_error\(\) \{ echo "error: \$\(basename "\$0"\) stopped at line \$1" >&2; \}/);
+    for (const script of [seed, dataApi, engine]) {
+      expect(script).toMatch(/^set -Eeuo pipefail$/m);
+      expect(script).toContain("trap 'on_error $LINENO' ERR");
+    }
   });
 
   it('never test railway\'s output with `| grep -q`: grep closes the pipe, railway dies with SIGPIPE, and under pipefail the guard read "nothing there" and carried on', () => {
-    for (const script of [provision, seed]) {
-      for (const line of script.split('\n').filter((l) => !l.trim().startsWith('#'))) expect(line).not.toMatch(/railway[^|\n]*\|\s*grep\s+-\w*q/);
+    for (const [name, script] of Object.entries(scripts)) {
+      for (const line of script.split('\n').filter((l) => !l.trim().startsWith('#'))) {
+        expect(line, name).not.toMatch(/railway[^|\n]*\|\s*(grep\s+-\w*q|awk|head)/);   // an early-exiting reader breaks the pipe
+        expect(line, name).not.toMatch(/printf '%s\\n' "\$\w+" \| grep -\w*q/);          // and so does a large writer: search with a here-string
+      }
     }
   });
 
@@ -77,12 +94,72 @@ describe('the scripts fail closed and keep secrets off the command line and the 
     expect(seed).toMatch(/pending.*applied/s);
   });
 
-  it('keep the database off the public internet: no TCP proxy, no public URL', () => {
-    for (const script of [provision, seed]) {
+  it('never put a secret in a --variables argument: keys, tokens, passwords and secrets go through stdin (set_secret)', () => {
+    for (const [name, script] of Object.entries(scripts)) {
+      for (const line of script.split('\n').filter((l) => !l.trim().startsWith('#'))) expect(line, name).not.toMatch(/--variables\s+"?\w*(KEY|SECRET|PASSWORD|TOKEN|PW)\w*=/);
+    }
+    expect(common).toMatch(/railway variable set "\$3" --stdin/);
+    expect(dataApi).toMatch(/printf '.*:%s@.*' "\$password" \| set_secret postgrest "\$environment" PGRST_DB_URI/);
+    expect(engine).toMatch(/env_value "\$envfile" "\$key_name" \| set_secret/);
+  });
+
+  it('read the env file in-process and never print a value: no trace mode, and no echo of a value read from it', () => {
+    for (const [name, script] of Object.entries(scripts)) {
+      expect(script, name).not.toMatch(/set -\w*x|bash -x/);
+      expect(script, name).not.toMatch(/echo[^\n]*\$\(env_value/);
+    }
+  });
+
+  it('keep the database and the engines off the public internet: no TCP proxy, no public URL, no domain', () => {
+    for (const script of Object.values(scripts)) {
+      expect(script).not.toMatch(/railway domain/);
       expect(script).not.toMatch(/tcp-proxy\s+(create|add|new)/);
       expect(script).not.toContain('DATABASE_PUBLIC_URL');
     }
     expect(seed).toContain('${{postgres.DATABASE_URL}}');
+  });
+});
+
+describe('the data API and the engines are deployed from the repo\'s own definitions', () => {
+  const compose = read('docker-compose.prod.yml');
+
+  it('PostgREST is the image pinned in docker-compose.prod.yml, read from it so there is one pin, with the compose service\'s settings', () => {
+    expect(dataApi).toContain("grep -m1 -o 'postgrest/postgrest@sha256:[0-9a-f]\\{64\\}' \"$REPO/docker-compose.prod.yml\"");
+    expect(compose).toMatch(/postgrest\/postgrest@sha256:[0-9a-f]{64}/);
+    for (const setting of ['PGRST_DB_SCHEMAS=public', 'PGRST_DB_EXTRA_SEARCH_PATH=public, extensions', 'PGRST_DB_ANON_ROLE=anon', 'PGRST_DB_POOL=10', 'PGRST_DB_PREPARED_STATEMENTS=false']) {
+      expect(dataApi).toContain(`--variables "${setting}"`);
+      const [key, value] = setting.split('=');
+      expect(compose).toMatch(new RegExp(`${key}: (\\$\\{${key}:-${value}\\}|${value})`));
+    }
+  });
+
+  it('the authenticator password is set by a private one-off job on the same pinned image, as a psql variable (never spliced into the statement), then the job is deleted', () => {
+    const job = read('deploy/railway/roles/Dockerfile');
+    expect(job).toContain(`FROM ${/postgres:17-alpine@sha256:[0-9a-f]{64}/.exec(read('backend/scripts/baseline-load.sh'))?.[0]}`);
+    expect(read('deploy/railway/roles/set-authenticator-password.sh')).toContain("ALTER ROLE authenticator WITH LOGIN PASSWORD :'pw';");
+    expect(JSON.parse(read('deploy/railway/roles/railway.json'))).toEqual({ deploy: { restartPolicyType: 'NEVER' } });
+    expect(dataApi).toContain('railway service delete --service');
+  });
+
+  it('PostgREST uses the DB_JWT_SECRET the backend uses (compose passes it to both) and connects as authenticator over the private address with TLS', () => {
+    expect(compose).toMatch(/PGRST_JWT_SECRET: \$\{DB_JWT_SECRET/);
+    expect(dataApi).toContain('PGRST_JWT_SECRET');
+    expect(dataApi).toContain('postgres://authenticator:%s@${{postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/emithran?sslmode=require');
+  });
+
+  it('each engine gets the compose service\'s port and settings, and the API key the backend sends', () => {
+    expect(compose).toMatch(/PORT: 5055/);
+    expect(compose).toMatch(/PORT: 5100/);
+    for (const v of ['PORT=5055', 'MAX_CONCURRENT_ANALYSES=1', 'ANALYSIS_HARD_LIMIT_SECONDS=900', 'RATE_LIMIT_PER_MINUTE=10', 'PORT=5100']) expect(engine).toContain(`"${v}"`);
+    expect(engine).toContain('CAD_ENGINE_API_KEY');
+    expect(engine).toContain('ECAD_ENGINE_API_KEY');
+  });
+
+  it('refuse to run twice, refuse a missing value by name, and remove a service that failed to start', () => {
+    expect(dataApi).toMatch(/already has a postgrest service/);
+    expect(engine).toMatch(/already has a \$engine service/);
+    expect(engine).toContain('require_env_values "$envfile" "${required[@]}"');
+    expect(engine).toContain('removing the failed $created service');
   });
 });
 
