@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -16,7 +17,8 @@ const engine = read('deploy/railway/deploy-engine.sh');
 const backend = read('deploy/railway/deploy-backend.sh');
 const frontend = read('deploy/railway/deploy-frontend.sh');
 const probe = read('deploy/railway/probe-environment.sh');
-const scripts = { provision, seed, common, dataApi, engine, backend, frontend, probe };
+const tunnel = read('deploy/railway/deploy-tunnel.sh');
+const scripts = { provision, seed, common, dataApi, engine, backend, frontend, probe, tunnel };
 const imageOf = (text: string, pattern: RegExp) => pattern.exec(text)?.[0];
 
 describe('the jobs run the repo\'s own tools on the repo\'s own pinned images', () => {
@@ -293,6 +295,64 @@ describe('the private-network probe', () => {
     expect(probe).toMatch(/trap cleanup EXIT/);
     expect(probe).toContain('railway service delete --service "$created"');
     expect(probe).toMatch(/already has a probe service/);
+  });
+});
+
+describe('the tunnel connector', () => {
+  const compose = read('docker-compose.prod.yml');
+
+  it('is the cloudflared image and command of the compose service, read from compose so there is one pin, with the token on stdin and no public domain', () => {
+    const pinned = /cloudflare\/cloudflared:[0-9.]+@sha256:[0-9a-f]{64}/.exec(compose)?.[0];
+    expect(pinned).toBeDefined();
+    expect(tunnel).toContain("grep -m1 -o 'cloudflare/cloudflared:[0-9.]*@sha256:[0-9a-f]\\{64\\}' \"$REPO/docker-compose.prod.yml\"");
+    expect(tunnel).toContain('CMD ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:2000", "run"]');
+    expect(compose).toContain('command: tunnel --no-autoupdate --metrics 127.0.0.1:2000 run');
+    expect(tunnel).toMatch(/env_value "\$envfile" TUNNEL_TOKEN \| set_secret tunnel "\$environment" TUNNEL_TOKEN/);
+    expect(tunnel).not.toMatch(/railway domain/);
+  });
+
+  it('needs a frontend and a backend to reach, refuses to run twice, and removes a connector that never registered', () => {
+    expect(tunnel).toContain('for dep in frontend backend');
+    expect(tunnel).toMatch(/already has a tunnel service/);
+    expect(tunnel).toContain('Registered tunnel connection');
+    expect(tunnel).toContain('removing the failed $created service');
+  });
+});
+
+describe('deploy/railway is runnable from a fresh clone', () => {
+  // This repository sets core.fileMode=false on some machines, which makes git ignore a chmod: the scripts were once committed as 100644 and
+  // `deploy/railway/seed-environment.sh` failed with "Permission denied" on a clean checkout. So the mode RECORDED in git is checked, not the file's.
+  const recorded = Object.fromEntries(
+    execFileSync('git', ['ls-files', '-s', 'deploy/railway'], { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').map((l) => {
+      const [mode, , , file] = l.split(/\s+/);
+      return [file!, mode!];
+    }),
+  );
+
+  it('records every script the runbook runs directly, and every stand-in command, as executable', () => {
+    const mustBeExecutable = Object.keys(recorded).filter((f) => /\.sh$/.test(f) && !f.endsWith('/common.sh')).concat(['deploy/railway/bootstrap/shims/docker', 'deploy/railway/bootstrap/shims/shasum', 'deploy/railway/bootstrap/shims/mktemp']);
+    expect(mustBeExecutable.length).toBeGreaterThan(8);
+    for (const file of mustBeExecutable) expect(recorded[file], file).toBe('100755');
+  });
+
+  it('copies the stand-in commands into the image with an explicit mode, so the image does not depend on the modes of the folder it was built from', () => {
+    expect(read('deploy/railway/bootstrap/Dockerfile')).toContain('COPY --chmod=0755 shims/docker shims/shasum shims/mktemp /usr/local/bin/');
+  });
+});
+
+describe('every job image runs as an unprivileged user (Trivy DS-0002: a container with no USER runs as root, and these hold database credentials)', () => {
+  const users: Record<string, string> = { bootstrap: 'postgres', migrate: 'node', roles: 'postgres', probe: 'postgres' };
+  for (const [job, user] of Object.entries(users)) {
+    it(`${job} runs as ${user}`, () => {
+      const lines = read(`deploy/railway/${job}/Dockerfile`).split('\n').filter((l) => /^USER /.test(l));
+      expect(lines).toEqual([`USER ${user}`]);
+    });
+  }
+
+  it('the bootstrap image has no need for root: /work, /baseline.dangling and the data folders exist and belong to postgres at build time', () => {
+    const dockerfile = read('deploy/railway/bootstrap/Dockerfile');
+    expect(dockerfile).toContain('mkdir /baseline.dangling /tmp/work && chown postgres:postgres /baseline.dangling /tmp/work && ln -s /tmp/work /work');
+    for (const dir of ['scripts', 'migrations', 'baseline']) expect(dockerfile).toContain(`COPY --chown=postgres:postgres ${dir} /${dir}`);
   });
 });
 
