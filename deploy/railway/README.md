@@ -65,7 +65,7 @@ Lessons the scripts encode (each was a real failure while building them, and a t
 
 ## What was verified, and what was not
 
-Verified on staging: PostgREST connects as `authenticator` and loads the schema (234 relations, 94 functions); `ecad-engine` starts and serves on its port;
+Verified on staging: PostgREST connects as `authenticator` and loads the schema (234 relations, 94 functions); `ecad-engine` and `cad-engine` start and serve on their ports;
 no service has a public domain. Postgres 17 starts on its volume; the baseline loads (216 tables, 3 users, every row count matches); all 54
 migrations apply; a second run applies none; production without `CONFIRM_PRODUCTION=yes` is refused; the provisioner refuses an existing
 database; a bootstrap into a loaded database refuses and leaves nothing behind.
@@ -80,7 +80,9 @@ Not verified or not done:
 - **`backend`, `frontend` and `cloudflared`**: not deployed. The backend needs the file-storage values (Cloudflare R2: bucket, S3 keys, endpoint,
   `TRUSTED_STORAGE_HOSTS`) and the frontend needs `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET`; none exist yet. `cloudflared` needs the tunnel's
   published routes pointed at the Railway private addresses.
-- **`cad-engine`**: see the status in the pull request that added it; its image needs far more memory than a free or trial Railway plan allows.
+- **`cad-engine` under load.** It builds (conda + OpenCASCADE) and starts serving on staging, but a real CAD analysis has not been run: that needs the
+  backend and file storage. Its memory use under a real part is unmeasured, and compose's limits (CPU, memory, one analysis at a time) are not
+  applied on Railway. Measure it with a real upload before relying on it, and watch `railway metrics`.
 - **Production**: not created yet (duplicate the finished staging environment, then rotate every secret).
 
 ## Production
