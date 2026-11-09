@@ -132,6 +132,9 @@ Migrations are tested on a throwaway Postgres: `npm run test:sql` (also a CI job
    kept as a workflow artifact for 7 days (Sundays: 28). **Not in the backup:** auth users and stored files (the free tier has no
    automated backups for them; export users from the dashboard before risky changes).
 
+An environment is only checked once it is listed in the repository variable `OPS_ENVIRONMENTS` (see "Enabling the nightly checks" in
+`docs/runbooks/schema-drift.md`); until then the workflow warns that nothing is backed up and runs nothing.
+
 One-time setup, per GitHub Environment (`stage`, `production`): secrets `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
 `MIGRATE_DATABASE_URL` (session pooler, port 5432), `BACKUP_AGE_RECIPIENT`. Make the key pair once on a trusted machine
 (`age-keygen -o backup-age.key`), put only the `age1...` public line in the secret, and keep the private file offline. Run the

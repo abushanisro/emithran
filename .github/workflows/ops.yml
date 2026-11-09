@@ -5,6 +5,10 @@ name: Operations
 #                artifact (7 days; Sundays 28 days), next to the managed Postgres's own point-in-time backups. Stored files are in the
 #                bucket and not part of this backup.
 #   schema-drift nightly read-only comparison of the live `public` schema with main's baseline + migrations; fails on any difference.
+# An environment is only checked once it is enabled: the repository variable OPS_ENVIRONMENTS lists the environments that are live
+# ("stage production"). Until then the `plan` job says so as a warning and nothing else runs, so a database that does not exist yet is
+# not reported as a failed backup every night. Once an environment is enabled, every rule below applies unchanged: a missing secret or
+# baseline fails the job.
 # Secrets live in the GitHub Environments `stage` and `production` (never in the repo):
 #   MIGRATE_DATABASE_URL                      direct connection string of the managed Postgres
 #   BACKUP_AGE_RECIPIENT                      the age PUBLIC key; the private key stays offline with the operator
@@ -27,14 +31,43 @@ env:
   POSTGRES_IMAGE: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
 
 jobs:
+  # Decides which environments the two jobs below run for. It never touches an environment, so it creates no deployment record.
+  plan:
+    name: enabled environments
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      environments: ${{ steps.plan.outputs.environments }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Read OPS_ENVIRONMENTS
+        id: plan
+        env:
+          OPS_ENVIRONMENTS: ${{ vars.OPS_ENVIRONMENTS }}
+        run: |
+          set -euo pipefail
+          environments="$(node .github/scripts/ops-environments.mjs)"
+          echo "environments=$environments" >> "$GITHUB_OUTPUT"
+          if [ "$environments" = "[]" ]; then
+            echo "::warning::Operations is not enabled for any environment (repository variable OPS_ENVIRONMENTS is empty): no database is being backed up and no schema is being checked. Enable an environment once it is provisioned (docs/runbooks/schema-drift.md)."
+            { echo "### Operations is not enabled"; echo; echo "No environment is listed in the repository variable \`OPS_ENVIRONMENTS\`, so nothing was backed up or compared. This is expected until an environment is provisioned; see \"Enabling the nightly checks\" in docs/runbooks/schema-drift.md."; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Operations runs for: $environments"
+          fi
+
   ops:
     name: ${{ matrix.environment }}
+    needs: plan
+    if: needs.plan.outputs.environments != '[]'
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 1 # stage first; production only runs if stage's checks passed
       fail-fast: true
       matrix:
-        environment: [stage, production]
+        environment: ${{ fromJSON(needs.plan.outputs.environments) }}
     environment: ${{ matrix.environment }}
     steps:
       - name: Dump, count and encrypt
@@ -68,11 +101,13 @@ jobs:
   # MIGRATE_DATABASE_URL. A missing secret or baseline fails the job: an unverified schema is never reported as a clean one.
   schema-drift:
     name: schema drift (${{ matrix.environment }})
+    needs: plan
+    if: needs.plan.outputs.environments != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        environment: [stage, production]
+        environment: ${{ fromJSON(needs.plan.outputs.environments) }}
     environment: ${{ matrix.environment }}
     defaults:
       run:

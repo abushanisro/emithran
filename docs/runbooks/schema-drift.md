@@ -24,6 +24,21 @@ dump carries none) and owners.
    `backend/scripts/baseline-dump.sh --schema-only "<read-only url of that database>" backend/migrations/baseline`, committed. It
    is the same baseline a new installation starts from. Until it is committed the job fails ("no schema-only baseline").
 
+## Enabling the nightly checks
+
+The workflow runs for an environment only once it is enabled. Until then the `plan` job ends the run with a yellow warning ("Operations
+is not enabled for any environment") and nothing else runs, so an environment whose database does not exist yet is not reported as a
+failed backup every night.
+
+After the three steps above are done for an environment (and its backup secrets `MIGRATE_DATABASE_URL` and `BACKUP_AGE_RECIPIENT`
+are set), add it to the repository variable `OPS_ENVIRONMENTS` (Settings -> Secrets and variables -> Actions -> Variables), for example
+`stage` first and later `stage production`. Names are separated by spaces, commas or lines; any name other than `stage` and
+`production` fails the plan job, so a typo cannot silently switch off a live environment's backups. Then run the workflow once by hand
+(Actions -> Operations -> Run workflow) and confirm the backup artifact and a clean comparison.
+
+From that moment every rule below applies: a missing secret or baseline fails the job. Do not enable an environment before its
+database exists, and do not leave a live one out of the variable.
+
 ## When it fails
 
 - **`-` lines** are in main but not live: a migration was not applied (`npm run db:migrate -- --env <env> --dry-run` lists it) or
