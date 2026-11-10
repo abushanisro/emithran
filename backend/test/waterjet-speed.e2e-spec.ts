@@ -1,21 +1,24 @@
 // Waterjet cutting speed against the real database: the machine library carries a mixing tube
 // diameter for every waterjet, and the reference machine is on file, so every machine scales.
-import { Test } from '@nestjs/testing';
-import { ConfigModule } from '@nestjs/config';
-import * as path from 'path';
-import { BOMItemsModule } from '../src/modules/bom-items/bom-items.module';
+import type { TestingModule } from '@nestjs/testing';
+import { createE2eModule } from './support/create-e2e-app';
 import { SheetMetalLookupService } from '../src/modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { WATERJET_REFERENCE_MACHINE, waterjetSpeedFactor } from '../src/modules/bom-items/costing/sheet-metal/process/waterjet-engine';
 
 jest.setTimeout(120_000);
 
+process.env.ELECTRONICS_QUEUE_DRIVER = 'memory'; // no queue polling in a read-only spec
+
 describe('[e2e] waterjet speed factor', () => {
+  let moduleRef: TestingModule;
   let lookup: SheetMetalLookupService;
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') }), BOMItemsModule],
-    }).compile();
-    lookup = moduleRef.get(SheetMetalLookupService);
+    moduleRef = await createE2eModule();
+    lookup = moduleRef.get(SheetMetalLookupService, { strict: false });
+  });
+
+  afterAll(async () => {
+    await moduleRef.close();
   });
 
   it('the reference machine is its own factor of 1', async () => {

@@ -4,14 +4,9 @@
 process.env.ALLOW_DEV_AUTH_BYPASS = 'true';
 process.env.ELECTRONICS_QUEUE_DRIVER = 'memory';
 
-import { Test } from '@nestjs/testing';
-import { VersioningType, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { GlobalExceptionFilter } from '../src/common/filters/global-exception.filter';
-import { CustomValidationPipe } from '../src/common/pipes/validation.pipe';
-import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
-import { RequestAuthInterceptor } from '../src/common/interceptors/request-auth.interceptor';
+import { createE2eApp } from './support/create-e2e-app';
 
 jest.setTimeout(180_000);
 
@@ -19,13 +14,7 @@ describe('[e2e] dev auth bypass ON (explicit opt-in)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-    app.useGlobalPipes(new CustomValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: false }));
-    app.useGlobalFilters(new GlobalExceptionFilter());
-    app.useGlobalInterceptors(new TransformInterceptor(), new RequestAuthInterceptor());
-    await app.init();
+    app = await createE2eApp();
   });
 
   afterAll(async () => {
@@ -37,10 +26,12 @@ describe('[e2e] dev auth bypass ON (explicit opt-in)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('serves a request with a forged token as the bypass account', async () => {
+  // The bypass covers a request with NO token only (request-auth.guard.ts): a token that is presented and invalid is rejected outright,
+  // bypass or not, so a client cannot choose which identity it gets by sending garbage.
+  it('rejects a forged token even with the bypass on: the bypass only covers a request with no token', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/electronic-coverage-reports')
       .set('Authorization', 'Bearer not-a-real-token');
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 });

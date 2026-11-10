@@ -8,15 +8,10 @@
 process.env.ALLOW_DEV_AUTH_BYPASS = 'false';
 process.env.ELECTRONICS_QUEUE_DRIVER = 'memory';
 
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { VersioningType, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { GlobalExceptionFilter } from '../src/common/filters/global-exception.filter';
-import { CustomValidationPipe } from '../src/common/pipes/validation.pipe';
-import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
-import { RequestAuthInterceptor } from '../src/common/interceptors/request-auth.interceptor';
+import { createE2eApp } from './support/create-e2e-app';
 
 jest.setTimeout(180_000);
 
@@ -34,13 +29,7 @@ describe('[e2e] dev auth bypass OFF — real app, real auth', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-    app.useGlobalPipes(new CustomValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: false }));
-    app.useGlobalFilters(new GlobalExceptionFilter());
-    app.useGlobalInterceptors(new TransformInterceptor(), new RequestAuthInterceptor());
-    await app.init();
+    app = await createE2eApp();
 
     const config = app.get(ConfigService);
     expect(config.get('ADMIN_FALLBACK_EMAIL')).toBeTruthy();
