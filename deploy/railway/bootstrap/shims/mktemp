@@ -1,5 +1,0 @@
-#!/bin/sh
-# baseline-load.sh does `work="$(mktemp -d)"` and maps that folder to /work in every command it runs. In this image /work is a link to /tmp/work
-# (made at build time), so handing the loader /tmp/work lets an unprivileged user do all of it without writing to the filesystem root.
-if [ "$*" = "-d" ]; then mkdir -p /tmp/work; echo /tmp/work; exit 0; fi
-exec /usr/bin/mktemp "$@"
