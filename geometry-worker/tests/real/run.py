@@ -43,9 +43,9 @@ IMAGES = {
     "engine": os.environ.get("CAD_ENGINE_IMAGE", "mithran-cad-engine:dev"),
 }
 BUILD_HINTS = {
-    "worker": "docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad --target worker -t cad-worker:dev core",
-    "core": "docker build --platform linux/amd64 -t cad-core:dev core",
-    "pyocc": "docker build --platform linux/amd64 -t py-occt:dev -f geometry-worker/tests/Dockerfile.pyocct geometry-worker/tests",
+    "worker": "docker build --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad --target worker -t cad-worker:dev core",
+    "core": "docker build -t cad-core:dev core",
+    "pyocc": "docker build -t py-occt:dev -f geometry-worker/tests/Dockerfile.pyocct geometry-worker/tests",
     "engine": "cd cad-engine && docker compose -f docker-compose.dev.yml build cad-engine",
 }
 FIXTURES = ROOT / "backend/test/fixtures/cad"
@@ -175,13 +175,13 @@ def stage_geometry(steps: list, out: Path) -> tuple:
     wire = sorted(os.listdir(indir))
 
     started = time.time()
-    py = run(["docker", "run", "--rm", "--platform", "linux/amd64", *user(), "-v", f"{indir}:/in:ro", "-v", f"{ROOT / 'cad-engine'}:/engine:ro", "-v", f"{HERE}:/tool:ro",
+    py = run(["docker", "run", "--rm", *user(), "-v", f"{indir}:/in:ro", "-v", f"{ROOT / 'cad-engine'}:/engine:ro", "-v", f"{HERE}:/tool:ro",
               IMAGES["pyocc"], "python", "/tool/pyocc_side.py", "report", "/in"], check=False)
     notes["python_wall_seconds"] = round(time.time() - started, 2)
     cpp_out = out / "cpp"
     cpp_out.mkdir(exist_ok=True)
     started = time.time()
-    cpp = run(["docker", "run", "--rm", "--platform", "linux/amd64", *user(), "--entrypoint", "/usr/local/bin/geometry-worker", "-v", f"{indir}:/in:ro", "-v", f"{cpp_out}:/out",
+    cpp = run(["docker", "run", "--rm", *user(), "--entrypoint", "/usr/local/bin/geometry-worker", "-v", f"{indir}:/in:ro", "-v", f"{cpp_out}:/out",
                IMAGES["worker"], "--deadline-ms", "600000", "/out", *[f"/in/{w}" for w in wire]], check=False)
     notes["cpp_wall_seconds"] = round(time.time() - started, 2)
     py_report = cpp_report = None
@@ -216,7 +216,7 @@ def id_of(file_name: str) -> str:
 
 
 def measure(directory: Path) -> dict:
-    p = run(["docker", "run", "--rm", "--platform", "linux/amd64", *user(), "-v", f"{directory}:/d:ro", "-v", f"{ROOT / 'cad-engine'}:/engine:ro", "-v", f"{HERE}:/tool:ro",
+    p = run(["docker", "run", "--rm", *user(), "-v", f"{directory}:/d:ro", "-v", f"{ROOT / 'cad-engine'}:/engine:ro", "-v", f"{HERE}:/tool:ro",
              IMAGES["pyocc"], "python", "/tool/pyocc_side.py", "measure", "/d"])
     return last_json(p.stdout)
 
@@ -227,7 +227,7 @@ def stage_exports(wire_dir: Path, py_report, cpp_report, out: Path) -> tuple:
     py_dir, cpp_dir = out / "python", ROOT / "never"  # cpp parts live in the geometry stage's output
     py_dir.mkdir(parents=True, exist_ok=True)
     py_report_path = out.parent / "geometry" / "python.report.json"
-    run(["docker", "run", "--rm", "--platform", "linux/amd64", *user(), "-v", f"{wire_dir}:/in:ro", "-v", f"{py_report_path.parent}:/rep:ro", "-v", f"{py_dir}:/out", "-v", f"{ROOT / 'cad-engine'}:/engine:ro",
+    run(["docker", "run", "--rm", *user(), "-v", f"{wire_dir}:/in:ro", "-v", f"{py_report_path.parent}:/rep:ro", "-v", f"{py_dir}:/out", "-v", f"{ROOT / 'cad-engine'}:/engine:ro",
          "-v", f"{HERE}:/tool:ro", IMAGES["pyocc"], "python", "/tool/pyocc_side.py", "export", "/in", "/rep/python.report.json", "/out"])
     cpp_dir = out.parent / "geometry" / "cpp" / "parts"
     measured = {"python": measure(py_dir), "cpp": measure(cpp_dir) if cpp_dir.exists() else {}}
@@ -267,7 +267,7 @@ class Engine:
         if not self.owned:
             return self
         run(["docker", "rm", "-f", "parity-engine"], check=False)
-        run(["docker", "run", "-d", "--rm", "--name", "parity-engine", "--platform", "linux/amd64", "-p", "127.0.0.1:5056:5055", "-e", f"CAD_ENGINE_API_KEY={ENGINE_KEY}", "-e", "HOST=0.0.0.0", "-e", "PORT=5055",
+        run(["docker", "run", "-d", "--rm", "--name", "parity-engine", "-p", "127.0.0.1:5056:5055", "-e", f"CAD_ENGINE_API_KEY={ENGINE_KEY}", "-e", "HOST=0.0.0.0", "-e", "PORT=5055",
              IMAGES["engine"], "bash", "-lc", "source /opt/conda/etc/profile.d/conda.sh && conda activate cad-env && exec python -m uvicorn main:app --host 0.0.0.0 --port 5055"])
         self.url = "http://127.0.0.1:5056"
         for _ in range(60):
@@ -489,7 +489,7 @@ def write_summary(out: Path, summary: list, findings: list) -> None:
             s = r["stages"].get(stage)
             cells.append("n/a" if s is None else "pass" if s["findings"] == 0 else "FAIL " + ", ".join(f"{c}:{n}" for c, n in s["by_category"].items()))
         lines.append(f"| {r['case']} | " + " | ".join(cells) + " |")
-    lines += ["", "## Timings (wall clock, amd64 containers on this host, under emulation on Apple Silicon: indicative only)", "", "| case | python engine | c++ worker | python path e2e | rust path e2e |", "|---|---|---|---|---|"]
+    lines += ["", "## Timings (wall clock, containers run natively on this host's architecture: indicative only)", "", "| case | python engine | c++ worker | python path e2e | rust path e2e |", "|---|---|---|---|---|"]
     for r in summary:
         g, e = r["stages"].get("geometry", {}).get("notes", {}), r["stages"].get("e2e", {}).get("notes", {})
         lines.append(f"| {r['case']} | {g.get('python_wall_seconds', 'n/a')} s | {g.get('cpp_wall_seconds', 'n/a')} s | {e.get('python_path_seconds', 'n/a')} s | {e.get('rust_path_seconds', 'n/a')} s |")
