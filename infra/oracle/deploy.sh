@@ -18,7 +18,7 @@ git rev-parse --verify --quiet "$ref^{commit}" >/dev/null || { echo "unknown git
 # Required values must be filled; optional ones (monitoring, AI, network names) may stay blank.
 python3 - <<'PY'
 import sys
-optional={"ANTHROPIC_API_KEY","OTEL_EXPORTER_OTLP_ENDPOINT","OTEL_EXPORTER_OTLP_METRICS_ENDPOINT","OTEL_TRACES_SAMPLER_ARG","APP_INTERNAL_NETWORK","APP_EDGE_NETWORK"}
+optional={"ANTHROPIC_API_KEY","OTEL_EXPORTER_OTLP_ENDPOINT","OTEL_EXPORTER_OTLP_METRICS_ENDPOINT","OTEL_TRACES_SAMPLER_ARG","APP_INTERNAL_NETWORK","APP_EDGE_NETWORK","BACKUP_HEARTBEAT_URL"}
 def parse(p):
     d={}
     for l in open(p):

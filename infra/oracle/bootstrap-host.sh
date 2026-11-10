@@ -15,7 +15,7 @@ trap 'echo "bootstrap-host.sh failed at line $LINENO" >&2' ERR
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl gnupg unattended-upgrades fail2ban >/dev/null
+apt-get install -y -qq ca-certificates curl gnupg unattended-upgrades fail2ban age >/dev/null   # age: encrypts the nightly database backup (backup.sh)
 
 cat > /etc/ssh/sshd_config.d/99-emithran.conf <<'S'
 PasswordAuthentication no
