@@ -455,6 +455,9 @@ export class AutoFillService {
         // default family: 'milled' at 0.65 here is what showed unclassified
         // parts as "Machining".
         family: family.family,
+        // What the shape alone reads as (cad-engine geometric_family), which differs from `family` when the user's
+        // chosen process overrode it. Undefined on an older engine.
+        geometricFamily: cadMI?.geometric_family ?? undefined,
         confidence: family.confidence,
         signals,
         classificationSignals: cadMI?.classification_signals ?? undefined,

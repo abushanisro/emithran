@@ -11,6 +11,8 @@ export interface FlatPatternHole { cx_mm: number; cy_mm: number; diameter_mm: nu
 interface FlatPatternViewProps {
   /** Offers a Reanalyze when no outline is stored: the outline comes from the last CAD analysis. */
   bomItemId?: string | undefined;
+  /** The chosen process and the geometry disagree: shown instead of the outline message, with no Reanalyze. */
+  processConflict?: string | null | undefined;
   partName?: string | undefined;
   outlinePointsMm?: number[][] | undefined;
   holesMm?: FlatPatternHole[] | undefined;
@@ -52,7 +54,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 // straight off the already-loaded BOM item's featureGraph -- no true-nest
 // (or any other) network call needed, since the outline is CAD-static.
 export function FlatPatternView({
-  bomItemId, partName, outlinePointsMm, holesMm, outlineSource, boundingLengthMm, boundingWidthMm, flatPatternAreaMm2,
+  bomItemId, processConflict, partName, outlinePointsMm, holesMm, outlineSource, boundingLengthMm, boundingWidthMm, flatPatternAreaMm2,
   materialLabel, gradeLabel, thicknessMm, cutLengthMm, bendCount, holeCount, pierceCount,
 }: FlatPatternViewProps) {
   const bbox = useMemo(() => normalizeFlatPattern(outlinePointsMm, holesMm), [outlinePointsMm, holesMm]);
@@ -78,11 +80,13 @@ export function FlatPatternView({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/70 text-sm text-center px-6">
         <p>
-          {outlineSource === 'unavailable'
+          {processConflict
+            ? `No flat pattern for this part. ${processConflict}`
+            : outlineSource === 'unavailable'
             ? "No real flat-pattern outline is stored for this part. cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis. Reanalyze to retry extraction."
             : 'Real flat-pattern outline unavailable for this part.'}
         </p>
-        {bomItemId && <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />}
+        {bomItemId && !processConflict && <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />}
       </div>
     );
   }

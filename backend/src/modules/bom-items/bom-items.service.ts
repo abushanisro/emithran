@@ -17,6 +17,7 @@ import { reconcileSheetGeometry } from './costing/shared/geometry-reconciliation
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
 import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary, selectAppliedGeneration, detectAppliedGenerationDrift } from './costing/shared/core/cost-engine';
 import type { MHRRateInput, AppliedProcessCostRecord } from './costing/shared/core/cost-engine';
+import { processChoiceConflict } from './costing/shared/core/part-family-process-group';
 import { planInspection, finalizeInspectionLine } from './costing/shared/process/inspection-engine';
 import type { InspectionInput } from './costing/shared/process/inspection-engine';
 import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/calculator-formula-evaluator';
@@ -2736,10 +2737,18 @@ export class BOMItemsService {
     userId: string,
     accessToken: string,
     sheet: NestingSheet,
+    // featureGraph.classification: when the chosen process and the geometry disagree, that is why there is no outline.
+    classification?: { family?: string | null; geometricFamily?: string | null },
   ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
     const outlinePointsMm = summary?.flatPatternOutlinePointsMm;
     if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
-      return { selection: null, reason: "no real flat-pattern outline available for this part yet -- re-run Reanalyze" };
+      const conflict = processChoiceConflict(classification);
+      return {
+        selection: null,
+        reason: conflict
+          ? `no flat-pattern outline: ${conflict}`
+          : "no real flat-pattern outline available for this part yet -- re-run Reanalyze",
+      };
     }
 
     const holesForFingerprint = summary?.flatPatternHolesMm;
@@ -2932,7 +2941,7 @@ export class BOMItemsService {
     if (!sheet) return { _gapReason: GAP_REASON, _internalReason: BOMItemsService.NO_SHEET_GAP };
     const trueShape = await this.resolveTrueShapeNestCosting(
       ctx.itemId, summary, netWeightKg, densityKgM3, thicknessMm,
-      kerfMm, edgeMarginMm, ctx.userId, ctx.accessToken, sheet,
+      kerfMm, edgeMarginMm, ctx.userId, ctx.accessToken, sheet, (item.featureGraph as any)?.classification,
     );
     if (!trueShape.selection) {
       return { _gapReason: GAP_REASON, _internalReason: trueShape.reason };
@@ -4825,7 +4834,7 @@ export class BOMItemsService {
         // calculator itself wraps, exactly as before this reroute existed.
         ? await this.resolveTrueShapeNestCosting(
             item.id, summary, smNetWeightKg, materialDensityKgM3, sheetThicknessMm,
-            partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken, nestingSheet,
+            partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken, nestingSheet, (item.featureGraph as any)?.classification,
           )
         : trueShapeCalc.gap
           ? { selection: null as null, reason: trueShapeCalc.gap.gapType === 'unsupported_operation' ? trueShapeCalc.gap.reason : `${trueShapeCalc.gap.gapType} — see calculator ${trueShapeCalc.calculatorId}` }
@@ -5395,8 +5404,12 @@ export class BOMItemsService {
     const outlinePointsMm = summary.flatPatternOutlinePointsMm;
     const outlineSource: 'wire_walk' | 'unavailable' = summary.flatPatternOutlineSource === 'wire_walk' ? 'wire_walk' : 'unavailable';
     if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
-      // No real outline resolved for this part -- honest gap, not a guess.
-      const reason = outlineSource === 'unavailable'
+      // No real outline resolved for this part -- honest gap, not a guess. When the user's chosen process and the
+      // geometry disagree, that is the reason (a machined part has no flat pattern), and reanalyzing cannot help.
+      const conflict = processChoiceConflict(fg?.classification);
+      const reason = conflict
+        ? `No flat pattern for this part. ${conflict}`
+        : outlineSource === 'unavailable'
         ? `No real flat-pattern outline is stored for this part (featureGraph.summary.flatPatternOutlineSource = 'unavailable'). ` +
           `cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis ` +
           `(fragmentation, self-intersection, or area-reconciliation failure). Re-run Reanalyze to retry extraction.`
@@ -5839,7 +5852,7 @@ export class BOMItemsService {
     if (partAllowanceMm != null && nestingSheet) {
       const trueShape = await this.resolveTrueShapeNestCosting(
         item.id, summary, netWeightKg, materialDensityKgM3, sheetThicknessMm,
-        partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken, nestingSheet,
+        partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken, nestingSheet, (item.featureGraph as any)?.classification,
       );
       if (trueShape.selection) {
         grossWeightKg = trueShape.selection.grossWeightPerPartKg;

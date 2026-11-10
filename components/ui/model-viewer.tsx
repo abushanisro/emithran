@@ -158,6 +158,7 @@ interface ModelViewerProps {
   nestCandidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }> | undefined;
   nestMaterialLabel?: string | undefined;
   nestGradeLabel?: string | undefined;
+  processConflict?: string | null | undefined;
   /** Flat Pattern toolbar toggle (visualization only) — the real unfolded 2D outline for this part. */
   flatPatternPartName?: string | undefined;
   flatPatternOutlinePointsMm?: number[][] | undefined;
@@ -215,6 +216,7 @@ export function ModelViewer({
   nestCandidateSheets,
   nestMaterialLabel,
   nestGradeLabel,
+  processConflict,
   flatPatternPartName,
   flatPatternOutlinePointsMm,
   flatPatternHolesMm,
@@ -378,6 +380,7 @@ export function ModelViewer({
               {...(nestCandidateSheets !== undefined ? { nestCandidateSheets } : {})}
               {...(nestMaterialLabel !== undefined ? { nestMaterialLabel } : {})}
               {...(nestGradeLabel !== undefined ? { nestGradeLabel } : {})}
+              {...(processConflict !== undefined ? { processConflict } : {})}
               {...(flatPatternPartName !== undefined ? { flatPatternPartName } : {})}
               {...(flatPatternOutlinePointsMm !== undefined ? { flatPatternOutlinePointsMm } : {})}
               {...(flatPatternHolesMm !== undefined ? { flatPatternHolesMm } : {})}
@@ -541,6 +544,7 @@ export function ModelViewer({
               {...(nestCandidateSheets !== undefined ? { nestCandidateSheets } : {})}
               {...(nestMaterialLabel !== undefined ? { nestMaterialLabel } : {})}
               {...(nestGradeLabel !== undefined ? { nestGradeLabel } : {})}
+              {...(processConflict !== undefined ? { processConflict } : {})}
               {...(flatPatternPartName !== undefined ? { flatPatternPartName } : {})}
               {...(flatPatternOutlinePointsMm !== undefined ? { flatPatternOutlinePointsMm } : {})}
               {...(flatPatternHolesMm !== undefined ? { flatPatternHolesMm } : {})}

@@ -83,3 +83,18 @@ export function processesForMaterialGroups(
   const allowed = new Set(selectable);
   return [...new Set(links.filter((l) => groups.has(l.materialGroup) && allowed.has(l.processGroup)).map((l) => l.processGroup))].sort();
 }
+
+/**
+ * When the item's chosen process and its geometry disagree (the CAD engine reports the family it analysed the part as and,
+ * separately, what the shape alone reads as), the sentence to show, naming the Process to set. Null when they agree or
+ * either is unknown; families of one process group (milled / turned) never conflict. Same words as the backend's
+ * processChoiceConflict (part-family-process-group.ts).
+ */
+export function processChoiceConflict(
+  classification: { family?: string | null; geometricFamily?: string | null } | null | undefined,
+): string | null {
+  const chosenGroup = familyToProcessGroupLabel(classification?.family);
+  const geometricGroup = familyToProcessGroupLabel(classification?.geometricFamily);
+  if (!chosenGroup || !geometricGroup || chosenGroup === geometricGroup) return null;
+  return `This part's Process is ${chosenGroup}, but its geometry reads as ${geometricGroup} (${classification?.geometricFamily ?? ''}). Set its Process to ${geometricGroup}; reanalyzing as ${chosenGroup} will not change this.`;
+}
