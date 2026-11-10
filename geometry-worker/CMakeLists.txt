@@ -16,7 +16,7 @@ find_package(nlohmann_json REQUIRED)
 
 set(OCCT_LIBS
   TKernel TKMath TKG2d TKG3d TKGeomBase TKBRep TKGeomAlgo TKTopAlgo TKPrim TKBO TKShHealing
-  TKXSBase TKLCAF TKCDF TKCAF TKXCAF TKSTEPBase TKSTEPAttr TKSTEP209 TKSTEP TKXDESTEP)
+  TKXSBase TKLCAF TKCDF TKCAF TKXCAF TKDE TKDESTEP)
 
 add_library(core STATIC src/assembly.cpp src/measure.cpp src/report.cpp src/step_io.cpp)
 target_include_directories(core PUBLIC src ${OpenCASCADE_INCLUDE_DIR})
