@@ -428,54 +428,42 @@ class SheetMetalFeatureExtractor:
         except Exception as e:
             logger.warning(f"[SheetMetal] rapid_traverse estimation failed: {e}")
 
-        flat_pattern_area_mm2 = 0.0
-        flat_pattern_area_method = "dominant_face_only"
-        flat_pattern_bounding_rect: Optional[Dict[str, float]] = None
-        # Real outline+hole geometry for true (non-rectangle) nesting
-        # visualization -- see _compute_flat_pattern_outline's own docstring.
-        # None (never fabricated) when the wire-walk/merge couldn't resolve
-        # one for this part; failures here never affect flat_pattern_area_mm2
-        # or flat_pattern_bounding_rect above, which are computed independently.
-        flat_pattern_outline: Optional[Dict[str, Any]] = None
-        try:
-            if bends["count"] > 0:
-                # Multi-panel unfold -- the dominant face alone would miss
-                # every wall/flange folded up from the base.
-                unfold = self._compute_true_flat_pattern_area(shape, dominant_face, sheet_thickness)
-                if unfold["method"] == "true_unfold":
-                    flat_pattern_area_mm2 = unfold["area_mm2"]
-                    flat_pattern_area_method = f"true_unfold ({unfold['bends_used']}/{unfold['bends_total']} bends, {unfold['panel_count']} panels)"
-                    dedup_bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness) if dominant_normal else []
-                    flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, dedup_bends)
-                    try:
-                        flat_pattern_outline = self._compute_flat_pattern_outline(
-                            dominant_face, panels, dedup_bends, holes.get("centroids_mm", []),
-                            expected_area_mm2=flat_pattern_area_mm2,
-                        )
-                    except Exception as e:
-                        logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
-                else:
-                    logger.warning(
-                        "[SheetMetal] true_unfold could not resolve panels "
-                        "(non-manifold or unusual import) -- falling back to dominant-face-only, "
-                        "which will UNDERCOUNT area/weight for this bent part"
-                    )
-                    flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
-            else:
-                # No bends -- the part is flat, so the dominant face IS the
-                # whole blank. The simple method is exact here, not an
-                # approximation.
-                flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
-                flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, [])
+        # The blanks this part is cut from: one per solid body (a weldment or a multi-part file holds several -- a
+        # channel and a separate end plate are two blanks, never one sheet). Each is unfolded on its own; the
+        # single-outline fields below describe the part when it is one blank, and the totals when it is several.
+        bodies = _sheet_bodies(shape)
+        if len(bodies) <= 1:
+            blanks = [self._flat_pattern_of_body(shape, sheet_thickness, dominant_face, panels, dominant_normal,
+                                                 bends["count"], holes.get("centroids_mm", []))]
+        else:
+            blanks = []
+            for body in bodies:
                 try:
-                    flat_pattern_outline = self._compute_flat_pattern_outline(
-                        dominant_face, panels, [], holes.get("centroids_mm", []),
-                        expected_area_mm2=flat_pattern_area_mm2,
-                    )
+                    blanks.append(self._flat_pattern_of_separate_body(body, sheet_thickness, holes.get("centroids_mm", [])))
                 except Exception as e:
-                    logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
-        except Exception as e:
-            logger.warning(f"[SheetMetal] flat_pattern_area failed: {e}")
+                    logger.warning(f"[SheetMetal] flat pattern of one body failed: {e}")
+                    blanks.append({"area_mm2": 0.0, "method": "failed", "bounding_rect": None, "outline": None})
+        flat_pattern_area_mm2 = round(sum(b["area_mm2"] for b in blanks), 1)
+        if len(blanks) == 1:
+            flat_pattern_area_method = blanks[0]["method"]
+            flat_pattern_bounding_rect = blanks[0]["bounding_rect"]
+            flat_pattern_outline = blanks[0]["outline"]
+        else:
+            flat_pattern_area_method = f"{len(blanks)} blanks: " + "; ".join(b["method"] for b in blanks)
+            flat_pattern_bounding_rect = None  # several blanks have no one rectangle; see flat_pattern_blanks
+            flat_pattern_outline = None
+        flat_pattern_blanks = [
+            {
+                "area_mm2": round(b["area_mm2"], 1),
+                "method": b["method"],
+                "bounding_length_mm": round(b["bounding_rect"]["length_mm"], 2) if b["bounding_rect"] else None,
+                "bounding_width_mm": round(b["bounding_rect"]["width_mm"], 2) if b["bounding_rect"] else None,
+                "outline_points_mm": b["outline"]["outline_points_mm"] if b["outline"] else None,
+                "holes_mm": b["outline"]["holes_mm"] if b["outline"] else None,
+                "outline_source": "wire_walk" if b["outline"] else "unavailable",
+            }
+            for b in blanks
+        ]
 
         # Validation warnings + debug output
         validation_debug = self._validate_sheet_geometry(
@@ -861,9 +849,109 @@ class SheetMetalFeatureExtractor:
             "flat_pattern_holes_mm": flat_pattern_outline["holes_mm"] if flat_pattern_outline else None,
             "flat_pattern_holes_unplaced": flat_pattern_outline["holes_unplaced"] if flat_pattern_outline else None,
             "flat_pattern_outline_source": "wire_walk" if flat_pattern_outline else "unavailable",
+            # Every blank the part is cut from (one per solid body), each with its own area, bounding rectangle,
+            # outline and holes in its own unfolded frame. One entry for an ordinary sheet part, equal to the fields
+            # above; several for a weldment / multi-body file, whose blanks are nested together.
+            "flat_pattern_blanks": flat_pattern_blanks,
             "sheet_geometry_debug": {**geom_debug, **validation_debug},
             "feature_graph_v2": feature_graph_v2,
         }
+
+    def _flat_pattern_of_body(
+        self,
+        shape: Any,
+        sheet_thickness: float,
+        dominant_face: Any,
+        panels: List[Dict[str, Any]],
+        dominant_normal: Optional[Tuple[float, float, float]],
+        bend_count: int,
+        hole_centroids_mm: List[Any],
+    ) -> Dict[str, Any]:
+        """
+        One blank's flat pattern: {"area_mm2", "method", "bounding_rect", "outline"} for a single sheet body (`shape`
+        is that body, `panels` and `dominant_face` are its own). Failures leave a field None or the area on the
+        dominant-face method, never a guess -- the same contract the single-body extraction always had.
+        """
+        flat_pattern_area_mm2 = 0.0
+        flat_pattern_area_method = "dominant_face_only"
+        flat_pattern_bounding_rect: Optional[Dict[str, float]] = None
+        # Real outline+hole geometry for true (non-rectangle) nesting
+        # visualization -- see _compute_flat_pattern_outline's own docstring.
+        # None (never fabricated) when the wire-walk/merge couldn't resolve
+        # one for this part; failures here never affect flat_pattern_area_mm2
+        # or flat_pattern_bounding_rect above, which are computed independently.
+        flat_pattern_outline: Optional[Dict[str, Any]] = None
+        try:
+            if bend_count > 0:
+                # Multi-panel unfold -- the dominant face alone would miss
+                # every wall/flange folded up from the base.
+                unfold = self._compute_true_flat_pattern_area(shape, dominant_face, sheet_thickness)
+                if unfold["method"] == "true_unfold":
+                    flat_pattern_area_mm2 = unfold["area_mm2"]
+                    flat_pattern_area_method = f"true_unfold ({unfold['bends_used']}/{unfold['bends_total']} bends, {unfold['panel_count']} panels)"
+                    dedup_bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness) if dominant_normal else []
+                    flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, dedup_bends)
+                    try:
+                        flat_pattern_outline = self._compute_flat_pattern_outline(
+                            dominant_face, panels, dedup_bends, hole_centroids_mm,
+                            expected_area_mm2=flat_pattern_area_mm2,
+                        )
+                    except Exception as e:
+                        logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
+                else:
+                    logger.warning(
+                        "[SheetMetal] true_unfold could not resolve panels "
+                        "(non-manifold or unusual import) -- falling back to dominant-face-only, "
+                        "which will UNDERCOUNT area/weight for this bent part"
+                    )
+                    flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
+            else:
+                # No bends -- the part is flat, so the dominant face IS the
+                # whole blank. The simple method is exact here, not an
+                # approximation.
+                flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
+                flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, [])
+                try:
+                    flat_pattern_outline = self._compute_flat_pattern_outline(
+                        dominant_face, panels, [], hole_centroids_mm,
+                        expected_area_mm2=flat_pattern_area_mm2,
+                    )
+                except Exception as e:
+                    logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
+        except Exception as e:
+            logger.warning(f"[SheetMetal] flat_pattern_area failed: {e}")
+        return {
+            "area_mm2": flat_pattern_area_mm2,
+            "method": flat_pattern_area_method,
+            "bounding_rect": flat_pattern_bounding_rect,
+            "outline": flat_pattern_outline,
+        }
+
+    def _flat_pattern_of_separate_body(self, body: Any, sheet_thickness: float, hole_centroids_mm: List[Any]) -> Dict[str, Any]:
+        """
+        The flat pattern of one body of a multi-body file. The body is its own blank, so its own dominant face, panels,
+        bends and holes are found on it alone (the part's thickness carries over: one gauge per part). Holes are kept
+        to those inside this body's box, so a hole of the next body is never placed on this blank.
+        """
+        from OCC.Core.Bnd import Bnd_Box  # type: ignore
+        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+
+        box = Bnd_Box()
+        brepbndlib.Add(body, box, True)
+        x0, y0, z0, x1, y1, z1 = box.Get()
+        dims = [x1 - x0, y1 - y0, z1 - z0]
+        _t, dominant_face, _conf, _dbg = self._extract_sheet_metal_geometry(body, dims)
+        panels = self._identify_panels(body, sheet_thickness)
+        dominant_normal = None
+        if dominant_face is not None:
+            n = BRepAdaptor_Surface(dominant_face).Plane().Axis().Direction()
+            dominant_normal = (float(n.X()), float(n.Y()), float(n.Z()))
+        bend_count = len(self._collect_dedup_bends(body, dominant_normal, sheet_thickness)) if dominant_normal else 0
+        margin = 1.0
+        holes = [h for h in hole_centroids_mm
+                 if x0 - margin <= h[0] <= x1 + margin and y0 - margin <= h[1] <= y1 + margin and z0 - margin <= h[2] <= z1 + margin]
+        return self._flat_pattern_of_body(body, sheet_thickness, dominant_face, panels, dominant_normal, bend_count, holes)
 
     # ── Sheet thickness + dominant face (combined single pass) ────────────────
 
@@ -4418,3 +4506,28 @@ def _cylinder_is_bend(
         return across > 0 and along == 0
     dnx, dny, dnz = dominant_normal
     return abs(ax * dnx + ay * dny + az * dnz) < 0.5
+
+
+# A solid smaller than this share of the part's largest body is modelling debris (exporters leave zero-volume or
+# sliver solids: SLEEK-FRAME v2 carries 64 of them beside its one real body), not a blank.
+SHEET_BODY_MIN_VOLUME_SHARE = 0.01
+
+
+def _sheet_bodies(shape: Any) -> List[Any]:
+    """The solid bodies of `shape` that are blanks of their own, largest first; [] when it holds no solid."""
+    from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+    from OCC.Core.TopAbs import TopAbs_SOLID  # type: ignore
+    from OCC.Core.GProp import GProp_GProps  # type: ignore
+    from OCC.Core.BRepGProp import brepgprop  # type: ignore
+
+    solids = []
+    exp = TopExp_Explorer(shape, TopAbs_SOLID)
+    while exp.More():
+        props = GProp_GProps()
+        brepgprop.VolumeProperties(exp.Current(), props)
+        solids.append((abs(props.Mass()), exp.Current()))
+        exp.Next()
+    if not solids:
+        return []
+    largest = max(v for v, _ in solids)
+    return [solid for v, solid in sorted(solids, key=lambda t: -t[0]) if v >= largest * SHEET_BODY_MIN_VOLUME_SHARE]

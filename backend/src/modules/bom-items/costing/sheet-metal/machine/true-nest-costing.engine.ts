@@ -69,3 +69,32 @@ export function selectBestTrueNestCandidate(
   }
   return best;
 }
+
+/**
+ * A part cut from several blanks (one per solid body: a channel and its end plate), each nested on its own on the same
+ * sheet. Every blank takes sheetWeight / (copies of it per sheet) of material, so one part takes the sum of those:
+ *   grossWeightPerPart = sheetWeight x SUM(1 / partsPerSheet_b)
+ * and one sheet holds floor(1 / SUM(1 / partsPerSheet_b)) whole sets. This is how a part whose blanks are cut as separate
+ * nests is costed; nesting the blanks together (a tab dropped into another blank's skeleton) could only lower it.
+ * Null when a blank does not fit the sheet, or a whole set needs more than one sheet (no honest parts-per-sheet).
+ */
+export function combineBlankNests(
+  sheet: { sheetWidthMm: number; sheetLengthMm: number; sheetWeightKg: number },
+  partsPerSheetPerBlank: number[],
+  netWeightKg: number,
+): TrueNestCostingSelection | null {
+  if (partsPerSheetPerBlank.length === 0 || sheet.sheetWeightKg <= 0) return null;
+  if (partsPerSheetPerBlank.some((n) => !(n > 0))) return null;
+  const sheetsPerSet = partsPerSheetPerBlank.reduce((sum, n) => sum + 1 / n, 0);
+  const setsPerSheet = Math.floor(1 / sheetsPerSet + 1e-9);
+  if (setsPerSheet < 1) return null;
+  const grossWeightPerPartKg = sheet.sheetWeightKg * sheetsPerSet;
+  return {
+    sheetWidthMm: sheet.sheetWidthMm,
+    sheetLengthMm: sheet.sheetLengthMm,
+    partsPerSheet: setsPerSheet,
+    sheetWeightKg: sheet.sheetWeightKg,
+    grossWeightPerPartKg,
+    utilisationPct: Math.round(computeMassBasedUtilizationPct(netWeightKg, grossWeightPerPartKg) * 10) / 10,
+  };
+}

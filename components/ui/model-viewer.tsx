@@ -11,6 +11,7 @@ import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
 import type { AnnotationSource } from '@/lib/features/dimension-annotations';
 import type { PmiReviewProps } from '@/components/viewer/pmi-review-list';
 import { isWebGLAvailable } from '@/lib/utils/webgl';
+import type { FlatPatternBlank } from '@/lib/types/manufacturing';
 
 export type { HeatmapSource, HeatmapNormalization, HeatmapLayerType } from '@/lib/heatmap/types';
 
@@ -170,6 +171,7 @@ interface ModelViewerProps {
   flatPatternBendCount?: number | undefined;
   flatPatternHoleCount?: number | undefined;
   flatPatternPierceCount?: number | undefined;
+  flatPatternBlanks?: FlatPatternBlank[] | undefined;
   flatPatternAreaMm2?: number | undefined;
 }
 
@@ -227,6 +229,7 @@ export function ModelViewer({
   flatPatternBendCount,
   flatPatternHoleCount,
   flatPatternPierceCount,
+  flatPatternBlanks,
   flatPatternAreaMm2,
 }: ModelViewerProps) {
   const [error, setError] = useState<string | null>(null);
@@ -391,6 +394,7 @@ export function ModelViewer({
               {...(flatPatternBendCount !== undefined ? { flatPatternBendCount } : {})}
               {...(flatPatternHoleCount !== undefined ? { flatPatternHoleCount } : {})}
               {...(flatPatternPierceCount !== undefined ? { flatPatternPierceCount } : {})}
+              {...(flatPatternBlanks !== undefined ? { flatPatternBlanks } : {})}
               {...(flatPatternAreaMm2 !== undefined ? { flatPatternAreaMm2 } : {})}
             />
           </ErrorBoundary>
@@ -555,6 +559,7 @@ export function ModelViewer({
               {...(flatPatternBendCount !== undefined ? { flatPatternBendCount } : {})}
               {...(flatPatternHoleCount !== undefined ? { flatPatternHoleCount } : {})}
               {...(flatPatternPierceCount !== undefined ? { flatPatternPierceCount } : {})}
+              {...(flatPatternBlanks !== undefined ? { flatPatternBlanks } : {})}
               {...(flatPatternAreaMm2 !== undefined ? { flatPatternAreaMm2 } : {})}
             />
           </ErrorBoundary>

@@ -15094,9 +15094,10 @@
             }
           },
           {
+            "description": "Parts required (sheets required is computed from it); default 1",
             "in": "query",
             "name": "quantity",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -15120,7 +15121,7 @@
           {
             "in": "query",
             "name": "kerfMm",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -15128,7 +15129,16 @@
           {
             "in": "query",
             "name": "edgeMarginMm",
-            "required": true,
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which blank to nest when the part is cut from several (0-based, one per solid body); default 0",
+            "in": "query",
+            "name": "blank",
+            "required": false,
             "schema": {
               "type": "string"
             }
