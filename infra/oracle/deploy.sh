@@ -4,7 +4,7 @@
 #   infra/oracle/deploy.sh <vm-public-ip> <git-ref> [<baseline-dir>]      e.g. infra/oracle/deploy.sh 203.0.113.7 v0.1.2
 #
 # Ships exactly what git has at <git-ref> (git archive, never your working tree), env/prd.env, and the baseline; then on the VM: host setup
-# (once), data tier, database (infra/oracle/production-db.sh), migrations, application, and the nightly backup timer. Needs the key made for
+# (once), data tier, database (infra/oracle/production-db.sh), migrations, application, monitoring, and the nightly backup timer. Needs the key made for
 # this (~/.ssh/emithran_prod_ed25519). Refuses to run when env/prd.env has blank required values. Re-runnable: each step skips what is done.
 set -Eeuo pipefail
 trap 'echo "deploy.sh failed at line $LINENO" >&2' ERR
@@ -33,28 +33,31 @@ ph=[k for k,v in pr.items() if "REPLACE_" in v]
 if ph: sys.exit("env/prd.env still holds placeholders: "+", ".join(ph))
 PY
 
-echo "[1/6] host setup"
+echo "[1/7] host setup"
 "${ssh_[@]}" 'command -v docker >/dev/null && test -f /etc/ssh/sshd_config.d/99-emithran.conf' 2>/dev/null \
   || "${ssh_[@]}" 'sudo bash -s' < infra/oracle/bootstrap-host.sh
 
-echo "[2/6] shipping $ref"
+echo "[2/7] shipping $ref"
 git archive "$ref" | "${ssh_[@]}" 'mkdir -p /opt/emithran && tar -x -C /opt/emithran'
 "${ssh_[@]}" 'mkdir -p /opt/emithran/env /opt/emithran/baseline'
 tar -C "$baseline" -cf - . | "${ssh_[@]}" 'tar -x -C /opt/emithran/baseline'
 "${ssh_[@]}" 'umask 077; cat > /opt/emithran/env/prd.env' < env/prd.env
 
-echo "[3/6] data tier"
+echo "[3/7] data tier"
 "${ssh_[@]}" 'cd /opt/emithran && P="docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file env/prd.env" && $P up -d postgres \
   && for i in $(seq 1 60); do $P exec -T postgres pg_isready -U postgres >/dev/null 2>&1 && exit 0; sleep 2; done; echo "postgres did not become ready" >&2; exit 1'
 
-echo "[4/6] database (baseline, clean-up, role) and migrations"
+echo "[4/7] database (baseline, clean-up, role) and migrations"
 "${ssh_[@]}" 'cd /opt/emithran && DROP_DANGLING=1 BASELINE_DIR=/opt/emithran/baseline infra/oracle/production-db.sh'
 "${ssh_[@]}" 'cd /opt/emithran/backend && docker run --rm --network host -v /opt/emithran:/work -w /work/backend node:24 sh -c "npm ci --legacy-peer-deps --no-audit --no-fund >/dev/null && npm run db:migrate -- --env prd --confirm"'
 
-echo "[5/6] application (builds the images on the VM: several minutes the first time; no `storage` service: files go to R2)"
+echo "[5/7] application (builds the images on the VM: several minutes the first time; no `storage` service: files go to R2)"
 "${ssh_[@]}" 'cd /opt/emithran && docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file env/prd.env up -d --build postgres postgrest backend frontend cad-engine ecad-engine cloudflared'
 
-echo "[6/6] nightly backup timer"
+echo "[6/7] monitoring (Prometheus, Grafana, probes, host metrics): the app keeps running if this stack is down"
+"${ssh_[@]}" 'cd /opt/emithran && docker compose -p emithran-prd-mon -f docker-compose.monitoring.yml --env-file env/prd.env --profile host-metrics up -d'
+
+echo "[7/7] nightly backup timer"
 "${ssh_[@]}" 'sudo tee /etc/systemd/system/emithran-backup.service >/dev/null <<S
 [Unit]
 Description=Emithran database backup to R2

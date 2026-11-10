@@ -1,7 +1,7 @@
 # Production on Oracle Cloud (Always Free)
 
 Production runs the repo's own compose files (`docker-compose.prod.yml` + `docker-compose.data.yml`, project `emithran-prd`) on one Always Free
-Ampere VM (4 OCPU, 24 GB, Ubuntu 24.04 arm64), behind the Cloudflare tunnel `emithran-prod` at `app.emithran.com` (`platform.emithran.com` is a different product, the Manufacturing Data Spider on Vercel: do not point it here); files go to the R2
+Ampere VM (4 OCPU, 24 GB, Ubuntu 24.04 arm64), behind the Cloudflare tunnel `emithran-prod` at `cloud.emithran.com` (`platform.emithran.com` is a different product, the Manufacturing Data Spider on Vercel: do not point it here). `cloud.emithran.com` was the Vercel frontend; it moves to this stack at go-live by changing its DNS record, and rolls back by changing it back; files go to the R2
 bucket `emithran-prod`. Nothing here costs money: a $1 budget alerts on the first cent of spend, and the shape is inside the free allowance.
 
 | Script | Where it runs | What it does |
@@ -32,3 +32,12 @@ install path. Verified on a throwaway Postgres built from the same compose files
 - Oracle reclaims an Always Free VM that stays under 20% CPU/network/memory for 7 days: `bootstrap-host.sh` installs a low-priority hourly burst.
 - Free ARM capacity is often exhausted; `vm.sh` retries. A smaller VM resizes up in place later at no cost.
 - Do not click Upgrade. Keep total A1 use at or under 4 OCPU / 24 GB and block storage at or under 200 GB.
+
+## Watching production
+- **Inside the VM:** `docker-compose.monitoring.yml` (Prometheus, Grafana, blackbox probes, host metrics; 16 alert rules; docs/ops/monitoring.md). Grafana is
+  `https://monitor.emithran.com` behind Cloudflare Access (owners only), never public. Memory limits of the whole stack add up to 10.5 GB: it fits the
+  24 GB VM and the 12 GB fallback.
+- **From outside:** a free external uptime monitor on `https://cloud.emithran.com/api/health/live` (UptimeRobot: 5-minute checks, email). The monitor inside
+  the VM cannot report that the VM itself is down.
+- **Notifications:** Prometheus alerts fire but nothing is sent until a Grafana contact point is configured (email through your Resend account).
+- Also free and already there: Cloudflare Analytics and the WAF event log, the Auth0 tenant logs, and `journalctl -u emithran-backup`.
