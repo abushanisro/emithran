@@ -28,6 +28,9 @@ def parse(p):
 ex,pr=parse('env/prd.env.example'),parse('env/prd.env')
 bad=[k for k in ex if k not in optional and not k.startswith(('GRAFANA_','PROM_')) and not pr.get(k)]
 if bad: sys.exit("env/prd.env is missing: "+", ".join(bad))
+# A value that is still the example's placeholder counts as missing (REPLACE_ME, REPLACE_APP_HOST ...): it passes a "not blank" test and breaks at runtime.
+ph=[k for k,v in pr.items() if "REPLACE_" in v]
+if ph: sys.exit("env/prd.env still holds placeholders: "+", ".join(ph))
 PY
 
 echo "[1/6] host setup"
@@ -48,8 +51,8 @@ echo "[4/6] database (baseline, clean-up, role) and migrations"
 "${ssh_[@]}" 'cd /opt/emithran && DROP_DANGLING=1 BASELINE_DIR=/opt/emithran/baseline infra/oracle/production-db.sh'
 "${ssh_[@]}" 'cd /opt/emithran/backend && docker run --rm --network host -v /opt/emithran:/work -w /work/backend node:24 sh -c "npm ci --legacy-peer-deps --no-audit --no-fund >/dev/null && npm run db:migrate -- --env prd --confirm"'
 
-echo "[5/6] application (builds the images on the VM: several minutes the first time)"
-"${ssh_[@]}" 'cd /opt/emithran && docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file env/prd.env up -d --build'
+echo "[5/6] application (builds the images on the VM: several minutes the first time; no `storage` service: files go to R2)"
+"${ssh_[@]}" 'cd /opt/emithran && docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file env/prd.env up -d --build postgres postgrest backend frontend cad-engine ecad-engine cloudflared'
 
 echo "[6/6] nightly backup timer"
 "${ssh_[@]}" 'sudo tee /etc/systemd/system/emithran-backup.service >/dev/null <<S
