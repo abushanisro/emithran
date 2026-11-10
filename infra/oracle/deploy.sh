@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploys the production stack to the Oracle VM from your Mac.
 #
-#   infra/oracle/deploy.sh <vm-public-ip> <git-ref> [<baseline-dir>]      e.g. infra/oracle/deploy.sh 203.0.113.7 v0.1.2
+#   [MONITORING=auto|on|off] infra/oracle/deploy.sh <vm-public-ip> <git-ref> [<baseline-dir>]      e.g. infra/oracle/deploy.sh 203.0.113.7 v0.1.2
 #
 # Ships exactly what git has at <git-ref> (git archive, never your working tree), env/prd.env, and the baseline; then on the VM: host setup
 # (once), data tier, database (infra/oracle/production-db.sh), migrations, application, monitoring, and the nightly backup timer. Needs the key made for
@@ -54,8 +54,15 @@ echo "[4/7] database (baseline, clean-up, role) and migrations"
 echo "[5/7] application (builds the images on the VM: several minutes the first time; no `storage` service: files go to R2)"
 "${ssh_[@]}" 'cd /opt/emithran && docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file env/prd.env up -d --build postgres postgrest backend frontend cad-engine ecad-engine cloudflared'
 
-echo "[6/7] monitoring (Prometheus, Grafana, probes, host metrics): the app keeps running if this stack is down"
-"${ssh_[@]}" 'cd /opt/emithran && docker compose -p emithran-prd-mon -f docker-compose.monitoring.yml --env-file env/prd.env --profile host-metrics up -d'
+# Monitoring needs about 1.75 GB; the app about 8.75 GB. It starts only on a VM with at least 10 GB of memory (the 24 GB and the 12 GB sizes), so a smaller
+# VM keeps its memory for the application. MONITORING=off forces it off.
+mem_gb="$("${ssh_[@]}" "free -g | awk '/^Mem:/ {print \$2}'")"
+if [ "${MONITORING:-auto}" = off ] || { [ "${MONITORING:-auto}" = auto ] && [ "$mem_gb" -lt 10 ]; }; then
+  echo "[6/7] monitoring skipped (${mem_gb} GB of memory, MONITORING=${MONITORING:-auto}); start it later with: MONITORING=on infra/oracle/deploy.sh <ip> <ref>"
+else
+  echo "[6/7] monitoring (Prometheus, Grafana, probes, host metrics): the app keeps running if this stack is down"
+  "${ssh_[@]}" 'cd /opt/emithran && docker compose -p emithran-prd-mon -f docker-compose.monitoring.yml --env-file env/prd.env --profile host-metrics up -d'
+fi
 
 echo "[7/7] nightly backup timer"
 "${ssh_[@]}" 'sudo tee /etc/systemd/system/emithran-backup.service >/dev/null <<S
