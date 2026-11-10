@@ -1,23 +1,24 @@
 // The two tables behind the TPP calculator's lookup eyes, read from the real database
 // (migration 902 staged both). Real ProcessesService, read-only, no mocks.
-import { Test } from '@nestjs/testing';
-import { ConfigModule } from '@nestjs/config';
-import * as path from 'path';
-import { ProcessesModule } from '../src/modules/processes/processes.module';
+import type { TestingModule } from '@nestjs/testing';
+import { createE2eModule } from './support/create-e2e-app';
 import { ProcessesService } from '../src/modules/processes/processes.service';
-import { SessionModule } from '../src/common/session/session.module';
 
 jest.setTimeout(120_000);
 
+process.env.ELECTRONICS_QUEUE_DRIVER = 'memory'; // no queue polling in a read-only spec
+
 describe('[e2e] Turret Press reference tables', () => {
+  let moduleRef: TestingModule;
   let service: ProcessesService;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      // SessionModule is global in AppModule; the auth guard ProcessesModule wires needs it.
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') }), SessionModule, ProcessesModule],
-    }).compile();
-    service = moduleRef.get(ProcessesService);
+    moduleRef = await createE2eModule();
+    service = moduleRef.get(ProcessesService, { strict: false });
+  });
+
+  afterAll(async () => {
+    await moduleRef.close();
   });
 
   it('lists the 21 turret machines with the rates the calculator reads', async () => {
