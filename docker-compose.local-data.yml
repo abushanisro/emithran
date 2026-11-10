@@ -23,7 +23,6 @@ services:
   # Started by `local:load` once the database holds the schema and the `authenticator` role exists.
   postgrest:
     image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
-    platform: linux/amd64
     profiles: [api]
     restart: unless-stopped
     depends_on:

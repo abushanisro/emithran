@@ -45,4 +45,4 @@ crashed, a different refusal), `export`, `archive`, `bom`. `DIR/diff.json` has a
 "passing" is), configuration differences found by reading both sources, and the images' provenance.
 
 Not measured: memory, crash rates over many files, and real nested assembly files from a customer (the repository's own fixture is the only
-nested assembly). Timings on Apple Silicon include amd64 emulation and are indicative only.
+nested assembly). Timings depend on the host and are indicative only.

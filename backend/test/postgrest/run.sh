@@ -43,7 +43,7 @@ INSERT INTO public.cad_uploads (id, organization_id, created_by, bom_id, file_na
   ('a0000000-0000-4000-8000-000000000003','cccccccc-cccc-4ccc-8ccc-cccccccccccc','11111111-1111-1111-1111-111111111111','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','c.step','s3',1,'p/c.step', now() - interval '1 minute');
 SQL
 JWT_SECRET="$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')"
-docker run -d --rm --name "$ID-rest" --network "$ID" -p 127.0.0.1::3000 --platform linux/amd64 \
+docker run -d --rm --name "$ID-rest" --network "$ID" -p 127.0.0.1::3000 \
   -e PGRST_DB_URI="postgres://authenticator:authpw@$ID-pg:5432/postgres" -e PGRST_DB_SCHEMAS=public -e PGRST_DB_ANON_ROLE=anon \
   -e PGRST_JWT_SECRET="$JWT_SECRET" -e PGRST_SERVER_HOST=0.0.0.0 "$REST_IMAGE" >/dev/null
 PORT=""

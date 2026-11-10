@@ -11,8 +11,8 @@ equals the tree. Then checks the isolation itself: the worker container has no c
 interface but loopback, the runner's own process environment no longer holds its credentials, and a process a worker leaves
 behind does not survive its job.
 
-  docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad --target worker -t cad-worker:dev core
-  docker build --platform linux/amd64 -t cad-core:dev core
+  docker build --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad --target worker -t cad-worker:dev core
+  docker build -t cad-core:dev core
   python3 core/tests/e2e.py
 """
 import base64
@@ -118,7 +118,7 @@ def docker(*args, check=True):
 
 def start_pair(port, volume, extra_worker_args=()):
     """The worker and the runner, isolated as in docker-compose.prod.yml (cad-worker, cad-core)."""
-    hardened = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true", "--platform", "linux/amd64"]
+    hardened = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true"]
     worker = docker(
         "run", "-d", "--rm", *hardened, "--network", "none", "--user", "10005:10005",
         "--tmpfs", "/tmp:size=1g,uid=10005,gid=10005,mode=0700", "-v", f"{volume}:/run/cad-worker",

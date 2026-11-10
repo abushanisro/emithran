@@ -41,13 +41,13 @@ print(json.dumps({'parts': parts, 'total_s': round(wall, 2), 'peak_rss_mb': roun
 
 
 def docker(image, mounts, code, python="python"):
-    cmd = ["docker", "run", "--rm", "--platform", "linux/amd64", *[a for m in mounts for a in ("-v", m)], image, python, "-c", code]
+    cmd = ["docker", "run", "--rm", *[a for m in mounts for a in ("-v", m)], image, python, "-c", code]
     return json.loads(subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip().splitlines()[-1])
 
 
 def main():
     with tempfile.TemporaryDirectory() as work:
-        subprocess.run(["docker", "run", "--rm", "--platform", "linux/amd64", "-v", f"{work}:/work", "-v", f"{HERE}:/bench:ro", "py-occt:dev",
+        subprocess.run(["docker", "run", "--rm", "-v", f"{work}:/work", "-v", f"{HERE}:/bench:ro", "py-occt:dev",
                         "python", "/bench/make_assembly.py", "/work/bench.step", PARTS], check=True, capture_output=True)
         size_mb = (Path(work) / "bench.step").stat().st_size / 1e6
         py = docker("py-occt:dev", [f"{work}:/work:ro", f"{ROOT/'cad-engine'}:/engine:ro"], PY_MEASURE)

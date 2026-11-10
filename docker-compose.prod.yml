@@ -256,7 +256,6 @@ services:
   cad-core:
     <<: *hardened
     profiles: [rust-core]
-    platform: linux/amd64
     build:
       context: ./core
       dockerfile: Dockerfile
@@ -309,7 +308,6 @@ services:
   casting-worker:
     <<: *hardened
     profiles: [sand-casting]
-    platform: linux/amd64
     build:
       context: ./casting-worker
       dockerfile: Dockerfile
@@ -341,7 +339,6 @@ services:
   cad-worker:
     <<: *hardened
     profiles: [rust-core]
-    platform: linux/amd64
     build:
       context: ./core
       dockerfile: Dockerfile
@@ -382,7 +379,6 @@ services:
   postgrest:
     <<: *hardened
     image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
-    platform: linux/amd64
     user: "10004:10004"
     environment:
       PGRST_DB_URI: ${POSTGREST_DB_URI:?set POSTGREST_DB_URI in the env file}
