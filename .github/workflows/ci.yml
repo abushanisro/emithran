@@ -315,6 +315,20 @@ jobs:
           push: false
           tags: cad-engine:ci
 
+  cad-engine-tests:
+    name: CAD engine tests (pytest in the production image)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -t cad-engine:ci cad-engine
+      - run: docker build --build-arg BASE_IMAGE=cad-engine:ci -t cad-engine:test -f cad-engine/Dockerfile.dev cad-engine
+      # The engine's own suite, in the image the service ships (production image + pytest). The tests are mounted, not baked in: .dockerignore keeps them out of the runtime image.
+      - run: >-
+          docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD/cad-engine/test:/app/test:ro" -w /app cad-engine:test
+          conda run --no-capture-output -n cad-env python -m pytest -q -p no:cacheprovider test
+
   # The same builds and checks as the x86 jobs above, natively on an ARM runner (no emulation): the CAD workers must run on both.
   # They are separate jobs, not a matrix on the required ones, so the required check names do not change.
   cad-workers-arm:
@@ -332,6 +346,11 @@ jobs:
       - run: docker build -t cad-core:dev core
       - run: python3 core/tests/e2e.py
       - run: docker build -t cad-engine:ci cad-engine
+      - run: docker build --build-arg BASE_IMAGE=cad-engine:ci -t cad-engine:test -f cad-engine/Dockerfile.dev cad-engine
+      # The engine's own suite, in the image the service ships (production image + pytest). The tests are mounted, not baked in: .dockerignore keeps them out of the runtime image.
+      - run: >-
+          docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD/cad-engine/test:/app/test:ro" -w /app cad-engine:test
+          conda run --no-capture-output -n cad-env python -m pytest -q -p no:cacheprovider test
 
   casting-worker-arm:
     name: Casting worker on ARM (C++ build, sandboxed run, hand-worked results)
