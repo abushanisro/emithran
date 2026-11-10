@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import type { SandGatingLayout } from '@/lib/casting/gating-layout';
 import type { CalculatorRun } from '@/lib/costing/sand-calculations';
 import type { SandRouteAlternative } from '@/lib/costing/sand-alternatives';
-import { apiClient } from '../client';
+import { apiClient, ApiError } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
 import { runProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -272,6 +272,30 @@ export function invalidateBOMItemUpdateQueries(queryClient: QueryClient, data: B
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'dfm-scores'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'plastic-dfm'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'part-summary'] });
+}
+
+// A re-analysis replaces the item's geometry (feature graph, flat-pattern outline), so on top of what any item update
+// invalidates it refreshes what is computed from the geometry alone: the true nest and the machining need.
+export function invalidateBOMItemReanalysisQueries(queryClient: QueryClient, data: BOMItem): void {
+  invalidateBOMItemUpdateQueries(queryClient, data);
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'true-nest'] });
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'machining-need'] });
+}
+
+/** Re-runs the CAD analysis on the item's stored 3D file (POST /bom-items/:id/reanalyze), then refreshes it and its costs. */
+export function useReanalyzeBOMItem(itemId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // The engine can take minutes on a large STEP file; the backend allows the same.
+    mutationFn: () => apiClient.post<BOMItem>(`/bom-items/${itemId}/reanalyze`, undefined, { timeout: 180_000 }),
+    onSuccess: (data) => {
+      invalidateBOMItemReanalysisQueries(queryClient, data);
+      toast.success('CAD analysis re-run');
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof ApiError ? error.getUserMessage() : 'Could not re-run the CAD analysis');
+    },
+  });
 }
 
 export function useUpdateBOMItem() {

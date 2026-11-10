@@ -3999,6 +3999,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   </DialogTitle>
                 </DialogHeader>
                 <FlatPatternView
+                  bomItemId={bomItemId}
                   partName={flatPatternPartName}
                   outlinePointsMm={flatPatternOutlinePointsMm}
                   holesMm={flatPatternHolesMm}

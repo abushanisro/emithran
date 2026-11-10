@@ -2,12 +2,15 @@
 
 import React, { useMemo, useState } from 'react';
 
+import { ReanalyzeButton } from '@/components/features/bom/ReanalyzeButton';
 import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-pattern-drawing';
 import { shoelaceAreaMm2 } from '@/lib/geometry/polygon2d';
 
 export interface FlatPatternHole { cx_mm: number; cy_mm: number; diameter_mm: number }
 
 interface FlatPatternViewProps {
+  /** Offers a Reanalyze when no outline is stored: the outline comes from the last CAD analysis. */
+  bomItemId?: string | undefined;
   partName?: string | undefined;
   outlinePointsMm?: number[][] | undefined;
   holesMm?: FlatPatternHole[] | undefined;
@@ -49,7 +52,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 // straight off the already-loaded BOM item's featureGraph -- no true-nest
 // (or any other) network call needed, since the outline is CAD-static.
 export function FlatPatternView({
-  partName, outlinePointsMm, holesMm, outlineSource, boundingLengthMm, boundingWidthMm, flatPatternAreaMm2,
+  bomItemId, partName, outlinePointsMm, holesMm, outlineSource, boundingLengthMm, boundingWidthMm, flatPatternAreaMm2,
   materialLabel, gradeLabel, thicknessMm, cutLengthMm, bendCount, holeCount, pierceCount,
 }: FlatPatternViewProps) {
   const bbox = useMemo(() => normalizeFlatPattern(outlinePointsMm, holesMm), [outlinePointsMm, holesMm]);
@@ -73,10 +76,13 @@ export function FlatPatternView({
 
   if (!bbox) {
     return (
-      <div className="flex flex-1 items-center justify-center text-white/70 text-sm text-center px-6">
-        {outlineSource === 'unavailable'
-          ? "No real flat-pattern outline is stored for this part. cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis. Re-run Reanalyze to retry extraction."
-          : 'Real flat-pattern outline unavailable for this part.'}
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/70 text-sm text-center px-6">
+        <p>
+          {outlineSource === 'unavailable'
+            ? "No real flat-pattern outline is stored for this part. cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis. Reanalyze to retry extraction."
+            : 'Real flat-pattern outline unavailable for this part.'}
+        </p>
+        {bomItemId && <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />}
       </div>
     );
   }

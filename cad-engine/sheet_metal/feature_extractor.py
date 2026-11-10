@@ -879,7 +879,8 @@ class SheetMetalFeatureExtractor:
         collect_modal_pairs: also put in `debug["modal_pairs"]` the antiparallel face pairs that voted for the modal
         thickness, as [face_ordinal_a, face_ordinal_b, separation_mm, combined_area_mm2], where the ordinal is the
         face's TopExp explorer index (the one the viewer's face_map and every feature's face_ids use). These are
-        the faces the reported thickness was measured on. Off by default, so sheet metal's debug output is unchanged;
+        the faces the reported thickness was measured on (combined_area_mm2 is the pair's wall area: its smaller face, see step 3).
+        Off by default, so sheet metal's debug output is unchanged;
         the plastic extractor turns it on to show the wall's faces behind a calculator input.
 
         Algorithm:
@@ -896,13 +897,17 @@ class SheetMetalFeatureExtractor:
              Works for ANY normal orientation, not just ±X/Y/Z.
 
           3. Area-weighted distance histogram at 0.05 mm resolution.
-             Each pair votes with weight = combined_area of both faces.
+             Each pair votes with the area of the wall it can bound: its SMALLER face. Two faces are a wall only where
+             they face each other, so the larger face's excess is not evidence of that thickness. With the sum of both
+             areas, one large face votes its whole area again for every small face opposite it: the 1576 mm² base of a
+             machined holder, opposite four 2.1 mm² counterbore floors 1 mm away, outvoted its real 3.5 mm walls and
+             the part was read as 1 mm sheet.
              Modal bin = sheet material gauge.
              (A 55-bend frame with many flat sections all at 2 mm produces a
               clear majority vote over the rare large-distance pairs.)
 
           4. Among pairs within ±15% of the modal thickness, score each pair:
-               score = combined_area × (1 + 0.3 × centrality)
+               score = wall_area × (1 + 0.3 × centrality)
              where centrality = 1 − (dist_from_part_centre / bbox_half_diag).
              Highest score → dominant blank face.
 
@@ -1023,7 +1028,7 @@ class SheetMetalFeatureExtractor:
                 dist = abs(di + dj)
                 if dist < 0.3 or dist > max_gauge_loose:
                     continue
-                pair_area = ai + aj
+                pair_area = min(ai, aj)  # the wall this pair bounds (docstring step 3)
                 bin_key = round(dist / BIN_RES) * BIN_RES
                 hist[bin_key] += pair_area
                 hist_count[bin_key] += 1

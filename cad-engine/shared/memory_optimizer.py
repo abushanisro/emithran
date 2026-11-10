@@ -103,6 +103,40 @@ class OptimizationResult:
 # MODULE-LEVEL HELPERS
 # ============================================================================
 
+# Sheet stock has one gauge, so a sheet part's antiparallel wall pairs sit at that one thickness: the modal gauge bin holds
+# nearly all of the paired wall area (`area_ratio` of SheetMetalFeatureExtractor._extract_sheet_metal_geometry). A machined
+# housing has thin walls too, but at several stepped thicknesses (floors, counterbores, bosses), so no one gauge dominates.
+# Measured on real parts with the wall-area histogram: ten sheet-metal parts of a customer pack (EMUSKI) 0.82-1.00, every
+# one that needed the override 0.93-1.00; the machined Cannula Holder bottom (3.5 mm walls stepped at 1, 2.5, 3.5 and 4.5 mm)
+# 0.65. The milled -> sheet_metal override below requires at least this share.
+SHEET_GAUGE_DOMINANCE_MIN = 0.80
+
+
+def smf_override_verdict(gauge_mm: float, gauge_dominance: float, dims: List[float], volume_mm3: float) -> Optional[Tuple[bool, str]]:
+    """
+    Whether a part the classifier called milled is sheet metal after all: (is_sheet, reason), or None when the cross-check
+    does not apply (the part is not hollow enough, or no gauge was found that is small next to its smallest dimension).
+    Sheet metal needs both a thin gauge (< 45% of the smallest bbox dimension, e.g. 2 mm on a 60 mm deep box) and ONE gauge
+    (it holds at least SHEET_GAUGE_DOMINANCE_MIN of the wall area); a thin gauge alone also describes a machined housing.
+    """
+    pos = [d for d in dims if d > 0]
+    if len(pos) < 3 or volume_mm3 <= 0:
+        return None
+    fill_ratio = volume_mm3 / (pos[0] * pos[1] * pos[2])
+    min_bbox = min(pos)
+    if fill_ratio >= 0.15 or not (0 < gauge_mm < min_bbox * 0.45):
+        return None
+    if gauge_dominance >= SHEET_GAUGE_DOMINANCE_MIN:
+        return True, (
+            f"smf_override: gauge={gauge_mm:.2f}mm < {min_bbox * 0.45:.1f}mm (45% of min bbox {min_bbox:.1f}mm), "
+            f"fill_ratio={fill_ratio:.3f}, gauge holds {gauge_dominance:.0%} of the wall area"
+        )
+    return False, (
+        f"smf_override declined: gauge={gauge_mm:.2f}mm holds only {gauge_dominance:.0%} of the wall area "
+        f"(sheet stock is one gauge: >= {SHEET_GAUGE_DOMINANCE_MIN:.0%}); stepped wall thicknesses => machined"
+    )
+
+
 def _compute_cyl_signals(
     raw_cylinders_full: list,
     total_face_count: int,
@@ -597,29 +631,27 @@ class AdvancedCADMemoryOptimizer:
             # low (< 15%), there is still a chance the part is sheet metal that
             # slipped through all topology gates (e.g. a deep box where flatness
             # exceeds 0.48 but bends produce a valid gauge). Run the antiparallel-
-            # face-pair gauge detector; if it finds a plausible gauge that is
-            # small relative to the smallest bbox dimension, override to sheet_metal.
-            if detected_family == MILLED and volume_mm3 > 0:
-                _pos_dims_chk = [d for d in dims_list if d > 0]
-                _bbox_vol_chk = dims_list[0] * dims_list[1] * dims_list[2] if len(dims_list) >= 3 else 0
-                _fill_ratio_chk = volume_mm3 / _bbox_vol_chk if _bbox_vol_chk > 0 else 1.0
-                if _fill_ratio_chk < 0.15 and sheet_geometry is not None:
-                    try:
-                        _gauge_chk = float(sheet_geometry[0] or 0)
-                        _min_bbox_chk = min(_pos_dims_chk) if _pos_dims_chk else 0.0
-                        # Valid gauge must be small relative to min bbox dimension:
-                        # a true sheet gauge is << the smallest forming dimension.
-                        # Threshold: gauge < 45% of min bbox dim (e.g. 2mm gauge, 60mm depth is fine).
-                        if _gauge_chk > 0 and _gauge_chk < _min_bbox_chk * 0.45:
+            # face-pair gauge detector; override to sheet_metal only if the part
+            # is made of ONE gauge: a gauge small relative to the smallest bbox
+            # dimension AND holding most of the part's wall area. A thin wall
+            # somewhere is not enough: a machined housing has thin walls too, at
+            # several stepped thicknesses (see SHEET_GAUGE_DOMINANCE_MIN).
+            if detected_family == MILLED and volume_mm3 > 0 and sheet_geometry is not None:
+                try:
+                    _verdict = smf_override_verdict(
+                        gauge_mm=float(sheet_geometry[0] or 0),
+                        gauge_dominance=float((sheet_geometry[3] or {}).get('area_ratio', 0.0)),
+                        dims=dims_list,
+                        volume_mm3=volume_mm3,
+                    )
+                    if _verdict is not None:
+                        _is_sheet, _reason = _verdict
+                        classification_reasons.append(_reason)
+                        if _is_sheet:
                             detected_family = SHEET_METAL
                             family_confidence = max(family_confidence, 0.72)
-                            classification_reasons.append(
-                                f"smf_override: gauge={_gauge_chk:.2f}mm < "
-                                f"{_min_bbox_chk * 0.45:.1f}mm (45% of min bbox {_min_bbox_chk:.1f}mm), "
-                                f"fill_ratio={_fill_ratio_chk:.3f}"
-                            )
-                    except Exception as _e:
-                        logger.debug(f"[mfg_intel] SMF cross-check failed: {_e}")
+                except Exception as _e:
+                    logger.debug(f"[mfg_intel] SMF cross-check failed: {_e}")
             # ── Sheet-metal impossibility veto ────────────────────────────────
             # Sheet stock has ONE gauge everywhere, so a sheet part's smallest
             # bbox dimension is either ≈1× the gauge (flat blank) or ≥~4× the
