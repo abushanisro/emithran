@@ -25,7 +25,11 @@ a pull request, every CI and security job green on a branch that is up to date, 
 2. **Merge it with a merge commit, never squash.** A squash gives `main` a commit `develop` does not have, the two diverge, and every release then
    needs a back-merge. The `main` ruleset allows only merge commits for this reason.
 3. Deploy `main` to production. Tag the merge commit `vX.Y.Z`.
-4. Do **not** delete `develop` (GitHub's automatic cleanup skips the default branch, and the ruleset forbids deleting it).
+4. **Sync `develop` the same day.** The release merge commit exists only on `main`, and the strict "branch must be up to date" rule counts it, so the next
+   release pull request would show as behind. From `develop`: `git switch -c chore/sync-main-into-develop && git merge --no-ff origin/main`, open a
+   pull request into `develop` and merge it with a **merge commit** (the tree is identical, so it changes no file). Do not use a pull request whose head is
+   `main`: its checks are `main`'s own, and "Update branch" would push to `main`.
+5. Do **not** delete `develop` (GitHub's automatic cleanup skips the default branch, and the ruleset forbids deleting it).
 
 ## A hotfix
 
