@@ -14,6 +14,10 @@ trap 'echo "mac-prod.sh failed at line $LINENO" >&2' ERR
 ref="${1:?usage: mac-prod.sh <git-ref>}"
 repo="$(git rev-parse --show-toplevel)"; cd "$repo"
 sha="$(git rev-parse --verify --quiet "$ref^{commit}")" || { echo "unknown git ref: $ref" >&2; exit 2; }
+# The release must carry everything this script runs from it. An older release (one that predates the deploy tooling) is refused BEFORE anything is changed.
+for f in docker-compose.prod.yml docker-compose.data.yml infra/oracle/production-db.sh backend/scripts/baseline-load.sh backend/scripts/migrate.ts env/prd.env.example; do
+  git cat-file -e "$sha:$f" 2>/dev/null || { echo "release $ref (${sha:0:12}) does not contain $f: it predates the deploy tooling. Nothing was changed." >&2; exit 2; }
+done
 run="${PROD_DIR:-$HOME/emithran-prod-run}"; baseline="${BASELINE_DIR:-$HOME/emithran-baseline}"
 case "$run" in */emithran-prod-run) ;; *) echo "PROD_DIR must end in /emithran-prod-run (it is emptied on each release): $run" >&2; exit 2 ;; esac
 [ -f "$run/env/prd.env" ] && [ -d "$baseline" ] || { echo "need $run/env/prd.env and the baseline directory $baseline" >&2; exit 2; }
