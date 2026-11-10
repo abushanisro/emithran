@@ -48,7 +48,7 @@ echo "[3/7] data tier"
   && for i in $(seq 1 60); do $P exec -T postgres pg_isready -U postgres >/dev/null 2>&1 && exit 0; sleep 2; done; echo "postgres did not become ready" >&2; exit 1'
 
 echo "[4/7] database (baseline, clean-up, role) and migrations"
-"${ssh_[@]}" 'cd /opt/emithran && DROP_DANGLING=1 BASELINE_DIR=/opt/emithran/baseline infra/oracle/production-db.sh'
+"${ssh_[@]}" 'cd /opt/emithran && DROP_DANGLING=1 BASELINE_DIR=/opt/emithran/baseline bash infra/oracle/production-db.sh'
 "${ssh_[@]}" 'cd /opt/emithran/backend && docker run --rm --network host -v /opt/emithran:/work -w /work/backend node:24 sh -c "npm ci --legacy-peer-deps --no-audit --no-fund >/dev/null && npm run db:migrate -- --env prd --confirm"'
 
 echo "[5/7] application (builds the images on the VM: several minutes the first time; no `storage` service: files go to R2)"
@@ -64,7 +64,7 @@ Description=Emithran database backup to R2
 [Service]
 Type=oneshot
 User=ubuntu
-ExecStart=/opt/emithran/infra/oracle/backup.sh
+ExecStart=/bin/bash /opt/emithran/infra/oracle/backup.sh
 S
 sudo tee /etc/systemd/system/emithran-backup.timer >/dev/null <<S
 [Unit]
