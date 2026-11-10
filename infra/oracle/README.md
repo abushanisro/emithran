@@ -1,7 +1,7 @@
 # Production on Oracle Cloud (Always Free)
 
 Production runs the repo's own compose files (`docker-compose.prod.yml` + `docker-compose.data.yml`, project `emithran-prd`) on one Always Free
-Ampere VM (4 OCPU, 24 GB, Ubuntu 24.04 arm64), behind the Cloudflare tunnel `emithran-prod` at `platform.emithran.com`; files go to the R2
+Ampere VM (4 OCPU, 24 GB, Ubuntu 24.04 arm64), behind the Cloudflare tunnel `emithran-prod` at `app.emithran.com` (`platform.emithran.com` is a different product, the Manufacturing Data Spider on Vercel: do not point it here); files go to the R2
 bucket `emithran-prod`. Nothing here costs money: a $1 budget alerts on the first cent of spend, and the shape is inside the free allowance.
 
 | Script | Where it runs | What it does |
