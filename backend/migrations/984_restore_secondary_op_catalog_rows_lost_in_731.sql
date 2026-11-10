@@ -46,6 +46,16 @@ BEGIN
     RETURN;
   END IF;
 
+  -- A database that has some process rows (earlier migrations seed a few) but none of the four calculators was built without the
+  -- reference catalog (the schema-only baseline, CI's local stack): there is nothing of 731's to put back, and the catalog arrives
+  -- whole in the reference-data package. Only SOME of them missing is a damaged catalog, which is the abort below.
+  IF NOT EXISTS (SELECT 1 FROM calculators k WHERE k.id IN (
+       'edccd27a-c91c-479d-a440-d00053249a3a', '0f7d6451-3937-472d-9a4c-3f8f3ebf59d8',
+       '72f84130-a741-425f-8fa9-9b027541801c', 'fe42139c-5675-4a82-94d5-7f2d440ae9bf')) THEN
+    RAISE NOTICE 'Migration 984: none of the four secondary-operation calculators exist (no reference catalog); nothing to restore';
+    RETURN;
+  END IF;
+
   -- The calculators the rows bind to. Never created here: if one is gone, the catalog cannot be restored honestly.
   SELECT string_agg(c.id::text, ', ') INTO missing
   FROM (VALUES
