@@ -1321,6 +1321,9 @@ export interface TrueNestResultDto {
   utilizationPct: number;
   sheetsRequired: number | null;
   capped: boolean;
+  /** Which of the part's blanks this nest is of (0-based) and how many there are: 1 for an ordinary part, one per solid body for a multi-body file. */
+  blankIndex: number;
+  blankCount: number;
 }
 
 // On-demand only (enabled defaults to requiring both sheet dims AND the
@@ -1334,11 +1337,11 @@ export function useTrueNest(
   quantity: number,
   sheetWidthMm: number | undefined,
   sheetLengthMm: number | undefined,
-  options?: { kerfMm?: number | undefined; edgeMarginMm?: number | undefined; enabled?: boolean | undefined },
+  options?: { kerfMm?: number | undefined; edgeMarginMm?: number | undefined; enabled?: boolean | undefined; blank?: number | undefined },
 ) {
   const hasSheet = typeof sheetWidthMm === 'number' && sheetWidthMm > 0 && typeof sheetLengthMm === 'number' && sheetLengthMm > 0;
   return useQuery({
-    queryKey: ['bom-items', itemId, 'true-nest', quantity, sheetWidthMm, sheetLengthMm, options?.kerfMm, options?.edgeMarginMm],
+    queryKey: ['bom-items', itemId, 'true-nest', quantity, sheetWidthMm, sheetLengthMm, options?.kerfMm, options?.edgeMarginMm, options?.blank ?? 0],
     queryFn: () => {
       const params = new URLSearchParams({
         quantity: String(quantity),
@@ -1347,6 +1350,7 @@ export function useTrueNest(
       });
       if (options?.kerfMm !== undefined) params.set('kerfMm', String(options.kerfMm));
       if (options?.edgeMarginMm !== undefined) params.set('edgeMarginMm', String(options.edgeMarginMm));
+      if (options?.blank) params.set('blank', String(options.blank));
       // Kept above cad-analysis.service.ts's own 90s /nest timeout so the
       // backend's specific diagnostic reason surfaces before this generic
       // client-side abort would.

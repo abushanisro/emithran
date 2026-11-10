@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { ReanalyzeButton } from '@/components/features/bom/ReanalyzeButton';
 import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-pattern-drawing';
 import { shoelaceAreaMm2 } from '@/lib/geometry/polygon2d';
+import type { FlatPatternBlank } from '@/lib/types/manufacturing';
 
 export interface FlatPatternHole { cx_mm: number; cy_mm: number; diameter_mm: number }
 
@@ -35,6 +36,8 @@ interface FlatPatternViewProps {
   bendCount?: number | undefined;
   holeCount?: number | undefined;
   pierceCount?: number | undefined;
+  /** Every blank the part is cut from (one per solid body); with several, the view shows one at a time. */
+  blanks?: FlatPatternBlank[] | undefined;
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -53,7 +56,48 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 // shows it on its own, before any sheet/nesting decision is made. Reads
 // straight off the already-loaded BOM item's featureGraph -- no true-nest
 // (or any other) network call needed, since the outline is CAD-static.
-export function FlatPatternView({
+/**
+ * The part's flat pattern. A part cut from several blanks (a multi-body file: a channel and its end plate) shows a
+ * switcher and each blank's own outline, holes, size and area; an ordinary part shows its one flat pattern.
+ */
+export function FlatPatternView(props: FlatPatternViewProps) {
+  const { blanks } = props;
+  const [index, setIndex] = useState(0);
+  if (!blanks || blanks.length <= 1) return <SingleFlatPatternView {...props} />;
+  const blank = blanks[Math.min(index, blanks.length - 1)]!;
+  return (
+    <div className="flex flex-1 min-h-0 flex-col">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-white bg-[#3f3f3f] border-b border-[#555555]">
+        <span className="text-white/60">This part is cut from {blanks.length} blanks:</span>
+        {blanks.map((b, i) => (
+          <button
+            key={i} type="button" onClick={() => { setIndex(i); }}
+            className={`px-2 py-0.5 rounded border ${i === index ? 'bg-white text-black border-white' : 'border-white/30 hover:bg-white/10'}`}
+          >
+            Blank {i + 1} · {Math.round(b.areaMm2).toLocaleString()} mm²
+          </button>
+        ))}
+      </div>
+      <SingleFlatPatternView
+        key={index}
+        {...props}
+        partName={`${props.partName ?? 'Part'} — blank ${(index + 1).toString()} of ${blanks.length.toString()}`}
+        outlinePointsMm={blank.outlinePointsMm ?? undefined}
+        holesMm={blank.holesMm}
+        outlineSource={blank.outlineSource}
+        boundingLengthMm={blank.boundingLengthMm ?? undefined}
+        boundingWidthMm={blank.boundingWidthMm ?? undefined}
+        flatPatternAreaMm2={blank.areaMm2}
+        cutLengthMm={undefined}
+        bendCount={undefined}
+        holeCount={blank.holesMm.length}
+        pierceCount={undefined}
+      />
+    </div>
+  );
+}
+
+function SingleFlatPatternView({
   bomItemId, processConflict, partName, outlinePointsMm, holesMm, outlineSource, boundingLengthMm, boundingWidthMm, flatPatternAreaMm2,
   materialLabel, gradeLabel, thicknessMm, cutLengthMm, bendCount, holeCount, pierceCount,
 }: FlatPatternViewProps) {

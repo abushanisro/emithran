@@ -26,6 +26,7 @@ import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-
 import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 import { currentFeatureGraphVersion } from '../analysis-status';
 import { plasticCostDrivers } from '../costing/plastic-molding/plastic-cost-drivers';
+import { parseFlatPatternBlanks, type FlatPatternBlank } from '../costing/sheet-metal/machine/flat-pattern-blanks';
 
 export interface RawGeometry {
   volume: number;
@@ -126,6 +127,8 @@ export interface RawGeometry {
   /** Holes on panels outside the flat-pattern layout, so absent from flatPatternHolesMm. */
   flatPatternHolesUnplaced?: number;
   flatPatternOutlineSource?: 'wire_walk' | 'unavailable';
+  /** Every blank the part is cut from, one per solid body (see FlatPatternBlank); undefined from an older engine. */
+  flatPatternBlanks?: FlatPatternBlank[];
   materialUtilizationPct?: number;
   scrapAreaMm2?: number;
   sheetThicknessMm: number;
@@ -481,6 +484,7 @@ export class AutoFillService {
         flatPatternHolesMm: geo.flatPatternHolesMm,
         flatPatternHolesUnplaced: geo.flatPatternHolesUnplaced,
         flatPatternOutlineSource: geo.flatPatternOutlineSource,
+        flatPatternBlanks: geo.flatPatternBlanks,
         // A molded part's drivers are the molding cost model's own inputs (what each one does is on the driver); the sheet-metal drivers above would read
         // its holes as drill points.
         costDrivers: isInjectionMolded
@@ -1080,6 +1084,7 @@ export class AutoFillService {
       flatPatternHolesMm: Array.isArray(smf?.flat_pattern_holes_mm) ? smf.flat_pattern_holes_mm : undefined,
       flatPatternHolesUnplaced: typeof smf?.flat_pattern_holes_unplaced === 'number' ? smf.flat_pattern_holes_unplaced : undefined,
       flatPatternOutlineSource: smf?.flat_pattern_outline_source === 'wire_walk' ? 'wire_walk' : 'unavailable',
+      flatPatternBlanks: parseFlatPatternBlanks(smf?.flat_pattern_blanks),
       materialUtilizationPct: smf?.material_utilization_pct != null ? safe(smf.material_utilization_pct, 0) : undefined,
       scrapAreaMm2: smf?.scrap_area_mm2 != null ? safe(smf.scrap_area_mm2, 0) : undefined,
       sheetThicknessMm: safe(smf?.sheet_thickness_mm, 0),
@@ -1316,6 +1321,7 @@ export class AutoFillService {
       flatPatternHolesMm: Array.isArray(geo.flatPatternHolesMm) ? geo.flatPatternHolesMm : undefined,
       flatPatternHolesUnplaced: typeof geo.flatPatternHolesUnplaced === 'number' ? geo.flatPatternHolesUnplaced : undefined,
       flatPatternOutlineSource: geo.flatPatternOutlineSource,
+      flatPatternBlanks: Array.isArray(geo.flatPatternBlanks) ? geo.flatPatternBlanks : undefined,
       materialUtilizationPct: geo.materialUtilizationPct,
       scrapAreaMm2: geo.scrapAreaMm2,
       sheetThicknessMm: clamp(geo.sheetThicknessMm, 50),

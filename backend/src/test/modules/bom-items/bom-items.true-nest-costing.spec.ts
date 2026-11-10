@@ -349,3 +349,47 @@ describe('resolveTrueShapeNestCosting — surviving Reanalyze without going stal
     expect(computeTrueNest).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('resolveTrueShapeNestCosting — a part cut from several blanks (multi-body file)', () => {
+  const PLATE = [[0, 0], [250, 0], [250, 220], [0, 220]];
+  const blank = (outline: number[][] | null, areaMm2: number) => ({
+    areaMm2, boundingLengthMm: null, boundingWidthMm: null, outlinePointsMm: outline, holesMm: [],
+    outlineSource: outline ? 'wire_walk' as const : 'unavailable' as const,
+  });
+
+  it('nests every blank on the sheet on its own and sums their material', async () => {
+    // channel: 10 per sheet, end plate: 40 per sheet -> one part takes 1/10 + 1/40 of a sheet; 8 whole sets per sheet
+    const computeTrueNest = jest.fn()
+      .mockResolvedValueOnce({ result: { partsPerSheet: 10 }, reason: '' })
+      .mockResolvedValueOnce({ result: { partsPerSheet: 40 }, reason: '' });
+    const { updateSpy, call } = buildService(computeTrueNest);
+
+    const result = await call({ flatPatternBlanks: [blank(OUTLINE, 5000), blank(PLATE, 55000)] });
+
+    expect(computeTrueNest).toHaveBeenCalledTimes(2);
+    expect(computeTrueNest.mock.calls[1][0]).toEqual(expect.objectContaining({ outlinePointsMm: PLATE, sheetWidthMm: 1500, sheetLengthMm: 3000 }));
+    const sheetWeightKg = (1500 * 3000 * THICKNESS_MM / 1e9) * DENSITY_KG_M3;
+    expect(result.selection).toEqual(expect.objectContaining({ partsPerSheet: 8, sheetWeightKg }));
+    expect(result.selection!.grossWeightPerPartKg).toBeCloseTo(sheetWeightKg * (1 / 10 + 1 / 40), 9);
+    const cached = (updateSpy.mock.calls[0]![1] as { featureGraph: { summary: { trueNestCostingCache: { inputFingerprint: string } } } }).featureGraph.summary.trueNestCostingCache;
+    expect(cached.inputFingerprint.split('+')).toHaveLength(2); // the cache is keyed on every blank
+  });
+
+  it('names the blank that has no outline instead of costing the part without it', async () => {
+    const computeTrueNest = jest.fn();
+    const { call } = buildService(computeTrueNest);
+    const result = await call({ flatPatternBlanks: [blank(OUTLINE, 5000), blank(null, 174)] });
+    expect(result.selection).toBeNull();
+    expect(result.reason).toContain('cut from 2 blanks and blank 2 has no flat-pattern outline');
+    expect(computeTrueNest).not.toHaveBeenCalled();
+  });
+
+  it('an ordinary part (one blank) keeps the single-outline path', async () => {
+    const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 45 }, reason: '' }));
+    const { call } = buildService(computeTrueNest);
+    const result = await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [], flatPatternBlanks: [blank(OUTLINE, 5000)] });
+    expect(computeTrueNest).toHaveBeenCalledTimes(1);
+    expect(result.selection?.partsPerSheet).toBe(45);
+  });
+});
+

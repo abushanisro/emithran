@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { ReanalyzeButton } from '@/components/features/bom/ReanalyzeButton';
@@ -80,9 +80,14 @@ export function NestView({
   const margin = Number(marginStr) || 0;
   const activeSheet = { widthMm: Number(widthStr) || 0, lengthMm: Number(lengthStr) || 0 };
 
+  // A part cut from several blanks (one per solid body of a multi-body file) is nested blank by blank: the view shows
+  // one at a time, and costing sums them (bom-items.service.ts resolveMultiBlankNestCosting).
+  const [blank, setBlank] = useState(0);
   const { data, isLoading, isError, error } = useTrueNest(
-    bomItemId, qty, activeSheet.widthMm, activeSheet.lengthMm, { kerfMm: kerf, edgeMarginMm: margin },
+    bomItemId, qty, activeSheet.widthMm, activeSheet.lengthMm, { kerfMm: kerf, edgeMarginMm: margin, blank },
   );
+  const [blankCount, setBlankCount] = useState(1);
+  useEffect(() => { if (data) setBlankCount(data.blankCount); }, [data]);
 
   // The real part outline does not depend on the sheet, so once any nest has
   // loaded it ranks every candidate sheet without more nest calls.
@@ -198,6 +203,19 @@ export function NestView({
             </Button>
           )}
         </div>
+        {blankCount > 1 && (
+          <div className="flex items-center gap-1.5 mt-1.5 text-[11px]">
+            <span className="text-white/60">This part is cut from {blankCount} blanks, each nested on its own:</span>
+            {Array.from({ length: blankCount }, (_, i) => (
+              <Button
+                key={i} size="sm" variant={i === blank ? 'default' : 'secondary'} className="h-6 px-2 text-[11px]"
+                onClick={() => { setBlank(i); setSelected(null); }}
+              >
+                Blank {i + 1}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {recommendations.length > 0 && (
           <div>
@@ -368,7 +386,9 @@ function SheetDetail({ data, materialLabel, gradeLabel, thicknessMm, quantity, o
   data: TrueNestResultDto; materialLabel?: string | undefined; gradeLabel?: string | undefined; thicknessMm?: number | undefined; quantity: number;
   onApply: () => void; applyState: 'idle' | 'loading' | 'success' | 'error'; applyMessage: string;
 }) {
-  const canApply = data.partsPerSheet > 0 && typeof thicknessMm === 'number' && thicknessMm > 0;
+  // One blank's nest is not the part's material when the part is cut from several: costing sums every blank's nest.
+  const multiBlank = data.blankCount > 1;
+  const canApply = !multiBlank && data.partsPerSheet > 0 && typeof thicknessMm === 'number' && thicknessMm > 0;
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold mb-1.5">Visualization — heuristic placement</p>
@@ -377,7 +397,8 @@ function SheetDetail({ data, materialLabel, gradeLabel, thicknessMm, quantity, o
       {typeof thicknessMm === 'number' && <Row label="Thickness" value={`${thicknessMm.toString()} mm`} />}
       <Row label="Sheet size" value={`${data.sheetWidthMm.toString()}×${data.sheetLengthMm.toString()} mm`} />
       <Row label="Required qty" value={quantity} />
-      <Row label="Parts / sheet (this view)" value={data.partsPerSheet} />
+      {multiBlank && <Row label="Blank" value={`${(data.blankIndex + 1).toString()} of ${data.blankCount.toString()}`} />}
+      <Row label={multiBlank ? 'Copies of this blank / sheet' : 'Parts / sheet (this view)'} value={data.partsPerSheet} />
       <Row label="Sheets required (this view)" value={data.sheetsRequired ?? '—'} />
       <Row label="True-shape nest utilization" value={`${data.utilizationPct.toString()}%`} />
       <Row label="Outline source" value={data.outlineSource === 'wire_walk' ? 'verified geometry' : 'unavailable'} />
@@ -394,6 +415,11 @@ function SheetDetail({ data, materialLabel, gradeLabel, thicknessMm, quantity, o
         >
           {applyState === 'loading' ? 'Applying…' : 'Apply this sheet to Raw Material'}
         </Button>
+        {multiBlank && (
+          <p className="text-[10px] text-white/60 leading-snug">
+            The material cost already adds up every blank&apos;s nest on this sheet; one blank alone is not the part&apos;s gross usage, so it is not applied.
+          </p>
+        )}
         {applyMessage && (
           <p className={`text-[10px] leading-snug ${applyState === 'success' ? 'text-emerald-400' : applyState === 'error' ? 'text-red-400' : 'text-white/60'}`}>
             {applyMessage}

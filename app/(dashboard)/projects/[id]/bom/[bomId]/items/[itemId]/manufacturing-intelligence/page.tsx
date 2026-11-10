@@ -10003,6 +10003,7 @@ export default function ManufacturingIntelligencePage() {
                       flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
                       flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}
                       flatPatternOutlineSource={item.featureGraph?.summary?.flatPatternOutlineSource}
+                      flatPatternBlanks={item.featureGraph?.summary?.flatPatternBlanks}
                       flatPatternBoundingLengthMm={item.featureGraph?.summary?.flatPatternBoundingLengthMm}
                       flatPatternBoundingWidthMm={item.featureGraph?.summary?.flatPatternBoundingWidthMm}
                       flatPatternCutLengthMm={item.cutLengthMm}
@@ -10172,6 +10173,7 @@ export default function ManufacturingIntelligencePage() {
                             flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
                             flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}
                             flatPatternOutlineSource={item.featureGraph?.summary?.flatPatternOutlineSource}
+                      flatPatternBlanks={item.featureGraph?.summary?.flatPatternBlanks}
                             flatPatternBoundingLengthMm={item.featureGraph?.summary?.flatPatternBoundingLengthMm}
                             flatPatternBoundingWidthMm={item.featureGraph?.summary?.flatPatternBoundingWidthMm}
                             flatPatternCutLengthMm={item.cutLengthMm}

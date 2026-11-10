@@ -55,6 +55,7 @@ import { MeasurementOverlay } from './measurement-overlay';
 import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
 import { getResultColors } from './measurement-overlay';
 import { MeasurementPanel } from './measurement-panel';
+import type { FlatPatternBlank } from '@/lib/types/manufacturing';
 
 const RISK_HIGHLIGHT_COLORS: Record<string, string> = {
   low: '#22c55e',
@@ -170,6 +171,7 @@ interface EDrawingsViewerProps {
   flatPatternBendCount?: number;
   flatPatternHoleCount?: number;
   flatPatternPierceCount?: number;
+  flatPatternBlanks?: FlatPatternBlank[] | undefined;
   flatPatternAreaMm2?: number;
 }
 
@@ -3094,7 +3096,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel, processConflict,
   flatPatternPartName, flatPatternOutlinePointsMm, flatPatternHolesMm, flatPatternOutlineSource,
   flatPatternBoundingLengthMm, flatPatternBoundingWidthMm, flatPatternCutLengthMm, flatPatternBendCount,
-  flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2,
+  flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2, flatPatternBlanks,
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
   const [modelLoadStatus, setModelLoadStatus] = useState<ModelLoadStatus>(null);
@@ -4015,6 +4017,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                 </DialogHeader>
                 <FlatPatternView
                   bomItemId={bomItemId}
+                  blanks={flatPatternBlanks}
                   partName={flatPatternPartName}
                   outlinePointsMm={flatPatternOutlinePointsMm}
                   holesMm={flatPatternHolesMm}

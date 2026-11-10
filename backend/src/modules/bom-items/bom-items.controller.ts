@@ -1532,6 +1532,10 @@ export class BOMItemsController {
 
   @OrgRole('viewer')
   @Get(':id/true-nest')
+  @ApiQuery({ name: 'quantity', required: false, description: 'Parts required (sheets required is computed from it); default 1' })
+  @ApiQuery({ name: 'kerfMm', required: false })
+  @ApiQuery({ name: 'edgeMarginMm', required: false })
+  @ApiQuery({ name: 'blank', required: false, description: 'Which blank to nest when the part is cut from several (0-based, one per solid body); default 0' })
   @ApiOperation({ summary: 'True (real polygon) 2D nesting placement — visualization only, not a cost source. On-demand; call only when the Nest view opens.' })
   @ApiResponse({ status: 200, description: 'True nest computed' })
   async getTrueNest(
@@ -1541,6 +1545,7 @@ export class BOMItemsController {
     @Query('sheetLengthMm') sheetLengthMm: string,
     @Query('kerfMm') kerfMm: string,
     @Query('edgeMarginMm') edgeMarginMm: string,
+    @Query('blank') blank: string,
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
@@ -1556,6 +1561,7 @@ export class BOMItemsController {
       parseFloat(sheetLengthMm),
       kerfMm ? parseFloat(kerfMm) : undefined,
       edgeMarginMm ? parseFloat(edgeMarginMm) : undefined,
+      blank ? parseInt(blank, 10) || 0 : 0,
     );
     if (!result) {
       this.logger.warn(`[true-nest] ${id}: ${reason}`);

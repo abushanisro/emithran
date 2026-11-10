@@ -37,4 +37,7 @@ export interface TrueNestResultDto {
   // sheet was confirmed full -- placements still reflect a real, valid
   // partial result, just possibly short of the sheet's true capacity.
   capped: boolean;
+  /** Which of the part's blanks this nest is of (0-based), and how many it is cut from: 1 for an ordinary part, one per solid body for a multi-body file. */
+  blankIndex: number;
+  blankCount: number;
 }

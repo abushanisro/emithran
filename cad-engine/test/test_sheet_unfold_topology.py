@@ -113,3 +113,37 @@ def test_a_forced_family_keeps_what_the_geometry_alone_reads():
     assert mi["detected_family"] == "sheet_metal"
     assert mi["geometric_family"] != "sheet_metal"
     assert any(r.startswith("geometry alone reads ") for r in mi["classification_reason"])
+
+
+def test_a_multi_body_file_is_unfolded_blank_by_blank():
+    # A bent bracket and a separate flat plate in one file (a weldment's two blanks): one sheet can't be both, so each
+    # body is its own blank with its own outline, and the part's flat area is their sum.
+    from OCC.Core.BRep import BRep_Builder
+    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from OCC.Core.TopoDS import TopoDS_Compound
+    from OCC.Core.gp import gp_Pnt as P
+
+    bracket = _bent_sheet([(0, 0), (80, 0), (80, 60)], 4.0, 2.0, 100.0)
+    plate = BRepPrimAPI_MakeBox(P(200, 0, 0), 120.0, 2.0, 90.0).Shape()  # 120 x 90 x 2, clear of the bracket
+    compound = TopoDS_Compound()
+    builder = BRep_Builder()
+    builder.MakeCompound(compound)
+    builder.Add(compound, bracket)
+    builder.Add(compound, plate)
+
+    f = _features(compound)
+    blanks = f["flat_pattern_blanks"]
+    assert len(blanks) == 2
+    assert all(b["outline_source"] == "wire_walk" for b in blanks)
+    areas = sorted(b["area_mm2"] for b in blanks)
+    assert areas[0] == pytest.approx(120.0 * 90.0, rel=0.005)  # the plate
+    assert areas[1] == pytest.approx(_volume(bracket) / 2.0, rel=0.02)  # the bracket's developed area
+    assert f["flat_pattern_area_mm2"] == pytest.approx(sum(areas), abs=0.5)
+    assert f["flat_pattern_outline_source"] == "unavailable"  # no one outline for two blanks; see flat_pattern_blanks
+
+
+def test_an_ordinary_part_is_one_blank_equal_to_its_flat_pattern():
+    f = _features(_bent_sheet(*HAT))
+    (blank,) = f["flat_pattern_blanks"]
+    assert blank["area_mm2"] == pytest.approx(f["flat_pattern_area_mm2"], abs=0.1)
+    assert blank["outline_points_mm"] == f["flat_pattern_outline_points_mm"]
