@@ -3,7 +3,7 @@
 # carries, set the data API's role password. Migrations run afterwards (deploy.sh). Fails closed and is safe to re-run: an already-loaded database
 # is left alone.
 #
-#   BASELINE_DIR=/opt/emithran/baseline [PG_CONTAINER=<name>] [DOCKER_NETWORK=emithran-prd_db] infra/oracle/production-db.sh
+#   BASELINE_DIR=/opt/emithran/baseline [PG_CONTAINER=<name>] [DOCKER_NETWORK=emithran-prd_db] [ENV_FILE=env/prd.env] infra/oracle/production-db.sh
 #
 # The baseline is schema + the reference/library data (from the stage database); it also carries the two QA organizations, their members and
 # users of that database. Those are test fixtures, not people: they are deleted here, but ONLY when everything in those tables is a fixture
@@ -14,9 +14,14 @@ set -Eeuo pipefail
 trap 'echo "production-db.sh failed at line $LINENO" >&2' ERR
 BASELINE_DIR="${BASELINE_DIR:?BASELINE_DIR}"
 net="${DOCKER_NETWORK:-emithran-prd_db}"
-pg="${PG_CONTAINER:-$(docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file env/prd.env ps -q postgres)}"
+env_file="${ENV_FILE:-env/prd.env}"
+pg="${PG_CONTAINER:-$(docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file "$env_file" ps -q postgres)}"
 [ -n "$pg" ] || { echo "no postgres container" >&2; exit 2; }
-set -a; . env/prd.env; set +a
+set -a
+# the env file is chosen at run time
+# shellcheck source=/dev/null
+. "$env_file"
+set +a
 psql_() { docker exec -i "$pg" psql -U postgres -d postgres -v ON_ERROR_STOP=1 "$@"; }
 enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$1"; }
 
