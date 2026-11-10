@@ -29,6 +29,11 @@ async function main(): Promise<void> {
     const mat = await (await api('/raw_materials?name=eq.Generic%20Nylon%2C%20Type%2011%2040%25%20Glass&select=cut_code', minter.forService())).json() as { cut_code: number | string | null }[];
     must(mat.length === 1 && Number(mat[0]!.cut_code) === 41.11, `material ${JSON.stringify(mat)}`);
   });
+  await check('migration 984 restored the counterbore, countersink, PEM and tapping catalog rows, each bound to its calculator', async () => {
+    const rows = await (await api('/process_calculator_mappings?machine_class=in.(drill_press,pem_press,tapping)&select=operation,calculator_id', minter.forService())).json() as { operation: string; calculator_id: string | null }[];
+    const bound = rows.filter((r) => r.calculator_id !== null).map((r) => r.operation).sort();
+    must(JSON.stringify(bound) === JSON.stringify(['Counterboring', 'Countersinking', 'PEM Insertion', 'Tapping', 'Tapping']), `rows ${JSON.stringify(rows)}`);
+  });
   await check('migration 981 gave the Black Oxide machine the labor rate its wage grade carries', async () => {
     const rows = await (await api('/mhr_records?machine_class=eq.surface_black_oxide&select=usd_labor_rate_per_hr,usd_lhr_total', minter.forService())).json() as { usd_labor_rate_per_hr: number | string | null; usd_lhr_total: number | string | null }[];
     must(rows.length === 1 && Number(rows[0]!.usd_labor_rate_per_hr) === 29.95 && Number(rows[0]!.usd_lhr_total) === 29.95, `rows ${JSON.stringify(rows)}`);
