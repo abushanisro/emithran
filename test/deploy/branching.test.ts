@@ -98,3 +98,13 @@ describe('the docs state the same model', () => {
     expect(read('docs/GOVERNANCE.md')).toContain('docs/BRANCHING.md');
   });
 });
+
+describe('a push to a long-lived branch is never cancelled', () => {
+  for (const file of ['ci.yml', 'security.yml']) {
+    it(`${file} cancels superseded runs only for pull requests`, () => {
+      const text = read(`.github/workflows/${file}`);
+      expect(text).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
+      expect(text).not.toMatch(/cancel-in-progress: true/);
+    });
+  }
+});

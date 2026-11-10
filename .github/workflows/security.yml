@@ -17,7 +17,9 @@ on:
 
 concurrency:
   group: security-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a pull request makes its older run pointless, so that is cancelled. A push to main or develop is NEVER cancelled: each commit that lands there
+  # keeps its own complete result (merging two pull requests in a row used to cancel the first one's 40-minute run, so no commit was ever fully verified).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least privilege: jobs that need more ask for it themselves.
 permissions:
