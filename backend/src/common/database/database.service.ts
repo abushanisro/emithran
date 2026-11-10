@@ -59,7 +59,9 @@ export class DatabaseService {
     }
     this.logger.debug(`privileged client: ${reason}`);
     recordPrivilegedClientCall(privilegedSite(reason));
-    return createDbClient(this.postgrestUrl, this.minter.forService());
+    // A function, not a token: some callers keep this client for the life of the process (the electronics job queue), and a service
+    // token lives minutes. The minter caches, so asking on every request costs nothing.
+    return createDbClient(this.postgrestUrl, () => this.minter.forService());
   }
 
   /** The token PostgREST trusts for this user (RLS sees `userId` through auth.uid()). */
