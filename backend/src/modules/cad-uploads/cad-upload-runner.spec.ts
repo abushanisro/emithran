@@ -331,7 +331,7 @@ describe('CadUploadRunner', () => {
     expect(last(updates)).toMatchObject({
       status: 'failed',
       error_code: 'no_step_files',
-      error_detail: 'The archive holds no STEP files. It holds 2 .pdf, 1 .zip. Export your parts as STEP (AP242) and zip those.',
+      error_detail: 'The archive holds no STEP files. It holds 2 .pdf, 1 .zip. An archive inside a zip is not unpacked: unpack inner.zip and zip the STEP files it holds.',
     });
   });
 

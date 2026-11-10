@@ -1,3 +1,4 @@
+import { isPackedArchiveName } from '../../common/archive/expand-archive';
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 
 export type UploadCheck = { ok: true; kind: 'zip' | 'step' } | { ok: false; code: string; message: string };
@@ -30,19 +31,37 @@ export function checkUpload(name: string, bytes: Buffer): UploadCheck {
   if (NATIVE_CAD.test(name)) {
     return reject('native_cad_not_supported', `${name} is a native CAD file. Export it as STEP (AP242) and upload that.`);
   }
+  if (isPackedArchiveName(name)) {
+    return reject('unsupported_type', `${name} is a ${extensionOf(name)} archive, which is not read. Unpack it and upload a .zip of the STEP files.`);
+  }
   return reject('unsupported_type', `${name}: upload a .zip of STEP files, or a .step / .stp file.`);
 }
 
-/** What a zip with no STEP file says about itself: the kinds of file it does hold, so "no STEP files" is never a bare verdict. */
-export function noStepFilesMessage(paths: readonly string[]): string {
+const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
+
+/** ".rar", ".gz", or "(no extension)": the last extension of a file name, lower-case. */
+function extensionOf(path: string): string {
+  const name = baseName(path);
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot).toLowerCase() : '(no extension)';
+}
+
+/**
+ * What a zip with no STEP file says about itself: the kinds of file it does hold, so "no STEP files" is never a bare verdict. `nested` are
+ * the archives inside it (a .rar zipped for e-mail, a zip of zips), which are never unpacked: when there are any, the advice names them,
+ * because the parts are most likely inside. The Rust core says the same words (core/crates/runner/src/job.rs `no_step_files_message`).
+ */
+export function noStepFilesMessage(others: readonly string[], nested: readonly string[] = []): string {
   const base = 'The archive holds no STEP files.';
-  const advice = 'Export your parts as STEP (AP242) and zip those.';
   const byType = new Map<string, number>();
-  for (const path of paths) {
-    const name = path.slice(path.lastIndexOf('/') + 1);
-    const dot = name.lastIndexOf('.');
-    const type = dot > 0 ? name.slice(dot).toLowerCase() : '(no extension)';
+  for (const path of [...others, ...nested]) {
+    const type = extensionOf(path);
     byType.set(type, (byType.get(type) ?? 0) + 1);
+  }
+  let advice = 'Export your parts as STEP (AP242) and zip those.';
+  if (nested.length > 0) {
+    const names = nested.slice(0, 3).map(baseName).join(', ') + (nested.length > 3 ? ` and ${nested.length - 3} more` : '');
+    advice = `An archive inside a zip is not unpacked: unpack ${names} and zip the STEP files ${nested.length === 1 ? 'it holds' : 'they hold'}.`;
   }
   if (byType.size === 0) return `${base} ${advice}`;
   const found = [...byType].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([type, n]) => `${n} ${type}`).join(', ');

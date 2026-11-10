@@ -37,7 +37,7 @@ import { StartUploadUseCase, type StartUploadResult } from '../application/start
 import { validateSuppliedFacts, type SuppliedFacts } from '../domain/supplied-facts';
 import { scenarioOptions, type ScenarioOptions } from '../domain/engines/assembly-steps.engine';
 import { PLANNED_ENGINES } from '../domain/reference/engine-inputs';
-import { isArchiveName } from '../../../common/archive/expand-archive';
+import { isZipName } from '../../../common/archive/expand-archive';
 import { isFolderUpload, parseUploadPaths } from '../domain/uploads/upload-paths';
 import { acceptedFormats, MAX_UPLOAD_BYTES } from '../domain/uploads/validate-upload';
 import { ElectronicsRepository, type CostResultRow, type RevisionRow } from '../infrastructure/repositories/electronics.repository';
@@ -142,7 +142,7 @@ export class ElectronicsController {
   ): Promise<StartUploadResult | StartAssemblyResult> {
     files = checkedUploadFiles(files);
     const paths = checkedUploadPaths(body.paths);
-    const archive = files.length === 1 && files[0] && isArchiveName(files[0].originalname) ? files[0] : null;
+    const archive = files.length === 1 && files[0] && isZipName(files[0].originalname) ? files[0] : null;
     if (archive) {
       // A design pack: unpacked and read as the folder it was made from (one board, or an assembly of several).
       return this.startAssembly.executeArchive({

@@ -78,7 +78,7 @@ fn step_files(
     bytes: Vec<u8>,
     limits: Limits,
 ) -> Result<(Vec<StepFile>, Vec<Skip>), Failure> {
-    if !archive::is_archive_name(&row.file_name) {
+    if !archive::is_zip_name(&row.file_name) {
         return Ok((
             vec![StepFile {
                 name: row.file_name.clone(),
@@ -88,7 +88,7 @@ fn step_files(
         ));
     }
     let expanded = archive::expand(&row.file_name, &bytes, limits)
-        .map_err(|e| Failure::permanent(e.code(), format!("{e:?}")))?;
+        .map_err(|e| Failure::permanent(e.code(), e.message().to_string()))?;
     let mut skipped: Vec<Skip> = expanded
         .skipped
         .into_iter()
@@ -99,7 +99,7 @@ fn step_files(
         .collect();
     let nested: Vec<String> = skipped
         .iter()
-        .filter(|s| s.reason.starts_with("an archive inside"))
+        .filter(|s| s.reason == archive::NESTED_ARCHIVE_REASON)
         .map(|s| s.path.clone())
         .collect();
     let mut not_step: Vec<String> = Vec::new(); // what the zip holds instead, for the error when it holds no STEP file
@@ -125,14 +125,11 @@ fn step_files(
         }
     }
     if files.is_empty() {
-        let others: Vec<&str> = not_step
-            .iter()
-            .chain(nested.iter())
-            .map(String::as_str)
-            .collect();
+        let others: Vec<&str> = not_step.iter().map(String::as_str).collect();
+        let nested: Vec<&str> = nested.iter().map(String::as_str).collect();
         return Err(Failure::permanent(
             "no_step_files",
-            no_step_files_message(&others),
+            no_step_files_message(&others, &nested),
         ));
     }
     Ok((files, skipped))
@@ -166,11 +163,13 @@ fn skip_reason(file_name: &str) -> String {
 }
 
 /// What a zip with no STEP file says about itself: the kinds of file it does hold, so "no STEP files" is never a bare verdict.
-/// The same words as the backend's `noStepFilesMessage`, so either core tells the user the same thing.
-fn no_step_files_message(paths: &[&str]) -> String {
+/// `nested` are the archives inside it, which are never unpacked: when there are any, the advice names them, because the parts are
+/// most likely inside. The same words as the backend's `noStepFilesMessage`, so either core tells the user the same thing.
+fn no_step_files_message(others: &[&str], nested: &[&str]) -> String {
+    let base_name = |path: &str| path.rsplit('/').next().unwrap_or(path).to_string();
     let mut by_type: Vec<(String, usize)> = Vec::new();
-    for path in paths {
-        let name = path.rsplit('/').next().unwrap_or(path);
+    for path in others.iter().chain(nested.iter()) {
+        let name = base_name(path);
         let ty = match name.rfind('.') {
             Some(dot) if dot > 0 => name[dot..].to_ascii_lowercase(),
             _ => "(no extension)".to_string(),
@@ -180,7 +179,27 @@ fn no_step_files_message(paths: &[&str]) -> String {
             None => by_type.push((ty, 1)),
         }
     }
-    let advice = "Export your parts as STEP (AP242) and zip those.";
+    let advice = if nested.is_empty() {
+        "Export your parts as STEP (AP242) and zip those.".to_string()
+    } else {
+        let mut names = nested
+            .iter()
+            .take(3)
+            .map(|p| base_name(p))
+            .collect::<Vec<_>>()
+            .join(", ");
+        if nested.len() > 3 {
+            names.push_str(&format!(" and {} more", nested.len() - 3));
+        }
+        let holds = if nested.len() == 1 {
+            "it holds"
+        } else {
+            "they hold"
+        };
+        format!(
+            "An archive inside a zip is not unpacked: unpack {names} and zip the STEP files {holds}."
+        )
+    };
     if by_type.is_empty() {
         return format!("The archive holds no STEP files. {advice}");
     }
@@ -838,16 +857,31 @@ mod tests {
     fn a_zip_without_step_files_says_what_it_holds() {
         let advice = "Export your parts as STEP (AP242) and zip those.";
         assert_eq!(
-            no_step_files_message(&["P/P01.pdf", "P/P02.PDF", "P/readme.txt"]),
+            no_step_files_message(&["P/P01.pdf", "P/P02.PDF", "P/readme.txt"], &[]),
             format!("The archive holds no STEP files. It holds 2 .pdf, 1 .txt. {advice}")
         );
         assert_eq!(
-            no_step_files_message(&["a/Top.SLDASM"]),
+            no_step_files_message(&["a/Top.SLDASM"], &[]),
             format!("The archive holds no STEP files. It holds 1 .sldasm. {advice}")
         );
         assert_eq!(
-            no_step_files_message(&[]),
+            no_step_files_message(&[], &[]),
             format!("The archive holds no STEP files. {advice}")
+        );
+    }
+
+    #[test]
+    fn a_zip_holding_only_an_archive_names_it_to_unpack() {
+        assert_eq!(
+            no_step_files_message(&[], &["EMUSKI_sheet metal.rar/EMUSKI_sheet metal.rar"]),
+            "The archive holds no STEP files. It holds 1 .rar. An archive inside a zip is not unpacked: unpack EMUSKI_sheet metal.rar and zip the STEP files it holds."
+        );
+        assert_eq!(
+            no_step_files_message(
+                &["P/readme.pdf"],
+                &["P/a.zip", "P/b.7z", "P/c.rar", "P/d.rar"]
+            ),
+            "The archive holds no STEP files. It holds 2 .rar, 1 .7z, 1 .pdf, 1 .zip. An archive inside a zip is not unpacked: unpack a.zip, b.7z, c.rar and 1 more and zip the STEP files they hold."
         );
     }
 }

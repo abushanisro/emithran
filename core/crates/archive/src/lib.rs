@@ -55,7 +55,8 @@ pub enum Error {
     Encrypted(String),
     EntryTooLarge(String),
     TooLarge(String),
-    Empty,
+    /// No file came out: the message says why (nothing at all, or only archives, which are not unpacked).
+    Empty(String),
 }
 
 impl Error {
@@ -66,9 +67,45 @@ impl Error {
             Error::Encrypted(_) => "archive_encrypted",
             Error::EntryTooLarge(_) => "archive_entry_too_large",
             Error::TooLarge(_) => "archive_too_large",
-            Error::Empty => "archive_empty",
+            Error::Empty(_) => "archive_empty",
         }
     }
+
+    /// What to tell the user, in the same words as the TypeScript expander.
+    pub fn message(&self) -> &str {
+        match self {
+            Error::Unreadable(m)
+            | Error::Encrypted(m)
+            | Error::EntryTooLarge(m)
+            | Error::TooLarge(m)
+            | Error::Empty(m) => m,
+        }
+    }
+}
+
+/// Why an archive yields no file. When it holds only archives (a .rar zipped for e-mail, a zip of zips) it is not empty: the files
+/// are one level down, so the message names what to unpack. The same words as the backend's `emptyArchiveMessage`.
+pub fn empty_archive_message(nested_paths: &[&str]) -> String {
+    if nested_paths.is_empty() {
+        return "The archive holds no files.".to_string();
+    }
+    let mut names = nested_paths
+        .iter()
+        .take(3)
+        .map(|p| p.rsplit('/').next().unwrap_or(p))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if nested_paths.len() > 3 {
+        names.push_str(&format!(" and {} more", nested_paths.len() - 3));
+    }
+    let (them, hold) = if nested_paths.len() == 1 {
+        ("it", "it holds")
+    } else {
+        ("them", "they hold")
+    };
+    format!(
+        "The archive holds only {names}, and an archive inside an archive is not unpacked. Unpack {them} and zip the files {hold}."
+    )
 }
 
 const CENTRAL: u32 = 0x0201_4b50;
@@ -77,7 +114,7 @@ const EOCD: u32 = 0x0605_4b50;
 
 /// The folder name a pack stands for: its file name without the extension, and without characters a path cannot hold.
 pub fn root_name(file_name: &str) -> String {
-    let stem = if is_archive_name(file_name) {
+    let stem = if is_zip_name(file_name) {
         &file_name[..file_name.len() - 4]
     } else {
         file_name
@@ -91,10 +128,34 @@ pub fn root_name(file_name: &str) -> String {
     }
 }
 
-pub fn is_archive_name(file_name: &str) -> bool {
+/// Why an archive inside the archive is left packed; callers that need to tell the user about it match on this. The same words as
+/// the backend's `NESTED_ARCHIVE_REASON` (backend/src/common/archive/expand-archive.ts).
+pub const NESTED_ARCHIVE_REASON: &str =
+    "an archive inside the archive is not unpacked: unpack it and zip the files it holds";
+
+/// Archive formats people pack design files in. Only a .zip is ever unpacked, and only one level: any of these inside it (a .rar
+/// zipped for e-mail, a zip of zips) is listed as skipped by name, so the user is told what to unpack instead of "no files found".
+/// The backend keeps the same list (expand-archive.ts `PACKED_ARCHIVE`).
+const PACKED_EXTENSIONS: [&str; 15] = [
+    "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "tbz", "tbz2", "xz", "txz", "zst", "cab", "arj",
+    "lzh",
+];
+
+/// A .zip: the one archive format that is unpacked.
+pub fn is_zip_name(file_name: &str) -> bool {
     file_name.len() >= 4
         && file_name.is_char_boundary(file_name.len() - 4)
         && file_name[file_name.len() - 4..].eq_ignore_ascii_case(".zip")
+}
+
+/// Any archive format (.zip, .rar, .7z, .tar.gz...), whether or not it can be unpacked.
+pub fn is_packed_archive_name(file_name: &str) -> bool {
+    match file_name.rsplit_once('.') {
+        Some((_, ext)) => PACKED_EXTENSIONS
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(ext)),
+        None => false,
+    }
 }
 
 fn u16_at(buf: &[u8], at: usize) -> Option<u16> {
@@ -287,10 +348,10 @@ pub fn expand(file_name: &str, buf: &[u8], limits: Limits) -> Result<Expanded, E
                 "{inner} is encrypted; upload an unencrypted archive."
             )));
         }
-        if is_archive_name(&name) {
+        if is_packed_archive_name(&name) {
             skipped.push(Skipped {
                 path,
-                reason: "an archive inside the archive is not unpacked; upload it on its own",
+                reason: NESTED_ARCHIVE_REASON,
             });
             continue;
         }
@@ -320,7 +381,12 @@ pub fn expand(file_name: &str, buf: &[u8], limits: Limits) -> Result<Expanded, E
         entries.push(Entry { name, path, bytes });
     }
     if entries.is_empty() {
-        return Err(Error::Empty);
+        let nested: Vec<&str> = skipped
+            .iter()
+            .filter(|s| s.reason == NESTED_ARCHIVE_REASON)
+            .map(|s| s.path.as_str())
+            .collect();
+        return Err(Error::Empty(empty_archive_message(&nested)));
     }
     Ok(Expanded {
         root,
@@ -537,8 +603,26 @@ mod tests {
     #[test]
     fn an_archive_of_folders_only_is_empty() {
         assert_eq!(
-            code(expand("p.zip", &zip(&[e("a/", "")]), LIMITS)),
-            "archive_empty"
+            expand("p.zip", &zip(&[e("a/", "")]), LIMITS).unwrap_err(),
+            Error::Empty("The archive holds no files.".to_string())
+        );
+    }
+
+    #[test]
+    fn an_archive_of_archives_is_not_called_empty_it_names_what_to_unpack() {
+        let bytes = zip(&[
+            e("EMUSKI_sheet metal.rar", "Rar!"),
+            e("__MACOSX/._EMUSKI_sheet metal.rar", "x"),
+        ]);
+        let err = expand("EMUSKI_sheet metal.rar.zip", &bytes, LIMITS).unwrap_err();
+        assert_eq!(err.code(), "archive_empty");
+        assert_eq!(
+            err.message(),
+            "The archive holds only EMUSKI_sheet metal.rar, and an archive inside an archive is not unpacked. Unpack it and zip the files it holds."
+        );
+        assert_eq!(
+            empty_archive_message(&["p/a.zip", "p/b.7z", "p/c.rar", "p/d.rar"]),
+            "The archive holds only a.zip, b.7z, c.rar and 1 more, and an archive inside an archive is not unpacked. Unpack them and zip the files they hold."
         );
     }
 
@@ -549,8 +633,71 @@ mod tests {
             "PCBA + Harness Drawing"
         );
         assert_eq!(root_name(".zip"), "Design pack");
-        assert!(is_archive_name("a.Zip"));
-        assert!(!is_archive_name("a.xlsx"));
+        assert!(is_zip_name("a.Zip"));
+        assert!(!is_zip_name("a.rar"));
+        assert!(!is_zip_name("a.xlsx"));
+    }
+
+    #[test]
+    fn knows_every_archive_format_though_it_unpacks_only_zip() {
+        for name in [
+            "a.zip",
+            "a.RAR",
+            "a.7z",
+            "a.tar",
+            "a.tar.gz",
+            "a.tgz",
+            "a.step.gz",
+            "a.bz2",
+            "a.xz",
+            "a.zst",
+            "a.cab",
+        ] {
+            assert!(is_packed_archive_name(name), "{name}");
+        }
+        for name in [
+            "a.step",
+            "a.stp",
+            "a.pdf",
+            "a.xlsx",
+            "a.gtl",
+            "rar",
+            "a.rar.pdf",
+        ] {
+            assert!(!is_packed_archive_name(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn lists_an_archive_of_another_format_inside_the_zip_as_skipped() {
+        let bytes = zip(&[
+            e("Pack.rar", "Rar!"),
+            e("__MACOSX/._Pack.rar", "x"),
+            e("b/layer.gtl", GERBER),
+        ]);
+        let result = expand("Pack.rar.zip", &bytes, LIMITS).unwrap();
+        assert_eq!(
+            result
+                .entries
+                .iter()
+                .map(|x| x.path.as_str())
+                .collect::<Vec<_>>(),
+            ["Pack.rar/b/layer.gtl"]
+        );
+        assert_eq!(
+            result
+                .skipped
+                .iter()
+                .map(|x| (x.path.as_str(), x.reason))
+                .collect::<Vec<_>>(),
+            [
+                ("Pack.rar/Pack.rar", NESTED_ARCHIVE_REASON),
+                (
+                    "Pack.rar/__MACOSX/._Pack.rar",
+                    "system metadata written by the archiving tool"
+                ),
+            ]
+        );
     }
 
     #[test]
