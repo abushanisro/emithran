@@ -1,4 +1,4 @@
-import { archiveRootName, expandArchive as expand, isArchiveName, type ArchiveLimits } from './expand-archive';
+import { archiveRootName, emptyArchiveMessage, expandArchive as expand, isPackedArchiveName, isZipName, NESTED_ARCHIVE_REASON, type ArchiveLimits } from './expand-archive';
 import { zip } from './test-zip';
 
 const LIMITS: ArchiveLimits = { maxEntries: 5000, maxEntryBytes: 25 * 1024 * 1024, maxTotalBytes: 1024 * 1024 * 1024 };
@@ -58,14 +58,44 @@ describe('expandArchive', () => {
   });
 
   it('an archive of folders only is empty', () => {
-    expect(expandArchive('p.zip', zip([{ name: 'a/' }]))).toMatchObject({ ok: false, code: 'archive_empty' });
+    expect(expandArchive('p.zip', zip([{ name: 'a/' }]))).toEqual({ ok: false, code: 'archive_empty', message: 'The archive holds no files.' });
+  });
+
+  it('an archive of archives is not called empty: it names what to unpack', () => {
+    expect(expandArchive('EMUSKI_sheet metal.rar.zip', zip([{ name: 'EMUSKI_sheet metal.rar', data: 'Rar!' }, { name: '__MACOSX/._EMUSKI_sheet metal.rar', data: 'x' }]))).toEqual({
+      ok: false,
+      code: 'archive_empty',
+      message: 'The archive holds only EMUSKI_sheet metal.rar, and an archive inside an archive is not unpacked. Unpack it and zip the files it holds.',
+    });
+    expect(emptyArchiveMessage(['p/a.zip', 'p/b.7z', 'p/c.rar', 'p/d.rar'])).toBe(
+      'The archive holds only a.zip, b.7z, c.rar and 1 more, and an archive inside an archive is not unpacked. Unpack them and zip the files they hold.',
+    );
   });
 
   it('names the root after the archive file', () => {
     expect(archiveRootName('PCBA + Harness Drawing.ZIP')).toBe('PCBA + Harness Drawing');
     expect(archiveRootName('.zip')).toBe('Design pack');
-    expect(isArchiveName('a.Zip')).toBe(true);
-    expect(isArchiveName('a.xlsx')).toBe(false);
+    expect(isZipName('a.Zip')).toBe(true);
+    expect(isZipName('a.rar')).toBe(false);
+    expect(isZipName('a.xlsx')).toBe(false);
+  });
+
+  it('knows every archive format, though it unpacks only zip', () => {
+    for (const name of ['a.zip', 'a.RAR', 'a.7z', 'a.tar', 'a.tar.gz', 'a.tgz', 'a.step.gz', 'a.bz2', 'a.xz', 'a.zst', 'a.cab']) expect(isPackedArchiveName(name)).toBe(true);
+    for (const name of ['a.step', 'a.stp', 'a.pdf', 'a.xlsx', 'a.gtl', 'rar', 'a.rar.pdf']) expect(isPackedArchiveName(name)).toBe(false);
+  });
+
+  it('lists an archive of another format inside the zip as skipped, not as a file', () => {
+    const result = expandArchive('Pack.rar.zip', zip([
+      { name: 'Pack.rar', data: 'Rar!' },
+      { name: '__MACOSX/._Pack.rar', data: 'x' },
+      { name: 'b/layer.gtl', data: GERBER },
+    ]));
+    expect(result.ok && result.entries.map((e) => e.path)).toEqual(['Pack.rar/b/layer.gtl']);
+    expect(result.ok && result.skipped).toEqual([
+      { path: 'Pack.rar/Pack.rar', reason: NESTED_ARCHIVE_REASON },
+      { path: 'Pack.rar/__MACOSX/._Pack.rar', reason: 'system metadata written by the archiving tool' },
+    ]);
   });
 });
 

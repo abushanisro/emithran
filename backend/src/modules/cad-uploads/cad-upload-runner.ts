@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, PayloadTooLargeException, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import FormData from 'form-data';
 
-import { NESTED_ARCHIVE_REASON, type ArchiveLimits, type ExpandedArchive } from '../../common/archive/expand-archive';
+import { isZipName, NESTED_ARCHIVE_REASON, type ArchiveLimits, type ExpandedArchive } from '../../common/archive/expand-archive';
 import { expandArchiveInWorker } from '../../common/heavy-work/heavy-work';
 import { AuditService } from '../../common/audit/audit.service';
 import { cadEngineHttp } from '../../common/resilience/engine-http';
@@ -319,7 +319,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
   }
 
   private async stepFiles(row: CadUploadRow, bytes: Buffer): Promise<{ files: StepFile[]; skipped: { path: string; reason: string }[] }> {
-    if (!/\.zip$/i.test(row.file_name)) return { files: [{ name: row.file_name, bytes }], skipped: [] };
+    if (!isZipName(row.file_name)) return { files: [{ name: row.file_name, bytes }], skipped: [] };
 
     const archive = await this.expand(row.file_name, bytes);
     if (!archive.ok) throw new PermanentFailure(archive.code, archive.message);
@@ -336,7 +336,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     }
     if (files.length === 0) {
       const nested = archive.skipped.filter((s) => s.reason === NESTED_ARCHIVE_REASON).map((s) => s.path);
-      throw new PermanentFailure('no_step_files', noStepFilesMessage([...notStep, ...nested]));
+      throw new PermanentFailure('no_step_files', noStepFilesMessage(notStep, nested));
     }
     return { files, skipped };
   }

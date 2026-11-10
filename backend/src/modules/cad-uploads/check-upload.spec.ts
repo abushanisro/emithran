@@ -32,6 +32,15 @@ describe('checkUpload', () => {
     expect(checkUpload('a.step', Buffer.alloc(0))).toMatchObject({ ok: false, code: 'empty_file' });
     expect(checkUpload('notes.txt', STEP)).toMatchObject({ ok: false, code: 'unsupported_type' });
   });
+
+  it('names an archive it cannot read and says what to upload instead', () => {
+    expect(checkUpload('EMUSKI_sheet metal.rar', Buffer.from('Rar!\x1a\x07\x01\x00'))).toEqual({
+      ok: false,
+      code: 'unsupported_type',
+      message: 'EMUSKI_sheet metal.rar is a .rar archive, which is not read. Unpack it and upload a .zip of the STEP files.',
+    });
+    expect(checkUpload('parts.7z', STEP)).toMatchObject({ ok: false, code: 'unsupported_type', message: expect.stringContaining('a .7z archive') });
+  });
 });
 
 describe('noStepFilesMessage', () => {
@@ -47,6 +56,15 @@ describe('noStepFilesMessage', () => {
 
   it('says only what is certain when nothing else was found', () => {
     expect(noStepFilesMessage([])).toBe(`The archive holds no STEP files. ${advice}`);
+  });
+
+  it('names the archive inside the zip to unpack, since the parts are most likely in it', () => {
+    expect(noStepFilesMessage([], ['EMUSKI_sheet metal.rar/EMUSKI_sheet metal.rar'])).toBe(
+      'The archive holds no STEP files. It holds 1 .rar. An archive inside a zip is not unpacked: unpack EMUSKI_sheet metal.rar and zip the STEP files it holds.',
+    );
+    expect(noStepFilesMessage(['P/readme.pdf'], ['P/a.zip', 'P/b.7z', 'P/c.rar', 'P/d.rar'])).toBe(
+      'The archive holds no STEP files. It holds 2 .rar, 1 .7z, 1 .pdf, 1 .zip. An archive inside a zip is not unpacked: unpack a.zip, b.7z, c.rar and 1 more and zip the STEP files they hold.',
+    );
   });
 });
 

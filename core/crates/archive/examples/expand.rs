@@ -83,13 +83,13 @@ fn main() {
         }
         Err(e) => {
             let code = match &e {
-                Error::Empty => "archive_empty",
+                Error::Empty(_) => "archive_empty",
                 _ => "refused",
             };
             println!(
                 "{{\"error\":{{\"code\":{},\"message\":{}}}}}",
                 quote(code),
-                quote(&format!("{e:?}"))
+                quote(e.message())
             );
         }
     }

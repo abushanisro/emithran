@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AssemblyNode, CadUpload } from '@/lib/api/cad-uploads';
-import { describeFailure, isInFlight, summarize, visibleRows } from '@/lib/cad-uploads/upload-view';
+import { describeFailure, isInFlight, rejectedFileMessage, summarize, visibleRows } from '@/lib/cad-uploads/upload-view';
 
 const node = (name: string, kind: AssemblyNode['kind'], quantity = 1, children: AssemblyNode[] = []): AssemblyNode => ({
   definition: name, name, kind, quantity, file: 'a.step', children,
@@ -33,8 +33,28 @@ describe('describeFailure', () => {
     const detail = 'The archive holds no STEP files. It holds 9 .pdf. Export your parts as STEP (AP242) and zip those.';
     expect(describeFailure({ errorCode: 'no_step_files', errorDetail: detail })).toBe(detail);
   });
+  it('shows an archive of archives as the server named it, not as "holds no files"', () => {
+    const detail = 'The archive holds only Pack.rar, and an archive inside an archive is not unpacked. Unpack it and zip the files it holds.';
+    expect(describeFailure({ errorCode: 'archive_empty', errorDetail: detail })).toBe(detail);
+  });
   it('never shows an empty message for an unknown code', () => {
     expect(describeFailure({ errorCode: 'something_new', errorDetail: null })).toBe('Processing failed.');
+  });
+});
+
+describe('rejectedFileMessage', () => {
+  it('names an archive it cannot read and says what to upload instead', () => {
+    expect(rejectedFileMessage({ name: 'EMUSKI_sheet metal.rar', size: 10 }, 50)).toBe(
+      'EMUSKI_sheet metal.rar is a .rar archive, which is not read. Unpack it and upload a .zip of the STEP files.',
+    );
+    expect(rejectedFileMessage({ name: 'parts.tar.gz', size: 10 }, 50)).toContain('a .gz archive');
+  });
+  it('sends native CAD to a STEP export, and names the size limit for a file over it', () => {
+    expect(rejectedFileMessage({ name: 'Top.SLDASM', size: 10 }, 50)).toBe('Top.SLDASM is a native CAD file. Export it as STEP (AP242) and upload that.');
+    expect(rejectedFileMessage({ name: 'big.zip', size: 51 * 1024 * 1024 }, 50)).toBe('big.zip is larger than 50 MB.');
+  });
+  it('says what it accepts for anything else', () => {
+    expect(rejectedFileMessage({ name: 'notes.txt', size: 10 }, 50)).toBe('notes.txt: upload a .zip of STEP files, or a .step / .stp file.');
   });
 });
 
