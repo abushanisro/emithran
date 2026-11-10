@@ -6,7 +6,7 @@
 # 4 OCPU / 24 GB / 200 GB is the whole Always Free allowance, so it costs nothing and is not reclaimed when the trial ends (a quota in the tenancy
 # refuses anything larger). IMDSv2 is required: the CAD engine opens untrusted files, and the metadata service must not be reachable by a
 # server-side request. Free ARM capacity is often exhausted: "Out of host capacity" tries the next size of SIZES ("ocpu:gb" list, default
-# 4:24 then 2:12; an A1 VM can be resized in place later) and, when none fits, waits and retries; "Too many requests" backs off. Up to TRIES rounds. Idempotent by name.
+# 4:24 then 2:12; an A1 VM can be resized in place later) and, when none fits, waits and retries; "Too many requests" and transient network errors (timeouts) back off and retry. Up to TRIES rounds. Idempotent by name.
 # Prints the public IP.
 set -Eeuo pipefail
 trap 'echo "vm.sh failed at line $LINENO" >&2' ERR
@@ -27,7 +27,7 @@ case "$id" in ocid1.*) echo "instance exists: $id" >&2 ;; *)
         --is-pv-encryption-in-transit-enabled true --instance-options '{"areLegacyImdsEndpointsDisabled":true}' --wait-for-state RUNNING \
         --query 'data.id' --raw-output || true)"
       case "$out" in ocid1.*) id="$out"; echo "launched with $size (OCPU:GB)" >&2; break 2 ;; esac
-      if printf '%s' "$out" | grep -q -i -E 'capacity|too many requests'; then echo "size $size not available now (try $try)" >&2; sleep 20; else echo "$out" | head -12 >&2; exit 1; fi
+      if printf '%s' "$out" | grep -q -i -E 'capacity|too many requests|timed out|timeout|temporarily|service unavailable|internal error|connection (reset|aborted|error)'; then echo "size $size not available now or a transient error (try $try)" >&2; sleep 20; else echo "$out" | head -12 >&2; exit 1; fi
     done
     sleep 90
   done
