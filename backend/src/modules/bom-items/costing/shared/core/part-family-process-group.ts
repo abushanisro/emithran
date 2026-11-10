@@ -18,3 +18,20 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   sand_cast: 'Sand Casting',
   investment_cast: 'Casting Investment',
 };
+
+/**
+ * When the process the user chose and the part's geometry disagree (cad-engine reports both: the family it analysed the
+ * part as, and `geometric_family`, what the shape alone reads as), the sentence to tell them, naming the Process to set.
+ * Null when they agree or either is unknown; families of one process group (milled / turned) never conflict.
+ */
+export function processChoiceConflict(
+  classification: { family?: string | null; geometricFamily?: string | null } | null | undefined,
+): string | null {
+  const chosen = classification?.family;
+  const geometric = classification?.geometricFamily;
+  if (!chosen || !geometric) return null;
+  const chosenGroup = CAD_FAMILY_TO_PROCESS_GROUP[chosen];
+  const geometricGroup = CAD_FAMILY_TO_PROCESS_GROUP[geometric];
+  if (!chosenGroup || !geometricGroup || chosenGroup === geometricGroup) return null;
+  return `This part's Process is ${chosenGroup}, but its geometry reads as ${geometricGroup} (${geometric}). Set its Process to ${geometricGroup}; reanalyzing as ${chosenGroup} will not change this.`;
+}

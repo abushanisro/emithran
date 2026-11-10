@@ -614,18 +614,6 @@ class AdvancedCADMemoryOptimizer:
                 volume_mm3=volume_mm3,
             )
 
-            # Manual family override (see analyze_and_optimize's own docstring)
-            # -- short-circuits BEFORE any veto logic below runs, so the real
-            # sheet-metal/plastic-molded classifier chain is never consulted
-            # or regressed for a part the user explicitly flagged. Only a
-            # real platform family is honored; any other string (typo, stale
-            # client, unrecognized value) is silently ignored rather than
-            # faked into a family that doesn't exist.
-            if family_hint and family_hint in ALL_FAMILIES:
-                detected_family = family_hint
-                family_confidence = 1.0
-                classification_reasons = [f"manual family_hint={family_hint} (user override via Create BOM Item process dropdown)"]
-
             # ── Post-classification SMF cross-check ───────────────────────────
             # When the classifier returns milled but the fill ratio is very
             # low (< 15%), there is still a chance the part is sheet metal that
@@ -718,9 +706,29 @@ class AdvancedCADMemoryOptimizer:
                         f"{_excess['excess']} wall plane(s) cannot come from the same blank => machined solid"
                     )
 
+            # What the geometry alone says, after every cross-check and veto above. Kept even when the
+            # user chose the process, so a choice the shape contradicts (a machined holder set to Sheet
+            # Metal has no flat pattern to unfold) is visible instead of failing later as "no outline".
+            geometric_family = detected_family
+
+            # Manual family override (see analyze_and_optimize's own docstring): the user's chosen process
+            # decides the family the part is analysed and costed as. Applied after the geometric chain so
+            # no veto silently overrules the user; the geometry's own verdict is reported beside it. Only a
+            # real platform family is honored; any other string (typo, stale client, unrecognized value) is
+            # ignored rather than faked into a family that doesn't exist.
+            if family_hint and family_hint in ALL_FAMILIES:
+                _geometry_said = f"geometry alone reads {geometric_family}" + (f": {'; '.join(classification_reasons)}" if classification_reasons else "")
+                detected_family = family_hint
+                family_confidence = 1.0
+                classification_reasons = [
+                    f"manual family_hint={family_hint} (user override via Create BOM Item process dropdown)",
+                    _geometry_said,
+                ]
+
             _hole_density_val = round(holes.get('count', 0) / max(total_face_count, 1), 3)
             manufacturing_intelligence = {
                 'detected_family': detected_family,
+                'geometric_family': geometric_family,
                 'family_confidence': round(family_confidence, 3),
                 'features': {},
                 'classification_signals': {

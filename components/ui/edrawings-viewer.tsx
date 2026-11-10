@@ -157,6 +157,8 @@ interface EDrawingsViewerProps {
   nestCandidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }>;
   nestMaterialLabel?: string;
   nestGradeLabel?: string;
+  /** The chosen process and the geometry disagree (processChoiceConflict): the reason there is no flat pattern, and why Reanalyze cannot help. */
+  processConflict?: string | null;
   /** Flat Pattern toolbar toggle — the real unfolded 2D outline (cad-engine's wire-walk extraction), shown on its own before Nest places copies of it on a sheet. Omit outlinePointsMm to hide the button entirely. */
   flatPatternPartName?: string;
   flatPatternOutlinePointsMm?: number[][];
@@ -3089,7 +3091,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   onBrepFacePick,
   highlightColor,
   setupAxes,
-  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel,
+  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel, processConflict,
   flatPatternPartName, flatPatternOutlinePointsMm, flatPatternHolesMm, flatPatternOutlineSource,
   flatPatternBoundingLengthMm, flatPatternBoundingWidthMm, flatPatternCutLengthMm, flatPatternBendCount,
   flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2,
@@ -3997,6 +3999,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   candidateSheets={nestCandidateSheets}
                   materialLabel={nestMaterialLabel}
                   gradeLabel={nestGradeLabel}
+                  processConflict={processConflict}
                   thicknessMm={sheetThickness}
                 />
               </DialogContent>
@@ -4021,6 +4024,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   flatPatternAreaMm2={flatPatternAreaMm2}
                   materialLabel={nestMaterialLabel}
                   gradeLabel={nestGradeLabel}
+                  processConflict={processConflict}
                   thicknessMm={sheetThickness}
                   cutLengthMm={flatPatternCutLengthMm}
                   bendCount={flatPatternBendCount}

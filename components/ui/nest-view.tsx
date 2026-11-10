@@ -27,6 +27,8 @@ interface NestViewProps {
   sheetSource?: string | undefined;
   /** Stock sheets to rank and recommend from (backend blankSpec.candidateSheets). */
   candidateSheets?: CandidateSheet[] | undefined;
+  /** The chosen process and the geometry disagree: no Reanalyze (it cannot produce an outline), the conflict says what to do. */
+  processConflict?: string | null | undefined;
 }
 
 function extractErrorDetail(error: unknown): string | null {
@@ -54,7 +56,7 @@ function placementTransform(xMm: number, yMm: number, rotationDeg: number): stri
 
 export function NestView({
   bomItemId, quantity, sheetWidthMm, sheetLengthMm, kerfMm, edgeMarginMm,
-  materialLabel, gradeLabel, thicknessMm, sheetSource, candidateSheets,
+  materialLabel, gradeLabel, thicknessMm, sheetSource, candidateSheets, processConflict,
 }: NestViewProps) {
   // Starts from what the cost engine nested with (the selected laser's sheet,
   // the part-spacing kerf for this thickness, the edge allowance); every
@@ -261,7 +263,7 @@ export function NestView({
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/70 text-sm text-center px-6">
             <p>{extractErrorDetail(error) ?? 'Real flat-pattern outline unavailable for this part — true nesting could not be computed.'}</p>
             {/* The nest needs the outline from the last CAD analysis; a fresh analysis is the one thing that can supply it. */}
-            <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />
+            {!processConflict && <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />}
           </div>
         ) : (
           <>

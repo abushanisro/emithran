@@ -109,7 +109,7 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // also used by NRE and by the drawing-callout surface-treatment auto-cost).
 import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/api/hooks/useSecondaryProcesses';
 import {
-  familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily,
+  familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
@@ -9998,6 +9998,7 @@ export default function ManufacturingIntelligencePage() {
                       nestCandidateSheets={costForHeatmap?.blankSpec?.candidateSheets}
                       nestMaterialLabel={item.material ?? undefined}
                       nestGradeLabel={item.materialGrade ?? undefined}
+                      processConflict={processChoiceConflict(item.featureGraph?.classification)}
                       flatPatternPartName={item.partName ?? item.name}
                       flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
                       flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}
@@ -10166,6 +10167,7 @@ export default function ManufacturingIntelligencePage() {
                             nestCandidateSheets={costForHeatmap?.blankSpec?.candidateSheets}
                             nestMaterialLabel={item.material ?? undefined}
                             nestGradeLabel={item.materialGrade ?? undefined}
+                      processConflict={processChoiceConflict(item.featureGraph?.classification)}
                             flatPatternPartName={item.partName ?? item.name}
                             flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
                             flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}

@@ -67,6 +67,8 @@ export type FeatureCategory =
 
 export interface FamilyClassification {
   family: ManufacturingFamily;
+  /** What the shape alone reads as; differs from `family` when the chosen process overrode it. Absent on older analyses. */
+  geometricFamily?: string;
   confidence: number;
   signals: string[];
   classificationSignals?: Record<string, number | string>;
