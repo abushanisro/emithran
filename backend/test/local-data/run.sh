@@ -49,6 +49,17 @@ SELECT 'Sand Casting', n, n, false FROM unnest(ARRAY['Cleaning','CO2 Cured','Coo
 -- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;
+-- the catalog columns and the process taxonomy as the real database has them (migrations 367-371, 424, 725), and the four
+-- secondary-operation calculators the baseline holds: migration 984 restores their catalog rows and fails if a calculator is missing
+ALTER TABLE public.process_calculator_mappings ADD COLUMN machine_class varchar(100), ADD COLUMN applicable_families text[],
+  ADD COLUMN lhr_process_group varchar(50), ADD COLUMN canonical_process_id uuid;
+CREATE TABLE public.process_taxonomy (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), process_group varchar(255) NOT NULL, process_name varchar(255) NOT NULL, machine_class varchar(100),
+  roadmap_status varchar(20), is_active boolean DEFAULT true, display_order integer DEFAULT 0, CONSTRAINT unique_process_taxonomy_row UNIQUE (process_group, process_name)
+);
+INSERT INTO public.calculators (id, name, is_global) VALUES
+  ('edccd27a-c91c-479d-a440-d00053249a3a', 'Sheet Metal - Counterboring', true), ('0f7d6451-3937-472d-9a4c-3f8f3ebf59d8', 'Sheet Metal - Countersinking', true),
+  ('72f84130-a741-425f-8fa9-9b027541801c', 'Sheet Metal - PEM Insertion', true), ('fe42139c-5675-4a82-94d5-7f2d440ae9bf', 'Machining - Tapping', true);
 -- the materials table as the real database has it (migration 352 adds cut_code): migration 978 writes the cut code of the plastics onto it
 CREATE TABLE public.raw_materials (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name varchar(255) NOT NULL, cut_code decimal(10,2));
 INSERT INTO public.raw_materials (name) VALUES ('Generic Nylon, Type 11 40% Glass');
