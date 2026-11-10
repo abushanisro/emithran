@@ -17,7 +17,7 @@ a CAD-upload reader on `emithran.job.queue.depth` (the gauge now takes one reade
 histogram buckets.
 
 ## Backend: OpenObserve, single node
-Pinned image: `public.ecr.aws/zinclabs/openobserve:v1.0.4` (see `docker-compose.observability.yml`).
+Image used for the checks below: `public.ecr.aws/zinclabs/openobserve:v1.0.4`. The repo no longer ships a compose file for it; the stack that is kept is `docker-compose.monitoring.yml` ([monitoring.md](monitoring.md)).
 
 ### Verified locally (2026-10-20, Docker 29.8.0 in WSL2)
 | Check | Result |
@@ -125,9 +125,4 @@ Production (once deployed on Railway): enable the volume's daily backup schedule
 Unset `OTEL_EXPORTER_OTLP_ENDPOINT` (and redeploy or restart the service): the SDK is not loaded and behavior is identical to before. The telemetry backend can be stopped independently with no effect on the application.
 
 ## Local use
-```bash
-export OPENOBSERVE_ROOT_EMAIL=you@example.test
-export OPENOBSERVE_ROOT_PASSWORD='<choose one; never commit it>'
-docker compose -f docker-compose.observability.yml up -d
-# UI: http://127.0.0.1:5080
-```
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` to any OTLP/HTTP receiver, for example the one in `docker-compose.monitoring.yml`. Unset, telemetry is off.
