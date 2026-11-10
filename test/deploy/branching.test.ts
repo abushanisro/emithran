@@ -93,7 +93,7 @@ describe('the nightly Operations check compares each environment with the branch
 describe('the docs state the same model', () => {
   it('BRANCHING.md names both branches, the merge methods and the release and hotfix procedures, and the flow in DEPLOYMENT_SECURITY.md points to it', () => {
     const doc = read('docs/BRANCHING.md');
-    for (const phrase of ['`main`', '`develop`', 'merge commit', 'squash', 'Release vX.Y.Z', 'hotfix/*', 'default branch', 'delete_branch_on_merge']) expect(doc).toContain(phrase);
+    for (const phrase of ['`main`', '`develop`', 'merge commit', 'squash', 'Release vX.Y.Z', 'hotfix/*', 'default branch', 'delete_branch_on_merge', 'Sync `develop` the same day', 'chore/sync-main-into-develop']) expect(doc).toContain(phrase);
     expect(read('docs/DEPLOYMENT_SECURITY.md')).toContain('BRANCHING.md');
     expect(read('docs/GOVERNANCE.md')).toContain('docs/BRANCHING.md');
   });
