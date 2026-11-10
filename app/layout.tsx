@@ -25,20 +25,20 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'mithran - Manufacturing One-Stop Solution',
-    template: '%s | mithran',
+    default: 'Emithran - Manufacturing One-Stop Solution',
+    template: '%s | Emithran',
   },
   description: 'Enterprise manufacturing One-Stop Solution for should-cost analysis, vendor management, and cost optimization.',
-  authors: [{ name: 'mithran' }],
+  authors: [{ name: 'Emithran' }],
   keywords: ['manufacturing', 'cost modeling', 'should-cost analysis', 'vendor management', 'BOM processing'],
   openGraph: {
-    title: 'mithran - Manufacturing One-Stop Solution',
+    title: 'Emithran - Manufacturing One-Stop Solution',
     description: 'Enterprise manufacturing One-Stop Solution for should-cost analysis, vendor management, and cost optimization.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    site: '@mithran',
+    site: '@emithran',
   },
   icons: {
     icon: [
