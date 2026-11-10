@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { ReanalyzeButton } from '@/components/features/bom/ReanalyzeButton';
 import { Button } from '@/components/ui/button';
 import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-pattern-drawing';
 import { Input } from '@/components/ui/input';
@@ -257,8 +258,10 @@ export function NestView({
             Choose a sheet above (or enter its width and length) to nest this part.
           </div>
         ) : isError || !data ? (
-          <div className="flex flex-1 items-center justify-center text-white/70 text-sm text-center px-6">
-            {extractErrorDetail(error) ?? 'Real flat-pattern outline unavailable for this part — true nesting could not be computed. This is a real geometry gap, not an error to retry.'}
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/70 text-sm text-center px-6">
+            <p>{extractErrorDetail(error) ?? 'Real flat-pattern outline unavailable for this part — true nesting could not be computed.'}</p>
+            {/* The nest needs the outline from the last CAD analysis; a fresh analysis is the one thing that can supply it. */}
+            <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />
           </div>
         ) : (
           <>

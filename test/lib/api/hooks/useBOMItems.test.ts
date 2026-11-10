@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, it, expect, vi } from 'vitest';
 
-import { invalidateBOMItemUpdateQueries, type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { invalidateBOMItemReanalysisQueries, invalidateBOMItemUpdateQueries, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 
 // P0.5 — DFM scores are material/thickness-bracketed (dfm-scoring.service.ts's
 // UNDERSIZED_HOLE and CRACK_RISK checks), but useUpdateBOMItem's onSuccess used
@@ -75,5 +75,21 @@ describe('invalidateBOMItemUpdateQueries — P0.5 material-grade DFM staleness f
     const invalidatedKeys = spy.mock.calls.map((call) => (call[0] as { queryKey: unknown[] }).queryKey);
     expect(invalidatedKeys).toContainEqual(['bom-items', 'item-42', 'dfm-scores']);
     expect(invalidatedKeys.some((k) => k[0] === 'bom-items' && k[1] === 'item-1')).toBe(false);
+  });
+});
+
+describe('invalidateBOMItemReanalysisQueries', () => {
+  it('refreshes what comes from the geometry too: a Reanalyze from the nest panel must re-run the nest it was opened on', () => {
+    const queryClient = new QueryClient();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    invalidateBOMItemReanalysisQueries(queryClient, updatedItem());
+
+    const invalidatedKeys = spy.mock.calls.map((call) => (call[0] as { queryKey: unknown[] }).queryKey);
+    // the true-nest prefix covers every sheet / quantity / kerf variant the panel has asked for
+    expect(invalidatedKeys).toContainEqual(['bom-items', 'item-1', 'true-nest']);
+    expect(invalidatedKeys).toContainEqual(['bom-items', 'item-1', 'machining-need']);
+    expect(invalidatedKeys).toContainEqual(['bom-items', 'item-1', 'cost-summary']);
+    expect(invalidatedKeys).toContainEqual(['bom-items', 'item-1', 'route-comparison']);
   });
 });
