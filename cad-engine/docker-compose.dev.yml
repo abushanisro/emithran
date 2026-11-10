@@ -5,8 +5,8 @@
 # `python main.py` cannot work natively there. The container is the one runtime every host shares, and it is the image Railway
 # builds from, so dev and prod cannot drift.
 #
-# Why linux/amd64 on every service: conda-forge publishes pythonocc-core 7.7.2 for linux-64 only. x86 hosts (Windows, Linux, Intel
-# Mac) run it natively; Apple Silicon runs it under emulation (Docker Desktop: enable "Use Rosetta for x86_64/amd64 emulation").
+# No platform pin: conda-forge publishes pythonocc-core 7.8.1 for linux-64 and linux-aarch64, so the image builds natively on x86 hosts
+# (Windows, Linux, Intel Mac) and on ARM ones (Apple Silicon, ARM servers), without emulation.
 #
 #   docker compose -f docker-compose.dev.yml up --build
 #   docker compose -f docker-compose.dev.yml run --rm cad-engine pytest test -q
@@ -27,7 +27,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: mithran-cad-engine:dev
-    platform: linux/amd64
     container_name: mithran-cad-engine-dev
     # Docker runs inside the WSL distro and stops with it; come back up
     # whenever the daemon starts again instead of staying Exited.
@@ -87,7 +86,6 @@ services:
       args:
         BASE_IMAGE: mithran-cad-engine:dev
     image: mithran-cad-engine:test
-    platform: linux/amd64
     profiles: ["test"]
     volumes:
       - .:/app
