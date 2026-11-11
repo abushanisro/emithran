@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prepares the production database on the VM (run from /opt/emithran after the data tier is up): load the baseline, remove the QA fixtures it
 # carries, set the data API's role password. Migrations run afterwards (deploy.sh). Fails closed and is safe to re-run: an already-loaded database
-# is left alone.
+# is left alone (the fixture clean-up runs only right after a fresh load).
 #
 #   BASELINE_DIR=/opt/emithran/baseline [PG_CONTAINER=<name>] [DOCKER_NETWORK=emithran-prd_db] [ENV_FILE=env/prd.env] infra/oracle/production-db.sh
 #
@@ -25,15 +25,10 @@ set +a
 psql_() { docker exec -i "$pg" psql -U postgres -d postgres -v ON_ERROR_STOP=1 "$@"; }
 enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$1"; }
 
-if [ "$(psql_ -Atc "select to_regclass('public.organizations') is not null")" = "t" ]; then
-  echo "baseline already loaded: leaving the database as it is"
-else
-  echo "loading the baseline..."
-  DOCKER_NETWORK="$net" backend/scripts/baseline-load.sh "$BASELINE_DIR" "postgres://postgres:$(enc "$POSTGRES_PASSWORD")@postgres:5432/postgres"
-fi
-
-echo "removing the QA fixtures (only if everything there is a fixture)..."
-psql_ -1 <<'S'
+# Only ever called right after a fresh load. On a database that already holds real rows (invited users, organizations) it must never run.
+remove_qa_fixtures() {
+  echo "removing the QA fixtures (only if everything there is a fixture)..."
+  psql_ -1 <<'S'
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.authorized_users WHERE email NOT LIKE '%@emithran.test') THEN RAISE EXCEPTION 'authorized_users holds a non-fixture row: refusing to clean up'; END IF;
@@ -43,6 +38,15 @@ BEGIN
   DELETE FROM public.organizations;
 END $$;
 S
+}
+
+if [ "$(psql_ -Atc "select to_regclass('public.organizations') is not null")" = "t" ]; then
+  echo "baseline already loaded: leaving the database as it is"
+else
+  echo "loading the baseline..."
+  DOCKER_NETWORK="$net" backend/scripts/baseline-load.sh "$BASELINE_DIR" "postgres://postgres:$(enc "$POSTGRES_PASSWORD")@postgres:5432/postgres"
+  remove_qa_fixtures
+fi
 
 echo "setting the data API role password..."
 psql_ -c "ALTER ROLE authenticator WITH LOGIN PASSWORD '$(printf '%s' "$AUTHENTICATOR_PASSWORD" | sed "s/'/''/g")'" >/dev/null
