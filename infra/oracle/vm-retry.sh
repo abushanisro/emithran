@@ -26,7 +26,7 @@ mkdir "$STATE/lock" 2>/dev/null || { log "previous run still going, skipped"; ex
 trap 'rmdir "$STATE/lock" 2>/dev/null' EXIT
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-out="$(TRIES=1 SIZES="${SIZES:-4:24 2:12 1:6}" bash "$here/vm.sh" 2>&1)"; rc=$?
+out="$(TRIES=1 SIZES="${SIZES:-2:12 1:6}" bash "$here/vm.sh" 2>&1)"; rc=$?
 last="$(printf '%s\n' "$out" | tail -1)"
 
 if [ "$rc" -eq 0 ] && printf '%s' "$last" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
@@ -38,7 +38,7 @@ if [ "$rc" -eq 0 ] && printf '%s' "$last" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){
   exit 0
 fi
 if printf '%s' "$out" | grep -qi 'no capacity after\|out of host capacity\|out of capacity'; then
-  log "no capacity (4:24, 2:12, 1:6 all refused)"; exit 0
+  log "no capacity (2:12, 1:6 both refused)"; exit 0
 fi
 if printf '%s' "$out" | grep -qiE 'NotAuthenticated|NotAuthorized|session has expired|re-authenticate|InvalidKey|invalid.*signature|"status": ?40[13]'; then
   log "login problem: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)"
