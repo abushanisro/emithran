@@ -140,6 +140,14 @@ describe('infra/oracle/micro-release.sh', () => {
     expect(execFileSync('git', ['ls-files', '-s', 'infra/oracle/micro-release.sh'], { cwd: ROOT, encoding: 'utf8' }).split(/\s+/)[0]).toBe('100755');
   });
 
+  it('runs the migrations (with --confirm, which production requires) BEFORE shipping any image, and detects changes by layer contents', () => {
+    const text = readFileSync(join(ROOT, 'infra/oracle/micro-release.sh'), 'utf8');
+    expect(text).toContain('scripts/migrate.ts --env prd --confirm');
+    expect(text.indexOf('== 3/6 migrations')).toBeGreaterThan(0);
+    expect(text.indexOf('== 3/6 migrations')).toBeLessThan(text.indexOf('== 4/6 ship what changed'));
+    expect(text).toContain('{{json .RootFS.Layers}}'); // not {{.Id}}: an id changes on every rebuild
+  });
+
   it('refuses an unknown ref before touching any server', () => {
     const dir = mkdtempSync(join(tmpdir(), 'release-'));
     const res = spawnSync('bash', [join(ROOT, 'infra/oracle/micro-release.sh'), 'no-such-ref-anywhere'], { encoding: 'utf8', cwd: ROOT, env: env(dir) });

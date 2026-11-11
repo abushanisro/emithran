@@ -7,9 +7,9 @@
 # What it does, in this order, and why:
 #  1. Refuses an unknown ref, a ref without the micro files, or servers that are not healthy NOW (a release onto a sick system hides the cause).
 #  2. Builds the four images for linux/amd64 from `git archive <ref>` (never your working tree) under the project name emithran-amd64.
-#  3. Ships only the images whose content changed (docker save | ssh docker load: no registry, no token) and tags what runs now as good-<old sha>.
-#  4. Runs the release's own database migrations through an encrypted SSH forward to Postgres (each runs in its own transaction; a failure stops here,
-#     before any service was replaced; the database stays at the last good migration).
+#  3. Runs the release's own database migrations through an encrypted SSH forward to Postgres (each in its own transaction; a failure stops here,
+#     before anything was shipped or replaced; the database stays at the last good migration).
+#  4. Ships only the images whose LAYERS changed (docker save | ssh docker load: no registry, no token) and tags what runs now as good-<old sha>.
 #  5. Engines first, then the web tier; each waits for its health checks. Postgres and the tunnel connector are not restarted by a release, unless RESTART_TUNNEL=1 asks for the connector to be recreated once (to apply a changed setting).
 #  6. Checks the public site. Any failure from step 3 on puts the last good images back and says so.
 # The previous images stay on the servers as good-<sha>; `ROLLBACK=1 infra/oracle/micro-release.sh <old-ref>` is not needed: the failure path does it.
@@ -47,12 +47,31 @@ work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 git archive "$sha" | tar -x -C "$work"
 run bash -c "cd '$work' && DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose -p $IP -f docker-compose.prod.yml -f docker-compose.data.yml --env-file '$ENV_FILE' build backend frontend ecad-engine cad-engine"
 
+echo "== 3/6 migrations (the release's own files, through an encrypted SSH forward; each in its own transaction)"
+if [ "${DRY_RUN:-}" = 1 ]; then echo "DRY: forward 127.0.0.1:15432 -> $APP_HOST:5432, run migrate.ts --env prd from the export"; else
+  ssh -i "$KEY" -o BatchMode=yes -f -N -o ExitOnForwardFailure=yes -L 127.0.0.1:15432:127.0.0.1:5432 "ubuntu@$APP_HOST"
+  fwd="$(pgrep -f '127.0.0.1:15432:127.0.0.1:5432' | head -1)"; trap 'kill "$fwd" 2>/dev/null || true; rm -rf "$work"' EXIT
+  python3 - "$work" "$ENV_FILE" <<'PY'
+import sys,urllib.parse
+work,envf=sys.argv[1:3]; d={}
+for l in open(envf):
+    if '=' in l and not l.startswith('#'): k,v=l.rstrip('\n').split('=',1); d[k]=v
+d['MIGRATE_DATABASE_URL']='postgresql://postgres:%s@host.docker.internal:15432/postgres?sslmode=disable'%urllib.parse.quote(d['POSTGRES_PASSWORD'],safe='')
+open(work+'/.migrate.env','w').write('\n'.join(f'{k}={v}' for k,v in d.items())+'\n')
+PY
+  chmod 600 "$work/.migrate.env"
+  docker run --rm --add-host host.docker.internal:host-gateway -v "$work:/work" -w /work/backend node:24 sh -c 'npm ci --legacy-peer-deps --no-audit --no-fund >/dev/null 2>&1 && npx ts-node -r tsconfig-paths/register scripts/migrate.ts --env prd --confirm --env-file ../.migrate.env' 2>&1 | tail -5
+  kill "$fwd" 2>/dev/null || true
+fi
+
 changed=(); shipped_app=(); shipped_eng=()
-echo "== 3/6 ship what changed; keep what runs now as good-$oldshort"
+echo "== 4/6 ship what changed; keep what runs now as good-$oldshort"
 for s in cad-engine ecad-engine backend frontend; do
   case "$s" in cad-engine|ecad-engine) h="$ENGINE_HOST" ;; *) h="$APP_HOST" ;; esac
-  new_id="$(docker image inspect "$IP-$s" --format '{{.Id}}' 2>/dev/null || echo none)"
-  cur_id="$(ssh_ "$h" "docker image inspect emithran-prd-$s:latest --format '{{.Id}}' 2>/dev/null || echo none")"
+  # By the contents of the layers: an image id changes on every rebuild (the config carries a timestamp) even when nothing in it did, and the CAD
+  # image is 1.1 GB to send.
+  new_id="$(docker image inspect "$IP-$s" --format '{{json .RootFS.Layers}}' 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
+  cur_id="$(ssh_ "$h" "docker image inspect emithran-prd-$s:latest --format '{{json .RootFS.Layers}}' 2>/dev/null | sha256sum | cut -d' ' -f1")"
   if [ "$new_id" = "$cur_id" ]; then echo "  $s: unchanged"; continue; fi
   echo "  $s: changed, shipping $(( $(docker image inspect "$IP-$s" --format '{{.Size}}' 2>/dev/null || echo 0) / 1000000 )) MB"
   run ssh_ "$h" "docker tag emithran-prd-$s:latest emithran-prd-$s:good-$oldshort 2>/dev/null || true"
@@ -67,23 +86,6 @@ rollback() {
   echo "previous images restored (the database stays at its last good migration: fix forward with a new migration if the old code cannot run on it)" >&2
 }
 [ "${DRY_RUN:-}" = 1 ] || trap rollback ERR
-
-echo "== 4/6 migrations (the release's own files, through an encrypted SSH forward; each in its own transaction)"
-if [ "${DRY_RUN:-}" = 1 ]; then echo "DRY: forward 127.0.0.1:15432 -> $APP_HOST:5432, run migrate.ts --env prd from the export"; else
-  ssh -i "$KEY" -o BatchMode=yes -f -N -o ExitOnForwardFailure=yes -L 127.0.0.1:15432:127.0.0.1:5432 "ubuntu@$APP_HOST"
-  fwd="$(pgrep -f '127.0.0.1:15432:127.0.0.1:5432' | head -1)"; trap 'kill "$fwd" 2>/dev/null || true; rm -rf "$work"' EXIT
-  python3 - "$work" "$ENV_FILE" <<'PY'
-import sys,urllib.parse
-work,envf=sys.argv[1:3]; d={}
-for l in open(envf):
-    if '=' in l and not l.startswith('#'): k,v=l.rstrip('\n').split('=',1); d[k]=v
-d['MIGRATE_DATABASE_URL']='postgresql://postgres:%s@host.docker.internal:15432/postgres?sslmode=disable'%urllib.parse.quote(d['POSTGRES_PASSWORD'],safe='')
-open(work+'/.migrate.env','w').write('\n'.join(f'{k}={v}' for k,v in d.items())+'\n')
-PY
-  chmod 600 "$work/.migrate.env"
-  docker run --rm --add-host host.docker.internal:host-gateway -v "$work:/work" -w /work/backend node:24 sh -c 'npm ci --legacy-peer-deps --no-audit --no-fund >/dev/null 2>&1 && npx ts-node -r tsconfig-paths/register scripts/migrate.ts --env prd --env-file ../.migrate.env' 2>&1 | tail -5
-  kill "$fwd" 2>/dev/null || true; trap rollback ERR
-fi
 
 echo "== 5/6 engines first, then the web tier (each waits for its health checks)"
 scp -i "$KEY" -o BatchMode=yes -q "$work/docker-compose.prod.yml" "$work/docker-compose.data.yml" "$work/docker-compose.micro-engines.yml" "ubuntu@$ENGINE_HOST:/opt/emithran/" 2>/dev/null || true
