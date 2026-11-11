@@ -1974,12 +1974,9 @@ export class MHRService {
     accessToken: string,
     processGroup?: string,
   ): Promise<{ category: string; machineClass: string | null }[]> {
-    const { data, error } = await readAllRows((from, to) => this.databaseService
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('benchmark_source_key, machine_class, process_group, commodity_code')
-      .order('id')
-      .range(from, to));
+    // The distinct combinations of the four columns, in the order each first appears by id (migration 986): the loop below only depends on a
+    // combination's first appearance, so it decides exactly as it did over every row.
+    const { data, error } = await this.databaseService.getClient(accessToken).rpc('mhr_distinct_category_sources');
 
     if (error) {
       this.logger.error(`Error fetching distinct categories: ${error.message}`, 'MHRService');
@@ -2034,13 +2031,8 @@ export class MHRService {
   }
 
   private async readGetDistinctProcessGroups(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.databaseService
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('process_group')
-      .not('process_group', 'is', null)
-      .order('id')
-      .range(from, to));
+    // One DISTINCT in the database (migration 986) instead of every row in pages; it runs as the caller, so row-level security still decides the list.
+    const { data, error } = await this.databaseService.getClient(accessToken).rpc('mhr_distinct_values', { p_column: 'process_group' });
 
     if (error) {
       // A failed read is an error, never an empty list (an empty picker hid it).
@@ -2048,7 +2040,7 @@ export class MHRService {
       throw new InternalServerErrorException('Unable to retrieve process groups. Please try again later.');
     }
 
-    return [...new Set(data.map((r: { process_group: string | null }) => r.process_group).filter((g): g is string => !!g))].sort();
+    return [...new Set(((data ?? []) as Array<string | null>).filter((g): g is string => !!g))].sort();
   }
 
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
@@ -2056,20 +2048,15 @@ export class MHRService {
   }
 
   private async readGetDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.databaseService
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('manufacturer_country')
-      .not('manufacturer_country', 'is', null)
-      .order('id')
-      .range(from, to));
+    // One DISTINCT in the database (migration 986) instead of every row in pages; it runs as the caller, so row-level security still decides the list.
+    const { data, error } = await this.databaseService.getClient(accessToken).rpc('mhr_distinct_values', { p_column: 'manufacturer_country' });
 
     if (error) {
       this.logger.error(`Error fetching distinct manufacturer countries: ${error.message}`, 'MHRService');
       return [];
     }
 
-    return [...new Set(data?.map((r: any) => r.manufacturer_country).filter(Boolean) as string[])].sort();
+    return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
   }
 
   // Real distinct wage_grade values actually live on mhr_records — replaces
@@ -2085,20 +2072,15 @@ export class MHRService {
   }
 
   private async readGetDistinctWageGrades(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.databaseService
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('wage_grade')
-      .not('wage_grade', 'is', null)
-      .order('id')
-      .range(from, to));
+    // One DISTINCT in the database (migration 986) instead of every row in pages; it runs as the caller, so row-level security still decides the list.
+    const { data, error } = await this.databaseService.getClient(accessToken).rpc('mhr_distinct_values', { p_column: 'wage_grade' });
 
     if (error) {
       this.logger.error(`Error fetching distinct wage grades: ${error.message}`, 'MHRService');
       return [];
     }
 
-    return [...new Set(data?.map((r: any) => r.wage_grade).filter(Boolean) as string[])].sort();
+    return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
   }
 
   // Deliberately NOT scoped by user_id (matches getDistinctManufacturerCountries,
@@ -2112,20 +2094,15 @@ export class MHRService {
   }
 
   private async readGetDistinctCurrencies(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.databaseService
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('currency')
-      .not('currency', 'is', null)
-      .order('id')
-      .range(from, to));
+    // One DISTINCT in the database (migration 986) instead of every row in pages; it runs as the caller, so row-level security still decides the list.
+    const { data, error } = await this.databaseService.getClient(accessToken).rpc('mhr_distinct_values', { p_column: 'currency' });
 
     if (error) {
       this.logger.error(`Error fetching distinct currencies: ${error.message}`, 'MHRService');
       return [];
     }
 
-    return [...new Set(data?.map((r: any) => r.currency).filter(Boolean) as string[])].sort();
+    return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
   }
 
   async getDistinctLocations(accessToken: string): Promise<string[]> {
@@ -2133,19 +2110,14 @@ export class MHRService {
   }
 
   private async readGetDistinctLocations(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.databaseService
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('location')
-      .not('location', 'is', null)
-      .order('id')
-      .range(from, to));
+    // One DISTINCT in the database (migration 986) instead of every row in pages; it runs as the caller, so row-level security still decides the list.
+    const { data, error } = await this.databaseService.getClient(accessToken).rpc('mhr_distinct_values', { p_column: 'location' });
 
     if (error) {
       this.logger.error(`Error fetching distinct locations: ${error.message}`, 'MHRService');
       return [];
     }
 
-    return [...new Set(data?.map((r: any) => r.location).filter(Boolean) as string[])].sort();
+    return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
   }
 }
