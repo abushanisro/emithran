@@ -36,11 +36,8 @@ describe('.github/workflows/uptime.yml', () => {
     expect(run({ '/api/health/ready': '200', '/auth/login': '307' })).toBe(0);
   });
 
-  it('tolerates a release that predates the readiness address (404), and nothing else', () => {
-    expect(run({ '/api/health/ready': '404', '/auth/login': '307' })).toBe(0);
-  });
-
   it.each([
+    ['the readiness address is missing (404)', { '/api/health/ready': '404', '/auth/login': '307' }],
     ['the database or an engine is down (503)', { '/api/health/ready': '503', '/auth/login': '307' }],
     ['the site does not answer at all', { '/api/health/ready': '000', '/auth/login': '000' }],
     ['the sign-in redirect breaks', { '/api/health/ready': '200', '/auth/login': '502' }],

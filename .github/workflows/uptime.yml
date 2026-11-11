@@ -28,9 +28,8 @@ jobs:
             echo "$1 -> $code (want $2${3:+ or $3})"
             if [ "$code" != "$2" ] && [ "$code" != "${3:-none}" ]; then fail=1; fi
           }
-          # the API process, the database and both CAD engines answer. 404 = a release that predates this address: tolerated until it is deployed, then
-          # remove the allowance below so that the check can never silently go blind.
-          probe "$SITE/api/health/ready" 200 404
+          # the API process, the database and both CAD engines answer (only 200 is accepted: a missing address must fail, never pass silently)
+          probe "$SITE/api/health/ready" 200
           # the sign-in redirect works (the frontend and the login hand-off)
           probe "$SITE/auth/login" 307
           exit "$fail"
