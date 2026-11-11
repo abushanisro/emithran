@@ -96,3 +96,25 @@ describe('infra/oracle/vm-retry.sh', () => {
     expect(r.log).toContain('launcher-setup.sh');
   });
 });
+
+describe('infra/oracle/launcher-setup.sh INSTALL_ONLY', () => {
+  it('installs its own copy of the scripts and schedules THAT, so switching git branches cannot break the job', () => {
+    const home = mkdtempSync(join(tmpdir(), 'launcher-home-'));
+    mkdirSync(join(home, 'Library/LaunchAgents'), { recursive: true });
+    mkdirSync(join(home, 'bin'));
+    const calls = join(home, 'launchctl.calls');
+    writeFileSync(join(home, 'bin', 'launchctl'), `#!/usr/bin/env bash\necho "$*" >> "${calls}"\n`);
+    chmodSync(join(home, 'bin', 'launchctl'), 0o755);
+    const res = spawnSync('bash', [join(ROOT, 'infra/oracle/launcher-setup.sh')], {
+      encoding: 'utf8',
+      env: { PATH: `${join(home, 'bin')}:${process.env.PATH ?? ''}`, HOME: home, INSTALL_ONLY: '1' },
+    });
+    expect(res.status).toBe(0);
+    for (const f of ['vm.sh', 'vm-retry.sh']) expect(existsSync(join(home, '.emithran/oracle', f))).toBe(true);
+    const plist = readFileSync(join(home, 'Library/LaunchAgents/com.emithran.oracle-retry.plist'), 'utf8');
+    expect(plist).toContain(join(home, '.emithran/oracle/vm-retry.sh'));
+    expect(plist).not.toContain(ROOT); // never the repository folder
+    expect(plist).toContain('<integer>600</integer>');
+    expect(readFileSync(calls, 'utf8')).toContain('bootstrap');
+  });
+});
