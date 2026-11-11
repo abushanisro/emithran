@@ -35,6 +35,16 @@ It builds amd64 images from the commit, runs its migrations FIRST (through an en
 updates the engines then the web tier with health waits, checks the public site, and restores the previous images by itself on any failure. Check the
 step line before it ships anything (`== 3/6 migrations` then `== 4/6 ship what changed`), and always `git pull` first: a release is of the commit you name.
 
+## QA on staging, then production
+Test on staging, never on production. Staging is the same stack on the Mac (`stage.emithran.com`, own database, own bucket, own Auth0 app).
+```
+infra/oracle/stage-release.sh origin/develop     # DRY_RUN=1 first; builds `git archive <ref>` into ~/emithran-stage-run, migrates the STAGE database,
+                                                 # recreates the services, runs the smoke test, restores the previous images by itself on a failure
+scripts/smoke.sh https://stage.emithran.com      # 30 seconds, read-only; run it any time (also against https://app.emithran.com after a production release)
+```
+For a signed-in check as well: `LOAD_BASE=https://stage.emithran.com LOAD_EMAIL=... LOAD_PASSWORD=... node scripts/loadtest/session.mjs ~/.stage-cookie`, then
+`SMOKE_COOKIE_FILE=~/.stage-cookie scripts/smoke.sh https://stage.emithran.com`. Do your manual QA on staging, and release to production only when it is good.
+
 ## Rollback
 - A failed release rolls itself back. A bad release that passed its checks: `docker tag emithran-prd-<service>:good-<old sha> emithran-prd-<service>:latest`
   on the server, then `docker compose ... up -d --no-build --force-recreate <service>` (the previous images are kept as `good-<sha>`).
