@@ -65,6 +65,12 @@ PY
 fi
 
 changed=(); shipped_app=(); shipped_eng=()
+# PostgREST caches the database schema when it starts: a function or table a migration just created is unknown to it (a call answers "not found in the
+# schema cache") until it is told to reload. SIGUSR1 reloads it in place: no restart, no downtime. Always sent: it is harmless when nothing changed.
+if [ "${DRY_RUN:-}" = 1 ]; then echo "DRY: tell PostgREST to reload its schema cache (SIGUSR1)"; else
+  ssh_ "$APP_HOST" "docker kill -s SIGUSR1 emithran-prd-postgrest-1 >/dev/null && sleep 3" || echo "note: could not signal PostgREST; restart it if the release added database functions" >&2
+fi
+
 echo "== 4/6 ship what changed; keep what runs now as good-$oldshort"
 for s in cad-engine ecad-engine backend frontend; do
   case "$s" in cad-engine|ecad-engine) h="$ENGINE_HOST" ;; *) h="$APP_HOST" ;; esac
