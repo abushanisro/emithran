@@ -26,13 +26,14 @@ infra/oracle/micro-deploy.sh status
 Check: `GET /api/health/ready` inside the backend container answers 200 with database, cadEngine and ecadEngine "up".
 
 ## Cutover (about 5 minutes of downtime; do it at a quiet hour)
-The public site is served by whichever machine runs the tunnel connector (`cloudflared`, same tunnel token on both). Two connectors at once would split
-traffic between an old and a new copy of the data, so the order matters.
-1. Old host: `docker stop <project>-cloudflared-1` (site down), then stop its backend and frontend (no more writes).
-2. `RESET=1 infra/oracle/micro-db.sh` (final copy; it empties only the app server's copy and proves every table's row count).
-3. App server: `docker compose ... up -d --no-build backend frontend cloudflared`.
-4. Verify the public URL (login redirect, `/api/health`, one project opens). 
+`APP_HOST=<ip> infra/oracle/micro-cutover.sh` (run on the old host; `DRY_RUN=1` first prints every step). It stops the old connector FIRST, then the
+old backend and frontend, copies the database one last time (`RESET=1 micro-db.sh`, proven table by table), starts the new backend, frontend and
+connector, and checks the public URL. If any step or the public checks fail it rolls back by itself.
+
+Why the order: the tunnel connector (`cloudflared`, same token on both hosts) decides which copy of the data the public sees. Two at once would split
+traffic between an old and a new copy.
 
 ## Rollback (seconds)
-App server: `docker stop emithran-prd-cloudflared-1`. Old host: `docker start` its backend, frontend, cloudflared. Anything written on the new
-server after step 3 is not on the old host: copy it back first if the window was long.
+The old host's containers are stopped, never removed. On the app server `docker stop emithran-prd-cloudflared-1`, then on the old host `docker start`
+its postgres, backend, frontend and cloudflared. Anything written on the new server after the cutover is not on the old host: copy it back first if
+the window was long.
