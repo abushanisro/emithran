@@ -11,7 +11,7 @@
 set -Eeuo pipefail
 trap 'echo "vm.sh failed at line $LINENO" >&2' ERR
 : "${COMPARTMENT_ID:?}" "${SUBNET_ID:?}" "${IMAGE_ID:?}" "${SSH_PUBLIC_KEY_FILE:?}"
-export PYTHONWARNINGS=ignore
+export PYTHONWARNINGS=ignore SUPPRESS_LABEL_WARNING=True   # the label warning is about the key file's format, not a failure
 q() { oci "$@" 2>&1 | grep -v -E 'SyntaxWarning|INSTANCE_CONSOLE|Interactive mode'; }
 name=emithran-prod
 ad="$(q iam availability-domain list -c "$COMPARTMENT_ID" --query 'data[0].name' --raw-output)"
@@ -20,7 +20,9 @@ id="$(q compute instance list -c "$COMPARTMENT_ID" --display-name "$name" --quer
 case "$id" in ocid1.*) echo "instance exists: $id" >&2 ;; *)
   for try in $(seq 1 "${TRIES:-60}"); do
     for size in ${SIZES:-4:24 2:12}; do
-      out="$(q compute instance launch -c "$COMPARTMENT_ID" --availability-domain "$ad" --display-name "$name" --shape VM.Standard.A1.Flex \
+      # --no-retry: the CLI otherwise retries Oracle's 'Out of host capacity' (an HTTP 500) for many minutes per size, so one pass over three sizes took
+      # about 20 minutes and looked like a hang. A refused launch must come back in seconds; the scheduler is the retry.
+      out="$(q --no-retry --connection-timeout 15 --read-timeout 120 compute instance launch -c "$COMPARTMENT_ID" --availability-domain "$ad" --display-name "$name" --shape VM.Standard.A1.Flex \
         --shape-config "{\"ocpus\":${size%%:*},\"memoryInGBs\":${size##*:}}" --subnet-id "$SUBNET_ID" --assign-public-ip true \
         --source-details "{\"sourceType\":\"image\",\"imageId\":\"$IMAGE_ID\",\"bootVolumeSizeInGBs\":150,\"bootVolumeVpusPerGB\":10}" \
         --ssh-authorized-keys-file "$SSH_PUBLIC_KEY_FILE" \
@@ -29,7 +31,7 @@ case "$id" in ocid1.*) echo "instance exists: $id" >&2 ;; *)
       case "$out" in ocid1.*) id="$out"; echo "launched with $size (OCPU:GB)" >&2; break 2 ;; esac
       if printf '%s' "$out" | grep -q -i -E 'capacity|too many requests|timed out|timeout|temporarily|service unavailable|internal error|connection (reset|aborted|error)'; then echo "size $size not available now or a transient error (try $try)" >&2; sleep 20; else echo "$out" | head -12 >&2; exit 1; fi
     done
-    sleep 90
+    if [ "$try" -lt "${TRIES:-60}" ]; then sleep 90; fi   # nothing to wait for after the last try (the scheduler runs this script once per attempt)
   done
   case "$id" in ocid1.*) ;; *) echo "no capacity after ${TRIES:-60} tries" >&2; exit 1 ;; esac ;;
 esac

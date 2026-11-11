@@ -8,6 +8,8 @@ bucket `emithran-prod`. Nothing here costs money: a $1 budget alerts on the firs
 |---|---|---|
 | `network.sh` | your Mac (OCI CLI, session login) | VCN, internet gateway, public subnet; SSH is the only inbound port |
 | `vm.sh` | your Mac | the VM; tries 4 OCPU / 24 GB, then smaller, and retries when Oracle has no free capacity |
+| `launcher-setup.sh` | your Mac, once | a least-privilege IAM user with an API key (no expiring browser login) + a launchd agent that runs `vm-retry.sh` every 10 minutes |
+| `vm-retry.sh` | launchd | ONE attempt; on success it records `~/.emithran/oracle-retry/RESULT`, notifies you and unschedules itself; it notifies (at most every 6 h) when the key is rejected |
 | `bootstrap-host.sh` | the VM, as root | key-only SSH, fail2ban, automatic security updates, Docker with log rotation, swap, keep-alive timer |
 | `production-db.sh` | the VM | loads the baseline, removes the QA fixtures, sets the data API password |
 | `backup.sh` | the VM, nightly | `pg_dump` to the R2 bucket under `backups/` |
