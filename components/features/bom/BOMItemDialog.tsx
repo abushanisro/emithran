@@ -1488,7 +1488,7 @@ export function BOMItemDialog({
 
         try {
           setUploadProgress({ file2d: 0, file3d: 0 });
-          await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
+          await apiClient.uploadFiles(`/bom-items/${itemId}/files`, formDataUpload);
           setUploadProgress({ file2d: 100, file3d: 100 });
           toast.success('Files uploaded successfully', {
             description: `${fileNames.join(', ')} attached to ${formData.name}`,
@@ -1505,7 +1505,7 @@ export function BOMItemDialog({
               label: 'Retry Upload',
               onClick: async () => {
                 try {
-                  await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
+                  await apiClient.uploadFiles(`/bom-items/${itemId}/files`, formDataUpload);
                   toast.success('Files uploaded successfully on retry');
                 } catch {
                   toast.error('Upload failed again. Please try manually later.');
@@ -1627,7 +1627,7 @@ export function BOMItemDialog({
         const uploadForm = new FormData();
         uploadForm.append('file3d', pf.file);
         try {
-          await apiClient.uploadFiles(`/bom-items/${newItem.id}/upload-files`, uploadForm);
+          await apiClient.uploadFiles(`/bom-items/${newItem.id}/files`, uploadForm);
         } catch (_) { /* file upload failure is non-fatal */ }
 
         successCount++;

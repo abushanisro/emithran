@@ -56,8 +56,8 @@ function apiPathsOf(file: string): Array<{ file: string; path: string; method?: 
   };
   const apiFile = file.startsWith('lib/api/');
   (function visit(n: ts.Node) {
-    const call = ts.isCallExpression(n) ? /^apiClient\.(get|post|put|patch|delete)$/.exec(n.expression.getText()) : null;
-    if (call && ts.isCallExpression(n) && n.arguments[0]) add(n.arguments[0], call[1].toUpperCase());
+    const call = ts.isCallExpression(n) ? /^apiClient\.(get|post|put|patch|delete|uploadFiles)$/.exec(n.expression.getText()) : null;
+    if (call && ts.isCallExpression(n) && n.arguments[0]) add(n.arguments[0], call[1] === 'uploadFiles' ? 'POST' : call[1].toUpperCase());
     else if (apiFile && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateExpression(n))) add(n);
     ts.forEachChild(n, visit);
   })(sf);
