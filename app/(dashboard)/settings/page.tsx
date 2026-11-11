@@ -166,7 +166,7 @@ function PreferencesTab() {
         <div className="mb-6">
           <h3 className="text-base font-semibold">Appearance</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Customize how mithran looks on your device.
+            Customize how Emithran looks on your device.
           </p>
         </div>
 

@@ -2,12 +2,18 @@
 
 import React, { useMemo, useState } from 'react';
 
+import { ReanalyzeButton } from '@/components/features/bom/ReanalyzeButton';
 import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-pattern-drawing';
 import { shoelaceAreaMm2 } from '@/lib/geometry/polygon2d';
+import type { FlatPatternBlank } from '@/lib/types/manufacturing';
 
 export interface FlatPatternHole { cx_mm: number; cy_mm: number; diameter_mm: number }
 
 interface FlatPatternViewProps {
+  /** Offers a Reanalyze when no outline is stored: the outline comes from the last CAD analysis. */
+  bomItemId?: string | undefined;
+  /** The chosen process and the geometry disagree: shown instead of the outline message, with no Reanalyze. */
+  processConflict?: string | null | undefined;
   partName?: string | undefined;
   outlinePointsMm?: number[][] | undefined;
   holesMm?: FlatPatternHole[] | undefined;
@@ -30,6 +36,8 @@ interface FlatPatternViewProps {
   bendCount?: number | undefined;
   holeCount?: number | undefined;
   pierceCount?: number | undefined;
+  /** Every blank the part is cut from (one per solid body); with several, the view shows one at a time. */
+  blanks?: FlatPatternBlank[] | undefined;
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -48,8 +56,49 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 // shows it on its own, before any sheet/nesting decision is made. Reads
 // straight off the already-loaded BOM item's featureGraph -- no true-nest
 // (or any other) network call needed, since the outline is CAD-static.
-export function FlatPatternView({
-  partName, outlinePointsMm, holesMm, outlineSource, boundingLengthMm, boundingWidthMm, flatPatternAreaMm2,
+/**
+ * The part's flat pattern. A part cut from several blanks (a multi-body file: a channel and its end plate) shows a
+ * switcher and each blank's own outline, holes, size and area; an ordinary part shows its one flat pattern.
+ */
+export function FlatPatternView(props: FlatPatternViewProps) {
+  const { blanks } = props;
+  const [index, setIndex] = useState(0);
+  if (!blanks || blanks.length <= 1) return <SingleFlatPatternView {...props} />;
+  const blank = blanks[Math.min(index, blanks.length - 1)]!;
+  return (
+    <div className="flex flex-1 min-h-0 flex-col">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-white bg-[#3f3f3f] border-b border-[#555555]">
+        <span className="text-white/60">This part is cut from {blanks.length} blanks:</span>
+        {blanks.map((b, i) => (
+          <button
+            key={i} type="button" onClick={() => { setIndex(i); }}
+            className={`px-2 py-0.5 rounded border ${i === index ? 'bg-white text-black border-white' : 'border-white/30 hover:bg-white/10'}`}
+          >
+            Blank {i + 1} · {Math.round(b.areaMm2).toLocaleString()} mm²
+          </button>
+        ))}
+      </div>
+      <SingleFlatPatternView
+        key={index}
+        {...props}
+        partName={`${props.partName ?? 'Part'} — blank ${(index + 1).toString()} of ${blanks.length.toString()}`}
+        outlinePointsMm={blank.outlinePointsMm ?? undefined}
+        holesMm={blank.holesMm}
+        outlineSource={blank.outlineSource}
+        boundingLengthMm={blank.boundingLengthMm ?? undefined}
+        boundingWidthMm={blank.boundingWidthMm ?? undefined}
+        flatPatternAreaMm2={blank.areaMm2}
+        cutLengthMm={undefined}
+        bendCount={undefined}
+        holeCount={blank.holesMm.length}
+        pierceCount={undefined}
+      />
+    </div>
+  );
+}
+
+function SingleFlatPatternView({
+  bomItemId, processConflict, partName, outlinePointsMm, holesMm, outlineSource, boundingLengthMm, boundingWidthMm, flatPatternAreaMm2,
   materialLabel, gradeLabel, thicknessMm, cutLengthMm, bendCount, holeCount, pierceCount,
 }: FlatPatternViewProps) {
   const bbox = useMemo(() => normalizeFlatPattern(outlinePointsMm, holesMm), [outlinePointsMm, holesMm]);
@@ -73,10 +122,15 @@ export function FlatPatternView({
 
   if (!bbox) {
     return (
-      <div className="flex flex-1 items-center justify-center text-white/70 text-sm text-center px-6">
-        {outlineSource === 'unavailable'
-          ? "No real flat-pattern outline is stored for this part. cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis. Re-run Reanalyze to retry extraction."
-          : 'Real flat-pattern outline unavailable for this part.'}
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/70 text-sm text-center px-6">
+        <p>
+          {processConflict
+            ? `No flat pattern for this part. ${processConflict}`
+            : outlineSource === 'unavailable'
+            ? "No real flat-pattern outline is stored for this part. cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis. Reanalyze to retry extraction."
+            : 'Real flat-pattern outline unavailable for this part.'}
+        </p>
+        {bomItemId && !processConflict && <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />}
       </div>
     );
   }

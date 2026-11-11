@@ -83,7 +83,7 @@ import { PlasticDfmFindings } from '@/components/features/manufacturing-intellig
 import { isSupersededPlasticCheck, isSupersededPlasticWarning, plasticDfmReadiness } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { invalidateBOMItemUpdateQueries, useBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, type PlasticDfmView, usePlasticDfm } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, type PlasticDfmView, usePlasticDfm } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -109,7 +109,7 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // also used by NRE and by the drawing-callout surface-treatment auto-cost).
 import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/api/hooks/useSecondaryProcesses';
 import {
-  familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily,
+  familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
@@ -9471,7 +9471,6 @@ export default function ManufacturingIntelligencePage() {
   }, [heatmapSources, fg, dfmScores, heatmapLayer, costHeatmapWeights, toleranceHeatmapWeights, sustainabilityHeatmapWeights, item?.holeCount, item?.bendCount, item?.sheetThicknessMm]);
 
   const [recalculating, setRecalculating] = useState(false);
-  const [rerunningDfm, setRerunningDfm] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
 
   // NOTE: this page deliberately does NOT auto-capture a 3D thumbnail (unlike
@@ -9496,21 +9495,11 @@ export default function ManufacturingIntelligencePage() {
     }
   };
 
-  // Re-runs the CAD analysis on the stored 3D file (the backend's POST /reanalyze), so a part analysed before the engine
-  // learned to record something (the faces behind a measurement, say) gets it, then refreshes the item and its costs.
-  const handleRerunDfm = async () => {
-    if (rerunningDfm) return;
-    setRerunningDfm(true);
-    try {
-      const updated = await apiClient.post<BOMItem>(`/bom-items/${itemId}/reanalyze`, undefined, { timeout: 180_000 });
-      invalidateBOMItemUpdateQueries(queryClient, updated);
-      toast.success('CAD analysis re-run');
-    } catch (e: unknown) {
-      toast.error(e instanceof ApiError ? e.getUserMessage() : 'Could not re-run the CAD analysis');
-    } finally {
-      setRerunningDfm(false);
-    }
-  };
+  // Re-runs the CAD analysis on the stored 3D file, so a part analysed before the engine learned to record something
+  // (the faces behind a measurement, say) gets it, then refreshes the item and everything computed from its geometry.
+  const reanalyze = useReanalyzeBOMItem(itemId);
+  const rerunningDfm = reanalyze.isPending;
+  const handleRerunDfm = () => { if (!rerunningDfm) reanalyze.mutate(); };
 
   const handleRecalculateCost = async () => {
     if (recalculating) return;
@@ -9695,7 +9684,7 @@ export default function ManufacturingIntelligencePage() {
         Recalculate Cost
       </button>
       <button
-        onClick={() => { void handleRerunDfm(); }}
+        onClick={handleRerunDfm}
         disabled={rerunningDfm || !item.file3dPath}
         className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
       >
@@ -10009,10 +9998,12 @@ export default function ManufacturingIntelligencePage() {
                       nestCandidateSheets={costForHeatmap?.blankSpec?.candidateSheets}
                       nestMaterialLabel={item.material ?? undefined}
                       nestGradeLabel={item.materialGrade ?? undefined}
+                      processConflict={processChoiceConflict(item.featureGraph?.classification)}
                       flatPatternPartName={item.partName ?? item.name}
                       flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
                       flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}
                       flatPatternOutlineSource={item.featureGraph?.summary?.flatPatternOutlineSource}
+                      flatPatternBlanks={item.featureGraph?.summary?.flatPatternBlanks}
                       flatPatternBoundingLengthMm={item.featureGraph?.summary?.flatPatternBoundingLengthMm}
                       flatPatternBoundingWidthMm={item.featureGraph?.summary?.flatPatternBoundingWidthMm}
                       flatPatternCutLengthMm={item.cutLengthMm}
@@ -10177,10 +10168,12 @@ export default function ManufacturingIntelligencePage() {
                             nestCandidateSheets={costForHeatmap?.blankSpec?.candidateSheets}
                             nestMaterialLabel={item.material ?? undefined}
                             nestGradeLabel={item.materialGrade ?? undefined}
+                      processConflict={processChoiceConflict(item.featureGraph?.classification)}
                             flatPatternPartName={item.partName ?? item.name}
                             flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
                             flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}
                             flatPatternOutlineSource={item.featureGraph?.summary?.flatPatternOutlineSource}
+                      flatPatternBlanks={item.featureGraph?.summary?.flatPatternBlanks}
                             flatPatternBoundingLengthMm={item.featureGraph?.summary?.flatPatternBoundingLengthMm}
                             flatPatternBoundingWidthMm={item.featureGraph?.summary?.flatPatternBoundingWidthMm}
                             flatPatternCutLengthMm={item.cutLengthMm}

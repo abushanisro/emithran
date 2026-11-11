@@ -7,7 +7,7 @@ import { useDropzone } from 'react-dropzone';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCadUpload, useStartCadUpload } from '@/lib/api/hooks/useCadUploads';
-import { describeFailure, summarize, visibleRows } from '@/lib/cad-uploads/upload-view';
+import { describeFailure, rejectedFileMessage, summarize, visibleRows } from '@/lib/cad-uploads/upload-view';
 import { cn } from '@/lib/utils';
 
 // The one upload limit (MAX_UPLOAD_MB in the env file: the backend and the engine read the same value). Written as a literal
@@ -29,6 +29,8 @@ interface Entry {
   file: File;
   uploadId: string | null;
   error: string | null;
+  /** Refused before upload (wrong kind, too large): sending it again cannot help, so it offers no retry. */
+  refused: boolean;
 }
 
 const fileKey = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
@@ -54,9 +56,15 @@ export function AssemblyTreeGenerator({ className, bomId, onUploaded }: Assembly
     disabled: !bomId,
     onDrop: (files) => {
       // The same file dropped twice is one upload (the server also treats identical bytes as one).
-      const fresh = files.filter((f) => !entries.some((e) => e.key === fileKey(f))).map((file) => ({ key: fileKey(file), file, uploadId: null, error: null }));
+      const fresh = files.filter((f) => !entries.some((e) => e.key === fileKey(f))).map((file) => ({ key: fileKey(file), file, uploadId: null, error: null, refused: false }));
       setEntries((prev) => [...prev, ...fresh]);
       fresh.forEach(send);
+    },
+    onDropRejected: (rejections) => {
+      const refused = rejections
+        .filter(({ file }) => !entries.some((e) => e.key === fileKey(file)))
+        .map(({ file }) => ({ key: fileKey(file), file, uploadId: null, error: rejectedFileMessage(file, MAX_UPLOAD_MB), refused: true }));
+      setEntries((prev) => [...prev, ...refused]);
     },
   });
 
@@ -123,7 +131,7 @@ function UploadCard({ entry, onRetry, onRemove, onDone }: { entry: Entry; onRetr
           </p>
         </div>
         {status === 'done' && upload?.duplicate && <Badge variant="outline">Already uploaded</Badge>}
-        {status === 'failed' && (
+        {status === 'failed' && !entry.refused && (
           <Button variant="ghost" size="sm" onClick={onRetry}>
             <RefreshCw className="mr-1 h-3 w-3" />Retry
           </Button>

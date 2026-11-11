@@ -428,54 +428,42 @@ class SheetMetalFeatureExtractor:
         except Exception as e:
             logger.warning(f"[SheetMetal] rapid_traverse estimation failed: {e}")
 
-        flat_pattern_area_mm2 = 0.0
-        flat_pattern_area_method = "dominant_face_only"
-        flat_pattern_bounding_rect: Optional[Dict[str, float]] = None
-        # Real outline+hole geometry for true (non-rectangle) nesting
-        # visualization -- see _compute_flat_pattern_outline's own docstring.
-        # None (never fabricated) when the wire-walk/merge couldn't resolve
-        # one for this part; failures here never affect flat_pattern_area_mm2
-        # or flat_pattern_bounding_rect above, which are computed independently.
-        flat_pattern_outline: Optional[Dict[str, Any]] = None
-        try:
-            if bends["count"] > 0:
-                # Multi-panel unfold -- the dominant face alone would miss
-                # every wall/flange folded up from the base.
-                unfold = self._compute_true_flat_pattern_area(shape, dominant_face, sheet_thickness)
-                if unfold["method"] == "true_unfold":
-                    flat_pattern_area_mm2 = unfold["area_mm2"]
-                    flat_pattern_area_method = f"true_unfold ({unfold['bends_used']}/{unfold['bends_total']} bends, {unfold['panel_count']} panels)"
-                    dedup_bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness) if dominant_normal else []
-                    flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, dedup_bends)
-                    try:
-                        flat_pattern_outline = self._compute_flat_pattern_outline(
-                            dominant_face, panels, dedup_bends, holes.get("centroids_mm", []),
-                            expected_area_mm2=flat_pattern_area_mm2,
-                        )
-                    except Exception as e:
-                        logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
-                else:
-                    logger.warning(
-                        "[SheetMetal] true_unfold could not resolve panels "
-                        "(non-manifold or unusual import) -- falling back to dominant-face-only, "
-                        "which will UNDERCOUNT area/weight for this bent part"
-                    )
-                    flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
-            else:
-                # No bends -- the part is flat, so the dominant face IS the
-                # whole blank. The simple method is exact here, not an
-                # approximation.
-                flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
-                flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, [])
+        # The blanks this part is cut from: one per solid body (a weldment or a multi-part file holds several -- a
+        # channel and a separate end plate are two blanks, never one sheet). Each is unfolded on its own; the
+        # single-outline fields below describe the part when it is one blank, and the totals when it is several.
+        bodies = _sheet_bodies(shape)
+        if len(bodies) <= 1:
+            blanks = [self._flat_pattern_of_body(shape, sheet_thickness, dominant_face, panels, dominant_normal,
+                                                 bends["count"], holes.get("centroids_mm", []))]
+        else:
+            blanks = []
+            for body in bodies:
                 try:
-                    flat_pattern_outline = self._compute_flat_pattern_outline(
-                        dominant_face, panels, [], holes.get("centroids_mm", []),
-                        expected_area_mm2=flat_pattern_area_mm2,
-                    )
+                    blanks.append(self._flat_pattern_of_separate_body(body, sheet_thickness, holes.get("centroids_mm", [])))
                 except Exception as e:
-                    logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
-        except Exception as e:
-            logger.warning(f"[SheetMetal] flat_pattern_area failed: {e}")
+                    logger.warning(f"[SheetMetal] flat pattern of one body failed: {e}")
+                    blanks.append({"area_mm2": 0.0, "method": "failed", "bounding_rect": None, "outline": None})
+        flat_pattern_area_mm2 = round(sum(b["area_mm2"] for b in blanks), 1)
+        if len(blanks) == 1:
+            flat_pattern_area_method = blanks[0]["method"]
+            flat_pattern_bounding_rect = blanks[0]["bounding_rect"]
+            flat_pattern_outline = blanks[0]["outline"]
+        else:
+            flat_pattern_area_method = f"{len(blanks)} blanks: " + "; ".join(b["method"] for b in blanks)
+            flat_pattern_bounding_rect = None  # several blanks have no one rectangle; see flat_pattern_blanks
+            flat_pattern_outline = None
+        flat_pattern_blanks = [
+            {
+                "area_mm2": round(b["area_mm2"], 1),
+                "method": b["method"],
+                "bounding_length_mm": round(b["bounding_rect"]["length_mm"], 2) if b["bounding_rect"] else None,
+                "bounding_width_mm": round(b["bounding_rect"]["width_mm"], 2) if b["bounding_rect"] else None,
+                "outline_points_mm": b["outline"]["outline_points_mm"] if b["outline"] else None,
+                "holes_mm": b["outline"]["holes_mm"] if b["outline"] else None,
+                "outline_source": "wire_walk" if b["outline"] else "unavailable",
+            }
+            for b in blanks
+        ]
 
         # Validation warnings + debug output
         validation_debug = self._validate_sheet_geometry(
@@ -861,9 +849,109 @@ class SheetMetalFeatureExtractor:
             "flat_pattern_holes_mm": flat_pattern_outline["holes_mm"] if flat_pattern_outline else None,
             "flat_pattern_holes_unplaced": flat_pattern_outline["holes_unplaced"] if flat_pattern_outline else None,
             "flat_pattern_outline_source": "wire_walk" if flat_pattern_outline else "unavailable",
+            # Every blank the part is cut from (one per solid body), each with its own area, bounding rectangle,
+            # outline and holes in its own unfolded frame. One entry for an ordinary sheet part, equal to the fields
+            # above; several for a weldment / multi-body file, whose blanks are nested together.
+            "flat_pattern_blanks": flat_pattern_blanks,
             "sheet_geometry_debug": {**geom_debug, **validation_debug},
             "feature_graph_v2": feature_graph_v2,
         }
+
+    def _flat_pattern_of_body(
+        self,
+        shape: Any,
+        sheet_thickness: float,
+        dominant_face: Any,
+        panels: List[Dict[str, Any]],
+        dominant_normal: Optional[Tuple[float, float, float]],
+        bend_count: int,
+        hole_centroids_mm: List[Any],
+    ) -> Dict[str, Any]:
+        """
+        One blank's flat pattern: {"area_mm2", "method", "bounding_rect", "outline"} for a single sheet body (`shape`
+        is that body, `panels` and `dominant_face` are its own). Failures leave a field None or the area on the
+        dominant-face method, never a guess -- the same contract the single-body extraction always had.
+        """
+        flat_pattern_area_mm2 = 0.0
+        flat_pattern_area_method = "dominant_face_only"
+        flat_pattern_bounding_rect: Optional[Dict[str, float]] = None
+        # Real outline+hole geometry for true (non-rectangle) nesting
+        # visualization -- see _compute_flat_pattern_outline's own docstring.
+        # None (never fabricated) when the wire-walk/merge couldn't resolve
+        # one for this part; failures here never affect flat_pattern_area_mm2
+        # or flat_pattern_bounding_rect above, which are computed independently.
+        flat_pattern_outline: Optional[Dict[str, Any]] = None
+        try:
+            if bend_count > 0:
+                # Multi-panel unfold -- the dominant face alone would miss
+                # every wall/flange folded up from the base.
+                unfold = self._compute_true_flat_pattern_area(shape, dominant_face, sheet_thickness)
+                if unfold["method"] == "true_unfold":
+                    flat_pattern_area_mm2 = unfold["area_mm2"]
+                    flat_pattern_area_method = f"true_unfold ({unfold['bends_used']}/{unfold['bends_total']} bends, {unfold['panel_count']} panels)"
+                    dedup_bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness) if dominant_normal else []
+                    flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, dedup_bends)
+                    try:
+                        flat_pattern_outline = self._compute_flat_pattern_outline(
+                            dominant_face, panels, dedup_bends, hole_centroids_mm,
+                            expected_area_mm2=flat_pattern_area_mm2,
+                        )
+                    except Exception as e:
+                        logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
+                else:
+                    logger.warning(
+                        "[SheetMetal] true_unfold could not resolve panels "
+                        "(non-manifold or unusual import) -- falling back to dominant-face-only, "
+                        "which will UNDERCOUNT area/weight for this bent part"
+                    )
+                    flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
+            else:
+                # No bends -- the part is flat, so the dominant face IS the
+                # whole blank. The simple method is exact here, not an
+                # approximation.
+                flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
+                flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, [])
+                try:
+                    flat_pattern_outline = self._compute_flat_pattern_outline(
+                        dominant_face, panels, [], hole_centroids_mm,
+                        expected_area_mm2=flat_pattern_area_mm2,
+                    )
+                except Exception as e:
+                    logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
+        except Exception as e:
+            logger.warning(f"[SheetMetal] flat_pattern_area failed: {e}")
+        return {
+            "area_mm2": flat_pattern_area_mm2,
+            "method": flat_pattern_area_method,
+            "bounding_rect": flat_pattern_bounding_rect,
+            "outline": flat_pattern_outline,
+        }
+
+    def _flat_pattern_of_separate_body(self, body: Any, sheet_thickness: float, hole_centroids_mm: List[Any]) -> Dict[str, Any]:
+        """
+        The flat pattern of one body of a multi-body file. The body is its own blank, so its own dominant face, panels,
+        bends and holes are found on it alone (the part's thickness carries over: one gauge per part). Holes are kept
+        to those inside this body's box, so a hole of the next body is never placed on this blank.
+        """
+        from OCC.Core.Bnd import Bnd_Box  # type: ignore
+        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+
+        box = Bnd_Box()
+        brepbndlib.Add(body, box, True)
+        x0, y0, z0, x1, y1, z1 = box.Get()
+        dims = [x1 - x0, y1 - y0, z1 - z0]
+        _t, dominant_face, _conf, _dbg = self._extract_sheet_metal_geometry(body, dims)
+        panels = self._identify_panels(body, sheet_thickness)
+        dominant_normal = None
+        if dominant_face is not None:
+            n = BRepAdaptor_Surface(dominant_face).Plane().Axis().Direction()
+            dominant_normal = (float(n.X()), float(n.Y()), float(n.Z()))
+        bend_count = len(self._collect_dedup_bends(body, dominant_normal, sheet_thickness)) if dominant_normal else 0
+        margin = 1.0
+        holes = [h for h in hole_centroids_mm
+                 if x0 - margin <= h[0] <= x1 + margin and y0 - margin <= h[1] <= y1 + margin and z0 - margin <= h[2] <= z1 + margin]
+        return self._flat_pattern_of_body(body, sheet_thickness, dominant_face, panels, dominant_normal, bend_count, holes)
 
     # ── Sheet thickness + dominant face (combined single pass) ────────────────
 
@@ -879,7 +967,8 @@ class SheetMetalFeatureExtractor:
         collect_modal_pairs: also put in `debug["modal_pairs"]` the antiparallel face pairs that voted for the modal
         thickness, as [face_ordinal_a, face_ordinal_b, separation_mm, combined_area_mm2], where the ordinal is the
         face's TopExp explorer index (the one the viewer's face_map and every feature's face_ids use). These are
-        the faces the reported thickness was measured on. Off by default, so sheet metal's debug output is unchanged;
+        the faces the reported thickness was measured on (combined_area_mm2 is the pair's wall area: its smaller face, see step 3).
+        Off by default, so sheet metal's debug output is unchanged;
         the plastic extractor turns it on to show the wall's faces behind a calculator input.
 
         Algorithm:
@@ -896,13 +985,17 @@ class SheetMetalFeatureExtractor:
              Works for ANY normal orientation, not just ±X/Y/Z.
 
           3. Area-weighted distance histogram at 0.05 mm resolution.
-             Each pair votes with weight = combined_area of both faces.
+             Each pair votes with the area of the wall it can bound: its SMALLER face. Two faces are a wall only where
+             they face each other, so the larger face's excess is not evidence of that thickness. With the sum of both
+             areas, one large face votes its whole area again for every small face opposite it: the 1576 mm² base of a
+             machined holder, opposite four 2.1 mm² counterbore floors 1 mm away, outvoted its real 3.5 mm walls and
+             the part was read as 1 mm sheet.
              Modal bin = sheet material gauge.
              (A 55-bend frame with many flat sections all at 2 mm produces a
               clear majority vote over the rare large-distance pairs.)
 
           4. Among pairs within ±15% of the modal thickness, score each pair:
-               score = combined_area × (1 + 0.3 × centrality)
+               score = wall_area × (1 + 0.3 × centrality)
              where centrality = 1 − (dist_from_part_centre / bbox_half_diag).
              Highest score → dominant blank face.
 
@@ -1023,7 +1116,7 @@ class SheetMetalFeatureExtractor:
                 dist = abs(di + dj)
                 if dist < 0.3 or dist > max_gauge_loose:
                     continue
-                pair_area = ai + aj
+                pair_area = min(ai, aj)  # the wall this pair bounds (docstring step 3)
                 bin_key = round(dist / BIN_RES) * BIN_RES
                 hist[bin_key] += pair_area
                 hist_count[bin_key] += 1
@@ -3130,12 +3223,35 @@ class SheetMetalFeatureExtractor:
 
         # ── 2. Pair antiparallel planar faces ~sheet_thickness apart ───────
         tol = max(0.15, sheet_thickness * 0.15)
+        # A panel's two faces lie one thickness apart AND face each other. Planes alone are not enough: two flanges in
+        # one plane (a hat profile's feet, a frame's opposite rails) offer every face a partner on the wrong flange,
+        # and pairing those ties bends to the wrong panels. Each face takes the partner its footprint overlaps most.
+        from OCC.Core.Bnd import Bnd_Box  # type: ignore
+        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
+        boxes = []
+        for entry in planar:
+            box = Bnd_Box()
+            brepbndlib.Add(entry[5], box, True)
+            boxes.append(box.Get())
+        slack = sheet_thickness + tol
+
+        def _overlap(a: int, b: int) -> float:
+            ba, bb = boxes[a], boxes[b]
+            vol = 1.0
+            for k in range(3):
+                span = min(ba[k + 3], bb[k + 3]) - max(ba[k], bb[k]) + slack
+                if span <= 0:
+                    return 0.0
+                vol *= span
+            return vol
+
         used = [False] * len(planar)
         panels: List[Dict[str, Any]] = []
         for i in range(len(planar)):
             if used[i]:
                 continue
             ni, di = planar[i][:3], planar[i][3]
+            best_j, best_overlap = -1, 0.0
             for j in range(i + 1, len(planar)):
                 if used[j]:
                     continue
@@ -3146,6 +3262,10 @@ class SheetMetalFeatureExtractor:
                 dist = abs(di + dj)
                 if abs(dist - sheet_thickness) > tol:
                     continue
+                overlap = _overlap(i, j)
+                if overlap > best_overlap:
+                    best_j, best_overlap = j, overlap
+            for j in ([best_j] if best_j >= 0 else []):
                 used[i] = True
                 used[j] = True
                 # Prefer the FORWARD-oriented face of the pair as the
@@ -3159,6 +3279,7 @@ class SheetMetalFeatureExtractor:
                     "normal": rep_normal,
                     "plane_d": planar[rep_idx][3],
                     "face": planar[rep_idx][5],
+                    "faces": [planar[i][5], planar[j][5]],  # both sides: a bend meets either one
                     "area": planar[i][4],  # one face's area = the panel's flat area
                 })
                 break
@@ -3201,6 +3322,8 @@ class SheetMetalFeatureExtractor:
         min_bend_line = max(2.0 * sheet_thickness, 3.0)
         candidates: List[Dict[str, Any]] = []
 
+        edge_faces = _edge_face_map(shape)
+        panel_faces = [f for p in self._identify_panels(shape, sheet_thickness) for f in p["faces"]]
         exp2 = TopExp_Explorer(shape, TopAbs_FACE)
         while exp2.More():
             try:
@@ -3214,10 +3337,9 @@ class SheetMetalFeatureExtractor:
                     fx, fy, fz = float(d.X()), float(d.Y()), float(d.Z())
                     fn = math.sqrt(fx * fx + fy * fy + fz * fz) or 1.0
                     fx, fy, fz = fx / fn, fy / fn, fz / fn
-                    axis_alignment = abs(fx * dnx + fy * dny + fz * dnz)
-                    if axis_alignment >= 0.5:
+                    if not _cylinder_is_bend(face, (fx, fy, fz), edge_faces, panel_faces, (dnx, dny, dnz)):
                         exp2.Next()
-                        continue  # aligned with sheet normal -- a hole/boss, not a bend
+                        continue  # a hole, boss or corner round: it cuts through a sheet, it does not fold one
                     if not (0.1 <= radius <= max_bend_radius):
                         exp2.Next()
                         continue
@@ -3248,6 +3370,7 @@ class SheetMetalFeatureExtractor:
                         "axial_length": axial_length,
                         "dir": (fx, fy, fz),
                         "axis_point": (px, py, pz),
+                        "face": face,
                     })
             except Exception:
                 pass
@@ -3290,9 +3413,11 @@ class SheetMetalFeatureExtractor:
                 used_bend[i] = True
                 used_bend[partner_j] = True
                 inner = ci if ci["radius"] < candidates[partner_j]["radius"] else candidates[partner_j]
+                bend_faces = [ci["face"], candidates[partner_j]["face"]]
             else:
                 used_bend[i] = True
                 inner = ci  # no concentric partner found -- use this face alone
+                bend_faces = [ci["face"]]
 
             radius = inner["radius"]
             k_factor = 0.33 if radius < 2.0 * sheet_thickness else 0.41
@@ -3304,6 +3429,10 @@ class SheetMetalFeatureExtractor:
                 "angle_rad": inner["angle_rad"],
                 "axial_length": inner["axial_length"],
                 "allowance_mm": allowance_mm,
+                "thickness_mm": sheet_thickness,
+                # The faces the bend's cylinders share a B-rep edge with: the panels it joins, read from the
+                # topology rather than inferred from distances (_bend_panel_adjacency).
+                "neighbor_faces": _edge_neighbor_faces(edge_faces, bend_faces),
             })
 
         return bends
@@ -3497,21 +3626,7 @@ class SheetMetalFeatureExtractor:
         # bend when the bend's own axis_point lies (within radius + a small
         # tolerance) on that panel's plane — the two closest panels are its
         # endpoints.
-        adjacency: List[List[Tuple[int, Dict[str, Any]]]] = [[] for _ in range(n)]
-        for bend in bends:
-            ax_pt = bend["axis_point"]
-            tol = bend["radius"] * 1.5 + 2.0
-            dists = []
-            for i, p in enumerate(panels):
-                nx, ny, nz = p["normal"]
-                dist = abs(ax_pt[0] * nx + ax_pt[1] * ny + ax_pt[2] * nz - p["plane_d"])
-                dists.append((dist, i))
-            dists.sort(key=lambda t: t[0])
-            if len(dists) < 2 or dists[1][0] > tol:
-                continue  # couldn't confidently find both connected panels for this bend
-            i1, i2 = dists[0][1], dists[1][1]
-            adjacency[i1].append((i2, bend))
-            adjacency[i2].append((i1, bend))
+        adjacency = _bend_panel_adjacency(panels, bends)
 
         # Per panel: origin_3d (a 3D reference point on the panel) + u_3d/v_3d
         # (orthonormal in-plane 3D directions) + origin_2d (that reference
@@ -3757,21 +3872,7 @@ class SheetMetalFeatureExtractor:
                 break
 
         # Same bend-to-panel adjacency matching as _compute_flat_pattern_layout.
-        adjacency: List[List[Tuple[int, Dict[str, Any]]]] = [[] for _ in range(n)]
-        for bend in bends:
-            ax_pt = bend["axis_point"]
-            tol = bend["radius"] * 1.5 + 2.0
-            dists = []
-            for i, p in enumerate(panels):
-                nx, ny, nz = p["normal"]
-                dist = abs(ax_pt[0] * nx + ax_pt[1] * ny + ax_pt[2] * nz - p["plane_d"])
-                dists.append((dist, i))
-            dists.sort(key=lambda t: t[0])
-            if len(dists) < 2 or dists[1][0] > tol:
-                continue
-            i1, i2 = dists[0][1], dists[1][1]
-            adjacency[i1].append((i2, bend))
-            adjacency[i2].append((i1, bend))
+        adjacency = _bend_panel_adjacency(panels, bends)
 
         frame_origin_3d: List[Optional[Tuple[float, float, float]]] = [None] * n
         frame_u3d: List[Optional[Tuple[float, float, float]]] = [None] * n
@@ -3991,7 +4092,13 @@ class SheetMetalFeatureExtractor:
             )
             return None
 
-        merged = unary_union(panel_polygons)
+        # Panels and bend strips meet edge to edge, so in exact arithmetic their union is one polygon; in floating point
+        # neighbouring edges miss each other by ~1e-9 mm and unary_union keeps them apart (a hat profile's foot and its
+        # bend strip came out as a separate piece and the whole outline was declined as fragmented). A morphological
+        # close -- grow every piece by SEAM_WELD_MM, union, shrink back -- welds seams narrower than that and leaves the
+        # true outline unchanged: mitred joins keep corners sharp, and 0.05 mm is far below any kerf or tolerance.
+        SEAM_WELD_MM = 0.05
+        merged = unary_union([poly.buffer(SEAM_WELD_MM, join_style=2) for poly in panel_polygons]).buffer(-SEAM_WELD_MM, join_style=2)
         if merged.is_empty:
             logger.warning("[SheetMetal] flat_pattern_outline declined: unary_union of panel polygons is empty")
             return None
@@ -4285,3 +4392,142 @@ class SheetMetalFeatureExtractor:
             "bbox_dims_sorted_mm": [round(d, 2) for d in sorted_dims],
             "validation_warnings": warnings_emitted,
         }
+
+
+def _edge_face_map(shape: Any) -> Any:
+    """Every edge of `shape` -> the faces it bounds (built once per part, then queried per bend)."""
+    from OCC.Core.TopExp import topexp  # type: ignore
+    from OCC.Core.TopAbs import TopAbs_EDGE, TopAbs_FACE  # type: ignore
+    from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape  # type: ignore
+
+    edge_faces = TopTools_IndexedDataMapOfShapeListOfShape()
+    topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_faces)
+    return edge_faces
+
+
+def _edge_neighbor_faces(edge_faces: Any, faces: List[Any]) -> List[Any]:
+    """The faces that share a B-rep edge with any of `faces` (themselves excluded), from an _edge_face_map."""
+    from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+    from OCC.Core.TopAbs import TopAbs_EDGE  # type: ignore
+    from OCC.Core.TopTools import TopTools_ListIteratorOfListOfShape  # type: ignore
+    from OCC.Core.TopoDS import topods  # type: ignore
+
+    out: List[Any] = []
+    for face in faces:
+        exp = TopExp_Explorer(face, TopAbs_EDGE)
+        while exp.More():
+            edge = exp.Current()
+            if edge_faces.Contains(edge):
+                it = TopTools_ListIteratorOfListOfShape(edge_faces.FindFromKey(edge))
+                while it.More():
+                    other = it.Value()
+                    if not any(other.IsSame(f) for f in faces) and not any(other.IsSame(o) for o in out):
+                        out.append(topods.Face(other))
+                    it.Next()
+            exp.Next()
+    return out
+
+
+def _bend_panel_adjacency(panels: List[Dict[str, Any]], bends: List[Dict[str, Any]]) -> List[List[Tuple[int, Dict[str, Any]]]]:
+    """
+    Which two panels each bend joins, as an adjacency list over panel indices (one entry per bend, both directions).
+
+    Read from the B-rep: a bend's cylinder faces share edges with exactly the faces of the two flanges it folds
+    (bend["neighbor_faces"]); a panel is joined when either of its two faces is among them. That holds for any
+    part, whatever its thickness, radius or how many panels lie in parallel planes.
+
+    Only when the topology does not name exactly two panels (a bend face split by the exporter, a bend running into
+    a third wall) does it fall back to geometry: the two panels whose planes pass closest to the bend axis, which
+    lies one inner radius from the inner face and radius + thickness from the outer one. The tolerance used to be
+    1.5 x radius + 2 mm with no thickness term, so on a 5 mm sheet with a 2 mm radius the outer face (7 mm away)
+    was never matched, the panel graph fell apart and the flat-pattern outline was declined.
+    """
+    n = len(panels)
+    adjacency: List[List[Tuple[int, Dict[str, Any]]]] = [[] for _ in range(n)]
+    for bend in bends:
+        joined: List[int] = []
+        for nbr in bend.get("neighbor_faces") or []:
+            for i, p in enumerate(panels):
+                if i not in joined and any(nbr.IsSame(f) for f in (p.get("faces") or [p["face"]])):
+                    joined.append(i)
+        if len(joined) != 2:
+            ax = bend["axis_point"]
+            thickness = bend.get("thickness_mm") or 0.0
+            tol = bend["radius"] + thickness + max(0.5, 0.1 * (bend["radius"] + thickness))
+            dists = sorted(
+                (abs(ax[0] * p["normal"][0] + ax[1] * p["normal"][1] + ax[2] * p["normal"][2] - p["plane_d"]), i)
+                for i, p in enumerate(panels)
+            )
+            if len(dists) < 2 or dists[1][0] > tol:
+                continue  # neither the topology nor the geometry names both panels: leave the bend out, never guess
+            joined = [dists[0][1], dists[1][1]]
+        i1, i2 = joined
+        adjacency[i1].append((i2, bend))
+        adjacency[i2].append((i1, bend))
+    return adjacency
+
+
+def _cylinder_is_bend(
+    face: Any,
+    axis_dir: Tuple[float, float, float],
+    edge_faces: Any,
+    panel_faces: List[Any],
+    dominant_normal: Tuple[float, float, float],
+) -> bool:
+    """
+    Whether a cylindrical face folds the sheet (a bend) rather than cutting through it (a hole, boss or corner round).
+
+    Decided by the PANEL faces it borders (faces paired with an opposite face one sheet thickness away, _identify_panels):
+    a bend joins two flanges, whose faces lie parallel to its axis (normals perpendicular to it); a hole or a corner
+    round borders the two faces of the one sheet it passes through, whose normals run along its axis. The sheet's
+    edge faces (a bend strip's ends, the outline's sides) are not panel faces and do not vote. This holds wherever the
+    bend sits on the part. The test it replaces compared the axis with the part's dominant normal, which rejects every
+    bend between two walls both perpendicular to the main panel (a channel's side walls, a tab folded from a wall):
+    those bends were dropped, the panel graph fell apart and the flat-pattern outline and layout were declined.
+
+    A cylinder that borders no panel face (bend meeting bend) falls back to that dominant-normal test.
+    """
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+
+    ax, ay, az = axis_dir
+    along = across = 0
+    for nbr in _edge_neighbor_faces(edge_faces, [face]):
+        if not any(nbr.IsSame(f) for f in panel_faces):
+            continue
+        try:
+            n = BRepAdaptor_Surface(nbr).Plane().Axis().Direction()
+        except Exception:
+            continue
+        if abs(ax * n.X() + ay * n.Y() + az * n.Z()) >= 0.5:
+            along += 1
+        else:
+            across += 1
+    if along or across:
+        return across > 0 and along == 0
+    dnx, dny, dnz = dominant_normal
+    return abs(ax * dnx + ay * dny + az * dnz) < 0.5
+
+
+# A solid smaller than this share of the part's largest body is modelling debris (exporters leave zero-volume or
+# sliver solids: SLEEK-FRAME v2 carries 64 of them beside its one real body), not a blank.
+SHEET_BODY_MIN_VOLUME_SHARE = 0.01
+
+
+def _sheet_bodies(shape: Any) -> List[Any]:
+    """The solid bodies of `shape` that are blanks of their own, largest first; [] when it holds no solid."""
+    from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+    from OCC.Core.TopAbs import TopAbs_SOLID  # type: ignore
+    from OCC.Core.GProp import GProp_GProps  # type: ignore
+    from OCC.Core.BRepGProp import brepgprop  # type: ignore
+
+    solids = []
+    exp = TopExp_Explorer(shape, TopAbs_SOLID)
+    while exp.More():
+        props = GProp_GProps()
+        brepgprop.VolumeProperties(exp.Current(), props)
+        solids.append((abs(props.Mass()), exp.Current()))
+        exp.Next()
+    if not solids:
+        return []
+    largest = max(v for v, _ in solids)
+    return [solid for v, solid in sorted(solids, key=lambda t: -t[0]) if v >= largest * SHEET_BODY_MIN_VOLUME_SHARE]

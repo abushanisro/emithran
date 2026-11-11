@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import type { SandGatingLayout } from '@/lib/casting/gating-layout';
 import type { CalculatorRun } from '@/lib/costing/sand-calculations';
 import type { SandRouteAlternative } from '@/lib/costing/sand-alternatives';
-import { apiClient } from '../client';
+import { apiClient, ApiError } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
 import { runProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -272,6 +272,30 @@ export function invalidateBOMItemUpdateQueries(queryClient: QueryClient, data: B
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'dfm-scores'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'plastic-dfm'] });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'part-summary'] });
+}
+
+// A re-analysis replaces the item's geometry (feature graph, flat-pattern outline), so on top of what any item update
+// invalidates it refreshes what is computed from the geometry alone: the true nest and the machining need.
+export function invalidateBOMItemReanalysisQueries(queryClient: QueryClient, data: BOMItem): void {
+  invalidateBOMItemUpdateQueries(queryClient, data);
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'true-nest'] });
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'machining-need'] });
+}
+
+/** Re-runs the CAD analysis on the item's stored 3D file (POST /bom-items/:id/reanalyze), then refreshes it and its costs. */
+export function useReanalyzeBOMItem(itemId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // The engine can take minutes on a large STEP file; the backend allows the same.
+    mutationFn: () => apiClient.post<BOMItem>(`/bom-items/${itemId}/reanalyze`, undefined, { timeout: 180_000 }),
+    onSuccess: (data) => {
+      invalidateBOMItemReanalysisQueries(queryClient, data);
+      toast.success('CAD analysis re-run');
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof ApiError ? error.getUserMessage() : 'Could not re-run the CAD analysis');
+    },
+  });
 }
 
 export function useUpdateBOMItem() {
@@ -1297,6 +1321,9 @@ export interface TrueNestResultDto {
   utilizationPct: number;
   sheetsRequired: number | null;
   capped: boolean;
+  /** Which of the part's blanks this nest is of (0-based) and how many there are: 1 for an ordinary part, one per solid body for a multi-body file. */
+  blankIndex: number;
+  blankCount: number;
 }
 
 // On-demand only (enabled defaults to requiring both sheet dims AND the
@@ -1310,11 +1337,11 @@ export function useTrueNest(
   quantity: number,
   sheetWidthMm: number | undefined,
   sheetLengthMm: number | undefined,
-  options?: { kerfMm?: number | undefined; edgeMarginMm?: number | undefined; enabled?: boolean | undefined },
+  options?: { kerfMm?: number | undefined; edgeMarginMm?: number | undefined; enabled?: boolean | undefined; blank?: number | undefined },
 ) {
   const hasSheet = typeof sheetWidthMm === 'number' && sheetWidthMm > 0 && typeof sheetLengthMm === 'number' && sheetLengthMm > 0;
   return useQuery({
-    queryKey: ['bom-items', itemId, 'true-nest', quantity, sheetWidthMm, sheetLengthMm, options?.kerfMm, options?.edgeMarginMm],
+    queryKey: ['bom-items', itemId, 'true-nest', quantity, sheetWidthMm, sheetLengthMm, options?.kerfMm, options?.edgeMarginMm, options?.blank ?? 0],
     queryFn: () => {
       const params = new URLSearchParams({
         quantity: String(quantity),
@@ -1323,6 +1350,7 @@ export function useTrueNest(
       });
       if (options?.kerfMm !== undefined) params.set('kerfMm', String(options.kerfMm));
       if (options?.edgeMarginMm !== undefined) params.set('edgeMarginMm', String(options.edgeMarginMm));
+      if (options?.blank) params.set('blank', String(options.blank));
       // Kept above cad-analysis.service.ts's own 90s /nest timeout so the
       // backend's specific diagnostic reason surfaces before this generic
       // client-side abort would.

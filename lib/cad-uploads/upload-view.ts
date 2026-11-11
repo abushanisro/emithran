@@ -16,7 +16,21 @@ const FAILURES: Record<string, string> = {
   processing_failed: 'Processing failed after several attempts.',
 };
 
-const DETAIL_IS_COMPLETE: ReadonlySet<string> = new Set(['no_step_files']);
+// The backend's lists (check-upload.ts NATIVE_CAD, expand-archive.ts PACKED_ARCHIVE): the server is the authority, this only spares
+// the user an upload the server would refuse, and says why instead of dropping the file silently.
+const NATIVE_CAD = /\.(sldasm|sldprt|catpart|catproduct|prt|asm|ipt|iam|x_t|x_b|3dm|dwg)$/i;
+const PACKED_ARCHIVE = /\.(rar|7z|tar|gz|tgz|bz2|tbz|tbz2|xz|txz|zst|cab|arj|lzh)$/i;
+
+/** Why a file dropped on the upload card is not sent: the same words the server would answer with. */
+export function rejectedFileMessage(file: { name: string; size: number }, maxMb: number): string {
+  const extension = /\.[^.]+$/.exec(file.name)?.[0].toLowerCase() ?? '';
+  if (PACKED_ARCHIVE.test(file.name)) return `${file.name} is a ${extension} archive, which is not read. Unpack it and upload a .zip of the STEP files.`;
+  if (NATIVE_CAD.test(file.name)) return `${file.name} is a native CAD file. Export it as STEP (AP242) and upload that.`;
+  if (/\.(zip|step|stp)$/i.test(file.name) && file.size > maxMb * 1024 * 1024) return `${file.name} is larger than ${maxMb} MB.`;
+  return `${file.name}: upload a .zip of STEP files, or a .step / .stp file.`;
+}
+
+const DETAIL_IS_COMPLETE: ReadonlySet<string> = new Set(['no_step_files', 'archive_empty']);
 
 /** What to tell the user about a failed upload: a plain sentence per code, plus the detail the server recorded. */
 export function describeFailure(upload: Pick<CadUpload, 'errorCode' | 'errorDetail'>): string {

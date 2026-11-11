@@ -38,8 +38,8 @@ test('Rtp2 laser calculator: cut length and pierce popups match the engine numbe
   const popup = page.locator('div.fixed', { hasText: /^CAD evidence:/ });
   await expect(popup).toContainText('cut length = 5018.1 mm');
   await expect(popup).not.toContainText('the input holds');
-  // the model is drawn when the test account can fetch it; otherwise the popup says so
-  await expect(popup.locator('canvas').or(popup.getByText(/The 3D model could not be loaded|Preparing 3D model/))).toHaveCount(1);
+  // the model is drawn when the test account can fetch it; otherwise the popup says so (its own message, or the viewer's "Model download failed" when the file is not in the store)
+  await expect(popup.locator('canvas').or(popup.getByText(/The 3D model could not be loaded|Preparing 3D model|Model download failed/))).toHaveCount(1);
 
   // Pierces: switching eyes replaces the highlight (one feature at a time)
   await page.getByTitle(/CAD faces/).nth(1).click();

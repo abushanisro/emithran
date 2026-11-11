@@ -4,7 +4,7 @@ import { highlightLabel, uniqueOccurrenceTriangles } from '@/lib/features/highli
 import { faceIdForTriangle } from '@/lib/features/machining-feature-tree';
 import React, { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Grid, Center } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { fitCameraToBox } from '@/lib/geometry/camera-fit';
@@ -55,6 +55,7 @@ import { MeasurementOverlay } from './measurement-overlay';
 import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
 import { getResultColors } from './measurement-overlay';
 import { MeasurementPanel } from './measurement-panel';
+import type { FlatPatternBlank } from '@/lib/types/manufacturing';
 
 const RISK_HIGHLIGHT_COLORS: Record<string, string> = {
   low: '#22c55e',
@@ -157,6 +158,8 @@ interface EDrawingsViewerProps {
   nestCandidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }>;
   nestMaterialLabel?: string;
   nestGradeLabel?: string;
+  /** The chosen process and the geometry disagree (processChoiceConflict): the reason there is no flat pattern, and why Reanalyze cannot help. */
+  processConflict?: string | null;
   /** Flat Pattern toolbar toggle — the real unfolded 2D outline (cad-engine's wire-walk extraction), shown on its own before Nest places copies of it on a sheet. Omit outlinePointsMm to hide the button entirely. */
   flatPatternPartName?: string;
   flatPatternOutlinePointsMm?: number[][];
@@ -168,6 +171,7 @@ interface EDrawingsViewerProps {
   flatPatternBendCount?: number;
   flatPatternHoleCount?: number;
   flatPatternPierceCount?: number;
+  flatPatternBlanks?: FlatPatternBlank[] | undefined;
   flatPatternAreaMm2?: number;
 }
 
@@ -608,13 +612,22 @@ const DFM_COLORS = {
 
 type DFMType = keyof typeof DFM_COLORS;
 
+/** Distinct DFM feature types present in `features` that have a legend colour. */
+function dfmLegendTypes(features: ManufacturingFeature[] | undefined): DFMType[] {
+  return (features ?? [])
+    .map(f => f.type)
+    .filter((t, i, arr) => arr.indexOf(t) === i)
+    .filter(t => t in DFM_COLORS) as DFMType[];
+}
+
+// Plain DOM over the canvas, not drei <Html>: an <Html> inside the R3F tree owns a
+// nested React root and unmounts it synchronously from a layout-effect cleanup during
+// the R3F commit, which React reports as "Attempted to synchronously unmount a root
+// while React was already rendering".
 function DFMLegend({ activeTypes }: { activeTypes: DFMType[] }) {
   if (activeTypes.length === 0) return null;
   return (
-    <Html
-      position={[-999, -999, 0]}
-      style={{ position: 'fixed', bottom: 72, left: 16, pointerEvents: 'none', userSelect: 'none' }}
-    >
+    <div className="absolute bottom-20 left-36 pointer-events-none select-none">
       <div style={{
         background: 'rgba(20,20,30,0.85)',
         backdropFilter: 'blur(8px)',
@@ -639,7 +652,49 @@ function DFMLegend({ activeTypes }: { activeTypes: DFMType[] }) {
           </div>
         ))}
       </div>
-    </Html>
+    </div>
+  );
+}
+
+/** STLModel's load state, reported to the viewer so it can draw the overlay in DOM (see DFMLegend). */
+type ModelLoadStatus =
+  | { kind: 'loading'; stage: string; progress: number }
+  | { kind: 'error'; message: string }
+  | null;
+
+function ModelLoadStatusOverlay({ status }: { status: ModelLoadStatus }) {
+  if (!status) return null;
+  if (status.kind === 'error') {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg border border-destructive">
+          <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+            <div className="text-destructive">⚠️</div>
+            <div className="text-sm font-medium">Failed to Load 3D Model</div>
+            <div className="text-xs text-muted-foreground">{status.message}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg border">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent animate-spin rounded-full" />
+          <div className="text-sm font-medium">Loading 3D Model</div>
+          <div className="text-xs text-muted-foreground">
+            {status.stage || (status.progress > 0 ? `${status.progress.toFixed(1)}%` : 'Preparing...')}
+          </div>
+          <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-500 ease-out"
+              style={{ width: `${Math.max(2, Math.min(100, status.progress))}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1472,6 +1527,7 @@ function STLModel({
   heatmapRiskValuesRef,
   onHeatmapInspect,
   onTrianglePick,
+  onLoadStatus,
 }: {
   url: string;
   color: string;
@@ -1524,6 +1580,8 @@ function STLModel({
   onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
   /** Called with the picked STL triangle index on a plain (non-heatmap, non-measure) click. */
   onTrianglePick?: ((triangleIndex: number) => void) | undefined;
+  /** Load progress / failure, drawn by the viewer as a DOM overlay outside the Canvas. */
+  onLoadStatus?: ((status: ModelLoadStatus) => void) | undefined;
 }) {
   const setupAxes = React.useContext(SetupAxesCtx);
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
@@ -1532,8 +1590,15 @@ function STLModel({
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStage, setLoadingStage] = useState<string>('Initializing...');
   const [loadingError, setLoadingError] = useState<string | null>(null);
-  const [previewReady, _setPreviewReady] = useState(false);
-  const [detailsReady, _setDetailsReady] = useState(false);
+
+  useEffect(() => {
+    onLoadStatus?.(
+      loadingError ? { kind: 'error', message: loadingError }
+        : isLoading ? { kind: 'loading', stage: loadingStage, progress: loadingProgress }
+          : null,
+    );
+  }, [onLoadStatus, isLoading, loadingStage, loadingProgress, loadingError]);
+  useEffect(() => () => onLoadStatus?.(null), [onLoadStatus]);
 
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
@@ -2574,57 +2639,8 @@ function STLModel({
     });
   });
 
-  // ─── DFM legend types ───────────────────────────────────────────────────
-
-  const activeTypes = (manufacturingFeatures ?? [])
-    .map(f => f.type)
-    .filter((t, i, arr) => arr.indexOf(t) === i)
-    .filter(t => t in DFM_COLORS) as DFMType[];
-
   // ─── Render states ──────────────────────────────────────────────────────
-
-  if (isLoading) {
-    return (
-      <group>
-        <Html position={[0, 0, 0]} center>
-          <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg border">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent animate-spin rounded-full" />
-              <div className="text-sm font-medium">Loading 3D Model</div>
-              <div className="text-xs text-muted-foreground">
-                {loadingStage || (loadingProgress > 0 ? `${loadingProgress.toFixed(1)}%` : 'Preparing...')}
-              </div>
-              <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-500 ease-out"
-                  style={{ width: `${Math.max(2, Math.min(100, loadingProgress))}%` }}
-                />
-              </div>
-              {previewReady && !detailsReady && (
-                <div className="text-xs text-yellow-400">Preview ready • Loading details...</div>
-              )}
-            </div>
-          </div>
-        </Html>
-      </group>
-    );
-  }
-
-  if (loadingError) {
-    return (
-      <group>
-        <Html position={[0, 0, 0]} center>
-          <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg border border-destructive">
-            <div className="flex flex-col items-center gap-3 text-center max-w-sm">
-              <div className="text-destructive">⚠️</div>
-              <div className="text-sm font-medium">Failed to Load 3D Model</div>
-              <div className="text-xs text-muted-foreground">{loadingError}</div>
-            </div>
-          </div>
-        </Html>
-      </group>
-    );
-  }
+  // Loading / error UI is reported via onLoadStatus and drawn outside the Canvas.
 
   if (!geometry) return null;
 
@@ -2775,10 +2791,6 @@ function STLModel({
           })
         : null}
 
-      {showFeatures && activeTypes.length > 0 && !isExploded && (
-        <DFMLegend activeTypes={activeTypes} />
-      )}
-
       {/* ─── Measurement highlights ─── */}
       {geometry && measureMode !== 'IDLE' && (() => {
         geometry.computeBoundingBox();
@@ -2907,6 +2919,7 @@ function Scene({
   occurrenceFaceIndices, groupFaceIndices,
   riskGroups, selectedOccurrenceColor, groupHighlightColor,
   heatmapActive, heatmapSources, heatmapNormalization, heatmapRiskValuesRef, onHeatmapInspect, onTrianglePick,
+  onLoadStatus,
 }: {
   fileUrl: string; modelColor: string; showGrid: boolean;
   viewPosition: [number, number, number]; autoFit: boolean; fitCenter: [number, number, number];
@@ -2943,6 +2956,7 @@ function Scene({
   heatmapRiskValuesRef?: React.RefObject<Float32Array | null> | undefined;
   onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
   onTrianglePick?: ((triangleIndex: number) => void) | undefined;
+  onLoadStatus: (status: ModelLoadStatus) => void;
 }) {
   return (
 <>
@@ -3045,6 +3059,7 @@ function Scene({
             heatmapRiskValuesRef={heatmapRiskValuesRef}
             onHeatmapInspect={onHeatmapInspect}
             onTrianglePick={onTrianglePick}
+            onLoadStatus={onLoadStatus}
           />
         </Center>
       </Suspense>
@@ -3078,12 +3093,13 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   onBrepFacePick,
   highlightColor,
   setupAxes,
-  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel,
+  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel, processConflict,
   flatPatternPartName, flatPatternOutlinePointsMm, flatPatternHolesMm, flatPatternOutlineSource,
   flatPatternBoundingLengthMm, flatPatternBoundingWidthMm, flatPatternCutLengthMm, flatPatternBendCount,
-  flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2,
+  flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2, flatPatternBlanks,
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
+  const [modelLoadStatus, setModelLoadStatus] = useState<ModelLoadStatus>(null);
   // Bumped to force a full Canvas remount (fresh WebGL context + geometry reload)
   // when a lost WebGL context fails to auto-restore — see onLost/onRestored below.
   const [canvasGeneration, setCanvasGeneration] = useState(0);
@@ -3985,6 +4001,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   candidateSheets={nestCandidateSheets}
                   materialLabel={nestMaterialLabel}
                   gradeLabel={nestGradeLabel}
+                  processConflict={processConflict}
                   thicknessMm={sheetThickness}
                 />
               </DialogContent>
@@ -3999,6 +4016,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   </DialogTitle>
                 </DialogHeader>
                 <FlatPatternView
+                  bomItemId={bomItemId}
+                  blanks={flatPatternBlanks}
                   partName={flatPatternPartName}
                   outlinePointsMm={flatPatternOutlinePointsMm}
                   holesMm={flatPatternHolesMm}
@@ -4008,6 +4027,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   flatPatternAreaMm2={flatPatternAreaMm2}
                   materialLabel={nestMaterialLabel}
                   gradeLabel={nestGradeLabel}
+                  processConflict={processConflict}
                   thicknessMm={sheetThickness}
                   cutLengthMm={flatPatternCutLengthMm}
                   bendCount={flatPatternBendCount}
@@ -4114,6 +4134,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               heatmapRiskValuesRef={heatmapRiskValuesRef}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
               {...(pickTriangle ? { onTrianglePick: pickTriangle } : {})}
+              onLoadStatus={setModelLoadStatus}
             />
             {measureMode !== 'IDLE' && (
               <MeasurementOverlay
@@ -4129,6 +4150,9 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
           </FeatureOverlayCtx.Provider>
           </DimensionOverlayCtx.Provider>
           </SetupAxesCtx.Provider>
+
+          <ModelLoadStatusOverlay status={modelLoadStatus} />
+          {internalShowFeatures && !isExploded && <DFMLegend activeTypes={dfmLegendTypes(features)} />}
 
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-[#2d2d2d]">

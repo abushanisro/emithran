@@ -67,6 +67,8 @@ export type FeatureCategory =
 
 export interface FamilyClassification {
   family: ManufacturingFamily;
+  /** What the shape alone reads as; differs from `family` when the chosen process overrode it. Absent on older analyses. */
+  geometricFamily?: string;
   confidence: number;
   signals: string[];
   classificationSignals?: Record<string, number | string>;
@@ -181,6 +183,17 @@ export interface FeatureGraphSummary {
   flatPatternOutlineSource?: 'wire_walk' | 'unavailable';
   flatPatternBoundingLengthMm?: number;
   flatPatternBoundingWidthMm?: number;
+  /** Every blank the part is cut from, one per solid body; several for a weldment / multi-body file (backend FlatPatternBlank). */
+  flatPatternBlanks?: FlatPatternBlank[];
+}
+
+export interface FlatPatternBlank {
+  areaMm2: number;
+  boundingLengthMm: number | null;
+  boundingWidthMm: number | null;
+  outlinePointsMm: number[][] | null;
+  holesMm: { cx_mm: number; cy_mm: number; diameter_mm: number }[];
+  outlineSource: 'wire_walk' | 'unavailable';
 }
 
 export interface FeatureGraph {

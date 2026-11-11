@@ -4,8 +4,8 @@ Parity: the C++ worker must read the same STEP files exactly as the Python engin
 Runs both in Docker on the NestJS e2e fixtures and compares the two reports: ids, names, kinds, quantities, files, problems and
 status exactly; measurements within 0.1% (the same OCCT version computes both, so they normally agree to the rounding).
 
-  docker build --platform linux/amd64 --build-context fixtures=backend/test/fixtures/cad -t gw-build:dev geometry-worker
-  docker build --platform linux/amd64 -t py-occt:dev -f geometry-worker/tests/Dockerfile.pyocct geometry-worker/tests
+  docker build --build-context fixtures=backend/test/fixtures/cad -t gw-build:dev geometry-worker
+  docker build -t py-occt:dev -f geometry-worker/tests/Dockerfile.pyocct geometry-worker/tests
   python3 geometry-worker/tests/parity.py
 """
 import json
@@ -37,7 +37,7 @@ def run_python(names):
     # pythonocc from conda-forge, the version the engine pins; the engine's own shared/ package is mounted read-only.
     # Wire names are not real files, so each is mapped to its fixture by the script above.
     script = PYTHON
-    cmd = ["docker", "run", "--rm", "--platform", "linux/amd64", "-v", f"{FIXTURES}:/fixtures:ro", "-v", f"{ROOT/'cad-engine'}:/engine:ro",
+    cmd = ["docker", "run", "--rm", "-v", f"{FIXTURES}:/fixtures:ro", "-v", f"{ROOT/'cad-engine'}:/engine:ro",
            "py-occt:dev", "python", "-c", script, *wire(names)]
     return json.loads(subprocess.run(cmd, check=True, capture_output=True, text=True).stdout)
 
@@ -51,7 +51,7 @@ def run_cpp(names):
             + [f"/src/build/geometry-worker --deadline-ms 120000 /out {' '.join('/tmp/in/' + w for w in wire(names))}"]
         )
         # as the calling user, so the files it writes into the temp folder can be cleaned up afterwards
-        cmd = ["docker", "run", "--rm", "--platform", "linux/amd64", "--user", f"{os.getuid()}:{os.getgid()}",
+        cmd = ["docker", "run", "--rm", "--user", f"{os.getuid()}:{os.getgid()}",
                "-v", f"{FIXTURES}:/fixtures:ro", "-v", f"{out}:/out", "gw-build:dev", "sh", "-c", shell]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return json.loads((Path(out) / "result.json").read_text())

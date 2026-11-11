@@ -93,8 +93,18 @@ describe('the nightly Operations check compares each environment with the branch
 describe('the docs state the same model', () => {
   it('BRANCHING.md names both branches, the merge methods and the release and hotfix procedures, and the flow in DEPLOYMENT_SECURITY.md points to it', () => {
     const doc = read('docs/BRANCHING.md');
-    for (const phrase of ['`main`', '`develop`', 'merge commit', 'squash', 'Release vX.Y.Z', 'hotfix/*', 'default branch', 'delete_branch_on_merge']) expect(doc).toContain(phrase);
+    for (const phrase of ['`main`', '`develop`', 'merge commit', 'squash', 'Release vX.Y.Z', 'hotfix/*', 'default branch', 'delete_branch_on_merge', 'Sync `develop` the same day', 'chore/sync-main-into-develop']) expect(doc).toContain(phrase);
     expect(read('docs/DEPLOYMENT_SECURITY.md')).toContain('BRANCHING.md');
     expect(read('docs/GOVERNANCE.md')).toContain('docs/BRANCHING.md');
   });
+});
+
+describe('a push to a long-lived branch is never cancelled', () => {
+  for (const file of ['ci.yml', 'security.yml']) {
+    it(`${file} cancels superseded runs only for pull requests`, () => {
+      const text = read(`.github/workflows/${file}`);
+      expect(text).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
+      expect(text).not.toMatch(/cancel-in-progress: true/);
+    });
+  }
 });

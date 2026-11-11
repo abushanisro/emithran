@@ -27,12 +27,13 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [
-    { name: 'setup', testMatch: /auth\.setup\.ts/ },
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/user.json' },
-      dependencies: ['setup'],
-    },
-  ],
+  // With the dev sign-in bypass on (frontend NEXT_PUBLIC_DEV_AUTH_BYPASS=true, backend ALLOW_DEV_AUTH_BYPASS=true) the app needs no login, so there is
+  // nothing to sign in to. Without it, the specs sign in once with the test account.
+  projects:
+    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === 'true'
+      ? [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
+      : [
+          { name: 'setup', testMatch: /auth\.setup\.ts/ },
+          { name: 'chromium', use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/user.json' }, dependencies: ['setup'] },
+        ],
 });

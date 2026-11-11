@@ -2,8 +2,8 @@
 #   worker  the C++ geometry-worker and `cad-worker-host`: parses customer CAD, holds no credential, runs with no network (UID 10005)
 #   runner  `cad-runner` (the default target): holds the database and bucket credentials, never parses CAD (UID 10003)
 # They talk only through a Unix socket on a volume the two share. Build both:
-#   docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad --target worker -t cad-worker:dev core
-#   docker build --platform linux/amd64 -t cad-core:dev core
+#   docker build --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad --target worker -t cad-worker:dev core
+#   docker build -t cad-core:dev core
 # (docker-compose.prod.yml passes the same named contexts and targets.) Base images are pinned by digest; Dependabot proposes bumps.
 
 FROM rust:1.99-slim-bookworm@sha256:24707e70a4f1e23d9a7b25202ec43126d28a52294b96aad5c670df1fd1f1d400 AS rust

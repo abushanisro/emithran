@@ -1,13 +1,20 @@
 # Test image for the CAD engine: the production image plus test-only tooling.
 #
 # Built FROM the production image rather than repeating its conda/pythonocc
-# setup, so tests exercise the exact runtime Railway ships and the production
+# setup, so tests exercise the exact runtime the service ships and the production
 # image stays free of pytest. Build the base first:
 #
 #   docker compose -f docker-compose.dev.yml build cad-engine
 #   docker compose -f docker-compose.dev.yml build tests
+#
+# The production image has no pip (removed, with its vendored copies of scanned libraries) and runs as the unprivileged `cad` user,
+# so this layer puts pip back and installs the test tooling as root, then drops back to `cad`. It is the TEST image only: it is
+# never deployed. The tests themselves are not in the image (.dockerignore); they are mounted at /app/test.
 ARG BASE_IMAGE=mithran-cad-engine:dev
 FROM ${BASE_IMAGE}
 
+USER root
 COPY requirements-dev.txt ./
-RUN conda run -n cad-env pip install --no-cache-dir -r requirements-dev.txt
+RUN conda install -y -q -n cad-env -c conda-forge pip && conda clean -afy \
+    && conda run -n cad-env pip install --no-cache-dir -r requirements-dev.txt
+USER cad
