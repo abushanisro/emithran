@@ -44,6 +44,11 @@ services:
         limits: { cpus: '1', memory: 200M, pids: 512 }
 
   cloudflared:
+    environment:
+      # Measured on this server: under load the connector used up to 124 % of a CPU thread, because its default transport (QUIC over UDP) encrypts every
+      # packet in application code. HTTP/2 over TCP uses the kernel's TCP and the CPU's AES, and two connections are enough for one small origin.
+      TUNNEL_TRANSPORT_PROTOCOL: http2
+      TUNNEL_HA_CONNECTIONS: "2"
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 64M, pids: 256 }

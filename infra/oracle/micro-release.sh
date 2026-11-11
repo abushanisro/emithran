@@ -10,7 +10,7 @@
 #  3. Ships only the images whose content changed (docker save | ssh docker load: no registry, no token) and tags what runs now as good-<old sha>.
 #  4. Runs the release's own database migrations through an encrypted SSH forward to Postgres (each runs in its own transaction; a failure stops here,
 #     before any service was replaced; the database stays at the last good migration).
-#  5. Engines first, then the web tier; each waits for its health checks. Postgres and the tunnel connector are never restarted by a release.
+#  5. Engines first, then the web tier; each waits for its health checks. Postgres and the tunnel connector are not restarted by a release, unless RESTART_TUNNEL=1 asks for the connector to be recreated once (to apply a changed setting).
 #  6. Checks the public site. Any failure from step 3 on puts the last good images back and says so.
 # The previous images stay on the servers as good-<sha>; `ROLLBACK=1 infra/oracle/micro-release.sh <old-ref>` is not needed: the failure path does it.
 set -Eeuo pipefail
@@ -90,6 +90,11 @@ scp -i "$KEY" -o BatchMode=yes -q "$work/docker-compose.prod.yml" "$work/docker-
 scp -i "$KEY" -o BatchMode=yes -q "$work/docker-compose.prod.yml" "$work/docker-compose.data.yml" "$work/docker-compose.micro-app.yml" "ubuntu@$APP_HOST:/opt/emithran/" 2>/dev/null || true
 if [ "${#shipped_eng[@]}" -gt 0 ]; then run dc "$ENGINE_HOST" docker-compose.micro-engines.yml env/engines.env up -d --no-build --wait --wait-timeout 180 "${shipped_eng[*]}"; fi
 if [ "${#shipped_app[@]}" -gt 0 ]; then run dc "$APP_HOST" docker-compose.micro-app.yml env/prd.env up -d --no-build --wait --wait-timeout 180 "${shipped_app[*]}"; fi
+
+if [ "${RESTART_TUNNEL:-}" = 1 ]; then
+  echo "== tunnel connector: recreated once to apply its settings (a few seconds without the public site; Cloudflare reconnects it)"
+  run dc "$APP_HOST" docker-compose.micro-app.yml env/prd.env up -d --no-build --force-recreate cloudflared
+fi
 
 echo "== 6/6 checks"
 if [ "${DRY_RUN:-}" = 1 ]; then echo "DRY: readiness 200 inside the backend; $PUBLIC_URL/api/health 200 and /auth/login 307"; exit 0; fi
