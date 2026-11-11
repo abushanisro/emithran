@@ -148,12 +148,18 @@ describe('infra/oracle/micro-release.sh', () => {
     expect(res.stdout).not.toContain('preflight');
   });
 
-  it('refuses a release that lacks the micro files, naming the file', () => {
+  it('refuses a release that lacks the micro files, naming the file (in a throwaway repository, so history depth cannot matter)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'release-'));
-    const first = execFileSync('git', ['rev-list', '--max-parents=0', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim().split('\n')[0];
-    const res = spawnSync('bash', [join(ROOT, 'infra/oracle/micro-release.sh'), first], { encoding: 'utf8', cwd: ROOT, env: env(dir) });
+    const repo = join(dir, 'old-release');
+    mkdirSync(repo);
+    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' });
+    git('init', '-q');
+    writeFileSync(join(repo, 'README.md'), 'a release that predates the deploy tooling\n');
+    git('add', 'README.md');
+    git('commit', '-q', '-m', 'old');
+    const res = spawnSync('bash', [join(ROOT, 'infra/oracle/micro-release.sh'), 'HEAD'], { encoding: 'utf8', cwd: repo, env: env(dir) });
     expect(res.status).toBe(2);
-    expect(res.stderr).toMatch(/does not contain .*nothing was changed/);
+    expect(res.stderr).toMatch(/does not contain docker-compose\.prod\.yml: nothing was changed/);
+    expect(res.stdout).not.toContain('preflight');
   });
 });
-
