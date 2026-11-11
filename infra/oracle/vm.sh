@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The production VM: Always Free Ampere A1 (4 OCPU, 24 GB), Ubuntu 24.04 Minimal aarch64, 150 GB boot volume, key-only login.
+# The production VM: Always Free Ampere A1 (4 OCPU, 24 GB), Ubuntu 24.04 Minimal aarch64, 100 GB boot volume (BOOT_GB; Always Free storage is 200 GB IN TOTAL across all servers: two small x86 servers of 50 GB leave exactly 100 GB, and anything above that is billed), key-only login.
 #
 #   OCI_CLI_PROFILE=<p> OCI_CLI_AUTH=security_token COMPARTMENT_ID=<tenancy ocid> SUBNET_ID=<ocid> IMAGE_ID=<ocid> SSH_PUBLIC_KEY_FILE=<file.pub> infra/oracle/vm.sh
 #
@@ -24,7 +24,7 @@ case "$id" in ocid1.*) echo "instance exists: $id" >&2 ;; *)
       # about 20 minutes and looked like a hang. A refused launch must come back in seconds; the scheduler is the retry.
       out="$(q --no-retry --connection-timeout 15 --read-timeout 120 compute instance launch -c "$COMPARTMENT_ID" --availability-domain "$ad" --display-name "$name" --shape VM.Standard.A1.Flex \
         --shape-config "{\"ocpus\":${size%%:*},\"memoryInGBs\":${size##*:}}" --subnet-id "$SUBNET_ID" --assign-public-ip true \
-        --source-details "{\"sourceType\":\"image\",\"imageId\":\"$IMAGE_ID\",\"bootVolumeSizeInGBs\":150,\"bootVolumeVpusPerGB\":10}" \
+        --source-details "{\"sourceType\":\"image\",\"imageId\":\"$IMAGE_ID\",\"bootVolumeSizeInGBs\":${BOOT_GB:-100},\"bootVolumeVpusPerGB\":10}" \
         --ssh-authorized-keys-file "$SSH_PUBLIC_KEY_FILE" \
         --is-pv-encryption-in-transit-enabled true --instance-options '{"areLegacyImdsEndpointsDisabled":true}' --wait-for-state RUNNING \
         --query 'data.id' --raw-output || true)"
