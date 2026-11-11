@@ -309,13 +309,11 @@ describe('MHRService.removeAll', () => {
 // string "Inspection" as machine_class — a value the rate resolvers'
 // `.eq('machine_class', 'cmm')` filter can never match.
 function makeCategoriesDatabase(rows: any[]) {
-  // Serves `.order().range(from, to)` like PostgREST: the requested slice.
-  const range = (from: number, to: number) => Promise.resolve({ data: rows.slice(from, to + 1), error: null });
-  const selectMock = jest.fn().mockReturnValue({ order: () => ({ range }) });
-  const fromMock = jest.fn().mockReturnValue({ select: selectMock });
+  // Serves the database function (migration 986) that returns the distinct combinations of the four category columns, already deduplicated.
+  const rpc = jest.fn().mockResolvedValue({ data: rows, error: null });
   return {
-    service: { getClient: jest.fn().mockReturnValue({ from: fromMock }) } as unknown as DatabaseService,
-    fromMock,
+    service: { getClient: jest.fn().mockReturnValue({ rpc }) } as unknown as DatabaseService,
+    rpc,
   };
 }
 
