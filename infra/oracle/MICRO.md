@@ -25,6 +25,12 @@ infra/oracle/micro-deploy.sh status
 ```
 Check: `GET /api/health/ready` inside the backend container answers 200 with database, cadEngine and ecadEngine "up".
 
+## Releases (after the cutover, this replaces mac-prod.sh)
+`infra/oracle/micro-release.sh <git-ref>` (settings in `~/.emithran/micro.env`; `DRY_RUN=1` prints the plan after read-only checks). It builds the amd64
+images from `git archive <ref>`, ships only what changed, keeps what runs now as `good-<old sha>`, runs the release's migrations through an encrypted SSH
+forward, updates the engines then the web tier (each waits for its health checks), and checks the public site. Any failure after the images were shipped
+puts the last good images back by itself. Postgres and the tunnel connector are never restarted by a release.
+
 ## Cutover (about 5 minutes of downtime; do it at a quiet hour)
 `APP_HOST=<ip> infra/oracle/micro-cutover.sh` (run on the old host; `DRY_RUN=1` first prints every step). It stops the old connector FIRST, then the
 old backend and frontend, copies the database one last time (`RESET=1 micro-db.sh`, proven table by table), starts the new backend, frontend and

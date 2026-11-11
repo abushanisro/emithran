@@ -131,3 +131,29 @@ describe('infra/oracle/mac-prod.sh after production moved', () => {
     expect(res.stdout).not.toContain('release :');
   });
 });
+
+describe('infra/oracle/micro-release.sh', () => {
+  const env = (dir: string) => ({ PATH: process.env.PATH ?? '', HOME: dir, APP_HOST: '192.0.2.1', ENGINE_HOST: '192.0.2.2', ENGINE_PRIVATE_IP: '10.0.0.2', MICRO_ENV: join(dir, 'none.env') });
+
+  it('is valid bash and recorded as executable', () => {
+    execFileSync('bash', ['-n', join(ROOT, 'infra/oracle/micro-release.sh')]);
+    expect(execFileSync('git', ['ls-files', '-s', 'infra/oracle/micro-release.sh'], { cwd: ROOT, encoding: 'utf8' }).split(/\s+/)[0]).toBe('100755');
+  });
+
+  it('refuses an unknown ref before touching any server', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'release-'));
+    const res = spawnSync('bash', [join(ROOT, 'infra/oracle/micro-release.sh'), 'no-such-ref-anywhere'], { encoding: 'utf8', cwd: ROOT, env: env(dir) });
+    expect(res.status).toBe(2);
+    expect(res.stderr).toContain('unknown git ref');
+    expect(res.stdout).not.toContain('preflight');
+  });
+
+  it('refuses a release that lacks the micro files, naming the file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'release-'));
+    const first = execFileSync('git', ['rev-list', '--max-parents=0', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim().split('\n')[0];
+    const res = spawnSync('bash', [join(ROOT, 'infra/oracle/micro-release.sh'), first], { encoding: 'utf8', cwd: ROOT, env: env(dir) });
+    expect(res.status).toBe(2);
+    expect(res.stderr).toMatch(/does not contain .*nothing was changed/);
+  });
+});
+
