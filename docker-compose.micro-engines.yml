@@ -1,0 +1,48 @@
+# Overlay for the engine server (a second small Always Free x86 server).
+#   docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml -f docker-compose.micro-engines.yml --env-file env/engines.env up -d --no-build \
+#     cad-engine ecad-engine cad-proxy ecad-proxy
+# The engines stay on the `internal` network, which has no route out and none in (they open untrusted files: they must not be able to phone home or
+# be reached). Reaching them from the web-tier server goes through a tiny forwarder that sits on `internal` AND `edge` and publishes ONLY on this
+# server's loopback; the SSH tunnel from the other server is what connects to that loopback. Nothing listens on a public or private-network address.
+services:
+  cad-engine:
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 700M, pids: 512 }
+
+  ecad-engine:
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 200M, pids: 512 }
+
+  cad-proxy:
+    image: alpine/socat:1.8.0.3
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["TCP-LISTEN:5055,fork,reuseaddr", "TCP:cad-engine:5055"]
+    ports: ["127.0.0.1:5055:5055"]
+    networks: [internal, edge]
+    depends_on:
+      cad-engine:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 16M, pids: 64 }
+
+  ecad-proxy:
+    image: alpine/socat:1.8.0.3
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["TCP-LISTEN:5100,fork,reuseaddr", "TCP:ecad-engine:5100"]
+    ports: ["127.0.0.1:5100:5100"]
+    networks: [internal, edge]
+    depends_on:
+      ecad-engine:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 16M, pids: 64 }
