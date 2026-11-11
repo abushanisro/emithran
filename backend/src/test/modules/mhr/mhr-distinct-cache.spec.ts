@@ -97,6 +97,42 @@ describe('MHR distinct lists come from the database, once, and are cached', () =
   });
 });
 
+describe('a failed read is never remembered', () => {
+  // Found live on 2026-11-12: right after migration 986 the data API did not know the new function yet, every list answered [] (as designed) and the cache
+  // kept those empty answers for five minutes. A failure must answer [] now and read again next time.
+  it.each([
+    ['currencies', 'getDistinctCurrencies' as const],
+    ['locations', 'getDistinctLocations' as const],
+    ['manufacturer countries', 'getDistinctManufacturerCountries' as const],
+    ['wage grades', 'getDistinctWageGrades' as const],
+  ])('%s: empty while the database cannot answer, data as soon as it can', async (_label, method) => {
+    let healthy = false;
+    const rpc = jest.fn(() => Promise.resolve(healthy ? { data: ['A', 'B'], error: null } : { data: null, error: { message: 'function not found in the schema cache' } }));
+    const db = { getClient: jest.fn(() => ({ rpc })) } as unknown as DatabaseService;
+    const logger = { log: jest.fn(), error: jest.fn(), warn: jest.fn() } as unknown as Logger;
+    const service = new MHRService(db, logger, {} as ExchangeRateService, {} as LHRService);
+
+    expect(await service[method](token('u1'))).toEqual([]);
+    healthy = true;
+    expect(await service[method](token('u1'))).toEqual(['A', 'B']); // not stuck on the remembered failure
+    expect(await service[method](token('u1'))).toEqual(['A', 'B']);
+    expect(rpc).toHaveBeenCalledTimes(2); // the failure, then one good read that the cache keeps
+  });
+
+  it('categories too', async () => {
+    let healthy = false;
+    const rpc = jest.fn(() => Promise.resolve(healthy
+      ? { data: [{ benchmark_source_key: 'Inspection', machine_class: 'cmm', process_group: 'Machining' }], error: null }
+      : { data: null, error: { message: 'down' } }));
+    const db = { getClient: jest.fn(() => ({ rpc })) } as unknown as DatabaseService;
+    const logger = { log: jest.fn(), error: jest.fn(), warn: jest.fn() } as unknown as Logger;
+    const service = new MHRService(db, logger, {} as ExchangeRateService, {} as LHRService);
+    expect(await service.getDistinctCategoriesWithClass(token('u1'))).toEqual([]);
+    healthy = true;
+    expect(await service.getDistinctCategoriesWithClass(token('u1'))).toEqual([{ category: 'Inspection', machineClass: 'cmm' }]);
+  });
+});
+
 describe('categories over the reduced sources equal categories over every row', () => {
   // The database now returns, per combination of (first segment of the key, machine class, effective group), one entry in first-appearance order
   // (migration 986). The service's rule depends only on the FIRST appearance of each such combination. Random tables prove it: the answer from every

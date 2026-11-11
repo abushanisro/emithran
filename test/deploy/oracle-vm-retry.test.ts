@@ -148,6 +148,16 @@ describe('infra/oracle/micro-release.sh', () => {
     expect(text).toContain('{{json .RootFS.Layers}}'); // not {{.Id}}: an id changes on every rebuild
   });
 
+  it('tells PostgREST to reload its schema after the migrations and before the new code runs (a new function is unknown to it until then)', () => {
+    const text = readFileSync(join(ROOT, 'infra/oracle/micro-release.sh'), 'utf8');
+    const migrations = text.indexOf('== 3/6 migrations');
+    const reload = text.indexOf('docker kill -s SIGUSR1 emithran-prd-postgrest-1');
+    const ship = text.indexOf('== 4/6 ship what changed');
+    expect(migrations).toBeGreaterThan(0);
+    expect(reload).toBeGreaterThan(migrations);
+    expect(reload).toBeLessThan(ship);
+  });
+
   it('refuses an unknown ref before touching any server', () => {
     const dir = mkdtempSync(join(tmpdir(), 'release-'));
     const res = spawnSync('bash', [join(ROOT, 'infra/oracle/micro-release.sh'), 'no-such-ref-anywhere'], { encoding: 'utf8', cwd: ROOT, env: env(dir) });

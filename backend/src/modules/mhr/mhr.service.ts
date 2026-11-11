@@ -40,6 +40,13 @@ import { readWorkbook } from '../../common/heavy-work/heavy-work';
 /** Rows per request when pricing unpriced picker rows (keeps the id list well inside a URL). */
 const PICKER_ENGINE_BATCH = 100;
 
+/** A distinct-values read failed. Internal: the public methods answer [] (as they always did) but the cache never keeps that answer. */
+class DistinctReadFailed extends Error {
+  constructor() {
+    super('distinct values could not be read');
+  }
+}
+
 @Injectable()
 export class MHRService {
   private readonly calculationEngine: MHRCalculationEngine;
@@ -1967,7 +1974,7 @@ export class MHRService {
     accessToken: string,
     processGroup?: string,
   ): Promise<{ category: string; machineClass: string | null }[]> {
-    return this.distinct.get(accessToken, `categoriesWithClass|${processGroup ?? ''}`, () => this.readDistinctCategoriesWithClass(accessToken, processGroup));
+    return this.orEmptyWhenUnreadable(() => this.distinct.get(accessToken, `categoriesWithClass|${processGroup ?? ''}`, () => this.readDistinctCategoriesWithClass(accessToken, processGroup)));
   }
 
   private async readDistinctCategoriesWithClass(
@@ -1980,7 +1987,7 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error fetching distinct categories: ${error.message}`, 'MHRService');
-      return [];
+      throw new DistinctReadFailed();
     }
 
     const machineClassByCategory = new Map<string, string | null>();
@@ -2043,8 +2050,18 @@ export class MHRService {
     return [...new Set(((data ?? []) as Array<string | null>).filter((g): g is string => !!g))].sort();
   }
 
+  /** The old behaviour on a failed read (an empty list, the error logged) without the cache keeping it: a thrown failure is never remembered. */
+  private async orEmptyWhenUnreadable<T>(read: () => Promise<T[]>): Promise<T[]> {
+    try {
+      return await read();
+    } catch (error) {
+      if (error instanceof DistinctReadFailed) return [];
+      throw error;
+    }
+  }
+
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
-    return this.distinct.get(accessToken, 'manufacturerCountries', () => this.readGetDistinctManufacturerCountries(accessToken));
+    return this.orEmptyWhenUnreadable(() => this.distinct.get(accessToken, 'manufacturerCountries', () => this.readGetDistinctManufacturerCountries(accessToken)));
   }
 
   private async readGetDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
@@ -2053,7 +2070,7 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error fetching distinct manufacturer countries: ${error.message}`, 'MHRService');
-      return [];
+      throw new DistinctReadFailed();
     }
 
     return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
@@ -2068,7 +2085,7 @@ export class MHRService {
   // let a user overwrite a real value with a fabricated one by picking the
   // only options offered.
   async getDistinctWageGrades(accessToken: string): Promise<string[]> {
-    return this.distinct.get(accessToken, 'wageGrades', () => this.readGetDistinctWageGrades(accessToken));
+    return this.orEmptyWhenUnreadable(() => this.distinct.get(accessToken, 'wageGrades', () => this.readGetDistinctWageGrades(accessToken)));
   }
 
   private async readGetDistinctWageGrades(accessToken: string): Promise<string[]> {
@@ -2077,7 +2094,7 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error fetching distinct wage grades: ${error.message}`, 'MHRService');
-      return [];
+      throw new DistinctReadFailed();
     }
 
     return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
@@ -2090,7 +2107,7 @@ export class MHRService {
   // behavior) silently excluded every global location/currency from the filter
   // dropdown, even though findAll's own table happily returns those same rows.
   async getDistinctCurrencies(accessToken: string): Promise<string[]> {
-    return this.distinct.get(accessToken, 'currencies', () => this.readGetDistinctCurrencies(accessToken));
+    return this.orEmptyWhenUnreadable(() => this.distinct.get(accessToken, 'currencies', () => this.readGetDistinctCurrencies(accessToken)));
   }
 
   private async readGetDistinctCurrencies(accessToken: string): Promise<string[]> {
@@ -2099,14 +2116,14 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error fetching distinct currencies: ${error.message}`, 'MHRService');
-      return [];
+      throw new DistinctReadFailed();
     }
 
     return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
   }
 
   async getDistinctLocations(accessToken: string): Promise<string[]> {
-    return this.distinct.get(accessToken, 'locations', () => this.readGetDistinctLocations(accessToken));
+    return this.orEmptyWhenUnreadable(() => this.distinct.get(accessToken, 'locations', () => this.readGetDistinctLocations(accessToken)));
   }
 
   private async readGetDistinctLocations(accessToken: string): Promise<string[]> {
@@ -2115,7 +2132,7 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error fetching distinct locations: ${error.message}`, 'MHRService');
-      return [];
+      throw new DistinctReadFailed();
     }
 
     return [...new Set(((data ?? []) as Array<string | null>).filter(Boolean) as string[])].sort();
