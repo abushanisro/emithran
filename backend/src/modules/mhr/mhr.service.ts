@@ -1,20 +1,24 @@
-import { readAllRows, readAllRowsConcurrent } from '../../common/database/read-all-rows';
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
-import { Logger } from '../../common/logger/logger.service';
-import { DatabaseService } from '../../common/database/database.service';
-import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
-import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult, MHRReferenceDetailDto, MHRPickerRowDto, MHR_PICKER_COLUMNS, pickerRateUsdPerHour, type MHRPickerDbRow } from './dto/mhr-response.dto';
+import * as ExcelJS from 'exceljs';
 import { validate as isValidUUID } from 'uuid';
-import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
-import { MHRInputValidator } from './validators/mhr-input.validator';
+
 import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/mhr-calculation.constants';
-import { invalidateMachinePools } from '../bom-items/costing/shared/capability/machine-selection/pool-cache';
-import { resolveMachineEconomics } from '../bom-items/costing/shared/capability/machine-selection/economics-resolver';
-import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
-import { LHRService } from '../lhr/lhr.service';
+import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult, MHRReferenceDetailDto, MHRPickerRowDto, MHR_PICKER_COLUMNS, pickerRateUsdPerHour, type MHRPickerDbRow } from './dto/mhr-response.dto';
+import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
+import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { mapMhrRowToDto, storedNumber } from './mhr-row-mapping';
 import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
-import * as ExcelJS from 'exceljs';
+import { MHRInputValidator } from './validators/mhr-input.validator';
+import { CallerTtlCache, ClearsCallerCache } from '../../common/cache/caller-ttl-cache';
+import { readAllRows, readAllRowsConcurrent } from '../../common/database/read-all-rows';
+import { Logger } from '../../common/logger/logger.service';
+import { DatabaseService } from '../../common/database/database.service';
+
+
+import { resolveMachineEconomics } from '../bom-items/costing/shared/capability/machine-selection/economics-resolver';
+import { invalidateMachinePools } from '../bom-items/costing/shared/capability/machine-selection/pool-cache';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { LHRService } from '../lhr/lhr.service';
 import { orIlikeContains } from '../../common/db/postgrest-filter';
 import { readWorkbook } from '../../common/heavy-work/heavy-work';
 
@@ -40,6 +44,9 @@ const PICKER_ENGINE_BATCH = 100;
 export class MHRService {
   private readonly calculationEngine: MHRCalculationEngine;
   private readonly validator: MHRInputValidator;
+
+  /** The distinct-value lists below (see CallerTtlCache): identical between page loads, so computed once per user per few minutes. Writers clear it. */
+  private readonly distinct = new CallerTtlCache(5 * 60_000);
 
   constructor(
     private readonly databaseService: DatabaseService,
@@ -621,6 +628,7 @@ export class MHRService {
     };
   }
 
+  @ClearsCallerCache('distinct')
   async create(createMHRDto: CreateMHRDto, userId: string, accessToken: string): Promise<MHRResponseDto> {
     this.logger.log(`Creating MHR record for user: ${userId}`, 'MHRService');
 
@@ -847,6 +855,7 @@ export class MHRService {
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
   }
 
+  @ClearsCallerCache('distinct')
   async update(id: string, updateMHRDto: UpdateMHRDto, userId: string, accessToken: string): Promise<MHRResponseDto> {
     this.logger.log(`Updating MHR record: ${id}`, 'MHRService');
 
@@ -859,7 +868,7 @@ export class MHRService {
     const existing = await this.findOne(id, userId, accessToken);
 
     // Merge existing data with updates for calculation
-    const mergedData = { ...mapMhrRowToDto(existing as unknown as Record<string, unknown>).dto, ...updateMHRDto };
+    const mergedData = { ...mapMhrRowToDto(existing).dto, ...updateMHRDto };
     
     // Handle manual entry mode
     let calculations: MHRCalculationResult;
@@ -962,7 +971,7 @@ export class MHRService {
     // real is real regardless of which of the three write paths it came
     // through). Bumps capability_version, mirroring economics_version above.
     let capabilityTouched = false;
-    const capabilityFieldMap: Array<[keyof UpdateMHRDto, string]> = [
+    const capabilityFieldMap: [keyof UpdateMHRDto, string][] = [
       ['maxXMm', 'max_x_mm'], ['maxYMm', 'max_y_mm'], ['maxZMm', 'max_z_mm'],
       ['maxDiameterMm', 'max_diameter_mm'], ['maxLengthMm', 'max_length_mm'],
       ['maxTonnage', 'max_tonnage'], ['maxThicknessMm', 'max_thickness_mm'],
@@ -972,7 +981,7 @@ export class MHRService {
     ];
     for (const [dtoKey, column] of capabilityFieldMap) {
       if (updateMHRDto[dtoKey] !== undefined) {
-        (updateData as any)[column] = updateMHRDto[dtoKey];
+        (updateData)[column] = updateMHRDto[dtoKey];
         capabilityTouched = true;
       }
     }
@@ -1136,6 +1145,7 @@ export class MHRService {
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
   }
 
+  @ClearsCallerCache('distinct')
   async remove(id: string, userId: string, accessToken: string) {
     this.logger.log(`Deleting MHR record: ${id}`, 'MHRService');
 
@@ -1169,6 +1179,7 @@ export class MHRService {
     return { message: 'MHR record deleted successfully' };
   }
 
+  @ClearsCallerCache('distinct')
   async importFromExcel(
     fileBuffer: Buffer,
     userId: string,
@@ -1777,9 +1788,7 @@ export class MHRService {
       // Handle both PostgreSQL native and PostgREST schema-cache error formats:
       //   PostgreSQL: column "xyz" of relation "mhr_records" does not exist
       //   PostgREST:  Could not find the 'xyz' column of 'mhr_records' in the schema cache
-      const miss = error.message.match(
-        /column "([^"]+)" of relation "mhr_records" does not exist|Could not find the '([^']+)' column of 'mhr_records' in the schema cache/,
-      );
+      const miss = /column "([^"]+)" of relation "mhr_records" does not exist|Could not find the '([^']+)' column of 'mhr_records' in the schema cache/.exec(error.message);
       const missingCol = miss?.[1] ?? miss?.[2];
       if (missingCol) {
         this.logger.warn(
@@ -1835,6 +1844,7 @@ export class MHRService {
     return { imported, skipped, errors };
   }
 
+  @ClearsCallerCache('distinct')
   async removeAll(userId: string, accessToken: string): Promise<{ deleted: number }> {
     this.logger.log(`Deleting all MHR records for user ${userId}`, 'MHRService');
 
@@ -1956,7 +1966,14 @@ export class MHRService {
   async getDistinctCategoriesWithClass(
     accessToken: string,
     processGroup?: string,
-  ): Promise<Array<{ category: string; machineClass: string | null }>> {
+  ): Promise<{ category: string; machineClass: string | null }[]> {
+    return this.distinct.get(accessToken, `categoriesWithClass|${processGroup ?? ''}`, () => this.readDistinctCategoriesWithClass(accessToken, processGroup));
+  }
+
+  private async readDistinctCategoriesWithClass(
+    accessToken: string,
+    processGroup?: string,
+  ): Promise<{ category: string; machineClass: string | null }[]> {
     const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
@@ -2013,6 +2030,10 @@ export class MHRService {
    */
   /** Every process group with machines on file (process_group, set on every row). */
   async getDistinctProcessGroups(accessToken: string): Promise<string[]> {
+    return this.distinct.get(accessToken, 'processGroups', () => this.readGetDistinctProcessGroups(accessToken));
+  }
+
+  private async readGetDistinctProcessGroups(accessToken: string): Promise<string[]> {
     const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
@@ -2031,6 +2052,10 @@ export class MHRService {
   }
 
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
+    return this.distinct.get(accessToken, 'manufacturerCountries', () => this.readGetDistinctManufacturerCountries(accessToken));
+  }
+
+  private async readGetDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
     const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
@@ -2056,6 +2081,10 @@ export class MHRService {
   // let a user overwrite a real value with a fabricated one by picking the
   // only options offered.
   async getDistinctWageGrades(accessToken: string): Promise<string[]> {
+    return this.distinct.get(accessToken, 'wageGrades', () => this.readGetDistinctWageGrades(accessToken));
+  }
+
+  private async readGetDistinctWageGrades(accessToken: string): Promise<string[]> {
     const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
@@ -2079,6 +2108,10 @@ export class MHRService {
   // behavior) silently excluded every global location/currency from the filter
   // dropdown, even though findAll's own table happily returns those same rows.
   async getDistinctCurrencies(accessToken: string): Promise<string[]> {
+    return this.distinct.get(accessToken, 'currencies', () => this.readGetDistinctCurrencies(accessToken));
+  }
+
+  private async readGetDistinctCurrencies(accessToken: string): Promise<string[]> {
     const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
@@ -2096,6 +2129,10 @@ export class MHRService {
   }
 
   async getDistinctLocations(accessToken: string): Promise<string[]> {
+    return this.distinct.get(accessToken, 'locations', () => this.readGetDistinctLocations(accessToken));
+  }
+
+  private async readGetDistinctLocations(accessToken: string): Promise<string[]> {
     const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
