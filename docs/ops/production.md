@@ -68,6 +68,6 @@ Stop the retry: `launchctl bootout gui/$(id -u)/com.emithran.oracle-retry`.
 ## Known risks and open items
 1. Capacity: a pilot of 3-5 comfortable, about 10 slow users, one CAD job at a time (`capacity.md`).
 2. Backups off; no outside uptime check; no Grafana for production.
-3. Dangling DNS: `backend.emithran.com` and `cad.emithran.com` still point at deleted Railway services (a takeover risk): delete them in Cloudflare DNS, with the `_railway-verify.*` TXT records.
+3. Stale DNS: `backend.emithran.com` and `cad.emithran.com` still point at deleted Railway services. The takeover risk is low (Railway only serves a custom domain after a TXT proof in our DNS) but they should go, with the `_railway-verify.*` TXT records.
 4. Single points of failure: one app server, one database, no replica. The Mac is the only other copy of the code's build tooling.
 5. Staging is on the developer Mac.
