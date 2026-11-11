@@ -7,6 +7,10 @@ const load = async () => {
   vi.resetModules();
   return import('@/app/api/health/route');
 };
+const loadReady = async () => {
+  vi.resetModules();
+  return import('@/app/api/health/ready/route');
+};
 
 beforeEach(() => {
   vi.stubEnv('API_URL', 'http://api.internal:4000/api/v1');
@@ -68,3 +72,42 @@ describe('GET /api/health', () => {
     expect(Object.keys(body)).toEqual(['status']);
   });
 });
+
+describe('GET /api/health/ready (what an outside uptime monitor watches)', () => {
+  it('asks the API\'s readiness endpoint (database and engines), not just its liveness', async () => {
+    upstream.mockResolvedValue(new Response('{"status":"ok"}'));
+    const res = await (await loadReady()).GET();
+    expect(res.status).toBe(200);
+    expect(upstream.mock.calls[0]?.[0]).toBe('http://api.internal:4000/api/health/ready');
+  });
+
+  it('answers 503 when the API is alive but not ready (a database or engine is down)', async () => {
+    upstream.mockResolvedValue(new Response('{"success":false}', { status: 503 }));
+    const res = await (await loadReady()).GET();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ status: 'unavailable' });
+  });
+
+  it('answers 503 when the API does not answer at all', async () => {
+    upstream.mockRejectedValue(new Error('connect ECONNREFUSED'));
+    expect((await (await loadReady()).GET()).status).toBe(503);
+  });
+
+  it('keeps the two answers apart: liveness being fine says nothing about readiness', async () => {
+    vi.resetModules();
+    upstream.mockImplementation((url) => Promise.resolve((typeof url === 'string' ? url : url instanceof URL ? url.href : url.url).endsWith('/ready') ? new Response('x', { status: 503 }) : new Response('{}')));
+    const live = await import('@/app/api/health/route');
+    const ready = await import('@/app/api/health/ready/route');
+    expect((await live.GET()).status).toBe(200);
+    expect((await ready.GET()).status).toBe(503);
+  });
+
+  it('shares one readiness call between callers that arrive together, and exposes only the status word', async () => {
+    upstream.mockResolvedValue(new Response('{"database":"postgres://secret","version":"1.2.3"}'));
+    const { GET } = await loadReady();
+    const answers = await Promise.all([GET(), GET(), GET()]);
+    expect(upstream).toHaveBeenCalledTimes(1);
+    expect(Object.keys((await answers[0].json()) as Record<string, unknown>)).toEqual(['status']);
+  });
+});
+
