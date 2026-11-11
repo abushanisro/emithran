@@ -23,22 +23,37 @@ const jetbrainsMono = JetBrains_Mono({
   fallback: ['Monaco', 'Menlo', 'monospace'],
 })
 
+const SITE_TITLE = 'Emithran - Manufacturing One-Stop Solution'
+const SITE_DESCRIPTION = 'Enterprise manufacturing One-Stop Solution for should-cost analysis, vendor management, and cost optimization.'
+// The link-preview card WhatsApp, LinkedIn, Slack, X, etc. show when app.emithran.com is shared. Crawlers need an absolute URL,
+// which metadataBase supplies; the file is served from public/ (proxy.ts skips .jpg, so no auth or CSP sits in front of it).
+const SHARE_IMAGE = { url: '/og-image.jpg', width: 764, height: 401, alt: 'Emithran', type: 'image/jpeg' }
+
 export const metadata: Metadata = {
+  metadataBase: new URL('https://app.emithran.com'),
   title: {
-    default: 'Emithran - Manufacturing One-Stop Solution',
+    default: SITE_TITLE,
     template: '%s | Emithran',
   },
-  description: 'Enterprise manufacturing One-Stop Solution for should-cost analysis, vendor management, and cost optimization.',
+  description: SITE_DESCRIPTION,
+  applicationName: 'Emithran',
   authors: [{ name: 'Emithran' }],
   keywords: ['manufacturing', 'cost modeling', 'should-cost analysis', 'vendor management', 'BOM processing'],
   openGraph: {
-    title: 'Emithran - Manufacturing One-Stop Solution',
-    description: 'Enterprise manufacturing One-Stop Solution for should-cost analysis, vendor management, and cost optimization.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: '/',
+    siteName: 'Emithran',
+    locale: 'en_US',
     type: 'website',
+    images: [SHARE_IMAGE],
   },
   twitter: {
     card: 'summary_large_image',
     site: '@emithran',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [SHARE_IMAGE],
   },
   icons: {
     icon: [
