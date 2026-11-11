@@ -63,7 +63,9 @@ import sys,urllib.parse
 run=sys.argv[1]; d={}
 for l in open(run+'/env/prd.env'):
     if '=' in l and not l.startswith('#'): k,v=l.rstrip('\n').split('=',1); d[k]=v
-d['MIGRATE_DATABASE_URL']='postgresql://postgres:%s@postgres:5432/postgres'%urllib.parse.quote(d['POSTGRES_PASSWORD'],safe='')
+# From inside Docker the host is called `postgres`, which the runner does not treat as local, so it would demand TLS that this container does not serve.
+# sslmode=disable is the runner's own switch (db-connection.ts) and is safe here: the traffic stays on Docker's private network.
+d['MIGRATE_DATABASE_URL']='postgresql://postgres:%s@postgres:5432/postgres?sslmode=disable'%urllib.parse.quote(d['POSTGRES_PASSWORD'],safe='')
 open(run+'/.migrate.env','w').write('\n'.join(f'{k}={v}' for k,v in d.items())+'\n')
 PY
 chmod 600 .migrate.env
