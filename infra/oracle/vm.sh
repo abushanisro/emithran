@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# The production VM: Always Free Ampere A1 (4 OCPU, 24 GB), Ubuntu 24.04 Minimal aarch64, 100 GB boot volume (BOOT_GB; Always Free storage is 200 GB IN TOTAL across all servers: two small x86 servers of 50 GB leave exactly 100 GB, and anything above that is billed), key-only login.
+# The production VM: Always Free Ampere A1 (2 OCPU, 12 GB), Ubuntu 24.04 Minimal aarch64, 100 GB boot volume (BOOT_GB; Always Free storage is 200 GB IN TOTAL across all servers: two small x86 servers of 50 GB leave exactly 100 GB, and anything above that is billed), key-only login.
 #
 #   OCI_CLI_PROFILE=<p> OCI_CLI_AUTH=security_token COMPARTMENT_ID=<tenancy ocid> SUBNET_ID=<ocid> IMAGE_ID=<ocid> SSH_PUBLIC_KEY_FILE=<file.pub> infra/oracle/vm.sh
 #
-# 4 OCPU / 24 GB / 200 GB is the whole Always Free allowance, so it costs nothing and is not reclaimed when the trial ends (a quota in the tenancy
+# 2 OCPU / 12 GB of Ampere A1 and 200 GB of block storage are the whole Always Free allowance (Oracle's documentation, 2026-11; older write-ups say 4 / 24, which applies to other account types), so it costs nothing and is not reclaimed when the trial ends (a quota in the tenancy
 # refuses anything larger). IMDSv2 is required: the CAD engine opens untrusted files, and the metadata service must not be reachable by a
 # server-side request. Free ARM capacity is often exhausted: "Out of host capacity" tries the next size of SIZES ("ocpu:gb" list, default
-# 4:24 then 2:12; an A1 VM can be resized in place later) and, when none fits, waits and retries; "Too many requests" and transient network errors (timeouts) back off and retry. Up to TRIES rounds. Idempotent by name.
+# 2:12 then 1:6; an A1 VM can be resized in place later) and, when none fits, waits and retries; "Too many requests" and transient network errors (timeouts) back off and retry. Up to TRIES rounds. Idempotent by name.
 # Prints the public IP.
 set -Eeuo pipefail
 trap 'echo "vm.sh failed at line $LINENO" >&2' ERR
@@ -19,7 +19,7 @@ ad="$(q iam availability-domain list -c "$COMPARTMENT_ID" --query 'data[0].name'
 id="$(q compute instance list -c "$COMPARTMENT_ID" --display-name "$name" --query 'data[?"lifecycle-state"!=`TERMINATED`]|[0].id' --raw-output || true)"
 case "$id" in ocid1.*) echo "instance exists: $id" >&2 ;; *)
   for try in $(seq 1 "${TRIES:-60}"); do
-    for size in ${SIZES:-4:24 2:12}; do
+    for size in ${SIZES:-2:12 1:6}; do
       # --no-retry: the CLI otherwise retries Oracle's 'Out of host capacity' (an HTTP 500) for many minutes per size, so one pass over three sizes took
       # about 20 minutes and looked like a hang. A refused launch must come back in seconds; the scheduler is the retry.
       out="$(q --no-retry --connection-timeout 15 --read-timeout 120 compute instance launch -c "$COMPARTMENT_ID" --availability-domain "$ad" --display-name "$name" --shape VM.Standard.A1.Flex \
