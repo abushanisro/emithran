@@ -252,44 +252,6 @@ export default async function RootLayout({
                     return false;
                   }
                 });
-                
-                // Handle dynamically injected extension scripts
-                const observer = new MutationObserver(function(mutations) {
-                  mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList') {
-                      mutation.addedNodes.forEach(function(node) {
-                        if (node.nodeType === 1 && node.tagName === 'SCRIPT') {
-                          const src = node.src || '';
-                          if (src.includes('chrome-extension://') || src.includes('moz-extension://')) {
-                            // Extension script detected - ensure our overrides persist
-                            setTimeout(function() {
-                              if (typeof window.console !== 'undefined') {
-                                window.console.error = console.error;
-                                window.console.warn = console.warn;
-                                window.console.log = console.log;
-                              }
-                            }, 50);
-                          }
-                        }
-                      });
-                    }
-                  });
-                });
-                
-                // Observe the document for extension script injection
-                observer.observe(document.documentElement, {
-                  childList: true,
-                  subtree: true
-                });
-                
-                // Ensure overrides persist
-                setInterval(function() {
-                  if (window.console.error !== console.error) {
-                    window.console.error = console.error;
-                    window.console.warn = console.warn;
-                    window.console.log = console.log;
-                  }
-                }, 1000);
               })();
             `,
           }}
@@ -297,7 +259,8 @@ export default async function RootLayout({
         <Providers nonce={nonce}>
           {children}
         </Providers>
-        {process.env.NODE_ENV === 'production' && <SpeedInsights debug={false} />}
+        {/* The script is served by Vercel at /_vercel/speed-insights: on any other host (the self-hosted production) it is a 404 on every page load. */}
+        {process.env.NODE_ENV === 'production' && process.env.VERCEL === '1' && <SpeedInsights debug={false} />}
       </body>
     </html>
   )
