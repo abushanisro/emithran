@@ -118,3 +118,16 @@ describe('infra/oracle/launcher-setup.sh INSTALL_ONLY', () => {
     expect(readFileSync(calls, 'utf8')).toContain('bootstrap');
   });
 });
+
+describe('infra/oracle/mac-prod.sh after production moved', () => {
+  it('refuses to run (it would start a second tunnel connector and split traffic) and changes nothing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mac-prod-'));
+    const marker = join(dir, 'MOVED_TO_ORACLE');
+    writeFileSync(marker, 'moved to the Oracle servers on 2026-11-11\n');
+    const res = spawnSync('bash', [join(ROOT, 'infra/oracle/mac-prod.sh'), 'HEAD'], { encoding: 'utf8', cwd: ROOT, env: { PATH: process.env.PATH ?? '', HOME: dir, PROD_MOVED_MARKER: marker } });
+    expect(res.status).toBe(3);
+    expect(res.stderr).toContain('no longer runs on this Mac');
+    expect(res.stderr).toContain('micro-deploy.sh');
+    expect(res.stdout).not.toContain('release :');
+  });
+});
