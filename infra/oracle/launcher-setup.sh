@@ -8,8 +8,10 @@
 #     lives on this Mac. If the key leaked, it could not touch billing, users, databases or storage; your admin login is not on disk for the retry.
 #  2. An API key (RSA 2048, mode 600, under ~/.oci) for that user: it does not expire like a browser session (revoke it any time in the console).
 #  3. ~/.emithran/oracle.env with the settings vm-retry.sh needs, and a launchd agent that runs vm-retry.sh every 10 minutes (survives reboots).
+# Oracle's identity service requires an email on every user: LAUNCHER_EMAIL (default contact+vm-launcher@emithran.com, a plus-address that
+# lands in the contact@ mailbox) is only a contact address, the user has no console password.
 # Safe to re-run: existing users, groups, policies, keys and the agent are reused or replaced, never duplicated.
-set -Eeuo pipefail
+set -euo pipefail
 trap 'echo "launcher-setup.sh failed at line $LINENO" >&2' ERR
 : "${IMAGE_ID:?IMAGE_ID (the Ubuntu aarch64 image ocid)}"
 export OCI_CLI_AUTH=security_token PYTHONWARNINGS=ignore
@@ -22,7 +24,7 @@ region="$(q iam region-subscription list --query 'data[?"is-home-region"]|[0]."r
 group="$(q iam group list --name "$name" --query 'data[0].id' --raw-output 2>/dev/null || true)"
 case "$group" in ocid1.*) ;; *) group="$(q iam group create --name "$name" --description "Launches the free VM only" --query 'data.id' --raw-output)" ;; esac
 user="$(q iam user list --name "$name" --query 'data[0].id' --raw-output 2>/dev/null || true)"
-case "$user" in ocid1.*) ;; *) user="$(q iam user create --name "$name" --description "API-key user for the VM retry (no console login)" --query 'data.id' --raw-output)" ;; esac
+case "$user" in ocid1.*) ;; *) user="$(q iam user create --name "$name" --description "API-key user for the VM retry (no console login)" --email "${LAUNCHER_EMAIL:-contact+vm-launcher@emithran.com}" --query 'data.id' --raw-output)" ;; esac
 q iam group add-user --user-id "$user" --group-id "$group" >/dev/null 2>&1 || true   # already a member is fine
 
 stmts='["Allow group '$name' to manage instance-family in tenancy","Allow group '$name' to use virtual-network-family in tenancy","Allow group '$name' to use volume-family in tenancy","Allow group '$name' to inspect compartments in tenancy"]'
