@@ -2,6 +2,7 @@
 # One-time setup so the VM retry never depends on a browser login that expires.
 #
 #   OCI_CLI_PROFILE=<admin session profile, after `oci session authenticate`> IMAGE_ID=<ocid> infra/oracle/launcher-setup.sh
+#   INSTALL_ONLY=1 infra/oracle/launcher-setup.sh     # only refresh the installed scripts and the schedule (no Oracle login needed)
 #
 # What it does, and why:
 #  1. A dedicated IAM user + group "emithran-vm-launcher" whose ONLY rights are launching/inspecting compute and using the network. Its API key
@@ -13,11 +14,12 @@
 # Safe to re-run: existing users, groups, policies, keys and the agent are reused or replaced, never duplicated.
 set -euo pipefail
 trap 'echo "launcher-setup.sh failed at line $LINENO" >&2' ERR
-: "${IMAGE_ID:?IMAGE_ID (the Ubuntu aarch64 image ocid)}"
+[ -n "${INSTALL_ONLY:-}" ] || : "${IMAGE_ID:?IMAGE_ID (the Ubuntu aarch64 image ocid)}"
 export OCI_CLI_AUTH=security_token PYTHONWARNINGS=ignore
 q() { oci "$@" 2> >(grep -v -E 'SyntaxWarning|INSTANCE_CONSOLE|Interactive mode' >&2); }
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 name=emithran-vm-launcher
+if [ -z "${INSTALL_ONLY:-}" ]; then
 tenancy="$(q iam availability-domain list --query 'data[0]."compartment-id"' --raw-output)"
 region="$(q iam region-subscription list --query 'data[?"is-home-region"]|[0]."region-name"' --raw-output)"
 
@@ -60,14 +62,19 @@ for i in 1 2 3 4 5 6; do
   OCI_CLI_PROFILE=$name OCI_CLI_AUTH=api_key oci iam availability-domain list -c "$tenancy" >/dev/null 2>&1 && ok=1 && break; sleep 10
 done
 [ "${ok:-}" = 1 ] || { echo "the new key was not accepted after 60 s: re-run this script" >&2; exit 1; }
+fi
 
+# The scheduled job must not depend on which git branch this folder has checked out (switching back to develop removed vm-retry.sh from under it
+# and every run failed silently with exit 127). It runs its own copy; re-run this script (INSTALL_ONLY=1 needs no Oracle login) to refresh it.
+bin="$HOME/.emithran/oracle"; mkdir -p "$bin"
+install -m 755 "$here/vm.sh" "$bin/vm.sh"; install -m 755 "$here/vm-retry.sh" "$bin/vm-retry.sh"
 plist="$HOME/Library/LaunchAgents/com.emithran.oracle-retry.plist"
 cat > "$plist" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>com.emithran.oracle-retry</string>
-  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$here/vm-retry.sh</string></array>
+  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$bin/vm-retry.sh</string></array>
   <key>EnvironmentVariables</key><dict>
     <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>HOME</key><string>$HOME</string></dict>
@@ -80,4 +87,5 @@ PL
 launchctl bootout "gui/$(id -u)/com.emithran.oracle-retry" >/dev/null 2>&1 || true
 rm -f "$HOME/.emithran/oracle-retry/RESULT"
 launchctl bootstrap "gui/$(id -u)" "$plist"
-echo "done: user $name, API key $key, retry scheduled every 10 minutes. Log: ~/.emithran/oracle-retry/retry.log"
+if [ -n "${INSTALL_ONLY:-}" ]; then echo "done: scripts installed in $bin, retry scheduled every 10 minutes. Log: ~/.emithran/oracle-retry/retry.log"
+else echo "done: user $name, API key $key, scripts installed in $bin, retry scheduled every 10 minutes. Log: ~/.emithran/oracle-retry/retry.log"; fi
