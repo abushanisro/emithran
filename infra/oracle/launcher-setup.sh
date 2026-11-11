@@ -29,7 +29,11 @@ q iam group add-user --user-id "$user" --group-id "$group" >/dev/null 2>&1 || tr
 
 stmts='["Allow group '$name' to manage instance-family in tenancy","Allow group '$name' to use virtual-network-family in tenancy","Allow group '$name' to use volume-family in tenancy","Allow group '$name' to inspect compartments in tenancy"]'
 pol="$(q iam policy list -c "$tenancy" --name "$name" --query 'data[0].id' --raw-output 2>/dev/null || true)"
-case "$pol" in ocid1.*) q iam policy update --policy-id "$pol" --statements "$stmts" --force >/dev/null ;;
+case "$pol" in ocid1.*)
+    # Oracle wants --version-date whenever statements are updated (an empty value means "keep"); skip the call when nothing differs
+    have="$(q iam policy get --policy-id "$pol" --query 'data.statements' 2>/dev/null | python3 -c 'import sys,json;print(json.dumps(sorted(json.load(sys.stdin))))')"
+    want="$(printf '%s' "$stmts" | python3 -c 'import sys,json;print(json.dumps(sorted(json.load(sys.stdin))))')"
+    [ "$have" = "$want" ] || q iam policy update --policy-id "$pol" --statements "$stmts" --version-date "" --force >/dev/null ;;
   *) q iam policy create -c "$tenancy" --name "$name" --description "Least privilege for the VM retry" --statements "$stmts" >/dev/null ;; esac
 
 key="$HOME/.oci/${name}.pem"; pub="$HOME/.oci/${name}_public.pem"; mkdir -p "$HOME/.oci"
