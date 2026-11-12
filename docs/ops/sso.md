@@ -56,8 +56,7 @@ Until Google verifies the brand, its account chooser names a domain ("to continu
 | Cookies are `Secure; HttpOnly; SameSite=lax` in production | the Auth0 SDK (https `APP_BASE_URL`) |
 
 ## Emails (password reset)
-Auth0 sends its emails through the Google Workspace mailbox `contact@emithran.com` (smtp.gmail.com, an app password), with the EMITHRAN
-template `infra/auth0/email/reset_email.html`. Without a provider Auth0 uses its built-in test sender (no-reply@auth0user.net, Auth0's
-look, rate-limited, often spam). Set up or change it: create an app password for the mailbox (myaccount.google.com/apppasswords; the
-account needs 2-Step Verification), then `DRY_RUN=1 infra/auth0/setup-email.sh` and `infra/auth0/setup-email.sh` (rerunnable).
-Gmail sends at most about 2,000 mails a day from one mailbox, far above what sign-in needs.
+Auth0 sends its emails with its own built-in sender (decision 2026-11-12): Auth0's default template with the tenant name EMITHRAN and the
+tenant logo, links on `auth.emithran.com` (tenant flag `enable_custom_domain_in_emails`). Nothing to configure. Limits (Auth0): no custom
+templates, rate-limited, "not for production use", and some mail is filed as spam. For a branded email from `contact@emithran.com`, an
+external SMTP provider is required (see git history: `infra/auth0/setup-email.sh`, removed 2026-11-12).
