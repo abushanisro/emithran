@@ -25,8 +25,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Auth0's handler serves /auth/login, /auth/callback, /auth/logout and /auth/profile, and keeps the session cookie rolling on every
-  // other request. Our headers are then added to whatever it returns.
+  // Logging out with no session: there is nothing to log out of here, and Auth0's standard logout would then ask "Are you sure you
+  // want to log out?" naming nobody (a second tab, an already-ended session). Straight to the sign-in page instead; both sign-in
+  // buttons make Auth0 ask again anyway (prompt=login). With a session, Auth0's logout carries the sign-in proof and never asks.
+  if (pathname === '/auth/logout' && !(await getAuth0().getSession(request))) {
+    return NextResponse.redirect(new URL('/auth', process.env.APP_BASE_URL ?? request.url))
+  }
+
+  // Auth0's handler serves /auth/login, /auth/callback, /auth/logout and /auth/profile, and lets every other request through (the
+  // session is not rolled: lib/auth0.ts). Our headers are then added to whatever it returns.
   const authResponse = await getAuth0().middleware(request)
   if (pathname.startsWith('/auth/') && !pathname.startsWith('/auth/callback/')) return authResponse
 
