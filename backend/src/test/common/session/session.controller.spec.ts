@@ -9,7 +9,8 @@ function makeService() {
   return {
     assertActive: jest.fn().mockResolvedValue({ lastActivityAt: T0, lastJobAt: null }),
     recordActivity: jest.fn().mockResolvedValue({ lastActivityAt: T0 + 5 * MIN, lastJobAt: null }),
-  } as unknown as SessionActivityService & { assertActive: jest.Mock; recordActivity: jest.Mock };
+    end: jest.fn().mockResolvedValue(undefined),
+  } as unknown as SessionActivityService & { assertActive: jest.Mock; recordActivity: jest.Mock; end: jest.Mock };
 }
 
 describe('SessionController', () => {
@@ -26,6 +27,18 @@ describe('SessionController', () => {
     const res = await new SessionController(service).activity({ kind: 'job' }, 's1', 'u1');
     expect(service.recordActivity).toHaveBeenCalledWith('s1', 'u1', 'job');
     expect(res.deadline).toBe(T0 + 35 * MIN);
+  });
+
+  it('ends the caller\'s own session at logout', async () => {
+    const service = makeService();
+    await new SessionController(service).end('s1', 'u1');
+    expect(service.end).toHaveBeenCalledWith('s1', 'u1');
+  });
+
+  it('has nothing to end for the development bypass (no session)', async () => {
+    const service = makeService();
+    await new SessionController(service).end(undefined, 'dev');
+    expect(service.end).not.toHaveBeenCalled();
   });
 
   it('reports the development bypass (no session) as not enforced, and stores nothing', async () => {

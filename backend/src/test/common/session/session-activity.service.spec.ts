@@ -4,14 +4,14 @@ import {
   sessionDeadline,
   sessionIdFromAccessToken,
 } from '../../../common/session/session-idle-policy';
-import { SessionActivityService, SESSION_IDLE_TIMEOUT_CODE } from '../../../common/session/session-activity.service';
+import { SessionActivityService, SESSION_ENDED_CODE, SESSION_IDLE_TIMEOUT_CODE } from '../../../common/session/session-activity.service';
 import { type DatabaseService } from '../../../common/database/database.service';
 
 const MIN = 60_000;
 const T0 = Date.parse('2026-10-15T09:00:00Z');
 const iso = (ms: number) => new Date(ms).toISOString();
 
-type Row = { last_activity_at: string; last_job_at: string | null };
+type Row = { last_activity_at: string; last_job_at: string | null; ended_at?: string | null };
 
 /** In-memory stand-in for user_session_activity behind the privileged client. */
 function fakeDatabase(opts: { readError?: object; writeError?: object } = {}) {
@@ -127,6 +127,27 @@ describe('SessionActivityService', () => {
     await svc.assertActive('s1', 'u1', T0);
     db.rows.set('s1', { last_activity_at: iso(T0 + 20 * MIN), last_job_at: null });
     await expect(svc.assertActive('s1', 'u1', T0 + 31 * MIN)).resolves.toMatchObject({ lastActivityAt: T0 + 20 * MIN });
+  });
+
+  // Logout ends the session on the server too: a copied session cookie is refused from then on, whatever its token still says.
+  it('refuses a session after it was ended at logout, and keeps refusing it', async () => {
+    const db = fakeDatabase();
+    const svc = new SessionActivityService(db.service);
+    await svc.assertActive('s1', 'u1', T0);
+    await svc.end('s1', 'u1', T0 + MIN);
+    expect(db.rows.get('s1')?.ended_at).toBe(iso(T0 + MIN));
+    const err = await svc.assertActive('s1', 'u1', T0 + 2 * MIN).catch((e) => e);
+    expect(err).toBeInstanceOf(UnauthorizedException);
+    expect(err.getResponse()).toMatchObject({ code: SESSION_ENDED_CODE });
+    await expect(svc.recordActivity('s1', 'u1', 'user', T0 + 3 * MIN)).rejects.toThrow(UnauthorizedException);
+    await expect(svc.assertActive('s1', 'u1', T0 + 4 * MIN)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('can end a session it has never seen (logout right after sign-in)', async () => {
+    const db = fakeDatabase();
+    const svc = new SessionActivityService(db.service);
+    await svc.end('s2', 'u1', T0);
+    await expect(svc.assertActive('s2', 'u1', T0 + MIN)).rejects.toThrow(UnauthorizedException);
   });
 
   it('moves the idle clock only on a user heartbeat', async () => {
