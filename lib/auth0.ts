@@ -20,8 +20,8 @@ export function getAuth0(): Auth0Client {
     signInReturnToPath: '/',
     // No rolling session: rolling re-writes the session cookie on every request, so API calls still in flight at "Log out" answered
     // after it and wrote the cookie back (the person stayed signed in). Idle sign-out is the app's own (30 minutes, enforced by the
-    // server: lib/auth/session-idle); the cookie simply ends 3 days after sign-in (the SDK's absolute duration).
-    session: { rolling: false },
+    // server: lib/auth/session-idle). A sign-in lasts at most 8 hours, one working day (decision 2026-11-12), then the person signs in again.
+    session: { rolling: false, absoluteDuration: 8 * 60 * 60 },
     // The BFF attaches the token to API calls on the server, so the route that would hand tokens to browser JavaScript is closed.
     enableAccessTokenEndpoint: false,
     // The browser's idle timer keys its shared state by session; with no token in the browser it reads the session id from the profile.
