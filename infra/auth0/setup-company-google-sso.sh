@@ -52,10 +52,12 @@ others=[{'ref':{'type':'action_id','value':b['action']['id']},'display_name':b['
 print(json.dumps({'bindings':[{'ref':{'type':'action_id','value':'$id'},'display_name':'$action'}]+others}))" > "$tmp/bindings.json"
 a0 patch actions/triggers/post-login/bindings --data "@$tmp/bindings.json" >/dev/null
 
-echo "[3/4] Google connection: your own client (kept options otherwise)"
+echo "[3/4] Google connection: your own client, account chooser always shown (kept options otherwise)"
 a0 get "connections/$conn" | GID="$gid" GSECRET="$gsecret" python3 -c "
 import json,os,sys
 o=json.load(sys.stdin)['options']; o.update(client_id=os.environ['GID'], client_secret=os.environ['GSECRET'], email=True, profile=True)
+# Always show Google's account chooser: someone signed in to Google as one person can pick another (and "Log out" then "Sign in" is never a silent re-login)
+o['upstream_params']={'prompt':{'value':'select_account'}}
 print(json.dumps({'options':o}))" > "$tmp/conn.json"
 a0 patch "connections/$conn" --data "@$tmp/conn.json" >/dev/null
 
