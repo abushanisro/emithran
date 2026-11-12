@@ -17,11 +17,12 @@ export interface PostLoginApi {
   access: { deny: (reason: string) => void }
 }
 
-export function onExecutePostLogin(event: PostLoginEvent, api: PostLoginApi): Promise<void> {
+// Auth0 checks the handler is declared `async` (it refuses a plain function that returns a promise, and then EVERY sign-in fails).
+// eslint-disable-next-line @typescript-eslint/require-await
+export async function onExecutePostLogin(event: PostLoginEvent, api: PostLoginApi): Promise<void> {
   if (event.connection.strategy === 'google-oauth2' && !isCompanyEmail(event.user, event.secrets.ALLOWED_GOOGLE_DOMAINS ?? '')) {
     api.access.deny('Sign in with your company Google account.')
   }
-  return Promise.resolve()
 }
 
 function isCompanyEmail(user: PostLoginEvent['user'], domains: string): boolean {

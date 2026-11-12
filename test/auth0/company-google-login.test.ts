@@ -48,7 +48,12 @@ describe('company Google sign-in (Auth0 Action)', () => {
     execFileSync('npx', ['tsc', '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--outDir', out, 'infra/auth0/company-google-login.ts']);
     expect(read('infra/auth0/setup-company-google-sso.sh')).toContain('npx tsc --module commonjs --target es2022 --skipLibCheck --outDir "$tmp" "$src"');
     fs.writeFileSync(path.join(out, 'package.json'), '{"type":"commonjs"}');
+    // Auth0 refuses the Action unless the export is declared exactly as an async function (every sign-in fails otherwise).
+    const source = fs.readFileSync(path.join(out, 'company-google-login.js'), 'utf8');
+    expect(source).toMatch(/^async function onExecutePostLogin\(event, api\)/m);
+    expect(source).toMatch(/^exports\.onExecutePostLogin = onExecutePostLogin;/m);
     const compiled = createRequire(import.meta.url)(path.join(out, 'company-google-login.js')) as { onExecutePostLogin: typeof onExecutePostLogin };
+    expect(Object.prototype.toString.call(compiled.onExecutePostLogin)).toBe('[object AsyncFunction]');
     const deny = vi.fn();
     const event = (email: string) => ({ connection: { strategy: 'google-oauth2' }, user: { email, email_verified: true }, secrets: { ALLOWED_GOOGLE_DOMAINS: 'emuski.com' } });
     await compiled.onExecutePostLogin(event('a@emuski.com'), { access: { deny } });
