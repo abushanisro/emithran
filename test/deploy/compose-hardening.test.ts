@@ -184,6 +184,13 @@ describe('docker-compose.prod.yml', () => {
     expect(read('Dockerfile.frontend')).toMatch(/ARG NEXT_PUBLIC_MAX_UPLOAD_MB\b/);
   });
 
+  // The "Sign in with SSO" button exists only when this name is compiled into the browser bundle; blank means no button.
+  it('compiles the SSO connection name into the browser bundle (blank hides the button)', () => {
+    expect(read('docker-compose.prod.yml')).toMatch(/NEXT_PUBLIC_AUTH0_SSO_CONNECTION: \$\{NEXT_PUBLIC_AUTH0_SSO_CONNECTION:-\}/);
+    expect(read('Dockerfile.frontend')).toMatch(/ARG NEXT_PUBLIC_AUTH0_SSO_CONNECTION\n/);
+    expect(read('Dockerfile.frontend')).toMatch(/ENV NEXT_PUBLIC_AUTH0_SSO_CONNECTION=\$\{NEXT_PUBLIC_AUTH0_SSO_CONNECTION\}/);
+  });
+
   it('caps the backend V8 heap at about 70% of its container memory, so V8 fails before the kernel kills the container', () => {
     const backend = compose.services.backend;
     const heapMb = Number(/--max-old-space-size=(\d+)/.exec(String(backend?.environment?.NODE_OPTIONS))?.[1]);

@@ -60,6 +60,8 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_GATEWAY_URL}/api/v1
         # The one upload limit, shown in the upload card. The backend and the engine take the same MAX_UPLOAD_MB.
         NEXT_PUBLIC_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+        # The Auth0 company SSO connection behind the "Sign in with SSO" button (it must be enabled for this app in Auth0). Blank: no button.
+        NEXT_PUBLIC_AUTH0_SSO_CONNECTION: ${NEXT_PUBLIC_AUTH0_SSO_CONNECTION:-}
     environment:
       NODE_ENV: production
       # Server-side calls stay on the private network: the backend, and the engine through the /api/cad proxy.
