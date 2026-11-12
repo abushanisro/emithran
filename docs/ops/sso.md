@@ -42,3 +42,5 @@ Until Google verifies the brand, its account chooser names a domain ("to continu
   then invite its people.
 - Turn SSO off: blank `NEXT_PUBLIC_AUTH0_SSO_CONNECTION` and release (no button), and switch the Google connection off for the apps in Auth0.
 - A refused Google account comes back to the sign-in page with "Sign-in did not complete".
+- Google always shows its account chooser (`upstream_params.prompt=select_account` on the Google connection, set by the script). Logging out of
+  the app does not log anyone out of Google (it would also end their Gmail); the chooser is how someone switches to another company account.
