@@ -32,6 +32,12 @@ describe('Auth0 client options', () => {
     expect((await options()).enableAccessTokenEndpoint).toBe(false);
   });
 
+  // A rolling session re-writes the session cookie on every request. API calls still in flight when someone clicks "Log out" then
+  // answered after the logout and wrote the cookie back, so they stayed signed in. Idle sign-out is the app's own (30 minutes, server side).
+  it('does not re-write the session cookie on ordinary requests, so a late response cannot undo a logout', async () => {
+    expect((await options()).session?.rolling).toBe(false);
+  });
+
   it("keeps the default profile claims plus the session id, which the idle timer uses instead of the token's sid", async () => {
     const { beforeSessionSaved } = await options();
     if (!beforeSessionSaved) throw new Error('beforeSessionSaved is not set');
