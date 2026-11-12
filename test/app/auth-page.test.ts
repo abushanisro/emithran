@@ -44,7 +44,7 @@ describe('sign-in page', () => {
   // Each button is its own link to Auth0 (works without JavaScript) with its own spinner, so one never shows the other loading.
   it('Sign In and Sign in with SSO are separate links, neither one loading or disabled', async () => {
     const html = await render();
-    expect(html).toMatch(/<a [^>]*href="\/auth\/login\?prompt=login"[^>]*>Sign In<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/auth\/login\?prompt=login&amp;connection=Username-Password-Authentication"[^>]*>Sign In<\/a>/);
     expect(html).toMatch(/<a [^>]*href="\/auth\/login\?prompt=login&amp;connection=emithran-auth"[^>]*>.*Sign in with SSO<\/a>/);
     expect(html).not.toContain('animate-spin');
     expect(html).not.toContain('aria-disabled="true"');
