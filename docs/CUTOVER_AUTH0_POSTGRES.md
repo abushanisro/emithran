@@ -20,8 +20,8 @@ environment that still has data in an old Supabase project.
    OAuth consent screen **Internal**, then a Web OAuth client with redirect URI `https://<AUTH0_DOMAIN>/login/callback`. In Auth0,
    Authentication → Enterprise → Google Workspace: purpose Authentication, the company domain, that client id and secret, Admin Directory
    API and extended attributes off, "Use ID instead of Email" on; enable it for the application. (Microsoft Entra ID or SAML work the same
-   way through their own enterprise connection.) Set `NEXT_PUBLIC_AUTH0_SSO_CONNECTION` (build time) to the connection's name so
-   "Sign in with SSO" goes straight to it; without it the app shows no SSO button. The Free plan includes one enterprise connection; Home
+   way through their own enterprise connection.) Today "Sign in with SSO" uses the Google connection limited to company
+   domains instead (`docs/ops/sso.md`); `NEXT_PUBLIC_AUTH0_SSO_CONNECTION` (build time) names it, and without it the app shows no SSO button. The Free plan includes one enterprise connection; Home
    Realm Discovery is not in Free.
 3. Add a **post-login Action** so the access token carries what the backend reads (replace the namespace with your `AUTH0_CLAIM_NAMESPACE`):
    ```js
@@ -81,8 +81,8 @@ may only claim and finish uploads; without 951 PostgREST refuses its token). Che
 
 1. `env/stage.env`: `POSTGREST_DB_URI` (role `authenticator`), `DB_JWT_SECRET` (>= 32 chars, **the same value** for backend, PostgREST and `cad-runner`),
    `S3_*` (set `S3_ENDPOINT` for anything other than AWS), `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLAIM_NAMESPACE`,
-   `AUTH0_TRUSTED_CONNECTIONS` (e.g. `emithran-auth,Username-Password-Authentication`: the SSO connection, the same name as
-   `NEXT_PUBLIC_AUTH0_SSO_CONNECTION`, and the database connection). Optional: `AUTH_DECISION_CACHE_SECONDS` (default 10, at most 60),
+   `AUTH0_TRUSTED_CONNECTIONS` (e.g. `google-oauth2,emithran-auth,Username-Password-Authentication`: the SSO connection, the same name
+   as `NEXT_PUBLIC_AUTH0_SSO_CONNECTION`, the Workspace connection and the database connection). Optional: `AUTH_DECISION_CACHE_SECONDS` (default 10, at most 60),
    the longest a person removed from `authorized_users` keeps access.
 2. Frontend build: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `APP_BASE_URL`.
 3. `docker compose -p emithran-stage -f docker-compose.prod.yml --env-file env/stage.env --profile rust-core up -d --build` (PostgREST always runs).
