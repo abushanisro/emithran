@@ -42,12 +42,14 @@ export class SessionActivityService {
 
   constructor(private readonly databaseService: DatabaseService) {}
 
-  /** Throws 401 if the session is past its deadline. */
+  /**
+   * Throws 401 if the session was ended at logout, or (when the idle sign-out is on) is past its deadline. With the idle sign-out
+   * switched off a session is never past a deadline, but logout still ends it: its row is read once, then served from memory.
+   */
   async assertActive(sessionId: string, userId: string, now = Date.now()): Promise<SessionActivityTimes> {
-    // Switched off: no session is ever past a deadline, and nothing is read or stored.
-    if (!idleTimeoutEnabled()) return { lastActivityAt: now, lastJobAt: null };
+    const idle = idleTimeoutEnabled();
     const cached = this.cache.get(sessionId);
-    if (cached && !cached.ended && sessionDeadline(cached) > now) return times(cached);
+    if (cached && !cached.ended && (!idle || sessionDeadline(cached) > now)) return times(cached);
 
     let stored: StoredTimes | null;
     try {
@@ -58,7 +60,7 @@ export class SessionActivityService {
       return this.unenforcedOrThrow(error, now);
     }
     if (stored.ended) throw this.ended(sessionId);
-    if (sessionDeadline(stored) <= now) {
+    if (idle && sessionDeadline(stored) <= now) {
       this.cache.delete(sessionId);
       throw new UnauthorizedException({
         message: 'Your session ended after 30 minutes of inactivity. Please sign in again.',
