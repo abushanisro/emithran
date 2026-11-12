@@ -112,6 +112,7 @@ import {
   familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
 import { materialPickerQuery, type MaterialPickerScope } from '@/lib/features/material-picker-query';
+import { MaterialScopeToggle } from '@/components/features/manufacturing-intelligence/MaterialScopeToggle';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -4486,17 +4487,7 @@ function MaterialPickerDialog({
             autoFocus
             className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
           />
-          {processGroup && (
-            <select
-              value={scope}
-              onChange={(e) => { setScope(e.target.value as MaterialPickerScope); }}
-              className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer w-44 shrink-0"
-              aria-label="Process"
-            >
-              <option value="process">{processGroup} materials</option>
-              <option value="all">All processes</option>
-            </select>
-          )}
+          {processGroup && <MaterialScopeToggle processGroup={processGroup} scope={scope} onChange={setScope} />}
           <select
             value={groupFilter}
             onChange={(e) => { setGroupFilter(e.target.value); }}
