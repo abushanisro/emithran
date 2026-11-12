@@ -44,26 +44,6 @@ async function fetchMe(): Promise<Me> {
 }
 
 /**
- * The company single sign-on connection (an Auth0 enterprise connection: Google Workspace, Microsoft Entra ID, SAML, ...), named at build
- * time by NEXT_PUBLIC_AUTH0_SSO_CONNECTION. Unset means no SSO button: there is no fallback to a public social login, so only the
- * company directory can sign people in this way.
- */
-export function ssoConnection(value = process.env.NEXT_PUBLIC_AUTH0_SSO_CONNECTION): string | null {
-  const name = value?.trim()
-  return name ? name : null
-}
-
-/** Auth0 login sent straight to the company SSO connection, skipping the Auth0 login form. */
-export function ssoSignInPath(connection: string): string {
-  return `/auth/login?connection=${encodeURIComponent(connection)}`
-}
-
-const go = (path: string) => {
-  window.location.assign(path)
-  return new Promise<never>(() => undefined)
-}
-
-/**
  * Auth0 sign-in (Universal Login: password, company SSO, MFA and password reset live there). The Auth0 session proves who the person is;
  * the backend decides whether they are invited and tells us their internal id, which is what the rest of the app uses.
  */
@@ -109,21 +89,12 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
     [me, auth0User],
   )
 
-  const signIn = useCallback(async () => go('/auth/login'), [])
-  const sso = ssoConnection()
-  const signInWithSso = useCallback(async () => {
-    if (!sso) throw new Error('Single sign-on is not configured (NEXT_PUBLIC_AUTH0_SSO_CONNECTION)')
-    return go(ssoSignInPath(sso))
-  }, [sso])
   const signOut = useCallback(async () => { await sessionSource.signOutThisDevice() }, [])
 
   const value: AuthContextType = {
     user,
     loading: isLoading || ((!!auth0User || devAuthBypassEnabled()) && me.state === 'loading'),
     accessDenied: me.state === 'denied',
-    signIn,
-    ssoAvailable: sso !== null,
-    signInWithSso,
     signOut,
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
