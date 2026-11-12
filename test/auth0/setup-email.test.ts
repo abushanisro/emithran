@@ -42,6 +42,10 @@ describe('infra/auth0/setup-email.sh', () => {
     expect(t).toMatchObject({ template: 'reset_email', enabled: true, syntax: 'liquid', from: 'EMITHRAN <contact@emithran.com>', subject: 'Reset your EMITHRAN password', urlLifetimeInSeconds: 3600 });
     expect(t?.body).toContain('href="{{ url }}"');
     expect(t?.body).toContain('EMITHRAN');
+    // the EMITHRAN logo from the app itself (a small copy), never an Auth0 image
+    expect(t?.body).toContain('src="https://app.emithran.com/email-logo.png"');
+    expect(t?.body).not.toContain('auth0.com');
+    expect(fs.existsSync('public/email-logo.png')).toBe(true);
   });
 
   // Without this tenant flag Auth0 builds the reset link on dev-ahu0oilgxwkz8hhf.us.auth0.com instead of auth.emithran.com.
