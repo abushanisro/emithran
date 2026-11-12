@@ -56,9 +56,10 @@ echo "[3/4] Google connection: your own client, account chooser always shown (ke
 a0 get "connections/$conn" | GID="$gid" GSECRET="$gsecret" python3 -c "
 import json,os,sys
 o=json.load(sys.stdin)['options']; o.update(client_id=os.environ['GID'], client_secret=os.environ['GSECRET'], email=True, profile=True)
-# Always show Google's account chooser: someone signed in to Google as one person can pick another (and "Log out" then "Sign in" is never a silent re-login)
+# Always show the Google account chooser: someone signed in to Google as one person can pick another, and logging out then in is never a silent re-login
 o['upstream_params']={'prompt':{'value':'select_account'}}
 print(json.dumps({'options':o}))" > "$tmp/conn.json"
+[ -s "$tmp/conn.json" ] || { echo "internal error: empty connection update, nothing sent" >&2; exit 1; }
 a0 patch "connections/$conn" --data "@$tmp/conn.json" >/dev/null
 
 echo "[4/4] Google connection: switched on for the apps"
