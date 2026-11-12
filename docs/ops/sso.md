@@ -19,8 +19,8 @@ the same result for any number of companies.
 1. **Google key** (console.cloud.google.com, signed in as the emithran.com admin; about 10 minutes, free):
    new project `emithran-sign-in` → Google Auth Platform → Branding: app name `EMITHRAN`, support email → Audience: **External**, then
    **Publish app** (only name, email and profile are asked for, so Google needs no review) → Clients → Create client → Web application,
-   name `EMITHRAN sign-in`, Authorized redirect URIs `https://auth.emithran.com/login/callback` and
-   `https://dev-ahu0oilgxwkz8hhf.us.auth0.com/login/callback` → keep the client ID and secret.
+   name `EMITHRAN sign-in`, Authorized redirect URI `https://auth.emithran.com/login/callback` only → keep the client ID and secret. Every environment signs in
+   through the custom domain (`AUTH0_DOMAIN=auth.emithran.com`), never `*.auth0.com`, so Google shows our domain and can verify our brand.
 2. **Auth0** (`auth0 login` first): `DRY_RUN=1 infra/auth0/setup-company-google-sso.sh`, then without `DRY_RUN`. It asks for the client ID
    and secret (hidden), deploys the rule, attaches it before the existing `emithran-claims` Action, puts the key on the Google connection,
    and only then switches Google on for EMITHRAN Cloud and EMITHRAN Cloud (Stage).
@@ -28,6 +28,14 @@ the same result for any number of companies.
    `AUTH0_TRUSTED_CONNECTIONS=google-oauth2,emithran-auth,Username-Password-Authentication`. Local: restart `npm run dev` and the backend.
    Staging and production: `infra/oracle/stage-release.sh origin/develop`, then `infra/oracle/micro-release.sh origin/develop`.
 4. **Invite** the people (`infra/oracle/authorize-user.sh`, production runbook). Being on an allowed domain is not enough on its own.
+
+## Google shows "EMITHRAN" (brand verification, free, once)
+Until Google verifies the brand, its account chooser names a domain ("to continue to …") instead of EMITHRAN. In Google Auth Platform:
+1. Branding: app name `EMITHRAN`, support email, logo (120x120, optional), home page `https://www.emithran.com`, privacy policy
+   `https://www.emithran.com/privacy`, terms `https://www.emithran.com/terms`, authorised domain `emithran.com` only.
+2. Clients → EMITHRAN sign-in: the only redirect URI is `https://auth.emithran.com/login/callback`.
+3. emithran.com verified in Google Search Console for the same Google account (a DNS TXT record in Cloudflare).
+4. Verification centre → submit brand verification. Google answers in a few business days; nothing changes for users while it waits.
 
 ## Everyday
 - Add a company: `ALLOWED_GOOGLE_DOMAINS=emithran.com,emuski.com,newco.com infra/auth0/setup-company-google-sso.sh` (no code change, no release),
