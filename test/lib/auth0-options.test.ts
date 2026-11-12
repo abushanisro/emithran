@@ -38,6 +38,11 @@ describe('Auth0 client options', () => {
     expect((await options()).session?.rolling).toBe(false);
   });
 
+  // Decision 2026-11-12: a sign-in lasts at most one working day (8 hours), however active the person is; then they sign in again.
+  it('ends every sign-in after 8 hours at most', async () => {
+    expect((await options()).session?.absoluteDuration).toBe(8 * 60 * 60);
+  });
+
   it("keeps the default profile claims plus the session id, which the idle timer uses instead of the token's sid", async () => {
     const { beforeSessionSaved } = await options();
     if (!beforeSessionSaved) throw new Error('beforeSessionSaved is not set');
