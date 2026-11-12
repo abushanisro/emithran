@@ -38,6 +38,12 @@ describe('Auth0 client options', () => {
     expect((await options()).session?.rolling).toBe(false);
   });
 
+  // OIDC logout asks "Are you sure you want to log out?" (with an empty "Hi ,") whenever the request carries no session, e.g. a second
+  // tab or an already-ended session. Auth0's /v2/logout never asks: it ends the Auth0 session and returns to the app.
+  it('logs out through /v2/logout, which never shows a confirmation page', async () => {
+    expect((await options()).logoutStrategy).toBe('v2');
+  });
+
   // Decision 2026-11-12: a sign-in lasts at most one working day (8 hours), however active the person is; then they sign in again.
   it('ends every sign-in after 8 hours at most', async () => {
     expect((await options()).session?.absoluteDuration).toBe(8 * 60 * 60);

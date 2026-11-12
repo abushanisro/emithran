@@ -22,6 +22,9 @@ export function getAuth0(): Auth0Client {
     // after it and wrote the cookie back (the person stayed signed in). Idle sign-out is the app's own (30 minutes, enforced by the
     // server: lib/auth/session-idle). A sign-in lasts at most 8 hours, one working day (decision 2026-11-12), then the person signs in again.
     session: { rolling: false, absoluteDuration: 8 * 60 * 60 },
+    // Auth0's /v2/logout ends the Auth0 session and returns straight to the app. The OIDC logout would ask "Are you sure you want to
+    // log out?" (naming nobody) whenever the request carries no session, e.g. from a second tab or after the session already ended.
+    logoutStrategy: 'v2',
     // The BFF attaches the token to API calls on the server, so the route that would hand tokens to browser JavaScript is closed.
     enableAccessTokenEndpoint: false,
     // The browser's idle timer keys its shared state by session; with no token in the browser it reads the session id from the profile.
