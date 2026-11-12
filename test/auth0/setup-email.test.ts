@@ -44,6 +44,11 @@ describe('infra/auth0/setup-email.sh', () => {
     expect(t?.body).toContain('EMITHRAN');
   });
 
+  // Without this tenant flag Auth0 builds the reset link on dev-ahu0oilgxwkz8hhf.us.auth0.com instead of auth.emithran.com.
+  it('puts the custom domain (auth.emithran.com) into email links', () => {
+    expect(writes.find((w) => w.url === 'tenants/settings')?.body).toEqual({ flags: { enable_custom_domain_in_emails: true } });
+  });
+
   it('changes nothing in a dry run', () => {
     expect(run({ DRY_RUN: '1' })).toEqual([]);
   });
@@ -51,7 +56,7 @@ describe('infra/auth0/setup-email.sh', () => {
   // First run on a tenant: Auth0 answers "not found" for the provider and the template. The script creates both, quietly.
   it('creates the provider and the template when Auth0 has neither, without errors', () => {
     const fresh = run({ FAKE_NOT_FOUND: '1' });
-    expect(fresh.map((w) => [w.method, w.url].join(" "))).toEqual(['post emails/provider', 'post email-templates']);
+    expect(fresh.map((w) => [w.method, w.url].join(" "))).toEqual(['post emails/provider', 'post email-templates', 'patch tenants/settings']);
     expect(lastStderr).not.toMatch(/Traceback|Error/);
   });
 });

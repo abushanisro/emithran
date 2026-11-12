@@ -17,11 +17,12 @@ has() { python3 -c "import json,sys; s=sys.stdin.read().strip(); d=json.loads(s)
 
 echo "sender  : EMITHRAN <$sender> through smtp.gmail.com:587 (Google Workspace)"
 echo "template: reset_email from infra/auth0/email/reset_email.html (subject: Reset your EMITHRAN password)"
+echo "links  : on the custom domain auth.emithran.com (tenant flag enable_custom_domain_in_emails)"
 if [ "${DRY_RUN:-0}" = 1 ]; then echo "DRY_RUN: nothing changed."; exit 0; fi
 read -r -s -p "Google app password for $sender (hidden): " pass; echo
 [ -n "$pass" ] || { echo "the app password is required" >&2; exit 2; }
 
-echo "[1/2] email provider: Google Workspace SMTP"
+echo "[1/3] email provider: Google Workspace SMTP"
 SENDER="$sender" PASS="$pass" python3 -c "
 import json,os
 s=os.environ['SENDER']
@@ -30,11 +31,13 @@ print(json.dumps({'name':'smtp','enabled':True,'default_from_address':s,
 if a0 get emails/provider 2>/dev/null | has name; then a0 patch emails/provider --data "@$tmp/provider.json" >/dev/null
 else a0 post emails/provider --data "@$tmp/provider.json" >/dev/null; fi
 
-echo "[2/2] reset_email template"
+echo "[2/3] reset_email template"
 SENDER="$sender" python3 -c "
 import json,os
 print(json.dumps({'template':'reset_email','enabled':True,'syntax':'liquid','from':'EMITHRAN <%s>' % os.environ['SENDER'],
   'subject':'Reset your EMITHRAN password','urlLifetimeInSeconds':3600,'body':open('infra/auth0/email/reset_email.html').read()}))" > "$tmp/template.json"
 if a0 get email-templates/reset_email 2>/dev/null | has template; then a0 patch email-templates/reset_email --data "@$tmp/template.json" >/dev/null
 else a0 post email-templates --data "@$tmp/template.json" >/dev/null; fi
+echo "[3/3] links in emails use the custom domain (auth.emithran.com), not the tenant's auth0.com address"
+a0 patch tenants/settings --data '{"flags":{"enable_custom_domain_in_emails":true}}' >/dev/null
 echo "done. Test: Auth0 sign-in page -> Forgot password."
