@@ -225,12 +225,23 @@ describe('SessionActivityService with the inactivity timeout switched off', () =
     if (previous === undefined) delete process.env.SESSION_IDLE_TIMEOUT_ENABLED; else process.env.SESSION_IDLE_TIMEOUT_ENABLED = previous;
   });
 
-  it('never ends a session, however long it has been idle, and reads and stores nothing', async () => {
+  it('never ends a session for being idle, however long, and reads it from the database only once', async () => {
     const db = fakeDatabase();
     db.rows.set('s1', { last_activity_at: iso(T0 - 24 * 60 * MIN), last_job_at: null });
     const svc = new SessionActivityService(db.service);
-    await expect(svc.assertActive('s1', 'u1', T0)).resolves.toEqual({ lastActivityAt: T0, lastJobAt: null });
-    expect(db.reads).not.toHaveBeenCalled();
+    await expect(svc.assertActive('s1', 'u1', T0)).resolves.toBeDefined();
+    await expect(svc.assertActive('s1', 'u1', T0 + 300 * MIN)).resolves.toBeDefined();
+    expect(db.reads).toHaveBeenCalledTimes(1);
+  });
+
+  // Production runs with the idle sign-out off; logout must still end the session there (and on another instance with no cache).
+  it('still refuses a session after it was ended at logout', async () => {
+    const db = fakeDatabase();
+    const svc = new SessionActivityService(db.service);
+    await svc.assertActive('s1', 'u1', T0);
+    await svc.end('s1', 'u1', T0 + MIN);
+    await expect(svc.assertActive('s1', 'u1', T0 + 2 * MIN)).rejects.toThrow(UnauthorizedException);
+    await expect(new SessionActivityService(db.service).assertActive('s1', 'u1', T0 + 2 * MIN)).rejects.toThrow(UnauthorizedException);
   });
 
   it('does not hide a failing session store: with the timeout on it is still a 503 (the switch is read per call)', async () => {

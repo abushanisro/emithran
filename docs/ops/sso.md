@@ -48,7 +48,8 @@ Until Google verifies the brand, its account chooser names a domain ("to continu
 ## Session policy (decision 2026-11-12)
 | Rule | Where |
 |---|---|
-| Idle sign-out after 30 minutes, enforced by the server per Auth0 session | backend `common/session` (`user_session_activity`) |
+| Idle sign-out after 30 minutes, enforced by the server per Auth0 session. **Switched off in every environment today** (`SESSION_IDLE_TIMEOUT_ENABLED=false`, decision of 2026-11-04) | backend `common/session` (`user_session_activity`) |
+| Logout ends the session on the server (a copied cookie is refused at once), whether the idle sign-out is on or off | `POST /api/v1/auth/session/end`, migration 1000 |
 | A sign-in lasts at most 8 hours, then sign in again | `lib/auth0.ts` (`session.absoluteDuration`), and the refresh token's lifetime |
 | The session cookie is never re-written by ordinary requests (a late response cannot undo a logout) | `lib/auth0.ts` (`session.rolling: false`) |
 | Refresh tokens rotate and expire after 8 hours; access tokens last 1 hour; code flow only | Auth0: `infra/auth0/apply-session-policy.sh` (`DRY_RUN=1` first; rerunnable) |
