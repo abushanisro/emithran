@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A fake Auth0 CLI for test/auth0/setup-script.test.ts: answers reads with fixtures and appends every write ("method path body") to $FAKE_LOG.
 m=$2; p=$3; [ "$m" = get ] || [ "$m" = patch ] || [ "$m" = post ] || { p=$2; m=get; }
-data=""; for a in "$@"; do case $a in @*) data=$(cat "${a#@}");; esac; done
+data=""; prev=""; for a in "$@"; do [ "$prev" = --data ] && case $a in @*) data=$(cat "${a#@}");; *) data=$a;; esac; prev=$a; done
 [ "$m" != get ] && echo "$m $p $data" >> "$FAKE_LOG"
 case "$m $p" in
   "get connections?strategy=google-oauth2&fields=id") echo '[{"id":"con_G"}]';;
