@@ -111,8 +111,7 @@ import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/
 import {
   familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
-import { materialPickerQuery, type MaterialPickerScope } from '@/lib/features/material-picker-query';
-import { MaterialScopeToggle } from '@/components/features/manufacturing-intelligence/MaterialScopeToggle';
+import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -4367,12 +4366,11 @@ function MaterialPickerDialog({
   open: boolean;
   onClose: () => void;
   onSelect: (grade: string) => void;
-  /** The item's selected process: the list starts with that process's materials ("All processes" shows every material). */
+  /** The item's selected process: the group dropdown starts on "<process> materials" ("All Groups" shows every material). */
   processGroup: string | null;
 }) {
   const [search, setSearch] = useState('');
-  const [scope, setScope] = useState<MaterialPickerScope>('process');
-  const [groupFilter, setGroupFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState(() => initialMaterialGroup(processGroup));
   const [classFilter, setClassFilter] = useState('');
   const [selected, setSelected] = useState<RawMaterial | null>(null);
 
@@ -4391,7 +4389,7 @@ function MaterialPickerDialog({
   // page), and their option lists come from the catalog's own filter options so a
   // chosen filter never shrinks the list it was chosen from.
   const { data: filterOptions } = useRawMaterialFilterOptions();
-  const query = { processGroup, scope, materialGroup: groupFilter, materialClass: classFilter };
+  const query = { processGroup, group: groupFilter, materialClass: classFilter };
   const { data: catalog, isLoading: catalogLoading } = useRawMaterials(open ? materialPickerQuery(query) : undefined);
   const { data: searchData, isFetching: searchFetching } = useRawMaterials(
     isSearching ? materialPickerQuery({ ...query, search: debouncedSearch }) : undefined,
@@ -4403,7 +4401,7 @@ function MaterialPickerDialog({
   const classes = filterOptions?.materialClasses ?? [];
   const total = isSearching ? (searchData?.total ?? materials.length) : (catalog?.total ?? materials.length);
   // The server lists the whole catalog when no material group is linked to the process; say so instead of implying a filter.
-  const processUnlinked = scope === 'process' && !!processGroup && (isSearching ? searchData : catalog)?.processMaterialGroups?.length === 0;
+  const processUnlinked = groupFilter === PROCESS_MATERIALS && !!processGroup && (isSearching ? searchData : catalog)?.processMaterialGroups?.length === 0;
 
   const filtered = materials;
 
@@ -4487,12 +4485,12 @@ function MaterialPickerDialog({
             autoFocus
             className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
           />
-          {processGroup && <MaterialScopeToggle processGroup={processGroup} scope={scope} onChange={setScope} />}
           <select
             value={groupFilter}
             onChange={(e) => { setGroupFilter(e.target.value); }}
             className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer w-40 shrink-0"
           >
+            {processGroup && <option value={PROCESS_MATERIALS}>{processGroup} materials</option>}
             <option value="">All Groups</option>
             {groups.map((g) => <option key={g} value={g}>{g}</option>)}
           </select>

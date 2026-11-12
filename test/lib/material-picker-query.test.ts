@@ -1,24 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import { materialPickerQuery } from '@/lib/features/material-picker-query';
+import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 
-// The Material Database dialog: once a process is selected it lists that process's materials (process_material_groups, migration 879),
-// and "All processes" lists the whole catalog. Group and class filters apply either way.
-describe('Material Database query', () => {
-  it("lists the selected process's materials by default", () => {
-    expect(materialPickerQuery({ processGroup: 'Plastic Molding', scope: 'process' })).toEqual({ limit: 1000, processGroup: 'Plastic Molding' });
+// The Material Database has one group dropdown. With a selected process its first choice is "<process> materials" (the process's linked
+// material groups, process_material_groups, migration 879) and it starts there; "All Groups" lists every material; a group lists that group.
+describe('Material Database group dropdown', () => {
+  it("starts on the selected process's materials, or on All Groups without a process", () => {
+    expect(initialMaterialGroup('Sand Casting')).toBe(PROCESS_MATERIALS);
+    expect(initialMaterialGroup(null)).toBe('');
   });
 
-  it('lists every material for "All processes"', () => {
-    expect(materialPickerQuery({ processGroup: 'Plastic Molding', scope: 'all' })).toEqual({ limit: 1000 });
+  it("asks for the process's materials", () => {
+    expect(materialPickerQuery({ processGroup: 'Sand Casting', group: PROCESS_MATERIALS })).toEqual({ limit: 1000, processGroup: 'Sand Casting' });
   });
 
-  it('lists every material when no process is selected yet', () => {
-    expect(materialPickerQuery({ processGroup: null, scope: 'process' })).toEqual({ limit: 1000 });
+  it('asks for every material on All Groups', () => {
+    expect(materialPickerQuery({ processGroup: 'Sand Casting', group: '' })).toEqual({ limit: 1000 });
   });
 
-  it('keeps the search, group and class filters', () => {
-    expect(materialPickerQuery({ processGroup: 'Machining', scope: 'process', search: '6061', materialGroup: 'Aluminium', materialClass: 'Non-Ferrous' }))
-      .toEqual({ limit: 1000, processGroup: 'Machining', search: '6061', materialGroup: 'Aluminium', materialClass: 'Non-Ferrous' });
+  it('asks for one group when a group is chosen (the process does not narrow it further)', () => {
+    expect(materialPickerQuery({ processGroup: 'Sand Casting', group: 'Aluminium' })).toEqual({ limit: 1000, materialGroup: 'Aluminium' });
+  });
+
+  it('keeps the class filter and the search', () => {
+    expect(materialPickerQuery({ processGroup: 'Machining', group: PROCESS_MATERIALS, materialClass: 'Non-Ferrous', search: '6061' }))
+      .toEqual({ limit: 1000, processGroup: 'Machining', materialClass: 'Non-Ferrous', search: '6061' });
   });
 });

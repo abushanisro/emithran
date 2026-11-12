@@ -1,21 +1,26 @@
 import type { QueryRawMaterialsParams } from '@/lib/api/hooks/useRawMaterials'
 
-/** "process": the selected process's materials (process_material_groups, migration 879). "all": the whole catalog. */
-export type MaterialPickerScope = 'process' | 'all'
+/** The group dropdown's "<process> materials" choice: the selected process's linked material groups (migration 879). */
+export const PROCESS_MATERIALS = '__process__'
 
-/** The raw-materials query of the Material Database dialog. Without a selected process it is always the whole catalog. */
+/** Where the group dropdown starts: on the selected process's materials, or on All Groups ('') when no process is selected. */
+export function initialMaterialGroup(processGroup: string | null | undefined): string {
+  return processGroup ? PROCESS_MATERIALS : ''
+}
+
+/** The Material Database's raw-materials query for its group dropdown value ('' = All Groups), class filter and search. */
 export function materialPickerQuery(o: {
   processGroup: string | null | undefined
-  scope: MaterialPickerScope
-  search?: string
-  materialGroup?: string
+  group: string
   materialClass?: string
+  search?: string
 }): QueryRawMaterialsParams {
+  const processMaterials = o.group === PROCESS_MATERIALS && !!o.processGroup
   return {
     limit: 1000,
-    ...(o.scope === 'process' && o.processGroup ? { processGroup: o.processGroup } : {}),
-    ...(o.search ? { search: o.search } : {}),
-    ...(o.materialGroup ? { materialGroup: o.materialGroup } : {}),
+    ...(processMaterials && o.processGroup ? { processGroup: o.processGroup } : {}),
+    ...(o.group && o.group !== PROCESS_MATERIALS ? { materialGroup: o.group } : {}),
     ...(o.materialClass ? { materialClass: o.materialClass } : {}),
+    ...(o.search ? { search: o.search } : {}),
   }
 }
