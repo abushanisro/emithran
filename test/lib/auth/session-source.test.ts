@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const profile = vi.fn<typeof fetch>();
 
+const assign = vi.fn();
+
 async function load() {
   vi.resetModules();
   vi.stubGlobal('fetch', profile);
-  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), location: { assign } });
   return (await import('@/lib/auth/session-source')).sessionSource;
 }
 
@@ -34,5 +36,22 @@ describe('browser session source', () => {
   it('reports no session when the profile answers 401', async () => {
     profile.mockResolvedValue(new Response(null, { status: 401 }));
     expect(await firstSessionId(await load())).toBeNull();
+  });
+
+  // Logout ends the session on the server first (a copied cookie is then refused), then leaves through Auth0's logout.
+  it('ends the session on the server, then leaves through Auth0 logout', async () => {
+    profile.mockResolvedValue(new Response(null, { status: 204 }));
+    const source = await load();
+    void source.signOutThisDevice();
+    await vi.waitFor(() => { expect(assign).toHaveBeenCalledWith('/auth/logout'); });
+    expect(profile).toHaveBeenCalledWith('/api/v1/auth/session/end', expect.objectContaining({ method: 'POST' }));
+    expect(profile.mock.invocationCallOrder[0]).toBeLessThan(assign.mock.invocationCallOrder[0] ?? 0);
+  });
+
+  it('still logs out when the server cannot be reached', async () => {
+    profile.mockRejectedValue(new TypeError('network down'));
+    const source = await load();
+    void source.signOutThisDevice();
+    await vi.waitFor(() => { expect(assign).toHaveBeenCalledWith('/auth/logout'); });
   });
 });

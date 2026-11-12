@@ -290,6 +290,7 @@ org:member      PATCH /api/v1/rfqs/:id/close  RfqController.closeRfq
 org:member      PATCH /api/v1/rfqs/:id/send  RfqController.sendRfq
 org:member      PATCH /api/v1/supplier-evaluation-groups/:id  SupplierEvaluationGroupsController.update
 authenticated   POST /api/v1/auth/session/activity  SessionController.activity
+authenticated   POST /api/v1/auth/session/end  SessionController.end
 org:member      POST /api/v1/balloon-diagrams  ProjectReportsController.createBalloonDiagram
 org:member      POST /api/v1/balloon-diagrams/:id/annotations  ProjectReportsController.addAnnotation
 org:member      POST /api/v1/benchmark-sessions  BenchmarkSessionsController.create
