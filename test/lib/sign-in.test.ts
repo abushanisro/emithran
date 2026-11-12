@@ -4,9 +4,11 @@ import { SIGN_IN_PATH, ssoSignInPath } from '@/lib/auth/sign-in';
 
 /** "Sign in with SSO" goes straight to the company's Auth0 enterprise connection, and never to a public social login. */
 describe('sign-in addresses', () => {
-  it('signs in through Auth0, and through the configured enterprise connection for SSO', () => {
-    expect(SIGN_IN_PATH).toBe('/auth/login');
-    expect(ssoSignInPath('emithran-auth')).toBe('/auth/login?connection=emithran-auth');
+  // Someone clicking a sign-in button is not signed in to the app, so Auth0 must ask (password form, or Google's account chooser)
+  // instead of silently reusing a leftover Auth0 session for whoever signed in there last.
+  it('signs in through Auth0, always asking, and through the configured connection for SSO', () => {
+    expect(SIGN_IN_PATH).toBe('/auth/login?prompt=login');
+    expect(ssoSignInPath('emithran-auth')).toBe('/auth/login?prompt=login&connection=emithran-auth');
   });
 
   it('has no SSO address, and so no button, when no connection is configured: no fallback to Google social login', () => {
@@ -16,6 +18,6 @@ describe('sign-in addresses', () => {
   });
 
   it('encodes the connection name', () => {
-    expect(ssoSignInPath('a&b')).toBe('/auth/login?connection=a%26b');
+    expect(ssoSignInPath('a&b')).toBe('/auth/login?prompt=login&connection=a%26b');
   });
 });
