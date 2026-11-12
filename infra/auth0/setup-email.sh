@@ -12,7 +12,8 @@ cd "$(git rev-parse --show-toplevel)"
 sender="${EMAIL_SENDER:-contact@emithran.com}"
 tmp="$(mktemp -d)"; chmod 700 "$tmp"; trap 'rm -rf "$tmp"' EXIT
 a0() { auth0 api "$@" --no-input; }
-has() { python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if isinstance(d, dict) and d.get('$1') else 1)"; }
+# Whether Auth0 returned an object with that field. "Not found" arrives as an empty answer (and a failing exit): that is a no.
+has() { python3 -c "import json,sys; s=sys.stdin.read().strip(); d=json.loads(s) if s else {}; sys.exit(0 if isinstance(d, dict) and d.get('$1') else 1)"; }
 
 echo "sender  : EMITHRAN <$sender> through smtp.gmail.com:587 (Google Workspace)"
 echo "template: reset_email from infra/auth0/email/reset_email.html (subject: Reset your EMITHRAN password)"

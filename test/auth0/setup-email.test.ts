@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -6,15 +6,19 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // Runs infra/auth0/setup-email.sh against the fake `auth0` CLI (test/auth0/fixtures/auth0) and checks what it would send to Auth0.
+let lastStderr = '';
 function run(env: Record<string, string> = {}) {
   const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'auth0-email-')), 'writes.log');
   fs.writeFileSync(log, '');
   const bin = path.dirname(path.resolve('test/auth0/fixtures/auth0'));
-  execFileSync('infra/auth0/setup-email.sh', {
+  const result = spawnSync('infra/auth0/setup-email.sh', {
     input: 'abcd efgh ijkl mnop\n',
     env: { ...process.env, ...env, PATH: `${bin}:${process.env.PATH ?? ''}`, FAKE_LOG: log },
     stdio: ['pipe', 'ignore', 'pipe'],
+    encoding: 'utf8',
   });
+  if (result.status !== 0) throw new Error(`setup-email.sh failed: ${result.stderr}`);
+  lastStderr = result.stderr;
   return fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((line) => {
     const [method, url, ...body] = line.split(' ');
     return { method, url, body: JSON.parse(body.join(' ')) as Record<string, unknown> };
@@ -42,5 +46,12 @@ describe('infra/auth0/setup-email.sh', () => {
 
   it('changes nothing in a dry run', () => {
     expect(run({ DRY_RUN: '1' })).toEqual([]);
+  });
+
+  // First run on a tenant: Auth0 answers "not found" for the provider and the template. The script creates both, quietly.
+  it('creates the provider and the template when Auth0 has neither, without errors', () => {
+    const fresh = run({ FAKE_NOT_FOUND: '1' });
+    expect(fresh.map((w) => [w.method, w.url].join(" "))).toEqual(['post emails/provider', 'post email-templates']);
+    expect(lastStderr).not.toMatch(/Traceback|Error/);
   });
 });
