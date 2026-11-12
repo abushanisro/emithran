@@ -10,7 +10,7 @@ the same result for any number of companies.
 
 | Piece | Where |
 |---|---|
-| Domain rule | Auth0 Action `company-google-login`, source `infra/auth0/company-google-login.cjs` (tested in `test/auth0/`), secret `ALLOWED_GOOGLE_DOMAINS` |
+| Domain rule | Auth0 Action `company-google-login`, source `infra/auth0/company-google-login.ts` (tested in `test/auth0/`), secret `ALLOWED_GOOGLE_DOMAINS` |
 | Google sign-in key | Google Cloud project of emithran.com, OAuth client "EMITHRAN sign-in" |
 | Button | `NEXT_PUBLIC_AUTH0_SSO_CONNECTION=google-oauth2` (build time) in `.env`, `env/stage.env`, `~/emithran-prod-run/env/prd.env` |
 | Account linking | `google-oauth2` in `AUTH0_TRUSTED_CONNECTIONS` (backend), so a Google login joins the person's invited account |
