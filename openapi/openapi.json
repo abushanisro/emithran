@@ -12224,6 +12224,26 @@
         ]
       }
     },
+    "/api/v1/auth/session/end": {
+      "post": {
+        "operationId": "SessionController_end_v1",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Logout: ends this session on the server, so a copied session cookie is refused from now on.",
+        "tags": [
+          "Session"
+        ]
+      }
+    },
     "/api/v1/balloon-diagrams": {
       "post": {
         "operationId": "ProjectReportsController_createBalloonDiagram_v1",
