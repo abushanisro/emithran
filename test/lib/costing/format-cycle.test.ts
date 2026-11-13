@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCycleMin } from '@/lib/costing/format-cycle';
+import { formatCycleMin, formatCycleSec } from '@/lib/costing/format-cycle';
 
 describe('formatCycleMin', () => {
   it('minutes from a minute up, seconds below', () => {
@@ -17,5 +17,14 @@ describe('formatCycleMin', () => {
   it('nothing resolved reads 0.0 min', () => {
     expect(formatCycleMin(0)).toBe('0.0 min');
     expect(formatCycleMin(null)).toBe('0.0 min');
+  });
+});
+
+describe('formatCycleSec', () => {
+  it('whole seconds from a second up, two significant figures below: a short step is never "0 sec"', () => {
+    expect(formatCycleSec(22.4)).toBe('22 sec');
+    expect(formatCycleSec(0.23)).toBe('0.23 sec');
+    expect(formatCycleSec(0.0041)).toBe('0.0041 sec');
+    expect(formatCycleSec(0)).toBe('0 sec');
   });
 });

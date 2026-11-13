@@ -43,7 +43,7 @@ import { QuoteValidationNote } from '@/components/features/manufacturing-intelli
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
-import { formatCycleMin } from '@/lib/costing/format-cycle';
+import { formatCycleMin, formatCycleSec } from '@/lib/costing/format-cycle';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -602,7 +602,7 @@ function findNode(node: ProcessTreeNode, id: string): ProcessTreeNode | null {
 
 function formatEstCycleTime(sec: number | null, allocated = false): string {
   if (sec == null || !Number.isFinite(sec)) return 'unavailable';
-  return allocated ? `≈${sec.toFixed(0)} sec` : `${sec.toFixed(0)} sec`;
+  return allocated ? `≈${formatCycleSec(sec)}` : formatCycleSec(sec);
 }
 
 // tappingCandidateCount was here — a Ø<=6mm-holes-in-thin-sheet heuristic that
