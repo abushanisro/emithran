@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { SandGatingLayout } from '@/lib/casting/gating-layout';
 import type { CalculatorRun } from '@/lib/costing/sand-calculations';
-import type { SandRouteAlternative } from '@/lib/costing/sand-alternatives';
 import { apiClient, ApiError } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
@@ -1000,7 +999,7 @@ export interface CostSummaryDto {
   /** Present when a die-cast part reached the HPDC cavity step — see DieCastingBreakdown. */
   dieCasting?: DieCastingBreakdown;
   /** Sand casting: what the route decided (mirrors the backend's SandCastingBreakdown). */
-  sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine'; gating: SandGatingLayout; flask: { lengthMm: number; widthMm: number; heightMm: number }; alternatives?: SandRouteAlternative[] };
+  sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine'; gating: SandGatingLayout; flask: { lengthMm: number; widthMm: number; heightMm: number } };
   /** Sand casting: the machining allowance of each machined feature (display only, never costed). */
   machiningAllowance?: MachiningAllowanceSummary;
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */
@@ -1021,6 +1020,9 @@ export interface MachineChoiceDto {
   criteria: string[];
   chosen: string | null;
   capableCount: number;
+  /** Every machine of the class checked against the criteria. */
+  checkedCount: number;
+  /** The chosen machine first, then the next cheapest capable ones (at most 3); when none is capable, up to 3 rejected with the criteria they failed. */
   candidates: Array<{ name: string; status: 'chosen' | 'capable' | 'rejected'; perPartCost: number | null; reasons: string[] }>;
 }
 

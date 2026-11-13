@@ -172,7 +172,7 @@ describe('selectAndCost', () => {
     const costs = choice.candidates.filter((c) => c.perPartCost != null).map((c) => c.perPartCost as number);
     expect(costs.length).toBeGreaterThan(0);
     expect(r.line.totalCost).toBe(Math.min(...costs));
-    expect(choice.candidates.find((c) => c.status === 'rejected')?.reasons.length ?? 1).toBeGreaterThan(0);
+    expect(choice.checkedCount).toBeGreaterThanOrEqual(choice.capableCount);
   });
 
   it('with no capable machine the line is a named gap with every machine\'s reason, not a price', () => {

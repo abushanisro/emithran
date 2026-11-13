@@ -237,12 +237,10 @@ describe('the cost summary of a sand casting', () => {
     }
   });
 
-  it('sends the moulding machines compared, with costs under the summary\'s own name', () => {
+  it('the moulding line says why its machine: the whole routes compared, the chosen one first', () => {
     const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
-    const alts = s.sandCasting!.alternatives;
-    expect(alts).toHaveLength(route.alternatives.length);
-    expect(alts[0]).toMatchObject({ chosen: true, totalCost: route.totalUsd });
-    expect(alts.every((a) => !('totalUsd' in a))).toBe(true);
+    const choice = s.processLines.find((l) => l.process === route.mouldingProcess)!.machineChoice!;
+    expect(choice.candidates[0]).toMatchObject({ name: route.mouldingMachine, status: 'chosen', perPartCost: route.totalUsd });
   });
 
   it('the material-cost run carries every figure of the metal balance under the field names the web app reads, and the balance closes', () => {

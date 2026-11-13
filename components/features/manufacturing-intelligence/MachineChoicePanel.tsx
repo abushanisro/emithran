@@ -1,16 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import type { MachineChoiceDto } from '@/lib/api/hooks/useBOMItems';
 
 /**
- * Why a line runs on its machine (backend machine-choice.ts): the rule the
- * engine chose by, the criteria a machine had to meet, and every machine it
- * looked at -- chosen, capable with its cost on the rule's basis, or rejected
- * with the criteria it failed. Everything shown comes from the cost line.
+ * Why a line runs on its machine (backend machine-choice.ts): the rule the engine chose by, the criteria a machine had to meet, the chosen machine
+ * and the next cheapest capable ones (at most 3) with their cost on the rule's basis, and how many were capable of how many checked. When no machine
+ * is capable, the machines are listed with the criteria they failed. Everything shown comes from the cost line.
  */
 export function MachineChoicePanel({ choice, currencySymbol }: { choice: MachineChoiceDto; currencySymbol: string }) {
-  const [showRejected, setShowRejected] = useState(false);
   const capable = choice.candidates.filter((c) => c.status !== 'rejected');
   const rejected = choice.candidates.filter((c) => c.status === 'rejected');
   return (
@@ -29,7 +26,7 @@ export function MachineChoicePanel({ choice, currencySymbol }: { choice: Machine
       </div>
       <div>
         <div className="text-[10px] text-muted-foreground">
-          {choice.capableCount} capable of {choice.candidates.length} checked
+          {choice.capableCount} capable of {choice.checkedCount} checked{capable.length < choice.capableCount ? ` · top ${capable.length} shown` : ''}
         </div>
         {capable.map((c) => (
           <div key={c.name} className="flex items-baseline justify-between gap-2 text-[11px]">
@@ -40,12 +37,7 @@ export function MachineChoicePanel({ choice, currencySymbol }: { choice: Machine
             {c.perPartCost != null && <span className="tabular-nums shrink-0">{currencySymbol}{c.perPartCost.toFixed(4)}</span>}
           </div>
         ))}
-        {rejected.length > 0 && (
-          <button type="button" onClick={() => setShowRejected((v) => !v)} className="mt-1 text-[10px] text-brand-400 hover:text-brand-300">
-            {showRejected ? 'Hide' : 'Show'} {rejected.length} not capable
-          </button>
-        )}
-        {showRejected && rejected.map((c) => (
+        {rejected.map((c) => (
           <div key={c.name} className="text-[11px] text-muted-foreground">
             <span className="line-through decoration-muted-foreground/40">{c.name}</span>: {c.reasons.join('; ')}
           </div>

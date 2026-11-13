@@ -5,7 +5,8 @@
 // For every moulding machine that can hold the part a whole route is built; the cheapest complete one is the route (the moulding process
 // follows from it, unless the user chose one). Nothing is substituted: what the data or the measurements lack is named, and a step no machine
 // can do is a named gap line, which makes the route incomplete.
-import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import type { MachineChoiceDto, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import { machineChoice } from '../machine-choice';
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import type { ReferenceCalcRun, ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
 import type { CostContext } from '../casting-finishing';
@@ -99,23 +100,10 @@ export interface SandRoute {
   totalUsd: number | null;
   complete: boolean;
   warnings: string[];
-  /** Every moulding machine the route was tried on: the chosen one first, then the others by cost, then those that could not do it. */
-  alternatives: SandAlternative[];
-}
-
-/** One moulding machine's whole route, compared with the chosen one. */
-export interface SandAlternative {
-  mouldingProcess: string;
-  mouldingMachine: string;
-  chosen: boolean;
-  cavities: number | null;
-  totalUsd: number | null;
-  /** True when every step has a machine and the total is whole (only the chosen route can be incomplete). */
-  complete: boolean;
 }
 
 /** A route before it is compared with the others. */
-type BuiltRoute = Omit<SandRoute, 'alternatives'>;
+type BuiltRoute = SandRoute;
 
 interface Attempt {
   route: BuiltRoute | null;
@@ -336,39 +324,39 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
  */
 export function buildSandRoute(input: SandRouteInput): { route: SandRoute | null; missing: string[] } {
   const classes = MOULDING_PROCESSES.filter((p) => !input.scenario.mouldingClass || p.machineClass === input.scenario.mouldingClass);
-  const attempts: Attempt[] = [];
+  const attempts: Array<Attempt & { machine: string }> = [];
   const cache = new Map<string, ReturnType<typeof sharedFor>>();
   for (const p of classes) {
     for (const mould of input.machinesByClass[p.machineClass] ?? []) {
-      attempts.push(routeOn(input, mould, p.process, cache));
+      attempts.push({ ...routeOn(input, mould, p.process, cache), machine: mould.name });
     }
   }
   const routes = attempts.flatMap((a) => (a.route ? [a.route] : []));
   const complete = routes.filter((r) => r.complete).sort((a, b) => a.totalUsd! - b.totalUsd! || a.mouldingMachine.localeCompare(b.mouldingMachine));
   const fewest = [...routes].sort((a, b) => a.lines.filter(isGap).length - b.lines.filter(isGap).length)[0];
   const best = complete[0] ?? fewest;
-  if (best) return { route: { ...best, alternatives: alternativesOf(attempts, best) }, missing: [] };
+  if (best) {
+    const choice = mouldingChoice(attempts, best);
+    return { route: { ...best, lines: best.lines.map((l) => (l.process === best.mouldingProcess ? { ...l, machineChoice: choice } : l)) }, missing: [] };
+  }
   const reasons = [...new Set(attempts.flatMap((a) => a.missing))];
   return { route: null, missing: reasons.length ? reasons.slice(0, 8) : ['no moulding machines of the sand process classes'] };
 }
 
 
-/** Moulding machines shown for comparison: the chosen one and the next cheapest. */
-export const MOULDING_CHOICES = 3;
-
 /**
- * The chosen moulding machine and the next cheapest that physically hold the part and make a whole route (every step has a machine), at most
- * MOULDING_CHOICES. A machine whose flask cannot take the part, or whose route has a gap, is not a choice and is not listed.
+ * Why the moulding line runs on its machine: every moulding machine is tried with the whole route, so they are compared by the route's cost per
+ * part. A machine whose flask cannot hold the part, or whose route has a step no machine can do, is checked and not capable.
  */
-function alternativesOf(attempts: readonly Attempt[], chosen: BuiltRoute): SandAlternative[] {
-  const row = (r: BuiltRoute, isChosen: boolean): SandAlternative => ({
-    mouldingProcess: r.mouldingProcess, mouldingMachine: r.mouldingMachine, chosen: isChosen,
-    cavities: r.cavities, totalUsd: r.totalUsd, complete: r.complete,
+function mouldingChoice(attempts: ReadonlyArray<Attempt & { machine: string }>, chosen: BuiltRoute): MachineChoiceDto {
+  return machineChoice({
+    rule: 'Cheapest whole route per part (every moulding machine is tried with the whole route: cavities, cores, metal and every step)',
+    criteria: ['The flask holds the part with its sand borders', 'Every step of the route has a machine'],
+    evals: attempts.map((a) => (a.route?.complete
+      ? { name: a.route.mouldingMachine, reasons: [], cost: a.route.totalUsd }
+      : { name: a.machine, reasons: a.route ? ['a step of the route has no machine'] : a.missing.slice(0, 1) })),
+    chosen: chosen.mouldingMachine,
   });
-  const others = attempts
-    .flatMap(({ route }) => (route?.complete && !(route.mouldingMachine === chosen.mouldingMachine && route.mouldingProcess === chosen.mouldingProcess) ? [route] : []))
-    .sort((a, b) => a.totalUsd! - b.totalUsd! || a.mouldingMachine.localeCompare(b.mouldingMachine));
-  return [row(chosen, true), ...others.slice(0, MOULDING_CHOICES - 1).map((r) => row(r, false))];
 }
 
 /** The flask of a moulding machine; every machine that reached a route has one (cavitiesPerMould refuses a machine without flask length, width and height). */

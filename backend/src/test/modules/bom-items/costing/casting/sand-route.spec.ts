@@ -31,17 +31,15 @@ describe('buildSandRoute on a gray iron casting with one core (real sand data)',
     expect(route!.totalUsd).toBeGreaterThan(0);
   });
 
-  it('compares the top 3 moulding machines: only those that physically hold the part and make a whole route, the chosen one first, then the cheapest', () => {
-    const alts = route!.alternatives;
-    expect(alts.length).toBeGreaterThan(1);
-    expect(alts.length).toBeLessThanOrEqual(3);
-    expect(alts[0]).toMatchObject({ chosen: true, mouldingMachine: route!.mouldingMachine, totalUsd: route!.totalUsd });
-    expect(alts.filter((a) => a.chosen)).toHaveLength(1);
-    // no machine that cannot hold the part, and no incomplete route
-    for (const a of alts) expect(a).toMatchObject({ complete: true, cavities: expect.any(Number) });
-    const others = alts.slice(1).map((a) => a.totalUsd!);
+  it('the moulding line compares the moulding machines by their whole route: the chosen one first, then the cheapest that hold the part, at most 3', () => {
+    const choice = route!.lines.find((l) => l.process === route!.mouldingProcess)!.machineChoice!;
+    expect(choice.candidates[0]).toMatchObject({ name: route!.mouldingMachine, status: 'chosen', perPartCost: route!.totalUsd });
+    expect(choice.candidates.length).toBeGreaterThan(1);
+    expect(choice.candidates.length).toBeLessThanOrEqual(3);
+    const others = choice.candidates.slice(1).map((c) => c.perPartCost!);
     for (const t of others) expect(t).toBeGreaterThanOrEqual(route!.totalUsd!);
     expect(others).toEqual([...others].sort((x, y) => x - y));
+    expect(choice.checkedCount).toBeGreaterThan(choice.capableCount); // machines whose flask cannot hold the part are checked, not listed
   });
 
   it('sets the designed yield beside the plant baseline for the alloy', () => {

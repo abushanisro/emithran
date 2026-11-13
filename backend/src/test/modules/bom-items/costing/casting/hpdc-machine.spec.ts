@@ -226,12 +226,10 @@ describe('HPDC cycle time and casting line', () => {
     const line = r.processLines[0]!;
     const c = line.machineChoice!;
     expect(c.chosen).toBe(line.machineName);
-    expect(c.candidates).toHaveLength(machines.length);
+    expect(c.checkedCount).toBe(machines.length);
+    expect(c.candidates).toHaveLength(Math.min(3, c.capableCount));
     expect(c.candidates[0]!.status).toBe('chosen');
-    const capable = c.candidates.filter((x) => x.status !== 'rejected');
-    expect(capable.length).toBe(c.capableCount);
-    for (let i = 1; i < capable.length; i++) expect(capable[i]!.perPartCost!).toBeGreaterThanOrEqual(capable[i - 1]!.perPartCost!);
-    expect(c.candidates.filter((x) => x.status === 'rejected').every((x) => x.reasons.length > 0)).toBe(true);
+    for (let i = 2; i < c.candidates.length; i++) expect(c.candidates[i]!.perPartCost!).toBeGreaterThanOrEqual(c.candidates[i - 1]!.perPartCost!);
     expect(c.criteria.join(' ')).toMatch(/Clamping force at least/);
   });
 

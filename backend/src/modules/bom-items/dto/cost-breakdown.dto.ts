@@ -698,19 +698,6 @@ export interface SandCastingBreakdown {
   gating: SandGatingLayout;
   /** The moulding machine's flask (mm), to draw the mould (cope above the parting plane, drag below) around the part. */
   flask: { lengthMm: number; widthMm: number; heightMm: number };
-  /** The chosen moulding machine and the next cheapest that physically hold the part and make a whole route, at most 3 (costs in the location's currency). */
-  alternatives: SandRouteAlternative[];
-}
-
-/** One moulding machine's whole route, compared with the chosen one. */
-export interface SandRouteAlternative {
-  mouldingProcess: string;
-  mouldingMachine: string;
-  chosen: boolean;
-  cavities: number | null;
-  totalCost: number | null;
-  /** True when every step has a machine and the total is whole (only the chosen route can be incomplete). */
-  complete: boolean;
 }
 
 export interface MachineChoiceDto {
@@ -720,7 +707,9 @@ export interface MachineChoiceDto {
   criteria: string[];
   chosen: string | null;
   capableCount: number;
-  /** Chosen first, then capable by the rule's value, then rejected with the failed criteria. */
+  /** Every machine of the class that was checked against the criteria. */
+  checkedCount: number;
+  /** The chosen machine first, then the next cheapest capable ones: at most 3. When none is capable, up to 3 rejected with the criteria they failed. */
   candidates: Array<{ name: string; status: 'chosen' | 'capable' | 'rejected'; perPartCost: number | null; reasons: string[] }>;
 }
 
