@@ -37,6 +37,13 @@ export function catalogSourceLabel(r: { isCustom?: boolean | null; catalogSource
   return r.isCustom ? "custom item" : null;
 }
 
+/** The tooling catalog of the part's process group (the Cost Guide's Process Group), matched on its label; null when that process has none. */
+export function domainForProcessGroup(group: string | null | undefined, domains: readonly ToolingCatalogDomain[]): string | null {
+  const g = group?.trim().toLowerCase();
+  if (!g) return null;
+  return domains.find((d) => d.label.trim().toLowerCase() === g)?.key ?? null;
+}
+
 /** A process's display name: its catalog domain label, else the saved key made readable (records saved before the catalog). */
 export function processLabel(key: string | null | undefined, domains: readonly ToolingCatalogDomain[]): string {
   if (!key) return "";

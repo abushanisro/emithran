@@ -1381,6 +1381,16 @@ function PanelHeader({
 
 // ── CostSummaryTab — eMithran-style with inline editing ─────────────────────
 
+/**
+ * The Process the user picked in Create/Edit BOM Item, persisted as scenario_overrides.processGroup; items saved before that existed fall back to
+ * their stored family's process-group label. One rule for the Cost Guide and the tooling dialog.
+ */
+function partProcessGroup(item: BOMItem, fg: FeatureGraph | null | undefined): string | null {
+  // || on purpose: a blank saved choice falls back to the family, like an absent one
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/no-unnecessary-condition
+  return (item.scenarioOverrides?.processGroup as string | undefined) || familyToProcessGroupLabel(item.familyClassification ?? fg?.classification?.family) || null;
+}
+
 function CostSummaryTab({
   item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight, onShowEvidence, activeEvidenceLabel,
 }: {
@@ -2518,7 +2528,7 @@ function CostSummaryTab({
       <SectionHeader label="Tooling & Fixtures" />
       <RouteTooling itemId={item.id} cost={cost} currencySymbol={sym} conversionRate={fromUsd} />
       <div className="-mx-4">
-        <ToolingSection bomItemId={item.id} bomItem={item} compact currencySymbol={sym} conversionRate={fromUsd} />
+        <ToolingSection bomItemId={item.id} bomItem={item} partProcessGroup={partProcessGroup(item, fg)} compact currencySymbol={sym} conversionRate={fromUsd} />
       </div>
 
       {/* Sand casting: freeze this cost for review (a different member approves or rejects it). */}
@@ -4908,10 +4918,7 @@ function CostGuidePanel({
   // The Process the user picked in Create/Edit BOM Item, persisted as
   // scenario_overrides.processGroup; items saved before that existed fall
   // back to their stored family's process-group label.
-  const selectedProcessGroup =
-    (item.scenarioOverrides?.processGroup as string | undefined)
-    || familyToProcessGroupLabel(item.familyClassification ?? fg?.classification?.family)
-    || null;
+  const selectedProcessGroup = partProcessGroup(item, fg);
   // Only the materials of that process (process_material_groups, migration 879).
   const { data: allMatsData } = useRawMaterials(
     matInputValue.trim().length >= 1

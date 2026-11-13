@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { catalogItemFields, catalogSourceLabel, catalogSourceLine, defaultAmortization, processLabel } from "@/lib/costing/tooling-catalog";
+import { catalogItemFields, catalogSourceLabel, catalogSourceLine, domainForProcessGroup, defaultAmortization, processLabel } from "@/lib/costing/tooling-catalog";
 import type { ToolingCatalogItem } from "@/lib/api/tooling-catalogs";
 
 const AIR_POPPET: ToolingCatalogItem = {
@@ -70,5 +70,14 @@ describe("tooling catalog in the Add Tooling dialog", () => {
     expect(catalogSourceLabel({ isCustom: false, catalogSource: "2026-Plastic:cmStandardToolingComponents:0" })).toBe("from cmStandardToolingComponents row 1");
     expect(catalogSourceLabel({ isCustom: true, catalogSource: null })).toBe("custom item");
     expect(catalogSourceLabel({ isCustom: false, catalogSource: null })).toBeNull();
+  });
+
+  it("opens on the part's own process: the catalog domain whose label is the part's process group", () => {
+    const domains = [{ key: "injection_molding", label: "Plastic Molding" }, { key: "die_casting", label: "Die Casting" }];
+    expect(domainForProcessGroup("Plastic Molding", domains)).toBe("injection_molding");
+    expect(domainForProcessGroup("plastic molding ", domains)).toBe("injection_molding");
+    // a process with no tooling catalog opens with none chosen, never a guess
+    expect(domainForProcessGroup("Forging", domains)).toBeNull();
+    expect(domainForProcessGroup(null, domains)).toBeNull();
   });
 });

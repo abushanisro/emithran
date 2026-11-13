@@ -35,7 +35,7 @@ import {
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useToolingCatalog, useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import type { ToolingCatalogItem } from '@/lib/api/tooling-catalogs';
-import { catalogItemFields, catalogSourceLine, defaultAmortization, processLabel } from '@/lib/costing/tooling-catalog';
+import { catalogItemFields, catalogSourceLine, defaultAmortization, domainForProcessGroup, processLabel } from '@/lib/costing/tooling-catalog';
 
 interface ToolingCostDialogProps {
   open: boolean;
@@ -45,6 +45,8 @@ interface ToolingCostDialogProps {
   bomItem?: any;
   selectedProcess?: string | null;
   selectedSubProcess?: string | null;
+  /** The part's process group: a new item opens on the matching tooling catalog, so its items are listed straight away. */
+  partProcessGroup?: string | null;
 }
 
 /** A Machining operation (process_calculator_mappings): the only sub-processes with real data. */
@@ -63,6 +65,7 @@ export function ToolingCostDialog({
   bomItem,
   selectedProcess,
   selectedSubProcess,
+  partProcessGroup = null,
 }: ToolingCostDialogProps) {
   const [formData, setFormData] = useState({
     manufacturingProcess: '',
@@ -188,6 +191,13 @@ export function ToolingCostDialog({
     return [...groups.entries()];
   }, [catalog]);
   const pickedItem = catalog?.items.find((i) => i.id === catalogItemId) ?? null;
+
+  // A new item opens on the part's own process (its tooling catalog), once the catalogs are known; the user can still pick another.
+  const partDomain = domainForProcessGroup(partProcessGroup, catalogDomains);
+  useEffect(() => {
+    if (!open || initialData || selectedProcess || !partDomain) return;
+    setFormData((prev) => (prev.manufacturingProcess ? prev : { ...prev, manufacturingProcess: partDomain }));
+  }, [open, initialData, selectedProcess, partDomain]);
   const isCustom = catalogItemId === CUSTOM_ITEM;
 
   const pickCatalogItem = (id: string) => {
