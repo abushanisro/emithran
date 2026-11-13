@@ -3,6 +3,8 @@
 import { useState, type ReactNode } from 'react';
 import type { ConfidenceLevel, PhysicsGap, LookupTableRow, CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 
+import { buildCalculationTree, type CalculationNode } from '@/lib/costing/calculation-tree';
+
 // Narrower than ProcessLineCost -- lets non-process callers (e.g. a material
 // usage trace with no machine/labour rate) feed the same trace renderer
 // without fabricating unrelated process fields just to satisfy the type.
@@ -128,6 +130,58 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
   );
 }
 
+const shown = (v: number | string | null) =>
+  v == null ? '—' : typeof v === 'number' ? v.toLocaleString('en-US', { maximumSignificantDigits: 4, useGrouping: false }) : v;
+
+/** One row of the dependency tree; a calculated value opens onto the values its formula uses. */
+function CalculationRow({ node, depth, open: initiallyOpen }: { node: CalculationNode; depth: number; open: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen);
+  const parent = node.children.length > 0;
+  return (
+    <>
+      <tr className="border-t border-border/20 align-top">
+        <td className="py-0.5 pr-2 whitespace-nowrap" style={{ paddingLeft: depth * 14 }}>
+          {parent ? (
+            <button type="button" onClick={() => { setOpen((v) => !v); }} className="font-mono text-muted-foreground hover:text-foreground mr-1" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${node.name}`}>
+              {open ? '⊟' : '⊞'}
+            </button>
+          ) : <span className="inline-block w-[1.1em] mr-1" />}
+          <span className={depth === 0 ? 'font-medium text-foreground' : 'text-foreground/90'}>{node.name}</span>
+        </td>
+        <td className="py-0.5 pr-1 text-right tabular-nums">{shown(node.value)}</td>
+        <td className="py-0.5 pr-2 text-muted-foreground">{node.unit ?? ''}</td>
+        <td className="py-0.5 text-muted-foreground/80 max-w-[28rem] truncate" title={node.description ?? undefined}>
+          {node.kind === 'calculated' && node.description ? <span className="font-mono text-[10px]">= {node.description}</span> : node.description}
+        </td>
+      </tr>
+      {open && node.children.map((c) => <CalculationRow key={c.name} node={c} depth={depth + 1} open={false} />)}
+    </>
+  );
+}
+
+/** The line's result and, under it, what it is made of, as the stored calculator computed it (Formula Dependencies). */
+export function CalculationTree({ trace }: { trace: readonly CalculationTraceStep[] }) {
+  const root = buildCalculationTree(trace);
+  if (!root) return null;
+  return (
+    <div className="rounded border border-border/40 overflow-x-auto">
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <th className="text-left font-semibold px-1 py-1">Name</th>
+            <th className="text-right font-semibold pr-1">Value</th>
+            <th className="text-left font-semibold pr-2">Unit</th>
+            <th className="text-left font-semibold">Formula or source</th>
+          </tr>
+        </thead>
+        <tbody className="[&_td:first-child]:pl-1">
+          <CalculationRow node={root} depth={0} open />
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /**
  * On-screen calculation trace — the same real audit trail (inputs with
  * provenance, formulas with their real DB formula string, calculator
@@ -169,6 +223,8 @@ export function CalculationTracePanel({ line, renderInput }: {
       </div>
 
       {line.physicsGap && <PhysicsGapPanel gap={line.physicsGap} />}
+
+      <CalculationTree trace={trace} />
 
       {showSteps && trace.length > 0 && (
         <div className="rounded border border-border/40 divide-y divide-border/20 max-h-[280px] overflow-y-auto">
