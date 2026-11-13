@@ -43,6 +43,7 @@ import { QuoteValidationNote } from '@/components/features/manufacturing-intelli
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
+import { routeMachineDrift } from '@/lib/costing/applied-route';
 import { formatCycleMin, formatCycleSec } from '@/lib/costing/format-cycle';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
@@ -1770,10 +1771,16 @@ function CostSummaryTab({
   return (
     <div className="px-4 pb-4">
 
-      {/* ── Applied route label ── */}
+      {/* ── Applied route label ── The route is named by its id; the comparison recomputes the machine it picks, the saved rows keep the
+          one that was costed. When they differ, say so: the lines below are costed on the saved machine until Apply runs again. */}
       {appliedRoute && (
         <div className="pt-3 pb-1 text-xs text-muted-foreground">
           Route: <span className="font-semibold text-foreground">{appliedRoute.routeLabel}</span>
+          {routeMachineDrift(appliedRoute.processLines, (existingProcRecords?.records ?? []).filter((r) => r.isActive)).map((d) => (
+            <div key={d.process} className="mt-0.5 text-amber-600 dark:text-amber-500">
+              {d.process} is costed on {d.applied}, as applied. This route now picks {d.now} (its inputs changed since); Apply again to cost it there.
+            </div>
+          ))}
         </div>
       )}
 
