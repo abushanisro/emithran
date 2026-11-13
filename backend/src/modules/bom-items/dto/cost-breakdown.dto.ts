@@ -111,6 +111,8 @@ export interface CalculationTraceStep {
   formulaId?: string;
   formulaVersion?: number;
   state?: 'VALIDATED' | 'ASSUMED' | 'UNSUPPORTED';
+  /** The part's own value replaced this step (calculator_field_overrides, migration 1011): what the calculator would have used, and why it was changed. */
+  override?: { original: number | null; reason: string };
 }
 
 // Every lookup table declares exactly one policy (lookup_table_policy,

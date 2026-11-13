@@ -7916,6 +7916,39 @@
         "properties": {},
         "type": "object"
       },
+      "SetCalculatorFieldOverrideDto": {
+        "properties": {
+          "calculator": {
+            "example": "Injection Molding - Cycle Time",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "field": {
+            "example": "Cooling Time",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why this part differs from the calculator. Required, and kept in the audit trail.",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          },
+          "value": {
+            "description": "The part's own value for the field, in the field's unit. Positive.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "calculator",
+          "field",
+          "value",
+          "reason"
+        ],
+        "type": "object"
+      },
       "SetDrawDirectionDto": {
         "properties": {
           "axis": {
@@ -13363,6 +13396,121 @@
         "summary": "Get CAD analysis history for BOM item",
         "tags": [
           "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/calculator-field-overrides": {
+      "delete": {
+        "operationId": "CalculatorFieldOverridesController_clear_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "calculator",
+            "required": true,
+            "schema": {
+              "example": "Injection Molding - Cycle Time",
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "example": "Cooling Time",
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return one calculator field to the calculator for this part (?calculator=&field=). Audited.",
+        "tags": [
+          "Calculators"
+        ]
+      },
+      "get": {
+        "operationId": "CalculatorFieldOverridesController_list_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's own calculator field values, each with the reason, who and when.",
+        "tags": [
+          "Calculators"
+        ]
+      },
+      "put": {
+        "operationId": "CalculatorFieldOverridesController_set_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCalculatorFieldOverrideDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set one calculator field for this part (with the reason). The cost is recalculated with it. Audited.",
+        "tags": [
+          "Calculators"
         ]
       }
     },

@@ -134,6 +134,7 @@ import { billetFallback } from './costing/sheet-metal/machine/blank-stock-candid
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
 import { SandCatalogOperationsService } from './costing/casting/sand/sand-catalog-operations.service';
 import { MachiningAllowanceService } from './costing/casting/machining-allowance.service';
+import { CalculatorFieldOverridesService, overridesByCalculator } from './services/calculator-field-overrides.service';
 import { mouldingMethodOf, type MachiningAllowanceResult } from './costing/casting/machining-allowance';
 import { SandCostService, type SandCostResult } from './costing/casting/sand/sand-cost.service';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
@@ -4338,6 +4339,7 @@ export class BOMItemsService {
       const imInput: InjectionMoldingCostInput = {
         ...buildMoldingCommonInput({
           calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
+          calculatorOverrides: overridesByCalculator(await CalculatorFieldOverridesService.rows(this.databaseService.getClient(accessToken), id)),
           item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
           material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
           plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
