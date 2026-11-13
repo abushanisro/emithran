@@ -1190,9 +1190,9 @@ export class AutoFillService {
    * The cad-engine family_hint for a user-chosen process_group label — the
    * inverse of CAD_FAMILY_TO_PROCESS_GROUP, so the forward and reverse
    * mappings can never drift apart. Machining covers milled/turned/mill_turn;
-   * the first entry (milled) is the general one. A group with no CAD family
-   * (Sand Casting, Assembly, ...) returns undefined: there is no extractor to
-   * force, so the real classifier chain runs.
+   * the first entry (milled) is the general one; Sand Casting is sand_cast. A
+   * group with no CAD family (Assembly, ...) returns undefined: there is no
+   * extractor to force, so the real classifier chain runs.
    */
   familyHintForProcessGroup(processGroup: string | null | undefined): string | undefined {
     if (!processGroup) return undefined;
