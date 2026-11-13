@@ -81,6 +81,8 @@ export interface StoredProcessRow {
   totalCostPerPart?: number | null;
   /** What the operation charges beyond machine and crew time (energy, a consumable), USD per part (migration 1005); null when nothing. */
   otherCostPerPart?: number | null;
+  /** The phases of the operation cycle as its calculator gave them when applied (migration 1009); null when it has no calculator cycle. */
+  cyclePhases?: { name: string; seconds: number }[] | null;
   heads?: number | null;
   partsPerCycle?: number | null;
   scrap?: number | null;

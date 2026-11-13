@@ -324,3 +324,24 @@ describe('the line\'s other cost is persisted', () => {
     expect(sql).toContain('pg_advisory_xact_lock');
   });
 });
+
+// Migration 1009: the phases of a line's cycle, as its stored calculator gave them, are stored with it, so the Part details sheet and Direct Process
+// Costs show what the cycle is made of from the applied record.
+describe('the line\'s cycle phases are persisted', () => {
+  const code = executable(readFileSync(CONTROLLER, 'utf8'));
+  const sql = readFileSync(join(__dirname, '..', '..', '..', '..', 'migrations', '1009_process_cost_cycle_phases.sql'), 'utf8');
+
+  it('the writer stores the phases of the line\'s own calculation trace, NULL when it has no calculator cycle', () => {
+    expect(code).toMatch(/cycle_phases:\s*cyclePhasesOf\(line\.calculationTrace\)/);
+  });
+
+  it('the replace function declares and inserts it, keeping the 1005 and 972 columns', () => {
+    const recordset = sql.slice(sql.indexOf('jsonb_to_recordset'));
+    const insert = sql.slice(sql.indexOf('INSERT INTO process_cost_records'), sql.indexOf('FROM jsonb_to_recordset'));
+    for (const col of ['cycle_phases', 'other_cost_per_part', 'calculation_breakdown', 'machine_cost_per_part', ...COST_COLS]) {
+      expect(recordset).toContain(col);
+      expect(insert).toContain(col);
+    }
+    expect(sql).toContain('pg_advisory_xact_lock');
+  });
+});

@@ -135,3 +135,33 @@ describe('buildCostTable — labor and direct overhead', () => {
     expect(COST_COLUMNS.filter((c) => c.key === 'laborCost' || c.key === 'directOverhead').map((c) => c.group)).toEqual(['Variable Costs', 'Variable Costs']);
   });
 });
+
+// Migration 1009: an operation's cycle phases, as its stored calculator gave them, are its children, with their time and no money.
+describe('buildCostTable — cycle phases', () => {
+  const molding = process({
+    id: 'im', operation: 'Injection Molding', process_group: 'Plastic Molding', cycle_time: '6.20', total_cost_per_part: '0.53', setup_cost_per_part: '0.295',
+    cycle_phases: [{ name: 'Fill Time', seconds: 0.12 }, { name: 'Pack Time', seconds: 2 }, { name: 'Cooling Time', seconds: 2.9 }, { name: 'Press Dry Cycle Time', seconds: 1.18 }],
+  });
+
+  it('puts each phase under its operation, in order, with its time', () => {
+    const t = buildCostTable(input({ processes: [molding as never] }));
+    const phases = t.rows.filter((r) => r.parentId === 'process:im');
+    expect(phases.map((r) => [r.kind, r.name, r.values.laborTimeSec])).toEqual([
+      ['phase', 'Fill Time', 0.12], ['phase', 'Pack Time', 2], ['phase', 'Cooling Time', 2.9], ['phase', 'Press Dry Cycle Time', 1.18],
+    ]);
+    // a phase is a time, never money
+    for (const r of phases) expect(Object.keys(r.values)).toEqual(['laborTimeSec']);
+  });
+
+  it('adds nothing to the group or the part: the operation is counted once', () => {
+    const t = buildCostTable(input({ processes: [molding as never] }));
+    expect(row(t, 'group:Plastic Molding').values.totalVariable).toBeCloseTo(0.53, 6);
+    expect(row(t, 'part:i1').values.totalVariable).toBeCloseTo(0.101168 + 0.53, 6);
+  });
+
+  it('a record without phases (no calculator cycle, or applied before) has no children', () => {
+    const t = buildCostTable(input());
+    expect(t.rows.some((r) => r.kind === 'phase')).toBe(false);
+    expect(buildCostTable(input({ processes: [process({ id: 'x', cycle_phases: 'not a list' }) as never] })).rows.some((r) => r.kind === 'phase')).toBe(false);
+  });
+});
