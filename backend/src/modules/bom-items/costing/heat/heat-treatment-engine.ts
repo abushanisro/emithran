@@ -361,6 +361,8 @@ const MODELS: Record<string, Model> = {
   'Hot Isostatic Pressing': hip,
 };
 
+const PLASTIC_CLASS = 'Plastic & Rubber';
+
 export function computeHeatTreatments(
   part: HeatTreatmentFacts,
   ref: SecondaryReference,
@@ -369,6 +371,10 @@ export function computeHeatTreatments(
   calculators: ReferenceCalculators | null | undefined,
 ): SecondaryProcessResult[] {
   return HEAT_TREATMENT_PROCESSES.map((base) => {
+    // Heat treatment changes a metal's structure; a polymer is not heat treated. A material with no class on file is assessed as before.
+    if (part.materialClass === PLASTIC_CLASS) {
+      return notCosted(base, 'not_applicable', `Heat treatment is for metals: the part's material is ${PLASTIC_CLASS} (raw_materials.material_class).`);
+    }
     const pool = machines.filter((m) => m.machineClass === base.machineClass);
     const pooled = POOLED[base.process];
     if (pool.length === 0 && pooled) return pooled(base, part, ref, machines, calculators);
