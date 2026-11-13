@@ -716,6 +716,8 @@ export interface CalculationTraceStep {
   /** 'lookup' when this step's value came from a real sm_lookup_* DB row;
    *  'physics' when it's a deterministic formula over already-known values. */
   stepType?: 'physics' | 'lookup';
+  /** The part's own value replaced this step: what the calculator would have used, and why it was changed. */
+  override?: { original: number | null; reason: string };
 }
 
 export type LookupPolicyType = 'EXACT_MATCH' | 'INTERPOLATE' | 'RANGE' | 'FORMULA';
@@ -845,6 +847,8 @@ export interface ProcessLineCost {
    *  Calculator pipeline. Absent for processes not yet migrated onto it. */
   calculatorId?: string;
   calculatorVersion?: number;
+  /** The stored calculator's name: a part's own field values are set by it (calculator_field_overrides). Present where the engine applies them. */
+  calculatorName?: string;
   /** Present instead of a fabricated fallback number when the calculator
    *  couldn't resolve this line's cycle time — the line still appears (never
    *  silently omitted), but cycleTimeMin/totalCost reflect the gap (0/null). */

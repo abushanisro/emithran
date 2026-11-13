@@ -38,3 +38,9 @@ describe('a molding line with a part\'s own cooling time', () => {
     expect((own.calculationSnapshot as { inputs: Record<string, unknown> }).inputs.calculatorOverrides).toEqual(overrides);
   });
 });
+
+describe('a molding line names its calculator', () => {
+  it('so the Cost panel can set a field of it for the part (overrides are keyed by the calculator name)', () => {
+    expect(molding().calculatorName).toBe('Injection Molding - Cycle Time');
+  });
+});
