@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { CalculationTracePanel } from '@/components/features/process-planning/CalculationTracePanel';
+import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 import { useClearSandVariableOverride, useSandVariableOverrides, useSetSandVariableOverride } from '@/lib/api/hooks/useSandVariableOverrides';
 import type { SandVariableOverride } from '@/lib/api/sand-variable-overrides';
-import { variableOfSource, type CalculationEntry } from '@/lib/costing/sand-calculations';
+import { calculatorRunEntries, variableOfSource, type CalculatorRun } from '@/lib/costing/sand-calculations';
 
 const fieldClass = 'text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
 
@@ -59,25 +60,40 @@ function VariableEditor({ bomItemId, variable, current }: { bomItemId: string; v
   );
 }
 
-/** Every calculation behind the sand-casting cost: the formula, each input and where it came from. A plant variable can be set for this part. */
-export function SandCalculationsPanel({ bomItemId, entries }: { bomItemId: string; entries: CalculationEntry[] }) {
+/**
+ * The trace input renderer that lets a plant variable be set for this part: under each input read from a sand-casting plant variable, its
+ * editor. Used for the route lines' traces and the calculator runs' traces alike.
+ */
+export function useSandVariableInput(bomItemId: string): { renderInput: (step: CalculationTraceStep) => ReactNode; ownValues: string[] } {
   const overrides = useSandVariableOverrides(bomItemId);
   const byVariable = new Map((overrides.data?.overrides ?? []).map((o) => [o.variable, o]));
-  if (entries.length === 0) return <p className="text-xs text-muted-foreground">No calculations yet: the route has not been built.</p>;
+  return {
+    renderInput: (step) => {
+      const variable = variableOfSource(step.source);
+      return variable ? <VariableEditor bomItemId={bomItemId} variable={variable} current={byVariable.get(variable)} /> : null;
+    },
+    ownValues: [...byVariable.keys()],
+  };
+}
+
+/** The calculator runs behind the sand-casting cost (metal, risers, gating, core sand, core boxes): the formula, each input and where it came from. */
+export function SandCalculatorRuns({ bomItemId, runs }: { bomItemId: string; runs: Record<string, CalculatorRun> | undefined }) {
+  const { renderInput, ownValues } = useSandVariableInput(bomItemId);
+  const entries = calculatorRunEntries(runs);
+  if (entries.length === 0) return null;
   return (
-    <div className="space-y-2">
-      {byVariable.size > 0 && (
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Calculators</div>
+      {ownValues.length > 0 && (
         <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">
-          Calculated with this part’s own value for {[...byVariable.keys()].join(', ')}.
+          Calculated with this part’s own value for {ownValues.join(', ')}.
         </p>
       )}
       {entries.map((e) => (
         <details key={e.key} className="rounded border border-border/50 px-2 py-1">
           <summary className="cursor-pointer text-xs flex items-baseline justify-between gap-2">
             <span className="font-medium truncate min-w-0">{e.title}</span>
-            <span className="text-[10px] text-muted-foreground shrink-0">
-              {e.kind}{e.result ? ` · ${e.result}` : ''}
-            </span>
+            {e.result && <span className="text-[10px] text-muted-foreground shrink-0">{e.result}</span>}
           </summary>
           <div className="pt-1.5 space-y-1.5">
             {e.noTraceReason ? (
@@ -89,10 +105,7 @@ export function SandCalculationsPanel({ bomItemId, entries }: { bomItemId: strin
                   ...(e.calculatorId ? { calculatorId: e.calculatorId } : {}),
                   ...(e.calculatorVersion != null ? { calculatorVersion: e.calculatorVersion } : {}),
                 }}
-                renderInput={(step) => {
-                  const variable = variableOfSource(step.source);
-                  return variable ? <VariableEditor bomItemId={bomItemId} variable={variable} current={byVariable.get(variable)} /> : null;
-                }}
+                renderInput={renderInput}
               />
             )}
             {e.missing.length > 0 && (
@@ -103,4 +116,10 @@ export function SandCalculationsPanel({ bomItemId, entries }: { bomItemId: strin
       ))}
     </div>
   );
+}
+
+/** A sand route line's trace, with the editor under each input read from a plant variable. */
+export function SandLineTrace({ bomItemId, line }: { bomItemId: string; line: Parameters<typeof CalculationTracePanel>[0]['line'] }) {
+  const { renderInput } = useSandVariableInput(bomItemId);
+  return <CalculationTracePanel line={line} renderInput={renderInput} />;
 }
