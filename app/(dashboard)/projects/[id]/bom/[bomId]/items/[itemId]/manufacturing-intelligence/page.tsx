@@ -14,10 +14,9 @@ import { toast } from 'sonner';
 
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
-import { SandBalancePanel } from '@/components/costing/SandBalancePanel';
-import { SandCalculationsPanel } from '@/components/costing/SandCalculationsPanel';
+import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
+import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
 import { SandSnapshotsPanel } from '@/components/costing/SandSnapshotsPanel';
-import { calculationEntries } from '@/lib/costing/sand-calculations';
 import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
 import { useCastingAnalyses, useRequestCastingAnalysis } from '@/lib/api/hooks/useCastingAnalyses';
 import { analysisState, requestFailure } from '@/lib/casting/analysis-view';
@@ -1874,6 +1873,14 @@ function CostSummaryTab({
         />
       </div>
 
+      {/* Sand casting: the metal behind the material line and the calculators behind the route (metal, risers, gating, core sand, core boxes). */}
+      {cost.sandCasting && (
+        <div className="pl-2 pb-2 space-y-2">
+          <SandMetalBalance runs={cost.calculatorRuns} />
+          <SandCalculatorRuns bomItemId={item.id} runs={cost.calculatorRuns} />
+        </div>
+      )}
+
       {/* ── DIRECT PROCESS COSTS ── engine rows shown only when no stored records exist ── */}
       <SectionHeader label="Direct Process Costs" />
 
@@ -2242,7 +2249,10 @@ function CostSummaryTab({
                 {/* Why this cycle time: every input with its source (CAD /
                     lookup table / machine record / disclosed assumption) and
                     each formula, straight from the engine line that computed it. */}
-                {matchedEngineLine && <CalculationTracePanel line={matchedEngineLine} />}
+                {matchedEngineLine && (cost.sandCasting
+                  // A sand line's inputs read from a plant variable can be set for this part, under the input.
+                  ? <SandLineTrace bomItemId={item.id} line={matchedEngineLine} />
+                  : <CalculationTracePanel line={matchedEngineLine} />)}
                 {(heads > 1 || ppc > 1) && (
                   <div className="flex items-baseline justify-between gap-2 min-w-0">
                     <span className="text-xs text-muted-foreground truncate min-w-0">Heads × Parts/Cycle</span>
@@ -5527,23 +5537,6 @@ function CostGuidePanel({
                     error: requestCastingAnalysis.isError ? requestFailure(requestCastingAnalysis.error) : null,
                   }}
                 />
-              </Section>
-            )}
-
-            {isSandCast && (
-              <Section title="Sand Casting Calculations">
-                {cgpCostSummary && (
-                  <div className="pb-2">
-                    <SandBalancePanel
-                      runs={cgpCostSummary.calculatorRuns}
-                      materialCost={cgpCostSummary.materialCost}
-                      processLines={cgpCostSummary.processLines}
-                      toolingPerPart={cgpCostSummary.coreboxTooling?.perPartUsd ?? null}
-                      totalCost={cgpCostSummary.totalCost}
-                    />
-                  </div>
-                )}
-                <SandCalculationsPanel bomItemId={item.id} entries={calculationEntries(cgpCostSummary?.processLines, cgpCostSummary?.calculatorRuns)} />
               </Section>
             )}
 
