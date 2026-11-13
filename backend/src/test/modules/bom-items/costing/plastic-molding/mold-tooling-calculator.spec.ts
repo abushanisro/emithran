@@ -6,6 +6,7 @@ import { loadPlasticMoldingCalculatorSpec, plasticMoldingCalculatorsByName } fro
 import { buildPlasticMoldingCalculatorsMigrationSql } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators-migration';
 import { withFieldOverrides } from '../../../../../modules/bom-items/costing/shared/calculators/reference-calculator';
 import { selectMoldBase } from '../../../../../modules/bom-items/costing/plastic-molding/process/mold-base';
+import { moldCavityLookup } from '../../../../../modules/bom-items/costing/plastic-molding/process/mold-cavity';
 import { realPlasticReference } from './real-plastic-reference';
 
 // The mold tooling cost by its stored calculator (migration 1012): the staged lookups in, every price, hour and amortization step a formula.
@@ -18,7 +19,8 @@ const facts = (over: Partial<MoldToolingFacts> = {}): MoldToolingFacts => ({
   components: [{ componentName: 'Guide Pin', qty: 4, unitCostUsd: 100 }], componentsSubtotalUsd: 2140, moldBaseAreaMm2: 10_000,
   designHours: 3.24, assemblyHours: 23.18, tables: REF.tooling, toolroomRates: REF.toolroomRatesUsa, location: 'USA',
   annualVolume: 10_000, productionLifeYears: 3, cavityCount: 1, toolLifeShots: 144_000, toolLifeSource: 'tblToolLife: ABS',
-  moldBase: BASE, moldBaseRef: REF.moldBase, partHeightMm: 30, ...over,
+  moldBase: BASE, moldBaseRef: REF.moldBase, partHeightMm: 30,
+  cavity: moldCavityLookup({ faceCount: 900, surfaceAreaMm2: 40_000, ref: REF.moldBase }), partSurfaceAreaMm2: 40_000, ...over,
 });
 /** The plate steel by the formula, from the chosen base and the reference: what the calculator must give. */
 function expectedSteelUsd(): number {
@@ -31,11 +33,11 @@ function expectedSteelUsd(): number {
 }
 
 describe('the mold tooling calculator', () => {
-  it('is a helper whose result is the tooling cost per part, at version 2 written by migration 1013 (1012 is history)', () => {
+  it('is a helper whose result is the tooling cost per part, at version 3 written by migration 1014 (1012 and 1013 are history)', () => {
     const c = loadPlasticMoldingCalculatorSpec().calculators.find((x) => x.name === MOLD_TOOLING_CALCULATOR)!;
-    expect(c).toMatchObject({ helper: true, operations: [], migration: 1013, version: 2, output: 'Tooling Cost Per Part' });
-    expect(c.description).toMatch(/G-02 to G-08/);
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/1013_plastic_mold_base_steel.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1013));
+    expect(c).toMatchObject({ helper: true, operations: [], migration: 1014, version: 3, output: 'Tooling Cost Per Part' });
+    expect(c.description).toMatch(/G-03 to G-08/);
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1014_plastic_mold_cavity_machining_polish.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1014));
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1012_plastic_mold_tooling_calculator.sql'), 'utf8')).toContain(MOLD_TOOLING_CALCULATOR);
   });
 
@@ -47,7 +49,10 @@ describe('the mold tooling calculator', () => {
     expect(r.outputs['Mold Base Steel Cost']).toBeCloseTo(expectedSteelUsd(), 6);
     expect(r.outputs['Mold Base Steel Cost']).toBeGreaterThan(0);
     expect(r.outputs['Molds Required']).toBe(1);
-    expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd()) * 100 + 0.5) / 100);
+    // cavity: 40,000 mm2 = 62.0 in2 x 0.18 h/in2 (average, 900 faces) = 11.16 h x 100.55; polish: 0.04 m2 x 600 h/m2 = 24 h x 76.81
+    expect(r.outputs['Cavity Machining Cost']).toBeCloseTo((40_000 / 645.16) * 0.18 * 100.55, 6);
+    expect(r.outputs['Polish Cost']).toBeCloseTo(0.04 * 600 * 76.81, 6);
+    expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd() + r.outputs['Cavity Machining Cost']! + r.outputs['Polish Cost']!) * 100 + 0.5) / 100);
     expect(r.perPartUsd).toBe(Math.floor(r.outputs['Tooling Investment']! / 30_000 * 10000 + 0.5) / 10000);
     expect(r.trace.find((t) => t.fieldName === 'Mold Base Width')?.source).toMatch(/tblStandardMoldBaseSizes: .*layoutNumCav/);
     expect(r.trace.find((t) => t.fieldName === 'Tool Steel Price')?.source).toMatch(/AISI P20/);

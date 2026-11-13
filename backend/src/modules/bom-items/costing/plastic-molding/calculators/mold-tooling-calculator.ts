@@ -7,6 +7,7 @@ import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
 import { runReferenceCalculator, type CalcSeed, type ReferenceCalculators } from '../../shared/calculators/reference-calculator';
 import type { MoldBaseReference, MoldToolingTables } from '../plastic-reference';
 import type { MoldBaseChoice } from '../process/mold-base';
+import type { MoldCavityLookup } from '../process/mold-cavity';
 import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas } from './plastic-cycle-time';
 
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
@@ -35,6 +36,9 @@ export interface MoldToolingFacts {
   moldBaseRef: MoldBaseReference;
   /** The part's height along the pull (the bounding box's smallest side), mm. */
   partHeightMm: number | null;
+  /** The cavity machining rate for the part's complexity and size (mold-cavity.ts), or what is missing to choose it. */
+  cavity: MoldCavityLookup | { missing: string[] };
+  partSurfaceAreaMm2: number | null;
 }
 
 export type MoldToolingRun =
@@ -47,7 +51,9 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
   if (!f.toolroomRates) missing.push(`toolroom rates for ${f.location} (memory/ holds digital_factory_settings_usa only)`);
   if ('missing' in f.moldBase) missing.push(...f.moldBase.missing.map((m) => `mold base: ${m}`));
   if (!(f.partHeightMm != null && f.partHeightMm > 0)) missing.push('the part height (CAD bounding box)');
-  if (missing.length > 0 || !f.toolroomRates || 'missing' in f.moldBase) return { missing };
+  if ('missing' in f.cavity) missing.push(...f.cavity.missing.map((m) => `cavity: ${m}`));
+  if (missing.length > 0 || !f.toolroomRates || 'missing' in f.moldBase || 'missing' in f.cavity) return { missing };
+  const cav = f.cavity;
   const b = f.moldBase;
   const mb = f.moldBaseRef;
   const vars = `${REF}/variables`;
@@ -87,6 +93,13 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       'Tool Steel Density': { value: mb.steel.densityKgM3, source: `${steel}: densityKgPerM3`, lookup: true },
       'Tool Steel Price': { value: mb.steel.priceUsdPerKg, source: `${steel}: materialCostUsdPerKg`, lookup: true },
       'Mold Base Cost Factor': { value: mb.steel.moldBaseCostFactor, source: `${steel}: moldBaseCostFactor`, lookup: true },
+      'Part Surface Area': { value: f.partSurfaceAreaMm2!, source: 'CAD part surface area' },
+      'Cavity Machining Hours Per Sq In': {
+        value: cav.hoursPerSqIn, lookup: true,
+        source: `${REF}/lookup/tblHrsPerSqInch${cav.complexity}: the row up to ${cav.rowUpToSqIn} in² (${cav.complexity}: ${cav.faceCount} CAD faces against `
+          + `cmMoldSurfaceCountThreshold ${mb.complexityFaceThresholds.simple} / ${mb.complexityFaceThresholds.average}, borrowed from compression molding)`,
+      },
+      'Polish Hours Per Sq Meter': { value: mb.finish.hoursPerSqM, source: `${REF}/lookup/SPIFinishes: ${mb.finish.name} (defaultCavityFinishIM)`, lookup: true },
     },
   };
 }

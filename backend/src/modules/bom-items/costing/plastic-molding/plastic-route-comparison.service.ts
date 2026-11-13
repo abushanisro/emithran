@@ -10,7 +10,7 @@ import type { MaterialResolutionService } from '../../services/material-resoluti
 import { CalculatorCatalogService } from '../../services/calculator-catalog.service';
 import { PlasticReferenceService } from './lookup/plastic-reference.service';
 import { injectionMoldabilityGap } from '../../../raw-materials/material-moldability';
-import { buildMoldingCommonInput, partBboxLongestFirst, type MoldingSummary } from './molding-input';
+import { buildMoldingCommonInput, cadFaceCount, partBboxLongestFirst, type MoldingSummary } from './molding-input';
 import { estimatedToolHeightMm } from '../shared/capability/machine-selection/press-checks';
 import { mhrRateFromCandidate } from '../shared/capability/machine-selection/rate-from-candidate';
 import { fetchMachinePool } from '../shared/capability/machine-selection/selector';
@@ -156,7 +156,7 @@ export class PlasticRouteComparisonService {
     );
     const rcUsdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
     const imCommon = buildMoldingCommonInput({
-      item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
+      item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
       material: {
         materialCostPerKg, materialDensityKgM3, materialSource, materialType: rcMaterialType, materialStockForm: rcStockForm,
         materialMatlState: rcMatlState, materialClamp: rcClampProperties, realResinInputs: rcRealResinInputs,

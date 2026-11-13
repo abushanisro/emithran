@@ -3,7 +3,7 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
 
 /**
  * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977,
- * 1007 and 1012: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
+ * 1007, 1012 and 1013: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
  * NEW migration, which writes the calculators whose spec `migration` is its number (and raises their `version` when their formulas change, calculators.version, migration 428).
  *   976  the reaction injection calculator, version 2 (fill time added)
  *   977  the injection, structural foam and LSR calculators: their fill-factor inputs name the reference table they are read from, so the cost dialog's eye opens it
@@ -13,8 +13,9 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1010 the injection molding deflashing calculator: the parting line length over the manual flash trimming rate
  *   1012 the injection mold tooling calculator: components + toolroom labour, molds required, cost per part
  *   1013 the injection mold tooling calculator, version 2: the mold base plate steel (standard base, plate stack, default tool steel)
+ *   1014 the injection mold tooling calculator, version 3: the cavity and core machining (hours per square inch by complexity) and polish
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1013] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1014] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
@@ -48,14 +49,14 @@ const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 
       'operation maps to it; the injection engine runs it for the routed deflashing step.',
     ].join('\n'),
   },
-  1013: {
-    title: 'Injection mold tooling calculator, version 2 -- the mold base plate steel.',
+  1014: {
+    title: 'Injection mold tooling calculator, version 3 -- the cavity and core machining and polish.',
     rootCause: [
-      'The mold tooling cost (migration 1012) excluded the mold base and its plate steel, and said so: the reference holds the standard base sizes',
-      '(tblStandardMoldBaseSizes), the cavity layout and borders (layoutNumCav, betweenPartsMoldBorder, tblEdgeMoldBorderX/Y, the plate depth borders),',
-      'the plate thicknesses (aPlateFlatCavityRatio, a/bPlateMinThickness, clamp and support plates) and the default tool steel (AISI P20: density, price,',
-      'moldBaseCostFactor), but no formula. Version 2 adds the plate stack and its steel cost to the mold cost (formula registry F-25, ASSUMED). The',
-      'calculator is replaced under version 2 (a calculator in use is not edited in place).',
+      'The mold tooling cost (version 2, migration 1013) had no cavity and core: the reference holds the machining hours per square inch of part',
+      'surface by complexity and size (tblHrsPerSqInch{Simple,Average,Complex}), a face-count rule for the complexity (cmMoldSurfaceCountThreshold,',
+      'staged for compression molding and borrowed) and the polish hours per square meter of the default finish (SPIFinishes, defaultCavityFinishIM),',
+      'but no formula. Version 3 adds the cavity machining at the machining rate and the polish at the bench rate to the mold cost (formula registry',
+      'F-26, ASSUMED). The calculator is replaced under version 3 (a calculator in use is not edited in place).',
     ].join('\n'),
   },
 };
@@ -73,5 +74,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   976: '976_plastic_rim_fill_time_calculator.sql',
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
-  1013: '1013_plastic_mold_base_steel.sql',
+  1014: '1014_plastic_mold_cavity_machining_polish.sql',
 };

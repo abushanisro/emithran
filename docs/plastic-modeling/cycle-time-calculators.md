@@ -222,7 +222,6 @@ RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open
 
 | Id | Item | Staged in memory/ | State |
 |---|---|---|---|
-| G-02 | Core and cavity blocks | plate depth tables; cmToolMachiningRates; EDM rates; tblHrsPerSqInch* | UNSUPPORTED |
 | G-03 | Slides and lifters | tblSlideSizes; slide* and lifter* variables; costPerHydraulicEjector; slideCycleRate | UNSUPPORTED |
 | G-04 | EDM and heat treatment | edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg | UNSUPPORTED |
 | G-05 | Mold texture | cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime | UNSUPPORTED |
