@@ -14,7 +14,8 @@ interface User {
 import { catalogRowForLine, identityRows, type CatalogRow } from '../process-catalog/catalog-row-for-line';
 import { MISSING_ANALYSIS_TEXT } from '../analysis-status';
 import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from '../dto/apply-route.dto';
-import type { PhysicsGap } from '../dto/cost-breakdown.dto';
+import type { CalculationTraceStep, PhysicsGap } from '../dto/cost-breakdown.dto';
+import { cyclePhasesOf } from '../costing/shared/cycle-phases';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
 import { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge, persistableCycleSec } from '../costing/shared/core/engine-kernel';
@@ -400,6 +401,8 @@ export class RouteApplicationService {
       otherCostPerPartUsd?: number;
       /** The versions the line was calculated with (ProcessLineCost.calculationSnapshot); persisted into calculation_breakdown (migration 972). */
       calculationSnapshot?: object;
+      /** The stored calculator's run (ProcessLineCost.calculationTrace); its cycle phases are persisted into cycle_phases (migration 1009). */
+      calculationTrace?: CalculationTraceStep[];
     }>,
     batchSize: number,
     location: string,
@@ -733,6 +736,8 @@ export class RouteApplicationService {
         labor_cost_per_part:       line.laborCostPerPart ?? null,
         // What the line charges beyond machine and crew time (energy, a consumable), USD like total_cost_per_part (migration 1005).
         other_cost_per_part:       line.otherCostPerPartUsd ?? null,
+        // The phases of the cycle as the line's stored calculator gave them (migration 1009); null when the line has no calculator cycle.
+        cycle_phases:              cyclePhasesOf(line.calculationTrace),
         // Costed-operation provenance (migration 718).
         //
         // line_hourly_rate is line.hourlyRate verbatim and UNROUNDED -- the

@@ -114,6 +114,8 @@ export interface ProcessCostRecord {
   totalCostPerPart: number;
   /** What the operation charges beyond machine and crew time (energy, a consumable), USD per part; in totalCostPerPart (migration 1005). */
   otherCostPerPart?: number | null;
+  /** The phases of the operation cycle as its stored calculator gave them, in formula order (migration 1009); null when it has no calculator cycle. */
+  cyclePhases?: { name: string; seconds: number }[] | null;
   setupCostPerPart: number;
   totalCycleCostPerPart: number;
   totalCostBeforeScrap: number;

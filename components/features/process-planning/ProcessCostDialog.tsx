@@ -9,7 +9,6 @@ import { strokeFactorColumnOf, withOutputColumnLast } from '@/lib/processCatalog
 import type { CadEvidence } from './CadEvidencePanel';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
-import { FormulaDependencies } from '@/components/costing/FormulaDependencies';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -53,7 +52,6 @@ import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
 import { isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { calculatorSteps } from '@/lib/costing/calculation-tree';
 import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
@@ -3773,20 +3771,6 @@ export function ProcessCostDialog({
                     </CardContent>
                   </Card>
                 )}
-
-                {/* Formula Dependencies: the cycle time and what it is made of, from this calculator as it runs (an edited input changes it). */}
-                {calculatorResults && (() => {
-                  const fields = selectedCalculator.fields ?? [];
-                  const seed = engineSeedRef.current?.calculatorId === selectedCalculatorId ? engineSeedRef.current : engineSeedsRef.current[selectedCalculatorId] ?? null;
-                  const cycle = fields.find((f: CalculatorField) => f.fieldType === 'calculated' && isCycleTimeField(f.fieldName));
-                  return (
-                    <FormulaDependencies
-                      title={selectedCalculator.name}
-                      steps={calculatorSteps(fields, calculatorInputs, calculatorResults, seed?.provenance ?? {})}
-                      {...(cycle ? { rootName: cycle.fieldName } : {})}
-                    />
-                  );
-                })()}
 
                 {/* Computed Cycle Time — derived from the calculator's own
                     'Total Time'/'Cycle Time' field (see CYCLE_TIME_FIELD_NAMES),

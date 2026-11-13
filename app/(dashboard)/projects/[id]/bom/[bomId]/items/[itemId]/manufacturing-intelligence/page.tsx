@@ -2095,6 +2095,22 @@ function CostSummaryTab({
             {/* Expanded calculation breakdown */}
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
+                {/* The cycle's phases, as the line's calculator gave them when it was applied (process_cost_records.cycle_phases):
+                    each a step of the operation, with its time. */}
+                {(() => {
+                  const phases = (proc as StoredProcessRow).cyclePhases ?? [];
+                  return phases.length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Cycle</div>
+                    {phases.map((ph) => (
+                      <div key={ph.name} className="flex justify-between gap-2 text-xs py-0.5 border-b border-border/10 last:border-0">
+                        <span className="truncate">{ph.name}</span>
+                        <span className="text-muted-foreground tabular-nums shrink-0">{formatCycleSec(ph.seconds)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  );
+                })()}
                 {/* The catalog operation per feature a forming line performs in
                     one go (a casting shot): its real operations, with counts. */}
                 {(matchedEngineLine?.featureOperations?.length ?? 0) > 0 && (

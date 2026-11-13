@@ -4504,6 +4504,23 @@
         ],
         "type": "object"
       },
+      "CyclePhaseDto": {
+        "properties": {
+          "name": {
+            "example": "Cooling Time",
+            "type": "string"
+          },
+          "seconds": {
+            "example": 2.9,
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "seconds"
+        ],
+        "type": "object"
+      },
       "DetailedInspectionReportResponseDto": {
         "properties": {
           "balloonDrawing": {
@@ -6015,6 +6032,14 @@
             "example": "INR",
             "type": "string"
           },
+          "cyclePhases": {
+            "description": "The phases of the operation cycle as its stored calculator gave them, in the order of the cycle-time formula (migration 1009). Null when the line has no calculator cycle.",
+            "items": {
+              "$ref": "#/components/schemas/CyclePhaseDto"
+            },
+            "nullable": true,
+            "type": "array"
+          },
           "cycleTime": {
             "description": "Cycle time (seconds)",
             "example": 80,
@@ -6229,6 +6254,7 @@
           "cycleTime",
           "chargeBasis",
           "otherCostPerPart",
+          "cyclePhases",
           "partsPerCycle",
           "scrap",
           "totalCostPerPart",

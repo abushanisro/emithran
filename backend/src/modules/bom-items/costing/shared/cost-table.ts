@@ -63,7 +63,8 @@ export const COST_COLUMNS: readonly CostColumn[] = [
   { key: 'setupTimeSource', label: 'Setup Time Source', group: 'Process Source', unit: 'text', modelled: true, basic: false, note: 'Where the setup time came from; empty when the record does not say.' },
 ];
 
-export type CostRowKind = 'part' | 'material' | 'group' | 'process' | 'logistics' | 'procured' | 'tooling';
+/** 'phase': a part of an operation's cycle (process_cost_records.cycle_phases): a time, never money. */
+export type CostRowKind = 'part' | 'material' | 'group' | 'process' | 'phase' | 'logistics' | 'procured' | 'tooling';
 export type CostValue = number | string | null;
 
 export interface CostRow {
@@ -86,7 +87,9 @@ export interface CostTable {
 // The stored rows, as the database names the columns (numeric columns arrive as numbers or numeric strings).
 type Num = number | string | null | undefined;
 export interface ProcessRecord { id: string; operation: string | null; process_name: string | null; process_group: string | null; machine_name: string | null; cycle_time: Num; setup_cost_per_part: Num; total_cost_per_part: Num; op_nbr: Num; created_at: string;
-  parts_per_cycle?: Num; scrap?: Num; setup_time?: Num; batch_size?: Num; machine_rate?: Num; labor_rate?: Num; timing_source?: string | null; setup_time_source?: string | null; machine_cost_per_part?: Num; labor_cost_per_part?: Num }
+  parts_per_cycle?: Num; scrap?: Num; setup_time?: Num; batch_size?: Num; machine_rate?: Num; labor_rate?: Num; timing_source?: string | null; setup_time_source?: string | null; machine_cost_per_part?: Num; labor_cost_per_part?: Num;
+  /** Migration 1009: [{name, seconds}] as the stored calculator gave them; null when the line has no calculator cycle. */
+  cycle_phases?: unknown }
 export interface MaterialRecord { id: string; material_name: string | null; unit_cost: Num; net_usage: Num; total_cost: Num; material_utilization_rate: Num }
 export interface LogisticsRecord { id: string; cost_name: string | null; total_cost: Num }
 export interface ProcuredRecord { id: string; part_name: string | null; total_cost: Num }
@@ -114,6 +117,17 @@ function withTotals(values: CostRow['values']): CostRow['values'] {
   const total = (['materialCost', 'processCost', 'amortizedBatchSetup', 'logistics', 'tooling', 'otherDirect'] as const)
     .reduce((s, k) => s + (num(values[k]) ?? 0), 0);
   return { ...values, totalVariable: total, pieceCost: total };
+}
+
+/** An operation's cycle phases as its children: each a time, no money. A record without a valid list has none. */
+function phaseRows(p: ProcessRecord): CostRow[] {
+  if (!Array.isArray(p.cycle_phases)) return [];
+  return p.cycle_phases.flatMap((ph: unknown, i): CostRow[] => {
+    const { name, seconds } = (ph ?? {}) as { name?: unknown; seconds?: unknown };
+    return typeof name === 'string' && typeof seconds === 'number' && Number.isFinite(seconds)
+      ? [{ id: `phase:${p.id}:${i}`, parentId: `process:${p.id}`, kind: 'phase', name, status: 'ok', values: { laborTimeSec: seconds } }]
+      : [];
+  });
 }
 
 /** A parent row's money: the sum of its children's, per column; a column no child has stays empty. */
@@ -168,7 +182,8 @@ export function buildCostTable(input: CostTableInput): CostTable {
         }),
       };
     });
-    children.push({ id: groupId, parentId: partId, kind: 'group', name: group, status: rows.some((r) => r.status === 'attention') ? 'attention' : 'ok', values: sumOf(rows) }, ...rows);
+    children.push({ id: groupId, parentId: partId, kind: 'group', name: group, status: rows.some((r) => r.status === 'attention') ? 'attention' : 'ok', values: sumOf(rows) });
+    records.forEach((p, i) => { children.push(rows[i]!, ...phaseRows(p)); });
   }
 
   for (const r of input.logistics) {
@@ -185,8 +200,8 @@ export function buildCostTable(input: CostTableInput): CostTable {
     });
   }
 
-  // The part adds up its leaf rows only (a group row is already the sum of its processes).
-  const leaves = children.filter((c) => c.kind !== 'group');
+  // The part adds up its leaf rows only (a group row is already the sum of its processes; a phase is a time inside its operation).
+  const leaves = children.filter((c) => c.kind !== 'group' && c.kind !== 'phase');
   const partValues = sumOf(leaves);
   const part: CostRow = {
     id: partId, parentId: null, kind: 'part', name: input.part.name,

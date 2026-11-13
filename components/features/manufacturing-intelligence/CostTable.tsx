@@ -48,7 +48,7 @@ export function CostTable({ table, columns, display }: { table: CostTableData; c
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.id} className={cn("group hover:bg-muted/40", r.kind === "part" && "bg-muted/30 font-semibold", r.kind === "group" && "font-medium")}>
+          <tr key={r.id} className={cn("group hover:bg-muted/40", r.kind === "part" && "bg-muted/30 font-semibold", r.kind === "group" && "font-medium", r.kind === "phase" && "text-muted-foreground")}>
             <td className="sticky left-0 z-10 border-b border-border/40 bg-background group-hover:bg-muted/40 px-2 py-1">
               <div className="flex items-center gap-1" style={{ paddingLeft: r.depth * 14 }}>
                 {r.hasChildren ? (

@@ -16,7 +16,8 @@ export interface CostColumn {
   basic: boolean;
 }
 
-export type CostRowKind = "part" | "material" | "group" | "process" | "logistics" | "procured" | "tooling";
+/** "phase": a part of an operation's cycle, as its calculator gave it: a time, never money. */
+export type CostRowKind = "part" | "material" | "group" | "process" | "phase" | "logistics" | "procured" | "tooling";
 
 export interface CostRow {
   id: string;
