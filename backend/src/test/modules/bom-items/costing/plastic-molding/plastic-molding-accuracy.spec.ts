@@ -375,13 +375,32 @@ describe('characterization: what the mold cost depends on today', () => {
   });
 });
 
+describe('slides and lifters in the mold (F-28)', () => {
+  const NONE = { small: 0, medium: 0, large: 0 };
+  it('prices the CAD-sized lifter blocks into the mold and drops G-03 from the quote; unsized bundles keep it a gap', () => {
+    const sized = computeInjectionMoldedCostSummary(absPart({
+      annualVolume: 10_000, productionLifeYears: 3,
+      signals: { ...absPart().signals, sideActionBlocks: { slide: NONE, lifter: { ...NONE, small: 4 }, unsized: 0 } },
+    }));
+    expect(sized.tooling?.moldSideActionUsd).toBeGreaterThan(0);
+    expect(sized.validation?.unsupported.map((u) => u.id)).not.toContain('G-03');
+    const unsized = computeInjectionMoldedCostSummary(absPart({
+      annualVolume: 10_000, productionLifeYears: 3,
+      signals: { ...absPart().signals, sideActionBlocks: { slide: NONE, lifter: NONE, unsized: 2 } },
+    }));
+    expect(unsized.validation?.unsupported.map((u) => u.id)).toContain('G-03');
+    expect(unsized.warnings.join(' ')).toMatch(/slides and lifters \(the CAD bundles are not all recognised and sized\)/);
+  });
+});
+
 describe('operations the model does not cost', () => {
   const warn = (signals: object, grade = 'Generic ABS') => computeInjectionMoldedCostSummary({ ...absPart(), materialGrade: grade, signals: { ...absPart().signals, ...signals } }).warnings.join('\n');
 
   it('names the reference data a required operation has that the model does not read yet, instead of saying none exists', () => {
     const w = warn({ undercutCount: 6 });
     expect(w).toContain('Side Action (Slide/Lifter) required');
-    expect(w).toContain('tblSlideSizes');
+    // the blocks are in the tooling (F-28); what stays unread is the slide movement in the cycle
+    expect(w).toContain('slideCycleRate');
     expect(w).not.toMatch(/Side Action[^\n]*no sourced time\/rate data/);
   });
 

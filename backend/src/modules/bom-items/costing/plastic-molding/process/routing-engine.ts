@@ -11,6 +11,7 @@
 // instead of silently guessing (docs/ENGINEERING.md: wrong zeros are worse than visible
 // errors — the same applies to silently missing route steps).
 
+import type { SideActionSignals } from '../side-action-signals';
 import {
   IM_OPERATION_REGISTRY, IMOperationId, IMProcessTree, IMRoutedOperation,
   MoldingSubtype,
@@ -42,6 +43,8 @@ export interface InjectionMoldingSignals {
   /** Recognised side-action bundles only a slide can serve, and bundles a lifter or a slide could serve (see side-action-signals.ts). Absent: not recognised. */
   slideBundleCount?: number | null;
   slideOrLifterBundleCount?: number | null;
+  /** The recognised slide and lifter bundles by size class (side-action-signals.ts); null when the features were not recognised. */
+  sideActionBlocks?: SideActionSignals['blocks'] | null;
   insertCount: number | null;
   textFeatureCount: number | null;  // molded-in text/logos → pad print/laser mark NOT needed
   assemblyFeatureCount: number | null; // snap fits / weld ribs → welding or assembly

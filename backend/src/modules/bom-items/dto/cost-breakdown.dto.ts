@@ -899,6 +899,8 @@ export interface ToolingCostDto {
   moldEjectorSystemUsd?: number;
   moldSprueAndLocatingRingUsd?: number;
   moldTryoutUsd?: number;
+  /** The slide and lifter blocks in one mold, USD (formula registry F-28): steel, machining and CMM inspection. */
+  moldSideActionUsd?: number;
   /** The tooling calculator's run (migration 1012): every input with its source and every formula with its value. */
   calculationTrace?: CalculationTraceStep[];
   /** The tooling calculator's name: a part's own field values are set by it (calculator_field_overrides). */

@@ -38,7 +38,7 @@ describe('resolvePlasticReference', () => {
 });
 
 describe('computeMoldToolingCost on the real tables (the lookups; the prices are the tooling calculator\'s)', () => {
-  const COLD = { runner: 'cold' as const, classUsesInserts: false, cavityTexture: 'None' };
+  const COLD = { runner: 'cold' as const, classUsesInserts: false, cavityTexture: 'None', sideActionsPriced: false };
 
   it('leaves the ejector pins to the calculator (their quantity "is calculated in the cost model"), not reported missing', () => {
     const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling, scope: COLD });
@@ -47,6 +47,8 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
     expect(REF.moldExtras).toEqual({
       areaPerEjectorPinMm2: 7903.21, ejectorPinUsd: 5, ejectorPinAssemblyHours: 0.25, sprueBushingUsd: 70, locatingRingUsd: 85,
       tryoutBaseHours: 12, tryouts: 3, cavityTexture: 'None',
+      slideVolumeIn3: { small: 75, medium: 1100, large: 2000 }, lifterVolumeIn3: { small: 75, medium: 500, large: 1500 },
+      cmmHoursPerSideAction: 1.52, cmmBaseHours: 5,
     });
     expect(REF.toolroomRatesUsa.tryoutUsdPerHr).toBe(76.81);
     expect(REF.spiClasses.map((c) => [c.moldClass, c.useInsert])).toEqual([['Class105', false], ['Class104', false], ['Class103', false], ['Class102', true], ['Class101', true]]);
@@ -54,11 +56,14 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
 
   it('names only the gaps that apply to the mold: no hot drops on a cold runner, no inserts for a class built without, no texture for None', () => {
     expect(toolingGapIds(COLD)).toEqual(['G-03', 'G-04', 'G-06']);
-    expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth' })).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08']);
+    expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth', sideActionsPriced: false })).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08']);
+    // every bundle recognised and sized: the slides and lifters are priced (F-28), not a gap
+    expect(toolingGapIds({ ...COLD, sideActionsPriced: true })).toEqual(['G-04', 'G-06']);
+    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true })).toMatch(/try-out, the slide and lifter blocks, and the toolroom hours; it does NOT include EDM and heat treatment, cooling lines \(/);
     const w = toolingScopeWarning(COLD);
     expect(w).toMatch(/includes .*the cavity and core machining and polish.*ejector pins, sprue bushing, locating ring, try-out/);
-    expect(w).toMatch(/does NOT include slides and lifters, EDM and heat treatment, cooling lines \(/);
-    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None' })).toMatch(/hot drops \(the number of drops is not on file\), cavity inserts/);
+    expect(w).toMatch(/does NOT include slides and lifters \(the CAD bundles are not all recognised and sized\), EDM and heat treatment, cooling lines \(/);
+    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false })).toMatch(/hot drops \(the number of drops is not on file\), cavity inserts/);
   });
 
   it('counts Guide Pin at its real 0.25 h and says Guide Bush has no assembly time', () => {

@@ -115,12 +115,12 @@ const UNCOSTED_OPERATION_LABELS: Record<string, string> = {
  * an operation starts being costed it leaves UNCOSTED_OPERATION_LABELS; when the model reads one of these, it leaves this list.
  */
 const UNREAD_REFERENCE_DATA: Partial<Record<keyof typeof UNCOSTED_OPERATION_LABELS, string>> = {
-  side_action: 'slide and lifter sizes, volumes, cycle rate and the hydraulic ejector cost (tblSlideSizes, the slide* and lifter* variables, costPerHydraulicEjector)',
+  // The slide and lifter blocks are in the tooling (F-28); what stays unread is their movement in the cycle.
+  side_action: 'the hydraulic slide cycle rate and the hydraulic ejector cost (slideCycleRate, costPerHydraulicEjector) for the slide movement in the cycle',
   core_unscrewing: 'the unscrewing mechanism cost (costPerUnscrewingMechanism)',
   insert_loading: 'the in-mold insert loading time and insert cost (cmInsertManualLoadingTime, defaultInsertCost)',
   insert_installation: 'the insert install rate (insertInstallRate)',
   gate_trimming: 'the manual trim rate and trim stock allowance (manualTrimRate, trimStockAllowance)',
-  dimensional_inspection: 'the CMM hours for inspecting slides and lifters (cmmInspectionAdder, cmmInspectionMultiplier)',
 };
 const UNREAD_BY_LABEL = new Map(Object.entries(UNREAD_REFERENCE_DATA).map(([key, data]) => [UNCOSTED_OPERATION_LABELS[key], data]));
 
@@ -475,6 +475,10 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     ribCount: input.signals?.ribCount ?? null,
     bossCount: input.signals?.bossCount ?? null,
     undercutCount: input.signals?.undercutCount ?? null,
+    // The recognised side-action bundles (molding-input.ts): the slide hardware and the slide and lifter blocks are priced from them.
+    slideBundleCount: input.signals?.slideBundleCount ?? null,
+    slideOrLifterBundleCount: input.signals?.slideOrLifterBundleCount ?? null,
+    sideActionBlocks: input.signals?.sideActionBlocks ?? null,
     insertCount: input.signals?.insertCount ?? null,
     textFeatureCount: input.signals?.textFeatureCount ?? null,
     assemblyFeatureCount: input.signals?.assemblyFeatureCount ?? null,
@@ -667,7 +671,10 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     // Unscrewing cores add mold complexity beyond parting line — treat as additional undercut bump.
     const effectiveUndercutCount = (signals.undercutCount ?? 0) + ((signals as any).unscrewingCoreCount ?? 0);
     const mold = recommendMoldClass(lifetimeShots, plasticRef.spiClasses, signals.partingComplexity ?? null, effectiveUndercutCount);
-    const toolingScope = { runner: runnerSystemType, classUsesInserts: mold.useInsert, cavityTexture: plasticRef.moldExtras.cavityTexture };
+    const toolingScope = {
+      runner: runnerSystemType, classUsesInserts: mold.useInsert, cavityTexture: plasticRef.moldExtras.cavityTexture,
+      sideActionsPriced: signals.sideActionBlocks != null && signals.sideActionBlocks.unsized === 0,
+    };
     toolingGaps = toolingGapIds(toolingScope);
 
     // Required mold-window area: the press-sizing projected area x cavities.
@@ -705,6 +712,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       partSurfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null,
       extras: plasticRef.moldExtras,
       pressClampTonnes: input.machineClampTonnes != null && input.machineClampTonnes > 0 ? input.machineClampTonnes : null,
+      sideActionBlocks: signals.sideActionBlocks ?? null,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides));
     if (!tooling.derivable) {
       warnings.push(`Tooling not costed: missing ${tooling.missing.join('; ')}.`);
@@ -732,6 +740,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         moldEjectorSystemUsd: o['Ejector System Cost']!,
         moldSprueAndLocatingRingUsd: o['Sprue and Locating Ring Cost']!,
         moldTryoutUsd: o['Tryout Cost']!,
+        moldSideActionUsd: o['Side Action Cost']!,
         calculationTrace: tooling.trace,
         calculatorName: tooling.calculator.name,
       };
@@ -790,7 +799,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
     ...(q.pressSelected ? ['F-11'] : []),
     ...(q.cycleDerivable ? [q.isLsr ? 'F-09' : 'F-04', ...(q.isLsr ? [] : ['F-06']), 'F-05', 'F-07', 'F-08'] : []),
     ...(q.yieldKnown ? ['F-13'] : []),
-    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27'] : []),
+    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27', 'F-28'] : []),
   ];
 }
 

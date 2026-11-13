@@ -21,8 +21,9 @@ const facts = (over: Partial<MoldToolingFacts> = {}): MoldToolingFacts => ({
   annualVolume: 10_000, productionLifeYears: 3, cavityCount: 1, toolLifeShots: 144_000, toolLifeSource: 'tblToolLife: ABS',
   moldBase: BASE, moldBaseRef: REF.moldBase, partHeightMm: 30,
   cavity: moldCavityLookup({ faceCount: 900, surfaceAreaMm2: 40_000, ref: REF.moldBase }), partSurfaceAreaMm2: 40_000,
-  extras: REF.moldExtras, pressClampTonnes: 102, ...over,
+  extras: REF.moldExtras, pressClampTonnes: 102, sideActionBlocks: null, ...over,
 });
+const NONE = { small: 0, medium: 0, large: 0 };
 /** The mold assembly extras of the worked mold (F-27): 2 ejector pins (10,000 / 7,903.21 mm2), the sprue and ring, 3 try-outs of 12 h on a 102 t press. */
 const EXTRAS_USD = 2 * (5 + 0.25 * 76.81) + (70 + 85) + 12 * 1 * 3 * 76.81;
 /** The plate steel by the formula, from the chosen base and the reference: what the calculator must give. */
@@ -36,11 +37,12 @@ function expectedSteelUsd(): number {
 }
 
 describe('the mold tooling calculator', () => {
-  it('is a helper whose result is the tooling cost per part, at version 4 written by migration 1016 (1012 to 1014 are history)', () => {
+  it('is a helper whose result is the tooling cost per part, at version 5 written by migration 1017 (1012 to 1016 are history)', () => {
     const c = loadPlasticMoldingCalculatorSpec().calculators.find((x) => x.name === MOLD_TOOLING_CALCULATOR)!;
-    expect(c).toMatchObject({ helper: true, operations: [], migration: 1016, version: 4, output: 'Tooling Cost Per Part' });
+    expect(c).toMatchObject({ helper: true, operations: [], migration: 1017, version: 5, output: 'Tooling Cost Per Part' });
     expect(c.description).toMatch(/G-03 to G-08/);
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/1016_plastic_mold_assembly_extras.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1016));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1017_plastic_mold_slides_lifters.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1017));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1016_plastic_mold_assembly_extras.sql'), 'utf8')).toContain('version 4');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1014_plastic_mold_cavity_machining_polish.sql'), 'utf8')).toContain('version 3');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1012_plastic_mold_tooling_calculator.sql'), 'utf8')).toContain(MOLD_TOOLING_CALCULATOR);
   });
@@ -70,6 +72,33 @@ describe('the mold tooling calculator', () => {
     expect(r.trace.find((t) => t.fieldName === 'Tool Steel Price')?.source).toMatch(/AISI P20/);
     expect(r.trace.find((t) => t.fieldName === 'Purchased Components Cost')?.source).toMatch(/cmStandardToolingComponents: Guide Pin 4 x 100/);
     expect(r.trace.find((t) => t.fieldName === 'Design Rate')?.source).toMatch(/designRateUsdPerHr/);
+  });
+
+  it('prices the slide and lifter blocks the CAD engine sized: steel by volume, a cube of each machined at the cavity rate, CMM inspection', () => {
+    // 2 small lifters (75 in3 each) + 1 medium slide (1,100 in3); the cavity rate is 0.18 h/in2 (average, 900 faces)
+    const r = runMoldTooling(facts({ sideActionBlocks: { slide: { ...NONE, medium: 1 }, lifter: { ...NONE, small: 2 }, unsized: 0 } }), CALCS);
+    if (!r.derivable) throw new Error(r.missing.join());
+    const steel = REF.moldBase.steel;
+    expect(r.outputs['Side Action Steel Mass']).toBeCloseTo(1250 * 16387.064 / 1e9 * steel.densityKgM3, 9);
+    expect(r.outputs['Side Action Steel Cost']).toBeCloseTo(1250 * 16387.064 / 1e9 * steel.densityKgM3 * steel.priceUsdPerKg, 6);
+    const surface = 2 * 6 * 75 ** (2 / 3) + 6 * 1100 ** (2 / 3);
+    expect(r.outputs['Side Action Machining Hours']).toBeCloseTo(surface * 0.18, 6);
+    expect(r.outputs['Side Action Machining Cost']).toBeCloseTo(surface * 0.18 * 100.55, 6);
+    expect(r.outputs['Side Action CMM Hours']).toBeCloseTo(1.52 * 3 + 5, 9);
+    expect(r.outputs['Side Action Cost']).toBeCloseTo(r.outputs['Side Action Steel Cost']! + surface * 0.18 * 100.55 + (1.52 * 3 + 5) * 100.55, 6);
+    expect(r.trace.find((t) => t.fieldName === 'Lifter Block Volume')?.source).toMatch(/2 small x 75 in³ \(smallLifterVolume\)/);
+    expect(r.trace.find((t) => t.fieldName === 'Slide Block Volume')?.source).toMatch(/1 medium x 1100 in³ \(mediumSlideVolume\)/);
+    // and it is in the mold cost
+    const without = runMoldTooling(facts(), CALCS);
+    if (!without.derivable) throw new Error(without.missing.join());
+    expect(r.outputs['Mold Cost']! - without.outputs['Mold Cost']!).toBeCloseTo(r.outputs['Side Action Cost']!, 6);
+  });
+
+  it('adds no side-action cost, and no CMM base hours, when no bundle was recognised', () => {
+    const r = runMoldTooling(facts({ sideActionBlocks: { slide: NONE, lifter: NONE, unsized: 0 } }), CALCS);
+    if (!r.derivable) throw new Error(r.missing.join());
+    expect(r.outputs['Side Action CMM Hours']).toBe(0);
+    expect(r.outputs['Side Action Cost']).toBe(0);
   });
 
   it('doubles the try-out hours on a press over 500 t, and needs a press to know them', () => {

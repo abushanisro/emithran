@@ -41,6 +41,8 @@ export interface PlasticFeature {
     exceeds_max_stroke?: boolean;
     width_mm?: number;
     stroke_mm?: number;
+    /** LifterBundle / SlideBundle: small, medium or large, by the bundle width thresholds of the staged variables. */
+    size_class?: string;
     /** PartingLine: through holes (internal cutouts). */
     internal_cutouts?: number;
     /** PartingLine: the measured parting line length, mm. */

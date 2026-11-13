@@ -12,5 +12,5 @@ export const REGISTRY_FORMULA_OF_FIELD: Readonly<Record<string, Readonly<Record<
   injection_lsr: { 'Cure Time': 'F-09', 'Fill Time': 'F-05', 'Press Dry Cycle Time': 'F-07', 'Cycle Time': 'F-08' },
   rim: { 'Fill Time': 'F-19' },
   injection_deflash: { 'Cycle Time': 'F-24' },
-  injection_mold_tooling: { 'Mold Base Steel Cost': 'F-25', 'Cavity Machining Cost': 'F-26', 'Polish Cost': 'F-26', 'Ejector System Cost': 'F-27', 'Sprue and Locating Ring Cost': 'F-27', 'Tryout Cost': 'F-27', 'Mold Cost': 'F-16', 'Molds Required': 'F-17', 'Tooling Cost Per Part': 'F-18' },
+  injection_mold_tooling: { 'Mold Base Steel Cost': 'F-25', 'Cavity Machining Cost': 'F-26', 'Polish Cost': 'F-26', 'Ejector System Cost': 'F-27', 'Sprue and Locating Ring Cost': 'F-27', 'Tryout Cost': 'F-27', 'Side Action Cost': 'F-28', 'Side Action Steel Cost': 'F-28', 'Side Action Machining Cost': 'F-28', 'Side Action CMM Cost': 'F-28', 'Mold Cost': 'F-16', 'Molds Required': 'F-17', 'Tooling Cost Per Part': 'F-18' },
 };

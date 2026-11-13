@@ -23,7 +23,7 @@ describe('buildQuoteValidation', () => {
     const v = buildQuoteValidation(['F-02'], ['G-03']);
     expect(v.complete).toBe(false);
     expect(v.state).toBe('VALIDATED'); // the formulas used are sound; the quote is partial
-    expect(v.unsupported).toEqual([expect.objectContaining({ id: 'G-03', name: 'Slides and lifters', stagedData: expect.stringContaining('tblSlideSizes') })]);
+    expect(v.unsupported).toEqual([expect.objectContaining({ id: 'G-03', name: expect.stringMatching(/^Slides and lifters of CAD bundles not recognised or not sized/), stagedData: expect.stringContaining('tblSlideSizes') })]);
   });
 
   it('an unregistered formula id is a programming error, not a silent omission', () => {
