@@ -741,6 +741,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         moldSprueAndLocatingRingUsd: o['Sprue and Locating Ring Cost']!,
         moldTryoutUsd: o['Tryout Cost']!,
         moldSideActionUsd: o['Side Action Cost']!,
+        moldHeatTreatmentUsd: o['Heat Treatment Cost']!,
         calculationTrace: tooling.trace,
         calculatorName: tooling.calculator.name,
       };
@@ -799,7 +800,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
     ...(q.pressSelected ? ['F-11'] : []),
     ...(q.cycleDerivable ? [q.isLsr ? 'F-09' : 'F-04', ...(q.isLsr ? [] : ['F-06']), 'F-05', 'F-07', 'F-08'] : []),
     ...(q.yieldKnown ? ['F-13'] : []),
-    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27', 'F-28'] : []),
+    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27', 'F-28', 'F-29'] : []),
   ];
 }
 

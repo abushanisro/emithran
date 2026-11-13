@@ -377,10 +377,27 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
   },
 
+  {
+    id: 'F-29', version: 1, name: 'Heat treatment of the mold steel',
+    expression: 'hardened = W x L x (A + B) x density + side-action steel;  relieved = mold base steel - W x L x (A + B) x density;  cost = hardened x heat treat rate + relieved x stress relief rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'W, L, A, B', unit: 'mm', source: 'the standard mold base and its A (cavity) and B (core) plates (F-25)' },
+      { name: 'side-action steel', unit: 'kg', source: 'the slide and lifter blocks (F-28)' },
+      { name: 'heat treat rate, stress relief rate', unit: 'USD/kg', source: `${MEM}/process/digital_factory_settings_usa: heatTreatRateUsdPerKg, stressReliefRateUsdPerKg` },
+    ],
+    dependsOn: ['F-25', 'F-28'],
+    referenceSource: `${MEM}/process`,
+    assumptions: [
+      'The steel that forms the part (the cavity and core plates and the slide and lifter blocks) is hardened; the rest of the mold base (clamp and support plates) is stress relieved. The reference gives the rates, not which steel is treated.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
     ['G-03', 'Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle', 'tblSlideSizes; slideCycleRate; costPerHydraulicEjector'],
-    ['G-04', 'EDM and heat treatment', 'edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg'],
+    ['G-04', 'EDM of rib inserts (the CAD engine does not measure rib heights yet; heat treatment is F-29)', 'edmRateUsdPerHr; edmMaterialCost{Carbon,Copper}UsdPerIn3; edmElectrodeVolumeBurn; *RibInsertElectrodeSize; machinedRibThreshold'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
     ['G-06', 'Cooling and water lines', 'tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables'],
     ['G-07', 'Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them)', 'tblSpiType.Use Insert; costPerUnscrewingMechanism'],
