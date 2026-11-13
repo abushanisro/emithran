@@ -76,8 +76,8 @@ function Field({ step, bomItemId, calculator }: { step: CalculationTraceStep; bo
 }
 
 /**
- * The cycle of a calculator-driven operation in the Cost panel: its Cycle Time with the formula, then each phase the formula adds up and, on request,
- * every other field of the calculation. Where the engine applies a part's own values (`calculator` set), each field can be changed for this part with
+ * The cycle of a calculator-driven operation in the Cost panel: each phase its Cycle Time formula adds up and, on request, every other field of the
+ * calculation, then the Cycle Time itself with its formula, last, as their total. Where the engine applies a part's own values (`calculator` set), each field can be changed for this part with
  * the reason; the cost is recalculated with it. Read-only otherwise.
  */
 export function CycleCalculator({ trace, bomItemId, calculator }: { trace: readonly CalculationTraceStep[]; bomItemId: string; calculator: string | null }) {
@@ -86,13 +86,6 @@ export function CycleCalculator({ trace, bomItemId, calculator }: { trace: reado
   if (!fields) return null;
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
-      <div className="flex items-start justify-between gap-3 rounded-md bg-muted/40 p-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">{label(fields.cycle)}</div>
-          <p className="mt-0.5 font-mono text-xs text-muted-foreground break-words">Why: {fields.cycle.fieldName} = {fields.cycle.formula}</p>
-        </div>
-        <div className="shrink-0 text-lg font-bold tabular-nums text-primary">{formatFieldValue(fields.cycle.value)}</div>
-      </div>
       {fields.phases.map((s) => <Field key={`${s.fieldName}:${String(s.value)}`} step={s} bomItemId={bomItemId} calculator={calculator} />)}
       {fields.others.length > 0 && (
         <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => { setMore((v) => !v); }} aria-expanded={more}>
@@ -100,6 +93,13 @@ export function CycleCalculator({ trace, bomItemId, calculator }: { trace: reado
         </button>
       )}
       {more && fields.others.map((s) => <Field key={`${s.fieldName}:${String(s.value)}`} step={s} bomItemId={bomItemId} calculator={calculator} />)}
+      <div className="flex items-start justify-between gap-3 rounded-md bg-muted/40 p-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">{label(fields.cycle)}</div>
+          <p className="mt-0.5 font-mono text-xs text-muted-foreground break-words">Why: {fields.cycle.fieldName} = {fields.cycle.formula}</p>
+        </div>
+        <div className="shrink-0 text-lg font-bold tabular-nums text-primary">{formatFieldValue(fields.cycle.value)}</div>
+      </div>
       {calculator && <p className="text-[11px] text-muted-foreground">A changed value is this part&apos;s own, kept with its reason; press Apply to put the recalculated cost in the quote.</p>}
     </div>
   );
