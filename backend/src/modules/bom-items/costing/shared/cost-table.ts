@@ -75,7 +75,16 @@ export interface CostRow {
   /** attention: this cost object carries no cost (not costed yet). */
   status: 'ok' | 'attention';
   statusNote?: string;
+  /** Where the row's cost came from, when that is on file (a tooling item's catalog row). */
+  note?: string;
   values: Partial<Record<CostColumnKey, CostValue>>;
+}
+
+/** A tooling row's price source: its catalog row (dataset:table:row, numbered from 1 as the table shows it), or a custom item. Older rows have none. */
+function toolingSourceNote(r: ToolingRecord): string | undefined {
+  const m = r.catalog_source ? /^([^:]+):([^:]+):([0-9]+)$/.exec(r.catalog_source) : null;
+  if (m) return `Priced from ${m[2]} row ${Number(m[3]) + 1} (${m[1]})`;
+  return r.is_custom ? 'Custom item, not from the catalog' : undefined;
 }
 
 export interface CostTable {
@@ -93,7 +102,8 @@ export interface ProcessRecord { id: string; operation: string | null; process_n
 export interface MaterialRecord { id: string; material_name: string | null; unit_cost: Num; net_usage: Num; total_cost: Num; material_utilization_rate: Num }
 export interface LogisticsRecord { id: string; cost_name: string | null; total_cost: Num }
 export interface ProcuredRecord { id: string; part_name: string | null; total_cost: Num }
-export interface ToolingRecord { id: string; tooling_type: string | null; description: string | null; unit_cost: Num; quantity: Num; total_cost: Num; total_tooling_investment: Num }
+export interface ToolingRecord { id: string; tooling_type: string | null; description: string | null; unit_cost: Num; quantity: Num; total_cost: Num; total_tooling_investment: Num;
+  is_custom?: boolean | null; catalog_source?: string | null }
 
 export interface CostTableInput {
   part: { id: string; name: string; annualVolume: number | null };
@@ -196,6 +206,7 @@ export function buildCostTable(input: CostTableInput): CostTable {
     const investment = num(r.total_tooling_investment) ?? ((num(r.unit_cost) ?? 0) * (num(r.quantity) ?? 1) || null);
     children.push({
       id: `tooling:${r.id}`, parentId: partId, kind: 'tooling', name: r.description || r.tooling_type || 'Tooling', status: 'ok',
+      ...(toolingSourceNote(r) ? { note: toolingSourceNote(r)! } : {}),
       values: withTotals({ tooling: num(r.total_cost), capitalInvestment: investment }),
     });
   }

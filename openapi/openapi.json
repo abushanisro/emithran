@@ -3883,6 +3883,11 @@
             "description": "BOM item ID to link this cost to",
             "type": "string"
           },
+          "catalogSource": {
+            "description": "The catalog item the price came from (dataset:table:row); must be an item of the process catalog. Null for a custom item.",
+            "example": "2026-Plastic:cmStandardToolingComponents:0",
+            "type": "object"
+          },
           "description": {
             "description": "Description of the tooling item",
             "example": "End Mill - 10mm Carbide",
@@ -3904,6 +3909,11 @@
             "example": 14,
             "type": "number"
           },
+          "manufacturingProcess": {
+            "description": "The tooling catalog domain the item belongs to (GET /tooling-catalogs), e.g. injection_molding",
+            "maxLength": 100,
+            "type": "object"
+          },
           "notes": {
             "description": "Notes or comments",
             "type": "string"
@@ -3917,6 +3927,11 @@
             "description": "Technical specifications",
             "example": "4-flute, TiAlN coated, for steel",
             "type": "string"
+          },
+          "subProcess": {
+            "description": "A Machining operation, when the item is for one",
+            "maxLength": 200,
+            "type": "object"
           },
           "supplier": {
             "description": "Supplier information",
@@ -8565,6 +8580,11 @@
             "description": "BOM item ID",
             "type": "string"
           },
+          "catalogSource": {
+            "description": "The catalog item the price came from (dataset:table:row); null for a custom item",
+            "nullable": true,
+            "type": "string"
+          },
           "createdAt": {
             "description": "Created at",
             "format": "date-time",
@@ -8590,6 +8610,11 @@
             "description": "Lead time in days",
             "type": "number"
           },
+          "manufacturingProcess": {
+            "description": "The tooling catalog domain the item belongs to; null for rows saved before it was stored",
+            "nullable": true,
+            "type": "string"
+          },
           "notes": {
             "description": "Notes or comments",
             "type": "string"
@@ -8601,6 +8626,11 @@
           },
           "specifications": {
             "description": "Technical specifications",
+            "type": "string"
+          },
+          "subProcess": {
+            "description": "A Machining operation, when the item is for one",
+            "nullable": true,
             "type": "string"
           },
           "supplier": {
@@ -8658,6 +8688,9 @@
           "supplier",
           "leadTime",
           "notes",
+          "manufacturingProcess",
+          "subProcess",
+          "catalogSource",
           "isActive",
           "createdAt",
           "updatedAt"
@@ -10769,6 +10802,11 @@
             "description": "BOM item ID to link this cost to",
             "type": "string"
           },
+          "catalogSource": {
+            "description": "The catalog item the price came from (dataset:table:row); must be an item of the process catalog. Null for a custom item.",
+            "example": "2026-Plastic:cmStandardToolingComponents:0",
+            "type": "object"
+          },
           "description": {
             "description": "Description of the tooling item",
             "type": "string"
@@ -10785,6 +10823,11 @@
             "description": "Lead time in days",
             "type": "number"
           },
+          "manufacturingProcess": {
+            "description": "The tooling catalog domain the item belongs to (GET /tooling-catalogs), e.g. injection_molding",
+            "maxLength": 100,
+            "type": "object"
+          },
           "notes": {
             "description": "Notes or comments",
             "type": "string"
@@ -10796,6 +10839,11 @@
           "specifications": {
             "description": "Technical specifications",
             "type": "string"
+          },
+          "subProcess": {
+            "description": "A Machining operation, when the item is for one",
+            "maxLength": 200,
+            "type": "object"
           },
           "supplier": {
             "description": "Supplier information",

@@ -10,6 +10,8 @@
 
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
+import { catalogSourceProblem } from '../catalog/tooling-catalog';
+import { ToolingCatalogService } from './tooling-catalog.service';
 import { declareCostRecordCurrency } from '../../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreateToolingCostDto,
@@ -24,7 +26,17 @@ import { orIlikeContains } from '../../../common/db/postgrest-filter';
 export class ToolingCostService {
   private readonly logger = new Logger(ToolingCostService.name);
 
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly catalogs: ToolingCatalogService,
+  ) {}
+
+  /** A catalog source must name an item of the row's own process catalog (and a custom item has none): checked before saving. */
+  private async checkCatalogSource(row: { process: string | null; source: string | null; isCustom: boolean }, accessToken: string): Promise<void> {
+    const catalog = row.source && row.process && !row.isCustom ? await this.catalogs.catalog(row.process, accessToken) : null;
+    const problem = catalogSourceProblem(row, catalog);
+    if (problem) throw new BadRequestException(problem);
+  }
 
   /**
    * Calculate tooling cost per part
@@ -157,6 +169,7 @@ export class ToolingCostService {
   ): Promise<ToolingCostResponseDto> {
     try {
       const client = this.databaseService.getClient(accessToken);
+      await this.checkCatalogSource({ process: dto.manufacturingProcess ?? null, source: dto.catalogSource ?? null, isCustom: dto.isCustom === true }, accessToken);
 
       // Calculate costs
       const calculatedCosts = this.calculateToolingCosts(
@@ -183,6 +196,9 @@ export class ToolingCostService {
         supplier: dto.supplier,
         lead_time: dto.leadTime,
         notes: dto.notes,
+        manufacturing_process: dto.manufacturingProcess ?? null,
+        sub_process: dto.subProcess ?? null,
+        catalog_source: dto.catalogSource ?? null,
         is_active: dto.isActive ?? true,
 
         // Currency provenance (migration 708, P1b-i). The stored value stays
@@ -235,6 +251,13 @@ export class ToolingCostService {
         throw new NotFoundException('Tooling cost record not found');
       }
 
+      // The row as it will be: a changed process, source or custom flag is checked against the catalog.
+      await this.checkCatalogSource({
+        process: dto.manufacturingProcess !== undefined ? dto.manufacturingProcess : (existing.manufacturing_process ?? null),
+        source: dto.catalogSource !== undefined ? dto.catalogSource : (existing.catalog_source ?? null),
+        isCustom: dto.isCustom !== undefined ? dto.isCustom : existing.is_custom === true,
+      }, accessToken);
+
       // Merge with existing data for calculation
       const unitCost = dto.unitCost ?? existing.unit_cost;
       const quantity = dto.quantity ?? existing.quantity;
@@ -273,6 +296,9 @@ export class ToolingCostService {
       if (dto.supplier !== undefined) updateData.supplier = dto.supplier;
       if (dto.leadTime !== undefined) updateData.lead_time = dto.leadTime;
       if (dto.notes !== undefined) updateData.notes = dto.notes;
+      if (dto.manufacturingProcess !== undefined) updateData.manufacturing_process = dto.manufacturingProcess;
+      if (dto.subProcess !== undefined) updateData.sub_process = dto.subProcess;
+      if (dto.catalogSource !== undefined) updateData.catalog_source = dto.catalogSource;
       if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
       if (dto.bomItemId !== undefined) updateData.bom_item_id = dto.bomItemId;
 

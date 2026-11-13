@@ -26,6 +26,8 @@ export interface CostRow {
   name: string;
   status: "ok" | "attention";
   statusNote?: string;
+  /** Where the row's cost came from, when on file (a tooling item's catalog row). */
+  note?: string;
   values: Record<string, number | string | null | undefined>;
 }
 

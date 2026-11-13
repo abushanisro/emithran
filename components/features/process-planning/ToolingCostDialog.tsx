@@ -362,8 +362,11 @@ export function ToolingCostDialog({
     e.preventDefault();
 
     const submitData = {
-      manufacturingProcess: formData.manufacturingProcess,
-      subProcess: formData.subProcess,
+      // Blank is "none" (the columns refuse blank text).
+      manufacturingProcess: formData.manufacturingProcess || null,
+      subProcess: formData.subProcess || null,
+      // The catalog row the price came from: the item picked now, else the one the record already had; a custom item has none.
+      catalogSource: isCustom ? null : (pickedItem?.id ?? (initialData as { catalogSource?: string | null } | undefined)?.catalogSource ?? null),
       toolingType: formData.toolingType,
       description: formData.description,
       specifications: formData.specifications,

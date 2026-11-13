@@ -30,6 +30,13 @@ export function defaultAmortization(
   };
 }
 
+/** Where a saved tooling row was priced from: its catalog row, or "custom"; nothing for a row saved before the catalog. */
+export function catalogSourceLabel(r: { isCustom?: boolean | null; catalogSource?: string | null }): string | null {
+  const m = r.catalogSource ? /^([^:]+):([^:]+):([0-9]+)$/.exec(r.catalogSource) : null;
+  if (m) return `from ${m[2] ?? ""} row ${Number(m[3]) + 1}`;
+  return r.isCustom ? "custom item" : null;
+}
+
 /** A process's display name: its catalog domain label, else the saved key made readable (records saved before the catalog). */
 export function processLabel(key: string | null | undefined, domains: readonly ToolingCatalogDomain[]): string {
   if (!key) return "";

@@ -12,7 +12,7 @@ import {
   useDeleteToolingCost,
 } from '@/lib/api/hooks/useToolingCosts';
 import { useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
-import { processLabel } from '@/lib/costing/tooling-catalog';
+import { catalogSourceLabel, processLabel } from '@/lib/costing/tooling-catalog';
 
 interface ToolingSectionProps {
   bomItemId?: string;
@@ -30,6 +30,8 @@ interface ToolingRowView {
   toolingType?: string | null;
   amortizationParts?: number | string | null;
   usagePercentage?: number | string | null;
+  isCustom?: boolean | null;
+  catalogSource?: string | null;
 }
 const row = (item: unknown): ToolingRowView => item as ToolingRowView;
 /** A tool's name: its description, else its record type, else "Tooling" (an empty text is no name). */
@@ -91,6 +93,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
       const submitData = {
         manufacturingProcess: data.manufacturingProcess,
         subProcess: data.subProcess,
+        catalogSource: (data as { catalogSource?: string | null }).catalogSource ?? null,
         toolingType: data.toolingType,
         description: data.description,
         specifications: data.specifications,
@@ -181,6 +184,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                       <p className="text-[11px] text-muted-foreground">
                         {[
                           process,
+                          catalogSourceLabel(row(item)),
                           row(item).amortizationParts ? `spread over ${Number(row(item).amortizationParts).toLocaleString()} parts` : null,
                           // A tool shared with other parts is charged in part; a tool this part uses alone needs no note.
                           row(item).usagePercentage != null && Number(row(item).usagePercentage) !== 100 ? `${Number(row(item).usagePercentage)}% of the tool charged to this part` : null,
