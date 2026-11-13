@@ -19,14 +19,24 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1018 the injection mold tooling calculator, version 6: the heat treatment of the mold steel
  *   1019 the injection mold tooling calculator, version 7: the cooling lines
  *   1020 the injection mold tooling calculator, version 8: the rib inserts and their EDM
+ *   1021 the injection molding slide movement calculator: the hydraulic slides' movement in each shot
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1020] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1020, 1021] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
+  1021: {
+    title: 'Injection molding slide movement calculator -- the hydraulic slides\' movement in each shot.',
+    rootCause: [
+      'A part with a slide is routed a side action, but its time was not costed: the engine read no slide speed. The reference stages slideCycleRate',
+      '(100, Velocity) and the CAD engine measures each slide bundle\'s stroke. This calculator times the slides moving out and back once per shot, all',
+      'together, as 2 x the longest stroke / slideCycleRate (read as mm/s), per part (formula registry F-32, ASSUMED). A helper: no catalog operation',
+      'maps to it; the injection engine runs it for the routed side action and charges it at the press rate. Lifters add no time.',
+    ].join('\n'),
+  },
   1020: {
     title: 'Injection mold tooling calculator, version 8 -- the rib inserts and their EDM.',
     rootCause: [
@@ -80,4 +90,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
   1020: '1020_plastic_mold_rib_inserts_edm.sql',
+  1021: '1021_plastic_slide_movement_calculator.sql',
 };

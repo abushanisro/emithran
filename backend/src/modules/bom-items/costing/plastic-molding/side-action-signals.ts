@@ -19,6 +19,8 @@ export interface SideActionSignals {
    * is counted as a lifter (the cheaper of the two it could be). `unsized`: bundles with no size class, which cannot be priced.
    */
   blocks: { slide: BlockSizes; lifter: BlockSizes; unsized: number };
+  /** The longest stroke of a slide bundle (mm): the slides move out and back each shot. Null when no slide bundle has one. Lifters ride on the ejection. */
+  maxSlideStrokeMm: number | null;
 }
 
 export type BlockSize = 'small' | 'medium' | 'large';
@@ -38,6 +40,7 @@ export function sideActionSignals(graph: PlasticFeatureGraph | null | undefined)
   let slideBundles = 0;
   let slideOrLifterBundles = 0;
   const blocks = { slide: { small: 0, medium: 0, large: 0 }, lifter: { small: 0, medium: 0, large: 0 }, unsized: 0 };
+  let maxSlideStrokeMm: number | null = null;
   const sized = (kind: 'slide' | 'lifter', size: unknown) => {
     if (typeof size === 'string' && SIZES.has(size)) blocks[kind][size as BlockSize] += 1;
     else blocks.unsized += 1;
@@ -45,8 +48,13 @@ export function sideActionSignals(graph: PlasticFeatureGraph | null | undefined)
   for (const f of graph.items) {
     if (f.feature_type === 'Void' || f.feature_type === 'ComboVoid') undercutFeatures += 1;
     else if (HOLES.has(f.feature_type) && (f.attributes?.angle_to_pull_deg ?? 0) > ALONG_PULL_MAX_DEG) undercutFeatures += 1;
-    else if (f.feature_type === 'SlideBundle') { slideBundles += 1; sized('slide', f.attributes?.size_class); }
+    else if (f.feature_type === 'SlideBundle') {
+      slideBundles += 1;
+      sized('slide', f.attributes?.size_class);
+      const stroke = f.attributes?.stroke_mm;
+      if (typeof stroke === 'number' && stroke > 0) maxSlideStrokeMm = Math.max(maxSlideStrokeMm ?? 0, stroke);
+    }
     else if (f.feature_type === 'LifterBundle') { slideOrLifterBundles += 1; sized('lifter', f.attributes?.size_class); }
   }
-  return { undercutFeatures, slideBundles, slideOrLifterBundles, blocks };
+  return { undercutFeatures, slideBundles, slideOrLifterBundles, blocks, maxSlideStrokeMm };
 }

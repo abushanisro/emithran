@@ -14,7 +14,7 @@ import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
 import { cadEvidenceKey } from '../../shared/cad-evidence';
-import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR } from './plastic-cycle-time-seeds';
+import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR } from './plastic-cycle-time-seeds';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
 export function calculatorFingerprint(def: ReferenceCalculatorDef): string {
@@ -112,6 +112,11 @@ export function runCompressionCycleTime(input: { pressCycleTimeS: number | null;
 /** The time to trim the flash off the parting line by hand (length / rate), by the stored calculator. */
 export function runDeflashingTime(input: { partingLineLengthMm: number | null; rateMmPerS: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(DEFLASH_CALCULATOR, deflashingSeeds(input), calculators);
+}
+
+/** The time the hydraulic slides add to each part (F-32), by the stored slide movement calculator, or what is missing. */
+export function runSlideMovementTime(input: { slideStrokeMm: number | null; rateMmPerS: number | null; cavities: number }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(SLIDE_MOVEMENT_CALCULATOR, slideMovementSeeds(input), calculators);
 }
 
 /** The cycle of a reaction injection molding (dry cycle + fill + cure time), by the stored calculator. */
