@@ -225,6 +225,9 @@ export function buildCastingCostSummary(input: {
     ...(input.dieTooling ? { dieTooling: dieToolingDto(input.dieTooling) } : {}),
     ...(input.processChoice ? { dieCastingProcess: input.processChoice } : {}),
     ...(Object.keys(calculatorRuns).length ? { calculatorRuns } : {}),
+    // The metal the part is charged with, whatever the casting process: the material record is written from this one figure.
+    ...(sand ? (sand.material.boughtKg != null ? { castingMetal: { partKg: netKg, chargedKg: sand.material.boughtKg } } : {})
+      : dc && netKg > 0 ? { castingMetal: { partKg: r3(netKg), chargedKg: r3(chargedKg) } } : {}),
     ...(input.cores?.corebox ? {
       coreboxTooling: {
         boxes: input.cores.corebox.boxes, detail: input.cores.corebox.detail,

@@ -84,7 +84,7 @@ export class MaterialCostSnapshotService {
       itemVolumeMm3: item.volume,
       densityKgM3: material?.densityKgM3 ?? null,
       cadWeightKg: typeof item.weight === 'number' && item.weight > 0 ? item.weight : null,
-      castingMetal: summary.dieCasting?.metal ?? null,
+      castingMetal: summary.castingMetal ?? null,
     });
 
     // unitCost 0 asks the cost-record service for the grade's price at the location (see its create()).

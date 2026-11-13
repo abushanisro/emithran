@@ -90,7 +90,8 @@ export interface SandRoute {
   flask: SandFlask;
   coresMade: number;
   coresLeftSolid: number;
-  material: { netKg: number; pouredKg: number; yieldPct: number; costUsd: number | null; runs: ReferenceCalcRun[] };
+  /** boughtKg: net + melt loss + the gates and risers not remelted (the material-cost calculator); null when the metal is not costed. */
+  material: { netKg: number; pouredKg: number; yieldPct: number; boughtKg: number | null; costUsd: number | null; runs: ReferenceCalcRun[] };
   tooling: { perPartUsd: number; items: CoreboxTooling[] };
   /** The core sand calculator run of each core (the sand of the core and its prints), for the trace. */
   coreSandRuns: ReferenceCalcRun[];
@@ -278,6 +279,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
 
   // Metal bought: melt loss in the chosen furnace, gates and risers back to the furnace (remelt allowance), scrap paid by the good parts.
   let materialCost: number | null = null;
+  let boughtKg: number | null = null;
   const runs: ReferenceCalcRun[] = [metalRun];
   const furnace = before[0]!.machine; // melting is the first step
   if (furnace) {
@@ -295,6 +297,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
       );
       if ('run' in m) {
         materialCost = m.run.value!;
+        boughtKg = m.run.outputs['Bought Weight'] ?? null;
         runs.push(m.run);
       } else warnings.push(...m.reasons);
     }
@@ -322,7 +325,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
     route: {
       mouldingProcess, mouldingMachine: mould.name, cavities, lines: scaled, gating, flask: flaskOf(mould),
       coresMade: cored.cores.length, coresLeftSolid: cored.thin,
-      material: { netKg: r4(netKg), pouredKg: r4(pouredKg), yieldPct: r2((100 * netKg) / pouredKg), costUsd: materialCost != null ? r2(materialCost) : null, runs },
+      material: { netKg: r4(netKg), pouredKg: r4(pouredKg), yieldPct: r2((100 * netKg) / pouredKg), boughtKg, costUsd: materialCost != null ? r2(materialCost) : null, runs },
       tooling: { perPartUsd: r4(toolingPerPart), items },
       coreSandRuns: cored.cores.map((c) => c.run),
       totalUsd, complete, warnings,
