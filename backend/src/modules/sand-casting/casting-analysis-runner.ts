@@ -1,3 +1,4 @@
+import { castingWorkerAvailable } from "./casting-config";
 import { createHash } from "node:crypto";
 
 import {
@@ -67,7 +68,7 @@ export class CastingAnalysisRunner implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   private get enabled(): boolean {
-    return this.host !== null && process.env.CASTING_ANALYSIS_RUNNER !== "off";
+    return this.host !== null && castingWorkerAvailable();
   }
 
   private get admin() {

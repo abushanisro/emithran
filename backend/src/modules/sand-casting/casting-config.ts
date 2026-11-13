@@ -58,3 +58,11 @@ export function drawDirectionMismatch(
   }
   return null;
 }
+
+/**
+ * Whether a casting worker will run the analyses: its socket is set (CASTING_WORKER_SOCKET) and the runner is not switched off
+ * (CASTING_ANALYSIS_RUNNER=off). The runner polls only then, and only then does Apply wait for a casting analysis.
+ */
+export function castingWorkerAvailable(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  return !!env.CASTING_WORKER_SOCKET && env.CASTING_ANALYSIS_RUNNER !== "off";
+}

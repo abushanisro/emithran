@@ -63,11 +63,14 @@ export interface AnalysisStatusInput {
 /**
  * @param casting the item's casting-analysis status, read by the caller; only consulted for a family that has a casting analysis.
  * @param currentVersion the feature-graph version the engine writes now (see currentFeatureGraphVersion).
+ * @param castingWorker whether a casting worker will run the analysis (castingWorkerAvailable). Without one it can never finish, so it is
+ *   not waited for: the part is costed with the cad-engine's casting measurements (SandCostService's fallback).
  */
 export function deriveAnalysisStatus(
   item: AnalysisStatusInput,
   casting: AnalysisKindStatus,
   currentVersion: number,
+  castingWorker = true,
 ): AnalysisStatus {
   const family = (item.manufacturingFamilyOverride ?? '').trim()
     || item.featureGraph?.classification?.family
@@ -87,7 +90,7 @@ export function deriveAnalysisStatus(
     if (cad === 'ready' && item.chosenFamilyHint && analysedFamily && item.chosenFamilyHint !== analysedFamily) cad = 'stale';
   }
 
-  const needsCasting = hasModel && !!family && castingProcessOfFamily(family) === 'sand_casting';
+  const needsCasting = castingWorker && hasModel && !!family && castingProcessOfFamily(family) === 'sand_casting';
   const castingStatus: AnalysisKindStatusOrNotRequired = needsCasting ? casting : 'not_required';
 
   const drawing: AnalysisKindStatusOrNotRequired = item.file2dPath ? (item.drawingIntelligence ? 'ready' : 'none') : 'not_required';

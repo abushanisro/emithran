@@ -51,6 +51,15 @@ describe('deriveAnalysisStatus', () => {
       expect(deriveAnalysisStatus(sand(), 'ready', CURRENT)).toMatchObject({ casting: 'ready', ready: true, missing: [] });
     });
 
+    // Without a casting worker (none deployed, or CASTING_ANALYSIS_RUNNER=off) the analysis can never finish: it is not waited for, and the
+    // part is costed with the cad-engine's casting measurements (SandCostService's fallback). Where a worker runs, it still is.
+    it('does not wait for a casting analysis when no casting worker is available', () => {
+      expect(deriveAnalysisStatus(sand(), 'running', CURRENT, false)).toMatchObject({ casting: 'not_required', ready: true, missing: [] });
+      expect(deriveAnalysisStatus(sand(), 'none', CURRENT, false)).toMatchObject({ casting: 'not_required', ready: true });
+      expect(deriveAnalysisStatus(sand({ featureGraph: null, familyClassification: 'sand_cast' }), 'none', CURRENT, false).missing).toEqual(['cad_features']);
+      expect(deriveAnalysisStatus(sand(), 'running', CURRENT, true)).toMatchObject({ casting: 'running', ready: false });
+    });
+
     it('does not need it when the engineer pinned another family', () => {
       expect(deriveAnalysisStatus(sand({ manufacturingFamilyOverride: 'milled' }), 'none', CURRENT)).toMatchObject({ casting: 'not_required', ready: true });
     });
