@@ -44,6 +44,7 @@ export function sourceLine(f: FeatureAllowance): string {
     const basis = (BASIS_LABEL as Partial<Record<string, string>>)[s.basis ?? ''];
     return `${basis ?? s.ref ?? 'decision'} by ${s.setBy ?? 'an engineer'}${when}: ${s.reason ?? ''}`.trim();
   }
+  if (s.kind === 'drawing') return `From ${s.ref ?? 'the drawing'}`;
   return s.ref ?? (s.kind === 'dataset' ? 'licensed dataset' : 'approved profile');
 }
 

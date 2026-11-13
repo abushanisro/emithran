@@ -6,7 +6,9 @@
  * undecided one is listed for review; one the engineer marked not machined is left out. Never "every face".
  *
  * Where each value comes from, the first source that has one (migration 1002):
- *   1 specified                 an engineer's recorded decision from the drawing, the CAD model's PMI or the customer's specification
+ *   1 specified                 an engineer's recorded decision from the drawing, the CAD model's PMI or the customer's specification;
+ *                               else the drawing's own allowance callout as printed (drawing_analyzer): part-wide, so it applies to
+ *                               the machined features only, and only when it gives one millimetre value
  *   2 standard_derived          a LICENSED standard dataset (ISO 8062-3): the part's RMAG grade and the casting's largest dimension pick
  *                               one size band's value, exactly; no interpolation, no grade inferred
  *   3 foundry_profile_derived   an APPROVED foundry or customer profile: its most specific value for the material family and moulding
@@ -70,9 +72,19 @@ export interface AllowanceProfile {
   values: Array<{ materialFamily: string | null; mouldingMethod: MouldingMethod | null; sizeOverMm: number; sizeUptoMm: number; allowanceMm: number }>;
 }
 
+/** The drawing's machining allowance callout (bom_items.drawing_intelligence.machining_allowance), with the drawing it is on. */
+export interface DrawingAllowance {
+  text: string;
+  /** mm per machined face; null when the drawing gives no single millimetre value. */
+  allowanceMm: number | null;
+  rmag: string | null;
+  /** The drawing, e.g. "drawing 4471 rev B". */
+  ref: string;
+}
+
 export interface AllowanceSource {
   level: 1 | 2 | 3 | 4 | 5;
-  kind: 'decision' | 'dataset' | 'profile' | 'none';
+  kind: 'decision' | 'drawing' | 'dataset' | 'profile' | 'none';
   id: string | null;
   /** Human-readable provenance: the standard and licence, the profile and version, or the decision's basis. */
   ref: string | null;
@@ -110,6 +122,25 @@ export interface MachiningAllowanceResult {
 const SPECIFIED: ReadonlySet<DecisionBasis> = new Set(['engineering_drawing', 'cad_model_pmi', 'customer_specification']);
 const INTERNAL = new Set(['SimpleHole', 'MultiStepHole', 'Void']);
 const PLANAR = new Set(['PlanarFace']);
+
+/** The drawing's machining allowance callout from bom_items.drawing_intelligence; null when the drawing has none. */
+export function drawingAllowanceOf(drawingIntelligence: unknown): DrawingAllowance | null {
+  const di = drawingIntelligence as Record<string, unknown> | null | undefined;
+  const ma = di?.machining_allowance as Record<string, unknown> | null | undefined;
+  const text = typeof ma?.text === 'string' ? ma.text.trim() : '';
+  if (!text) return null;
+  const mm = ma!.allowance_mm;
+  const grade = ma!.rmag;
+  const field = (k: string) => (typeof di?.[k] === 'string' ? (di[k] as string).trim() : '');
+  const no = field('drawing_number');
+  const rev = field('drawing_revision');
+  return {
+    text,
+    allowanceMm: typeof mm === 'number' && Number.isFinite(mm) && mm > 0 ? mm : null,
+    rmag: typeof grade === 'string' && /^[A-K]$/.test(grade) ? grade : null,
+    ref: no ? `drawing ${no}${rev ? ` rev ${rev}` : ''}` : 'the drawing',
+  };
+}
 
 /** The moulding method of a sand moulding process (sand-route.ts MOULDING_PROCESSES); null when not one of them. */
 export function mouldingMethodOf(process: string | null | undefined): MouldingMethod | null {
@@ -173,12 +204,18 @@ export function resolveMachiningAllowance(input: {
   /** The part's current geometry hash (bom_items.geometry_hash); null = not analysed: no decision can be trusted. */
   geometryHash: string | null;
   largestDimensionMm: number | null;
+  /** The RMAG grade set for the part (A-K); the drawing's grade is used when none is set. */
   rmag: string | null;
   materialFamily: string | null;
   mouldingMethod: MouldingMethod | null;
   datasets: readonly AllowanceDataset[];
   profiles: readonly AllowanceProfile[];
+  drawing: DrawingAllowance | null;
 }): MachiningAllowanceResult {
+  const { drawing } = input;
+  const rmag = input.rmag ?? drawing?.rmag ?? null;
+  const rmagNote = input.rmag && drawing?.rmag && drawing.rmag !== input.rmag
+    ? `${drawing.ref} gives RMAG ${drawing.rmag}; RMAG ${input.rmag} set for the part is used` : null;
   const decisionOf = new Map(input.decisions.map((d) => [d.featureKey, d]));
   const features: FeatureAllowance[] = [];
   const notMachined: MachiningAllowanceResult['notMachined'] = [];
@@ -214,11 +251,17 @@ export function resolveMachiningAllowance(input: {
       out('requires_review', null, null, none);
       continue;
     }
-    // 1. specified
+    // 1. specified: the engineer's recorded decision, else the drawing's callout. On a hole the value is per side of the diameter.
     if (fresh && SPECIFIED.has(fresh.basis)) { out('specified', fresh.allowanceMm, fresh.sides, fromDecision(1, fresh)); continue; }
-    // 2 and 3: a licensed dataset, else an approved profile; on a hole the value is per side of the diameter
     const sides: 1 | 2 = INTERNAL.has(f.featureType) ? 2 : 1;
-    const ds = fromDatasets(input.datasets, input.rmag, input.largestDimensionMm, notes);
+    if (drawing?.allowanceMm != null) {
+      out('specified', drawing.allowanceMm, sides, { level: 1, kind: 'drawing', id: null, ref: `${drawing.ref}: "${drawing.text}"` });
+      continue;
+    }
+    if (drawing) notes.push(`${drawing.ref} says "${drawing.text}" but gives no single millimetre value`);
+    if (rmagNote) notes.push(rmagNote);
+    // 2 and 3: a licensed dataset, else an approved profile
+    const ds = fromDatasets(input.datasets, rmag, input.largestDimensionMm, notes);
     const pr = ds ? null : fromProfiles(input.profiles, input.materialFamily, input.mouldingMethod, input.largestDimensionMm, notes);
     const found = ds && ds !== 'conflict' ? ds : pr && pr !== 'conflict' ? pr : null;
     if (found) {

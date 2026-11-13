@@ -4,6 +4,7 @@ import {
 import { DatabaseService } from '../../../../common/database/database.service';
 import type { MachiningNeedView } from '../../services/feature-tolerance.service';
 import {
+  drawingAllowanceOf,
   resolveMachiningAllowance,
   type AllowanceDataset,
   type AllowanceDecision,
@@ -47,9 +48,10 @@ export class MachiningAllowanceService {
     if (!need.assessed || !need.result) return { result: null, warnings: [] };
     const client = this.databaseService.getClient(input.accessToken);
 
-    const item = await client.from('bom_items').select('organization_id, geometry_hash').eq('id', input.bomItemId).single();
+    const item = await client.from('bom_items').select('organization_id, geometry_hash, drawing_intelligence').eq('id', input.bomItemId).single();
     if (item.error) return { result: null, warnings: [`Machining allowance not shown: the part could not be read (${item.error.message}).`] };
-    const { organization_id: org, geometry_hash: geometryHash } = item.data as { organization_id: string; geometry_hash: string | null };
+    const { organization_id: org, geometry_hash: geometryHash, drawing_intelligence: drawingIntelligence } =
+      item.data as { organization_id: string; geometry_hash: string | null; drawing_intelligence: unknown };
 
     const [decisions, datasets, profiles] = await Promise.all([
       client.from('bom_item_machining_allowances')
@@ -80,6 +82,7 @@ export class MachiningAllowanceService {
     const result = resolveMachiningAllowance({
       features,
       geometryHash,
+      drawing: drawingAllowanceOf(drawingIntelligence),
       largestDimensionMm: input.largestDimensionMm,
       rmag: input.rmag,
       materialFamily: input.materialFamily,

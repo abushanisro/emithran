@@ -1,10 +1,12 @@
 import {
   resolveMachiningAllowance,
   mouldingMethodOf,
+  drawingAllowanceOf,
   type AllowanceDataset,
   type AllowanceDecision,
   type AllowanceFeature,
   type AllowanceProfile,
+  type DrawingAllowance,
 } from '../../../../../modules/bom-items/costing/casting/machining-allowance';
 
 // Machining allowance: the stock left on a cast face that is machined afterwards (never pattern shrinkage). For each machined feature the
@@ -38,6 +40,7 @@ const profile = (over: Partial<AllowanceProfile> = {}): AllowanceProfile => ({
 const base = {
   geometryHash: 'geo-1', largestDimensionMm: 150, rmag: null as string | null, materialFamily: 'Gray Iron', mouldingMethod: 'machine' as const,
   decisions: [] as AllowanceDecision[], datasets: [] as AllowanceDataset[], profiles: [] as AllowanceProfile[],
+  drawing: null as DrawingAllowance | null,
 };
 const one = (over: Partial<typeof base> & { features?: AllowanceFeature[] } = {}) =>
   resolveMachiningAllowance({ ...base, features: [hole()], ...over }).features[0]!;
@@ -161,5 +164,78 @@ describe('mouldingMethodOf', () => {
     expect(mouldingMethodOf('Manual Floor Moldmaking')).toBe('hand');
     expect(mouldingMethodOf('Something')).toBeNull();
     expect(mouldingMethodOf(null)).toBeNull();
+  });
+});
+
+// Level 1 also comes straight from the drawing: its machining allowance callout (cad-engine drawing_analyzer), read as printed. It is
+// part-wide, so it applies to the features known to be machined, never to every face, and never to one marked not machined.
+describe('resolveMachiningAllowance: the drawing\'s callout', () => {
+  const drawing = (over: Partial<DrawingAllowance> = {}): DrawingAllowance =>
+    ({ text: 'MACHINING ALLOWANCE 3 MM', allowanceMm: 3, rmag: null, ref: 'drawing 4471 rev B', ...over });
+
+  it('is specified, quoting the drawing and its callout, before a dataset, a profile or an estimate', () => {
+    const r = one({ drawing: drawing(), datasets: [dataset], profiles: [profile()], rmag: 'F',
+      decisions: [decision({ basis: 'engineering_estimate', allowanceMm: 2 })] });
+    expect(r).toMatchObject({ status: 'specified', allowanceMm: 3, sides: 2 });
+    expect(r.source).toMatchObject({ level: 1, kind: 'drawing', id: null });
+    expect(r.source.ref).toBe('drawing 4471 rev B: "MACHINING ALLOWANCE 3 MM"');
+    expect(r.asCast).toMatchObject({ rule: 'internal', finishedMm: 20, asCastMm: 14 });
+  });
+
+  it('a planar face carries it on its one side', () => {
+    expect(one({ features: [face()], drawing: drawing() })).toMatchObject({ status: 'specified', allowanceMm: 3, sides: 1 });
+  });
+
+  it("comes after an engineer's recorded specified decision, which is the reviewed one", () => {
+    const r = one({ drawing: drawing(), decisions: [decision({ allowanceMm: 1.5 })] });
+    expect(r).toMatchObject({ status: 'specified', allowanceMm: 1.5 });
+    expect(r.source.kind).toBe('decision');
+  });
+
+  it('is not applied to a feature marked not machined, nor decided for an undecided one', () => {
+    const res = resolveMachiningAllowance({ ...base, drawing: drawing(), features: [hole({ verdict: 'undecided', featureKey: 'u' }), hole()],
+      decisions: [decision({ machined: false, allowanceMm: null, sides: null, basis: 'not_machined', reason: 'as cast' })] });
+    expect(res.notMachined.map((n) => n.featureKey)).toEqual(['SimpleHole:h1']);
+    expect(res.features).toHaveLength(1);
+    expect(res.features[0]).toMatchObject({ featureKey: 'u', status: 'requires_review' });
+  });
+
+  it('with text but no single millimetre value, gives no value and says what the drawing printed', () => {
+    const r = one({ drawing: drawing({ text: 'MACHINING ALLOWANCE AS PER FOUNDRY STANDARD', allowanceMm: null }) });
+    expect(r.status).toBe('requires_review');
+    expect(r.notes.join(' ')).toContain('drawing 4471 rev B says "MACHINING ALLOWANCE AS PER FOUNDRY STANDARD"');
+  });
+
+  it("gives its RMAG grade to the licensed dataset when the part has none set; a grade set for the part wins, and a difference is said", () => {
+    expect(one({ drawing: drawing({ allowanceMm: null, rmag: 'F', text: 'ISO 8062-3 - DCTG 9 - RMAG F' }), datasets: [dataset] }))
+      .toMatchObject({ status: 'standard_derived', allowanceMm: 1.4 });
+    const r = one({ drawing: drawing({ allowanceMm: null, rmag: 'H', text: 'ISO 8062-3 - DCTG 9 - RMAG H' }), datasets: [dataset], rmag: 'F' });
+    expect(r).toMatchObject({ status: 'standard_derived', allowanceMm: 1.4 });
+    expect(r.notes.join(' ')).toMatch(/drawing 4471 rev B gives RMAG H; RMAG F set for the part is used/);
+  });
+
+  it('that closes a hole requires review', () => {
+    const r = one({ features: [hole({ sizeMm: 5 })], drawing: drawing() });
+    expect(r.status).toBe('requires_review');
+    expect(r.notes.join(' ')).toMatch(/closes the hole/);
+  });
+});
+
+// The drawing's callout as stored on the part (bom_items.drawing_intelligence), checked before it is trusted.
+describe('drawingAllowanceOf', () => {
+  const di = (ma: unknown, more: Record<string, unknown> = {}) => ({ drawing_number: '4471', drawing_revision: 'B', machining_allowance: ma, ...more });
+
+  it('reads the callout with the drawing number and revision', () => {
+    expect(drawingAllowanceOf(di({ text: 'ISO 8062-3 – DCTG 10 – RMA 6 (RMAG H)', allowance_mm: 6, rmag: 'H', dctg: 10 })))
+      .toEqual({ text: 'ISO 8062-3 – DCTG 10 – RMA 6 (RMAG H)', allowanceMm: 6, rmag: 'H', ref: 'drawing 4471 rev B' });
+    expect(drawingAllowanceOf(di({ text: 'MACHINING ALLOWANCE 3 MM', allowance_mm: 3 }, { drawing_number: '', drawing_revision: '' }))!.ref).toBe('the drawing');
+  });
+
+  it('is null without a callout, and keeps no value or grade that is not a plain positive millimetre or A-K', () => {
+    expect(drawingAllowanceOf(null)).toBeNull();
+    expect(drawingAllowanceOf(di(null))).toBeNull();
+    expect(drawingAllowanceOf(di({ text: '' }))).toBeNull();
+    expect(drawingAllowanceOf(di({ text: 'X', allowance_mm: -1, rmag: 'Z' }))).toMatchObject({ allowanceMm: null, rmag: null });
+    expect(drawingAllowanceOf(di({ text: 'X', allowance_mm: '3' }))).toMatchObject({ allowanceMm: null });
   });
 });
