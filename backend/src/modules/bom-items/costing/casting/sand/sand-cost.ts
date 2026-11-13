@@ -89,7 +89,7 @@ export function sandScenario(input: {
         curedDepthMm: positive(o[SAND_SCENARIO_KEYS.hotBoxCuredDepth]),
       },
       refractory: {
-        coat: COAT_CHOICES.find((c) => c === o[SAND_SCENARIO_KEYS.refractoryCoat]) ?? 'none',
+        coat: COAT_CHOICES.find((c) => c === o[SAND_SCENARIO_KEYS.refractoryCoat]) ?? null,
         dryMethod: DRY_METHODS.find((m) => m === o[SAND_SCENARIO_KEYS.refractoryDryMethod]) ?? null,
         dryMinutes: positive(o[SAND_SCENARIO_KEYS.refractoryDryMinutes]),
         pricePerKg: positive(o[SAND_SCENARIO_KEYS.refractoryCoatPrice]),

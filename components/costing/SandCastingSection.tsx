@@ -127,18 +127,18 @@ export function SandCastingSection({ overrides, onChange }: Props) {
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCuredDepth]: v }); }}
         title={`Hot box core making. ${HOT_BOX_GUIDANCE.curedDepth}`}
       />
-      <div className={rowClass} title="Refractory coating is not costed unless you choose it. The coating methods, rates and densities are in the reference data; the drying time and the coating's price are yours to set.">
+      <div className={rowClass} title="Empty: the plant's default (the cores are coated, defaultCoreRefractoryCoatingInclusion; the mould is not). The coating methods, rates, densities and drying times are in the reference data; the coating's price is not.">
         <span className={labelClass}>Refractory coat</span>
         <select
           className={`${controlClass} cursor-pointer`}
           value={text(SAND_SCENARIO_KEYS.refractoryCoat)}
           onChange={(e) => { onChange({ [SAND_SCENARIO_KEYS.refractoryCoat]: choiceOf(e.target.value) }); }}
         >
-          <option value="">Not coated</option>
+          <option value="">Plant default: the cores</option>
           {REFRACTORY_COAT_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
       </div>
-      {text(SAND_SCENARIO_KEYS.refractoryCoat) !== '' && (
+      {text(SAND_SCENARIO_KEYS.refractoryCoat) !== 'none' && (
         <>
           <div className={rowClass} title="How the coated mould or cores are dried.">
             <span className={labelClass}>Drying</span>
@@ -147,14 +147,14 @@ export function SandCastingSection({ overrides, onChange }: Props) {
               value={text(SAND_SCENARIO_KEYS.refractoryDryMethod)}
               onChange={(e) => { onChange({ [SAND_SCENARIO_KEYS.refractoryDryMethod]: choiceOf(e.target.value) }); }}
             >
-              <option value="">Not set: the drying is not costed</option>
+              <option value="">Cheaper of oven and air</option>
               {REFRACTORY_DRY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
           <NumberField
             label="Drying, min"
             value={number(SAND_SCENARIO_KEYS.refractoryDryMinutes)}
-            placeholder="set: time for a load"
+            placeholder="plant: oven 19, air 60"
             parse={parsePositive}
             onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.refractoryDryMinutes]: v }); }}
             title={REFRACTORY_GUIDANCE.dryMinutes}

@@ -1,5 +1,5 @@
 import { loadSandCastingCalculatorSpec, sandCastingCalculatorsByName } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculator-spec';
-import { NO_REFRACTORY, refractorySettingsProblems, type RefractorySettings } from '../../../../../modules/bom-items/costing/casting/sand/sand-refractory';
+import { NO_REFRACTORY, PLANT_REFRACTORY, type RefractorySettings } from '../../../../../modules/bom-items/costing/casting/sand/sand-refractory';
 import { buildSandRoute, type SandRouteInput } from '../../../../../modules/bom-items/costing/casting/sand/sand-route';
 import { sandScenario } from '../../../../../modules/bom-items/costing/casting/sand/sand-cost';
 import { allSandMachines, realSandReference, sandMaterial, HOT_BOX } from './sand-test-data';
@@ -24,24 +24,44 @@ const inputWith = (refractory: RefractorySettings | undefined, cores: SandRouteI
 const names = (r: NonNullable<ReturnType<typeof buildSandRoute>['route']>) => r.lines.map((l) => l.process);
 const line = (r: NonNullable<ReturnType<typeof buildSandRoute>['route']>, process: string) => r.lines.find((l) => l.process === process);
 
-describe('nothing is coated unless the user chose it', () => {
-  it('a scenario with no coating has no coating, drying or (with one core) assembly line, and is the same route as before', () => {
-    const none = buildSandRoute(inputWith(undefined, [core(30000)])).route!;
-    expect(names(none).filter((n) => /Refractory|assembly/.test(n))).toEqual([]);
-    expect(buildSandRoute(inputWith(NO_REFRACTORY, [core(30000)])).route!.totalUsd).toBe(none.totalUsd);
+// The coating follows the plant's data (memory/Sand casting variables) unless the Cost Guide says otherwise: the cores are coated
+// (defaultCoreRefractoryCoatingInclusion), the mould is not (no inclusion default), the drying is the cheaper of the oven (defaultOvenDryAndCoolTime 19 min)
+// and air (defaultAirDryAndCoolTime 60 min). "Not coated" chosen in the Cost Guide coats nothing.
+describe('the coating follows the plant data unless chosen', () => {
+  const coatLines = (r: NonNullable<ReturnType<typeof buildSandRoute>['route']>) => names(r).filter((n) => /Refractory/.test(n));
+
+  it('by default the cores are coated and dried, and the mould is not', () => {
+    const r = buildSandRoute(inputWith(undefined)).route!;
+    expect(coatLines(r)).toEqual(['Core Refractory Coat', expect.stringMatching(/^Refractory Coat (Oven|Air) Dry \(cores\)$/)]);
+    expect(r.complete).toBe(true);
+    expect(buildSandRoute(inputWith(PLANT_REFRACTORY)).route!.totalUsd).toBe(r.totalUsd);
   });
 
-  it('the scenario keys give the settings: a choice from the list, a method, positive numbers; anything else is not chosen', () => {
+  it('with no cores nothing is coated by default; "Not coated" chosen coats nothing', () => {
+    expect(coatLines(buildSandRoute(inputWith(undefined, [])).route!)).toEqual([]);
+    expect(coatLines(buildSandRoute(inputWith(NO_REFRACTORY)).route!)).toEqual([]);
+  });
+
+  it('the drying is the cheaper of the oven and air at the plant\'s drying times', () => {
+    const cost = (dryMethod: 'oven' | 'air', dryMinutes: number) => line(buildSandRoute(inputWith({ coat: 'cores', dryMethod, dryMinutes, pricePerKg: null })).route!, `Refractory Coat ${dryMethod === 'oven' ? 'Oven' : 'Air'} Dry (cores)`)!.totalCost;
+    const cheaper = Math.min(cost('oven', 19), cost('air', 60));
+    const chosen = buildSandRoute(inputWith(undefined)).route!.lines.find((l) => /Dry \(cores\)$/.test(l.process))!;
+    expect(chosen.totalCost).toBe(cheaper);
+  });
+
+  it('a chosen method without a time takes the plant\'s time for that method, and the trace names it', () => {
+    const r = buildSandRoute(inputWith({ coat: 'cores', dryMethod: 'oven', dryMinutes: null, pricePerKg: null })).route!;
+    const dry = line(r, 'Refractory Coat Oven Dry (cores)')!;
+    expect(JSON.stringify(dry.calculationTrace)).toMatch(/defaultOvenDryAndCoolTime/);
+    expect(r.complete).toBe(true);
+  });
+
+  it('the scenario keys give the settings: a choice from the list, a method, positive numbers; anything else is the plant\'s', () => {
     const settings = (o: Record<string, unknown>) => sandScenario({ overrides: o, batchSize: 1, annualVolume: null, productionLifeYears: null }).scenario.refractory;
     expect(settings({ sandRefractoryCoat: 'both', sandRefractoryDryMethod: 'air', sandRefractoryDryMinutes: 30, refractoryCoatingUsdPerKg: 4.5 })).toEqual({ coat: 'both', dryMethod: 'air', dryMinutes: 30, pricePerKg: 4.5 });
-    expect(settings({})).toEqual(NO_REFRACTORY);
-    expect(settings({ sandRefractoryCoat: 'everything', sandRefractoryDryMethod: 'sun', sandRefractoryDryMinutes: -5, refractoryCoatingUsdPerKg: 0 })).toEqual(NO_REFRACTORY);
-  });
-
-  it('a coating needs its drying method and time, and says which is missing', () => {
-    expect(refractorySettingsProblems(NO_REFRACTORY)).toEqual([]);
-    expect(refractorySettingsProblems({ coat: 'mould', dryMethod: null, dryMinutes: null, pricePerKg: null })).toHaveLength(2);
-    expect(refractorySettingsProblems(OVEN)).toEqual([]);
+    expect(settings({ sandRefractoryCoat: 'none' })).toEqual(NO_REFRACTORY);
+    expect(settings({})).toEqual(PLANT_REFRACTORY);
+    expect(settings({ sandRefractoryCoat: 'everything', sandRefractoryDryMethod: 'sun', sandRefractoryDryMinutes: -5, refractoryCoatingUsdPerKg: 0 })).toEqual(PLANT_REFRACTORY);
   });
 });
 
@@ -106,13 +126,14 @@ describe('the mould coated and dried', () => {
     expect(air.complete).toBe(true);
   });
 
-  it('a coating chosen without a drying time is a named gap: the route is incomplete and says which setting is missing', () => {
-    const gapped = buildSandRoute(inputWith({ coat: 'mould', dryMethod: 'oven', dryMinutes: null, pricePerKg: null }, [])).route!;
+  it('with no drying time in the Cost Guide or the plant data, the drying is a named gap: the route is incomplete and says so', () => {
+    const noTimes = Object.create(ref) as typeof ref;
+    noTimes.number = (k: string) => (/DryAndCoolTime$/.test(k) ? null : ref.number(k));
+    const gapped = buildSandRoute({ ...inputWith({ coat: 'mould', dryMethod: 'oven', dryMinutes: null, pricePerKg: null }, []), ref: noTimes }).route!;
     const dry = line(gapped, 'Refractory Coat Oven Dry (mould)')!;
     expect(dry.physicsGap).toBeDefined();
     expect(gapped.complete).toBe(false);
-    expect(gapped.totalUsd).toBeNull();
-    expect(JSON.stringify(dry.machineChoice)).toMatch(/drying time is not set/);
+    expect(JSON.stringify(dry.machineChoice)).toMatch(/drying time/);
   });
 });
 
