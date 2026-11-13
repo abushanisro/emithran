@@ -17,6 +17,19 @@ export const STRUCTURAL_FOAM_CALCULATOR = 'Structural Foam Molding - Cycle Time'
 export const LSR_CALCULATOR = 'Injection Molding - LSR Cycle Time';
 export const COMPRESSION_CALCULATOR = 'Compression Molding - Cycle Time';
 export const RIM_CALCULATOR = 'Reaction Injection Molding - Cycle Time';
+export const DEFLASH_CALCULATOR = 'Injection Molding - Deflashing';
+
+/** Seeds for the deflashing calculator: the CAD parting line length and the reference trimming rate, or the ones that are missing. */
+export function deflashingSeeds(input: { partingLineLengthMm: number | null; rateMmPerS: number | null }): SeedResult {
+  const missing: string[] = [];
+  if (!positive(input.partingLineLengthMm)) missing.push('parting line length (CAD PartingLine feature)');
+  if (!positive(input.rateMmPerS)) missing.push('manual flash trimming rate (cmManualFlashTrimmingRate)');
+  if (missing.length > 0) return { missing };
+  return { seeds: {
+    'Parting Line Length': { value: input.partingLineLengthMm!, source: 'CAD PartingLine feature: measured parting line length' },
+    'Manual Flash Trimming Rate': { value: input.rateMmPerS!, source: `${REF}/variables: cmManualFlashTrimmingRate (compression molding, borrowed for injection; read as mm/s)` },
+  } };
+}
 
 export type SeedResult = { seeds: Record<string, CalcSeed> } | { missing: string[] };
 

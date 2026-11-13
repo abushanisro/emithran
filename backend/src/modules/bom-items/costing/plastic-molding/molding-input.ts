@@ -26,6 +26,12 @@ export type MoldingSummary = DraftSummary & {
 
 const positive = (n: number | null | undefined): number | null => (n != null && n > 0 ? n : null);
 
+/** The measured length of the part's parting line (the PartingLine feature of the plastic feature graph); null when the graph has none. */
+function partingLineLengthMm(graph: MoldingSummary['plasticFeatureGraph']): number | null {
+  const line = graph?.items.find((f) => f.feature_type === 'PartingLine');
+  return positive(Number(line?.attributes?.length_mm));
+}
+
 /** Routing signals from the CAD analysis. A signal the analysis did not produce is null: the router then records a warning instead of assuming one. */
 export function moldingSignals(summary: MoldingSummary, bbox: readonly [number, number, number]): NonNullable<InjectionMoldingCostInput['signals']> {
   const sideActions = sideActionSignals(summary.plasticFeatureGraph);
@@ -43,6 +49,7 @@ export function moldingSignals(summary: MoldingSummary, bbox: readonly [number, 
     slideBundleCount: sideActions?.slideBundles ?? null,
     slideOrLifterBundleCount: sideActions?.slideOrLifterBundles ?? null,
     partingComplexity: summary.partingComplexity ?? null,
+    partingLineLengthMm: partingLineLengthMm(summary.plasticFeatureGraph),
     insertCount: positive(summary.insertCandidateCount),
   };
 }

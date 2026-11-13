@@ -14,7 +14,7 @@ import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
 import { cadEvidenceKey } from '../../shared/cad-evidence';
-import { injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, COMPRESSION_CALCULATOR, RIM_CALCULATOR } from './plastic-cycle-time-seeds';
+import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR } from './plastic-cycle-time-seeds';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
 export function calculatorFingerprint(def: ReferenceCalculatorDef): string {
@@ -44,7 +44,7 @@ export function withRegistryFormulas(trace: readonly CalculationTraceStep[], cal
 }
 
 /** The migrations that create and update the plastic-molding calculators: what to apply to a database that lacks them or holds an older version. */
-export const PLASTIC_CALCULATOR_MIGRATIONS = '975, 976, 977, 1007 and 1008';
+export const PLASTIC_CALCULATOR_MIGRATIONS = '975, 976, 977, 1007, 1008 and 1010';
 
 /**
  * The stored calculator of a name, when it is in the database AND is the version this engine was written for; otherwise why not. A calculator that is not there means the
@@ -107,6 +107,11 @@ function runPress(name: string, seeded: ReturnType<typeof pressCycleTimeSeeds>, 
 /** The cycle of a compression press (press open/close time plus cure time), by the stored calculator. */
 export function runCompressionCycleTime(input: { pressCycleTimeS: number | null; cureTimeMin: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(COMPRESSION_CALCULATOR, pressCycleTimeSeeds(input), calculators);
+}
+
+/** The time to trim the flash off the parting line by hand (length / rate), by the stored calculator. */
+export function runDeflashingTime(input: { partingLineLengthMm: number | null; rateMmPerS: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(DEFLASH_CALCULATOR, deflashingSeeds(input), calculators);
 }
 
 /** The cycle of a reaction injection molding (dry cycle + fill + cure time), by the stored calculator. */

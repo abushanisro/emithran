@@ -274,6 +274,24 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     note: 'Calculator "Reaction Injection Molding - Cycle Time" (F-19 is its Fill Time). A missing or invalid volume or rate makes the cycle a named gap, never a default.',
   },
 
+  {
+    id: 'F-24', version: 1, name: 'Deflashing time (manual flash trimming)',
+    expression: 't = L_parting / r_trim  [s]',
+    outputUnit: 's',
+    inputs: [
+      { name: 'L_parting parting line length', unit: 'mm', source: 'CAD PartingLine feature (cad-engine parting_line_reading_v1)' },
+      { name: 'r_trim manual flash trimming rate', unit: 'mm/s', source: `${MEM}/variables: cmManualFlashTrimmingRate` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/variables/cmManualFlashTrimmingRate (Compression Molding:Manual Flash Trimming//PartingLine)`,
+    assumptions: [
+      'The rate is staged for compression molding and borrowed for injection molding, which has no staged rate.',
+      'The reference types the rate only as Length/Time; it is read as mm/s, the unit that fits the reference\'s other Length/Time rates and a manual trim.',
+      'The whole parting line is trimmed; internal cutouts and the flash thickness are not modelled.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-molding-calculators.json',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
     ['G-01', 'Mold base selection and plate-by-plate steel', 'tblStandardMoldBaseSizes; tool material price and density (AISI P20 1.86 USD/kg, 7850 kg/m3); plate thickness variables; tblCavity/CorePlateDepthBorder; tblEdgeMoldBorderX/Y'],
