@@ -172,9 +172,12 @@ describe('selectAndCost', () => {
     expect(energy).toBeGreaterThan(0);
     expect(r.line.otherCostPerPartUsd).toBeCloseTo(energy, 3); // rounded as every per-part cost (roundPerPart)
     expect(r.line.otherCostDetail).toMatch(/energy/);
+    // what the energy was priced at, and where that price comes from, shown on the line (right panel) without opening the trace
+    expect(r.line.otherCostDetail).toMatch(/at 0\.0851 USD\/kWh \(USA electricity price\)/);
     expect(r.line.totalCost).toBeGreaterThan(0); // was rounded to 0.00 when below a cent
     // A casting's share of the furnace can be milliseconds: the line keeps it (it was rounded to 0.000 min, and Apply refused the line).
     expect(r.line.cycleTimeMin).toBeGreaterThan(0);
+    expect(r.line.featureBreakdown![0]!.timeSec).toBeGreaterThan(0);
     expect(r.line.cycleTimeMin * 60).toBeCloseTo(r.outcome!.sec, 1); // 0.001 min from there up
     expect(r.line.totalCost).toBeCloseTo((r.line.setupCost ?? 0) + (r.line.runCost ?? 0), 2);
   });

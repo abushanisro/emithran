@@ -6,7 +6,7 @@
 // time neither set nor in the data is a named gap; the coating has no price in the data, so it is costed for time and drying only and says so.
 import type { CostContext } from '../casting-finishing';
 import type { CostedStep, SandRouteContext, StepOutcome } from './sand-steps';
-import { runStep, selectAndCost } from './sand-steps';
+import { energyBasisOf, runStep, selectAndCost } from './sand-steps';
 import type { SandFinishContext } from './sand-finishing-steps';
 import { machineValue, type SandMachine } from './sand-machines';
 import { valuesProvider } from './sand-seeds';
@@ -144,7 +144,7 @@ export function dryStep(ctx: SandFinishContext, m: SandMachine, method: DryMetho
   if (perLoad == null || perLoad < 1) return fail(`one item (${(itemVolumeMm3 / 1e9).toFixed(3)} m³) does not fit the bed less racking`);
   const kwh = r.run.outputs['Energy'] ?? 0;
   const notes = kwh > 0 && !priced ? [`The drying energy (${kwh.toFixed(3)} kWh per casting) is not charged: no energy price for the location or in the Cost Guide.`] : [];
-  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? kwh * ctx.energyPricePerKwh! : 0, notes };
+  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? kwh * ctx.energyPricePerKwh! : 0, notes, ...(priced && kwh > 0 ? { energyBasis: energyBasisOf(ctx) } : {}) };
 }
 
 /** Gluing the cores of a casting into an assembly: one glue for each core after the first. */

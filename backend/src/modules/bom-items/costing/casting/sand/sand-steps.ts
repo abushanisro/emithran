@@ -8,7 +8,7 @@ import type { MachineChoiceDto } from '../../../dto/cost-breakdown.dto';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
-import { gap, line, roundLineCost, type CostContext } from '../casting-finishing';
+import { gap, line, roundLineCost, roundSec, type CostContext } from '../casting-finishing';
 import { machineChoice, roundPerPart, type ChoiceEval } from '../machine-choice';
 import { asFinishingMachine, machineValue, type SandMachine } from './sand-machines';
 import { pouringCoefficient } from './sand-gating';
@@ -72,7 +72,7 @@ export interface SandRouteContext {
 }
 
 export type StepOutcome =
-  | { ok: true; sec: number; run: ReferenceCalcRun; energyCostUsd: number; notes: string[]; /** Material used by the step (the refractory coating), USD per casting, added to the run cost. */ materialCostUsd?: number }
+  | { ok: true; sec: number; run: ReferenceCalcRun; energyCostUsd: number; notes: string[]; /** Material used by the step (the refractory coating), USD per casting, added to the run cost. */ materialCostUsd?: number; /** The energy price the energy was charged at, and its source (energyBasisOf). */ energyBasis?: string }
   | { ok: false; reasons: string[] };
 
 const fail = (...reasons: string[]): StepOutcome => ({ ok: false, reasons });
@@ -197,7 +197,7 @@ export function meltStep(ctx: SandRouteContext, furnace: SandMachine): StepOutco
   const energy = r.run.outputs['Energy Cost'];
   if (energy == null) return fail(`${MELTING} has no Energy Cost`);
   return {
-    ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? energy : 0,
+    ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? energy : 0, ...(priced ? { energyBasis: energyBasisOf(ctx) } : {}),
     notes: priced ? [] : ['Melting energy is not charged: the location has no electricity price (location_electricity_prices) and none is set in the Cost Guide.'],
   };
 }
@@ -236,6 +236,11 @@ export interface CostedStep {
   warnings: string[];
 }
 
+/** The energy price a step's energy is charged at, with where it comes from, for the line (the trace has it too). */
+export function energyBasisOf(ctx: Pick<SandRouteContext, 'energyPricePerKwh' | 'energyPriceSource'>): string | undefined {
+  return ctx.energyPricePerKwh != null ? `${ctx.energyPricePerKwh} USD/kWh (${ctx.energyPriceSource ?? 'energy price'})` : undefined;
+}
+
 /**
  * The cheapest capable machine for a step, costed as a casting line. Preferred machines come first when the data's
  * usePreferredMachines says so. With no capable machine the line is a named gap carrying every machine's reason.
@@ -258,14 +263,14 @@ export function selectAndCost(input: {
     const base = line({
       process: input.process, processGroup: SAND_PROCESS_GROUP, processRoute: input.process, machineClass: input.machineClass,
       machine: asFinishingMachine(m), sec: outcome.sec, batchSize: input.batchSize, costContext: input.costContext, warnings: [], run: outcome.run,
-      breakdown: `${input.process}: ${r2(outcome.sec)} s per casting${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
+      breakdown: `${input.process}: ${roundSec(outcome.sec)} s per casting${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
     });
     // Charged beyond time: the step's energy and material, its own figure on the line (stored and shown), kept below a cent.
     const material = outcome.materialCostUsd ?? 0;
     const other = outcome.energyCostUsd + material;
     const detail = [outcome.energyCostUsd ? `energy ${roundPerPart(outcome.energyCostUsd)}` : '', material ? `material ${roundPerPart(material)}` : ''].filter(Boolean).join(' + ');
     const costed: ProcessLineCost = other
-      ? { ...base, runCost: roundLineCost(base.runCost + other), totalCost: roundLineCost(base.totalCost + other), otherCostPerPartUsd: roundPerPart(other), otherCostDetail: `${detail} USD per casting` }
+      ? { ...base, runCost: roundLineCost(base.runCost + other), totalCost: roundLineCost(base.totalCost + other), otherCostPerPartUsd: roundPerPart(other), otherCostDetail: `${detail} USD per casting${outcome.energyBasis ? ` at ${outcome.energyBasis}` : ''}` }
       : base;
     return { m, outcome, costed };
   });

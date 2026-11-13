@@ -40,6 +40,8 @@ const num = (v: unknown): number | null => (v == null || v === '' || !Number.isF
 const r2 = (n: number) => Math.round(n * 100) / 100;
 /** A cycle time in minutes: to 0.001 min from there up, its significant figures below (a casting's share of a furnace's melt can be milliseconds). */
 const roundCycleMin = (m: number) => (Math.abs(m) >= 0.001 ? r3(m) : m === 0 ? 0 : Number(m.toPrecision(3)));
+/** Seconds: two decimals from 0.01 s up, three significant figures below (a few milliseconds of a furnace's melt is not 0 s). */
+export const roundSec = (s: number) => (Math.abs(s) >= 0.01 ? r2(s) : s === 0 ? 0 : Number(s.toPrecision(3)));
 /** A line's cost: to the cent from a cent up, its significant figures below (a fraction of a cent, such as one casting's share of a furnace, is not 0). */
 export const roundLineCost = (n: number) => (Math.abs(n) >= 0.01 ? r2(n) : roundPerPart(n));
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -70,7 +72,7 @@ export function line(args: {
     cycleTimeMin: roundCycleMin(args.sec / 60), setupTimeMin: r3(setup.setupMin), setupTimeSource: setup.source, operators: ops,
     hourlyRate: m.machineRatePerHr!, rateSource: 'mhr_database', machineClass: args.machineClass, machineName: m.name,
     commodityCode: null, labourRate: m.labourRatePerHr, mhrId: m.id,
-    featureBreakdown: [{ name: args.breakdown, featureType: 'Part', timeSec: r2(args.sec), count: 1 }],
+    featureBreakdown: [{ name: args.breakdown, featureType: 'Part', timeSec: roundSec(args.sec), count: 1 }],
     ...(args.run ? runOnLine(args.run) : {}),
   };
 }

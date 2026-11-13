@@ -69,12 +69,12 @@ export function SandCastingSection({ overrides, onChange }: Props) {
   const [open, setOpen] = useState(overridden > 0);
   return (
     <div className="space-y-1">
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        Automatic: moulding, cores and cavities from the CAD analysis; energy, coating and drying from the plant data; hot box from published values.
-      </p>
       <details open={open} onToggle={(e) => { setOpen(e.currentTarget.open); }}>
-        <summary className="cursor-pointer select-none text-[11px] font-medium text-brand-500 hover:text-brand-400">
-          {overridden > 0 ? `Overrides (${overridden} set)` : 'Override a setting'}
+        <summary
+          className="cursor-pointer select-none text-[11px] text-muted-foreground"
+          title="Moulding, cores and cavities from the CAD analysis; energy, coating and drying from the plant data; hot box from published values. What was used is on each line of the Cost tab."
+        >
+          Sand settings: {overridden > 0 ? `${overridden} overridden` : 'automatic'} · <span className="font-medium text-brand-500 hover:text-brand-400">Override</span>
         </summary>
         <div className="space-y-1 pt-1">
       <div className={rowClass}>
