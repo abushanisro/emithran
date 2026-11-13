@@ -19,8 +19,6 @@ import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
 import { SandSnapshotsPanel } from '@/components/costing/SandSnapshotsPanel';
 import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
 import { MachiningAllowancePanel } from '@/components/features/casting-viewer/MachiningAllowancePanel';
-import { useCastingAnalyses, useRequestCastingAnalysis } from '@/lib/api/hooks/useCastingAnalyses';
-import { analysisState, requestFailure } from '@/lib/casting/analysis-view';
 import { GcdToleranceTab } from '@/components/features/manufacturing-intelligence/GcdToleranceTab';
 import { MachineChoicePanel } from '@/components/features/manufacturing-intelligence/MachineChoicePanel';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
@@ -37,11 +35,13 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
-import { analysisNotReadyMessage, applyBlockReason } from '@/lib/analysis/analysis-status';
+import { applyGate } from '@/lib/analysis/analysis-status';
+import { cueRefreshAnalysis } from '@/lib/analysis/refresh-analysis-cue';
+import { RefreshAnalysisButton } from '@/components/features/analysis/RefreshAnalysisButton';
+import { SandRouteSummary } from '@/components/costing/SandRouteSummary';
 import { QuoteValidationNote } from '@/components/features/manufacturing-intelligence/QuoteValidationNote';
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
-import { useAnalysisRun } from '@/lib/api/hooks/useAnalysisRun';
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
@@ -1832,6 +1832,14 @@ function CostSummaryTab({
       {/* ── The cost sections below are the working view; the applied cost as a full table opens from here. ── */}
       <CostTablePanel itemId={item.id} refreshKey={costUpdatedAt} display={{ symbol: sym, fromUsd }} />
 
+      {/* Sand casting: what the route decided (machine, how the part was measured, cavities, cores, the machines compared). */}
+      {cost.sandCasting && (
+        <>
+          <SectionHeader label="Sand Casting Route" />
+          <div className="pl-2 pb-2"><SandRouteSummary route={cost.sandCasting} /></div>
+        </>
+      )}
+
       {/* ── DIRECT MATERIAL ── editable via RawMaterialsSection ── */}
       <SectionHeader label="Direct Material Costs" />
 
@@ -2486,6 +2494,21 @@ function CostSummaryTab({
         <ToolingSection bomItemId={item.id} bomItem={item} compact currencySymbol={sym} conversionRate={fromUsd} />
       </div>
 
+      {/* Sand casting: freeze this cost for review (a different member approves or rejects it). */}
+      {cost.sandCasting && (
+        <>
+          <SectionHeader label="Frozen Costs and Review" />
+          <div className="pl-2 pb-2">
+            <SandSnapshotsPanel
+              bomItemId={item.id}
+              location={factory}
+              batchSize={batchSize}
+              productionLifeYears={cost.resolvedInputs.productionLifeYears ?? undefined}
+            />
+          </div>
+        </>
+      )}
+
       {/* ── Grand total footer ── */}
       <div className="flex items-baseline justify-between pt-3 mt-1 border-t-2 border-border">
         <span className="text-base font-bold text-foreground">Total Manufacturing Cost</span>
@@ -2536,9 +2559,9 @@ function RouteComparisonCard({
   // removed Candidate Routes panel used, so "Apply Route" here now actually
   // commits the change server-side instead of only updating local UI state.
   const applyRoute = useApplyRoute(item.id);
+  // Apply never starts an analysis: on a part that is not analysed it points at Refresh analysis (top bar).
   const analysisStatus = useAnalysisStatus(item.id);
-  const applyBlock = applyBlockReason(analysisStatus.data);
-  const analysisRun = useAnalysisRun(item.id);
+  const gate = applyGate(analysisStatus.data);
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
@@ -2843,25 +2866,21 @@ function RouteComparisonCard({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (gate.kind === 'analyse') { cueRefreshAnalysis(); toast.warning(gate.reason); return; }
                       if (route.routeId) {
-                        // The route is computed from the part's analysis: the backend makes it current first (a no-op when it is).
-                        void analysisRun.mutateAsync().then((run) => {
-                          const notReady = analysisNotReadyMessage(run.status);
-                          if (notReady) { toast.error(notReady); return; }
-                          applyRoute.mutate({ routeId: route.routeId!, batchSize: comparison.resolvedInputs.batchSize, location: factory });
-                          onAppliedRouteChange(route.routeId);
-                          setSelectedRouteId(null);
-                        }).catch((err: unknown) => { toast.error(`Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`); });
+                        applyRoute.mutate({ routeId: route.routeId, batchSize: comparison.resolvedInputs.batchSize, location: factory });
+                        onAppliedRouteChange(route.routeId);
+                        setSelectedRouteId(null);
                         return;
                       }
                       onAppliedRouteChange(route.routeId);
                       setSelectedRouteId(null);
                     }}
-                    disabled={applyRoute.isPending || analysisRun.isPending || applyBlock != null}
-                    title={applyBlock ?? undefined}
+                    disabled={applyRoute.isPending || gate.kind === 'wait'}
+                    title={gate.kind === 'ok' ? undefined : gate.reason}
                     className="text-xs px-3 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 font-medium transition-colors disabled:opacity-50"
                   >
-                    {analysisRun.isPending ? 'Analysing…' : applyRoute.isPending ? 'Applying…' : 'Apply Route'}
+                    {applyRoute.isPending ? 'Applying…' : 'Apply Route'}
                   </button>
                 </div>
               )}
@@ -4774,10 +4793,10 @@ function CostGuidePanel({
   type LeftTab = 'scenario' | 'geo' | 'gdt' | 'features' | 'machine';
   const [tab, setTab] = useState<LeftTab>('scenario');
   const [leftAppliedRouteId, setLeftAppliedRouteId] = useState<string | null>(null);
-  // Apply Scenario starts with the analysis: the backend makes it current (a no-op when it is), so the user never starts one by hand. It only waits
-  // while the casting analysis it started is still running.
+  // Apply needs an analysed part: it never starts an analysis (Refresh analysis, top bar, does), waits while the casting analysis runs, and on a
+  // part that is not analysed points at Refresh analysis instead of applying.
   const analysisStatus = useAnalysisStatus(item.id);
-  const applyBlock = applyBlockReason(analysisStatus.data);
+  const gate = applyGate(analysisStatus.data);
   const [productLine, setProductLine] = useState('');
   const [matPickerOpen, setMatPickerOpen] = useState(false);
   // Apply Scenario confirmation + progress — the apply-route/apply-custom-route
@@ -4987,10 +5006,7 @@ function CostGuidePanel({
   };
   const updateBOMItem = useUpdateBOMItem();
   const patchScenarioOverrides = usePatchScenarioOverrides();
-  // A sand-cast part's casting analysis: only read (and polled) for sand casting.
   const isSandCast = cgpCostSummary?.family === 'sand_cast';
-  const castingAnalyses = useCastingAnalyses(isSandCast ? item.id : undefined);
-  const requestCastingAnalysis = useRequestCastingAnalysis(isSandCast ? item.id : undefined);
   const isCastingProcess = isCastingProcessGroup(selectedProcessGroup);
   // limit 1000 is the key the Edit Process Cost dialog reads: one shared request, not nine pages.
   const { data: processCatalog } = useProcessCalculatorMappings({ limit: 1000 });
@@ -5529,25 +5545,7 @@ function CostGuidePanel({
               <Section title="Sand Casting">
                 <SandCastingSection
                   overrides={item.scenarioOverrides}
-                  route={cgpCostSummary?.sandCasting}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
-                  analysis={{
-                    state: analysisState(castingAnalyses.data, Date.now()),
-                    onRequest: () => { requestCastingAnalysis.mutate(); },
-                    requesting: requestCastingAnalysis.isPending,
-                    error: requestCastingAnalysis.isError ? requestFailure(requestCastingAnalysis.error) : null,
-                  }}
-                />
-              </Section>
-            )}
-
-            {isSandCast && (
-              <Section title="Frozen Costs and Review">
-                <SandSnapshotsPanel
-                  bomItemId={item.id}
-                  location={factory}
-                  batchSize={batchSize}
-                  productionLifeYears={productionLife ?? undefined}
                 />
               </Section>
             )}
@@ -5662,9 +5660,12 @@ function CostGuidePanel({
         )}
         <div className="flex gap-1.5">
           <button
-            onClick={() => { setConfirmApplyOpen(true); }}
-            disabled={isApplying || applyBlock != null}
-            title={applyBlock ?? undefined}
+            onClick={() => {
+              if (gate.kind === 'analyse') { cueRefreshAnalysis(); toast.warning(gate.reason); return; }
+              setConfirmApplyOpen(true);
+            }}
+            disabled={isApplying || gate.kind === 'wait'}
+            title={gate.kind === 'ok' ? undefined : gate.reason}
             className="flex-1 text-xs bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded px-2 py-1 font-medium transition-colors flex items-center justify-center gap-1.5"
           >
             {isApplying ? 'Applying…' : 'Apply'}
@@ -5672,7 +5673,7 @@ function CostGuidePanel({
           <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">Copy</button>
           <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">New</button>
         </div>
-        {applyBlock && <p role="status" className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">{applyBlock}</p>}
+        {gate.kind !== 'ok' && <p role="status" className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">{gate.reason}</p>}
       </div>
 
       {/* Confirm before committing — apply-route/apply-custom-route re-runs the
@@ -9689,6 +9690,7 @@ export default function ManufacturingIntelligencePage() {
       <div className="w-px h-4 bg-border mx-0.5 shrink-0" />
 
       {/* Action buttons */}
+      <RefreshAnalysisButton itemId={item.id} hasFile={!!item.file3dPath} />
       <button
         onClick={() => { void handleRecalculateCost(); }}
         disabled={recalculating}

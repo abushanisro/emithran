@@ -21,8 +21,8 @@ export interface AnalysisRunResult {
 }
 
 /**
- * Makes an item's analysis current: runs exactly what the analysis status says is missing, and nothing else. It is the first step of Apply
- * Scenario (the route and the material cost are computed from the part's analysis), so a user never has to start an analysis by hand.
+ * Makes an item's analysis current: runs exactly what the analysis status says is missing, and nothing else. The user starts it (Refresh
+ * analysis); Apply Scenario and Apply Route refuse a part that is not analysed (RouteApplicationService.requireAnalysis) and never start it.
  *
  * Idempotent: with every analysis current it does no work. Single flight per item: a second call while one is running waits for it and gets the
  * same result, so a double click or two tabs cannot run the CAD engine twice. (One process: with several API instances the engine's own

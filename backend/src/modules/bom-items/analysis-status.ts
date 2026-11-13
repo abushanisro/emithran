@@ -15,7 +15,7 @@ export type MissingAnalysis = 'cad_features' | 'casting_analysis';
 
 /** What to tell the user to run, for each missing analysis. */
 export const MISSING_ANALYSIS_TEXT: Readonly<Record<MissingAnalysis, string>> = {
-  cad_features: 'the CAD features must be extracted (Apply Scenario does this)',
+  cad_features: 'the CAD features must be extracted (Refresh analysis does this)',
   casting_analysis: 'the casting analysis must finish',
 };
 

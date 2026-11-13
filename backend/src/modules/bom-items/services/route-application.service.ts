@@ -44,7 +44,7 @@ export class RouteApplicationService {
    * An apply writes a route from the part's analysis: refuse it until every analysis the part needs is finished and current. A route
    * computed without the CAD features rests on a bounding box and a guess, and is not the part's.
    */
-  private async requireAnalysis(id: string, user: User, token: string): Promise<void> {
+  async requireAnalysis(id: string, user: User, token: string): Promise<void> {
     const status = await this.analysisStatusService.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
     if (status.ready) return;
     throw new ConflictException({
