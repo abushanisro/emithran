@@ -78,6 +78,14 @@ export interface MoldingCommonFacts {
   calculators: InjectionMoldingCostInput['calculators'];
   /** The part's own calculator field values (calculator_field_overrides, migration 1011). */
   calculatorOverrides?: InjectionMoldingCostInput['calculatorOverrides'];
+  /** The CAD face count (cadFaceCount below): decides the mold complexity. */
+  cadFaceCount?: number | null;
+}
+
+/** The CAD face count of an analysed part (feature_graph.face_graph.face_attributes); null when the analysis holds none. */
+export function cadFaceCount(featureGraph: unknown): number | null {
+  const faces = (featureGraph as { face_graph?: { face_attributes?: unknown } } | null | undefined)?.face_graph?.face_attributes;
+  return Array.isArray(faces) && faces.length > 0 ? faces.length : null;
 }
 
 export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInput {
@@ -100,6 +108,7 @@ export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInp
     cavityCountOverride: f.cavityCountOverride,
     calculators: f.calculators,
     calculatorOverrides: f.calculatorOverrides ?? null,
+    cadFaceCount: f.cadFaceCount ?? null,
     // Tooling amortisation: both come from the canonical costing-input resolver, never re-read from the item.
     annualVolume: f.annualVolume ?? undefined,
     productionLifeYears: f.productionLifeYears,

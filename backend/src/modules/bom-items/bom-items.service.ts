@@ -46,7 +46,7 @@ import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
 import { PlasticRouteComparisonService, assignMoldingRouteBadges } from './costing/plastic-molding/plastic-route-comparison.service';
 import { routeCompatibility, noCompatibleProcess, NO_COMPATIBLE_PROCESS_MESSAGE } from './costing/plastic-molding/operation/route-compatibility';
-import { buildMoldingCommonInput } from './costing/plastic-molding/molding-input';
+import { buildMoldingCommonInput, cadFaceCount } from './costing/plastic-molding/molding-input';
 import { injectionMoldabilityGap } from '../raw-materials/material-moldability';
 import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
 import { SecondaryProcessService } from './services/secondary-process.service';
@@ -4340,7 +4340,7 @@ export class BOMItemsService {
         ...buildMoldingCommonInput({
           calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
           calculatorOverrides: overridesByCalculator(await CalculatorFieldOverridesService.rows(this.databaseService.getClient(accessToken), id)),
-          item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
+          item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
           material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
           plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
           currencySymbol: locInfo.symbol,

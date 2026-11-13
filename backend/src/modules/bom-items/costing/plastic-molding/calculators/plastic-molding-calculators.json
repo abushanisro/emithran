@@ -547,7 +547,7 @@
     {
       "key": "injection_mold_tooling",
       "name": "Injection Mold - Tooling",
-      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Not modelled yet, because the reference holds the data but no formula: core and cavity blocks, slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops and try-out (registry G-02 to G-08).",
+      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Cavity and core (formula registry F-26, ASSUMED): machined at tblHrsPerSqInch{Simple,Average,Complex} hours per square inch of part surface, the complexity from the CAD face count against cmMoldSurfaceCountThreshold{Simple,Average} (staged for compression molding and borrowed: the injection process states no rule), times the cavities, at the machining rate; polished to the default cavity finish (defaultCavityFinishIM, SPIFinishes hours per square meter) at the assembly (bench) rate, as no polishing rate is on file. Not modelled yet, because the reference holds the data but no formula: slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops and try-out (registry G-03 to G-08).",
       "operations": [],
       "helper": true,
       "output": "Tooling Cost Per Part",
@@ -559,9 +559,13 @@
         "Tooling Investment",
         "Mold Base Steel Mass",
         "Mold Base Steel Cost",
-        "Mold Stack Height"
+        "Mold Stack Height",
+        "Cavity Machining Hours",
+        "Cavity Machining Cost",
+        "Polish Hours",
+        "Polish Cost"
       ],
-      "version": 2,
+      "version": 3,
       "fields": [
         {
           "name": "Purchased Components Cost",
@@ -753,6 +757,27 @@
           }
         },
         {
+          "name": "Part Surface Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "the part's surface area"
+          }
+        },
+        {
+          "name": "Cavity Machining Hours Per Sq In",
+          "unit": "h/in²",
+          "source": {
+            "lookup": "tblHrsPerSqInch{Simple,Average,Complex}: the mold complexity (CAD face count against cmMoldSurfaceCountThreshold{Simple,Average}) and the first row covering the part surface area"
+          }
+        },
+        {
+          "name": "Polish Hours Per Sq Meter",
+          "unit": "h/m²",
+          "source": {
+            "lookup": "SPIFinishes: the default cavity finish (defaultCavityFinishIM)"
+          }
+        },
+        {
           "name": "Machining Hours",
           "unit": "h",
           "formula": "{Mold Base Area} / 1000000 / {Plate Machining Rate} * 2 + {Plate Setup Hours}"
@@ -803,9 +828,29 @@
           "formula": "{Mold Base Steel Mass} * {Tool Steel Price} * {Mold Base Cost Factor}"
         },
         {
+          "name": "Cavity Machining Hours",
+          "unit": "h",
+          "formula": "{Part Surface Area} / 645.16 * {Cavity Machining Hours Per Sq In} * {Cavities per Mold}"
+        },
+        {
+          "name": "Cavity Machining Cost",
+          "unit": "USD",
+          "formula": "{Cavity Machining Hours} * {Machining Rate}"
+        },
+        {
+          "name": "Polish Hours",
+          "unit": "h",
+          "formula": "{Part Surface Area} / 1000000 * {Polish Hours Per Sq Meter} * {Cavities per Mold}"
+        },
+        {
+          "name": "Polish Cost",
+          "unit": "USD",
+          "formula": "{Polish Hours} * {Assembly Rate}"
+        },
+        {
           "name": "Mold Cost",
           "unit": "USD",
-          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost}"
+          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost} + {Cavity Machining Cost} + {Polish Cost}"
         },
         {
           "name": "Lifetime Shots",
@@ -828,7 +873,7 @@
           "formula": "floor({Tooling Investment} / ({Annual Volume} * {Production Life}) * 10000 + 0.5) / 10000"
         }
       ],
-      "migration": 1013
+      "migration": 1014
     }
   ]
 }

@@ -53,6 +53,8 @@ export const PLASTIC_VARIABLE_KEYS = [
   // The mold base and its plate stack (mold-base.ts).
   'aPlateFlatCavityRatio', 'aPlateMinThickness', 'bPlateMinThickness', 'betweenPartsMoldBorder',
   'topClampPlateThickness', 'bottomClampPlateThickness', 'supportPlateThickness', 'useMetricOrImperialValues',
+  // The cavity and core: machining by complexity and the polish of the default finish (mold-cavity.ts).
+  'defaultCavityFinishIM', 'cmMoldSurfaceCountThresholdSimple', 'cmMoldSurfaceCountThresholdAverage',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -68,6 +70,7 @@ export const PLASTIC_LOOKUP_KEYS = [
   'layoutNumCav',
   'tblStandardMoldBaseSizes', 'tblEdgeMoldBorderX', 'tblEdgeMoldBorderY', 'tblCavityPlateDepthBorder', 'tblCorePlateDepthBorder',
   'digital_factory_tool_materials_usa',
+  'tblHrsPerSqInchSimple', 'tblHrsPerSqInchAverage', 'tblHrsPerSqInchComplex', 'SPIFinishes',
 ] as const;
 
 /** The reference material whose melt density converts GPPS-rated shot size (see header). */
@@ -136,7 +139,15 @@ export interface MoldBaseReference {
   supportPlateMm: number;
   /** digital_factory_settings_usa defaultToolMaterialName, and its row of digital_factory_tool_materials_usa. */
   steel: { name: string; densityKgM3: number; priceUsdPerKg: number; moldBaseCostFactor: number };
+  /** tblHrsPerSqInch{Simple,Average,Complex}: cavity machining hours per square inch of part surface, by the surface area (in2, the first row covering it). */
+  cavityHoursPerSqInByComplexity: Record<MoldComplexity, Array<{ upToSqIn: number; hoursPerSqIn: number }>>;
+  /** cmMoldSurfaceCountThreshold{Simple,Average}: the face counts up to which a part is simple, then average (staged for compression molding). */
+  complexityFaceThresholds: { simple: number; average: number };
+  /** defaultCavityFinishIM and its SPIFinishes row: the polish hours per square meter of cavity surface. */
+  finish: { name: string; hoursPerSqM: number };
 }
+
+export type MoldComplexity = 'Simple' | 'Average' | 'Complex';
 
 export interface PlasticReference {
   /** The staged dataset these rows belong to (e.g. '2026-Plastic') and a fingerprint of the exact rows read: a saved calculation records both (calculation-snapshot.ts). */
@@ -342,6 +353,20 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
   const steelName = typeof settings?.['defaultToolMaterialName'] === 'string' ? settings['defaultToolMaterialName'] : null;
   const steelRow = table('digital_factory_tool_materials_usa').find((r) => r['name'] === steelName);
   if (!steelRow) missing.push(`digital_factory_tool_materials_usa: the default tool material ${steelName ?? '(defaultToolMaterialName not set)'}`);
+  const hoursByArea = (key: string, label: string) => table(key)
+    .map((r) => ({ upToSqIn: num(r[`Surface Area ${label} (in^2)`]) ?? NaN, hoursPerSqIn: num(r[`Hrs Per Sq Inch ${label} (hr)`]) ?? NaN }))
+    .sort((a, b) => a.upToSqIn - b.upToSqIn);
+  const cavityHoursPerSqInByComplexity = {
+    Simple: hoursByArea('tblHrsPerSqInchSimple', 'Simple'),
+    Average: hoursByArea('tblHrsPerSqInchAverage', 'Average'),
+    Complex: hoursByArea('tblHrsPerSqInchComplex', 'Complex'),
+  };
+  if (Object.values(cavityHoursPerSqInByComplexity).some((rows) => rows.length === 0 || rows.some((r) => !(r.upToSqIn > 0 && r.hoursPerSqIn > 0)))) {
+    missing.push('tblHrsPerSqInch{Simple,Average,Complex}: non-numeric cell');
+  }
+  const finishName = text.get('defaultCavityFinishIM') ?? null;
+  const finishRow = table('SPIFinishes').find((r) => r['Finish Name'] === finishName);
+  if (!finishRow) missing.push(`SPIFinishes: the default cavity finish ${finishName ?? '(defaultCavityFinishIM not set)'}`);
   const moldBase: MoldBaseReference = {
     bases, system: system ?? 'Metric', edgeBorderXByKn, edgeBorderYByKn, cavityDepthBorderByKn, coreDepthBorderByKn, layouts,
     betweenPartsMm: variable('betweenPartsMoldBorder'), aPlateCavityRatio: variable('aPlateFlatCavityRatio'),
@@ -351,6 +376,9 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       name: steelName ?? '', densityKgM3: num(steelRow?.['densityKgPerM3']) ?? NaN, priceUsdPerKg: num(steelRow?.['materialCostUsdPerKg']) ?? NaN,
       moldBaseCostFactor: num(steelRow?.['moldBaseCostFactor']) ?? NaN,
     },
+    cavityHoursPerSqInByComplexity,
+    complexityFaceThresholds: { simple: variable('cmMoldSurfaceCountThresholdSimple'), average: variable('cmMoldSurfaceCountThresholdAverage') },
+    finish: { name: finishName ?? '', hoursPerSqM: num(finishRow?.['Hrs Per Sq Meter (hr / m^2)']) ?? NaN },
   };
 
   const fillFactors = (attribute: string) => table('injectionTimeAdjustmentFactors')

@@ -314,9 +314,28 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'process/mold-base.ts',
   },
 
+  {
+    id: 'F-26', version: 1, name: 'Cavity and core machining and polish',
+    expression: 'complexity = faces <= simple ? Simple : faces <= average ? Average : Complex;  machining = A_in2 x h_per_in2(complexity, A) x cavities x machining rate;  polish = A_m2 x h_per_m2(finish) x cavities x assembly rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'A part surface area', unit: 'mm2', source: 'CAD' },
+      { name: 'faces', unit: 'count', source: 'CAD face count (face_graph.face_attributes)' },
+      { name: 'simple, average', unit: 'count', source: `${MEM}/variables: cmMoldSurfaceCountThreshold{Simple,Average} (compression molding, borrowed)` },
+      { name: 'h_per_in2', unit: 'h/in2', source: `${MEM}/lookup: tblHrsPerSqInch{Simple,Average,Complex}` },
+      { name: 'h_per_m2', unit: 'h/m2', source: `${MEM}/lookup/SPIFinishes: defaultCavityFinishIM` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/lookup + variables`,
+    assumptions: [
+      'The face-count complexity thresholds are staged for compression molding and borrowed: the injection process states no rule.',
+      'The machining hours cover the whole part surface (cavity and core halves) for each cavity; the polish is charged at the assembly (bench) rate, as no polishing rate is on file.',
+    ],
+    state: 'ASSUMED', implementedIn: 'process/mold-cavity.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
-    ['G-02', 'Core and cavity blocks', 'plate depth tables; cmToolMachiningRates; EDM rates; tblHrsPerSqInch*'],
     ['G-03', 'Slides and lifters', 'tblSlideSizes; slide* and lifter* variables; costPerHydraulicEjector; slideCycleRate'],
     ['G-04', 'EDM and heat treatment', 'edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],

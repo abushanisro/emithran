@@ -892,6 +892,9 @@ export interface ToolingCostDto {
   moldsRequired?: number;
   /** The mold base plate steel in one mold, USD (formula registry F-25). */
   moldBaseSteelUsd?: number;
+  /** The cavity and core machining and their polish in one mold, USD (formula registry F-26). */
+  moldCavityMachiningUsd?: number;
+  moldPolishUsd?: number;
   /** The tooling calculator's run (migration 1012): every input with its source and every formula with its value. */
   calculationTrace?: CalculationTraceStep[];
   /** The tooling calculator's name: a part's own field values are set by it (calculator_field_overrides). */

@@ -80,7 +80,7 @@ describe('plastic formula registry', () => {
     expect(weakestState(['ASSUMED', 'UNSUPPORTED', 'VALIDATED'])).toBe('UNSUPPORTED');
   });
 
-  it('records what the model cannot yet compute (the register of README section 8): G-02 to G-11 (G-01, the mold base, is F-25)', () => {
-    expect(unsupported.map((f) => f.id)).toEqual(['G-02', 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08', 'G-09', 'G-10', 'G-11']);
+  it('records what the model cannot yet compute (the register of README section 8): G-03 to G-11 (G-01 is F-25, G-02 is F-26)', () => {
+    expect(unsupported.map((f) => f.id)).toEqual([ 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08', 'G-09', 'G-10', 'G-11']);
   });
 });
