@@ -42,6 +42,8 @@ function absPart(overrides: Partial<InjectionMoldingCostInput> = {}): InjectionM
     machineClampTonnes: MID.maxTonnage, machineShotCapacityG: MID.shotCapacityGrams, pressTiming: MID.timing, goodPartYield: MID.goodPartYield,
     calculators: plasticMoldingCalculatorsByName(),
     materialClamp: ABS_CLAMP, realResinInputs: ABS_RESIN, materialType: 'ABS', plasticReference: REF, location: 'USA',
+    // The part's box: 100 x 100 mm on the parting plane (the 10,000 mm2 projected area), 30 mm along the pull.
+    bboxMaxMm: 100, bboxMidMm: 100, bboxMinMm: 30,
     signals: { projectedAreaMm2: 10_000, undercutCount: 0 },
     ...overrides,
   };
@@ -181,12 +183,15 @@ describe('cost summary: worked ABS part', () => {
     expect(r.totalCost).toBeCloseTo(material + run, 6);
   });
 
-  it('tooling, USA, 10,000/yr x 3 yr: mold BOM 2,140 + labour 2,398.67 = 4,538.67, one mold (ABS 144,000 shots), 0.1513 per part', () => {
+  it('tooling, USA, 10,000/yr x 3 yr: mold BOM 2,140 + labour 2,398.67 + base steel 871.56 = 5,410.23, one mold (ABS 144,000 shots), 0.1803 per part', () => {
     // BOM (no undercut: no Hydraulic Cylinder / Side Lock; Ejector Pin has no quantity; Electrical has no cost):
     //   Air Poppet 25x30 + Ejector Guide Pin Bushing 30x6 + Guide Bush 100x4 + Guide Pin 100x4 + Limit Switch 50x4 + Return Pin 35x6 = 2,140
     // design 3.24 h (area <= 59,253 mm2) x 64.73 = 209.73
     // machining 0.01 m2 / 0.32 x 2 + 4 setup h = 4.0625 h x 100.55 = 408.46
     // assembly 0.006x30 + 2x6 + 1x4(pins 0.25x4) + 4 + 6 = 23.18 h x 76.81 = 1,780.48 (Guide Bush has no assembly time)
+    // base steel: 100 x 100 mm part, 1,300 kN press: edge borders 140 / 152 mm -> 380 x 404 mm -> standard base 396 x 446 mm;
+    //   depth borders 4 in = 101.6 mm: A = B = max(85.725, 0.5 x 30 + 101.6) = 116.6 mm; stack 28.575 + 116.6 + 116.6 + 47.625 + 28.575 = 337.975 mm;
+    //   396 x 446 x 337.975 mm = 59.69 dm3 x 7,850 kg/m3 = 468.58 kg x 1.86 USD/kg x 1.0 = 871.56
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 10_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldBomSubtotalUsd).toBe(2140);
     expect(t.moldEstimatedDesignHrs).toBe(3.24);
@@ -195,15 +200,16 @@ describe('cost summary: worked ABS part', () => {
     expect(t.moldLabourCostUsd).toBe(2398.67);
     expect(t.moldToolLifeShots).toBe(144_000);
     expect(t.moldsRequired).toBe(1);
-    expect(t.moldCostUsd).toBe(4538.67);
-    expect(t.moldCostPerPartUsd).toBe(0.1513);
+    expect(t.moldBaseSteelUsd).toBeCloseTo(871.56, 2);
+    expect(t.moldCostUsd).toBe(5410.23);
+    expect(t.moldCostPerPartUsd).toBe(0.1803);
   });
 
-  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 95,311.97 USD, 0.0318 per part (regression: not rounded to 0.03)', () => {
+  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 5,410.23 = 113,614.73 USD, 0.0379 per part (regression: not rounded to 0.04)', () => {
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 1_000_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldsRequired).toBe(21);
-    expect(t.moldCostUsd).toBe(95_311.97);
-    expect(t.moldCostPerPartUsd).toBe(0.0318);
+    expect(t.moldCostUsd).toBe(113_614.73);
+    expect(t.moldCostPerPartUsd).toBe(0.0379);
   });
 });
 
@@ -319,15 +325,18 @@ describe('characterization: what the mold cost depends on today', () => {
     return { total: r.tooling!.moldCostUsd, molds: r.tooling!.moldsRequired!, perMold: r.tooling!.moldCostUsd / r.tooling!.moldsRequired!, cls: r.tooling!.moldClass, bom: r.tooling!.moldBomSubtotalUsd };
   };
 
-  it('I-1: the cost of ONE mold does not grow with the cavity count (1 to 8 cavities: +1.3 %, only the plate area term moves); more cavities only mean fewer molds worn out', () => {
+  it('I-1: the cost of ONE mold grows with the cavity count only through the larger base (its plate steel); the components stay the same; more cavities mean fewer molds worn out', () => {
     const one = mold({ cavityCountOverride: 1 });
     expect(one.molds).toBe(3);
-    for (const cavities of [2, 4, 8]) {
+    for (const cavities of [2, 4]) {
       const m = mold({ cavityCountOverride: cavities });
       expect(m.bom).toBe(one.bom); // the same purchased components for any number of cavities
-      expect(m.perMold / one.perMold).toBeGreaterThan(0.99);
-      expect(m.perMold / one.perMold).toBeLessThan(1.02);
+      expect(m.perMold).toBeGreaterThanOrEqual(one.perMold); // a larger layout never needs a smaller base
     }
+    // 8 cavities of a 100 x 100 mm part in a row need a base over 1.6 m wide: no standard base holds it, so the tooling is a named gap, not a guess.
+    const eight = computeInjectionMoldedCostSummary(absPart({ annualVolume: 100_000, productionLifeYears: 3, cavityCountOverride: 8 }));
+    expect(eight.tooling).toBeUndefined();
+    expect(eight.warnings.join(' ')).toMatch(/Tooling not costed: .*no standard mold base.*custom base is not modelled/);
     expect(mold({ cavityCountOverride: 4 }).molds).toBe(1);
     expect(mold({ cavityCountOverride: 4 }).total).toBeLessThan(one.total); // a 4-cavity tool is priced below a 1-cavity one only because fewer molds wear out
   });
@@ -386,7 +395,7 @@ describe('quote validation: how far the quote can be trusted', () => {
     const v = part().validation!;
     expect(v.complete).toBe(false);
     // G-11: ABS is hygroscopic, so material drying is routed, and no data exists for it
-    expect(v.unsupported.map((u) => u.id)).toEqual(['G-01', 'G-02', 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08', 'G-09', 'G-10', 'G-11']);
+    expect(v.unsupported.map((u) => u.id)).toEqual(['G-02', 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08', 'G-09', 'G-10', 'G-11']);
   });
 
   it('without a volume there is no mold: the mold formulas and gaps are left out, the cycle and period gaps remain', () => {
@@ -424,7 +433,8 @@ describe('calculation snapshot on the saved line', () => {
     expect(s.engineVersion).toBe('emithran-cost-1');
     expect(s.formulas.map((f) => f.id)).toEqual(expect.arrayContaining(['F-04', 'F-12', 'F-16']));
     expect(s.state).toBe('ASSUMED');
-    expect(s.unsupported).toContain('G-01');
+    expect(s.unsupported).toContain('G-02');
+    expect(s.unsupported).not.toContain('G-01'); // the mold base steel is costed (F-25)
   });
 
   it('the fingerprint is that of the reference rows (the real staged data resolves to one stable value)', () => {

@@ -44,7 +44,7 @@ export function withRegistryFormulas(trace: readonly CalculationTraceStep[], cal
 }
 
 /** The migrations that create and update the plastic-molding calculators: what to apply to a database that lacks them or holds an older version. */
-export const PLASTIC_CALCULATOR_MIGRATIONS = '975, 976, 977, 1007, 1008, 1010 and 1012';
+export const PLASTIC_CALCULATOR_MIGRATIONS = '975, 976, 977, 1007, 1008, 1010, 1012 and 1013';
 
 /**
  * The stored calculator of a name, when it is in the database AND is the version this engine was written for; otherwise why not. A calculator that is not there means the

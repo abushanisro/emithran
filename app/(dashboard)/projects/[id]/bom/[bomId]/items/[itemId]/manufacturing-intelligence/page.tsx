@@ -7642,7 +7642,7 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
                 bomItemId={itemId}
                 calculator={mold.calculatorName ?? null}
                 result="Tooling Cost Per Part"
-                first={['Purchased Components Cost', 'Design Cost', 'Machining Cost', 'Assembly Cost', 'Mold Cost', 'Molds Required', 'Tooling Investment']}
+                first={['Mold Base Steel Cost', 'Purchased Components Cost', 'Design Cost', 'Machining Cost', 'Assembly Cost', 'Mold Cost', 'Molds Required', 'Tooling Investment']}
               />
             </div>
           )}

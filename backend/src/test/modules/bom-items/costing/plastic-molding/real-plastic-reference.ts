@@ -41,7 +41,7 @@ export function realReferenceRows(): PlasticReferenceRows {
   const variables = read('variables/digital_factory_variables.csv').map((r) => ({ key: r['variableName']!, value: r['stringValue'] ?? null }));
   // Same file for each key that migration 823 stages under it (split tables in
   // lookup/ as X__records.csv, the settings export in process/).
-  const fileOf = (k: string) => (k === 'digital_factory_settings_usa' ? `process/${k}.csv` : `lookup/${k}__records.csv`);
+  const fileOf = (k: string) => (k.startsWith('digital_factory_') ? `process/${k}.csv` : `lookup/${k}__records.csv`);
   const lookups = Object.fromEntries(PLASTIC_LOOKUP_KEYS.map((k) => [k, read(fileOf(k))]));
   const gps = read('materials_final.csv').find((r) => r['name'] === GPPS_REFERENCE_MATERIAL);
   const gppsMaterial = gps ? Object.fromEntries(Object.entries(gps).map(([k, v]) => [k, v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : v])) : undefined;

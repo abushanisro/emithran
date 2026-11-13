@@ -42,6 +42,7 @@ import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
 import { runDeflashingTime, runInjectionCycleTime } from '../calculators/plastic-cycle-time';
 import { runMoldTooling } from '../calculators/mold-tooling-calculator';
+import { selectMoldBase } from './mold-base';
 import { type ReferenceCalculators, withFieldOverrides, type CalculatorFieldOverrides } from '../../shared/calculators/reference-calculator';
 import {
   type CycleTimeResult,
@@ -212,6 +213,8 @@ export interface InjectionMoldingCostInput {
   // projected area (press sizing and tooling).
   bboxMaxMm?: number;
   bboxMidMm?: number;
+  // The smallest side: the part's height along the pull direction (the mold's plate stack).
+  bboxMinMm?: number;
   // Cavities per mold set by the user (Cost Guide); null = reference default.
   cavityCountOverride?: number | null;
   // The selected press's own process data from its HR Rates row
@@ -685,6 +688,12 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null, location: input.location ?? '(unknown location)',
       annualVolume: annualVol, productionLifeYears: prodLife, cavityCount, toolLifeShots,
       toolLifeSource: lifeRow ? `memory/Plastic Modeling/lookup/tblToolLife: ${input.materialType}` : `memory/Plastic Modeling/variables: defaultToolLife (no tblToolLife row for ${input.materialType ?? 'the material type'})`,
+      moldBase: selectMoldBase({
+        partLengthMm: input.bboxMaxMm ?? 0, partWidthMm: input.bboxMidMm ?? 0, cavities: cavityCount,
+        clampKn: input.machineClampTonnes != null && input.machineClampTonnes > 0 ? input.machineClampTonnes * 9.80665 : null, ref: plasticRef.moldBase,
+      }),
+      moldBaseRef: plasticRef.moldBase,
+      partHeightMm: (input.bboxMinMm ?? 0) > 0 ? input.bboxMinMm! : null,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides));
     if (!tooling.derivable) {
       warnings.push(`Tooling not costed: missing ${tooling.missing.join('; ')}.`);
@@ -706,6 +715,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         moldLabourCostUsd: r2(o['Toolroom Labour Cost']!),
         moldToolLifeShots: toolLifeShots,
         moldsRequired: o['Molds Required']!,
+        moldBaseSteelUsd: o['Mold Base Steel Cost']!,
         calculationTrace: tooling.trace,
         calculatorName: tooling.calculator.name,
       };
@@ -764,7 +774,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
     ...(q.pressSelected ? ['F-11'] : []),
     ...(q.cycleDerivable ? [q.isLsr ? 'F-09' : 'F-04', ...(q.isLsr ? [] : ['F-06']), 'F-05', 'F-07', 'F-08'] : []),
     ...(q.yieldKnown ? ['F-13'] : []),
-    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18'] : []),
+    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25'] : []),
   ];
 }
 
@@ -776,7 +786,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
 function unsupportedFormulas(q: { tooling: boolean; routed: ReadonlySet<string> }): string[] {
   const noData = ['material_drying', 'visual_inspection', 'ultrasonic_welding', 'secondary_cure_oven', 'lsr_compound_dosing'].some((op) => q.routed.has(op));
   return [
-    ...(q.tooling ? ['G-01', 'G-02', 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08'] : []),
+    ...(q.tooling ? ['G-02', 'G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08'] : []),
     'G-09', 'G-10',
     ...(noData ? ['G-11'] : []),
   ];

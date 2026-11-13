@@ -292,9 +292,30 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'calculators/plastic-molding-calculators.json',
   },
 
+  {
+    id: 'F-25', version: 1, name: 'Mold base and plate steel',
+    expression: 'base = smallest tblStandardMoldBaseSizes holding (layout + borders); A = max(min_A, r x h + border_cav); B = max(min_B, (1 - r) x h + border_core); m = W x L x (clamp_top + A + B + support + clamp_bottom) x rho; cost = m x price x moldBaseCostFactor',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'layout, between-parts border, edge borders', unit: 'count, mm', source: `${MEM}/lookup: layoutNumCav, tblEdgeMoldBorderX/Y; variables: betweenPartsMoldBorder` },
+      { name: 'W x L standard base', unit: 'mm', source: `${MEM}/lookup/tblStandardMoldBaseSizes` },
+      { name: 'h part height', unit: 'mm', source: 'CAD bounding box, the smallest side' },
+      { name: 'r, min_A, min_B, plate thicknesses', unit: 'ratio, mm', source: `${MEM}/variables: aPlateFlatCavityRatio, a/bPlateMinThickness, top/bottomClampPlateThickness, supportPlateThickness` },
+      { name: 'border_cav, border_core', unit: 'mm', source: `${MEM}/lookup: tblCavity/CorePlateDepthBorder (inches)` },
+      { name: 'rho, price, moldBaseCostFactor', unit: 'kg/m3, USD/kg, ratio', source: `${MEM}/process/digital_factory_tool_materials_usa: the default tool material (AISI P20)` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/lookup + variables + process/digital_factory_tool_materials_usa`,
+    assumptions: [
+      'The reference holds the sizes, borders, plate thicknesses and the steel, not the formula: the stack is priced as tool steel by mass.',
+      'The runner region coefficient widens the cavity region; the base may be turned to fit; a base larger than every standard one is not modelled (a named gap).',
+      'The ejector plates and rails have no injection-molding thickness on file and are not included.',
+    ],
+    state: 'ASSUMED', implementedIn: 'process/mold-base.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
-    ['G-01', 'Mold base selection and plate-by-plate steel', 'tblStandardMoldBaseSizes; tool material price and density (AISI P20 1.86 USD/kg, 7850 kg/m3); plate thickness variables; tblCavity/CorePlateDepthBorder; tblEdgeMoldBorderX/Y'],
     ['G-02', 'Core and cavity blocks', 'plate depth tables; cmToolMachiningRates; EDM rates; tblHrsPerSqInch*'],
     ['G-03', 'Slides and lifters', 'tblSlideSizes; slide* and lifter* variables; costPerHydraulicEjector; slideCycleRate'],
     ['G-04', 'EDM and heat treatment', 'edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg'],

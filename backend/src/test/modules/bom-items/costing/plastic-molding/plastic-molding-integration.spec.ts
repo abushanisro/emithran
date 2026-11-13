@@ -46,7 +46,7 @@ function quote(over: Partial<InjectionMoldingCostInput> = {}, pressName = pick()
     inspectionRate: { rate: 0, source: 'mhr_database', machineClass: 'cmm', machineName: null, commodityCode: null },
     machineClampTonnes: p.maxTonnage, machineShotCapacityG: p.shotCapacityGrams, pressTiming: p.timing, goodPartYield: p.goodPartYield, calculators: plasticMoldingCalculatorsByName(),
     materialClamp: CLAMP, realResinInputs: RESIN, materialType: 'Nylon', plasticReference: REF, location: 'USA',
-    bboxMaxMm: PART.lengthMm, bboxMidMm: PART.widthMm,
+    bboxMaxMm: PART.lengthMm, bboxMidMm: PART.widthMm, bboxMinMm: 30,
     signals: { projectedAreaMm2: AREA, undercutCount: 1, partingComplexity: 0.3, gateType: 'edge' },
     annualVolume: 50_000, productionLifeYears: 4,
     ...over,

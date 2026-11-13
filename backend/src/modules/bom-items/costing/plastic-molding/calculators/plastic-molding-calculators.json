@@ -547,7 +547,7 @@
     {
       "key": "injection_mold_tooling",
       "name": "Injection Mold - Tooling",
-      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Not modelled yet, because the reference holds the data but no formula: the mold base and plate steel, core and cavity blocks, slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops and try-out (registry G-01 to G-08).",
+      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Not modelled yet, because the reference holds the data but no formula: core and cavity blocks, slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops and try-out (registry G-02 to G-08).",
       "operations": [],
       "helper": true,
       "output": "Tooling Cost Per Part",
@@ -556,8 +556,12 @@
         "Toolroom Labour Cost",
         "Mold Cost",
         "Molds Required",
-        "Tooling Investment"
+        "Tooling Investment",
+        "Mold Base Steel Mass",
+        "Mold Base Steel Cost",
+        "Mold Stack Height"
       ],
+      "version": 2,
       "fields": [
         {
           "name": "Purchased Components Cost",
@@ -651,6 +655,104 @@
           }
         },
         {
+          "name": "Mold Base Width",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblStandardMoldBaseSizes: the smallest standard base (useMetricOrImperialValues) that holds the cavity layout and the edge borders"
+          }
+        },
+        {
+          "name": "Mold Base Length",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblStandardMoldBaseSizes: the same base"
+          }
+        },
+        {
+          "name": "Part Height",
+          "unit": "mm",
+          "source": {
+            "cad": "bounding box, the smallest side (along the pull direction)"
+          }
+        },
+        {
+          "name": "A Plate Cavity Ratio",
+          "unit": null,
+          "source": {
+            "variable": "aPlateFlatCavityRatio"
+          }
+        },
+        {
+          "name": "Cavity Plate Depth Border",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblCavityPlateDepthBorder (in): by the press force"
+          }
+        },
+        {
+          "name": "Core Plate Depth Border",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblCorePlateDepthBorder (in): by the press force"
+          }
+        },
+        {
+          "name": "A Plate Min Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "aPlateMinThickness"
+          }
+        },
+        {
+          "name": "B Plate Min Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "bPlateMinThickness"
+          }
+        },
+        {
+          "name": "Top Clamp Plate Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "topClampPlateThickness"
+          }
+        },
+        {
+          "name": "Support Plate Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "supportPlateThickness"
+          }
+        },
+        {
+          "name": "Bottom Clamp Plate Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "bottomClampPlateThickness"
+          }
+        },
+        {
+          "name": "Tool Steel Density",
+          "unit": "kg/m³",
+          "source": {
+            "lookup": "digital_factory_tool_materials_usa: densityKgPerM3 of the default tool material (digital_factory_settings_usa defaultToolMaterialName)"
+          }
+        },
+        {
+          "name": "Tool Steel Price",
+          "unit": "USD/kg",
+          "source": {
+            "lookup": "digital_factory_tool_materials_usa: materialCostUsdPerKg of the default tool material"
+          }
+        },
+        {
+          "name": "Mold Base Cost Factor",
+          "unit": null,
+          "source": {
+            "lookup": "digital_factory_tool_materials_usa: moldBaseCostFactor of the default tool material"
+          }
+        },
+        {
           "name": "Machining Hours",
           "unit": "h",
           "formula": "{Mold Base Area} / 1000000 / {Plate Machining Rate} * 2 + {Plate Setup Hours}"
@@ -676,9 +778,34 @@
           "formula": "{Design Cost} + {Machining Cost} + {Assembly Cost}"
         },
         {
+          "name": "A Plate Thickness",
+          "unit": "mm",
+          "formula": "max({A Plate Min Thickness}, {A Plate Cavity Ratio} * {Part Height} + {Cavity Plate Depth Border})"
+        },
+        {
+          "name": "B Plate Thickness",
+          "unit": "mm",
+          "formula": "max({B Plate Min Thickness}, (1 - {A Plate Cavity Ratio}) * {Part Height} + {Core Plate Depth Border})"
+        },
+        {
+          "name": "Mold Stack Height",
+          "unit": "mm",
+          "formula": "{Top Clamp Plate Thickness} + {A Plate Thickness} + {B Plate Thickness} + {Support Plate Thickness} + {Bottom Clamp Plate Thickness}"
+        },
+        {
+          "name": "Mold Base Steel Mass",
+          "unit": "kg",
+          "formula": "{Mold Base Width} * {Mold Base Length} * {Mold Stack Height} / 1000000000 * {Tool Steel Density}"
+        },
+        {
+          "name": "Mold Base Steel Cost",
+          "unit": "USD",
+          "formula": "{Mold Base Steel Mass} * {Tool Steel Price} * {Mold Base Cost Factor}"
+        },
+        {
           "name": "Mold Cost",
           "unit": "USD",
-          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost}"
+          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost}"
         },
         {
           "name": "Lifetime Shots",
@@ -701,7 +828,7 @@
           "formula": "floor({Tooling Investment} / ({Annual Volume} * {Production Life}) * 10000 + 0.5) / 10000"
         }
       ],
-      "migration": 1012
+      "migration": 1013
     }
   ]
 }

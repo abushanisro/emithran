@@ -50,6 +50,9 @@ export const PLASTIC_VARIABLE_KEYS = [
   // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
   'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilonForSlides', 'drawDirectionOrthogonalEpsilonForLifters',
   'cmAutoIncludeManualFlashTrimming', 'cmManualFlashTrimmingRate',
+  // The mold base and its plate stack (mold-base.ts).
+  'aPlateFlatCavityRatio', 'aPlateMinThickness', 'bPlateMinThickness', 'betweenPartsMoldBorder',
+  'topClampPlateThickness', 'bottomClampPlateThickness', 'supportPlateThickness', 'useMetricOrImperialValues',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -63,6 +66,8 @@ export const PLASTIC_LOOKUP_KEYS = [
   'digital_factory_settings_usa',
   'injectionTimeAdjustmentFactors',
   'layoutNumCav',
+  'tblStandardMoldBaseSizes', 'tblEdgeMoldBorderX', 'tblEdgeMoldBorderY', 'tblCavityPlateDepthBorder', 'tblCorePlateDepthBorder',
+  'digital_factory_tool_materials_usa',
 ] as const;
 
 /** The reference material whose melt density converts GPPS-rated shot size (see header). */
@@ -109,6 +114,30 @@ export interface CycleModel {
   gppsMeltDensityKgM3: number;
 }
 
+/** What sizes and prices a mold base, from memory/Plastic Modeling. Lengths in mm. */
+export interface MoldBaseReference {
+  /** tblStandardMoldBaseSizes of the system useMetricOrImperialValues names (Metric: the mm sizes, Imperial: the inch sizes, converted). */
+  bases: Array<{ name: string; widthMm: number; lengthMm: number }>;
+  system: 'Metric' | 'Imperial';
+  /** tblEdgeMoldBorderX / Y: the steel beside the cavities, by the press force (first row whose force covers it). */
+  edgeBorderXByKn: Array<{ maxKn: number; mm: number }>;
+  edgeBorderYByKn: Array<{ maxKn: number; mm: number }>;
+  /** tblCavityPlateDepthBorder / tblCorePlateDepthBorder (inches in the table, mm here): the steel behind the cavity, by the press force. */
+  cavityDepthBorderByKn: Array<{ maxKn: number; mm: number }>;
+  coreDepthBorderByKn: Array<{ maxKn: number; mm: number }>;
+  /** layoutNumCav: how a cavity count is laid out. */
+  layouts: Array<{ cavities: number; widthWise: number; lengthWise: number; runnerCoefficient: number }>;
+  betweenPartsMm: number;
+  aPlateCavityRatio: number;
+  aPlateMinMm: number;
+  bPlateMinMm: number;
+  topClampMm: number;
+  bottomClampMm: number;
+  supportPlateMm: number;
+  /** digital_factory_settings_usa defaultToolMaterialName, and its row of digital_factory_tool_materials_usa. */
+  steel: { name: string; densityKgM3: number; priceUsdPerKg: number; moldBaseCostFactor: number };
+}
+
 export interface PlasticReference {
   /** The staged dataset these rows belong to (e.g. '2026-Plastic') and a fingerprint of the exact rows read: a saved calculation records both (calculation-snapshot.ts). */
   sourceVersion: string;
@@ -132,6 +161,8 @@ export interface PlasticReference {
   defaultToolLifeShots: number;
   /** digital_factory_settings_usa, Default profile. USA only: no other location is on file. */
   toolroomRatesUsa: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number };
+  /** The mold base: standard sizes, borders, the plate stack and the default tool steel (mold-base.ts). */
+  moldBase: MoldBaseReference;
   /**
    * Variables that decide which catalog operation a recognised feature needs. Optional, unlike the rest of the reference: a database without them
    * still costs the part, and the operations the missing variable would decide are reported undecided (plastic-catalog-operation-resolver.ts).
@@ -282,6 +313,46 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     assemblyUsdPerHr: rate('assemblyRateUsdPerHr'),
   };
 
+  const system = text.get('useMetricOrImperialValues') === 'Imperial' ? 'Imperial' : text.get('useMetricOrImperialValues') === 'Metric' ? 'Metric' : null;
+  if (!system) missing.push('variables: useMetricOrImperialValues');
+  const IN = 25.4;
+  const bases = table('tblStandardMoldBaseSizes')
+    .filter((r) => (system === 'Imperial' ? r['Reference Uom'] === 'inches' : r['Reference Uom'] === 'mm'))
+    .map((r) => {
+      const k = r['Reference Uom'] === 'inches' ? IN : 1;
+      return { name: String(r['Mold Base Name']), widthMm: (num(r['Actual Width']) ?? NaN) * k, lengthMm: (num(r['Actual Length']) ?? NaN) * k };
+    })
+    .sort((a, b) => a.widthMm * a.lengthMm - b.widthMm * b.lengthMm);
+  if (bases.length === 0 || bases.some((b) => !(b.widthMm > 0 && b.lengthMm > 0))) missing.push('tblStandardMoldBaseSizes: Actual Width / Actual Length');
+  const byForce = (key: string, col: string, factor = 1) => table(key)
+    .map((r) => ({ maxKn: num(r['Max Press Force (kN)']) ?? NaN, mm: (num(r[col]) ?? NaN) * factor }))
+    .sort((a, b) => a.maxKn - b.maxKn);
+  const edgeBorderXByKn = byForce('tblEdgeMoldBorderX', 'Edge Mold Border X (mm)');
+  const edgeBorderYByKn = byForce('tblEdgeMoldBorderY', 'Edge Mold Border Y (mm)');
+  const cavityDepthBorderByKn = byForce('tblCavityPlateDepthBorder', 'Cavity Plate Depth Border (in)', IN);
+  const coreDepthBorderByKn = byForce('tblCorePlateDepthBorder', 'Core Plate Depth Border (in)', IN);
+  if ([...edgeBorderXByKn, ...edgeBorderYByKn, ...cavityDepthBorderByKn, ...coreDepthBorderByKn].some((r) => !Number.isFinite(r.maxKn + r.mm))) {
+    missing.push('tblEdgeMoldBorderX/Y, tblCavity/CorePlateDepthBorder: non-numeric cell');
+  }
+  const layouts = table('layoutNumCav').map((r) => ({
+    cavities: num(r['number_of_cavities']) ?? NaN, widthWise: num(r['cavities_width_wise']) ?? NaN,
+    lengthWise: num(r['cavities_length_wise']) ?? NaN, runnerCoefficient: num(r['coefficient_runner_region_width']) ?? NaN,
+  }));
+  if (layouts.some((l) => !Number.isFinite(l.cavities + l.widthWise + l.lengthWise + l.runnerCoefficient))) missing.push('layoutNumCav: non-numeric cell');
+  const steelName = typeof settings?.['defaultToolMaterialName'] === 'string' ? settings['defaultToolMaterialName'] : null;
+  const steelRow = table('digital_factory_tool_materials_usa').find((r) => r['name'] === steelName);
+  if (!steelRow) missing.push(`digital_factory_tool_materials_usa: the default tool material ${steelName ?? '(defaultToolMaterialName not set)'}`);
+  const moldBase: MoldBaseReference = {
+    bases, system: system ?? 'Metric', edgeBorderXByKn, edgeBorderYByKn, cavityDepthBorderByKn, coreDepthBorderByKn, layouts,
+    betweenPartsMm: variable('betweenPartsMoldBorder'), aPlateCavityRatio: variable('aPlateFlatCavityRatio'),
+    aPlateMinMm: variable('aPlateMinThickness'), bPlateMinMm: variable('bPlateMinThickness'),
+    topClampMm: variable('topClampPlateThickness'), bottomClampMm: variable('bottomClampPlateThickness'), supportPlateMm: variable('supportPlateThickness'),
+    steel: {
+      name: steelName ?? '', densityKgM3: num(steelRow?.['densityKgPerM3']) ?? NaN, priceUsdPerKg: num(steelRow?.['materialCostUsdPerKg']) ?? NaN,
+      moldBaseCostFactor: num(steelRow?.['moldBaseCostFactor']) ?? NaN,
+    },
+  };
+
   const fillFactors = (attribute: string) => table('injectionTimeAdjustmentFactors')
     .filter((r) => r['attribute'] === attribute)
     .map((r) => ({ upTo: num(r['number']) ?? NaN, factor: num(r['adjustment_factor']) ?? NaN }))
@@ -334,6 +405,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       toolLifeShotsByType,
       defaultToolLifeShots,
       toolroomRatesUsa,
+      moldBase,
       featureRules: {
         maxNoCoreInsertDiameterMm: optionalPositive('maxNoCoreInsertDiameter'),
         slideEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForSlides'),

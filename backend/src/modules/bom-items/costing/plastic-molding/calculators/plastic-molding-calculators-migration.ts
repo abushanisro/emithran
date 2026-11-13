@@ -2,8 +2,8 @@ import { buildDomainCalculatorsMigrationSql, type DomainMigrationText } from '..
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 
 /**
- * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977
- * and 1007: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
+ * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977,
+ * 1007 and 1012: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
  * NEW migration, which writes the calculators whose spec `migration` is its number (and raises their `version` when their formulas change, calculators.version, migration 428).
  *   976  the reaction injection calculator, version 2 (fill time added)
  *   977  the injection, structural foam and LSR calculators: their fill-factor inputs name the reference table they are read from, so the cost dialog's eye opens it
@@ -12,8 +12,9 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1008 the injection and structural foam calculators, version 3: the version-1 fields and formulas again (fill + pack + cooling + mold open/close)
  *   1010 the injection molding deflashing calculator: the parting line length over the manual flash trimming rate
  *   1012 the injection mold tooling calculator: components + toolroom labour, molds required, cost per part
+ *   1013 the injection mold tooling calculator, version 2: the mold base plate steel (standard base, plate stack, default tool steel)
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1012] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1013] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
@@ -47,13 +48,14 @@ const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 
       'operation maps to it; the injection engine runs it for the routed deflashing step.',
     ].join('\n'),
   },
-  1012: {
-    title: 'Injection mold tooling calculator -- components + toolroom labour, molds required, cost per part.',
+  1013: {
+    title: 'Injection mold tooling calculator, version 2 -- the mold base plate steel.',
     rootCause: [
-      'The mold tooling cost was computed in code (mold-tooling-engine.ts and the injection engine): the reference lookups were real, but the prices,',
-      'hours and amortization were not visible as a calculation and could not be changed for a part. This calculator states them as formulas over',
-      'the staged lookups (formula registry F-16, F-17, F-18): the same numbers, now shown on the line with their sources, and a part\'s own value',
-      'for any field is honoured (calculator_field_overrides). A helper: no catalog operation maps to it.',
+      'The mold tooling cost (migration 1012) excluded the mold base and its plate steel, and said so: the reference holds the standard base sizes',
+      '(tblStandardMoldBaseSizes), the cavity layout and borders (layoutNumCav, betweenPartsMoldBorder, tblEdgeMoldBorderX/Y, the plate depth borders),',
+      'the plate thicknesses (aPlateFlatCavityRatio, a/bPlateMinThickness, clamp and support plates) and the default tool steel (AISI P20: density, price,',
+      'moldBaseCostFactor), but no formula. Version 2 adds the plate stack and its steel cost to the mold cost (formula registry F-25, ASSUMED). The',
+      'calculator is replaced under version 2 (a calculator in use is not edited in place).',
     ].join('\n'),
   },
 };
@@ -71,5 +73,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   976: '976_plastic_rim_fill_time_calculator.sql',
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
-  1012: '1012_plastic_mold_tooling_calculator.sql',
+  1013: '1013_plastic_mold_base_steel.sql',
 };
