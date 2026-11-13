@@ -8,6 +8,7 @@ import { runReferenceCalculator, type CalcSeed, type ReferenceCalculators } from
 import type { MoldBaseReference, MoldExtrasReference, MoldToolingTables, ToolroomRates } from '../plastic-reference';
 import type { MoldBaseChoice } from '../process/mold-base';
 import type { MoldCavityLookup } from '../process/mold-cavity';
+import type { BlockSize, SideActionSignals } from '../side-action-signals';
 import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas } from './plastic-cycle-time';
 
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
@@ -45,6 +46,36 @@ export interface MoldToolingFacts {
   extras: MoldExtrasReference;
   /** The press the part runs on (t): the try-out hours double above 500 t. Null when no press is chosen. */
   pressClampTonnes: number | null;
+  /** The recognised slide and lifter bundles by size class (side-action-signals.ts); null when the CAD features were not recognised. */
+  sideActionBlocks: SideActionSignals['blocks'] | null;
+}
+
+const SIZE_ORDER: readonly BlockSize[] = ['small', 'medium', 'large'];
+
+/**
+ * The slide and lifter blocks the mold needs (F-28): their volume by size class, and their surface as cubes of that volume (6 x V^(2/3)). Unsized
+ * bundles and an unrecognised part add nothing; the scope warning names them (mold-tooling-engine.ts).
+ */
+export function sideActionBlocks(blocks: SideActionSignals['blocks'] | null, x: MoldExtrasReference) {
+  const list: Array<{ kind: 'slide' | 'lifter'; size: BlockSize; volumeIn3: number }> = [];
+  for (const kind of ['slide', 'lifter'] as const) {
+    const volumes = kind === 'slide' ? x.slideVolumeIn3 : x.lifterVolumeIn3;
+    for (const size of SIZE_ORDER) for (let i = 0; i < (blocks?.[kind][size] ?? 0); i++) list.push({ kind, size, volumeIn3: volumes[size] });
+  }
+  const volume = (kind: 'slide' | 'lifter') => list.filter((b) => b.kind === kind).reduce((t, b) => t + b.volumeIn3, 0);
+  const describe = (kind: 'slide' | 'lifter') => SIZE_ORDER
+    .map((size) => [size, list.filter((b) => b.kind === kind && b.size === size).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([size, n]) => `${n} ${size} x ${(kind === 'slide' ? x.slideVolumeIn3 : x.lifterVolumeIn3)[size]} in³ (${size}${kind === 'slide' ? 'Slide' : 'Lifter'}Volume)`)
+    .join(' + ');
+  return {
+    count: list.length,
+    slideVolumeIn3: volume('slide'),
+    lifterVolumeIn3: volume('lifter'),
+    surfaceIn2: list.reduce((t, b) => t + 6 * b.volumeIn3 ** (2 / 3), 0),
+    slideSource: describe('slide') || 'no slide bundles recognised',
+    lifterSource: describe('lifter') || 'no lifter bundles recognised',
+  };
 }
 
 export type MoldToolingRun =
@@ -64,6 +95,7 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
   const b = f.moldBase;
   const mb = f.moldBaseRef;
   const x = f.extras;
+  const sa = sideActionBlocks(f.sideActionBlocks, x);
   const vars = `${REF}/variables`;
   const steel = `${REF}/process/digital_factory_tool_materials_usa: ${mb.steel.name} (digital_factory_settings_usa defaultToolMaterialName)`;
   const listed = f.components.map((c) => `${c.componentName} ${c.qty} x ${c.unitCostUsd}`).join(', ');
@@ -120,6 +152,12 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       },
       'Number of Tryouts': { value: x.tryouts, source: `${vars}: defaultNumTryOuts` },
       'Tryout Rate': { value: f.toolroomRates.tryoutUsdPerHr, source: `${settings} tryoutRateUsdPerHr` },
+      'Slide Block Volume': { value: sa.slideVolumeIn3, source: `CAD slide bundles: ${sa.slideSource}`, lookup: true },
+      'Lifter Block Volume': { value: sa.lifterVolumeIn3, source: `CAD lifter bundles (a bundle a slide could also serve is costed as a lifter): ${sa.lifterSource}`, lookup: true },
+      'Side Action Block Surface': { value: sa.surfaceIn2, source: `each of the ${sa.count} block${sa.count === 1 ? '' : 's'} as a cube of its volume, 6 x V^(2/3) in², summed` },
+      'Side Actions': { value: sa.count, source: f.sideActionBlocks ? 'CAD: the recognised slide and lifter bundles with a size class' : 'CAD features not recognised: no bundles to price' },
+      'CMM Hours Per Side Action': { value: x.cmmHoursPerSideAction, source: `${vars}: cmmInspectionMultiplier` },
+      'CMM Base Hours': { value: x.cmmBaseHours, source: `${vars}: cmmInspectionAdder` },
     },
   };
 }

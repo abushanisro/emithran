@@ -57,6 +57,9 @@ export const PLASTIC_VARIABLE_KEYS = [
   'defaultCavityFinishIM', 'cmMoldSurfaceCountThresholdSimple', 'cmMoldSurfaceCountThresholdAverage',
   // The mold assembly extras (mold-tooling-calculator.ts, F-27): ejector pins, sprue, locating ring, try-out; and the default cavity texture.
   'areaCoveredPerEjectorPin', 'sprueBushingCost', 'locatingRingsCost', 'timePerTryoutBase', 'defaultNumTryOuts', 'cavityTexture_IM',
+  // The slide and lifter blocks (F-28): their volume by size class, and the CMM hours to inspect them.
+  'smallSlideVolume', 'mediumSlideVolume', 'largeSlideVolume', 'smallLifterVolume', 'mediumLifterVolume', 'largeLifterVolume',
+  'cmmInspectionMultiplier', 'cmmInspectionAdder',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -203,6 +206,12 @@ export interface MoldExtrasReference {
   tryouts: number;
   /** variables cavityTexture_IM: the default cavity texture ("None": no texture). */
   cavityTexture: string;
+  /** variables {small,medium,large}{Slide,Lifter}Volume (in3): the block steel of a slide or lifter of each size class (F-28). */
+  slideVolumeIn3: { small: number; medium: number; large: number };
+  lifterVolumeIn3: { small: number; medium: number; large: number };
+  /** variables cmmInspectionMultiplier and cmmInspectionAdder: the CMM hours to inspect the slides and lifters. */
+  cmmHoursPerSideAction: number;
+  cmmBaseHours: number;
 }
 
 export interface FeatureRules {
@@ -364,6 +373,10 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     tryoutBaseHours: variable('timePerTryoutBase'),
     tryouts: variable('defaultNumTryOuts'),
     cavityTexture: texture ?? '',
+    slideVolumeIn3: { small: variable('smallSlideVolume'), medium: variable('mediumSlideVolume'), large: variable('largeSlideVolume') },
+    lifterVolumeIn3: { small: variable('smallLifterVolume'), medium: variable('mediumLifterVolume'), large: variable('largeLifterVolume') },
+    cmmHoursPerSideAction: variable('cmmInspectionMultiplier'),
+    cmmBaseHours: variable('cmmInspectionAdder'),
   };
 
   const system = text.get('useMetricOrImperialValues') === 'Imperial' ? 'Imperial' : text.get('useMetricOrImperialValues') === 'Metric' ? 'Metric' : null;

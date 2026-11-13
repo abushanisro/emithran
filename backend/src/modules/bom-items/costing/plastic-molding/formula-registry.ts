@@ -355,9 +355,31 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
   },
 
+  {
+    id: 'F-28', version: 1, name: 'Slide and lifter blocks: steel, machining, CMM inspection',
+    expression: 'V = sum of block volumes by size class;  steel = V x density x price;  machining = sum(6 x V_block^(2/3)) x h_per_in2 x machining rate;  CMM = (multiplier x n + adder) x machining rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'blocks', unit: 'count by size class', source: 'CAD SlideBundle / LifterBundle size_class (cad-engine side_actions.py, by the staged bundle width thresholds)' },
+      { name: 'V_block', unit: 'in3', source: `${MEM}/variables: {small,medium,large}{Slide,Lifter}Volume` },
+      { name: 'density, price', unit: 'kg/m3, USD/kg', source: `${MEM}/process/digital_factory_tool_materials_usa: the default tool steel` },
+      { name: 'h_per_in2', unit: 'h/in2', source: `${MEM}/lookup: tblHrsPerSqInch{Simple,Average,Complex} (the cavity's, F-26)` },
+      { name: 'multiplier, adder', unit: 'h', source: `${MEM}/variables: cmmInspectionMultiplier, cmmInspectionAdder` },
+    ],
+    dependsOn: ['F-26'],
+    referenceSource: `${MEM}/variables + lookup + process`,
+    assumptions: [
+      'A LifterBundle (a lifter could serve it, and so could a slide) is costed as a lifter, the smaller block.',
+      'Each block is machined over the surface of a cube of its volume at the cavity hours per square inch (no slide or lifter machining hours are on file).',
+      'The CMM hours are cmmInspectionMultiplier x the side actions + cmmInspectionAdder, at the machining rate (the variables name the hours, not the form or the rate).',
+      'The block steel is priced at the steel price without the moldBaseCostFactor, which is for the mold base.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
-    ['G-03', 'Slides and lifters', 'tblSlideSizes; slide* and lifter* variables; costPerHydraulicEjector; slideCycleRate'],
+    ['G-03', 'Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle', 'tblSlideSizes; slideCycleRate; costPerHydraulicEjector'],
     ['G-04', 'EDM and heat treatment', 'edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
     ['G-06', 'Cooling and water lines', 'tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables'],
