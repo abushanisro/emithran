@@ -410,6 +410,33 @@ describe('rib inserts and their EDM in the mold (F-31)', () => {
   });
 });
 
+describe('the slide movement in each shot (F-32)', () => {
+  const NONE = { small: 0, medium: 0, large: 0 };
+  const run = (signals: object) => computeInjectionMoldedCostSummary(absPart({ signals: { ...absPart().signals, undercutCount: 2, ...signals } }));
+
+  it('charges the slides moving out and back at the press rate: 2 x the longest stroke / slideCycleRate (100 mm/s), per part', () => {
+    const r = run({ slideBundleCount: 2, slideOrLifterBundleCount: 0, maxSlideStrokeMm: 30, sideActionBlocks: { slide: { ...NONE, small: 2 }, lifter: NONE, unsized: 0 } });
+    const line = r.processLines.find((l) => l.calculatorName === 'Injection Molding - Slide Movement');
+    expect(line?.process).toBe('Side Action (Slide/Lifter)');
+    // 2 x 30 mm / 100 mm/s = 0.6 s per shot, one cavity
+    expect(line?.cycleTimeMin).toBeCloseTo(0.6 / 60, 9);
+    expect(line?.calculationTrace?.find((t) => t.fieldName === 'Slide Cycle Rate')?.value).toBe(100);
+    expect(r.warnings.join(' ')).not.toMatch(/Side Action \(Slide\/Lifter\) required/);
+  });
+
+  it('adds no time for lifters, and says so instead of calling the operation uncosted', () => {
+    const r = run({ slideBundleCount: 0, slideOrLifterBundleCount: 4, sideActionBlocks: { slide: NONE, lifter: { ...NONE, small: 4 }, unsized: 0 } });
+    expect(r.processLines.some((l) => l.calculatorName === 'Injection Molding - Slide Movement')).toBe(false);
+    expect(r.warnings.join(' ')).toMatch(/4 side-action bundle\(s\) are costed as lifters, which ride on the ejector stroke and add no cycle time/);
+    expect(r.warnings.join(' ')).not.toMatch(/Side Action \(Slide\/Lifter\) required/);
+  });
+
+  it('a slide with no measured stroke is a named gap', () => {
+    const r = run({ slideBundleCount: 1, slideOrLifterBundleCount: 0, maxSlideStrokeMm: null });
+    expect(r.warnings.join(' ')).toMatch(/Side Action \(Slide\/Lifter\) not costed: missing the slide stroke/);
+  });
+});
+
 describe('operations the model does not cost', () => {
   const warn = (signals: object, grade = 'Generic ABS') => computeInjectionMoldedCostSummary({ ...absPart(), materialGrade: grade, signals: { ...absPart().signals, ...signals } }).warnings.join('\n');
 

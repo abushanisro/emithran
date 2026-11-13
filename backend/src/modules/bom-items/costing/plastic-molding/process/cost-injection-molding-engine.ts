@@ -41,7 +41,7 @@ import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
-import { runDeflashingTime, runInjectionCycleTime } from '../calculators/plastic-cycle-time';
+import { runDeflashingTime, runInjectionCycleTime, runSlideMovementTime } from '../calculators/plastic-cycle-time';
 import { runMoldTooling } from '../calculators/mold-tooling-calculator';
 import { selectMoldBase } from './mold-base';
 import { moldCavityLookup } from './mold-cavity';
@@ -117,7 +117,7 @@ const UNCOSTED_OPERATION_LABELS: Record<string, string> = {
  */
 const UNREAD_REFERENCE_DATA: Partial<Record<keyof typeof UNCOSTED_OPERATION_LABELS, string>> = {
   // The slide and lifter blocks are in the tooling (F-28); what stays unread is their movement in the cycle.
-  side_action: 'the hydraulic slide cycle rate and the hydraulic ejector cost (slideCycleRate, costPerHydraulicEjector) for the slide movement in the cycle',
+  side_action: 'the slide speed (slideCycleRate), which the cost model reads once the CAD side-action bundles are recognised',
   core_unscrewing: 'the unscrewing mechanism cost (costPerUnscrewingMechanism)',
   insert_loading: 'the in-mold insert loading time and insert cost (cmInsertManualLoadingTime, defaultInsertCost)',
   insert_installation: 'the insert install rate (insertInstallRate)',
@@ -480,6 +480,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     slideBundleCount: input.signals?.slideBundleCount ?? null,
     slideOrLifterBundleCount: input.signals?.slideOrLifterBundleCount ?? null,
     sideActionBlocks: input.signals?.sideActionBlocks ?? null,
+    maxSlideStrokeMm: input.signals?.maxSlideStrokeMm ?? null,
     ribs: input.signals?.ribs ?? null,
     insertCount: input.signals?.insertCount ?? null,
     textFeatureCount: input.signals?.textFeatureCount ?? null,
@@ -581,10 +582,32 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     }
   }
   if (routed.has('side_action')) {
-    warnings.push(uncostedOpWarning(
-      UNCOSTED_OPERATION_LABELS.side_action,
-      `${signals.undercutCount ?? '?'} undercut feature(s) — slide/lifter tooling required`,
-    ));
+    // The hydraulic slides add their movement to every shot (F-32), charged at the press rate; lifters ride on the ejector stroke and add none.
+    // With the bundles not recognised, which it is cannot be told: the operation stays uncosted, as before.
+    if ((signals.slideBundleCount ?? 0) > 0) {
+      const move = runSlideMovementTime({
+        slideStrokeMm: signals.maxSlideStrokeMm ?? null,
+        rateMmPerS: plasticRef?.featureRules.slideCycleRateMmPerS ?? null,
+        cavities: cavityCount,
+      }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
+      if (move.derivable) {
+        const slideLine = makeLine(UNCOSTED_OPERATION_LABELS.side_action, null, batchSize, move.cycleSec / 60, mhrRate);
+        slideLine.calculationTrace = move.trace;
+        if (move.calculator.id) slideLine.calculatorId = move.calculator.id;
+        slideLine.calculatorName = move.calculator.name;
+        if (move.calculator.version != null) slideLine.calculatorVersion = move.calculator.version;
+        processLines.push(slideLine);
+      } else {
+        warnings.push(`${UNCOSTED_OPERATION_LABELS.side_action} not costed: missing ${move.missing.join('; ')}.`);
+      }
+    } else if (signals.slideBundleCount === 0 && (signals.slideOrLifterBundleCount ?? 0) > 0) {
+      warnings.push(`${UNCOSTED_OPERATION_LABELS.side_action}: the ${signals.slideOrLifterBundleCount} side-action bundle(s) are costed as lifters, which ride on the ejector stroke and add no cycle time; their blocks are in the tooling.`);
+    } else {
+      warnings.push(uncostedOpWarning(
+        UNCOSTED_OPERATION_LABELS.side_action,
+        `${signals.undercutCount ?? '?'} undercut feature(s) — slide/lifter tooling required`,
+      ));
+    }
   }
   if (routed.has('core_unscrewing')) {
     warnings.push(uncostedOpWarning(

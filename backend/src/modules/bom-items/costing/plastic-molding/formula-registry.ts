@@ -415,6 +415,24 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
+    id: 'F-32', version: 1, name: 'Slide movement in the cycle',
+    expression: 't = 2 x max slide stroke / slideCycleRate / cavities (s per part)',
+    outputUnit: 's',
+    inputs: [
+      { name: 'max slide stroke', unit: 'mm', source: 'CAD SlideBundle stroke_mm (cad-engine side_actions.py)' },
+      { name: 'slideCycleRate', unit: 'mm/s', source: `${MEM}/variables: slideCycleRate (Velocity, read as mm/s)` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/variables`,
+    assumptions: [
+      'The slides move out and back once per shot, all together, so the longest stroke sets the time.',
+      'Lifters ride on the ejector stroke and add no time; a LifterBundle is costed as a lifter (F-28).',
+      'Charged at the press rate as its own line (the press waits for the slides), not folded into the injection cycle calculator.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
     id: 'F-31', version: 1, name: 'Rib inserts and their EDM',
     expression: 'insert if rib height > threshold, class = smallest with area >= length x thickness;  steel = area x core plate height x density x price;  pocket = steel volume / pocket rate + setup;  EDM = electrode x burns x burn fraction / burn rate x EDM rate + electrode x burns x graphite price;  labour = design h(class) + cutter path + spotting + assembly',
     outputUnit: 'USD',

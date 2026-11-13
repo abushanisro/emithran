@@ -50,7 +50,7 @@ export const PLASTIC_VARIABLE_KEYS = [
   'conventionalRunnerMaxPressureReductionFactor', 'hotRunnerMaxPressureReductionFactor', 'minInjectionPressure',
   // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
   'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilonForSlides', 'drawDirectionOrthogonalEpsilonForLifters',
-  'cmAutoIncludeManualFlashTrimming', 'cmManualFlashTrimmingRate',
+  'cmAutoIncludeManualFlashTrimming', 'cmManualFlashTrimmingRate', 'slideCycleRate',
   // The mold base and its plate stack (mold-base.ts).
   'aPlateFlatCavityRatio', 'aPlateMinThickness', 'bPlateMinThickness', 'betweenPartsMoldBorder',
   'topClampPlateThickness', 'bottomClampPlateThickness', 'supportPlateThickness', 'useMetricOrImperialValues',
@@ -248,6 +248,8 @@ export interface FeatureRules {
   autoManualFlashTrimming: boolean | null;
   /** variable cmManualFlashTrimmingRate (Length/Time, read as mm/s): the linear rate of manual flash removal; null when not staged. */
   manualFlashTrimmingRateMmPerS?: number | null;
+  /** variable slideCycleRate (Velocity, read as mm/s): how fast a hydraulic slide moves (F-32); null when not staged. */
+  slideCycleRateMmPerS?: number | null;
 }
 
 export interface PlasticReferenceRows {
@@ -546,6 +548,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
         lifterEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForLifters'),
         autoManualFlashTrimming: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(text.get('cmAutoIncludeManualFlashTrimming')?.trim().toLowerCase()),
         manualFlashTrimmingRateMmPerS: optionalPositive('cmManualFlashTrimmingRate'),
+        slideCycleRateMmPerS: optionalPositive('slideCycleRate'),
       },
     },
     missing: [],
