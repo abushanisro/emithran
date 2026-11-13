@@ -7,6 +7,7 @@ import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
 import { runProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import type { FeatureGraph, DFMScoresResponse, OccurrenceScore } from '@/lib/types/manufacturing';
+import type { MachiningAllowanceSummary } from './useMachiningAllowance';
 
 export type { OccurrenceScore };
 
@@ -1000,6 +1001,8 @@ export interface CostSummaryDto {
   dieCasting?: DieCastingBreakdown;
   /** Sand casting: what the route decided (mirrors the backend's SandCastingBreakdown). */
   sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine'; gating: SandGatingLayout; flask: { lengthMm: number; widthMm: number; heightMm: number }; alternatives?: SandRouteAlternative[] };
+  /** Sand casting: the machining allowance of each machined feature (display only, never costed). */
+  machiningAllowance?: MachiningAllowanceSummary;
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */
   dieTooling?: DieToolingDto;
   /** Heat / surface / other secondary operations, shared by every family. See SecondaryOperationsDto. */
