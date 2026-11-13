@@ -163,7 +163,13 @@ export class ScenarioApplicationService {
       return { mode, routeId: null, routeLabel: applied.routeLabel, created: applied.created, operations: applied.operations };
     }
     const wanted = mode === 'auto' ? AUTO_ROUTE_ID : (routeId ?? route.routeId!);
-    const applied = await this.routes.applyRoute(id, { routeId: wanted, location, ...(batchSize ? { batchSize } : {}) }, user as never, token);
+    // A kept route can belong to the part's earlier process (sheet metal before it became a sand casting): then the recommendation is applied.
+    const applied = await this.routes.applyRoute(
+      id, { routeId: wanted, location, ...(batchSize ? { batchSize } : {}) }, user as never, token, ...(mode === 'keep' ? [{ fallbackToRecommended: true }] : []),
+    );
+    if (applied.replacedRouteId) {
+      warnings.push(`The applied route ${applied.replacedRouteId} is not a route for this part any more (its process changed): the recommended ${applied.routeLabel} was applied.`);
+    }
     return { mode, routeId: applied.routeId, routeLabel: applied.routeLabel, created: applied.created, operations: applied.operations };
   }
 

@@ -60,6 +60,8 @@ export class RouteApplicationService {
     dto: ApplyRouteDto,
     user: User,
     token: string,
+    /** Apply the recommended route instead when the asked one is no longer one of the part's routes (its process changed). Off for a route chosen by id. */
+    options: { fallbackToRecommended?: boolean } = {},
   ): Promise<ApplyRouteResult> {
     return this.audit.auditedRowChange('bom_items', id, 'cost.applied', async () => {
     await this.requireAnalysis(id, user, token);
@@ -87,7 +89,9 @@ export class RouteApplicationService {
     const batchSize = comparison.resolvedInputs.batchSize;
 
     // 2. Resolve 'auto' to the engine's own recommendation, from THIS comparison.
-    const routeId = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
+    const askedFor = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
+    const replaced = !!askedFor && options.fallbackToRecommended === true && !comparison.routes.some((r) => r.routeId === askedFor);
+    const routeId = replaced ? comparison.recommendedRouteId : askedFor;
     if (!routeId && comparison.noCompatibleProcessMessage) {
       // Every route is ruled out by a feature its process cannot make: say so, with each route's reason, and choose nothing.
       const reasons = comparison.routes.flatMap((r) => (r.compatibility?.incompatibilities ?? []).map((i) => `${r.routeLabel}: ${i.count} x ${i.featureType} (${i.reason})`));
@@ -162,6 +166,7 @@ export class RouteApplicationService {
       operations: insertedOps,
       routeLabel: route.routeLabel,
       routeId:    routeId,
+      ...(replaced ? { replacedRouteId: askedFor } : {}),
     };
   }, { route: dto.routeId, custom: false });
   }
