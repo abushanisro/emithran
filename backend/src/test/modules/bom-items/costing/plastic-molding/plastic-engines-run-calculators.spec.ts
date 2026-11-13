@@ -29,7 +29,7 @@ describe('the injection line is driven by its stored calculator', () => {
   it('carries the calculator id and version and the run: every input with its source, every formula with its value', () => {
     const line = moldingLine(computeInjectionMoldedCostSummary(part()));
     expect(line.calculatorId).toBe('Injection Molding - Cycle Time'); // the spec's calculators carry their name as id; the database's carry the uuid
-    expect(line.calculatorVersion).toBe(1);
+    expect(line.calculatorVersion).toBe(3);
     const trace = line.calculationTrace!;
     const inputs = trace.filter((t) => t.kind === 'input');
     expect(inputs.map((t) => t.fieldName)).toEqual(expect.arrayContaining(['Nominal Wall Thickness', 'Press Injection Rate', 'Fill Factor for Cavities', 'Cycle Time Adjustment Factor']));
@@ -86,7 +86,7 @@ describe('a saved calculation records which calculators it ran, and replay holds
 
   it('the snapshot names the calculator and a fingerprint of its formulas, and keeps the calculators out of the stored inputs', () => {
     const { snapshot } = save();
-    expect(snapshot.calculators).toEqual([{ name: 'Injection Molding - Cycle Time', version: 1, fingerprint: calculatorFingerprint(CALCULATORS['Injection Molding - Cycle Time']!) }]);
+    expect(snapshot.calculators).toEqual([{ name: 'Injection Molding - Cycle Time', version: 3, fingerprint: calculatorFingerprint(CALCULATORS['Injection Molding - Cycle Time']!) }]);
     expect(JSON.stringify(snapshot.inputs)).not.toContain('Pack to Cooling Ratio');
     expect(Object.keys(snapshot.inputs)).not.toContain('calculators');
   });
@@ -100,7 +100,7 @@ describe('a saved calculation records which calculators it ran, and replay holds
 
   it('is refused when the formulas now in force are not the ones it ran', () => {
     const { saved, snapshot } = save();
-    const tampered = { ...snapshot, calculators: [{ name: 'Injection Molding - Cycle Time', version: 1, fingerprint: '0000000000000000' }] };
+    const tampered = { ...snapshot, calculators: [{ name: 'Injection Molding - Cycle Time', version: 3, fingerprint: '0000000000000000' }] };
     const r = replayPlasticLine(tampered, rows(), saved);
     expect(r.reproduced).toBe(false);
     expect(r.reasons.join(' ')).toContain('have changed since this calculation');

@@ -83,7 +83,7 @@ describe('the injection cycle time, by the stored calculator', () => {
   it('names the calculator and a fingerprint of its formulas, which a saved calculation records', () => {
     const r = cycle(base);
     if (!r.derivable) throw new Error(r.missing.join());
-    expect(r.calculator).toMatchObject({ name: 'Injection Molding - Cycle Time', version: 1 });
+    expect(r.calculator).toMatchObject({ name: 'Injection Molding - Cycle Time', version: 3 });
     expect(r.calculator.fingerprint).toMatch(/^[0-9a-f]{16}$/);
     const foam = cycle(base, 'structural_foam');
     if (!foam.derivable) throw new Error(foam.missing.join());

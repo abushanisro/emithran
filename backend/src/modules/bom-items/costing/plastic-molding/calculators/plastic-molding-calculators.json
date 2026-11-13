@@ -155,7 +155,8 @@
           "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
       ],
-      "migration": 977
+      "migration": 1008,
+      "version": 3
     },
     {
       "key": "injection_lsr",
@@ -410,7 +411,8 @@
           "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
       ],
-      "migration": 977
+      "migration": 1008,
+      "version": 3
     },
     {
       "key": "compression",
