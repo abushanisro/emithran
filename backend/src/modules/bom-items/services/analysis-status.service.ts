@@ -1,3 +1,4 @@
+import { castingWorkerAvailable } from '../../sand-casting/casting-config';
 import { castingSourcePath } from '../../sand-casting/casting-source';
 import { Injectable } from '@nestjs/common';
 
@@ -24,6 +25,6 @@ export class AnalysisStatusService {
     const statuses = sourcePath ? await this.sandCasting.currentStatuses(item.id, sourcePath, token) : [];
     const group = (item.scenarioOverrides as Record<string, unknown> | null | undefined)?.['processGroup'];
     const chosenFamilyHint = this.autoFill.familyHintForProcessGroup(typeof group === 'string' ? group : undefined) ?? null;
-    return deriveAnalysisStatus({ ...item, chosenFamilyHint }, castingStatusOf(statuses), currentFeatureGraphVersion());
+    return deriveAnalysisStatus({ ...item, chosenFamilyHint }, castingStatusOf(statuses), currentFeatureGraphVersion(), castingWorkerAvailable());
   }
 }
