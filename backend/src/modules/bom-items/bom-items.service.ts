@@ -1,3 +1,4 @@
+import { castingSourcePath } from '../sand-casting/casting-source';
 import type { DbClient } from '../../common/db/postgrest-client';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
@@ -3088,7 +3089,7 @@ export class BOMItemsService {
     const item = await this.findOne(id, userId, accessToken);
     const grade = ((item as any).materialGrade ?? (item as any).material ?? null) as string | null;
     return this.sandCostService.dfm({
-      bomItemId: id, sourcePath: ((item as any).file3dPath ?? (item as any).file_3d_path ?? null) as string | null, grade,
+      bomItemId: id, sourcePath: castingSourcePath({ file_3d_path: (item as any).file3dPath ?? (item as any).file_3d_path, file_step_path: (item as any).fileStepPath ?? (item as any).file_step_path }), grade,
       client: this.databaseService.getUserClient(accessToken), accessToken,
     });
   }
@@ -4227,7 +4228,7 @@ export class BOMItemsService {
         const bbox = [(item as any).maxLength, (item as any).maxWidth, (item as any).maxHeight].map((v) => Number(v ?? 0));
         sandResult = await this.sandCostService.price({
           client, accessToken, location, grade,
-          bomItemId: id, sourcePath: ((item as any).file3dPath ?? (item as any).file_3d_path ?? null) as string | null,
+          bomItemId: id, sourcePath: castingSourcePath({ file_3d_path: (item as any).file3dPath ?? (item as any).file_3d_path, file_step_path: (item as any).fileStepPath ?? (item as any).file_step_path }),
           measurements: {
             volumeMm3: ((item.volume ?? 0) as number) || null,
             surfaceAreaMm2: Number((item as any).surfaceArea ?? (item as any).surface_area ?? 0) || null,
