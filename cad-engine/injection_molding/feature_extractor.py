@@ -349,7 +349,11 @@ class InjectionMoldedFeatureExtractor:
           n2 = -n1 → offset2 = dot(P2, n2) = dot(P2, -n1) = -dot(P2, n1)
           separation = |dot(P1-P2, n1)| = |offset1 + offset2|
 
-        Returns: {rib_count, rib_groups [{thickness_mm, count}], rib_confidence}
+        Height: the overlap of the two walls' extents along the pull (the 9th and 10th plane elements, from the
+        faces' vertices), measured; a plane without extents falls back to sqrt(area), labelled estimated, and is
+        left out of the group heights (the backend compares those with machinedRibThreshold for EDM'd inserts).
+
+        Returns: {rib_count, rib_groups [{thickness_mm, count, heights_mm, max_height_mm}], rib_confidence}
         Confidence 0.55: detects straight axis-aligned ribs well; diagonal/curved
         rib walls may be missed. Validated against straight-rib enclosure covers.
         """
@@ -362,6 +366,7 @@ class InjectionMoldedFeatureExtractor:
 
         rib_pairs = 0
         rib_separations: List[float] = []
+        rib_heights: List[Optional[float]] = []
         rib_data: List[Dict[str, Any]] = []  # per-rib centroid + dims for heatmap placement
         n_faces = len(wall_face_planes)
 
@@ -383,9 +388,14 @@ class InjectionMoldedFeatureExtractor:
                 rib_pairs += 1
                 rib_separations.append(round(sep, 2))
 
-                # Rib centroid = midpoint between the two face centroids.
-                # height estimate: area ≈ height × sep, so height ≈ sqrt(max_area)
-                height_est = round(math.sqrt(max(_area1, _area2, 1.0)), 2)
+                # Rib centroid = midpoint between the two face centroids. Height: the overlap of the two walls along
+                # the pull when the planes carry their extents; else area ≈ height × sep, so height ≈ sqrt(max_area).
+                ext1, ext2 = wall_face_planes[i][8:10], wall_face_planes[j][8:10]
+                measured = None
+                if len(ext1) == 2 and len(ext2) == 2 and all(math.isfinite(v) for v in (*ext1, *ext2)):
+                    measured = round(max(0.0, min(ext1[1], ext2[1]) - max(ext1[0], ext2[0])), 2)
+                rib_heights.append(measured)
+                height_est = measured if measured is not None else round(math.sqrt(max(_area1, _area2, 1.0)), 2)
                 rib_data.append({
                     "centroid": [
                         round((cx1 + cx2) / 2, 2),
@@ -394,16 +404,22 @@ class InjectionMoldedFeatureExtractor:
                     ],
                     "thickness_mm": round(sep, 2),
                     "height_mm": height_est,
+                    "height_source": "measured_along_pull" if measured is not None else "estimated_from_area",
                 })
 
         # Bin into 0.5 mm groups for DFM reporting
         binned: Dict[float, int] = {}
-        for s in rib_separations:
+        bin_heights: Dict[float, List[float]] = {}
+        for s, h in zip(rib_separations, rib_heights):
             bin_key = round(round(s / 0.5) * 0.5, 1)
             binned[bin_key] = binned.get(bin_key, 0) + 1
+            bin_heights.setdefault(bin_key, [])
+            if h is not None:
+                bin_heights[bin_key].append(h)
 
         rib_groups = sorted(
-            [{"thickness_mm": k, "count": v} for k, v in binned.items()],
+            [{"thickness_mm": k, "count": v, "heights_mm": sorted(bin_heights[k]), "max_height_mm": max(bin_heights[k]) if bin_heights[k] else None}
+             for k, v in binned.items()],
             key=lambda x: x["thickness_mm"],
         )
         confidence = 0.55 if rib_pairs > 0 else 0.35

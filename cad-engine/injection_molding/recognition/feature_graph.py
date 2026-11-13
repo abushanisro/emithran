@@ -59,7 +59,10 @@ def build_feature_graph(
     for g in rib_groups:
         items.append({
             "id": f"rib-t{g['thickness_mm']}", "feature_type": vocabulary("Rib"), "variant": "legacy_antiparallel_pairs", "diameter_mm": None, "depth_mm": None,
-            "attributes": {"thickness_mm": g["thickness_mm"], "count": g["count"], "confidence": rib_confidence}, "occurrences": [],
+            "attributes": {"thickness_mm": g["thickness_mm"], "count": g["count"], "confidence": rib_confidence,
+                           # measured along the pull (feature_extractor._detect_ribs); absent from groups made before heights were measured
+                           **({"heights_mm": g["heights_mm"], "max_height_mm": g["max_height_mm"]} if "heights_mm" in g else {})},
+            "occurrences": [],
         })
     sa = side_actions or {}
     for v in sa.get("voids", []):

@@ -71,7 +71,8 @@ def analyze_draft_angles(
     try:
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
         from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
-        from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_VERTEX  # type: ignore
+        from OCC.Core.BRep import BRep_Tool  # type: ignore
         from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
         from OCC.Core.TopoDS import topods  # type: ignore
         from OCC.Core.BRepGProp import brepgprop  # type: ignore
@@ -129,7 +130,9 @@ def analyze_draft_angles(
     draft_angles: List[float] = []
 
     # Collect wall face plane equations for reuse (e.g. Injection Molding's rib
-    # detection): (nx, ny, nz, plane_offset, area, cx, cy, cz).
+    # detection): (nx, ny, nz, plane_offset, area, cx, cy, cz, lo, hi), lo..hi the
+    # face's extent along the pull, from its vertices (a rib's height is the overlap
+    # of its two walls' extents).
     wall_face_planes: List[Tuple] = []
 
     # DFM face groups for 3D highlighting: face_index = global OCC ordinal,
@@ -184,7 +187,14 @@ def analyze_draft_angles(
             draft_angles.append(round(draft_deg, 2))
 
             offset = float(p.X()) * nx + float(p.Y()) * ny + float(p.Z()) * nz
-            wall_face_planes.append((nx, ny, nz, offset, area, centroid[0], centroid[1], centroid[2]))
+            along: List[float] = []
+            vexp = TopExp_Explorer(face, TopAbs_VERTEX)
+            while vexp.More():
+                vp = BRep_Tool.Pnt(topods.Vertex(vexp.Current()))
+                along.append(float(vp.X()) * pull[0] + float(vp.Y()) * pull[1] + float(vp.Z()) * pull[2])
+                vexp.Next()
+            lo, hi = (min(along), max(along)) if along else (float("nan"), float("nan"))
+            wall_face_planes.append((nx, ny, nz, offset, area, centroid[0], centroid[1], centroid[2], lo, hi))
 
             if dot < undercut_neg_dot_threshold:
                 undercut_count += 1

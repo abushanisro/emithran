@@ -101,6 +101,12 @@ class TestFeatureGraph:
         assert rib["variant"] == "legacy_antiparallel_pairs"
         assert rib["attributes"] == {"thickness_mm": 1.5, "count": 4, "confidence": 0.55}
 
+    def test_rib_heights_measured_along_the_pull_are_carried(self):
+        g = self.graph(box(100, 60, 20), legacy_rib_groups=[{"thickness_mm": 1.0, "count": 2, "heights_mm": [12.0, 26.0], "max_height_mm": 26.0}],
+                       legacy_rib_confidence=0.55)
+        rib = next(i for i in g["items"] if i["feature_type"] == "Rib")
+        assert rib["attributes"]["heights_mm"] == [12.0, 26.0] and rib["attributes"]["max_height_mm"] == 26.0
+
 
 def test_the_extractor_carries_the_graph_and_leaves_the_legacy_fields_as_they_were():
     part = cut(box(100, 60, 10), cyl((50, 30, -1), Z, 5, 12))
