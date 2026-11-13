@@ -266,6 +266,8 @@ org:viewer      GET /api/v1/supplier-nominations/:nominationId/vendor-ratings/:v
 org:viewer      GET /api/v1/supplier-nominations/approved-vendors/bom-part/:bomPartId  SupplierNominationsController.getApprovedVendorsByBomPart
 org:viewer      GET /api/v1/supplier-nominations/evaluations/:evaluationId/scores  SupplierNominationsController.getEvaluationScores
 org:viewer      GET /api/v1/supplier-nominations/project/:projectId  SupplierNominationsController.findByProject
+org:viewer      GET /api/v1/tooling-catalogs  ToolingCatalogController.list
+org:viewer      GET /api/v1/tooling-catalogs/:domain  ToolingCatalogController.findOne
 org:viewer      GET /api/v1/tooling-costs  ToolingCostController.findAll
 org:viewer      GET /api/v1/tooling-costs/:id  ToolingCostController.findOne
 org:viewer      GET /api/v1/vave-projects  VaveController.listProjects

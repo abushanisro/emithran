@@ -27731,6 +27731,55 @@
         ]
       }
     },
+    "/api/v1/tooling-catalogs": {
+      "get": {
+        "operationId": "ToolingCatalogController_list_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The domains that have a tooling catalog",
+        "tags": [
+          "Tooling Costs"
+        ]
+      }
+    },
+    "/api/v1/tooling-catalogs/{domain}": {
+      "get": {
+        "operationId": "ToolingCatalogController_findOne_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The priced tooling items of one domain, from its staged reference data",
+        "tags": [
+          "Tooling Costs"
+        ]
+      }
+    },
     "/api/v1/tooling-costs": {
       "get": {
         "operationId": "ToolingCostController_findAll_v1",
