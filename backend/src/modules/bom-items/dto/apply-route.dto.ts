@@ -67,6 +67,8 @@ export interface ApplyRouteResult {
   operations: string[];
   routeLabel: string;
   routeId: string;
+  /** The route asked for, when it was no longer one of the part's routes and the recommendation was applied instead (fallbackToRecommended). */
+  replacedRouteId?: string;
 }
 
 // Custom, dynamically-assembled route from the Workflow Builder.

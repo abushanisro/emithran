@@ -127,12 +127,21 @@ describe('ScenarioApplicationService.apply', () => {
 
     const keep = build({ notes: [{ notes: 'x' }, { notes: 'auto_fill_from_route:im-large-500t' }] });
     await keep.svc.apply(input({ route: { mode: 'keep' } }));
-    expect(keep.routes.applyRoute).toHaveBeenCalledWith('i1', { routeId: 'im-large-500t', location: 'USA' }, expect.anything(), 't');
+    // Kept, unless it is no longer a route for the part (its process changed): then the recommendation, said in a warning.
+    expect(keep.routes.applyRoute).toHaveBeenCalledWith('i1', { routeId: 'im-large-500t', location: 'USA' }, expect.anything(), 't', { fallbackToRecommended: true });
 
     const none = build();
     const k = await none.svc.apply(input({ route: { mode: 'keep' } }));
     expect(none.routes.applyRoute).toHaveBeenCalledWith('i1', { routeId: 'auto', location: 'USA' }, expect.anything(), 't');
     expect(k.warnings.join(' ')).toMatch(/No route was applied yet/);
+  });
+
+  it('says so when the kept route was replaced because the part has changed process', async () => {
+    const moved = build({ notes: [{ notes: 'auto_fill_from_route:sm-laser' }] });
+    moved.routes.applyRoute.mockResolvedValueOnce({ created: 14, operations: ['Melting'], routeLabel: 'Sand casting', routeId: 'sand-casting', replacedRouteId: 'sm-laser' });
+    const r = await moved.svc.apply(input({ route: { mode: 'keep' } }));
+    expect(r.route).toMatchObject({ routeId: 'sand-casting', created: 14 });
+    expect(r.warnings.join(' ')).toMatch(/sm-laser is not a route for this part any more.*Sand casting/);
   });
 
   it('a machine that cannot be saved is reported and does not undo the route', async () => {
