@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { HOT_BOX_GUIDANCE, SAND_CORE_PROCESSES, SAND_MOULDING_PROCESSES, SAND_SCENARIO_KEYS, choiceOf, parseCavities, parsePositive } from '@/lib/costing/sand-scenario';
+import { HOT_BOX_GUIDANCE, SAND_CORE_PROCESSES, SAND_MOULDING_PROCESSES, SAND_SCENARIO_KEYS, choiceOf, parseCavities, parsePositive, sandOverrideCount } from '@/lib/costing/sand-scenario';
 
 describe('sand scenario fields', () => {
   it('a positive number is read, an empty field clears the choice, anything else is refused without changing it', () => {
@@ -58,5 +58,14 @@ describe('sand scenario fields', () => {
       expect(text).toContain('US 5,365,995');
       expect(cores).toContain(`value: ${value}`);
     }
+  });
+});
+
+describe('sandOverrideCount', () => {
+  it('counts the sand settings the user set, and nothing else', () => {
+    expect(sandOverrideCount(null)).toBe(0);
+    expect(sandOverrideCount({})).toBe(0);
+    expect(sandOverrideCount({ [SAND_SCENARIO_KEYS.cavities]: 2, [SAND_SCENARIO_KEYS.refractoryCoat]: 'none', batchSize: 250 })).toBe(2);
+    expect(sandOverrideCount({ [SAND_SCENARIO_KEYS.mouldingProcess]: '', [SAND_SCENARIO_KEYS.energyPrice]: null })).toBe(0);
   });
 });
