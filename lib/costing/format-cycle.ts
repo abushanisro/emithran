@@ -9,3 +9,9 @@ export function formatCycleMin(min: number | null | undefined): string {
   if (sec >= 0.1) return `${sec.toFixed(1)} s`;
   return `${sec.toLocaleString('en-US', { maximumSignificantDigits: 2, useGrouping: false })} s`;
 }
+
+/** A cycle in seconds for the route table: whole seconds from a second up, two significant figures below (0.2 s, 0.0041 s), never "0 sec". */
+export function formatCycleSec(sec: number): string {
+  if (sec >= 1 || sec <= 0) return `${sec.toFixed(0)} sec`;
+  return `${sec.toLocaleString('en-US', { maximumSignificantDigits: 2, useGrouping: false })} sec`;
+}
