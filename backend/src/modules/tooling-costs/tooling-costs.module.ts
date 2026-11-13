@@ -12,6 +12,8 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../common/database/database.module';
 import { ToolingCostController } from './controllers/tooling-cost.controller';
 import { ToolingCostService } from './services/tooling-cost.service';
+import { ToolingCatalogController } from './controllers/tooling-catalog.controller';
+import { ToolingCatalogService } from './services/tooling-catalog.service';
 
 @Module({
   imports: [
@@ -19,9 +21,11 @@ import { ToolingCostService } from './services/tooling-cost.service';
   ],
   controllers: [
     ToolingCostController,
+    ToolingCatalogController,
   ],
   providers: [
     ToolingCostService,
+    ToolingCatalogService,
   ],
   exports: [
     ToolingCostService, // Export for use in other modules
