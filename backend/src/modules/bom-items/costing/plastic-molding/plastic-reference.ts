@@ -55,6 +55,8 @@ export const PLASTIC_VARIABLE_KEYS = [
   'topClampPlateThickness', 'bottomClampPlateThickness', 'supportPlateThickness', 'useMetricOrImperialValues',
   // The cavity and core: machining by complexity and the polish of the default finish (mold-cavity.ts).
   'defaultCavityFinishIM', 'cmMoldSurfaceCountThresholdSimple', 'cmMoldSurfaceCountThresholdAverage',
+  // The mold assembly extras (mold-tooling-calculator.ts, F-27): ejector pins, sprue, locating ring, try-out; and the default cavity texture.
+  'areaCoveredPerEjectorPin', 'sprueBushingCost', 'locatingRingsCost', 'timePerTryoutBase', 'defaultNumTryOuts', 'cavityTexture_IM',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -163,15 +165,17 @@ export interface PlasticReference {
   /** variables defaultNumberOfGatesPerCavity. */
   defaultGatesPerCavity: number;
   shotSizeSafetyFactor: number;
-  /** Ordered cheapest (lowest rating) first. */
-  spiClasses: Array<{ moldClass: MoldClass; cycleRating: number }>;
+  /** Ordered cheapest (lowest rating) first. useInsert: tblSpiType Use Insert, whether the class builds its cavity as inserts (null when not staged). */
+  spiClasses: Array<{ moldClass: MoldClass; cycleRating: number; useInsert: boolean | null }>;
   tooling: MoldToolingTables;
   /** tblToolLife: shots one mold lasts, by raw_materials material_type. */
   toolLifeShotsByType: Array<{ materialType: string; shots: number }>;
   /** variables defaultToolLife: for a material type with no tblToolLife row. */
   defaultToolLifeShots: number;
   /** digital_factory_settings_usa, Default profile. USA only: no other location is on file. */
-  toolroomRatesUsa: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number };
+  toolroomRatesUsa: ToolroomRates;
+  /** The mold assembly extras: the ejector pins, sprue bushing, locating ring and try-out, and the default cavity texture (F-27). */
+  moldExtras: MoldExtrasReference;
   /** The mold base: standard sizes, borders, the plate stack and the default tool steel (mold-base.ts). */
   moldBase: MoldBaseReference;
   /**
@@ -179,6 +183,26 @@ export interface PlasticReference {
    * still costs the part, and the operations the missing variable would decide are reported undecided (plastic-catalog-operation-resolver.ts).
    */
   featureRules: FeatureRules;
+}
+
+/** digital_factory_settings_usa toolroom rates, USD per hour. */
+export interface ToolroomRates { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number; tryoutUsdPerHr: number }
+
+/** What the mold's assembly extras cost, from memory/Plastic Modeling (F-27). */
+export interface MoldExtrasReference {
+  /** variables areaCoveredPerEjectorPin (mm2): one ejector pin per this much of the molded area. */
+  areaPerEjectorPinMm2: number;
+  /** cmStandardToolingComponents Ejector Pin unit cost (its quantity "is calculated in the cost model") and cmToolAssemblyTimes Ejector Pin hours. */
+  ejectorPinUsd: number;
+  ejectorPinAssemblyHours: number;
+  /** variables sprueBushingCost and locatingRingsCost: one of each per mold. */
+  sprueBushingUsd: number;
+  locatingRingUsd: number;
+  /** variables timePerTryoutBase (hours per try-out below 500 t, twice that above) and defaultNumTryOuts. */
+  tryoutBaseHours: number;
+  tryouts: number;
+  /** variables cavityTexture_IM: the default cavity texture ("None": no texture). */
+  cavityTexture: string;
 }
 
 export interface FeatureRules {
@@ -283,6 +307,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
   const spiClasses = table('tblSpiType').map((r) => ({
     moldClass: `Class${num(r['Spi Type'])}` as MoldClass,
     cycleRating: num(r['Num Annual Mold Cycles']),
+    useInsert: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(String(r['Use Insert'] ?? '').trim().toLowerCase()),
   }));
   if (spiClasses.some((c) => c.cycleRating == null)) missing.push('tblSpiType: Num Annual Mold Cycles');
 
@@ -322,6 +347,23 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     designUsdPerHr: rate('designRateUsdPerHr'),
     machiningUsdPerHr: rate('machiningRateUsdPerHr'),
     assemblyUsdPerHr: rate('assemblyRateUsdPerHr'),
+    tryoutUsdPerHr: rate('tryoutRateUsdPerHr'),
+  };
+  const ejectorPin = components.find((c) => componentNameKey(c.name) === componentNameKey('Ejector Pin'));
+  const ejectorPinHours = assemblyTimes.find((a) => componentNameKey(a.name) === componentNameKey('Ejector Pin'))?.hours;
+  if (!(ejectorPin?.unitCostUsd != null && ejectorPin.unitCostUsd > 0)) missing.push('cmStandardToolingComponents: Ejector Pin unit_cost_usd');
+  if (!(ejectorPinHours != null && ejectorPinHours > 0)) missing.push('cmToolAssemblyTimes: Ejector Pin assembly_time_hr');
+  const texture = text.get('cavityTexture_IM')?.trim() || null;
+  if (!texture) missing.push('variables: cavityTexture_IM');
+  const moldExtras: MoldExtrasReference = {
+    areaPerEjectorPinMm2: variable('areaCoveredPerEjectorPin'),
+    ejectorPinUsd: ejectorPin?.unitCostUsd ?? NaN,
+    ejectorPinAssemblyHours: ejectorPinHours ?? NaN,
+    sprueBushingUsd: variable('sprueBushingCost'),
+    locatingRingUsd: variable('locatingRingsCost'),
+    tryoutBaseHours: variable('timePerTryoutBase'),
+    tryouts: variable('defaultNumTryOuts'),
+    cavityTexture: texture ?? '',
   };
 
   const system = text.get('useMetricOrImperialValues') === 'Imperial' ? 'Imperial' : text.get('useMetricOrImperialValues') === 'Metric' ? 'Metric' : null;
@@ -428,11 +470,12 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       cavityLayouts,
       defaultGatesPerCavity,
       shotSizeSafetyFactor,
-      spiClasses: (spiClasses as Array<{ moldClass: MoldClass; cycleRating: number }>).sort((a, b) => a.cycleRating - b.cycleRating),
+      spiClasses: (spiClasses as Array<{ moldClass: MoldClass; cycleRating: number; useInsert: boolean | null }>).sort((a, b) => a.cycleRating - b.cycleRating),
       tooling: { components, assemblyTimes, operatorsByArea, designHoursByArea, plateMachiningRateM2PerHr, cavityPlateSetupHr, corePlateSetupHr },
       toolLifeShotsByType,
       defaultToolLifeShots,
       toolroomRatesUsa,
+      moldExtras,
       moldBase,
       featureRules: {
         maxNoCoreInsertDiameterMm: optionalPositive('maxNoCoreInsertDiameter'),

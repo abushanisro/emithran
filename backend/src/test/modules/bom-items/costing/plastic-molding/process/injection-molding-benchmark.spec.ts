@@ -172,14 +172,17 @@ describe('computeInjectionMoldedCostSummary', () => {
     expect(t.moldsRequired).toBe(Math.ceil((500_000 / r.injectionMolding!.cavityCount) / 144_000));
     expect(t.moldLabourCostUsd).toBeGreaterThan(0);
     expect(t.moldBaseSteelUsd).toBeGreaterThan(0);
-    expect(t.moldCostUsd).toBeCloseTo((t.moldBomSubtotalUsd! + t.moldLabourCostUsd! + t.moldBaseSteelUsd! + t.moldCavityMachiningUsd! + t.moldPolishUsd!) * t.moldsRequired!, 1);
+    expect(t.moldCostUsd).toBeCloseTo((t.moldBomSubtotalUsd! + t.moldLabourCostUsd! + t.moldBaseSteelUsd! + t.moldCavityMachiningUsd! + t.moldPolishUsd!
+      + t.moldEjectorSystemUsd! + t.moldSprueAndLocatingRingUsd! + t.moldTryoutUsd!) * t.moldsRequired!, 1);
   });
 
   it('prices side-action hardware only when the part has an undercut', () => {
     const without = computeInjectionMoldedCostSummary(input('PP', MID, 'x'));
     const withUndercut = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { signals: { projectedAreaMm2: 2000, undercutCount: 1 } }));
     expect(withUndercut.tooling!.moldBomSubtotalUsd!).toBeGreaterThan(without.tooling!.moldBomSubtotalUsd!);
-    expect(without.tooling!.moldMissingComponents).toEqual(expect.arrayContaining([expect.stringContaining('Ejector Pin')]));
+    // The ejector pins are counted and priced by the tooling calculator (F-27), no longer a component with no quantity.
+    expect((without.tooling!.moldMissingComponents ?? []).join(' ')).not.toMatch(/Ejector Pin/);
+    expect(without.tooling!.moldEjectorSystemUsd).toBeGreaterThan(0);
   });
 
   it('routes the real secondary signals: hygroscopic resin -> drying, undercut -> side action, inserts', () => {

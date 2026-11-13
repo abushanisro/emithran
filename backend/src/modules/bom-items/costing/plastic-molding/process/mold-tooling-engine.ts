@@ -49,9 +49,9 @@
 //   estimate, not re-cited as real, since no sourced per-cavity component
 //   fraction was found to replace it with.
 // - Ejector Pin: cmStandardToolingComponents' own notes say its quantity
-//   "is calculated in the cost model" — i.e. the source itself defers to a
-//   formula this dataset does not supply. Never guessed; reported as a real
-//   priced-per-unit component with an unresolved quantity (missingComponents).
+//   "is calculated in the cost model": the tooling calculator counts the pins
+//   (the molded area over areaCoveredPerEjectorPin, F-27) and prices them, so
+//   the component list leaves it out rather than reporting it missing.
 
 import { componentNameKey, type MoldToolingTables } from '../plastic-reference';
 
@@ -77,6 +77,8 @@ interface MoldToolingInput {
   slideOrLifterBundles: number;
   /** Staged tooling tables (plastic-reference.ts). */
   tables: MoldToolingTables;
+  /** What decides which of the remaining gaps apply to this mold: a hot runner needs hot drops, an insert-built class needs inserts, a texture needs texturing. */
+  scope: { runner: 'hot' | 'cold'; classUsesInserts: boolean | null; cavityTexture: string };
 }
 
 interface MoldToolingResult {
@@ -98,10 +100,33 @@ function bracket<T>(rows: readonly T[], bound: (r: T) => number, value: number):
   return rows.find((r) => value <= bound(r)) ?? rows[rows.length - 1]!;
 }
 
-const SCOPE_WARNING =
-  'Injection Molding tooling cost includes the mold base plate steel, the standard components and the toolroom hours; it does NOT include ' +
-  'core and cavity blocks, slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops ' +
-  'or try-out (no formula on file yet): the true tooling investment is higher than this figure.';
+// Priced by the tooling calculator from the staged ejector pin count and the components below; the list leaves it out (see the header).
+const CALCULATOR_PRICED_COMPONENTS = new Set(['Ejector Pin'].map(componentNameKey));
+
+/**
+ * What the tooling cost includes and what it still leaves out for this mold. Hot drops, inserts and texture are left out only when they apply: a cold
+ * runner has no hot drops, a class tblSpiType builds without inserts has none, and the default texture "None" is no texture.
+ */
+/** The registry gaps (formula-registry.ts) left in a priced mold: slides and lifters, EDM and heat treatment, cooling always; texture, inserts, hot drops where they apply. */
+export function toolingGapIds(scope: MoldToolingInput['scope']): string[] {
+  return [
+    'G-03', 'G-04',
+    ...(scope.cavityTexture.toLowerCase() !== 'none' ? ['G-05'] : []),
+    'G-06',
+    ...(scope.classUsesInserts !== false ? ['G-07'] : []),
+    ...(scope.runner === 'hot' ? ['G-08'] : []),
+  ];
+}
+
+export function toolingScopeWarning(scope: MoldToolingInput['scope']): string {
+  const left = ['slides and lifters', 'EDM and heat treatment', 'cooling lines'];
+  if (scope.runner === 'hot') left.push('hot drops (the number of drops is not on file)');
+  if (scope.classUsesInserts !== false) left.push('cavity inserts');
+  if (scope.cavityTexture.toLowerCase() !== 'none') left.push(`the ${scope.cavityTexture} texture`);
+  return 'Injection Molding tooling cost includes the mold base plate steel, the cavity and core machining and polish, the standard components, the ejector '
+    + `pins, sprue bushing, locating ring, try-out and the toolroom hours; it does NOT include ${left.join(', ')} (no formula on file yet): the true tooling `
+    + 'investment is higher than this figure.';
+}
 
 /**
  * Real, itemized, partial mold-tooling BOM cost. Pure function — every input
@@ -119,6 +144,7 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   const assemblyHrByKey = new Map(t.assemblyTimes.map((a) => [componentNameKey(a.name), a.hours]));
   for (const c of t.components) {
     if (SIDE_ACTION_ONLY_COMPONENTS.has(componentNameKey(c.name)) && !needsSlideHardware) continue; // real: no slide needed
+    if (CALCULATOR_PRICED_COMPONENTS.has(componentNameKey(c.name))) continue;
     if (c.quantity === null) {
       missingComponents.push(`${c.name} (real unit cost on file, but this part's real quantity is not derivable from any sourced table)`);
       continue;
@@ -136,7 +162,7 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   const estimatedDesignHrs = bracket(t.designHoursByArea, (r) => r.areaMm2, input.moldBaseAreaMm2).hours;
   const estimatedAssemblyOperators = bracket(t.operatorsByArea, (r) => r.areaM2, areaM2).operators;
 
-  const warnings = [SCOPE_WARNING];
+  const warnings = [toolingScopeWarning(input.scope)];
   if (input.slideBundles != null && input.slideBundles === 0 && input.slideOrLifterBundles > 0) {
     warnings.push(
       `Slide hardware (hydraulic cylinder, side lock) is not priced: ${input.slideOrLifterBundles} side-action bundle${input.slideOrLifterBundles === 1 ? '' : 's'} could be lifters or slides, `

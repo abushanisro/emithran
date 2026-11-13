@@ -35,7 +35,7 @@ import type {
 import type { IMProcessTree, MoldingSubtype } from './process-tree';
 import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
-import { computeMoldToolingCost } from './mold-tooling-engine';
+import { computeMoldToolingCost, toolingGapIds } from './mold-tooling-engine';
 import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
@@ -156,7 +156,7 @@ export function recommendMoldClass(
   spiClasses: PlasticReference['spiClasses'],
   partingComplexity: number | null,
   undercutCount: number | null,
-): { moldClass: MoldClass; cycleRating: number } {
+): PlasticReference['spiClasses'][number] {
   // spiClasses is ordered cheapest (lowest rating) first; the last is the most durable.
   const needsBump = (partingComplexity ?? 0) > 0.6 || (undercutCount ?? 0) > 2;
   let idx = spiClasses.findIndex((c) => c.cycleRating >= lifetimeShots);
@@ -655,6 +655,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
 
   // ── Tooling cost (separate from piece cost, omitted when inputs absent) ────
   let toolingResult: ToolingCostDto | undefined;
+  let toolingGaps: string[] = [];
   const annualVol = input.annualVolume;
   const prodLife = input.productionLifeYears;
   if (annualVol != null && prodLife != null && annualVol > 0 && prodLife > 0 && !plasticRef) {
@@ -666,6 +667,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     // Unscrewing cores add mold complexity beyond parting line — treat as additional undercut bump.
     const effectiveUndercutCount = (signals.undercutCount ?? 0) + ((signals as any).unscrewingCoreCount ?? 0);
     const mold = recommendMoldClass(lifetimeShots, plasticRef.spiClasses, signals.partingComplexity ?? null, effectiveUndercutCount);
+    const toolingScope = { runner: runnerSystemType, classUsesInserts: mold.useInsert, cavityTexture: plasticRef.moldExtras.cavityTexture };
+    toolingGaps = toolingGapIds(toolingScope);
 
     // Required mold-window area: the press-sizing projected area x cavities.
     const moldBaseAreaMm2 = Math.max(0, projectedAreaMm2 ?? 0) * cavityCount;
@@ -676,6 +679,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       slideBundles: signals.slideBundleCount ?? null,
       slideOrLifterBundles: signals.slideOrLifterBundleCount ?? 0,
       tables: plasticRef.tooling,
+      scope: toolingScope,
     });
     // Molds the job wears out: tblToolLife shots per tool for the material type,
     // the reference default (its median) for a type with no row.
@@ -699,6 +703,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       partHeightMm: (input.bboxMinMm ?? 0) > 0 ? input.bboxMinMm! : null,
       cavity: moldCavityLookup({ faceCount: input.cadFaceCount ?? null, surfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null, ref: plasticRef.moldBase }),
       partSurfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null,
+      extras: plasticRef.moldExtras,
+      pressClampTonnes: input.machineClampTonnes != null && input.machineClampTonnes > 0 ? input.machineClampTonnes : null,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides));
     if (!tooling.derivable) {
       warnings.push(`Tooling not costed: missing ${tooling.missing.join('; ')}.`);
@@ -723,6 +729,9 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         moldBaseSteelUsd: o['Mold Base Steel Cost']!,
         moldCavityMachiningUsd: o['Cavity Machining Cost']!,
         moldPolishUsd: o['Polish Cost']!,
+        moldEjectorSystemUsd: o['Ejector System Cost']!,
+        moldSprueAndLocatingRingUsd: o['Sprue and Locating Ring Cost']!,
+        moldTryoutUsd: o['Tryout Cost']!,
         calculationTrace: tooling.trace,
         calculatorName: tooling.calculator.name,
       };
@@ -740,7 +749,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   // is no quote to qualify.
   const validation = sizing.materialGap ? undefined : buildQuoteValidation(
     usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
-    unsupportedFormulas({ tooling: toolingResult != null, routed }),
+    unsupportedFormulas({ toolingGaps: toolingResult != null ? toolingGaps : [], routed }),
   );
   if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, PLASTIC_ENGINE_BUILD, input as unknown as Record<string, unknown>, cycle.derivable ? [cycle.calculator] : []);
 
@@ -781,7 +790,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
     ...(q.pressSelected ? ['F-11'] : []),
     ...(q.cycleDerivable ? [q.isLsr ? 'F-09' : 'F-04', ...(q.isLsr ? [] : ['F-06']), 'F-05', 'F-07', 'F-08'] : []),
     ...(q.yieldKnown ? ['F-13'] : []),
-    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26'] : []),
+    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27'] : []),
   ];
 }
 
@@ -790,10 +799,10 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
  * priced (it is priced from components and hours only), the cycle's handling and plasticizing and the period costs always, and the operations the
  * route needs that have no data at all.
  */
-function unsupportedFormulas(q: { tooling: boolean; routed: ReadonlySet<string> }): string[] {
+function unsupportedFormulas(q: { toolingGaps: readonly string[]; routed: ReadonlySet<string> }): string[] {
   const noData = ['material_drying', 'visual_inspection', 'ultrasonic_welding', 'secondary_cure_oven', 'lsr_compound_dosing'].some((op) => q.routed.has(op));
   return [
-    ...(q.tooling ? ['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08'] : []),
+    ...q.toolingGaps,
     'G-09', 'G-10',
     ...(noData ? ['G-11'] : []),
   ];

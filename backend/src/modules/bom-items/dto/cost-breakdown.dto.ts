@@ -895,6 +895,10 @@ export interface ToolingCostDto {
   /** The cavity and core machining and their polish in one mold, USD (formula registry F-26). */
   moldCavityMachiningUsd?: number;
   moldPolishUsd?: number;
+  /** The mold assembly extras in one mold, USD (formula registry F-27): the ejector pins (with their assembly), the sprue bushing and locating ring, the try-out. */
+  moldEjectorSystemUsd?: number;
+  moldSprueAndLocatingRingUsd?: number;
+  moldTryoutUsd?: number;
   /** The tooling calculator's run (migration 1012): every input with its source and every formula with its value. */
   calculationTrace?: CalculationTraceStep[];
   /** The tooling calculator's name: a part's own field values are set by it (calculator_field_overrides). */
