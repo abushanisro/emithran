@@ -111,6 +111,7 @@ import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/
 import {
   familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
+import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
@@ -3608,10 +3609,10 @@ function RouteSelectionDialog({
   // milling/turning engines), each already a full multi-line quote, exactly
   // like the plastic-molding routes. Both use the same complete-route pane.
   const isMachining = partFamily === 'milled' || partFamily === 'turned' || partFamily === 'mill_turn';
-  // Die-cast parts: one complete route per die-casting process (High Pressure /
-  // Gravity), each the full casting quote priced on that process.
+  // Die-cast parts: one complete route per die-casting process (High Pressure / Gravity); sand-cast parts: the sand route as quoted.
   const isDieCast = partFamily === 'die_cast';
-  const isCompleteRouteFamily = isIM || isMachining || isDieCast;
+  const isSandCast = partFamily === 'sand_cast';
+  const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
   // per-class array. The old array existed because React hooks can't be
@@ -4086,7 +4087,7 @@ function RouteSelectionDialog({
     if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     // A die-casting process route: feasible ones only, the same rule apply-route
     // enforces (an infeasible row still says why).
-    if (isDieCast) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
+    if (isDieCast || isSandCast) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     return false;
   };
 
@@ -4223,6 +4224,9 @@ function RouteSelectionDialog({
               cuttingGroupMeta={isDieCast ? {
                 title: 'Casting process',
                 description: 'Each die-casting process priced as the full quote for this part (casting, its machining after casting, finishing). The recommended one is the cheapest feasible, die and coreboxes included.',
+              } : isSandCast ? {
+                title: 'Sand casting',
+                description: 'The sand-casting route as quoted: melting, coremaking, moulding on the cheapest capable machine, pouring, shakeout and finishing. The Cost Guide compares the moulding machines.',
               } : isIM ? {
                 title: 'Molding process',
                 description: 'Real, priced alternatives for this part. Any molding process can be set when the part\'s material and features can be made by it and it is priced; a process that cannot says why on its row.',
