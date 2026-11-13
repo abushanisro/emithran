@@ -43,6 +43,7 @@ import { QuoteValidationNote } from '@/components/features/manufacturing-intelli
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
+import { formatCycleMin } from '@/lib/costing/format-cycle';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -384,11 +385,6 @@ function formatCell(v: unknown): string {
   return JSON.stringify(v);
 }
 
-function formatCycleMin(min: number | null | undefined): string {
-  if (min == null || !Number.isFinite(min) || min <= 0) return '0.0 min';
-  if (min < 1) return `${(min * 60).toFixed(1)} s`;
-  return `${min.toFixed(1)} min`;
-}
 // Never substitute the process route/group for a missing machine name — that
 // silently displays the process as if it were the machine (e.g. "Laser Cutting"
 // shown where a real machine like "Trumpf 3030" belongs). Say what's actually true.

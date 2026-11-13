@@ -11,7 +11,7 @@ import type { ReferenceCalcRun } from '../../shared/calculators/reference-calcul
 import { machineValue, type SandMachine } from './sand-machines';
 import { handlingTime } from './sand-handling';
 import { valuesProvider } from './sand-seeds';
-import { runStep, selectAndCost, type CostedStep, type SandRouteContext, type StepOutcome } from './sand-steps';
+import { energyBasisOf, runStep, selectAndCost, type CostedStep, type SandRouteContext, type StepOutcome } from './sand-steps';
 import type { CostContext } from '../casting-finishing';
 import { variableProvider } from './sand-seeds';
 
@@ -162,7 +162,7 @@ export function makeCoreStep(ctx: SandRouteContext, machine: SandMachine, core: 
   const notes = isHotBox && !priced && energyKwh != null
     ? [`Hot box heating energy is not charged: no energy price for the location or in the Cost Guide (the sand's heat alone is ${energyKwh.toFixed(3)} kWh per core, a lower bound).`]
     : [];
-  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: isHotBox ? r.run.outputs['Energy Cost'] ?? 0 : 0, notes };
+  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: isHotBox ? r.run.outputs['Energy Cost'] ?? 0 : 0, notes, ...(isHotBox && priced ? { energyBasis: energyBasisOf(ctx) } : {}) };
 }
 
 export interface CoreLine {
