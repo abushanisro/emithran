@@ -43,6 +43,8 @@ export interface PlasticFeature {
     stroke_mm?: number;
     /** LifterBundle / SlideBundle: small, medium or large, by the bundle width thresholds of the staged variables. */
     size_class?: string;
+    /** Rib: each rib the CAD engine measured along the pull (height, length = wall area / height, thickness), mm. */
+    ribs?: ReadonlyArray<{ height_mm: number; length_mm: number; thickness_mm: number }>;
     /** PartingLine: through holes (internal cutouts). */
     internal_cutouts?: number;
     /** PartingLine: the measured parting line length, mm. */

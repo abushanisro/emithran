@@ -42,7 +42,10 @@ def test_a_rib_pair_is_as_tall_as_its_two_walls_overlap_and_the_groups_carry_the
     assert out["rib_count"] == 2
     assert sorted(r["height_mm"] for r in out["rib_data"]) == [12.0, 26.0]
     assert all(r["height_source"] == "measured_along_pull" for r in out["rib_data"])
-    assert out["rib_groups"] == [{"thickness_mm": 1.0, "count": 2, "heights_mm": [12.0, 26.0], "max_height_mm": 26.0}]
+    # length: the smaller wall (100 mm2) over the height
+    assert out["rib_groups"] == [{"thickness_mm": 1.0, "count": 2, "heights_mm": [12.0, 26.0], "max_height_mm": 26.0, "ribs": [
+        {"height_mm": 12.0, "length_mm": round(100 / 12, 2), "thickness_mm": 1.0}, {"height_mm": 26.0, "length_mm": round(100 / 26, 2), "thickness_mm": 1.0},
+    ]}]
 
 
 def test_without_extents_the_height_is_not_measured_and_the_group_says_so():
@@ -50,4 +53,4 @@ def test_without_extents_the_height_is_not_measured_and_the_group_says_so():
     planes = [(1, 0, 0, 10.0, 100.0, 0, 0, 0), (-1, 0, 0, -11.0, 100.0, 0, 0, 0)]
     out = ex._detect_ribs(planes, nominal_wall_mm=2.0)
     assert out["rib_data"][0]["height_source"] == "estimated_from_area"
-    assert out["rib_groups"] == [{"thickness_mm": 1.0, "count": 1, "heights_mm": [], "max_height_mm": None}]
+    assert out["rib_groups"] == [{"thickness_mm": 1.0, "count": 1, "heights_mm": [], "max_height_mm": None, "ribs": []}]

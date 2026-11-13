@@ -3,7 +3,7 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
 
 /**
  * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977,
- * 1007, 1012, 1013, 1014, 1016, 1017 and 1018: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
+ * 1007, 1012, 1013, 1014, 1016, 1017, 1018 and 1019: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
  * NEW migration, which writes the calculators whose spec `migration` is its number (and raises their `version` when their formulas change, calculators.version, migration 428).
  *   976  the reaction injection calculator, version 2 (fill time added)
  *   977  the injection, structural foam and LSR calculators: their fill-factor inputs name the reference table they are read from, so the cost dialog's eye opens it
@@ -18,22 +18,23 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1017 the injection mold tooling calculator, version 5: the slide and lifter blocks (steel, machining, CMM inspection)
  *   1018 the injection mold tooling calculator, version 6: the heat treatment of the mold steel
  *   1019 the injection mold tooling calculator, version 7: the cooling lines
+ *   1020 the injection mold tooling calculator, version 8: the rib inserts and their EDM
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1019] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1020] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
-  1019: {
-    title: 'Injection mold tooling calculator, version 7 -- the cooling lines.',
+  1020: {
+    title: 'Injection mold tooling calculator, version 8 -- the rib inserts and their EDM.',
     rootCause: [
-      'The mold tooling cost (version 6, migration 1018) left out the cooling: the reference holds the water line diameter (defaultWaterLineDiameter),',
-      'the hose, fitting and manifold prices (waterHosesCost, waterManifoldFittingsCost, waterManifoldsCost) and a line drilling rate',
-      '(cmToolMachiningRates Heater Line Drilling), but not how many lines a mold needs. Version 7 adds the approved rule: lines across the cavity plate',
-      '3 line diameters apart, drilled at the machining rate, 2 hoses and 2 fittings per line, one manifold per side (formula registry F-30, ASSUMED).',
-      'The water baffles stay a named gap (no count on file). The calculator is replaced under version 7 (a calculator in use is not edited in place).',
+      'The mold tooling cost (version 7, migration 1019) left out the rib inserts: a rib taller than machinedRibThreshold cannot be machined into the',
+      'plate and is an insert burnt by EDM. The reference holds the insert areas, electrode sizes, burns and hours by class and the EDM rates, and the CAD',
+      'engine now measures each rib (height along the pull, length, thickness), but nothing says which class a rib is. Version 8 classes a tall rib by its',
+      'footprint against the class insert areas and prices its steel, pocket, graphite electrodes, EDM burn and labour (formula registry F-31, ASSUMED).',
+      'The calculator is replaced under version 8 (a calculator in use is not edited in place).',
     ].join('\n'),
   },
   976: {
@@ -78,5 +79,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   976: '976_plastic_rim_fill_time_calculator.sql',
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
-  1019: '1019_plastic_mold_cooling_lines.sql',
+  1020: '1020_plastic_mold_rib_inserts_edm.sql',
 };

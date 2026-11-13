@@ -11,6 +11,7 @@
 // instead of silently guessing (docs/ENGINEERING.md: wrong zeros are worse than visible
 // errors — the same applies to silently missing route steps).
 
+import type { RibSignals } from './rib-inserts';
 import type { SideActionSignals } from '../side-action-signals';
 import {
   IM_OPERATION_REGISTRY, IMOperationId, IMProcessTree, IMRoutedOperation,
@@ -45,6 +46,8 @@ export interface InjectionMoldingSignals {
   slideOrLifterBundleCount?: number | null;
   /** The recognised slide and lifter bundles by size class (side-action-signals.ts); null when the features were not recognised. */
   sideActionBlocks?: SideActionSignals['blocks'] | null;
+  /** The ribs the CAD engine measured (rib-inserts.ts); null when the graph has no plastic features. */
+  ribs?: RibSignals | null;
   insertCount: number | null;
   textFeatureCount: number | null;  // molded-in text/logos → pad print/laser mark NOT needed
   assemblyFeatureCount: number | null; // snap fits / weld ribs → welding or assembly

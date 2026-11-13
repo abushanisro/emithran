@@ -3,6 +3,7 @@
 import { type DraftSummary, undercutCountFromDraftSummary } from './draft-signals';
 import type { InjectionMoldingCostInput } from './process/cost-injection-molding-engine';
 import { sideActionSignals } from './side-action-signals';
+import { ribSignals } from './process/rib-inserts';
 import type { PlasticFeatureGraph } from './operation/plastic-catalog-operations.service';
 
 /** The part's three bounding-box sides, longest first. A side CAD did not measure is 0. */
@@ -49,6 +50,7 @@ export function moldingSignals(summary: MoldingSummary, bbox: readonly [number, 
     slideBundleCount: sideActions?.slideBundles ?? null,
     slideOrLifterBundleCount: sideActions?.slideOrLifterBundles ?? null,
     sideActionBlocks: sideActions?.blocks ?? null,
+    ribs: ribSignals(summary.plasticFeatureGraph),
     partingComplexity: summary.partingComplexity ?? null,
     partingLineLengthMm: partingLineLengthMm(summary.plasticFeatureGraph),
     insertCount: positive(summary.insertCandidateCount),

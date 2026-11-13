@@ -78,7 +78,7 @@ interface MoldToolingInput {
   /** Staged tooling tables (plastic-reference.ts). */
   tables: MoldToolingTables;
   /** What decides which of the remaining gaps apply to this mold: a hot runner needs hot drops, an insert-built class needs inserts, a texture needs texturing. */
-  scope: { runner: 'hot' | 'cold'; classUsesInserts: boolean | null; cavityTexture: string; sideActionsPriced: boolean };
+  scope: { runner: 'hot' | 'cold'; classUsesInserts: boolean | null; cavityTexture: string; sideActionsPriced: boolean; ribInsertsPriced: boolean };
 }
 
 interface MoldToolingResult {
@@ -107,11 +107,11 @@ const CALCULATOR_PRICED_COMPONENTS = new Set(['Ejector Pin'].map(componentNameKe
  * What the tooling cost includes and what it still leaves out for this mold. Hot drops, inserts and texture are left out only when they apply: a cold
  * runner has no hot drops, a class tblSpiType builds without inserts has none, and the default texture "None" is no texture.
  */
-/** The registry gaps (formula-registry.ts) left in a priced mold: EDM and the water baffles always; slides and lifters when the CAD bundles are not all sized; texture, inserts, hot drops where they apply. */
+/** The registry gaps (formula-registry.ts) left in a priced mold: the water baffles always; the rib inserts when the CAD ribs are not all measured and classed; slides and lifters when the CAD bundles are not all sized; texture, inserts, hot drops where they apply. */
 export function toolingGapIds(scope: MoldToolingInput['scope']): string[] {
   return [
     ...(scope.sideActionsPriced ? [] : ['G-03']),
-    'G-04',
+    ...(scope.ribInsertsPriced ? [] : ['G-04']),
     ...(scope.cavityTexture.toLowerCase() !== 'none' ? ['G-05'] : []),
     'G-06',
     ...(scope.classUsesInserts !== false ? ['G-07'] : []),
@@ -120,12 +120,12 @@ export function toolingGapIds(scope: MoldToolingInput['scope']): string[] {
 }
 
 export function toolingScopeWarning(scope: MoldToolingInput['scope']): string {
-  const left = [...(scope.sideActionsPriced ? [] : ['slides and lifters (the CAD bundles are not all recognised and sized)']), 'EDM', 'water baffles (no count on file)'];
+  const left = [...(scope.sideActionsPriced ? [] : ['slides and lifters (the CAD bundles are not all recognised and sized)']), ...(scope.ribInsertsPriced ? [] : ['the rib inserts and their EDM (the CAD ribs are not all measured, or one is too large for an insert class)']), 'water baffles (no count on file)'];
   if (scope.runner === 'hot') left.push('hot drops (the number of drops is not on file)');
   if (scope.classUsesInserts !== false) left.push('cavity inserts');
   if (scope.cavityTexture.toLowerCase() !== 'none') left.push(`the ${scope.cavityTexture} texture`);
   return 'Injection Molding tooling cost includes the mold base plate steel, the cavity and core machining and polish, the standard components, the ejector '
-    + `pins, sprue bushing, locating ring, try-out, ${scope.sideActionsPriced ? 'the slide and lifter blocks, ' : ''}the heat treatment, the cooling lines and the toolroom hours; it does NOT include ${left.join(', ')} (no formula on file yet): the true tooling `
+    + `pins, sprue bushing, locating ring, try-out, ${scope.sideActionsPriced ? 'the slide and lifter blocks, ' : ''}the heat treatment, the cooling lines, ${scope.ribInsertsPriced ? 'the rib inserts and their EDM, ' : ''}and the toolroom hours; it does NOT include ${left.join(', ')} (no formula on file yet): the true tooling `
     + 'investment is higher than this figure.';
 }
 
