@@ -1,4 +1,5 @@
 import { castingWorkerAvailable } from "./casting-config";
+import { CASTING_SOURCE_COLUMNS, castingSourcePath } from "./casting-source";
 import { createHash } from "node:crypto";
 
 import {
@@ -146,11 +147,11 @@ export class CastingAnalysisRunner implements OnModuleInit, OnModuleDestroy {
   private async process(row: CastingAnalysisRow): Promise<void> {
     const { data: item, error } = await this.admin
       .from("bom_items")
-      .select("file_3d_path")
+      .select(CASTING_SOURCE_COLUMNS)
       .eq("id", row.bom_item_id)
       .maybeSingle();
     if (error) throw new Error(`could not read the BOM item: ${error.message}`);
-    const path = (item as { file_3d_path: string | null } | null)?.file_3d_path;
+    const path = item ? castingSourcePath(item as { file_3d_path: string | null; file_step_path: string | null }) : null;
     if (!path)
       throw new PermanentFailure("no_cad_file", "The BOM item no longer has a 3D file.");
     const bytes = await this.objects.get(CASTING_SOURCE_BUCKET, path);

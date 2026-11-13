@@ -68,6 +68,7 @@ function setup(
   rows: CastingAnalysisRow[],
   options: {
     path?: string | null;
+    stepPath?: string | null;
     bytes?: Buffer | null;
     /** An analysis of the same file that finished while this one waited (null: none). */
     twin?: CastingAnalysisRow | null;
@@ -75,7 +76,7 @@ function setup(
     twinError?: boolean;
   } = {},
 ) {
-  const { path = "p/part.step", bytes = BYTES, twin = null, twinError = false } = options;
+  const { path = "p/part.step", stepPath = null, bytes = BYTES, twin = null, twinError = false } = options;
   const twinFilters: Record<string, unknown> = {};
   const queue = [...rows];
   const updates: { patch: Record<string, unknown>; where: Record<string, unknown> }[] =
@@ -87,7 +88,7 @@ function setup(
         ? {
             select: () => ({
               eq: () => ({
-                maybeSingle: async () => ({ data: { file_3d_path: path }, error: null }),
+                maybeSingle: async () => ({ data: { file_3d_path: path, file_step_path: stepPath }, error: null }),
               }),
             }),
           }
@@ -110,7 +111,7 @@ function setup(
   };
   const stored: string[] = [];
   const objects = {
-    get: async () => bytes,
+    get: jest.fn(async (_bucket: string, _key: string) => bytes),
     put: async (_b: string, key: string) => void stored.push(key),
   };
   const audit = { recordBestEffort: jest.fn(async () => undefined) };
@@ -120,7 +121,7 @@ function setup(
     audit as never,
     objects as never,
   );
-  return { runner, updates, stored, audit, queue, twinFilters };
+  return { runner, updates, stored, audit, queue, twinFilters, objects };
 }
 
 afterEach(() => {
@@ -198,6 +199,13 @@ describe("CastingAnalysisRunner", () => {
       status: "failed",
       error_code: "worker_killed",
     });
+  });
+
+  it("reads the item's STEP, not its STL conversion, when it has both (the worker reads STEP only)", async () => {
+    const t = setup([claimed()], { path: "p/part.stl", stepPath: "p/part.step" });
+    t.runner.answer = async () => ({ ok: false, code: "worker_failed", message: "not needed here" }) as never;
+    await t.runner.tick();
+    expect(t.objects.get).toHaveBeenCalledWith(expect.any(String), "p/part.step");
   });
 
   it("refuses a file that changed since the request, a missing file, and a worker it was not built for", async () => {
