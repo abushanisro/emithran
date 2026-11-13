@@ -60,6 +60,8 @@ export const PLASTIC_VARIABLE_KEYS = [
   // The slide and lifter blocks (F-28): their volume by size class, and the CMM hours to inspect them.
   'smallSlideVolume', 'mediumSlideVolume', 'largeSlideVolume', 'smallLifterVolume', 'mediumLifterVolume', 'largeLifterVolume',
   'cmmInspectionMultiplier', 'cmmInspectionAdder',
+  // The cooling lines (F-30): the line diameter and the water hardware prices.
+  'defaultWaterLineDiameter', 'waterHosesCost', 'waterManifoldFittingsCost', 'waterManifoldsCost',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -216,6 +218,12 @@ export interface MoldExtrasReference {
   /** variables cmmInspectionMultiplier and cmmInspectionAdder: the CMM hours to inspect the slides and lifters. */
   cmmHoursPerSideAction: number;
   cmmBaseHours: number;
+  /** The cooling lines (F-30): variables defaultWaterLineDiameter (mm) and the water hardware prices; cmToolMachiningRates Heater Line Drilling (mm/min). */
+  waterLineDiameterMm: number;
+  waterHoseUsd: number;
+  waterFittingUsd: number;
+  waterManifoldUsd: number;
+  lineDrillingMmPerMin: number;
 }
 
 export interface FeatureRules {
@@ -383,6 +391,11 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     lifterVolumeIn3: { small: variable('smallLifterVolume'), medium: variable('mediumLifterVolume'), large: variable('largeLifterVolume') },
     cmmHoursPerSideAction: variable('cmmInspectionMultiplier'),
     cmmBaseHours: variable('cmmInspectionAdder'),
+    waterLineDiameterMm: variable('defaultWaterLineDiameter'),
+    waterHoseUsd: variable('waterHosesCost'),
+    waterFittingUsd: variable('waterManifoldFittingsCost'),
+    waterManifoldUsd: variable('waterManifoldsCost'),
+    lineDrillingMmPerMin: named(rates, 'cmToolMachiningRates', 'Heater Line Drilling', 'rate'),
   };
 
   const system = text.get('useMetricOrImperialValues') === 'Imperial' ? 'Imperial' : text.get('useMetricOrImperialValues') === 'Metric' ? 'Metric' : null;

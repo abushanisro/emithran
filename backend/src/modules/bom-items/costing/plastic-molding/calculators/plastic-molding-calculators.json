@@ -547,7 +547,7 @@
     {
       "key": "injection_mold_tooling",
       "name": "Injection Mold - Tooling",
-      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Cavity and core (formula registry F-26, ASSUMED): machined at tblHrsPerSqInch{Simple,Average,Complex} hours per square inch of part surface, the complexity from the CAD face count against cmMoldSurfaceCountThreshold{Simple,Average} (staged for compression molding and borrowed: the injection process states no rule), times the cavities, at the machining rate; polished to the default cavity finish (defaultCavityFinishIM, SPIFinishes hours per square meter) at the assembly (bench) rate, as no polishing rate is on file. Mold assembly extras (formula registry F-27): the ejector pins, one per areaCoveredPerEjectorPin of the molded area, at the cmStandardToolingComponents Ejector Pin cost plus their cmToolAssemblyTimes hours at the assembly rate; one sprue bushing and one locating ring (sprueBushingCost, locatingRingsCost); the try-out, timePerTryoutBase hours per try-out (twice that on a press over 500 t, as its note states) x defaultNumTryOuts at the tryout rate. Slides and lifters (formula registry F-28, ASSUMED: the reference holds the block volumes and the CMM hours, not the formula): each recognised bundle is a block of its size class ({small,medium,large}{Slide,Lifter}Volume; a bundle a lifter could serve is costed as a lifter), priced as the default tool steel by mass x its price; machined over the surface of a cube of its volume at the cavity hours per square inch and the machining rate; inspected for cmmInspectionMultiplier x the side actions + cmmInspectionAdder CMM hours at the machining rate. Heat treatment (formula registry F-29, ASSUMED: the reference holds the rates per kg, not which steel is treated): the steel that forms the part (the cavity and core plates and the slide and lifter blocks) is hardened at heatTreatRateUsdPerKg, the rest of the mold base (clamp and support plates) stress relieved at stressReliefRateUsdPerKg. Not modelled yet: EDM, cooling lines, and, where they apply, hot drops (hot runner), cavity inserts (SPI classes tblSpiType builds with inserts) and texture (a cavityTexture other than None) (registry G-03 to G-08).",
+      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Cavity and core (formula registry F-26, ASSUMED): machined at tblHrsPerSqInch{Simple,Average,Complex} hours per square inch of part surface, the complexity from the CAD face count against cmMoldSurfaceCountThreshold{Simple,Average} (staged for compression molding and borrowed: the injection process states no rule), times the cavities, at the machining rate; polished to the default cavity finish (defaultCavityFinishIM, SPIFinishes hours per square meter) at the assembly (bench) rate, as no polishing rate is on file. Mold assembly extras (formula registry F-27): the ejector pins, one per areaCoveredPerEjectorPin of the molded area, at the cmStandardToolingComponents Ejector Pin cost plus their cmToolAssemblyTimes hours at the assembly rate; one sprue bushing and one locating ring (sprueBushingCost, locatingRingsCost); the try-out, timePerTryoutBase hours per try-out (twice that on a press over 500 t, as its note states) x defaultNumTryOuts at the tryout rate. Slides and lifters (formula registry F-28, ASSUMED: the reference holds the block volumes and the CMM hours, not the formula): each recognised bundle is a block of its size class ({small,medium,large}{Slide,Lifter}Volume; a bundle a lifter could serve is costed as a lifter), priced as the default tool steel by mass x its price; machined over the surface of a cube of its volume at the cavity hours per square inch and the machining rate; inspected for cmmInspectionMultiplier x the side actions + cmmInspectionAdder CMM hours at the machining rate. Heat treatment (formula registry F-29, ASSUMED: the reference holds the rates per kg, not which steel is treated): the steel that forms the part (the cavity and core plates and the slide and lifter blocks) is hardened at heatTreatRateUsdPerKg, the rest of the mold base (clamp and support plates) stress relieved at stressReliefRateUsdPerKg. Cooling lines (formula registry F-30, ASSUMED: the reference holds the line diameter, the hardware prices and a line drilling rate, not how many lines a mold needs): lines across the cavity plate at 3 x defaultWaterLineDiameter pitch along the mold base length, each the mold base width long, drilled at the cmToolMachiningRates Heater Line Drilling rate and the machining rate, with 2 hoses and 2 fittings per line and one manifold per side. Not modelled yet: EDM, water baffles (no count on file), and, where they apply, hot drops (hot runner), cavity inserts (SPI classes tblSpiType builds with inserts) and texture (a cavityTexture other than None) (registry G-03 to G-08).",
       "operations": [],
       "helper": true,
       "output": "Tooling Cost Per Part",
@@ -579,9 +579,12 @@
         "Cavity Core Plate Mass",
         "Hardened Steel Mass",
         "Stress Relieved Steel Mass",
-        "Heat Treatment Cost"
+        "Heat Treatment Cost",
+        "Water Lines",
+        "Water Line Drilling Hours",
+        "Cooling Cost"
       ],
-      "version": 6,
+      "version": 7,
       "fields": [
         {
           "name": "Purchased Components Cost",
@@ -913,6 +916,48 @@
           }
         },
         {
+          "name": "Water Line Diameter",
+          "unit": "mm",
+          "source": {
+            "variable": "defaultWaterLineDiameter"
+          }
+        },
+        {
+          "name": "Water Line Pitch Factor",
+          "unit": "",
+          "source": {
+            "engine": "approved rule: lines at 3 line diameters apart (no pitch is on file)"
+          }
+        },
+        {
+          "name": "Line Drilling Rate",
+          "unit": "mm/min",
+          "source": {
+            "lookup": "cmToolMachiningRates: Heater Line Drilling"
+          }
+        },
+        {
+          "name": "Water Hose Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "waterHosesCost"
+          }
+        },
+        {
+          "name": "Water Fitting Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "waterManifoldFittingsCost"
+          }
+        },
+        {
+          "name": "Water Manifold Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "waterManifoldsCost"
+          }
+        },
+        {
           "name": "Machining Hours",
           "unit": "h",
           "formula": "{Mold Base Area} / 1000000 / {Plate Machining Rate} * 2 + {Plate Setup Hours}"
@@ -1063,9 +1108,24 @@
           "formula": "{Hardened Steel Mass} * {Heat Treat Rate} + {Stress Relieved Steel Mass} * {Stress Relief Rate}"
         },
         {
+          "name": "Water Lines",
+          "unit": "",
+          "formula": "max(1, floor({Mold Base Length} / ({Water Line Pitch Factor} * {Water Line Diameter})))"
+        },
+        {
+          "name": "Water Line Drilling Hours",
+          "unit": "h",
+          "formula": "{Water Lines} * {Mold Base Width} / {Line Drilling Rate} / 60"
+        },
+        {
+          "name": "Cooling Cost",
+          "unit": "USD",
+          "formula": "{Water Line Drilling Hours} * {Machining Rate} + {Water Lines} * 2 * ({Water Hose Cost} + {Water Fitting Cost}) + 2 * {Water Manifold Cost}"
+        },
+        {
           "name": "Mold Cost",
           "unit": "USD",
-          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost} + {Cavity Machining Cost} + {Polish Cost} + {Ejector System Cost} + {Sprue and Locating Ring Cost} + {Tryout Cost} + {Side Action Cost} + {Heat Treatment Cost}"
+          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost} + {Cavity Machining Cost} + {Polish Cost} + {Ejector System Cost} + {Sprue and Locating Ring Cost} + {Tryout Cost} + {Side Action Cost} + {Heat Treatment Cost} + {Cooling Cost}"
         },
         {
           "name": "Lifetime Shots",
@@ -1088,7 +1148,7 @@
           "formula": "floor({Tooling Investment} / ({Annual Volume} * {Production Life}) * 10000 + 0.5) / 10000"
         }
       ],
-      "migration": 1018
+      "migration": 1019
     }
   ]
 }

@@ -3,7 +3,7 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
 
 /**
  * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977,
- * 1007, 1012, 1013, 1014, 1016 and 1017: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
+ * 1007, 1012, 1013, 1014, 1016, 1017 and 1018: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
  * NEW migration, which writes the calculators whose spec `migration` is its number (and raises their `version` when their formulas change, calculators.version, migration 428).
  *   976  the reaction injection calculator, version 2 (fill time added)
  *   977  the injection, structural foam and LSR calculators: their fill-factor inputs name the reference table they are read from, so the cost dialog's eye opens it
@@ -17,21 +17,23 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1016 the injection mold tooling calculator, version 4: the mold assembly extras (ejector pins, sprue bushing, locating ring, try-out)
  *   1017 the injection mold tooling calculator, version 5: the slide and lifter blocks (steel, machining, CMM inspection)
  *   1018 the injection mold tooling calculator, version 6: the heat treatment of the mold steel
+ *   1019 the injection mold tooling calculator, version 7: the cooling lines
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1018] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1019] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
-  1018: {
-    title: 'Injection mold tooling calculator, version 6 -- the heat treatment of the mold steel.',
+  1019: {
+    title: 'Injection mold tooling calculator, version 7 -- the cooling lines.',
     rootCause: [
-      'The mold tooling cost (version 5, migration 1017) left out the heat treatment: the reference prices hardening and stress relief per kg of tool',
-      'steel (digital_factory_settings_usa heatTreatRateUsdPerKg, stressReliefRateUsdPerKg) but says not which steel is treated. Version 6 hardens the',
-      'steel that forms the part (the cavity and core plates and the slide and lifter blocks) and stress relieves the rest of the mold base (formula',
-      'registry F-29, ASSUMED). The calculator is replaced under version 6 (a calculator in use is not edited in place).',
+      'The mold tooling cost (version 6, migration 1018) left out the cooling: the reference holds the water line diameter (defaultWaterLineDiameter),',
+      'the hose, fitting and manifold prices (waterHosesCost, waterManifoldFittingsCost, waterManifoldsCost) and a line drilling rate',
+      '(cmToolMachiningRates Heater Line Drilling), but not how many lines a mold needs. Version 7 adds the approved rule: lines across the cavity plate',
+      '3 line diameters apart, drilled at the machining rate, 2 hoses and 2 fittings per line, one manifold per side (formula registry F-30, ASSUMED).',
+      'The water baffles stay a named gap (no count on file). The calculator is replaced under version 7 (a calculator in use is not edited in place).',
     ].join('\n'),
   },
   976: {
@@ -76,5 +78,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   976: '976_plastic_rim_fill_time_calculator.sql',
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
-  1018: '1018_plastic_mold_heat_treatment.sql',
+  1019: '1019_plastic_mold_cooling_lines.sql',
 };

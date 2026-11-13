@@ -49,6 +49,7 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
       tryoutBaseHours: 12, tryouts: 3, cavityTexture: 'None',
       slideVolumeIn3: { small: 75, medium: 1100, large: 2000 }, lifterVolumeIn3: { small: 75, medium: 500, large: 1500 },
       cmmHoursPerSideAction: 1.52, cmmBaseHours: 5,
+      waterLineDiameterMm: 8, waterHoseUsd: 1.25, waterFittingUsd: 2.5, waterManifoldUsd: 55, lineDrillingMmPerMin: 25.4,
     });
     expect(REF.toolroomRatesUsa.tryoutUsdPerHr).toBe(76.81);
     expect(REF.spiClasses.map((c) => [c.moldClass, c.useInsert])).toEqual([['Class105', false], ['Class104', false], ['Class103', false], ['Class102', true], ['Class101', true]]);
@@ -59,10 +60,10 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
     expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth', sideActionsPriced: false })).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08']);
     // every bundle recognised and sized: the slides and lifters are priced (F-28), not a gap
     expect(toolingGapIds({ ...COLD, sideActionsPriced: true })).toEqual(['G-04', 'G-06']);
-    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true })).toMatch(/try-out, the slide and lifter blocks, the heat treatment and the toolroom hours; it does NOT include EDM, cooling lines \(/);
+    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true })).toMatch(/try-out, the slide and lifter blocks, the heat treatment, the cooling lines and the toolroom hours; it does NOT include EDM, water baffles/);
     const w = toolingScopeWarning(COLD);
     expect(w).toMatch(/includes .*the cavity and core machining and polish.*ejector pins, sprue bushing, locating ring, try-out/);
-    expect(w).toMatch(/does NOT include slides and lifters \(the CAD bundles are not all recognised and sized\), EDM, cooling lines \(/);
+    expect(w).toMatch(/does NOT include slides and lifters \(the CAD bundles are not all recognised and sized\), EDM, water baffles \(no count on file\) \(/);
     expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false })).toMatch(/hot drops \(the number of drops is not on file\), cavity inserts/);
   });
 

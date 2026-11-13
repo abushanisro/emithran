@@ -14,10 +14,12 @@ import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas }
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
 const OUTPUT = 'Tooling Cost Per Part';
 const REF = 'memory/Plastic Modeling';
-// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment) are this
+// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment), F-30 (cooling) are this
 // calculator's formulas; the seeds below supply their inputs.
 /** timePerTryoutBase's note: "basic hrs per tryout for <500T (x2 for bigger)". */
 const TRYOUT_DOUBLE_ABOVE_TONNES = 500;
+/** The approved cooling rule (F-30): water lines 3 line diameters apart. No pitch is on file; the input shows it and a part can change it. */
+const WATER_LINE_PITCH_FACTOR = 3;
 
 export interface MoldToolingFacts {
   /** The standard components the mold needs, priced (mold-tooling-engine.ts). */
@@ -162,6 +164,12 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       'CMM Base Hours': { value: x.cmmBaseHours, source: `${vars}: cmmInspectionAdder` },
       'Heat Treat Rate': { value: f.toolroomRates.heatTreatUsdPerKg, source: `${settings} heatTreatRateUsdPerKg (the cavity and core plates and the slide and lifter blocks)` },
       'Stress Relief Rate': { value: f.toolroomRates.stressReliefUsdPerKg, source: `${settings} stressReliefRateUsdPerKg (the clamp and support plates)` },
+      'Water Line Diameter': { value: x.waterLineDiameterMm, source: `${vars}: defaultWaterLineDiameter` },
+      'Water Line Pitch Factor': { value: WATER_LINE_PITCH_FACTOR, source: 'Approved rule: lines 3 line diameters apart across the cavity plate (no pitch is on file)' },
+      'Line Drilling Rate': { value: x.lineDrillingMmPerMin, source: `${REF}/lookup/cmToolMachiningRates: Heater Line Drilling (the only line drilling rate on file)`, lookup: true },
+      'Water Hose Cost': { value: x.waterHoseUsd, source: `${vars}: waterHosesCost (2 per line)` },
+      'Water Fitting Cost': { value: x.waterFittingUsd, source: `${vars}: waterManifoldFittingsCost (2 per line)` },
+      'Water Manifold Cost': { value: x.waterManifoldUsd, source: `${vars}: waterManifoldsCost (one per side)` },
     },
   };
 }
