@@ -111,9 +111,9 @@ import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/
 import {
   familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
-import { isMachiningTreeFamily, showsCatalogOperations } from '@/lib/features/process-tree-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
+import { isMachiningTreeFamily, showsCatalogOperations } from '@/lib/features/process-tree-family';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
