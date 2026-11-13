@@ -59,7 +59,8 @@ export function CostTable({ table, columns, display }: { table: CostTableData; c
                 {r.status === "ok"
                   ? <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" aria-label="Costed" />
                   : <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" aria-label={r.statusNote ?? "Needs attention"} />}
-                <span className="truncate" title={r.statusNote ?? r.name}>{r.name}</span>
+                <span className="truncate" title={r.statusNote ?? r.note ?? r.name}>{r.name}</span>
+                {r.note && <span className="truncate text-[10px] font-normal text-muted-foreground">{r.note}</span>}
               </div>
             </td>
             {cols.map((c) => (

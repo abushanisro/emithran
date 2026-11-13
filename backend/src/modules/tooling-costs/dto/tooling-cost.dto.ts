@@ -17,6 +17,8 @@ import {
   Min,
   Max,
   IsUUID,
+  Matches,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
@@ -83,6 +85,25 @@ export class CreateToolingCostDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'The tooling catalog domain the item belongs to (GET /tooling-catalogs), e.g. injection_molding', maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  manufacturingProcess?: string | null;
+
+  @ApiPropertyOptional({ description: 'A Machining operation, when the item is for one', maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  subProcess?: string | null;
+
+  @ApiPropertyOptional({ description: 'The catalog item the price came from (dataset:table:row); must be an item of the process catalog. Null for a custom item.', example: '2026-Plastic:cmStandardToolingComponents:0' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[^:]+:[^:]+:[0-9]+$/)
+  @MaxLength(300)
+  catalogSource?: string | null;
 
   @ApiPropertyOptional({ description: 'Is the record active', example: true, default: true })
   @IsOptional()
@@ -163,6 +184,25 @@ export class UpdateToolingCostDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'The tooling catalog domain the item belongs to (GET /tooling-catalogs), e.g. injection_molding', maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  manufacturingProcess?: string | null;
+
+  @ApiPropertyOptional({ description: 'A Machining operation, when the item is for one', maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  subProcess?: string | null;
+
+  @ApiPropertyOptional({ description: 'The catalog item the price came from (dataset:table:row); must be an item of the process catalog. Null for a custom item.', example: '2026-Plastic:cmStandardToolingComponents:0' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[^:]+:[^:]+:[0-9]+$/)
+  @MaxLength(300)
+  catalogSource?: string | null;
 
   @ApiPropertyOptional({ description: 'Is the record active' })
   @IsOptional()
@@ -271,6 +311,15 @@ export class ToolingCostResponseDto {
   @ApiProperty({ description: 'Notes or comments' })
   notes: string;
 
+  @ApiProperty({ description: 'The tooling catalog domain the item belongs to; null for rows saved before it was stored', nullable: true, type: String })
+  manufacturingProcess: string | null;
+
+  @ApiProperty({ description: 'A Machining operation, when the item is for one', nullable: true, type: String })
+  subProcess: string | null;
+
+  @ApiProperty({ description: 'The catalog item the price came from (dataset:table:row); null for a custom item', nullable: true, type: String })
+  catalogSource: string | null;
+
   @ApiProperty({ description: 'Is active' })
   isActive: boolean;
 
@@ -301,6 +350,9 @@ export class ToolingCostResponseDto {
       supplier: row.supplier || '',
       leadTime: parseFloat(row.lead_time) || 0,
       notes: row.notes || '',
+      manufacturingProcess: row.manufacturing_process ?? null,
+      subProcess: row.sub_process ?? null,
+      catalogSource: row.catalog_source ?? null,
       isActive: row.is_active !== false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

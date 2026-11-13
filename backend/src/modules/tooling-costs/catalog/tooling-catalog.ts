@@ -123,3 +123,15 @@ export const catalogDomains = () => Object.keys(TOOLING_CATALOGS).map((key) => (
 
 /** The staged source version of a memory/ domain (null for machining and sheet metal, which have their own). */
 export const memorySourceVersion = (domain: string) => MEMORY_DOMAINS.find((d) => d.key === domain)?.sourceVersion ?? null;
+
+/** Why a tooling row's catalog source cannot be saved, or null when it can: it must name an item of its own process's catalog, and a custom item has none. */
+export function catalogSourceProblem(
+  row: { process: string | null; source: string | null; isCustom: boolean },
+  catalog: { label: string; items: ReadonlyArray<{ id: string }> } | null,
+): string | null {
+  if (!row.source) return null;
+  if (row.isCustom) return 'A custom item has no catalog source';
+  if (!row.process || !catalog) return 'A catalog item needs its manufacturing process';
+  if (!catalog.items.some((i) => i.id === row.source)) return `${row.source} is not an item of the ${catalog.label} tooling catalog`;
+  return null;
+}

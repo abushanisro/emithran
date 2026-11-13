@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { catalogItemFields, catalogSourceLine, defaultAmortization, processLabel } from "@/lib/costing/tooling-catalog";
+import { catalogItemFields, catalogSourceLabel, catalogSourceLine, defaultAmortization, processLabel } from "@/lib/costing/tooling-catalog";
 import type { ToolingCatalogItem } from "@/lib/api/tooling-catalogs";
 
 const AIR_POPPET: ToolingCatalogItem = {
@@ -64,5 +64,11 @@ describe("tooling catalog in the Add Tooling dialog", () => {
     expect(processLabel("injection_molding", domains)).toBe("Plastic Molding");
     expect(processLabel("quality_inspection", domains)).toBe("Quality Inspection");
     expect(processLabel(null, domains)).toBe("");
+  });
+
+  it("labels a saved row by its catalog row, as custom, or not at all for a row saved before the catalog", () => {
+    expect(catalogSourceLabel({ isCustom: false, catalogSource: "2026-Plastic:cmStandardToolingComponents:0" })).toBe("from cmStandardToolingComponents row 1");
+    expect(catalogSourceLabel({ isCustom: true, catalogSource: null })).toBe("custom item");
+    expect(catalogSourceLabel({ isCustom: false, catalogSource: null })).toBeNull();
   });
 });

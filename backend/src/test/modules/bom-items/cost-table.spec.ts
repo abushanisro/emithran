@@ -76,6 +76,18 @@ describe('buildCostTable', () => {
     expect(row(t, 'tooling:t').values.capitalInvestment).toBe(600);
   });
 
+  it('says where a tooling row was priced from: its catalog row, a custom item, or nothing for a row saved before (no note invented)', () => {
+    const base = { tooling_type: 'Mold component', description: 'Air Poppet', unit_cost: '25', quantity: '30', total_cost: '0.03', total_tooling_investment: '750' };
+    const t = buildCostTable(input({ tooling: [
+      { id: 'c', ...base, is_custom: false, catalog_source: '2026-Plastic:cmStandardToolingComponents:0' },
+      { id: 'u', ...base, is_custom: true, catalog_source: null },
+      { id: 'o', ...base, is_custom: false, catalog_source: null },
+    ] }));
+    expect(row(t, 'tooling:c').note).toBe('Priced from cmStandardToolingComponents row 1 (2026-Plastic)');
+    expect(row(t, 'tooling:u').note).toBe('Custom item, not from the catalog');
+    expect(row(t, 'tooling:o').note).toBeUndefined();
+  });
+
   it('flags a cost object with no cost, and a part with nothing applied', () => {
     const t = buildCostTable(input({ processes: [process({ id: 'z', total_cost_per_part: '0', setup_cost_per_part: '0' })] }));
     expect(row(t, 'process:z')).toMatchObject({ status: 'attention', statusNote: 'This operation carries no cost.' });

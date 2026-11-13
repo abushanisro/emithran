@@ -21,6 +21,12 @@ export interface ToolingCostInput {
   leadTime?: number;
   notes?: string;
   isActive?: boolean;
+  /** The tooling catalog domain (GET /tooling-catalogs) the item belongs to. */
+  manufacturingProcess?: string | null;
+  /** A Machining operation, when the item is for one. */
+  subProcess?: string | null;
+  /** The catalog item the price came from (dataset:table:row); null for a custom item. The backend checks it is an item of the process catalog. */
+  catalogSource?: string | null;
 }
 
 export interface CreateToolingCostDto extends ToolingCostInput {
@@ -47,6 +53,10 @@ export interface ToolingCostRecord {
   leadTime?: number;
   notes?: string;
   isActive: boolean;
+  /** Null for rows saved before migration 1015 (the process was not stored then). */
+  manufacturingProcess: string | null;
+  subProcess: string | null;
+  catalogSource: string | null;
   createdAt: string;
   updatedAt: string;
 }

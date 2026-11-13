@@ -2,6 +2,7 @@ import {
   TOOLING_CATALOGS,
   catalogItems,
   catalogDomains,
+  catalogSourceProblem,
   parseCatalogNumber,
 } from '../../../modules/tooling-costs/catalog/tooling-catalog';
 import { MEMORY_DOMAINS } from '../../../modules/processes/reference-domains';
@@ -75,5 +76,23 @@ describe('tooling catalog', () => {
       { key: 'sheet_metal', label: 'Sheet Metal' },
       { key: 'machining', label: 'Machining' },
     ]));
+  });
+
+  describe('a saved row\'s catalog source', () => {
+    const catalog = { label: 'Plastic Molding', items: [{ id: '2026-Plastic:cmStandardToolingComponents:0' }] };
+
+    it('is fine when absent, or when it names an item of the row\'s process catalog', () => {
+      expect(catalogSourceProblem({ process: null, source: null, isCustom: true }, null)).toBeNull();
+      expect(catalogSourceProblem({ process: 'injection_molding', source: '2026-Plastic:cmStandardToolingComponents:0', isCustom: false }, catalog)).toBeNull();
+    });
+
+    it('is refused on a custom item, without a process, or when the catalog has no such item', () => {
+      expect(catalogSourceProblem({ process: 'injection_molding', source: '2026-Plastic:cmStandardToolingComponents:0', isCustom: true }, catalog))
+        .toBe('A custom item has no catalog source');
+      expect(catalogSourceProblem({ process: null, source: '2026-Plastic:cmStandardToolingComponents:0', isCustom: false }, null))
+        .toBe('A catalog item needs its manufacturing process');
+      expect(catalogSourceProblem({ process: 'injection_molding', source: '2026-Plastic:cmStandardToolingComponents:99', isCustom: false }, catalog))
+        .toBe('2026-Plastic:cmStandardToolingComponents:99 is not an item of the Plastic Molding tooling catalog');
+    });
   });
 });
