@@ -349,6 +349,11 @@ export interface ProcessLineCost {
   /** The cycle's cost split into machine time and operator labour, for engines that charge both. With `setupCost` (machine and labour together) they add up to `totalCost` (before rounding). */
   machineCostPerPart?: number;
   laborCostPerPart?: number;
+  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in `runCost` and `totalCost`. In USD on purpose: never
+   *  converted with the line's money, it is stored as process_cost_records.other_cost_per_part (USD, like total_cost_per_part) and added by the Cost tab. */
+  otherCostPerPartUsd?: number;
+  /** What `otherCostPerPartUsd` is, e.g. "energy 0.0029 USD per casting". */
+  otherCostDetail?: string;
   // local currency/hr — the MACHINE hour rate, and only that.
   //
   // This said "fully burdened MHR (machine + labour)", which is not what any

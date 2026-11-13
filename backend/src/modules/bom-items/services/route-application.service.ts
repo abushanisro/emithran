@@ -396,6 +396,8 @@ export class RouteApplicationService {
       /** The cycle's machine / labour split when the engine states it (ProcessLineCost); persisted into machine_cost_per_part / labor_cost_per_part (migration 970). */
       machineCostPerPart?: number;
       laborCostPerPart?: number;
+      /** What the line charges beyond machine and crew time, USD (ProcessLineCost.otherCostPerPartUsd); persisted into other_cost_per_part (migration 1005). */
+      otherCostPerPartUsd?: number;
       /** The versions the line was calculated with (ProcessLineCost.calculationSnapshot); persisted into calculation_breakdown (migration 972). */
       calculationSnapshot?: object;
     }>,
@@ -729,6 +731,8 @@ export class RouteApplicationService {
         calculation_breakdown:     line.calculationSnapshot ?? null,
         machine_cost_per_part:     line.machineCostPerPart ?? null,
         labor_cost_per_part:       line.laborCostPerPart ?? null,
+        // What the line charges beyond machine and crew time (energy, a consumable), USD like total_cost_per_part (migration 1005).
+        other_cost_per_part:       line.otherCostPerPartUsd ?? null,
         // Costed-operation provenance (migration 718).
         //
         // line_hourly_rate is line.hourlyRate verbatim and UNROUNDED -- the

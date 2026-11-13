@@ -774,6 +774,10 @@ export type ConfidenceLevel = 'verified' | 'derived' | 'unsupported';
 
 export interface ProcessLineCost {
   process: string;
+  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in its runCost and totalCost (backend ProcessLineCost). */
+  otherCostPerPartUsd?: number;
+  /** What otherCostPerPartUsd is, e.g. "energy 0.0029 USD per casting". */
+  otherCostDetail?: string;
   /** Real process_calculator_mappings identity for this line, resolved server-side
    *  from the DB (never hardcoded) — absent on paths not yet wired to resolve it,
    *  in which case callers must derive a process group from machineClass rather

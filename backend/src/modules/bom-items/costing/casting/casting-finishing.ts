@@ -20,7 +20,7 @@ import type { CalculatorRunDto, ProcessLineCost } from '../../dto/cost-breakdown
 import { eMithranTerms, resolveSetupMinutes, type EMithranTermsArgs } from '../shared/core/engine-kernel';
 import { runReferenceCalculator, type CalcRun, type CalcSeed, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
 import { castingSeed, runOnLine, runView, SeedSet } from './casting-calculator-seeds';
-import { machineChoice, type ChoiceEval } from './machine-choice';
+import { machineChoice, roundPerPart, type ChoiceEval } from './machine-choice';
 
 export interface FinishingMachine {
   id: string;
@@ -38,6 +38,8 @@ export type CostContext = Omit<EMithranTermsArgs, 'mhrPerHr' | 'dlrPerHr' | 'set
 
 const num = (v: unknown): number | null => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 const r2 = (n: number) => Math.round(n * 100) / 100;
+/** A line's cost: to the cent from a cent up, its significant figures below (a fraction of a cent, such as one casting's share of a furnace, is not 0). */
+export const roundLineCost = (n: number) => (Math.abs(n) >= 0.01 ? r2(n) : roundPerPart(n));
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** A costed casting line on one real machine (shared by the casting route engines). */
@@ -62,7 +64,7 @@ export function line(args: {
   });
   return {
     process: args.process, processGroup: args.processGroup, processRoute: args.processRoute, operation: args.process,
-    setupCost: r2(terms.setupCost), runCost: r2(terms.total - terms.setupCost), totalCost: r2(terms.total),
+    setupCost: roundLineCost(terms.setupCost), runCost: roundLineCost(terms.total - terms.setupCost), totalCost: roundLineCost(terms.total),
     cycleTimeMin: r3(args.sec / 60), setupTimeMin: r3(setup.setupMin), setupTimeSource: setup.source, operators: ops,
     hourlyRate: m.machineRatePerHr!, rateSource: 'mhr_database', machineClass: args.machineClass, machineName: m.name,
     commodityCode: null, labourRate: m.labourRatePerHr, mhrId: m.id,

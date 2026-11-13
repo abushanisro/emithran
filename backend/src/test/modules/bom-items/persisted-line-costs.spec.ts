@@ -303,3 +303,24 @@ describe('an applied line reports the rate the engine costed it at', () => {
     expect(line.hourlyRate).toBe(0);
   });
 });
+
+// Migration 1005: what a line charges beyond machine and crew time (energy, a consumable) is stored with it, USD like total_cost_per_part, so the
+// Cost tab can add it back when it recomputes the row from its rates.
+describe('the line\'s other cost is persisted', () => {
+  const code = executable(readFileSync(CONTROLLER, 'utf8'));
+  const sql = readFileSync(join(__dirname, '..', '..', '..', '..', 'migrations', '1005_process_cost_other_cost.sql'), 'utf8');
+
+  it('the writer passes the engine\'s USD figure through, NULL when the line charges nothing beyond time', () => {
+    expect(code).toMatch(/other_cost_per_part:\s*line\.otherCostPerPartUsd \?\? null/);
+  });
+
+  it('the replace function declares and inserts it, keeping the 972 columns', () => {
+    const recordset = sql.slice(sql.indexOf('jsonb_to_recordset'));
+    const insert = sql.slice(sql.indexOf('INSERT INTO process_cost_records'), sql.indexOf('FROM jsonb_to_recordset'));
+    for (const col of ['other_cost_per_part', 'calculation_breakdown', 'machine_cost_per_part', ...COST_COLS]) {
+      expect(recordset).toContain(col);
+      expect(insert).toContain(col);
+    }
+    expect(sql).toContain('pg_advisory_xact_lock');
+  });
+});

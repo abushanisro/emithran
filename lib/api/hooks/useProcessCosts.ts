@@ -112,6 +112,8 @@ export interface ProcessCostRecord {
   partsPerCycle: number;
   scrap: number;
   totalCostPerPart: number;
+  /** What the operation charges beyond machine and crew time (energy, a consumable), USD per part; in totalCostPerPart (migration 1005). */
+  otherCostPerPart?: number | null;
   setupCostPerPart: number;
   totalCycleCostPerPart: number;
   totalCostBeforeScrap: number;

@@ -163,6 +163,24 @@ describe('selectAndCost', () => {
   const base = { process: 'Pour', machineClass: 'sand_casting_pour', batchSize: 250, costContext, ref, criteria: ['ladle holds one mould'] };
   const ladles = sandMachines('machines_pour.csv', 'sand_casting_pour');
 
+  // What a step charges beyond machine and crew time (the melt's electricity, a coating's material) is its own figure on the line, in USD: the
+  // process record stores it and the Cost tab adds it, so the saved line equals the engine's. A fraction of a cent is kept, not rounded to 0.
+  it('the energy is the line\'s other cost, in its total and kept below a cent', () => {
+    const furnaces = sandMachines('machines_melting.csv', 'sand_casting_melting', () => ({ ratePerHr: 12.5, assumedDefaults: [] }));
+    const r = selectAndCost({ ...base, process: 'Melting', machineClass: 'sand_casting_melting', machines: furnaces, evaluate: (m) => meltStep({ ...ctx, energyPricePerKwh: 0.0851, energyPriceSource: 'USA electricity price' }, m) });
+    const energy = r.outcome!.energyCostUsd;
+    expect(energy).toBeGreaterThan(0);
+    expect(r.line.otherCostPerPartUsd).toBeCloseTo(energy, 3); // rounded as every per-part cost (roundPerPart)
+    expect(r.line.otherCostDetail).toMatch(/energy/);
+    expect(r.line.totalCost).toBeGreaterThan(0); // was rounded to 0.00 when below a cent
+    expect(r.line.totalCost).toBeCloseTo((r.line.setupCost ?? 0) + (r.line.runCost ?? 0), 2);
+  });
+
+  it('a step charging nothing beyond time has no other cost', () => {
+    const r = selectAndCost({ ...base, machines: ladles, evaluate: (m) => pourStep(ctx, m) });
+    expect(r.line.otherCostPerPartUsd).toBeUndefined();
+  });
+
   it('costs the cheapest capable machine and records why the others were not chosen', () => {
     const r = selectAndCost({ ...base, machines: ladles, evaluate: (m) => pourStep(ctx, m) });
     expect(r.machine).not.toBeNull();

@@ -6123,6 +6123,12 @@
             "example": "Part Assembly",
             "type": "string"
           },
+          "otherCostPerPart": {
+            "description": "What the operation charges beyond machine and crew time (energy, a consumable), USD per part; included in totalCostPerPart. Null when nothing beyond time.",
+            "example": 0.0029,
+            "nullable": true,
+            "type": "number"
+          },
           "partsPerCycle": {
             "description": "Parts per cycle",
             "example": 1,
@@ -6222,6 +6228,7 @@
           "heads",
           "cycleTime",
           "chargeBasis",
+          "otherCostPerPart",
           "partsPerCycle",
           "scrap",
           "totalCostPerPart",
