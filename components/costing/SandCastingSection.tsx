@@ -13,6 +13,7 @@ import {
   choiceOf,
   parseCavities,
   parsePositive,
+  sandOverrideCount,
   type FieldCommit,
 } from '@/lib/costing/sand-scenario';
 
@@ -63,8 +64,19 @@ function NumberField({ label, value, placeholder, parse, onCommit, title }: {
 export function SandCastingSection({ overrides, onChange }: Props) {
   const text = (key: string) => (typeof overrides?.[key] === 'string' ? overrides[key] : '');
   const number = (key: string) => (typeof overrides?.[key] === 'number' ? overrides[key] : null);
+  const overridden = sandOverrideCount(overrides);
+  // Every setting is decided automatically; the fields are overrides, shown when asked for (or when one is set).
+  const [open, setOpen] = useState(overridden > 0);
   return (
     <div className="space-y-1">
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        Automatic: moulding, cores and cavities from the CAD analysis; energy, coating and drying from the plant data; hot box from published values.
+      </p>
+      <details open={open} onToggle={(e) => { setOpen(e.currentTarget.open); }}>
+        <summary className="cursor-pointer select-none text-[11px] font-medium text-brand-500 hover:text-brand-400">
+          {overridden > 0 ? `Overrides (${overridden} set)` : 'Override a setting'}
+        </summary>
+        <div className="space-y-1 pt-1">
       <div className={rowClass}>
         <span className={labelClass}>Moulding</span>
         <select
@@ -169,6 +181,8 @@ export function SandCastingSection({ overrides, onChange }: Props) {
           />
         </>
       )}
+        </div>
+      </details>
     </div>
   );
 }

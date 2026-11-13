@@ -15,6 +15,14 @@ export const SAND_SCENARIO_KEYS = {
   refractoryCoatPrice: 'refractoryCoatingUsdPerKg',
 } as const;
 
+/** How many sand settings the user has overridden: every one is automatic (CAD, plant data, published sources) until set. */
+export function sandOverrideCount(overrides: Readonly<Record<string, unknown>> | null | undefined): number {
+  return Object.values(SAND_SCENARIO_KEYS).filter((k) => {
+    const v = overrides?.[k];
+    return (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'string' && v !== '');
+  }).length;
+}
+
 /** What can be coated (backend sand-refractory.ts): nothing unless chosen. The values are the backend's. */
 export const REFRACTORY_COAT_CHOICES = [
   { value: 'none', label: 'Not coated' },
