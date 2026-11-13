@@ -11,12 +11,16 @@ export interface CycleFields {
   others: CalculationTraceStep[];
 }
 
-/** A line's calculation as the Cost panel lays it out: the cycle, its phases, the rest. Null when the calculation has no cycle time. */
-export function cycleFields(trace: readonly CalculationTraceStep[] | null | undefined): CycleFields | null {
-  const cycle = [...(trace ?? [])].reverse().find((s) => s.kind === 'calculated' && CYCLE_FIELDS.includes(s.fieldName));
+/**
+ * A calculation as the Cost panel lays it out: the result (by default the Cycle Time or Total Time), the fields shown first (by default the ones the
+ * result's formula names: a cycle's phases), and the rest in the calculator's order. Null when the calculation has no such result.
+ */
+export function cycleFields(trace: readonly CalculationTraceStep[] | null | undefined, opts: { result?: string; first?: readonly string[] } = {}): CycleFields | null {
+  const results = opts.result ? [opts.result] : CYCLE_FIELDS;
+  const cycle = [...(trace ?? [])].reverse().find((s) => s.kind === 'calculated' && results.includes(s.fieldName));
   if (!cycle || !trace) return null;
   const byName = new Map(trace.map((s) => [s.fieldName, s]));
-  const names = [...new Set([...(cycle.formula ?? '').matchAll(/\{([^}]+)\}/g)].map((m) => m[1] ?? ''))];
+  const names = opts.first ? [...opts.first] : [...new Set([...(cycle.formula ?? '').matchAll(/\{([^}]+)\}/g)].map((m) => m[1] ?? ''))];
   const phases = names.flatMap((n) => { const s = byName.get(n); return s ? [s] : []; });
   const taken = new Set([cycle.fieldName, ...phases.map((p) => p.fieldName)]);
   return { cycle, phases, others: trace.filter((s) => !taken.has(s.fieldName)) };

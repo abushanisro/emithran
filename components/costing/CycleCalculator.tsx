@@ -80,9 +80,13 @@ function Field({ step, bomItemId, calculator }: { step: CalculationTraceStep; bo
  * every other field of the calculation. Where the engine applies a part's own values (`calculator` set), each field can be changed for this part with
  * the reason; the cost is recalculated with it. Read-only otherwise.
  */
-export function CycleCalculator({ trace, bomItemId, calculator }: { trace: readonly CalculationTraceStep[]; bomItemId: string; calculator: string | null }) {
+export function CycleCalculator({ trace, bomItemId, calculator, result, first }: {
+  trace: readonly CalculationTraceStep[]; bomItemId: string; calculator: string | null;
+  /** The result field, last (default: the Cycle Time or Total Time); `first`: the fields shown first (default: the ones its formula names). */
+  result?: string; first?: readonly string[];
+}) {
   const [more, setMore] = useState(false);
-  const fields = cycleFields(trace);
+  const fields = cycleFields(trace, { ...(result ? { result } : {}), ...(first ? { first } : {}) });
   if (!fields) return null;
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">

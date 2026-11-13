@@ -61,6 +61,17 @@ const MANUFACTURING_PROCESSES = {
   }
 };
 
+/** The fields of a saved tooling record the compact row reads. */
+interface ToolingRowView {
+  description?: string | null;
+  toolingType?: string | null;
+  amortizationParts?: number | string | null;
+  usagePercentage?: number | string | null;
+}
+const row = (item: unknown): ToolingRowView => item as ToolingRowView;
+/** A tool's name: its description, else its record type, else "Tooling" (an empty text is no name). */
+const toolName = (r: ToolingRowView): string => [r.description, r.toolingType?.replace(/_/g, ' ')].find((t) => t != null && t.trim() !== '') ?? 'Tooling';
+
 export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '$', conversionRate = 1 }: ToolingSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTooling, setEditTooling] = useState<any | null>(null);
@@ -202,12 +213,14 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                 return (
                   <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{item.toolingType?.replace(/_/g, ' ') || 'Tooling'}</p>
+                      {/* The tool by what it is (its description: "Injection mold (SPI Class104)"), not its record type ("die"). */}
+                      <p className="text-xs font-medium truncate">{toolName(row(item))}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {[
                           processData?.label,
-                          item.amortizationParts ? `${item.amortizationParts.toLocaleString()} pcs` : null,
-                          `${item.usagePercentage ?? 100}% usage`,
+                          row(item).amortizationParts ? `spread over ${Number(row(item).amortizationParts).toLocaleString()} parts` : null,
+                          // A tool shared with other parts is charged in part; a tool this part uses alone needs no note.
+                          row(item).usagePercentage != null && Number(row(item).usagePercentage) !== 100 ? `${Number(row(item).usagePercentage)}% of the tool charged to this part` : null,
                         ].filter(Boolean).join(' · ')}
                       </p>
                     </div>
