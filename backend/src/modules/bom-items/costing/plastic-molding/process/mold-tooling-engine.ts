@@ -99,8 +99,9 @@ function bracket<T>(rows: readonly T[], bound: (r: T) => number, value: number):
 }
 
 const SCOPE_WARNING =
-  'Injection Molding tooling cost does NOT include mold-base steel/blank cost (no price-by-size table is on ' +
-  'file); the true tooling investment is higher than this figure.';
+  'Injection Molding tooling cost includes the mold base plate steel, the standard components and the toolroom hours; it does NOT include ' +
+  'core and cavity blocks, slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops ' +
+  'or try-out (no formula on file yet): the true tooling investment is higher than this figure.';
 
 /**
  * Real, itemized, partial mold-tooling BOM cost. Pure function — every input

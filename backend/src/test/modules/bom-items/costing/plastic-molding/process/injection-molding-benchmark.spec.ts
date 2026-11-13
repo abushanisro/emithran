@@ -55,6 +55,7 @@ function input(material: keyof typeof MATERIALS, press: Press, name: string, ove
     materialType: m.type,
     plasticReference: REF,
     location: 'USA',
+    bboxMaxMm: 50, bboxMidMm: 40, bboxMinMm: 20,
     signals: { projectedAreaMm2: 2000, undercutCount: 0 },
     annualVolume: 10_000,
     productionLifeYears: 3,
@@ -170,7 +171,8 @@ describe('computeInjectionMoldedCostSummary', () => {
     expect(t.moldToolLifeShots).toBe(144_000);
     expect(t.moldsRequired).toBe(Math.ceil((500_000 / r.injectionMolding!.cavityCount) / 144_000));
     expect(t.moldLabourCostUsd).toBeGreaterThan(0);
-    expect(t.moldCostUsd).toBeCloseTo((t.moldBomSubtotalUsd! + t.moldLabourCostUsd!) * t.moldsRequired!, 1);
+    expect(t.moldBaseSteelUsd).toBeGreaterThan(0);
+    expect(t.moldCostUsd).toBeCloseTo((t.moldBomSubtotalUsd! + t.moldLabourCostUsd! + t.moldBaseSteelUsd!) * t.moldsRequired!, 1);
   });
 
   it('prices side-action hardware only when the part has an undercut', () => {
