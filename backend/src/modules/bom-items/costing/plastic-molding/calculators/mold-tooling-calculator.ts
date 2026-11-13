@@ -14,6 +14,8 @@ import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas }
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
 const OUTPUT = 'Tooling Cost Per Part';
 const REF = 'memory/Plastic Modeling';
+// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment) are this
+// calculator's formulas; the seeds below supply their inputs.
 /** timePerTryoutBase's note: "basic hrs per tryout for <500T (x2 for bigger)". */
 const TRYOUT_DOUBLE_ABOVE_TONNES = 500;
 
@@ -158,6 +160,8 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       'Side Actions': { value: sa.count, source: f.sideActionBlocks ? 'CAD: the recognised slide and lifter bundles with a size class' : 'CAD features not recognised: no bundles to price' },
       'CMM Hours Per Side Action': { value: x.cmmHoursPerSideAction, source: `${vars}: cmmInspectionMultiplier` },
       'CMM Base Hours': { value: x.cmmBaseHours, source: `${vars}: cmmInspectionAdder` },
+      'Heat Treat Rate': { value: f.toolroomRates.heatTreatUsdPerKg, source: `${settings} heatTreatRateUsdPerKg (the cavity and core plates and the slide and lifter blocks)` },
+      'Stress Relief Rate': { value: f.toolroomRates.stressReliefUsdPerKg, source: `${settings} stressReliefRateUsdPerKg (the clamp and support plates)` },
     },
   };
 }

@@ -3,7 +3,7 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
 
 /**
  * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977,
- * 1007, 1012, 1013, 1014 and 1016: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
+ * 1007, 1012, 1013, 1014, 1016 and 1017: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
  * NEW migration, which writes the calculators whose spec `migration` is its number (and raises their `version` when their formulas change, calculators.version, migration 428).
  *   976  the reaction injection calculator, version 2 (fill time added)
  *   977  the injection, structural foam and LSR calculators: their fill-factor inputs name the reference table they are read from, so the cost dialog's eye opens it
@@ -16,22 +16,22 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1014 the injection mold tooling calculator, version 3: the cavity and core machining (hours per square inch by complexity) and polish
  *   1016 the injection mold tooling calculator, version 4: the mold assembly extras (ejector pins, sprue bushing, locating ring, try-out)
  *   1017 the injection mold tooling calculator, version 5: the slide and lifter blocks (steel, machining, CMM inspection)
+ *   1018 the injection mold tooling calculator, version 6: the heat treatment of the mold steel
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1017] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1018] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
-  1017: {
-    title: 'Injection mold tooling calculator, version 5 -- the slide and lifter blocks.',
+  1018: {
+    title: 'Injection mold tooling calculator, version 6 -- the heat treatment of the mold steel.',
     rootCause: [
-      'The mold tooling cost (version 4, migration 1016) left out the slides and lifters the CAD engine recognises (SlideBundle, LifterBundle, each with',
-      'a size class from the staged bundle width thresholds). The reference holds the block volume of each size ({small,medium,large}{Slide,Lifter}Volume)',
-      'and the CMM hours to inspect them (cmmInspectionMultiplier, cmmInspectionAdder), but no formula. Version 5 prices each block as the default tool',
-      'steel, machines the surface of a cube of its volume at the cavity hours per square inch, and inspects them on the CMM, all at the machining rate',
-      '(formula registry F-28, ASSUMED). The calculator is replaced under version 5 (a calculator in use is not edited in place).',
+      'The mold tooling cost (version 5, migration 1017) left out the heat treatment: the reference prices hardening and stress relief per kg of tool',
+      'steel (digital_factory_settings_usa heatTreatRateUsdPerKg, stressReliefRateUsdPerKg) but says not which steel is treated. Version 6 hardens the',
+      'steel that forms the part (the cavity and core plates and the slide and lifter blocks) and stress relieves the rest of the mold base (formula',
+      'registry F-29, ASSUMED). The calculator is replaced under version 6 (a calculator in use is not edited in place).',
     ].join('\n'),
   },
   976: {
@@ -76,5 +76,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   976: '976_plastic_rim_fill_time_calculator.sql',
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
-  1017: '1017_plastic_mold_slides_lifters.sql',
+  1018: '1018_plastic_mold_heat_treatment.sql',
 };

@@ -37,11 +37,12 @@ function expectedSteelUsd(): number {
 }
 
 describe('the mold tooling calculator', () => {
-  it('is a helper whose result is the tooling cost per part, at version 5 written by migration 1017 (1012 to 1016 are history)', () => {
+  it('is a helper whose result is the tooling cost per part, at version 6 written by migration 1018 (1012 to 1017 are history)', () => {
     const c = loadPlasticMoldingCalculatorSpec().calculators.find((x) => x.name === MOLD_TOOLING_CALCULATOR)!;
-    expect(c).toMatchObject({ helper: true, operations: [], migration: 1017, version: 5, output: 'Tooling Cost Per Part' });
+    expect(c).toMatchObject({ helper: true, operations: [], migration: 1018, version: 6, output: 'Tooling Cost Per Part' });
     expect(c.description).toMatch(/G-03 to G-08/);
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/1017_plastic_mold_slides_lifters.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1017));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1018_plastic_mold_heat_treatment.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1018));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1017_plastic_mold_slides_lifters.sql'), 'utf8')).toContain('version 5');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1016_plastic_mold_assembly_extras.sql'), 'utf8')).toContain('version 4');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1014_plastic_mold_cavity_machining_polish.sql'), 'utf8')).toContain('version 3');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1012_plastic_mold_tooling_calculator.sql'), 'utf8')).toContain(MOLD_TOOLING_CALCULATOR);
@@ -63,7 +64,10 @@ describe('the mold tooling calculator', () => {
     expect(r.outputs['Sprue and Locating Ring Cost']).toBe(155);
     expect(r.outputs['Tryout Hours']).toBe(36);
     expect(r.outputs['Tryout Cost']).toBeCloseTo(36 * 76.81, 6);
-    expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd() + r.outputs['Cavity Machining Cost']! + r.outputs['Polish Cost']! + EXTRAS_USD) * 100 + 0.5) / 100);
+    expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd() + r.outputs['Cavity Machining Cost']! + r.outputs['Polish Cost']! + EXTRAS_USD
+      + r.outputs['Heat Treatment Cost']!) * 100 + 0.5) / 100);
+    // no slides: both rates are 2.11 USD/kg, so the whole stack is treated at 2.11
+    expect(r.outputs['Heat Treatment Cost']).toBeCloseTo(r.outputs['Mold Base Steel Mass']! * 2.11, 6);
     expect(r.trace.find((t) => t.fieldName === 'Ejector Pin Cost')?.source).toMatch(/cmStandardToolingComponents: Ejector Pin/);
     expect(r.trace.find((t) => t.fieldName === 'Tryout Press Multiplier')?.source).toMatch(/<500T \(x2 for bigger\)": the press is 102 t/);
     expect(r.trace.find((t) => t.fieldName === 'Tryout Rate')?.source).toMatch(/tryoutRateUsdPerHr/);
@@ -91,7 +95,25 @@ describe('the mold tooling calculator', () => {
     // and it is in the mold cost
     const without = runMoldTooling(facts(), CALCS);
     if (!without.derivable) throw new Error(without.missing.join());
-    expect(r.outputs['Mold Cost']! - without.outputs['Mold Cost']!).toBeCloseTo(r.outputs['Side Action Cost']!, 6);
+    // (the blocks are also hardened, F-29)
+    expect(r.outputs['Mold Cost']! - without.outputs['Mold Cost']!).toBeCloseTo(r.outputs['Side Action Cost']! + r.outputs['Side Action Steel Mass']! * REF.toolroomRatesUsa.heatTreatUsdPerKg, 6);
+  });
+
+  it('hardens the cavity and core plates and the side-action blocks, and stress relieves the rest of the mold base', () => {
+    if ('missing' in BASE) throw new Error(BASE.missing.join());
+    const mb = REF.moldBase;
+    const r = runMoldTooling(facts({ sideActionBlocks: { slide: NONE, lifter: { ...NONE, small: 2 }, unsized: 0 } }), CALCS);
+    if (!r.derivable) throw new Error(r.missing.join());
+    const a = Math.max(mb.aPlateMinMm, mb.aPlateCavityRatio * 30 + BASE.cavityDepthBorderMm);
+    const b = Math.max(mb.bPlateMinMm, (1 - mb.aPlateCavityRatio) * 30 + BASE.coreDepthBorderMm);
+    const cavityCore = BASE.base.widthMm * BASE.base.lengthMm * (a + b) / 1e9 * mb.steel.densityKgM3;
+    expect(r.outputs['Cavity Core Plate Mass']).toBeCloseTo(cavityCore, 6);
+    expect(r.outputs['Hardened Steel Mass']).toBeCloseTo(cavityCore + r.outputs['Side Action Steel Mass']!, 6);
+    expect(r.outputs['Stress Relieved Steel Mass']).toBeCloseTo(r.outputs['Mold Base Steel Mass']! - cavityCore, 6);
+    const rates = REF.toolroomRatesUsa;
+    expect(r.outputs['Heat Treatment Cost']).toBeCloseTo(
+      (cavityCore + r.outputs['Side Action Steel Mass']!) * rates.heatTreatUsdPerKg + (r.outputs['Mold Base Steel Mass']! - cavityCore) * rates.stressReliefUsdPerKg, 6);
+    expect(r.trace.find((t) => t.fieldName === 'Heat Treat Rate')?.source).toMatch(/heatTreatRateUsdPerKg/);
   });
 
   it('adds no side-action cost, and no CMM base hours, when no bundle was recognised', () => {

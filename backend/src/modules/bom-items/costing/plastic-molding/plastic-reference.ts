@@ -189,7 +189,11 @@ export interface PlasticReference {
 }
 
 /** digital_factory_settings_usa toolroom rates, USD per hour. */
-export interface ToolroomRates { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number; tryoutUsdPerHr: number }
+export interface ToolroomRates {
+  designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number; tryoutUsdPerHr: number;
+  /** heatTreatRateUsdPerKg and stressReliefRateUsdPerKg: hardening and stress relief of the tool steel, per kg (F-29). */
+  heatTreatUsdPerKg: number; stressReliefUsdPerKg: number;
+}
 
 /** What the mold's assembly extras cost, from memory/Plastic Modeling (F-27). */
 export interface MoldExtrasReference {
@@ -357,6 +361,8 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     machiningUsdPerHr: rate('machiningRateUsdPerHr'),
     assemblyUsdPerHr: rate('assemblyRateUsdPerHr'),
     tryoutUsdPerHr: rate('tryoutRateUsdPerHr'),
+    heatTreatUsdPerKg: rate('heatTreatRateUsdPerKg'),
+    stressReliefUsdPerKg: rate('stressReliefRateUsdPerKg'),
   };
   const ejectorPin = components.find((c) => componentNameKey(c.name) === componentNameKey('Ejector Pin'));
   const ejectorPinHours = assemblyTimes.find((a) => componentNameKey(a.name) === componentNameKey('Ejector Pin'))?.hours;

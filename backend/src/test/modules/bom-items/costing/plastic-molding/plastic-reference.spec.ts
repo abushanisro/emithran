@@ -59,10 +59,10 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
     expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth', sideActionsPriced: false })).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08']);
     // every bundle recognised and sized: the slides and lifters are priced (F-28), not a gap
     expect(toolingGapIds({ ...COLD, sideActionsPriced: true })).toEqual(['G-04', 'G-06']);
-    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true })).toMatch(/try-out, the slide and lifter blocks, and the toolroom hours; it does NOT include EDM and heat treatment, cooling lines \(/);
+    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true })).toMatch(/try-out, the slide and lifter blocks, the heat treatment and the toolroom hours; it does NOT include EDM, cooling lines \(/);
     const w = toolingScopeWarning(COLD);
     expect(w).toMatch(/includes .*the cavity and core machining and polish.*ejector pins, sprue bushing, locating ring, try-out/);
-    expect(w).toMatch(/does NOT include slides and lifters \(the CAD bundles are not all recognised and sized\), EDM and heat treatment, cooling lines \(/);
+    expect(w).toMatch(/does NOT include slides and lifters \(the CAD bundles are not all recognised and sized\), EDM, cooling lines \(/);
     expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false })).toMatch(/hot drops \(the number of drops is not on file\), cavity inserts/);
   });
 
@@ -76,7 +76,7 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
   });
 
   it('reads the reference USA toolroom rates the tooling calculator prices the hours at', () => {
-    expect(REF.toolroomRatesUsa).toEqual({ designUsdPerHr: 64.73, machiningUsdPerHr: 100.55, assemblyUsdPerHr: 76.81, tryoutUsdPerHr: 76.81 });
+    expect(REF.toolroomRatesUsa).toEqual({ designUsdPerHr: 64.73, machiningUsdPerHr: 100.55, assemblyUsdPerHr: 76.81, tryoutUsdPerHr: 76.81, heatTreatUsdPerKg: 2.11, stressReliefUsdPerKg: 2.11 });
   });
 });
 

@@ -223,7 +223,7 @@ RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open
 | Id | Item | Staged in memory/ | State |
 |---|---|---|---|
 | G-03 | Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle | tblSlideSizes; slideCycleRate; costPerHydraulicEjector | UNSUPPORTED |
-| G-04 | EDM and heat treatment | edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg | UNSUPPORTED |
+| G-04 | EDM of rib inserts (the CAD engine does not measure rib heights yet; heat treatment is F-29) | edmRateUsdPerHr; edmMaterialCost{Carbon,Copper}UsdPerIn3; edmElectrodeVolumeBurn; *RibInsertElectrodeSize; machinedRibThreshold | UNSUPPORTED |
 | G-05 | Mold texture | cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime | UNSUPPORTED |
 | G-06 | Cooling and water lines | tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables | UNSUPPORTED |
 | G-07 | Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them) | tblSpiType.Use Insert; costPerUnscrewingMechanism | UNSUPPORTED |

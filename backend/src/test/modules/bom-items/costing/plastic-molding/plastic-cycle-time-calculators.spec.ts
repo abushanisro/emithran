@@ -61,7 +61,7 @@ describe('plastic molding calculator spec', () => {
     const quoted = (name: string) => '$q$' + name + '$q$';
     // RIM is at version 2 (976); injection and structural foam at version 3 (1008, after 1007's version 2 was reverted); the rest at version 1
     expect(spec.calculators.filter((c) => (c.version ?? 1) > 1).map((c) => [c.name, c.version, c.migration]))
-      .toEqual([[INJECTION_CALCULATOR, 3, 1008], [STRUCTURAL_FOAM_CALCULATOR, 3, 1008], [RIM_CALCULATOR, 2, 976], ['Injection Mold - Tooling', 5, 1017]]);
+      .toEqual([[INJECTION_CALCULATOR, 3, 1008], [STRUCTURAL_FOAM_CALCULATOR, 3, 1008], [RIM_CALCULATOR, 2, 976], ['Injection Mold - Tooling', 6, 1018]]);
     // 1008 writes the version-1 cycle again: fill + pack + cooling + mold open/close, no plasticizing or ejection field
     const m1008 = committed('1008_plastic_injection_cycle_restore_v1.sql');
     expect(m1008).toContain('version = 3');
