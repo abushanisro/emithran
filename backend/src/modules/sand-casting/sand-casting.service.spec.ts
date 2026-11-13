@@ -55,7 +55,7 @@ function setup(
   options: {
     own?: CastingAnalysisRow | null;
     finished?: CastingAnalysisRow | null;
-    item?: { id: string; file_3d_path: string | null } | null;
+    item?: { id: string; file_3d_path: string | null; file_step_path?: string | null } | null;
     bytes?: Buffer | null;
     raceOnInsert?: boolean;
     /** The item's draw-direction override as the user's client reads it (null: none, automatic). */
@@ -174,6 +174,14 @@ function setup(
 }
 
 describe("SandCastingService.request", () => {
+  // A STEP upload is stored twice: the STEP itself (file_step_path) and its STL conversion for the viewer (file_3d_path). The worker reads STEP only.
+  it("sends the worker the STEP when the item has one, not the STL conversion", async () => {
+    const { service, calls, objects } = setup({ item: { id: "item-1", file_3d_path: "path/part.stl", file_step_path: "path/part.step" } });
+    await service.request(input);
+    expect(objects.get).toHaveBeenCalledWith(expect.any(String), "path/part.step");
+    expect(calls.inserts[0]).toMatchObject({ source_path: "path/part.step" });
+  });
+
   it("queues a new analysis, identifies the file by its hash and the worker version, and wakes the runner", async () => {
     const { service, calls, runner, audit } = setup();
     const { analysis, reused } = await service.request(input);

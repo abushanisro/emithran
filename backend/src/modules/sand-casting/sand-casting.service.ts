@@ -1,3 +1,4 @@
+import { CASTING_SOURCE_COLUMNS, castingSourcePath } from "./casting-source";
 import { createHash } from "node:crypto";
 
 import {
@@ -74,12 +75,13 @@ export class SandCastingService {
     input: CastingRequest,
   ): Promise<{ analysis: CastingAnalysisRow; reused: boolean }> {
     const item = await this.readItem(input.bomItemId, input.token);
-    if (!item.file_3d_path)
+    const sourcePath = castingSourcePath(item);
+    if (!sourcePath)
       throw new UnprocessableEntityException({
         code: "no_cad_file",
         message: "This BOM item has no 3D file to analyse.",
       });
-    const bytes = await this.objects.get(CASTING_SOURCE_BUCKET, item.file_3d_path);
+    const bytes = await this.objects.get(CASTING_SOURCE_BUCKET, sourcePath);
     if (!bytes)
       throw new ConflictException({
         code: "cad_file_missing",
@@ -87,7 +89,7 @@ export class SandCastingService {
       });
 
     // What the analysis is run with: the engineer's draw direction for this item if there is one, else the automatic choice.
-    const config = configForAxis((await this.drawDirection(input.bomItemId, input.token, item.file_3d_path)).axis);
+    const config = configForAxis((await this.drawDirection(input.bomItemId, input.token, sourcePath)).axis);
     const key = {
       input_sha256: createHash("sha256").update(bytes).digest("hex"),
       worker_version: CASTING_WORKER_VERSION,
@@ -97,7 +99,7 @@ export class SandCastingService {
     };
     const admin = this.admin();
 
-    const result = await this.queueOrReuse(admin, input, { ...key, source_path: item.file_3d_path });
+    const result = await this.queueOrReuse(admin, input, { ...key, source_path: sourcePath });
     if (!result.reused || result.created) {
       await this.audit.recordBestEffort({
         action: "casting_analysis.requested",
@@ -286,7 +288,7 @@ export class SandCastingService {
 
   /** The item's 3D file path now. Read as the user. */
   private async currentFilePath(bomItemId: string, token: string): Promise<string | null> {
-    return (await this.readItem(bomItemId, token)).file_3d_path;
+    return castingSourcePath(await this.readItem(bomItemId, token));
   }
 
   /** The geometry of the item's file at `path` as its automatic analysis measured it, or null when none finished (geometry does not depend on the worker version). */
@@ -315,9 +317,10 @@ export class SandCastingService {
     reason: string,
   ): Promise<{ drawDirection: DrawDirectionView; analysis: CastingAnalysisRow; reused: boolean }> {
     const item = await this.readItem(input.bomItemId, input.token); // not found for another organization's item
-    const previous = await this.drawDirection(input.bomItemId, input.token, item.file_3d_path);
+    const sourcePath = castingSourcePath(item);
+    const previous = await this.drawDirection(input.bomItemId, input.token, sourcePath);
     // Bound to this file and to its geometry as measured so far (none yet: then a later replacement can only be confirmed, never carried over).
-    const geometry = item.file_3d_path ? await this.automaticGeometry(input.bomItemId, item.file_3d_path, input.token) : null;
+    const geometry = sourcePath ? await this.automaticGeometry(input.bomItemId, sourcePath, input.token) : null;
     const { error } = await this.admin()
       .from("casting_draw_directions")
       .upsert(
@@ -328,7 +331,7 @@ export class SandCastingService {
           reason: reason.trim(),
           set_by: input.userId,
           set_at: new Date().toISOString(),
-          source_path: item.file_3d_path,
+          source_path: sourcePath,
           geometry,
         },
         { onConflict: "bom_item_id" },
@@ -342,13 +345,13 @@ export class SandCastingService {
       meta: { axis, reason: reason.trim(), previousAxis: previous.declaredAxis },
     });
     const requested = await this.request(input);
-    return { drawDirection: await this.drawDirection(input.bomItemId, input.token, item.file_3d_path), ...requested };
+    return { drawDirection: await this.drawDirection(input.bomItemId, input.token, sourcePath), ...requested };
   }
 
   /** Returns the part to the automatic draw direction. Audited. */
   async clearDrawDirection(input: CastingRequest): Promise<{ drawDirection: DrawDirectionView; analysis: CastingAnalysisRow; reused: boolean }> {
-    const item = await this.readItem(input.bomItemId, input.token);
-    const previous = await this.drawDirection(input.bomItemId, input.token, item.file_3d_path);
+    const sourcePath = castingSourcePath(await this.readItem(input.bomItemId, input.token));
+    const previous = await this.drawDirection(input.bomItemId, input.token, sourcePath);
     const { error } = await this.admin().from("casting_draw_directions").delete().eq("bom_item_id", input.bomItemId);
     if (error) throw new Error(`Could not remove the draw direction: ${error.message}`);
     if (previous.declaredAxis) {
@@ -361,7 +364,7 @@ export class SandCastingService {
       });
     }
     const requested = await this.request(input);
-    return { drawDirection: await this.drawDirection(input.bomItemId, input.token, item.file_3d_path), ...requested };
+    return { drawDirection: await this.drawDirection(input.bomItemId, input.token, sourcePath), ...requested };
   }
 
   /** The analyses of one BOM item, newest first. An empty list means "not requested", never "passed". */
@@ -379,16 +382,16 @@ export class SandCastingService {
   private async readItem(
     bomItemId: string,
     token: string,
-  ): Promise<{ id: string; file_3d_path: string | null }> {
+  ): Promise<{ id: string; file_3d_path: string | null; file_step_path: string | null }> {
     const { data, error } = await this.database
       .getUserClient(token)
       .from("bom_items")
-      .select("id, file_3d_path")
+      .select(`id, ${CASTING_SOURCE_COLUMNS}`)
       .eq("id", bomItemId)
       .maybeSingle();
     if (error) throw new Error(`Could not read the BOM item: ${error.message}`);
     if (!data) throw new NotFoundException(`BOM item ${bomItemId} not found`);
-    return data as { id: string; file_3d_path: string | null };
+    return data as { id: string; file_3d_path: string | null; file_step_path: string | null };
   }
 
   private async find(
