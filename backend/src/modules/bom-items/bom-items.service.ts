@@ -133,6 +133,8 @@ import { MachineDiscoveryService } from './services/machine-discovery.service';
 import { billetFallback } from './costing/sheet-metal/machine/blank-stock-candidates';
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
 import { SandCatalogOperationsService } from './costing/casting/sand/sand-catalog-operations.service';
+import { MachiningAllowanceService } from './costing/casting/machining-allowance.service';
+import { mouldingMethodOf, type MachiningAllowanceResult } from './costing/casting/machining-allowance';
 import { SandCostService, type SandCostResult } from './costing/casting/sand/sand-cost.service';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
@@ -292,6 +294,8 @@ export class BOMItemsService {
     private readonly hydroformingReference: HydroformingReferenceService,
     /** The sand-casting report on the route's lines (display only); optional so the hand-built services in tests need not pass it. */
     private readonly sandCatalogOperations?: SandCatalogOperationsService,
+    /** The machining allowance of a sand casting (display only); optional for the same reason. */
+    private readonly machiningAllowance?: MachiningAllowanceService,
   ) { }
 
   /**
@@ -3987,6 +3991,8 @@ export class BOMItemsService {
       let processChoice: DieCastingProcessChoiceDto | null = null;
       // Sand casting: the route (sand-cost.service.ts), or what keeps it from being built.
       let sandResult: SandCostResult | null = null;
+      // Sand casting: the stock left on each machined feature (machining-allowance.ts), shown and never costed.
+      let machiningAllowance: MachiningAllowanceResult | null = null;
       // Die casting: what the metal calculators of the summary need.
       let metal: {
         calculators: ReferenceCalculators; alloy: { name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
@@ -4247,6 +4253,18 @@ export class BOMItemsService {
           usdToLocal, costContext: zeroCtx,
         });
         route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...sandResult.warnings] };
+        if (this.machiningAllowance) {
+          const rmag = item.scenarioOverrides?.['machiningAllowanceRmag'];
+          const allowance = await this.machiningAllowance.resolve({
+            bomItemId: id, accessToken, need: m.need,
+            largestDimensionMm: Math.max(...bbox) || null,
+            materialFamily: (await this.sandCostService.getMaterial(client, grade))?.materialType ?? null,
+            mouldingMethod: mouldingMethodOf(sandResult.route?.mouldingProcess),
+            rmag: typeof rmag === 'string' && /^[A-K]$/.test(rmag) ? rmag : null,
+          });
+          machiningAllowance = allowance.result;
+          route.warnings.push(...allowance.warnings);
+        }
       } else {
         // Investment casting: no casting engine yet (a named, uncosted
         // line); machining after casting is still assessed for the process.
@@ -4277,6 +4295,7 @@ export class BOMItemsService {
         }),
         ...currencyMeta,
         drawingCadConsistency,
+        ...(machiningAllowance ? { machiningAllowance } : {}),
       };
       // No appendRateWarnings: it reads any uncosted line as "no machine in HR
       // Rates", but a casting line can be uncosted for its material or geometry;
