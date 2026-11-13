@@ -132,6 +132,7 @@ import { MaterialResolutionService } from './services/material-resolution.servic
 import { MachineDiscoveryService } from './services/machine-discovery.service';
 import { billetFallback } from './costing/sheet-metal/machine/blank-stock-candidates';
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
+import { SandCatalogOperationsService } from './costing/casting/sand/sand-catalog-operations.service';
 import { SandCostService, type SandCostResult } from './costing/casting/sand/sand-cost.service';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
@@ -289,6 +290,8 @@ export class BOMItemsService {
     private readonly smCatalogOperations: SheetMetalCatalogOperationsService,
     private readonly plasticCatalogOperations: PlasticCatalogOperationsService,
     private readonly hydroformingReference: HydroformingReferenceService,
+    /** The sand-casting report on the route's lines (display only); optional so the hand-built services in tests need not pass it. */
+    private readonly sandCatalogOperations?: SandCatalogOperationsService,
   ) { }
 
   /**
@@ -4278,6 +4281,19 @@ export class BOMItemsService {
       // No appendRateWarnings: it reads any uncosted line as "no machine in HR
       // Rates", but a casting line can be uncosted for its material or geometry;
       // the casting engines name the actual gap, machines included.
+      // The sand-casting report: each feature under the catalog operation that makes it (sand-catalog-operations.ts). The casting analysis's
+      // features carry their cores; the cad-engine's do not, so without an analysis a hole is undecided between mould and core.
+      if (sandResult && this.sandCatalogOperations) {
+        const v2 = ((fg?.feature_graph_v2?.features ?? []) as Array<{ id?: string; feature_type?: string; diameter_mm?: number | null }>)
+          .filter((x) => typeof x.id === 'string' && typeof x.feature_type === 'string')
+          .map((x) => ({ id: x.id!, type: x.feature_type!, core: null, diameterMm: x.diameter_mm ?? null }));
+        castingResult.warnings.push(...await this.sandCatalogOperations.attach({
+          lines: castingResult.processLines,
+          features: sandResult.analysisFeatures ?? v2,
+          coresLinked: !!sandResult.analysisFeatures,
+          accessToken,
+        }));
+      }
       this.applyCostOverrides(castingResult, costOverrides);
       if (costOverrides.size > 0) castingResult.costOverrides = Object.fromEntries(costOverrides);
       if (localLinesOut) {

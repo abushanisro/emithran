@@ -1,3 +1,4 @@
+import { sandFeaturesFromCastingResult, type SandFeature } from './sand-catalog-operations';
 import { Injectable } from '@nestjs/common';
 import type { DbClient } from '../../../../../common/db/postgrest-client';
 import { escapeLikePattern, quoteFilterValue } from '../../../../../common/db/postgrest-filter';
@@ -61,6 +62,8 @@ export interface SandCostResult {
   route: SandRoute | null;
   missing: string[];
   warnings: string[];
+  /** The casting analysis's features with the core that forms each, when it measured the part; else absent (the cad-engine's features carry no core links). */
+  analysisFeatures?: SandFeature[];
 }
 
 /**
@@ -113,7 +116,8 @@ export class SandCostService {
   async price(req: SandCostRequest): Promise<SandCostResult> {
     const warnings: string[] = [];
     let measuredBy: SandCostResult['measuredBy'] = 'cad-engine';
-    const none = (...missing: string[]): SandCostResult => ({ measuredBy, route: null, missing, warnings });
+    let analysisFeatures: SandFeature[] | undefined;
+    const none = (...missing: string[]): SandCostResult => ({ measuredBy, route: null, missing, warnings, ...(analysisFeatures ? { analysisFeatures } : {}) });
     // The casting analysis (the C++ worker, on the exact solid) measures the part when there is one for the current file; otherwise the cad-engine does.
     let measurements = req.measurements;
     const analysis = await this.analyses.latestResult(req.bomItemId, req.sourcePath, req.accessToken);
@@ -122,6 +126,7 @@ export class SandCostService {
       if (fromAnalysis.measurements) {
         measurements = fromAnalysis.measurements;
         measuredBy = 'casting analysis';
+        analysisFeatures = sandFeaturesFromCastingResult(analysis.result) ?? undefined;
         warnings.push(`Measured by the casting analysis (worker ${analysis.workerVersion}) on the exact solid.`);
       } else {
         warnings.push(`The casting analysis could not be used (${fromAnalysis.missing.join('; ')}): the cad-engine's measurements are used.`);
@@ -152,6 +157,6 @@ export class SandCostService {
     warnings.push(...scenarioWarnings);
     const { route, missing } = buildSandRoute({ ref, spec, calculators, material, part, machinesByClass: machines, scenario, costContext: req.costContext });
     if (!route) return none(...missing);
-    return { measuredBy, route: sandRouteToLocal(route, req.usdToLocal), missing: [], warnings: [...warnings, ...route.warnings] };
+    return { measuredBy, route: sandRouteToLocal(route, req.usdToLocal), missing: [], warnings: [...warnings, ...route.warnings], ...(analysisFeatures ? { analysisFeatures } : {}) };
   }
 }

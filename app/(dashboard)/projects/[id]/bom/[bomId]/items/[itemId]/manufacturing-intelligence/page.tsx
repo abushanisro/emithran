@@ -114,6 +114,7 @@ import {
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
+import { isMachiningTreeFamily, showsCatalogOperations } from '@/lib/features/process-tree-family';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
@@ -721,7 +722,7 @@ function buildProcessTree(
   // machining is decided by the part family, not by the step name containing
   // "Milling"/"Machining": that substring test skipped real steps such as
   // "4 Axis Mill", which is why they showed no features at all.
-  const isMachiningFamily = family !== '' && family !== 'sheet_metal' && family !== 'plastic_molded';
+  const isMachiningFamily = isMachiningTreeFamily(family);
   const v2All = fg?.feature_graph_v2?.features ?? [];
   const v2ById = new Map(v2All.map((f) => [f.id, f]));
   // The cost line of a step: by the engine's name for it, else by machine class when exactly one line
@@ -783,7 +784,6 @@ function buildProcessTree(
     });
 
   const operations: ProcessTreeNode[] = recs.map((rec, opIdx) => {
-    const isSheetMetal = family === 'sheet_metal';
     // Moulded-part geometry is PART-level: it belongs to the part's first
     // resolved operation, whatever the engineer named or however many steps
     // they added (exact-name gates on "Injection"/"Molding" silently dropped it).
@@ -799,7 +799,7 @@ function buildProcessTree(
     // Sheet metal: the catalog operations this step performs on the part's own
     // CAD features ("Punching // SimpleHole Ø4.0 ×14"), resolved by the backend.
     // Plastic molding: the same, from the recognised features and the molding process's catalog rows (backend plastic-catalog-operation-resolver.ts).
-    if ((isSheetMetal || family === 'plastic_molded') && matchedCostLine?.catalogOperations?.length) {
+    if (showsCatalogOperations(family) && matchedCostLine?.catalogOperations?.length) {
       const withMachine = (n: OperationTreeNode): ProcessTreeNode =>
         ({ ...n, factory, machine, ...(n.children ? { children: n.children.map(withMachine) } : {}) });
       featureNodes.push(...sheetMetalOperationNodes(`catop_${opIdx}`, matchedCostLine.catalogOperations).map(withMachine));
