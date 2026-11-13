@@ -70,9 +70,7 @@ export function realMaterialClamp(name: string): MaterialClampProperties {
  *  its reference record carry it: tonnage = clampingForceKn / 9.80665 (migration
  *  633), shot capacity in GPPS grams, and its timing (migration 648). */
 export function realPress(name: string): {
-  maxTonnage: number; shotCapacityGrams: number;
-  timing: { injectionRateMm3PerS: number | null; dryCycleTimeS: number | null; plasticizingRateGPerS: number | null; openingStrokeMm: number | null };
-  clampKn: number;
+  maxTonnage: number; shotCapacityGrams: number; timing: { injectionRateMm3PerS: number | null; dryCycleTimeS: number | null };
   /** Machine hour rate (USD/h): direct + indirect overhead, as the HR Rates row carries it. */
   mhrUsd: number;
   /** yields.goodPartYield (good_part_yield). */
@@ -84,11 +82,7 @@ export function realPress(name: string): {
   return {
     maxTonnage: Number(row['limits.clampingForceKn']) / 9.80665,
     shotCapacityGrams: Number(row['limits.shotSizeGppsG']),
-    timing: {
-      injectionRateMm3PerS: n(row['rates.injectionRateMm3PerS']), dryCycleTimeS: n(row['time.dryCycleTimeS']),
-      plasticizingRateGPerS: n(row['rates.plasticizingRateGppsGPerS']), openingStrokeMm: n(row['limits.openingStrokeMm']),
-    },
-    clampKn: Number(row['limits.clampingForceKn']),
+    timing: { injectionRateMm3PerS: n(row['rates.injectionRateMm3PerS']), dryCycleTimeS: n(row['time.dryCycleTimeS']) },
     mhrUsd: Number(row['accounting.directOverheadRateUsdPerHr']) + Number(row['accounting.indirectOverheadRateUsdPerHr']),
     goodPartYield: Number(row['yields.goodPartYield']),
   };
@@ -112,8 +106,7 @@ export function realResinInputs(name: string): RealResinInputs {
 /** Every press in machine/injection_molding_machines.csv, as the selector's candidate pool carries it. */
 export function allRealPresses(): Array<{
   name: string; maxTonnage: number; shotCapacityGrams: number; tieBarXMm: number; tieBarYMm: number;
-  timing: { injectionRateMm3PerS: number | null; dryCycleTimeS: number | null; plasticizingRateGPerS: number | null; openingStrokeMm: number | null };
-  clampKn: number; mhrUsd: number; goodPartYield: number;
+  timing: { injectionRateMm3PerS: number | null; dryCycleTimeS: number | null }; mhrUsd: number; goodPartYield: number;
 }> {
   return read('machine/injection_molding_machines.csv').map((row) => ({
     name: row['name']!,
@@ -124,10 +117,7 @@ export function allRealPresses(): Array<{
     timing: {
       injectionRateMm3PerS: row['rates.injectionRateMm3PerS'] ? Number(row['rates.injectionRateMm3PerS']) : null,
       dryCycleTimeS: row['time.dryCycleTimeS'] ? Number(row['time.dryCycleTimeS']) : null,
-      plasticizingRateGPerS: row['rates.plasticizingRateGppsGPerS'] ? Number(row['rates.plasticizingRateGppsGPerS']) : null,
-      openingStrokeMm: row['limits.openingStrokeMm'] ? Number(row['limits.openingStrokeMm']) : null,
     },
-    clampKn: Number(row['limits.clampingForceKn']),
     mhrUsd: Number(row['accounting.directOverheadRateUsdPerHr']) + Number(row['accounting.indirectOverheadRateUsdPerHr']),
     goodPartYield: Number(row['yields.goodPartYield']),
   }));

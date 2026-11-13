@@ -2,15 +2,16 @@ import { buildDomainCalculatorsMigrationSql, type DomainMigrationText } from '..
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 
 /**
- * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So is 977
- * (the fill-factor tables of injection, structural foam and LSR): its file is kept as committed, and the generator no longer writes it. A calculator in use is changed by a
+ * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977
+ * and 1007: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
  * NEW migration, which writes the calculators whose spec `migration` is its number (and raises their `version` when their formulas change, calculators.version, migration 428).
  *   976  the reaction injection calculator, version 2 (fill time added)
  *   977  the injection, structural foam and LSR calculators: their fill-factor inputs name the reference table they are read from, so the cost dialog's eye opens it
  *        (field metadata only: no formula changes, so no new version)
- *   1007 the injection and structural foam calculators, version 2: plasticizing and ejection in the cycle, the injection rate share, no pack phase on top of cooling
+ *   1007 the injection and structural foam calculators, version 2 (plasticizing and ejection; no pack phase), reverted by 1008
+ *   1008 the injection and structural foam calculators, version 3: the version-1 fields and formulas again (fill + pack + cooling + mold open/close)
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1007] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
@@ -26,16 +27,13 @@ const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 
       'replaced under version 2 (a calculator in use is not edited in place under its version); the others are unchanged.',
     ].join('\n'),
   },
-  1007: {
-    title: 'Injection and structural foam calculators, version 2 -- plasticizing and ejection in the cycle; holding pressure no longer counted twice.',
+  1008: {
+    title: 'Injection and structural foam calculators, version 3 -- the version-1 cycle again (reverts 1007).',
     rootCause: [
-      'The injection cycle (migration 975) was fill + pack + cooling + mold open/close. The Menges cooling time runs from the end of filling to ejection, and',
-      'holding pressure acts inside that time, so the separate pack phase (35 % of cooling, at least 2 s) counted it twice. The reference states the inputs of',
-      'the phases the cycle left out, read by nothing: the press plasticizing rate (or plasticizingRateByClampForce) with plasticizingRateMultiplier, the',
-      'ejector variables (ejectorDistanceFactor, ejectorPercentMaxMachineVelocity, numEjectorCycles, dryCycleStrokeFactor) and injectionRateMultiplier.',
-      'Version 2: cycle = injection + cooling + the plasticizing that outlasts cooling + ejection (mold open/close + the ejector stroke), each a calculator',
-      'field shown on the line (formula registry F-05 v2, F-08 v2, F-20, F-21). The calculators are replaced under version 2; LSR, compression and RIM are',
-      'unchanged.',
+      'Migration 1007 replaced the injection and structural foam cycle (fill + pack + cooling + mold open/close) with version 2 (injection + cooling +',
+      'plasticizing beyond cooling + ejection). That change is reverted by decision: the cycle stays as it was. A migration that has run is never',
+      'edited or removed, so this one writes the version-1 fields and formulas again under version 3 (a calculator in use is not changed in place',
+      'under its version). A database that never ran 1007 gets the same calculators. LSR, compression and RIM are unchanged.',
     ].join('\n'),
   },
 };
@@ -51,5 +49,5 @@ export function buildPlasticMoldingCalculatorsMigrationSql(number: PlasticMoldin
 
 export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCalculatorMigration, string> = {
   976: '976_plastic_rim_fill_time_calculator.sql',
-  1007: '1007_plastic_injection_cycle_plasticizing_ejection.sql',
+  1008: '1008_plastic_injection_cycle_restore_v1.sql',
 };

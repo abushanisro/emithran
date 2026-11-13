@@ -18,8 +18,6 @@ const rate = (machineClass: string, usd: number, name: string | null) => ({ rate
 const part = (over: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCostInput => ({
   volume: 50_000, surfaceArea: 40_000, wallThicknessNominalMm: 2, materialGrade: 'ABS', materialCostPerKg: 3.046, materialDensityKgM3: 1040, materialSource: 'db',
   batchSize: 250, family: 'plastic_molded', mhrRate: { ...rate('injection_molding', PRESS.mhrUsd, 'Arburg Allrounder 420 C 1300 - 350'), setupTimeHr: 2 },
-  // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
-  bboxMinMm: 30,
   deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null), machineClampTonnes: PRESS.maxTonnage, machineShotCapacityG: PRESS.shotCapacityGrams,
   pressTiming: PRESS.timing, goodPartYield: PRESS.goodPartYield, calculators: CALCULATORS, materialClamp: realMaterialClamp('ABS'), realResinInputs: realResinInputs('ABS'), materialType: 'ABS',
   plasticReference: realPlasticReference(), location: 'USA', annualVolume: 100_000, productionLifeYears: 3, signals: { projectedAreaMm2: 10_000, undercutCount: 0 },
@@ -31,7 +29,7 @@ describe('the injection line is driven by its stored calculator', () => {
   it('carries the calculator id and version and the run: every input with its source, every formula with its value', () => {
     const line = moldingLine(computeInjectionMoldedCostSummary(part()));
     expect(line.calculatorId).toBe('Injection Molding - Cycle Time'); // the spec's calculators carry their name as id; the database's carry the uuid
-    expect(line.calculatorVersion).toBe(2);
+    expect(line.calculatorVersion).toBe(3);
     const trace = line.calculationTrace!;
     const inputs = trace.filter((t) => t.kind === 'input');
     expect(inputs.map((t) => t.fieldName)).toEqual(expect.arrayContaining(['Nominal Wall Thickness', 'Press Injection Rate', 'Fill Factor for Cavities', 'Cycle Time Adjustment Factor']));
@@ -68,8 +66,8 @@ describe('the injection line is driven by its stored calculator', () => {
 
   it('a calculator edited in the database changes the number: the calculator is the computation', () => {
     const edited = JSON.parse(JSON.stringify(CALCULATORS)) as typeof CALCULATORS;
-    const ejection = edited['Injection Molding - Cycle Time']!.fields.find((f) => f.field_name === 'Ejection Time')!;
-    ejection.default_value = '{Press Dry Cycle Time} + {Ejector Stroke Time} + 1';
+    const factor = edited['Injection Molding - Cycle Time']!.fields.find((f) => f.field_name === 'Pack to Cooling Ratio')!;
+    factor.default_value = '0.5';
     const base = moldingLine(computeInjectionMoldedCostSummary(part())).cycleTimeMin;
     const changed = moldingLine(computeInjectionMoldedCostSummary(part({ calculators: edited }))).cycleTimeMin;
     expect(changed).toBeGreaterThan(base);
@@ -88,8 +86,8 @@ describe('a saved calculation records which calculators it ran, and replay holds
 
   it('the snapshot names the calculator and a fingerprint of its formulas, and keeps the calculators out of the stored inputs', () => {
     const { snapshot } = save();
-    expect(snapshot.calculators).toEqual([{ name: 'Injection Molding - Cycle Time', version: 2, fingerprint: calculatorFingerprint(CALCULATORS['Injection Molding - Cycle Time']!) }]);
-    expect(JSON.stringify(snapshot.inputs)).not.toContain('Press Platen Speed');
+    expect(snapshot.calculators).toEqual([{ name: 'Injection Molding - Cycle Time', version: 3, fingerprint: calculatorFingerprint(CALCULATORS['Injection Molding - Cycle Time']!) }]);
+    expect(JSON.stringify(snapshot.inputs)).not.toContain('Pack to Cooling Ratio');
     expect(Object.keys(snapshot.inputs)).not.toContain('calculators');
   });
 
@@ -102,7 +100,7 @@ describe('a saved calculation records which calculators it ran, and replay holds
 
   it('is refused when the formulas now in force are not the ones it ran', () => {
     const { saved, snapshot } = save();
-    const tampered = { ...snapshot, calculators: [{ name: 'Injection Molding - Cycle Time', version: 1, fingerprint: '0000000000000000' }] };
+    const tampered = { ...snapshot, calculators: [{ name: 'Injection Molding - Cycle Time', version: 3, fingerprint: '0000000000000000' }] };
     const r = replayPlasticLine(tampered, rows(), saved);
     expect(r.reproduced).toBe(false);
     expect(r.reasons.join(' ')).toContain('have changed since this calculation');

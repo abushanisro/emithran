@@ -1,5 +1,4 @@
-// Formula registry (plastic-molding/formula-registry.ts): F-04, F-05, F-06, F-07, F-08, F-09, F-22, F-23 (F-20, F-21 in the calculator spec). Change a formula or its
-// constants -> bump its version there.
+// Formula registry (plastic-molding/formula-registry.ts): F-04, F-05, F-06, F-07, F-08, F-09. Change a formula or its constants -> bump its version there.
 //
 // The inputs and the result of a molding cycle time. The cycle time itself is computed by the stored calculators (plastic-molding-calculators.json, migration 975;
 // see calculators/plastic-cycle-time.ts), as for heat treatment, machining and die casting: the formulas are in the database, the engine supplies the inputs. What
@@ -9,17 +8,12 @@
 // The model the calculators state (the documentation is docs/plastic-modeling/cycle-time-calculators.md):
 //   Cooling       Menges: t = (s² / π²α) × ln((4/π)(Tm − Tw)/(Te − Tw)), α = k / (ρ_melt × cp); Tm, Tw (+ defaultMoldTemperatureIncrease), Te, k, cp, ρ_melt are
 //                 the material's reference values
-//   Injection     shot melt volume / (the press's injectionRateMm3PerS × injectionRateMultiplier), times the injectionTimeAdjustmentFactors for cavities
-//                 per mold and gates per cavity
-//   Plasticizing  the shot's GPPS mass / (the press's plasticizing rate, else plasticizingRateByClampForce, × plasticizingRateMultiplier); the screw
-//                 recovers during cooling, so only the time beyond cooling is in the cycle
-//   Ejection      the press's Euromap 6 dry cycle (mold open and close) + the ejector stroke: numEjectorCycles × 2 × ejectorDistanceFactor × part height
-//                 at ejectorPercentMaxMachineVelocity of the platen speed (2 × dryCycleStrokeFactor × opening stroke / dry cycle)
-//   Total         (injection + cooling + max(0, plasticizing - cooling) + ejection) × cycleTimeAdjustmentFactor
-// Holding pressure acts inside the Menges cooling time (fill end to ejection), so it is not a phase of its own (calculator version 2, migration 1007).
-// Robotic part handling is not modelled (the reference default is gravity ejection). Any input missing makes the cycle not derivable, with each
-// missing input named; nothing is filled from a default.
-// LSR (thermoset) cures instead of cooling (Arrhenius, literature constants); its cycle is fill + cure + mold open/close.
+//   Fill          shot melt volume / the press's injectionRateMm3PerS, times the injectionTimeAdjustmentFactors for cavities per mold and gates per cavity
+//   Mold motion   the press's Euromap 6 dry cycle (time.dryCycleTimeS)
+//   Pack / hold   0.35 × cooling, floor 2 s: the Menges gate-freeze rule (the reference data holds no hold-time value)
+//   Total         (fill + pack + cool + mold motion) × cycleTimeAdjustmentFactor
+// Ejector travel is not modelled. Any input missing makes the cycle not derivable, with each missing input named; nothing is filled from a default.
+// LSR (thermoset) cures instead of cooling (Arrhenius, literature constants), no pack phase.
 
 import type { CycleModel } from '../plastic-reference';
 import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
@@ -47,10 +41,6 @@ export interface ResinThermalProps {
 export interface PressTiming {
   injectionRateMm3PerS: number | null;
   dryCycleTimeS: number | null;
-  /** GPPS grams the screw melts per second; null = the press record states none (the clamp-force table is used). */
-  plasticizingRateGPerS?: number | null;
-  /** The platen's full opening stroke, mm. */
-  openingStrokeMm?: number | null;
 }
 
 type ThermalResult = { props: ResinThermalProps } | { missing: string[] };
@@ -85,11 +75,9 @@ export type CycleTimeResult =
   | {
       derivable: true;
       fillSec: number;
+      packSec: number;
       coolSec: number;
-      /** The screw's recovery for the next shot; it runs during cooling, so only the time beyond cooling is in the cycle. */
-      plasticizingSec: number;
-      /** Mold open and close (the press dry cycle) plus the ejector stroke. */
-      ejectionSec: number;
+      moldMotionSec: number;
       totalCycleSec: number;
       trace: CalculationTraceStep[];
       /** Per input read from a reference lookup table, the table and the row it came from (the cost dialog outlines it). */
@@ -110,10 +98,4 @@ export interface CycleTimeInput {
   shotMeltVolumeMm3: number | null;
   cavityCount: number;
   gatesPerCavity: number;
-  /** GPPS-equivalent mass of one full shot (all cavities), g: what the screw plasticizes for the next shot. */
-  shotGppsMassG?: number | null;
-  /** The part's height along the pull direction (its smallest bounding-box side), mm: what the ejector pushes it out over. */
-  partHeightMm?: number | null;
-  /** The press's clamp force, kN: picks the plasticizing rate from the reference table when the press record states none. */
-  pressClampKn?: number | null;
 }

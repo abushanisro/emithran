@@ -95,7 +95,6 @@ export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInp
     productionLifeYears: f.productionLifeYears,
     bboxMaxMm: bbox[0],
     bboxMidMm: bbox[1],
-    bboxMinMm: bbox[2],
     signals: moldingSignals(f.summary, bbox),
   };
 }

@@ -18,8 +18,6 @@ const rate = (machineClass: string, usd: number, name: string | null) => ({ rate
 const part = (over: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCostInput => ({
   volume: 50_000, surfaceArea: 40_000, wallThicknessNominalMm: 2, materialGrade: 'ABS', materialCostPerKg: 3.046, materialDensityKgM3: 1040, materialSource: 'db',
   batchSize: 250, family: 'plastic_molded', mhrRate: { ...rate('injection_molding', PRESS.mhrUsd, 'Arburg Allrounder 420 C 1300 - 350'), setupTimeHr: 2 },
-  // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
-  bboxMinMm: 30,
   deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null), machineClampTonnes: PRESS.maxTonnage, machineShotCapacityG: PRESS.shotCapacityGrams,
   pressTiming: PRESS.timing, goodPartYield: PRESS.goodPartYield, calculators: CALCULATORS, materialClamp: realMaterialClamp('ABS'), realResinInputs: realResinInputs('ABS'), materialType: 'ABS',
   plasticReference: realPlasticReference(), location: 'USA', annualVolume: 100_000, productionLifeYears: 3, signals: { projectedAreaMm2: 10_000, undercutCount: 0 },
@@ -61,8 +59,6 @@ describe('the lookup row an injection line used', () => {
     expect(line.lookupMatches).toEqual({
       'Fill Factor for Cavities': { table: 'injectionTimeAdjustmentFactors', row: { attribute: 'Cavities Per Mold', number: 3 } },
       'Fill Factor for Gates': { table: 'injectionTimeAdjustmentFactors', row: { attribute: 'Gates Per Cavity', number: 1 } },
-      // the press record states no plasticizing rate, so it is the clamp-force table's row at the press's 1,300 kN
-      'Press Plasticizing Rate': { table: 'plasticizingRateByClampForce', row: { 'Clamp Force (kN)': 1300 } },
     });
   });
 
@@ -73,22 +69,21 @@ describe('the lookup row an injection line used', () => {
     if (m) expect(m.row).toEqual({ attribute: 'Cavities Per Mold', number: 5 });
   });
 
-  /** The staged row a match names, and the value it holds: a fill factor, or a plasticizing rate. */
-  const stagedValue = (m: { table: string; row: Record<string, string | number> }): number | undefined =>
-    m.table === 'injectionTimeAdjustmentFactors'
-      ? realFillFactorRows().find((r) => r.attribute === m.row.attribute && r.number === m.row.number)?.factor
-      : realPlasticReference().cycleModel.plasticizingRateByClampKn.find((r) => r.clampKn === m.row['Clamp Force (kN)'])?.gPerS;
-
   it('names a row that is really in the staged table, so the viewer can outline it', () => {
-    const matches = Object.values(moldingLine().lookupMatches ?? {});
-    expect(matches.map((m) => m.table).sort()).toEqual(['injectionTimeAdjustmentFactors', 'injectionTimeAdjustmentFactors', 'plasticizingRateByClampForce']);
-    for (const m of matches) expect(stagedValue(m)).toBeDefined();
+    const staged = realFillFactorRows();
+    for (const m of Object.values(moldingLine().lookupMatches ?? {})) {
+      const row = m.row as { attribute: string; number: number };
+      expect(staged.some((r) => r.attribute === row.attribute && r.number === row.number)).toBe(true);
+    }
   });
 
-  it('the value on the trace is that row\'s value', () => {
+  it('the value on the trace is that row\'s adjustment factor', () => {
     const line = moldingLine();
+    const staged = realFillFactorRows();
     for (const [field, m] of Object.entries(line.lookupMatches ?? {})) {
-      expect(line.calculationTrace!.find((t) => t.fieldName === field)?.value).toBe(stagedValue(m));
+      const row = m.row as { attribute: string; number: number };
+      const factor = staged.find((r) => r.attribute === row.attribute && r.number === row.number)!.factor;
+      expect(line.calculationTrace!.find((t) => t.fieldName === field)?.value).toBe(factor);
     }
   });
 
@@ -100,12 +95,11 @@ describe('the lookup row an injection line used', () => {
 
 describe('the calculator fields that name a reference table', () => {
   it('are the fill factors, and the table is one the endpoint is willing to serve', () => {
-    expect(plasticLookupTableNames()).toEqual(['injectionTimeAdjustmentFactors', 'plasticizingRateByClampForce']);
+    expect(plasticLookupTableNames()).toEqual(['injectionTimeAdjustmentFactors']);
     const f = CALCULATORS['Injection Molding - Cycle Time']!.fields.filter((x) => x.source_table);
     expect(f.map((x) => [x.field_name, x.data_source, x.source_table, x.source_field])).toEqual([
       ['Fill Factor for Cavities', 'machining_lookup', 'injectionTimeAdjustmentFactors', 'adjustment_factor'],
       ['Fill Factor for Gates', 'machining_lookup', 'injectionTimeAdjustmentFactors', 'adjustment_factor'],
-      ['Press Plasticizing Rate', 'machining_lookup', 'plasticizingRateByClampForce', 'Plasticizing Rate (g / s)'],
     ]);
   });
 });
@@ -133,21 +127,10 @@ describe('the lookup-table endpoint serves the plastic reference tables the calc
     // the output column is last, and the matched row's keys are columns of the table
     expect(table.columnDefinitions.map((c: { name: string }) => c.name).slice(-1)).toEqual(['adjustment_factor']);
     const columns = table.columnDefinitions.map((c: { name: string }) => c.name);
-    const fillMatches = Object.values(moldingLine().lookupMatches ?? {}).filter((m) => m.table === 'injectionTimeAdjustmentFactors');
-    for (const m of fillMatches) for (const key of Object.keys(m.row)) expect(columns).toContain(key);
+    for (const m of Object.values(moldingLine().lookupMatches ?? {})) for (const key of Object.keys(m.row)) expect(columns).toContain(key);
     // and the row the engine named is among the rows
     const used = moldingLine().lookupMatches!['Fill Factor for Cavities']!.row;
     expect(table.rows.some((r: Record<string, unknown>) => r.attribute === used.attribute && r.number === used.number)).toBe(true);
-  });
-
-  it('serves the plasticizing table too, with the key and the row the line names', async () => {
-    const staged = realPlasticReference().cycleModel.plasticizingRateByClampKn;
-    const { svc, calls } = service({ rows: staged.map((r) => ({ name: 'plasticizingRateByClampForce', 'Clamp Force (kN)': r.clampKn, 'Plasticizing Rate (g / s)': r.gPerS })) });
-    const table = await svc.getMachiningLookupTableByName('plasticizingRateByClampForce', 'Plasticizing Rate (g / s)');
-    expect(calls).toContainEqual(['key', 'plasticizingRateByClampForce']);
-    const used = moldingLine().lookupMatches!['Press Plasticizing Rate']!.row;
-    expect(table.columnDefinitions.map((c: { name: string }) => c.name)).toContain('Clamp Force (kN)');
-    expect(table.rows.some((r: Record<string, unknown>) => r['Clamp Force (kN)'] === used['Clamp Force (kN)'])).toBe(true);
   });
 
   it('refuses a table no calculator names', async () => {

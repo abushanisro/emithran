@@ -106,20 +106,19 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'process/cycle-time.ts',
   },
   {
-    id: 'F-05', version: 2, name: 'Injection (fill) time',
-    expression: 't = V_shot / (Q_press x m_injection) x f_cavities x f_gates  [s]',
+    id: 'F-05', version: 1, name: 'Fill time',
+    expression: 't = V_shot / Q_press x f_cavities x f_gates  [s]',
     outputUnit: 's',
     inputs: [
       { name: 'V_shot melt volume', unit: 'mm3', source: 'F-02 mass / melt density' },
       { name: 'Q_press injection rate', unit: 'mm3/s', source: `${MEM}/machine: rates.injectionRateMm3PerS` },
-      { name: 'm_injection', unit: 'ratio', source: `${MEM}/variables: injectionRateMultiplier` },
       { name: 'f_cavities, f_gates', unit: 'ratio', source: `${MEM}/lookup: injectionTimeAdjustmentFactors` },
     ],
     dependsOn: ['F-03'],
-    referenceSource: `${MEM}/machine + ${MEM}/variables/injectionRateMultiplier + ${MEM}/lookup/injectionTimeAdjustmentFactors`,
+    referenceSource: `${MEM}/machine + ${MEM}/lookup/injectionTimeAdjustmentFactors`,
     assumptions: [],
     state: 'VALIDATED', implementedIn: 'process/cycle-time.ts',
-    note: 'Version 2 (migration 1007) applies injectionRateMultiplier ("used to downgrade the machine injection rate"), staged and unread in version 1 (investigation I-4). LSR keeps version 1.',
+    note: 'Open question: variable injectionRateMultiplier (0.25, "downgrade the machine injection rate") is staged and unread (investigation I-4).',
   },
   {
     id: 'F-06', version: 1, name: 'Pack and hold time',
@@ -130,7 +129,6 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     referenceSource: 'Menges gate-freeze rule (literature). "The reference data holds no hold time."',
     assumptions: ['Hold time is 35 % of cooling time with a 2 s floor.'],
     state: 'ASSUMED', implementedIn: 'process/cycle-time.ts',
-    note: 'Not in the cycle from calculator version 2 (migration 1007): holding pressure acts inside the Menges cooling time (F-04, fill end to ejection), so adding it counted it twice. Kept for calculations saved under version 1.',
   },
   {
     id: 'F-07', version: 1, name: 'Mold open and close time',
@@ -142,18 +140,13 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'VALIDATED', implementedIn: 'process/cycle-time.ts',
   },
   {
-    id: 'F-08', version: 2, name: 'Cycle time',
-    expression: 't = (t_injection + t_cooling + max(0, t_plasticizing - t_cooling) + t_ejection) x cycleTimeAdjustmentFactor',
+    id: 'F-08', version: 1, name: 'Cycle time',
+    expression: 't = (t_fill + t_pack + t_cooling + t_open/close) x cycleTimeAdjustmentFactor',
     outputUnit: 's',
     inputs: [{ name: 'cycleTimeAdjustmentFactor', unit: 'ratio', source: `${MEM}/variables: cycleTimeAdjustmentFactor` }],
-    dependsOn: ['F-04', 'F-05', 'F-20', 'F-21'],
-    referenceSource: `${MEM}/variables`,
-    assumptions: [
-      'The screw plasticizes the next shot while the part cools, so plasticizing adds only the time it outlasts cooling.',
-      'Holding pressure is inside the cooling time (F-06 is no longer added). Robotic part handling and material handling are not in the cycle (gravity ejection, the reference default).',
-    ],
+    dependsOn: ['F-04', 'F-05', 'F-06', 'F-07'],
+    referenceSource: `${MEM}/variables`, assumptions: ['Ejector travel, plasticizing, part and material handling are not in the cycle (no formulas or press data).'],
     state: 'ASSUMED', implementedIn: 'process/cycle-time.ts',
-    note: 'Version 2 (migration 1007). The LSR calculator keeps version 1: fill + cure + mold open/close.',
   },
   {
     id: 'F-09', version: 1, name: 'LSR cure time (Arrhenius)',
@@ -281,65 +274,6 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     note: 'Calculator "Reaction Injection Molding - Cycle Time" (F-19 is its Fill Time). A missing or invalid volume or rate makes the cycle a named gap, never a default.',
   },
 
-  {
-    id: 'F-20', version: 1, name: 'Plasticizing time',
-    expression: 't = m_shot,GPPS / (P_press x m_plasticizing)  [s]',
-    outputUnit: 's',
-    inputs: [
-      { name: 'm_shot,GPPS shot mass', unit: 'g', source: 'F-02 shot mass of all cavities as GPPS-equivalent grams (shot-size.ts)' },
-      { name: 'P_press plasticizing rate', unit: 'g/s', source: `${MEM}/machine: rates.plasticizingRateGppsGPerS; when absent, ${MEM}/lookup/plasticizingRateByClampForce at the press clamp force` },
-      { name: 'm_plasticizing', unit: 'ratio', source: `${MEM}/variables: plasticizingRateMultiplier` },
-    ],
-    dependsOn: [],
-    referenceSource: `${MEM}/machine + ${MEM}/lookup/plasticizingRateByClampForce + ${MEM}/variables/plasticizingRateMultiplier`,
-    assumptions: ['The reference states the rate and the multiplier, not the formula: the time is the shot mass over the derated rate.', 'A press record without a rate takes the clamp-force table row at or above its clamp force (no interpolation).'],
-    state: 'ASSUMED', implementedIn: 'calculators/plastic-molding-calculators.json',
-  },
-  {
-    id: 'F-21', version: 1, name: 'Ejection time (mold open and close + ejector stroke)',
-    expression: 't = t_open/close + n_cycles x 2 x k_distance x h_part / (v_platen x p_ejector / 100);  v_platen = 2 x k_stroke x s_opening / t_dry  [s]',
-    outputUnit: 's',
-    inputs: [
-      { name: 't_open/close = t_dry', unit: 's', source: 'F-07' },
-      { name: 'h_part part height', unit: 'mm', source: 'CAD bounding box, the smallest side (along the pull direction)' },
-      { name: 's_opening opening stroke', unit: 'mm', source: `${MEM}/machine: limits.openingStrokeMm` },
-      { name: 'k_distance, p_ejector, n_cycles, k_stroke', unit: 'ratio, %, count, ratio', source: `${MEM}/variables: ejectorDistanceFactor, ejectorPercentMaxMachineVelocity, numEjectorCycles, dryCycleStrokeFactor` },
-    ],
-    dependsOn: ['F-07'],
-    referenceSource: `${MEM}/variables (ejector*, dryCycleStrokeFactor) + ${MEM}/machine`,
-    assumptions: [
-      'The reference states the ejector variables, not the formula: the ejector travels ejectorDistanceFactor x the part height out and back.',
-      "The press's maximum speed is not staged: it is the Euromap 6 dry-cycle speed, the platen moving dryCycleStrokeFactor x the opening stroke each way in the dry cycle.",
-    ],
-    state: 'ASSUMED', implementedIn: 'calculators/plastic-molding-calculators.json',
-  },
-
-  {
-    id: 'F-22', version: 1, name: 'LSR fill time',
-    expression: 't = V_shot / Q_press x f_cavities x f_gates  [s]',
-    outputUnit: 's',
-    inputs: [
-      { name: 'V_shot melt volume', unit: 'mm3', source: 'F-02 mass / melt density' },
-      { name: 'Q_press injection rate', unit: 'mm3/s', source: `${MEM}/machine: rates.injectionRateMm3PerS` },
-      { name: 'f_cavities, f_gates', unit: 'ratio', source: `${MEM}/lookup: injectionTimeAdjustmentFactors` },
-    ],
-    dependsOn: ['F-03'],
-    referenceSource: `${MEM}/machine + ${MEM}/lookup/injectionTimeAdjustmentFactors`,
-    assumptions: [],
-    state: 'VALIDATED', implementedIn: 'process/cycle-time.ts',
-    note: 'The LSR calculator\'s fill (version 1 of F-05): the thermoplastic injectionRateMultiplier is not applied to the LSR metering pump.',
-  },
-  {
-    id: 'F-23', version: 1, name: 'LSR cycle time',
-    expression: 't = (t_fill + t_cure + t_open/close) x cycleTimeAdjustmentFactor',
-    outputUnit: 's',
-    inputs: [{ name: 'cycleTimeAdjustmentFactor', unit: 'ratio', source: `${MEM}/variables: cycleTimeAdjustmentFactor` }],
-    dependsOn: ['F-07', 'F-09', 'F-22'],
-    referenceSource: `${MEM}/variables`,
-    assumptions: ['No pack phase and no plasticizing for a liquid silicone (metered two-component feed); ejector travel and handling are not in the cycle.'],
-    state: 'ASSUMED', implementedIn: 'process/cycle-time.ts',
-  },
-
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
     ['G-01', 'Mold base selection and plate-by-plate steel', 'tblStandardMoldBaseSizes; tool material price and density (AISI P20 1.86 USD/kg, 7850 kg/m3); plate thickness variables; tblCavity/CorePlateDepthBorder; tblEdgeMoldBorderX/Y'],
@@ -350,7 +284,7 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     ['G-06', 'Cooling and water lines', 'tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables'],
     ['G-07', 'Inserts and unscrewing mechanisms', 'insertInstallRate; cmInsertManualLoadingTime; defaultInsertCost; costPerUnscrewingMechanism; tblSpiType.Use Insert'],
     ['G-08', 'Tool assembly extras: ejector system, sprue, locating ring, hot drops, try-out', 'ejector*, sprueBushingCost, locatingRingsCost, costPerStandardHotDrop, tryoutRateUsdPerHr'],
-    ['G-09', 'Part and material handling and setup scrap in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*'],
+    ['G-09', 'Handling, setup scrap and plasticizing in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS'],
     ['G-10', 'Period costs: indirect overhead, SG&A, margin', 'sGandARate; markUpRate; machine indirect overhead'],
     ['G-11', 'Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing', 'nothing staged'],
   ] as const).map(([id, name, stagedData]): FormulaEntry => ({
