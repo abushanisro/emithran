@@ -63,6 +63,8 @@ export interface SecondaryPartFacts {
   materialCutCode: number | null;
   /** raw_materials.material_group (e.g. "Aluminum Alloy"), when resolved. */
   materialTypeName?: string | null;
+  /** raw_materials.material_class: "Ferrous", "Non-Ferrous" or "Plastic & Rubber"; null when the grade has none on file. */
+  materialClass?: string | null;
   /** The part is machined (CAD family milled / turned / mill_turn): picks the passivation treatment row. */
   isMachined?: boolean | null;
   /** The drawing surface-treatment callout text (e.g. "Anodize Type II"), when stated. */
