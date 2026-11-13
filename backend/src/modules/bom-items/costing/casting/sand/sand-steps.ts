@@ -8,8 +8,8 @@ import type { MachineChoiceDto } from '../../../dto/cost-breakdown.dto';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
-import { gap, line, type CostContext } from '../casting-finishing';
-import { machineChoice, type ChoiceEval } from '../machine-choice';
+import { gap, line, roundLineCost, type CostContext } from '../casting-finishing';
+import { machineChoice, roundPerPart, type ChoiceEval } from '../machine-choice';
 import { asFinishingMachine, machineValue, type SandMachine } from './sand-machines';
 import { pouringCoefficient } from './sand-gating';
 import type { SandReference } from './sand-reference';
@@ -260,8 +260,13 @@ export function selectAndCost(input: {
       machine: asFinishingMachine(m), sec: outcome.sec, batchSize: input.batchSize, costContext: input.costContext, warnings: [], run: outcome.run,
       breakdown: `${input.process}: ${r2(outcome.sec)} s per casting${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
     });
-    const energy = outcome.energyCostUsd + (outcome.materialCostUsd ?? 0);
-    const costed: ProcessLineCost = energy ? { ...base, runCost: r2(base.runCost + energy), totalCost: r2(base.totalCost + energy) } : base;
+    // Charged beyond time: the step's energy and material, its own figure on the line (stored and shown), kept below a cent.
+    const material = outcome.materialCostUsd ?? 0;
+    const other = outcome.energyCostUsd + material;
+    const detail = [outcome.energyCostUsd ? `energy ${roundPerPart(outcome.energyCostUsd)}` : '', material ? `material ${roundPerPart(material)}` : ''].filter(Boolean).join(' + ');
+    const costed: ProcessLineCost = other
+      ? { ...base, runCost: roundLineCost(base.runCost + other), totalCost: roundLineCost(base.totalCost + other), otherCostPerPartUsd: roundPerPart(other), otherCostDetail: `${detail} USD per casting` }
+      : base;
     return { m, outcome, costed };
   });
   const capable = evaluated.filter((e) => e.costed);

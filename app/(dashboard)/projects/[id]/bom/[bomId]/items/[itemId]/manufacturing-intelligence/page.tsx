@@ -2026,6 +2026,8 @@ function CostSummaryTab({
         const scrap        = resolved?.scrap ?? 0;
         const setupPerPart = resolved?.setupPerPart ?? 0;
         const cyclePerPart = resolved?.cyclePerPart ?? 0;
+        // Charged beyond machine and crew time (a furnace's electricity, a coating): with the line, not from its rates.
+        const otherPerPart = resolved?.otherPerPart ?? 0;
         // Always derive from setupPerPart/cyclePerPart — the SAME values the
         // Setup/Run rows below display — rather than ever substituting the
         // stored proc.totalCostPerPart. That stored field previously won
@@ -2039,7 +2041,7 @@ function CostSummaryTab({
         // in the header while Setup/Run just below it showed real numbers,
         // an internally-inconsistent, obviously-wrong result. Recomputing
         // unconditionally can only ever match what's already displayed.
-        const procCost     = (setupPerPart + cyclePerPart) * (1 + scrap / 100) * fromUsd;
+        const procCost     = (setupPerPart + cyclePerPart + otherPerPart) * (1 + scrap / 100) * fromUsd;
         const cycleMin     = cycleSec ? formatCycleMin(cycleSec / 60) : null;
         const isExpanded   = expandedProcs.has(`stored:${proc.id}`);
         return (
@@ -2289,6 +2291,12 @@ function CostSummaryTab({
                   <span className="text-xs text-muted-foreground truncate min-w-0">Run</span>
                   <span className="text-xs tabular-nums text-foreground shrink-0">{fmtL(cyclePerPart * fromUsd)}</span>
                 </div>
+                {otherPerPart > 0 && (
+                  <div className="flex items-baseline justify-between gap-2 min-w-0" title={matchedEngineLine?.otherCostDetail ?? undefined}>
+                    <span className="text-xs text-muted-foreground truncate min-w-0">Energy and consumables{matchedEngineLine?.otherCostDetail ? ` (${matchedEngineLine.otherCostDetail})` : ''}</span>
+                    <span className="text-xs tabular-nums text-foreground shrink-0">{fmtL(otherPerPart * fromUsd)}</span>
+                  </div>
+                )}
                 {scrap > 0 && (
                   <div className="flex items-baseline justify-between gap-2 min-w-0">
                     <span className="text-xs text-muted-foreground truncate min-w-0">Scrap ({scrap}%)</span>
