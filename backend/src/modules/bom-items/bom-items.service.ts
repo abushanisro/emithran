@@ -112,6 +112,7 @@ import {
   largestPunchHitPerimeterMm, punchingRequirement, waterjetRequirement, shearRequirement, plasmaCutRequirement, laserPunchRequirement,
   pressFormingRequirement, rollBendingRequirement, deburrSecPerMm,
 } from './costing/shared/capability/machine-selection/physics';
+import { sandCastingRoute } from './costing/casting/sand/sand-route-comparison';
 import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
   drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
@@ -5623,6 +5624,38 @@ export class BOMItemsService {
     };
   }
 
+  /** A sand-cast part's route comparison: its one route, the cost summary as quoted; the local-currency lines are what Apply saves. */
+  private async sandCastingRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const local: { lines?: ProcessLineCost[]; localCurrency?: string } = {};
+    const summary = await this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, local);
+    const route = sandCastingRoute(summary);
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = [{ ...route, processLines: local.lines ?? [] }];
+      localCurrencyOut.localCurrency = local.localCurrency;
+    }
+    return {
+      bomItemId: id,
+      batchSize: summary.batchSize,
+      recommendedRouteId: route.isFeasible ? route.routeId : null,
+      materialCost: summary.materialCost,
+      materialGrade: summary.materialGrade,
+      grossWeightKg: summary.grossWeightKg,
+      materialCostPerKg: summary.materialCostPerKg,
+      materialSource: summary.materialSource,
+      routes: [route],
+      comparisonWarnings: route.isFeasible ? [] : ['The sand-casting route could not be fully costed for this part.'],
+      currency: summary.currency ?? 'USD',
+      currencySymbol: summary.currencySymbol ?? '$',
+      ...(summary.toUsdRate != null ? { toUsdRate: summary.toUsdRate } : {}),
+      ...(summary.usdToDisplayRate != null ? { usdToDisplayRate: summary.usdToDisplayRate } : {}),
+      resolvedInputs: summary.resolvedInputs,
+    };
+  }
+
   /**
    * Route comparison: every candidate route (computeRouteComparison), each
    * with the same selected shared secondary operations appended, so a route's
@@ -5762,6 +5795,10 @@ export class BOMItemsService {
     // path as the quote, so the comparison can never disagree with it).
     if (castingProcessOfFamily(family) === 'die_casting') {
       return this.dieCastingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Sand casting: one route, the cost summary as quoted (sand-route-comparison.ts).
+    if (castingProcessOfFamily(family) === 'sand_casting') {
+      return this.sandCastingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
 
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
