@@ -75,6 +75,13 @@ one attempt every 10 minutes (launchd agent `com.emithran.oracle-retry`, key-bas
 `RESULT` holds the address; then run the same compose files and scripts there (`infra/oracle/deploy.sh`, `bootstrap-host.sh`).
 Stop the retry: `launchctl bootout gui/$(id -u)/com.emithran.oracle-retry`.
 
+## Sand-casting worker (not on production yet)
+The casting worker (`casting-worker/`, compose profile `sand-casting`) measures a sand-cast part from its STEP: draw axis, wall thickness, cores
+and which features they form, draft, parting line, undercuts. It needs up to 2 GB and the servers have 1 GB, so production does not run it:
+sand-cast parts are costed with the cad-engine's casting measurements ("Measured by the cad-engine") and Apply does not wait for a casting
+analysis. Staging runs it when `env/stage.env` sets `CASTING_WORKER_SOCKET=/run/casting-worker/worker.sock` (`stage-release.sh` then starts it).
+On a bigger server (the ARM one): set the same variable in `prd.env` and add the `casting-worker` service with `--profile sand-casting`.
+
 ## Known risks and open items
 1. Capacity: a pilot of 3-5 comfortable, about 10 slow users, one CAD job at a time (`capacity.md`).
 2. Backups off; no outside uptime check; no Grafana for production.

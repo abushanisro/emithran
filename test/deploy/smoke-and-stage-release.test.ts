@@ -70,6 +70,15 @@ describe('scripts/smoke.sh', () => {
 });
 
 describe('infra/oracle/stage-release.sh', () => {
+  // The sand-casting worker is part of staging when the settings name its socket: compose profile on, and the worker in the service list
+  // (built, tagged good-<sha> for rollback, recreated with the rest).
+  it('runs the casting worker when the settings name its socket', () => {
+    const text = fs.readFileSync(path.join(root, 'infra/oracle/stage-release.sh'), 'utf8');
+    expect(text).toMatch(/grep -qE '\^CASTING_WORKER_SOCKET=\.\+' "\$ENV_FILE"; then profile="--profile sand-casting"; services="\$services casting-worker"/);
+    expect(text).toMatch(/docker compose -p "\$P" \$profile -f docker-compose.prod.yml/);
+    expect(fs.readFileSync(path.join(root, 'env/stage.env.example'), 'utf8')).toMatch(/^CASTING_WORKER_SOCKET=\/run\/casting-worker\/worker.sock$/m);
+  });
+
   const script = path.join(root, 'infra/oracle/stage-release.sh');
   const sh = (args: string[], env: Record<string, string> = {}) => {
     const r = spawnSync('bash', [script, ...args], { env: { ...process.env, ...env }, encoding: 'utf8' });
