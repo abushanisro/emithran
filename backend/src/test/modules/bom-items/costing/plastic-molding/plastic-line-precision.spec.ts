@@ -18,9 +18,7 @@ const cover = (over: Partial<InjectionMoldingCostInput> = {}) => computeInjectio
   mhrRate: { rate: MACHINE_RATE, labourRate: LABOUR_RATE, operators: OPERATORS, source: 'mhr_database', machineClass: 'injection_molding', machineName: 'Press', commodityCode: null, setupTimeHr: SETUP_HR },
   deburrRate: { rate: 0, labourRate: 0, operators: 0, source: 'mhr_database', machineClass: 'deburring', machineName: null, commodityCode: null },
   inspectionRate: { rate: 0, labourRate: 0, operators: 0, source: 'mhr_database', machineClass: 'cmm', machineName: null, commodityCode: null },
-  // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
-  bboxMinMm: 30,
-  machineClampTonnes: 100, machineShotCapacityG: 400, pressTiming: { injectionRateMm3PerS: 64000, dryCycleTimeS: 1.1, plasticizingRateGPerS: 10, openingStrokeMm: 350 }, goodPartYield: YIELD,
+  machineClampTonnes: 100, machineShotCapacityG: 400, pressTiming: { injectionRateMm3PerS: 64000, dryCycleTimeS: 1.1 }, goodPartYield: YIELD,
   calculators: plasticMoldingCalculatorsByName(), materialClamp: realMaterialClamp('Polypropylene G-P H'), materialType: 'Polypropylene', plasticReference: realPlasticReference(),
   realResinInputs: { meltingTempC: 291, moldTempC: 91, ejectionTempC: 129, specificHeatMeltJgC: 1.7, thermalConductivityMeltWMK: 0.3, densityOfMeltKgM3: 1200 },
   location: 'USA', annualVolume: 1000, productionLifeYears: 5, cavityCountOverride: 1, currencySymbol: '$', usdToLocal: 1,

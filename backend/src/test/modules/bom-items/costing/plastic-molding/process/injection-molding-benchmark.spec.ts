@@ -45,8 +45,6 @@ function input(material: keyof typeof MATERIALS, press: Press, name: string, ove
     mhrRate: rate('injection_molding', press.mhrUsd, name),
     deburrRate: rate('deburring', 0, null),
     inspectionRate: rate('cmm', 0, null),
-    // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
-    bboxMinMm: 30,
     machineClampTonnes: press.maxTonnage,
     machineShotCapacityG: press.shotCapacityGrams,
     pressTiming: press.timing,

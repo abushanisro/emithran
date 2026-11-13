@@ -9,7 +9,6 @@ import {
 } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time-seeds';
 import { calculatorFingerprint, runInjectionCycleTime } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time';
 import { computeCycleTime, type CycleTimeInput } from './legacy-cycle-time-oracle';
-import type { CycleTimeInput as EngineCycleInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
 import { computeCompressionMoldingCost } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-compression-molding-engine';
 import { runReferenceCalculator, type ReferenceCalculators } from '../../../../../modules/bom-items/costing/shared/calculators/reference-calculator';
 import type { MHRRateInput } from '../../../../../modules/bom-items/costing/shared/core/cost-engine';
@@ -54,137 +53,102 @@ describe('plastic molding calculator spec', () => {
     expect(sfm.description).toContain('NOT modelled');
   });
 
-  it('the committed migrations 976 and 1007 are exactly what the generator writes from the spec (975 and 977 are history and are not edited)', () => {
-    const committed = (file: string) => readFileSync(join(__dirname, '../../../../../../migrations', file), 'utf8');
-    expect(committed('976_plastic_rim_fill_time_calculator.sql')).toBe(buildPlasticMoldingCalculatorsMigrationSql(976));
-    expect(committed('1007_plastic_injection_cycle_plasticizing_ejection.sql')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1007));
+  it('the committed migration 976 is exactly what the generator writes from the spec, for the calculators above version 1 (975 is history and is not edited)', () => {
+    const committed = readFileSync(join(__dirname, '../../../../../../migrations/976_plastic_rim_fill_time_calculator.sql'), 'utf8');
+    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql(976));
+    // only the reaction injection calculator changed, and its version is raised
+    expect(spec.calculators.filter((c) => (c.version ?? 1) > 1).map((c) => c.name)).toEqual([RIM_CALCULATOR]);
+    expect(committed).toContain('version = 2');
+    // the plain injection calculator's name is a part of the RIM one's, so the name as it is quoted in the SQL is what is looked for
     const quoted = (name: string) => '$q$' + name + '$q$';
-    // 1007 writes injection and structural foam, at version 2; LSR, compression and RIM are not in it
-    expect(spec.calculators.filter((c) => c.migration === 1007).map((c) => [c.name, c.version])).toEqual([[INJECTION_CALCULATOR, 2], [STRUCTURAL_FOAM_CALCULATOR, 2]]);
-    const m1007 = committed('1007_plastic_injection_cycle_plasticizing_ejection.sql');
-    for (const name of [LSR_CALCULATOR, COMPRESSION_CALCULATOR, RIM_CALCULATOR]) expect(m1007).not.toContain(quoted(name));
-    expect(m1007).toContain('version = 2');
-    // the history files keep what they wrote
-    expect(committed('975_plastic_molding_calculators.sql')).toContain(quoted(INJECTION_CALCULATOR));
-    for (const name of [INJECTION_CALCULATOR, LSR_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR]) expect(committed('977_plastic_fill_factor_lookup_tables.sql')).toContain(quoted(name));
-    // the two fill factors of each injection calculator carry their staged table, and the thermoplastic plasticizing rate its fallback table
+    expect(committed).not.toContain(quoted(INJECTION_CALCULATOR));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/975_plastic_molding_calculators.sql'), 'utf8')).toContain(quoted(INJECTION_CALCULATOR));
+  });
+
+  it('the committed migration 977 is what the generator writes: the fill-factor inputs of injection, structural foam and LSR name their reference table, and nothing else changes', () => {
+    const committed = readFileSync(join(__dirname, '../../../../../../migrations/977_plastic_fill_factor_lookup_tables.sql'), 'utf8');
+    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql(977));
+    const written = spec.calculators.filter((c) => c.migration === 977).map((c) => c.name).sort();
+    expect(written).toEqual([INJECTION_CALCULATOR, LSR_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR].sort());
+    // no calculator is in two migrations, and none of these three has a new version: their formulas did not change
+    expect(spec.calculators.filter((c) => c.migration === 977 && (c.version ?? 1) !== 1)).toEqual([]);
+    for (const name of written) expect(committed).toContain(`$q$${name}$q$`);
+    expect(committed).not.toContain(`$q$${RIM_CALCULATOR}$q$`);
+    // exactly the two fill factors of each carry a table, and it is the staged one
     const tabled = spec.calculators.flatMap((c) => c.fields.filter((f) => f.sourceTable).map((f) => `${c.key}:${f.name}:${f.dataSource}:${f.sourceTable}.${f.sourceField}`));
-    expect(tabled.sort()).toEqual([
-      ...['injection', 'injection_lsr', 'structural_foam'].flatMap((k) => ['Fill Factor for Cavities', 'Fill Factor for Gates'].map((n) => `${k}:${n}:machining_lookup:injectionTimeAdjustmentFactors.adjustment_factor`)),
-      ...['injection', 'structural_foam'].map((k) => `${k}:Press Plasticizing Rate:machining_lookup:plasticizingRateByClampForce.Plasticizing Rate (g / s)`),
-    ].sort());
+    expect(tabled.sort()).toEqual(['injection', 'injection_lsr', 'structural_foam'].flatMap((k) => ['Fill Factor for Cavities', 'Fill Factor for Gates'].map((n) => `${k}:${n}:machining_lookup:injectionTimeAdjustmentFactors.adjustment_factor`)).sort());
   });
 
   it('the calculators the formulas run on are the same with or without the table metadata (a fingerprint covers formulas, units and field names)', () => {
     const inj = plasticMoldingCalculatorsByName()[INJECTION_CALCULATOR]!;
-    expect(inj.fields.filter((f) => f.source_table).map((f) => f.field_name)).toEqual(['Fill Factor for Cavities', 'Fill Factor for Gates', 'Press Plasticizing Rate']);
+    expect(inj.fields.filter((f) => f.source_table).map((f) => f.field_name)).toEqual(['Fill Factor for Cavities', 'Fill Factor for Gates']);
     expect(calculatorFingerprint({ ...inj, fields: inj.fields.map((f) => ({ ...f, data_source: null, source_table: null, source_field: null })) })).toBe(calculatorFingerprint(inj));
   });
 
   it('the calculator descriptions say what is not modelled, so no one reads them as complete', () => {
     const text = (n: string) => spec.calculators.find((c) => c.name === n)!.description;
-    expect(text(INJECTION_CALCULATOR)).toMatch(/Not modelled.*robotic part handling.*slides and lifters/s);
-    expect(text(INJECTION_CALCULATOR)).toMatch(/holding pressure is inside it and is not added again/);
+    expect(text(INJECTION_CALCULATOR)).toMatch(/Not modelled.*ejector travel.*plasticizing/s);
     expect(text(COMPRESSION_CALCULATOR)).toMatch(/charging, preheat, flash trimming/);
     expect(text(RIM_CALCULATOR)).toMatch(/F-19/);
     expect(text(RIM_CALCULATOR)).toMatch(/runner and sprue volume/);
   });
 });
 
-// ── version 2: the stored calculator gives the reference model, phase by phase ──────────────────────────────────────
-// Cooling is unchanged, so it still equals the frozen oracle (the in-code math the calculator replaced). The other phases are written out here
-// from the reference variables, independently of the calculator: injection at the derated press rate; plasticizing of the next shot, which counts
-// only beyond cooling; ejection = mold open/close + the ejector stroke; and no pack phase on top of cooling.
-const r2 = (v: number) => Math.floor(v * 100 + 0.5) / 100;
-function expectedV2(input: EngineCycleInput & { shotGppsMassG: number; partHeightMm: number }, coolSec: number) {
-  const m = MODEL;
-  const press = input.press!;
-  const fc = m.fillFactorByCavities.find((r) => input.cavityCount <= r.upTo)?.factor ?? m.fillFactorByCavities[m.fillFactorByCavities.length - 1]!.factor;
-  const fg = m.fillFactorByGates.find((r) => input.gatesPerCavity <= r.upTo)?.factor ?? m.fillFactorByGates[m.fillFactorByGates.length - 1]!.factor;
-  const injection = r2(input.shotMeltVolumeMm3! / (press.injectionRateMm3PerS! * m.injectionRateMultiplier) * fc * fg);
-  const rate = press.plasticizingRateGPerS ?? m.plasticizingRateByClampKn.find((r) => input.pressClampKn! <= r.clampKn)!.gPerS;
-  const plasticizing = r2(input.shotGppsMassG / (rate * m.plasticizingRateMultiplier));
-  const speed = 2 * m.dryCycleStrokeFactor * press.openingStrokeMm! / press.dryCycleTimeS!;
-  const ejection = press.dryCycleTimeS! + r2(m.numEjectorCycles * 2 * m.ejectorDistanceFactor * input.partHeightMm / (speed * m.ejectorPercentMaxMachineVelocity / 100));
-  return { injection, plasticizing, ejection, total: r2((injection + coolSec + Math.max(0, plasticizing - coolSec) + ejection) * m.cycleTimeAdjustmentFactor) };
-}
-
-describe('injection and structural foam (version 2): cooling as before, plus injection, plasticizing and ejection from the reference', () => {
+// ── parity: the stored calculators give exactly the numbers the engines give today ──────────────────────────────────
+describe('injection and structural foam: the calculator gives the numbers of the frozen oracle (the in-code math it replaced)', () => {
   const presses = allRealPresses().filter((_, i) => i % 6 === 0);
   const resins = realMaterialNames().filter((_, i) => i % 4 === 0);
   const walls = [0.8, 1.5, 2.5, 4.2];
   const layouts: Array<[number, number]> = [[1, 1], [2, 1], [4, 2], [8, 3], [16, 4]];
   const volumes = [4_000, 55_000, 310_000];
-  const v2 = (base: EngineCycleInput, press: ReturnType<typeof allRealPresses>[number], height = 40): EngineCycleInput & { shotGppsMassG: number; partHeightMm: number } =>
-    ({ ...base, shotGppsMassG: (base.shotMeltVolumeMm3 ?? 0) * 1e-3, partHeightMm: height, pressClampKn: press.clampKn });
 
   it('agrees to the last digit across real presses, real resins, walls, cavity layouts and shot sizes', () => {
-    let derivable = 0, notDerivable = 0, plasticizingBeyondCooling = 0, fromTable = 0;
+    let derivable = 0, notDerivable = 0, compared = 0;
     for (const press of presses) for (const resin of resins) {
       const real = realResinInputs(resin);
       for (const wall of walls) for (const [cav, gates] of layouts) for (const vol of volumes) {
-        const input = v2({ wallMm: wall, isLsr: false, real, model: MODEL, press: press.timing, shotMeltVolumeMm3: vol * cav, cavityCount: cav, gatesPerCavity: gates }, press);
-        const oracle = computeCycleTime(input);
+        const input: CycleTimeInput = { wallMm: wall, isLsr: false, real, model: MODEL, press: press.timing, shotMeltVolumeMm3: vol * cav, cavityCount: cav, gatesPerCavity: gates };
+        const engine = computeCycleTime(input);
         const seeded = injectionCycleTimeSeeds(input);
-        if (!oracle.derivable || !press.timing.openingStrokeMm) {
+        if (!engine.derivable) {
           notDerivable += 1;
+          // not derivable for the engine: the seeds must say so too (never a number the engine would not give)
           expect('missing' in seeded).toBe(true);
           continue;
         }
         derivable += 1;
-        if (!('seeds' in seeded)) throw new Error(`seeds must exist: ${press.name} ${resin}`);
-        const want = expectedV2(input, oracle.coolSec);
+        expect('seeds' in seeded).toBe(true);
+        if (!('seeds' in seeded)) continue;
         const r = run(INJECTION_CALCULATOR, seeded.seeds);
         expect(r.missing).toEqual([]);
-        expect(r.outputs['Cooling Time']).toBe(oracle.coolSec);
-        expect(r.outputs['Injection Time']).toBe(want.injection);
-        expect(r.outputs['Plasticizing Time']).toBe(want.plasticizing);
-        expect(r.outputs['Ejection Time']).toBeCloseTo(want.ejection, 10);
-        expect(r.value).toBe(want.total);
-        expect(r.outputs['Pack Time']).toBeUndefined();
-        if (want.plasticizing > oracle.coolSec) plasticizingBeyondCooling += 1;
-        if (press.timing.plasticizingRateGPerS == null) fromTable += 1;
+        expect(r.value).toBe(engine.totalCycleSec);
+        expect(r.outputs['Cooling Time']).toBe(engine.coolSec);
+        expect(r.outputs['Fill Time']).toBe(engine.fillSec);
+        expect(r.outputs['Pack Time']).toBe(engine.packSec);
+        // and the engine's own path (seeds, stored calculator, trace) gives the same numbers for both injection and structural foam
         for (const process of ['injection', 'structural_foam'] as const) {
           const viaEngine = runInjectionCycleTime(input, BY_NAME, process);
           if (!viaEngine.derivable) throw new Error(viaEngine.missing.join());
-          expect(viaEngine).toMatchObject({ totalCycleSec: want.total, coolSec: oracle.coolSec, fillSec: want.injection, plasticizingSec: want.plasticizing });
+          expect(viaEngine.totalCycleSec).toBe(engine.totalCycleSec);
+          expect(viaEngine.coolSec).toBe(engine.coolSec);
+          expect(viaEngine.fillSec).toBe(engine.fillSec);
+          expect(viaEngine.packSec).toBe(engine.packSec);
         }
+        compared += 1;
       }
     }
-    // the grid is real: both outcomes, plasticizing that outlasts cooling, and presses whose rate comes from the clamp-force table
+    // the grid is real: it exercises both outcomes
     expect(derivable).toBeGreaterThan(1000);
     expect(notDerivable).toBeGreaterThan(0);
-    expect(plasticizingBeyondCooling).toBeGreaterThan(0);
-    expect(fromTable).toBeGreaterThan(0);
-  });
-
-  it('is shorter than version 1 by the pack phase it no longer adds, before the new phases', () => {
-    const press = presses.find((p) => p.timing.plasticizingRateGPerS && p.timing.openingStrokeMm)!;
-    const input = v2({ wallMm: 2.5, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: press.timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1 }, press);
-    const oracle = computeCycleTime(input);
-    const viaEngine = runInjectionCycleTime(input, BY_NAME, 'injection');
-    if (!oracle.derivable || !viaEngine.derivable) throw new Error('fixture must be derivable');
-    const newPhases = viaEngine.fillSec + Math.max(0, viaEngine.plasticizingSec - viaEngine.coolSec) + viaEngine.ejectionSec;
-    expect(viaEngine.totalCycleSec).toBeCloseTo(oracle.totalCycleSec - oracle.packSec - oracle.fillSec - oracle.moldMotionSec + newPhases, 1);
-  });
-
-  it('takes the plasticizing rate from the press record, else the clamp-force table row at or above the clamp force, and says which', () => {
-    const press = presses.find((p) => p.timing.plasticizingRateGPerS && p.timing.openingStrokeMm)!;
-    const base = v2({ wallMm: 2, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: press.timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1 }, press);
-    const own = injectionCycleTimeSeeds(base);
-    if (!('seeds' in own)) throw new Error('fixture must be derivable');
-    expect(own.seeds['Press Plasticizing Rate']).toMatchObject({ value: press.timing.plasticizingRateGPerS, source: expect.stringContaining('plasticizingRateGppsGPerS') });
-    const table = injectionCycleTimeSeeds({ ...base, press: { ...base.press!, plasticizingRateGPerS: null }, pressClampKn: 340 });
-    if (!('seeds' in table)) throw new Error('fixture must be derivable');
-    expect(table.seeds['Press Plasticizing Rate']).toMatchObject({ value: 1.34, lookup: true, match: { table: 'plasticizingRateByClampForce', row: { 'Clamp Force (kN)': 350 } } });
+    expect(compared).toBe(derivable);
   });
 
   it('structural foam, which reuses the injection model, gives the same numbers through its own calculator', () => {
-    const press = presses.find((p) => p.timing.openingStrokeMm)!;
-    const input = v2({ wallMm: 3, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: press.timing, shotMeltVolumeMm3: 90_000, cavityCount: 2, gatesPerCavity: 1 }, press);
+    const input: CycleTimeInput = { wallMm: 3, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: presses[0]!.timing, shotMeltVolumeMm3: 90_000, cavityCount: 2, gatesPerCavity: 1 };
+    const engine = computeCycleTime(input);
     const seeded = injectionCycleTimeSeeds(input);
-    if (!('seeds' in seeded)) throw new Error('fixture must be derivable');
-    expect(run(STRUCTURAL_FOAM_CALCULATOR, seeded.seeds).value).toBe(run(INJECTION_CALCULATOR, seeded.seeds).value);
+    if (!engine.derivable || !('seeds' in seeded)) throw new Error('fixture must be derivable');
+    expect(run(STRUCTURAL_FOAM_CALCULATOR, seeded.seeds).value).toBe(engine.totalCycleSec);
     expect(injectionCalculatorName(false, 'structural_foam')).toBe(STRUCTURAL_FOAM_CALCULATOR);
   });
 
@@ -195,19 +159,20 @@ describe('injection and structural foam (version 2): cooling as before, plus inj
     expect(BY_OPERATION['Reaction Injection Molding']!.name).toBe(RIM_CALCULATOR);
   });
 
-  it('names every missing input, and never fills one', () => {
-    const press = presses.find((p) => p.timing.plasticizingRateGPerS && p.timing.openingStrokeMm)!;
-    const base = v2({ wallMm: 2, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: press.timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1 }, press);
-    const missing = (broken: EngineCycleInput) => { const r = injectionCycleTimeSeeds(broken); return 'missing' in r ? r.missing.join('; ') : ''; };
-    expect(missing({ ...base, wallMm: null })).toContain('nominal wall thickness');
-    expect(missing({ ...base, press: { ...base.press!, injectionRateMm3PerS: null } })).toContain('press injection rate');
-    expect(missing({ ...base, press: { ...base.press!, dryCycleTimeS: 0 } })).toContain('press dry cycle time');
-    expect(missing({ ...base, shotMeltVolumeMm3: null })).toContain('shot melt volume');
-    expect(missing({ ...base, real: { ...base.real!, thermalConductivityMeltWMK: null } })).toContain('thermal conductivity');
-    expect(missing({ ...base, partHeightMm: null })).toContain('part height');
-    expect(missing({ ...base, shotGppsMassG: null })).toContain('shot GPPS-equivalent mass');
-    expect(missing({ ...base, press: { ...base.press!, openingStrokeMm: null } })).toContain('press opening stroke');
-    expect(missing({ ...base, press: { ...base.press!, plasticizingRateGPerS: null }, pressClampKn: null })).toContain('press plasticizing rate');
+  it('names the same missing inputs the engine does, and never fills one', () => {
+    const base: CycleTimeInput = { wallMm: 2, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: presses[0]!.timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1 };
+    for (const broken of [
+      { ...base, wallMm: null },
+      { ...base, press: { injectionRateMm3PerS: null, dryCycleTimeS: base.press!.dryCycleTimeS } },
+      { ...base, press: { injectionRateMm3PerS: base.press!.injectionRateMm3PerS, dryCycleTimeS: 0 } },
+      { ...base, shotMeltVolumeMm3: null },
+      { ...base, real: { ...base.real!, thermalConductivityMeltWMK: null } },
+    ] as CycleTimeInput[]) {
+      const engine = computeCycleTime(broken);
+      const seeded = injectionCycleTimeSeeds(broken);
+      expect(engine.derivable).toBe(false);
+      expect('missing' in seeded && seeded.missing).toEqual(!engine.derivable ? engine.missing : []);
+    }
   });
 
   it('a temperature set with no Menges solution is missing, not a cycle', () => {
@@ -218,20 +183,19 @@ describe('injection and structural foam (version 2): cooling as before, plus inj
     expect('missing' in seeded && seeded.missing.join(' ')).toContain('no Menges solution');
   });
 
-  it('the trace gives every input with its source, the lookup rows it used, and every formula in order', () => {
-    const press = presses.find((p) => p.timing.plasticizingRateGPerS && p.timing.openingStrokeMm)!;
-    const input = v2({ wallMm: 2.5, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: press.timing, shotMeltVolumeMm3: 90_000, cavityCount: 4, gatesPerCavity: 2 }, press);
+  it('the trace gives every input with its source, the fill factors with the lookup-table row, and every formula', () => {
+    const input: CycleTimeInput = { wallMm: 2.5, isLsr: false, real: realResinInputs(resins[0]!), model: MODEL, press: presses[0]!.timing, shotMeltVolumeMm3: 90_000, cavityCount: 4, gatesPerCavity: 2 };
     const seeded = injectionCycleTimeSeeds(input);
     if (!('seeds' in seeded)) throw new Error('fixture must be derivable');
     const r = run(INJECTION_CALCULATOR, seeded.seeds);
     const inputs = r.trace.filter((t) => t.kind === 'input');
-    expect(inputs.length).toBe(24);
+    expect(inputs.length).toBe(14);
     expect(inputs.every((t) => typeof t.source === 'string' && t.source.length > 0)).toBe(true);
     expect(inputs.filter((t) => t.stepType === 'lookup').map((t) => t.fieldName)).toEqual(['Fill Factor for Cavities', 'Fill Factor for Gates']);
     expect(r.lookups['Fill Factor for Cavities']).toEqual({ table: 'injectionTimeAdjustmentFactors', row: { attribute: 'Cavities Per Mold', number: 5 } });
     expect(r.lookups['Fill Factor for Gates']).toEqual({ table: 'injectionTimeAdjustmentFactors', row: { attribute: 'Gates Per Cavity', number: 2 } });
     const formulas = r.trace.filter((t) => t.kind === 'calculated');
-    expect(formulas.map((t) => t.fieldName)).toEqual(['Mold Wall Temperature', 'Thermal Diffusivity', 'Cooling Time', 'Injection Time', 'Plasticizing Time', 'Press Platen Speed', 'Ejector Stroke Time', 'Ejection Time', 'Cycle Time']);
+    expect(formulas.map((t) => t.fieldName)).toEqual(['Mold Wall Temperature', 'Thermal Diffusivity', 'Cooling Time', 'Fill Time', 'Pack to Cooling Ratio', 'Pack Time Minimum', 'Pack Time', 'Cycle Time']);
     expect(formulas.every((t) => typeof t.formula === 'string' && t.formula.length > 0)).toBe(true);
   });
 });

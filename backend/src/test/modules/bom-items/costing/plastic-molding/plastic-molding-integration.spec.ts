@@ -44,8 +44,6 @@ function quote(over: Partial<InjectionMoldingCostInput> = {}, pressName = pick()
     mhrRate: { rate: p.mhrUsd, labourRate: 30, source: 'mhr_database', machineClass: 'injection_molding', machineName: p.name, commodityCode: null },
     deburrRate: { rate: 0, source: 'mhr_database', machineClass: 'deburring', machineName: null, commodityCode: null },
     inspectionRate: { rate: 0, source: 'mhr_database', machineClass: 'cmm', machineName: null, commodityCode: null },
-    // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
-    bboxMinMm: 30,
     machineClampTonnes: p.maxTonnage, machineShotCapacityG: p.shotCapacityGrams, pressTiming: p.timing, goodPartYield: p.goodPartYield, calculators: plasticMoldingCalculatorsByName(),
     materialClamp: CLAMP, realResinInputs: RESIN, materialType: 'Nylon', plasticReference: REF, location: 'USA',
     bboxMaxMm: PART.lengthMm, bboxMidMm: PART.widthMm,
@@ -107,12 +105,8 @@ describe('plastic molding: representative PA66 part through the real calculators
     for (let i = 1; i < perPart.length; i++) expect(perPart[i]!).toBeLessThanOrEqual(perPart[i - 1]!);
   });
 
-  it('a thicker wall never costs less machine time, and costs more once cooling outlasts plasticizing; a heavier part costs more material', () => {
-    // The smallest press that fits (300 kN, 2.63 g/s screw) needs 25.9 s to plasticize the 51 g shot: longer than cooling at 2 mm (4.6 s) and 4 mm (18.3 s),
-    // so the screw sets the cycle for both; at 6 mm cooling (41.3 s) outlasts it.
-    const run = (wall: number) => quote({ wallThicknessNominalMm: wall }).processLines[0]!.runCost;
-    expect(run(4)).toBeGreaterThanOrEqual(run(2));
-    expect(run(6)).toBeGreaterThan(run(4));
+  it('a thicker wall costs more machine time, a heavier part more material', () => {
+    expect(quote({ wallThicknessNominalMm: 4 }).processLines[0]!.runCost).toBeGreaterThan(quote({ wallThicknessNominalMm: 2 }).processLines[0]!.runCost);
     expect(quote({ volume: 90_000 }).materialCost).toBeGreaterThan(quote().materialCost);
   });
 

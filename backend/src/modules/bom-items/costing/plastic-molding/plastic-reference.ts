@@ -11,11 +11,7 @@
 //              (clamp-force.ts)
 //              cycleTimeAdjustmentFactor, defaultMoldTemperatureIncrease,
 //              defaultRunnerSystem       the cycle-time model (cycle-time.ts)
-//              injectionRateMultiplier, plasticizingRateMultiplier, ejectorDistanceFactor,
-//              ejectorPercentMaxMachineVelocity, numEjectorCycles, dryCycleStrokeFactor
-//                                       fill rate, plasticizing and the ejector stroke
 //   injectionTimeAdjustmentFactors      fill-time factors by cavities per mold / gates per cavity
-//   plasticizingRateByClampForce        plasticizing rate by clamp force, for a press record without one
 //   layoutNumCav                        the cavity counts a mold layout exists for
 //   material "Polystyrene"              GPPS: press shot size is rated in GPPS grams. The
 //                                       reference row at the reference GPPSMeltTemperature
@@ -47,9 +43,6 @@ export const PLASTIC_REFERENCE_SOURCE_VERSION: string =
 export const PLASTIC_VARIABLE_KEYS = [
   'clampForceSafetyFactor', 'shotSizeSafetyFactor', 'defaultToolLife',
   'cycleTimeAdjustmentFactor', 'defaultMoldTemperatureIncrease', 'defaultRunnerSystem', 'GPPSMeltTemperature',
-  // The injection cycle's fill rate, plasticizing and ejection (calculator version 2, migration 1007).
-  'injectionRateMultiplier', 'plasticizingRateMultiplier', 'ejectorDistanceFactor', 'ejectorPercentMaxMachineVelocity', 'numEjectorCycles',
-  'dryCycleStrokeFactor',
   'defaultNumCavities', 'defaultNumberOfGatesPerCavity',
   'flowRatioThresholdEasyFlow', 'flowRatioThresholdMediumFlow',
   'minimumPercentClampForceEasyFlow', 'minimumPercentClampForceMediumFlow', 'minimumPercentClampForceHardFlow',
@@ -70,7 +63,6 @@ export const PLASTIC_LOOKUP_KEYS = [
   'digital_factory_settings_usa',
   'injectionTimeAdjustmentFactors',
   'layoutNumCav',
-  'plasticizingRateByClampForce',
 ] as const;
 
 /** The reference material whose melt density converts GPPS-rated shot size (see header). */
@@ -115,17 +107,6 @@ export interface CycleModel {
   fillFactorByGates: Array<{ upTo: number; factor: number }>;
   /** GPPS melt density (kg/m3), for press shot sizes rated in GPPS grams. */
   gppsMeltDensityKgM3: number;
-  /** variables injectionRateMultiplier / plasticizingRateMultiplier: the share of the press's rated injection and plasticizing rates a production shot reaches. */
-  injectionRateMultiplier: number;
-  plasticizingRateMultiplier: number;
-  /** plasticizingRateByClampForce: the plasticizing rate (GPPS g/s) of a press of that clamp force, for a press record that states none; ascending. */
-  plasticizingRateByClampKn: Array<{ clampKn: number; gPerS: number }>;
-  /** The ejector stroke: ejectorDistanceFactor x the part height, at ejectorPercentMaxMachineVelocity (%) of the press's speed, numEjectorCycles times. */
-  ejectorDistanceFactor: number;
-  ejectorPercentMaxMachineVelocity: number;
-  numEjectorCycles: number;
-  /** variables dryCycleStrokeFactor: the Euromap 6 dry cycle moves the platen this share of its opening stroke (the press's speed follows from it). */
-  dryCycleStrokeFactor: number;
 }
 
 export interface PlasticReference {
@@ -320,10 +301,6 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
   else if (gppsTemp !== vars.get('GPPSMeltTemperature')) {
     missing.push(`material ${GPPS_REFERENCE_MATERIAL}: melting temperature ${gppsTemp} is not the reference GPPSMeltTemperature`);
   }
-  const plasticizingRateByClampKn = table('plasticizingRateByClampForce')
-    .map((r) => ({ clampKn: num(r['Clamp Force (kN)']) ?? NaN, gPerS: num(r['Plasticizing Rate (g / s)']) ?? NaN }))
-    .sort((a, b) => a.clampKn - b.clampKn);
-  if (plasticizingRateByClampKn.some((r) => !(r.clampKn > 0 && r.gPerS > 0))) missing.push('plasticizingRateByClampForce: non-numeric cell');
   const cycleModel: CycleModel = {
     cycleTimeAdjustmentFactor: variable('cycleTimeAdjustmentFactor'),
     moldTemperatureIncreaseC: moldIncrease ?? NaN,
@@ -331,13 +308,6 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     fillFactorByCavities,
     fillFactorByGates,
     gppsMeltDensityKgM3: gppsMelt ?? NaN,
-    injectionRateMultiplier: variable('injectionRateMultiplier'),
-    plasticizingRateMultiplier: variable('plasticizingRateMultiplier'),
-    plasticizingRateByClampKn,
-    ejectorDistanceFactor: variable('ejectorDistanceFactor'),
-    ejectorPercentMaxMachineVelocity: variable('ejectorPercentMaxMachineVelocity'),
-    numEjectorCycles: variable('numEjectorCycles'),
-    dryCycleStrokeFactor: variable('dryCycleStrokeFactor'),
   };
   const defaultNumCavities = variable('defaultNumCavities');
   const cavityLayouts = [...new Set(table('layoutNumCav').map((r) => num(r['number_of_cavities'])).filter((n): n is number => n != null && n > 0))]

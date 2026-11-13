@@ -211,8 +211,6 @@ export interface InjectionMoldingCostInput {
   // projected area (press sizing and tooling).
   bboxMaxMm?: number;
   bboxMidMm?: number;
-  // The smallest side: the part's height along the pull direction (the ejector stroke).
-  bboxMinMm?: number;
   // Cavities per mold set by the user (Cost Guide); null = reference default.
   cavityCountOverride?: number | null;
   // The selected press's own process data from its HR Rates row
@@ -451,10 +449,6 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         cavityCount,
         // No per-part gate-count signal: the reference defaultNumberOfGatesPerCavity.
         gatesPerCavity: plasticRef.defaultGatesPerCavity,
-        // The mass the screw melts for one shot, as GPPS grams (the press rating unit); no safety factor, which is for sizing the press.
-        shotGppsMassG: b.meltDensity && b.meltDensity > 0 ? shotWeightKg * cavityCount * 1000 * (plasticRef.cycleModel.gppsMeltDensityKgM3 / b.meltDensity) : null,
-        partHeightMm: (input.bboxMinMm ?? 0) > 0 ? input.bboxMinMm! : null,
-        pressClampKn: input.machineClampTonnes != null && input.machineClampTonnes > 0 ? input.machineClampTonnes * 9.80665 : null,
       }, input.calculators ?? null, mhrRate.machineClass === 'structural_foam_molding' ? 'structural_foam' : 'injection')
     : { derivable: false, missing: [`Plastic reference data (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')})`] };
   const cycleGapReason = cycle.derivable ? null : cycle.calculatorProblem ? `Cycle time not derivable: ${cycle.calculatorProblem}.` : `Cycle time not derivable: missing ${cycle.missing.join('; ')}.`;

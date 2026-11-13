@@ -84,49 +84,8 @@ export function injectionCycleTimeSeeds(input: CycleTimeInput): SeedResult {
       seeds['Thermal Conductivity of Melt'] = { value: r.thermalConductivityMeltWMK!, source: `${material}: thermal conductivity of melt` };
       seeds['Melt Density'] = { value: r.densityOfMeltKgM3!, source: `${material}: density of melt` };
     }
-    Object.assign(seeds, plasticizingAndEjectionSeeds(input, missing));
   }
   return missing.length > 0 ? { missing } : { seeds };
-}
-
-/**
- * The thermoplastic cycle's injection rate share, plasticizing and ejection inputs (calculator version 2): the reference variables, the press record (its own
- * plasticizing rate, else the reference table at its clamp force; its opening stroke), the GPPS mass of the shot and the part's height along the pull.
- */
-function plasticizingAndEjectionSeeds(input: CycleTimeInput, missing: string[]): Record<string, CalcSeed> {
-  const m = input.model;
-  const vars = `${REF}/variables`;
-  const seeds: Record<string, CalcSeed> = {
-    'Injection Rate Multiplier': { value: m.injectionRateMultiplier, source: `${vars}: injectionRateMultiplier (the share of the rated injection rate a shot reaches)` },
-    'Plasticizing Rate Multiplier': { value: m.plasticizingRateMultiplier, source: `${vars}: plasticizingRateMultiplier` },
-    'Dry Cycle Stroke Factor': { value: m.dryCycleStrokeFactor, source: `${vars}: dryCycleStrokeFactor (Euromap 6: the dry cycle moves 70 % of the stroke)` },
-    'Ejector Distance Factor': { value: m.ejectorDistanceFactor, source: `${vars}: ejectorDistanceFactor (ejector travel as a multiple of the part height)` },
-    'Ejector Velocity Percent': { value: m.ejectorPercentMaxMachineVelocity, source: `${vars}: ejectorPercentMaxMachineVelocity` },
-    'Number of Ejector Cycles': { value: m.numEjectorCycles, source: `${vars}: numEjectorCycles` },
-  };
-
-  if (positive(input.shotGppsMassG)) seeds['Shot GPPS Mass'] = { value: input.shotGppsMassG, source: 'Shot mass of all cavities + runner, as GPPS-equivalent grams (the press rating unit)' };
-  else missing.push('shot GPPS-equivalent mass (part volume and melt density)');
-
-  const own = input.press?.plasticizingRateGPerS ?? null;
-  const clamp = input.pressClampKn ?? null;
-  const row = positive(clamp) ? m.plasticizingRateByClampKn.find((r) => clamp <= r.clampKn) ?? m.plasticizingRateByClampKn[m.plasticizingRateByClampKn.length - 1] : undefined;
-  if (positive(own)) seeds['Press Plasticizing Rate'] = { value: own, source: 'Press reference record: rates.plasticizingRateGppsGPerS' };
-  else if (row) {
-    seeds['Press Plasticizing Rate'] = {
-      value: row.gPerS, lookup: true,
-      source: `${REF}/lookup/plasticizingRateByClampForce: the press record states no plasticizing rate; ${Math.round(clamp! * 10) / 10} kN clamp, row ${row.clampKn} kN`,
-      match: { table: 'plasticizingRateByClampForce', row: { 'Clamp Force (kN)': row.clampKn } },
-    };
-  } else missing.push('press plasticizing rate (plasticizingRateGppsGPerS, or the clamp force for plasticizingRateByClampForce)');
-
-  const stroke = input.press?.openingStrokeMm ?? null;
-  if (positive(stroke)) seeds['Press Opening Stroke'] = { value: stroke, source: 'Press reference record: limits.openingStrokeMm' };
-  else missing.push('press opening stroke (openingStrokeMm)');
-
-  if (positive(input.partHeightMm)) seeds['Part Height'] = { value: input.partHeightMm, source: 'CAD bounding box: the smallest side, along the pull direction' };
-  else missing.push('part height (CAD bounding box)');
-  return seeds;
 }
 
 /**

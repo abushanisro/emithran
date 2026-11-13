@@ -19,8 +19,6 @@ const base = (over: Partial<InjectionMoldingCostInput>): InjectionMoldingCostInp
   materialGrade: 'Generic ABS', materialCostPerKg: 3.046, materialDensityKgM3: 1040,
   mhrRate: rate('injection_molding', MID.mhrUsd, 'Arburg Allrounder 420 C 1300 - 350'),
   deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null),
-  // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
-  bboxMinMm: 30,
   machineClampTonnes: MID.maxTonnage, machineShotCapacityG: MID.shotCapacityGrams, pressTiming: MID.timing, goodPartYield: MID.goodPartYield, calculators: plasticMoldingCalculatorsByName(),
   materialClamp: realMaterialClamp('ABS'), realResinInputs: realResinInputs('ABS'), materialType: 'ABS',
   materialStockForm: 'Granules', materialMatlState: 'Base Polymer',
