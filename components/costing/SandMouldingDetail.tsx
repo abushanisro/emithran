@@ -14,11 +14,10 @@ export interface SandCastingBreakdown {
   alternatives?: SandRouteAlternative[];
 }
 
-/** What the sand route decided: the moulding machine it was costed with, how the part was measured, cavities and cores, and the other machines compared. */
-export function SandRouteSummary({ route }: { route: SandCastingBreakdown }) {
+/** The moulding line's detail (its row already shows the machine): how the part was measured, cavities and cores, and the other moulding machines compared. */
+export function SandMouldingDetail({ route }: { route: SandCastingBreakdown }) {
   return (
-    <div className="space-y-0.5">
-      <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Costed with</span><span className="font-medium text-right">{route.mouldingProcess} · {route.mouldingMachine}</span></div>
+    <div className="space-y-0.5 pt-1">
       <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Measured by</span><span className="font-medium">{route.measuredBy === 'casting analysis' ? 'casting analysis (exact solid)' : 'cad-engine'}</span></div>
       <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cavities</span><span className="font-medium">{route.cavities}</span></div>
       <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cores</span><span className="font-medium">{route.coresMade}{route.coresLeftSolid > 0 ? ` (+${route.coresLeftSolid} left solid, machined later)` : ''}</span></div>
