@@ -12,7 +12,7 @@ const input: SandRouteInput = {
   ref, spec: loadSandCastingCalculatorSpec(), calculators: sandCastingCalculatorsByName(), material: iron,
   part: {
     volumeMm3: (8 / iron.columns['density_kg_m3']!) * 1e9, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12,
-    partingLineMm: 900, abovePartingMm: 50, cores: [{ volumeMm3: 1.2e6, areaMm2: null, sizeMm: [200, 100, 60] }],
+    partingLineMm: 900, abovePartingMm: 50, cores: [{ volumeMm3: 1.2e6, areaMm2: 64000, sizeMm: [200, 100, 60] }],
   },
   machinesByClass: machines,
   scenario: { batchSize: 250, cavities: null, mouldingClass: null, chosenCoreProcess: null, energyPricePerKwh: 0.1, hotBox: HOT_BOX, lifetimeVolume: 10000 },
@@ -50,9 +50,9 @@ describe('buildSandRoute on a gray iron casting with one core (real sand data)',
     expect(tookMs).toBeLessThan(8000);
   });
 
-  it('runs the steps in order: melt, the core, moulding, pour, cooling, shakeout, degating, cleaning, finishing, inspection', () => {
+  it('runs the steps in order: melt, the core, its coating and drying (the plant\'s default), moulding, pour, cooling, shakeout, degating, cleaning, finishing, inspection', () => {
     const names = route!.lines.map((l) => l.process);
-    expect(names).toEqual(['Melting', expect.stringMatching(/coremaking$/), route!.mouldingProcess, 'Pour', 'Cooling', 'Shakeout', 'Degating', 'Cleaning', 'Finishing', 'Visual Inspection']);
+    expect(names).toEqual(['Melting', expect.stringMatching(/coremaking$/), 'Core Refractory Coat', expect.stringMatching(/^Refractory Coat (Oven|Air) Dry \(cores\)$/), route!.mouldingProcess, 'Pour', 'Cooling', 'Shakeout', 'Degating', 'Cleaning', 'Finishing', 'Visual Inspection']);
     expect(route!.lines.every((l) => l.physicsGap == null && l.totalCost > 0)).toBe(true);
     expect(route!.coresMade).toBe(1);
   });

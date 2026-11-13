@@ -11,7 +11,7 @@ describe('the refractory coating choices of the Cost Guide', () => {
     expect(SAND_SCENARIO_KEYS.refractoryDryMethod).toBe('sandRefractoryDryMethod');
     expect(SAND_SCENARIO_KEYS.refractoryDryMinutes).toBe('sandRefractoryDryMinutes');
     expect(SAND_SCENARIO_KEYS.refractoryCoatPrice).toBe('refractoryCoatingUsdPerKg');
-    expect(REFRACTORY_COAT_CHOICES.map((c) => c.value)).toEqual(['mould', 'cores', 'both']);
+    expect(REFRACTORY_COAT_CHOICES.map((c) => c.value)).toEqual(['none', 'mould', 'cores', 'both']);
     expect(REFRACTORY_DRY_METHODS.map((m) => m.value)).toEqual(['oven', 'air']);
   });
 
@@ -23,7 +23,7 @@ describe('the refractory coating choices of the Cost Guide', () => {
       expect(cost).toContain(`'${key}'`);
     }
     const list = (name: string) => [...(refractory.match(new RegExp(`export const ${name} = \\[([^\\]]*)\\]`))?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(list('COAT_CHOICES')).toEqual(['none', ...REFRACTORY_COAT_CHOICES.map((c) => c.value)]);
+    expect(list('COAT_CHOICES')).toEqual(REFRACTORY_COAT_CHOICES.map((c) => c.value));
     expect(list('DRY_METHODS')).toEqual(REFRACTORY_DRY_METHODS.map((m) => m.value));
   });
 

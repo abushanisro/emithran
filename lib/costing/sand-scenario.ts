@@ -17,6 +17,7 @@ export const SAND_SCENARIO_KEYS = {
 
 /** What can be coated (backend sand-refractory.ts): nothing unless chosen. The values are the backend's. */
 export const REFRACTORY_COAT_CHOICES = [
+  { value: 'none', label: 'Not coated' },
   { value: 'mould', label: 'The mould' },
   { value: 'cores', label: 'The cores' },
   { value: 'both', label: 'The mould and the cores' },
@@ -28,13 +29,13 @@ export const REFRACTORY_DRY_METHODS = [
 ] as const;
 
 /**
- * What the coating needs from the plant: the data defines the coating (method, rate, output, density, preparation, beds) but no drying time and no price, so
- * neither is assumed; a coating chosen without a drying time is not costed and the route says what to set. The ranges are published guidance shown beside
+ * What the coating takes from the plant: the data defines the coating (method, rate, output, density, preparation, beds) and its drying times
+ * (defaultOvenDryAndCoolTime 19 min, defaultAirDryAndCoolTime 60 min), used unless set here; it has no coating price, so none is assumed. The ranges are published guidance shown beside
  * the fields, never applied for the user (Foundry Management & Technology, "Innovations Enhance Mold Drying Effectiveness": core and mould drying ovens run
  * about 95-205 C and dry in 10-30 minutes, against 10-20 hours drying passively in the shop; solvent-based coatings can also be ignited for a very short dry).
  */
 export const REFRACTORY_GUIDANCE = {
-  dryMinutes: "The plant's time for a load in the oven (or on the air-dry area), in minutes. Published: ovens at about 95-205 C dry coated moulds and cores in 10-30 minutes; passive drying in the shop takes 10-20 hours; solvent-based coatings can be burned off in very little time. Take it from the coating's datasheet.",
+  dryMinutes: "A load's drying time in minutes. Empty: the plant's (oven 19, air 60: defaultOvenDryAndCoolTime, defaultAirDryAndCoolTime). Published: ovens at about 95-205 C dry coated moulds and cores in 10-30 minutes; passive drying in the shop takes 10-20 hours; solvent-based coatings can be burned off in very little time. Take it from the coating's datasheet.",
   price: "The coating's price per kg. It is not in the reference data, so nothing is assumed: until you set it, the coating is costed for time and drying only.",
 } as const;
 
