@@ -12,7 +12,7 @@ import type { BlankSpecDto } from '../../dto/blank-spec.dto';
  *   material on this same figure, so the record must agree with it.
  * - `casting_charge`: die casting -- Net is the part metal, Gross the metal
  *   charged (part x the alloy Yield Loss Factor), the same figures the engine
- *   prices material on (cost summary dieCasting.metal).
+ *   prices material on (cost summary castingMetal).
  * - `scrap_allowance_fallback`: no real stock/nesting result is available yet
  *   (cost summary still loading, or material density unresolved), so Gross is
  *   estimated as Net / (1 - scrap allowance). A disclosed estimate, never
@@ -73,7 +73,7 @@ export interface DeriveMaterialUsageInput {
   itemVolumeMm3: number | null | undefined;
   densityKgM3: number | null | undefined;
   cadWeightKg: number | null | undefined;
-  /** Die casting: the engine's per-part metal (cost summary dieCasting.metal). */
+  /** A casting's per-part metal (cost summary castingMetal: die casting and sand casting). */
   castingMetal?: { partKg: number; chargedKg: number } | null;
 }
 

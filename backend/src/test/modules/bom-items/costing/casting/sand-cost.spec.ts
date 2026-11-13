@@ -255,6 +255,13 @@ describe('the cost summary of a sand casting', () => {
     expect(v('Bought Weight')).toBeCloseTo(v('Net Weight') + v('Melt Loss') + gates * (1 - allowance), 9);
   });
 
+  it('gives the metal the part is charged with: the casting and the metal bought for it (the material record uses this one figure)', () => {
+    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
+    const bought = s.calculatorRuns!['Sand material cost']!.trace.find((t) => t.fieldName === 'Bought Weight')!.value as number;
+    expect(s.castingMetal!.partKg).toBe(route.material.netKg);
+    expect(s.castingMetal!.chargedKg).toBeCloseTo(bought, 3); // the trace shows it to 4 places
+  });
+
   it("sends the moulding machine's flask, for the viewer to draw the mould", () => {
     const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
     expect(s.sandCasting!.flask).toEqual(route.flask);

@@ -600,6 +600,8 @@ export interface CostSummaryDto {
   // High pressure die casting: cavities per die and the clamp / shot they set.
   // Present only when a die-cast part reached the HPDC engine's cavity step.
   dieCasting?: DieCastingBreakdown;
+  /** A casting's metal per part: the part itself and what it is charged with (die casting: x the yield loss factor; sand: the metal bought). The material record is written from it. */
+  castingMetal?: { partKg: number; chargedKg: number };
   /** Sand casting: how the route was chosen, for the Cost Guide (the user's choices stay unset until made). */
   sandCasting?: SandCastingBreakdown;
 

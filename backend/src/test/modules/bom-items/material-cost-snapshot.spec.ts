@@ -65,6 +65,12 @@ describe('MaterialCostSnapshotService.ensure', () => {
     expect(dto.netUsage).toBeGreaterThan(0);
   });
 
+  it('a casting is charged with the metal the casting route buys, not a generic scrap allowance', async () => {
+    const { svc, costRecords } = build([]);
+    await svc.ensure(input(summary({ grossWeightKg: 0.08, blankSpec: undefined, castingMetal: { partKg: 0.039, chargedKg: 0.041 } })));
+    expect(costRecords.create.mock.calls[0]![0]).toMatchObject({ netUsage: 0.039, grossUsage: 0.041, scrap: 4.88 });
+  });
+
   it('when raw_materials has no price the record carries the engine\'s price per kg in USD, not zero', async () => {
     const { svc, costRecords } = build([], { id: 'new', unitCost: 0 });
     await svc.ensure(input(summary({ materialCostPerKg: 8, usdToDisplayRate: 2 })));
