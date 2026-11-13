@@ -29,6 +29,29 @@ describe('sandScenario', () => {
     expect(bad.scenario.cavities).toBeNull();
     expect(bad.warnings).toEqual([expect.stringContaining('Lost Foam')]);
   });
+
+  // The energy price: the Cost Guide's for this part, else the location's sourced electricity price (location_electricity_prices, migration 1004),
+  // converted to USD with the app's exchange rates; else none, never assumed.
+  const usa = { pricePerKwh: 0.0851, currency: 'USD', basis: 'U.S. EIA Electric Power Monthly, Table 5.3: industrial sector, 2025 annual average' };
+  const france = { pricePerKwh: 0.175, currency: 'EUR', basis: 'HR Rates export (EUR)' };
+  it('the Cost Guide energy price wins over the location\'s', () => {
+    const s = sandScenario({ ...base, overrides: { energyPriceUsdPerKwh: 0.2 }, locationElectricity: usa, toUsd: (v) => v }).scenario;
+    expect(s).toMatchObject({ energyPricePerKwh: 0.2, energyPriceSource: expect.stringMatching(/Cost Guide/) as string });
+  });
+  it('without one, the location\'s electricity price is used, in USD, with its source', () => {
+    const s = sandScenario({ ...base, location: 'USA', locationElectricity: usa, toUsd: (v) => v }).scenario;
+    expect(s.energyPricePerKwh).toBe(0.0851);
+    expect(s.energyPriceSource).toMatch(/USA electricity price: 0\.0851 USD\/kWh \(U\.S\. EIA/);
+    const fr = sandScenario({ ...base, location: 'France', locationElectricity: france, toUsd: (v, c) => (c === 'EUR' ? v * 1.1 : null) }).scenario;
+    expect(fr.energyPricePerKwh).toBeCloseTo(0.1925, 6);
+    expect(fr.energyPriceSource).toMatch(/France electricity price: 0\.175 EUR\/kWh .*= 0\.1925 USD\/kWh/);
+  });
+  it('no price when the location has none, or its currency cannot be converted: energy is not charged, not assumed', () => {
+    expect(sandScenario({ ...base, locationElectricity: null, toUsd: (v) => v }).scenario.energyPricePerKwh).toBeNull();
+    const r = sandScenario({ ...base, location: 'France', locationElectricity: france, toUsd: () => null });
+    expect(r.scenario.energyPricePerKwh).toBeNull();
+    expect(r.warnings.join(' ')).toMatch(/EUR.*no exchange rate/);
+  });
 });
 
 describe('sandPart', () => {
@@ -69,11 +92,11 @@ const volume = (8 / iron.columns['density_kg_m3']!) * 1e9;
 const request = (over: Partial<SandCostRequest> = {}): SandCostRequest => ({
   client: {} as never, accessToken: 't', location: 'USA', grade: 'ASTM Grade 20 Gray Iron', bomItemId: 'item-1', sourcePath: 'path/part.step',
   measurements: { volumeMm3: volume, surfaceAreaMm2: 250000, bboxMm: [300, 200, 100], footprintMm: [300, 200], drawDepthMm: 100, wallNominalMm: 12, partingPerimeterMm: 900, rawCores: [] },
-  overrides: { sandMouldingProcess: 'Manual Std Moldmaking' }, batchSize: 250, annualVolume: 2000, productionLifeYears: 5, usdToLocal: 1, costContext, ...over,
+  overrides: { sandMouldingProcess: 'Manual Std Moldmaking' }, batchSize: 250, annualVolume: 2000, productionLifeYears: 5, usdToLocal: 1, toUsd: (v) => v, costContext, ...over,
 });
 function service(opts: { material?: Record<string, unknown> | null; calcs?: typeof calculators; ref?: ReturnType<typeof realSandReference> | null; analysis?: unknown } = {}) {
   const material = opts.material === undefined ? { name: 'ASTM Grade 20 Gray Iron', grade: 'x', material_type: 'Gray Iron', ...Object.fromEntries(Object.entries(iron.columns)) } : opts.material;
-  const client = { from: () => { const c: any = { select: () => c, eq: () => c, or: () => c, limit: async () => ({ data: material ? [material] : [], error: null }) }; return c; } };
+  const client = { from: () => { const c: any = { select: () => c, eq: () => c, or: () => c, maybeSingle: async () => ({ data: null, error: null }), limit: async () => ({ data: material ? [material] : [], error: null }) }; return c; } };
   const ref = opts.ref === undefined ? realSandReference() : opts.ref;
   const svc = new SandCostService(
     { get: async () => (ref ? { reference: ref, missing: [] } : { reference: null, missing: ['Sand casting reference data is not staged'] }) } as never,

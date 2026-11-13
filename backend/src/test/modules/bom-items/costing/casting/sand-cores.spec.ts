@@ -96,7 +96,7 @@ describe('makeCoreStep', () => {
     expect(priced.ok && priced.notes).toEqual([]);
     const unpriced = makeCoreStep({ ...ctx, energyPricePerKwh: null }, m, core);
     expect(unpriced.ok && unpriced.energyCostUsd).toBe(0);
-    expect(unpriced.ok && unpriced.notes).toEqual([expect.stringMatching(/^Hot box heating energy is not charged: the energy price is not set \(the sand's heat alone is 0\.089 kWh per core, a lower bound\)/)]);
+    expect(unpriced.ok && unpriced.notes).toEqual([expect.stringMatching(/^Hot box heating energy is not charged: no energy price for the location or in the Cost Guide \(the sand's heat alone is 0\.089 kWh per core, a lower bound\)/)]);
   });
 
   it('the energy is added to the line, so a priced core costs more than an unpriced one by exactly that', () => {

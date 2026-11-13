@@ -138,7 +138,7 @@ describe('meltStep (the furnace has no stored rate: the HR Rates engine prices i
     const out = meltStep(ctx, suitable);
     expect(out.ok).toBe(true);
     expect(out.ok && out.energyCostUsd).toBe(0);
-    expect(out.ok && out.notes).toEqual([expect.stringContaining('energy price')]);
+    expect(out.ok && out.notes).toEqual([expect.stringContaining('no electricity price')]);
   });
 
   it('with an energy price the energy cost follows it linearly', () => {
@@ -194,7 +194,7 @@ describe('selectAndCost', () => {
     const furnaces = sandMachines('machines_melting.csv', 'sand_casting_melting', () => ({ ratePerHr: 12.5, assumedDefaults: ['annual_maintenance_factor_pct'] }));
     const r = selectAndCost({ ...base, process: 'Melting', machineClass: 'sand_casting_melting', machines: furnaces, evaluate: (m) => meltStep(ctx, m) });
     expect(r.machine).not.toBeNull();
-    expect(r.warnings).toEqual([expect.stringContaining('energy price'), expect.stringContaining('assumed its defaults for annual_maintenance_factor_pct')]);
+    expect(r.warnings).toEqual([expect.stringContaining('no electricity price'), expect.stringContaining('assumed its defaults for annual_maintenance_factor_pct')]);
     expect(r.line.featureBreakdown?.[0]?.name).toMatch(/HR Rates engine/);
   });
 });

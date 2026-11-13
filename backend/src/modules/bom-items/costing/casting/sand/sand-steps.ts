@@ -62,8 +62,10 @@ export interface SandRouteContext {
   coresPerCasting: number;
   /** Metal poured: the casting with its risers and gating (kg), per casting and per mould. */
   poured: { perCastingKg: number; perMouldKg: number };
-  /** USD per kWh for melting; null until the user sets it (no default is assumed). */
+  /** USD per kWh: the Cost Guide's, else the location's sourced electricity price; null when neither exists (energy not charged). */
   energyPricePerKwh: number | null;
+  /** Where the energy price comes from, for the trace. */
+  energyPriceSource?: string | null;
   hotBox: HotBoxSettings;
   /** The batch size of the scenario (the preparation of a coating or an oven is shared by it). */
   batchSize: number;
@@ -189,14 +191,14 @@ export function meltStep(ctx: SandRouteContext, furnace: SandMachine): StepOutco
   const r = runStep(
     ctx, MELTING, furnace,
     { poured_kg: { value: ctx.poured.perCastingKg, source: 'metal per casting: net, risers and gating' } },
-    { scenario: valuesProvider({ energy_price: { value: priced ? ctx.energyPricePerKwh! : 0, source: priced ? 'energy price set in the scenario (USD/kWh)' : 'energy price not set: energy not charged' } }) },
+    { scenario: valuesProvider({ energy_price: { value: priced ? ctx.energyPricePerKwh! : 0, source: priced ? ctx.energyPriceSource ?? 'energy price (USD/kWh)' : 'no energy price: none set in the Cost Guide and none for the location' } }) },
   );
   if (!('run' in r)) return fail(...r.reasons);
   const energy = r.run.outputs['Energy Cost'];
   if (energy == null) return fail(`${MELTING} has no Energy Cost`);
   return {
     ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? energy : 0,
-    notes: priced ? [] : ['Melting energy is not charged: set the energy price (USD/kWh) in the scenario.'],
+    notes: priced ? [] : ['Melting energy is not charged: the location has no electricity price (location_electricity_prices) and none is set in the Cost Guide.'],
   };
 }
 

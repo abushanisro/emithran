@@ -57,8 +57,10 @@ export interface SandScenario {
   mouldingClass: string | null;
   /** A coremaking process the user chose. */
   chosenCoreProcess: string | null;
-  /** USD per kWh for melting: the user's, no default. */
+  /** USD per kWh: the Cost Guide's, else the location's sourced electricity price; null when neither exists (energy not charged). */
   energyPricePerKwh: number | null;
+  /** Where the energy price comes from, for the trace. */
+  energyPriceSource?: string | null;
   /** The plant's hot box settings; each null until the user sets it (no default is assumed). */
   hotBox: HotBoxSettings;
   /** The refractory coating the user chose and how it is dried; absent: nothing is coated. */
@@ -167,7 +169,7 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   const base: SandRouteContext = {
     ref, spec: input.spec, calculators: input.calculators, material: input.material,
     part: { netKg, modulusMm: modulus, dimsMm: part.dimsMm, wallNominalMm: thickness },
-    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh, hotBox: scenario.hotBox, batchSize: scenario.batchSize,
+    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh, energyPriceSource: scenario.energyPriceSource ?? null, hotBox: scenario.hotBox, batchSize: scenario.batchSize,
   };
   const { system: gating, missing: gatingMissing } = designGating({
     netKg, volumeMm3: part.volumeMm3, modulusMm: modulus, densityKgM3: density, materialName: input.material.name,

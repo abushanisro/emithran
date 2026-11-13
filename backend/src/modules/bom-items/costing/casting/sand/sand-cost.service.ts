@@ -8,7 +8,7 @@ import { loadSandCastingCalculatorSpec } from './calculators/sand-casting-calcul
 import { measurementsFromCastingResult } from '../../../../sand-casting/casting-measurements';
 import { evaluateSandDfm, type DfmResult } from '../../../../sand-casting/sand-dfm';
 import { SandCastingService } from '../../../../sand-casting/sand-casting.service';
-import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal, sandScenario, type SandMeasurements } from './sand-cost';
+import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal, sandScenario, type LocationElectricity, type SandMeasurements } from './sand-cost';
 import { SandMachineService } from './sand-machine.service';
 import { SandReferenceService } from './sand-reference.service';
 import { SAND_CASTING_SOURCE_VERSION } from './sand-reference';
@@ -52,6 +52,8 @@ export interface SandCostRequest {
   productionLifeYears: number | null;
   /** USD -> the location's currency. */
   usdToLocal: number;
+  /** An amount in a currency -> USD with the app's exchange rates; null when there is no rate (prices the location's electricity). */
+  toUsd: (value: number, currency: string) => number | null;
   costContext: CostContext;
 }
 
@@ -78,6 +80,14 @@ export class SandCostService {
     private readonly catalog: CalculatorCatalogService,
     private readonly analyses: SandCastingService,
   ) {}
+
+  /** The location's sourced electricity price (location_electricity_prices, migration 1004); null when it has none or it cannot be read. */
+  async electricityOf(client: DbClient, location: string): Promise<LocationElectricity | null> {
+    const { data, error } = await client.from('location_electricity_prices').select('price_per_kwh, currency, basis').eq('location', location).maybeSingle();
+    if (error || !data) return null;
+    const row = data as { price_per_kwh: number | string; currency: string; basis: string };
+    return { pricePerKwh: Number(row.price_per_kwh), currency: row.currency, basis: row.basis };
+  }
 
   /** The sand material whose name or grade equals the BOM item's material grade, case-insensitively; null when the grade is not a sand material. */
   async getMaterial(client: DbClient, grade: string | null): Promise<SandMaterial | null> {
@@ -153,7 +163,10 @@ export class SandCostService {
     const spec = loadSandCastingCalculatorSpec();
     const absent = spec.calculators.filter((c) => !calculators[c.name]).map((c) => c.name);
     if (absent.length) return none(`the sand calculators are not in the database (run migration 956): ${absent.slice(0, 3).join(', ')}${absent.length > 3 ? ', ...' : ''}`);
-    const { scenario, warnings: scenarioWarnings } = sandScenario({ overrides: req.overrides, batchSize: req.batchSize, annualVolume: req.annualVolume, productionLifeYears: req.productionLifeYears });
+    const { scenario, warnings: scenarioWarnings } = sandScenario({
+      overrides: req.overrides, batchSize: req.batchSize, annualVolume: req.annualVolume, productionLifeYears: req.productionLifeYears,
+      location: req.location, locationElectricity: await this.electricityOf(req.client, req.location), toUsd: req.toUsd,
+    });
     warnings.push(...scenarioWarnings);
     const { route, missing } = buildSandRoute({ ref, spec, calculators, material, part, machinesByClass: machines, scenario, costContext: req.costContext });
     if (!route) return none(...missing);

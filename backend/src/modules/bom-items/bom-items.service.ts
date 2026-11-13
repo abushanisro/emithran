@@ -4251,6 +4251,7 @@ export class BOMItemsService {
           },
           overrides: item.scenarioOverrides, batchSize, annualVolume: annualVolume ?? null, productionLifeYears: productionLifeYears ?? null,
           usdToLocal, costContext: zeroCtx,
+          toUsd: (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } },
         });
         route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...sandResult.warnings] };
         if (this.machiningAllowance) {

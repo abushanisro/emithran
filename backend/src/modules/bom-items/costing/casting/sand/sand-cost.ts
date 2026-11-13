@@ -33,11 +33,37 @@ export const SAND_SCENARIO_KEYS = {
  * The scenario as the route takes it. The core-box tooling is amortised over annual volume x production life; with either missing there is
  * no lifetime volume (null), and the tooling is not costed rather than spread over a made-up volume.
  */
+/** A location's electricity price as stored (location_electricity_prices, migration 1004): in its own currency, with its source. */
+export interface LocationElectricity { pricePerKwh: number; currency: string; basis: string }
+
+const p4 = (n: number) => String(Math.round(n * 10000) / 10000);
+
+/**
+ * The energy price the route charges: the Cost Guide's for this part, else the location's sourced electricity price converted to USD, else
+ * none (energy is then not charged, and each line says so). Never assumed.
+ */
+function energyPrice(override: number | null, location: string | undefined, row: LocationElectricity | null | undefined, toUsd: (value: number, currency: string) => number | null, warnings: string[]): { usdPerKwh: number; source: string } | null {
+  if (override != null) return { usdPerKwh: override, source: 'energy price set in the Cost Guide (USD/kWh)' };
+  if (!row) return null;
+  const usd = row.currency === 'USD' ? row.pricePerKwh : toUsd(row.pricePerKwh, row.currency);
+  if (usd == null || !(usd > 0)) {
+    warnings.push(`The ${location ?? 'location'} electricity price is in ${row.currency}, which has no exchange rate to USD: energy is not charged.`);
+    return null;
+  }
+  const converted = row.currency === 'USD' ? '' : ` = ${p4(usd)} USD/kWh`;
+  return { usdPerKwh: usd, source: `${location ?? 'location'} electricity price: ${p4(row.pricePerKwh)} ${row.currency}/kWh (${row.basis})${converted}` };
+}
+
 export function sandScenario(input: {
   overrides: Record<string, unknown> | null | undefined;
   batchSize: number;
   annualVolume: number | null;
   productionLifeYears: number | null;
+  /** The Digital Factory location and its electricity price (null when the location has none). */
+  location?: string;
+  locationElectricity?: LocationElectricity | null;
+  /** Converts an amount in a currency to USD with the app's exchange rates; null when there is no rate. */
+  toUsd?: (value: number, currency: string) => number | null;
 }): { scenario: Omit<SandScenario, 'lifetimeVolume'> & { lifetimeVolume: number | null }; warnings: string[] } {
   const o = input.overrides ?? {};
   const processName = typeof o[SAND_SCENARIO_KEYS.mouldingProcess] === 'string' ? (o[SAND_SCENARIO_KEYS.mouldingProcess] as string) : null;
@@ -53,7 +79,10 @@ export function sandScenario(input: {
       cavities: cavity != null && Number.isInteger(cavity) && cavity > 0 ? cavity : null,
       mouldingClass,
       chosenCoreProcess: typeof o[SAND_SCENARIO_KEYS.coreProcess] === 'string' ? (o[SAND_SCENARIO_KEYS.coreProcess] as string) : null,
-      energyPricePerKwh: positive(o[SAND_SCENARIO_KEYS.energyPrice]),
+      ...(() => {
+        const e = energyPrice(positive(o[SAND_SCENARIO_KEYS.energyPrice]), input.location, input.locationElectricity, input.toUsd ?? (() => null), warnings);
+        return { energyPricePerKwh: e?.usdPerKwh ?? null, energyPriceSource: e?.source ?? null };
+      })(),
       hotBox: {
         coreboxTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCoreboxTemp]),
         cureTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCureTemp]),

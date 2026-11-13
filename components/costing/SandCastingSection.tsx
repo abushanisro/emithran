@@ -98,10 +98,10 @@ export function SandCastingSection({ overrides, onChange }: Props) {
       <NumberField
         label="Energy, USD/kWh"
         value={number(SAND_SCENARIO_KEYS.energyPrice)}
-        placeholder="not set: energy not charged"
+        placeholder="the location's price"
         parse={parsePositive}
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.energyPrice]: v }); }}
-        title="Electricity price for melting. It is not in the reference data, so nothing is assumed: until you set it, melting energy is not charged."
+        title="Electricity price for melting, hot-box cores and drying ovens, for this part. Empty: the location's sourced price (reference data, e.g. USA: EIA industrial average); a location with none has its energy not charged, and the lines say so."
       />
       <NumberField
         label="Box temp, °C"

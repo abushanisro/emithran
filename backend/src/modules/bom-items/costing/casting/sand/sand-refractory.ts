@@ -139,7 +139,7 @@ export function dryStep(ctx: SandFinishContext, m: SandMachine, method: DryMetho
   const perLoad = r.run.outputs['Items per Load'];
   if (perLoad == null || perLoad < 1) return fail(`one item (${(itemVolumeMm3 / 1e9).toFixed(3)} m³) does not fit the bed less racking`);
   const kwh = r.run.outputs['Energy'] ?? 0;
-  const notes = kwh > 0 && !priced ? [`The drying energy (${kwh.toFixed(3)} kWh per casting) is not charged: the energy price is not set in the Cost Guide.`] : [];
+  const notes = kwh > 0 && !priced ? [`The drying energy (${kwh.toFixed(3)} kWh per casting) is not charged: no energy price for the location or in the Cost Guide.`] : [];
   return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? kwh * ctx.energyPricePerKwh! : 0, notes };
 }
 
