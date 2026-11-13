@@ -72,7 +72,7 @@ ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN
 INSERT INTO public.mhr_records (machine_class, location, usd_labor_rate_per_hr, usd_lhr_total) VALUES
   ('surface_black_oxide', 'USA', NULL, NULL), ('surface_oven_cure', 'USA', 29.95, 29.95), ('surface_shot_blast', 'USA', 29.95, 29.95);
 -- the process cost table as the real database has it (migration 034 on): migration 970 adds columns to it and redefines the function that fills it
-CREATE TABLE public.process_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid, is_active boolean DEFAULT true);
+CREATE TABLE public.process_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid, is_active boolean DEFAULT true, cycle_time numeric(12,2));
 INSERT INTO public.projects (user_id, name) VALUES ('11111111-1111-4111-8111-111111111111','Alice project');
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own ON public.projects FOR SELECT TO authenticated USING (user_id = auth.uid());

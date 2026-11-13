@@ -6,7 +6,7 @@ import {
   cuttingFeatureCoverage,
   requiredCutFeatures,
   resolveSetupMinutes,
-  findRouteDataGaps,
+  findRouteDataGaps, persistableCycleSec,
   isRouteDataComplete,
   selectRecommendedRoute,
   preferRealRate,
@@ -196,15 +196,17 @@ describe('findRouteDataGaps', () => {
     // dataComplete=false, excluding both from selectRecommendedRoute and pinning
     // the recommendation to Standard Press no matter what the scenario said.
     //
-    // The real floor is the column scale: a cycle that still rounds to 0.00 s at
-    // 2 dp is one that nothing resolved.
+    // The real floor is the column scale (NUMERIC(12,4) seconds, migration 1006): a cycle that still rounds to 0.0000 s is one that
+    // nothing resolved. A casting's share of a large furnace's melt is a real few milliseconds.
     expect(findRouteDataGaps([line({ cycleTimeMin: 1 / 60 })])).toEqual([]);
     expect(findRouteDataGaps([line({ cycleTimeMin: 0.6 / 60 })])).toEqual([]);
     expect(findRouteDataGaps([line({ cycleTimeMin: 0.36 / 60 })])).toEqual([]);
     expect(findRouteDataGaps([line({ cycleTimeMin: 0.01 / 60 })])).toEqual([]);
-    // Rounds to 0.00 s at the column scale -> nothing was resolved.
-    expect(findRouteDataGaps([line({ cycleTimeMin: 0.004 / 60 })])).toHaveLength(1);
+    expect(findRouteDataGaps([line({ cycleTimeMin: 0.004 / 60 })])).toEqual([]);
+    // Rounds to 0.0000 s at the column scale -> nothing was resolved.
+    expect(findRouteDataGaps([line({ cycleTimeMin: 0.00004 / 60 })])).toHaveLength(1);
     expect(findRouteDataGaps([line({ cycleTimeMin: 0 })])).toHaveLength(1);
+    expect(persistableCycleSec(0.004 / 60)).toBe(0.004);
   });
 
   it('reports a structured missing-lookup gap by its own required action', () => {

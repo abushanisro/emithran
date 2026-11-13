@@ -153,3 +153,16 @@ describe('what the user can choose, and what the data cannot do', () => {
     expect(route!.warnings.join(' ')).toMatch(/Patterns, core coating and core gluing are not costed/);
   });
 });
+
+// A small casting's melt costs a fraction of a cent: per good casting (divided by the route's good-part yield) it keeps its value and its
+// energy, so the saved record's total is not 0 (it was rounded to the cent).
+describe('a line below a cent, per good casting', () => {
+  const small = buildSandRoute({ ...input, part: { ...input.part, volumeMm3: (0.05 / iron.columns['density_kg_m3']!) * 1e9, dimsMm: [42, 42, 20], surfaceAreaMm2: 7500, partingLineMm: 170, wallNominalMm: 4, cores: [] } }).route!;
+  const melt = small.lines.find((l) => l.process === 'Melting')!;
+
+  it('keeps the melt\'s total and its energy, the energy inside the total', () => {
+    expect(melt.otherCostPerPartUsd).toBeGreaterThan(0);
+    expect(melt.totalCost).toBeGreaterThan(0);
+    expect(melt.totalCost).toBeGreaterThanOrEqual(melt.otherCostPerPartUsd!);
+  });
+});

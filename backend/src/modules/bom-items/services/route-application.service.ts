@@ -17,7 +17,7 @@ import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDt
 import type { PhysicsGap } from '../dto/cost-breakdown.dto';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
 import { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
-import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge } from '../costing/shared/core/engine-kernel';
+import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge, persistableCycleSec } from '../costing/shared/core/engine-kernel';
 import { RouteResultDto } from '../dto/route-comparison.dto';
 import { PersistedLineCurrency, resolvePersistedCostCurrencyBasis } from '../costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from '../costing/shared/core/persisted-process-cost';
@@ -422,7 +422,7 @@ export class RouteApplicationService {
      */
     currencyContext: PersistedLineCurrency,
   ): Promise<string[]> {
-    // process_cost_records.cycle_time is NUMERIC(12,2) holding SECONDS. This
+    // process_cost_records.cycle_time is NUMERIC(12,4) holding SECONDS (migration 1006). This
     // check used to justify itself by citing migration 034's
     // CHECK (cycle_time >= 1) and calling an unresolved cycle time
     // "schema-impossible to persist". It was not: 034 declares that constraint
@@ -601,7 +601,7 @@ export class RouteApplicationService {
       // real precision the schema already supports on every applied route —
       // confirmed live: a genuine 19.2s Inspection line saved as 19s, then
       // visibly disagreed with its own calculator's exact recomputation.
-      const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
+      const cycleTimeSec = persistableCycleSec(line.cycleTimeMin);
       const perPart = isPerPartCharge(line);
       // Labour is the rate the engine costed this line with — the selected
       // machine's own memory/ LHR (line.labourRate). No lhr_benchmark_rates or

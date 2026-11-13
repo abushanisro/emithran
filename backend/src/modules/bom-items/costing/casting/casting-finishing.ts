@@ -38,6 +38,8 @@ export type CostContext = Omit<EMithranTermsArgs, 'mhrPerHr' | 'dlrPerHr' | 'set
 
 const num = (v: unknown): number | null => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 const r2 = (n: number) => Math.round(n * 100) / 100;
+/** A cycle time in minutes: to 0.001 min from there up, its significant figures below (a casting's share of a furnace's melt can be milliseconds). */
+const roundCycleMin = (m: number) => (Math.abs(m) >= 0.001 ? r3(m) : m === 0 ? 0 : Number(m.toPrecision(3)));
 /** A line's cost: to the cent from a cent up, its significant figures below (a fraction of a cent, such as one casting's share of a furnace, is not 0). */
 export const roundLineCost = (n: number) => (Math.abs(n) >= 0.01 ? r2(n) : roundPerPart(n));
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -65,7 +67,7 @@ export function line(args: {
   return {
     process: args.process, processGroup: args.processGroup, processRoute: args.processRoute, operation: args.process,
     setupCost: roundLineCost(terms.setupCost), runCost: roundLineCost(terms.total - terms.setupCost), totalCost: roundLineCost(terms.total),
-    cycleTimeMin: r3(args.sec / 60), setupTimeMin: r3(setup.setupMin), setupTimeSource: setup.source, operators: ops,
+    cycleTimeMin: roundCycleMin(args.sec / 60), setupTimeMin: r3(setup.setupMin), setupTimeSource: setup.source, operators: ops,
     hourlyRate: m.machineRatePerHr!, rateSource: 'mhr_database', machineClass: args.machineClass, machineName: m.name,
     commodityCode: null, labourRate: m.labourRatePerHr, mhrId: m.id,
     featureBreakdown: [{ name: args.breakdown, featureType: 'Part', timeSec: r2(args.sec), count: 1 }],
