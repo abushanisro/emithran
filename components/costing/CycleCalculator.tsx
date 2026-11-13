@@ -1,5 +1,6 @@
 'use client';
 
+import { Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
@@ -9,61 +10,64 @@ import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
 const box = 'w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm tabular-nums focus:outline-hidden focus:ring-1 focus:ring-brand-500';
 const label = (s: CalculationTraceStep) => `${s.fieldName}${s.unit ? ` (${s.unit})` : ''}`;
 
-/** One field: its value in a box the engineer can change for this part (with the reason), and why it has the value it has. */
+/** One field: its value and why it has it; the pencil opens an editor to set the part's own value (with the reason). */
 function Field({ step, bomItemId, calculator }: { step: CalculationTraceStep; bomItemId: string; calculator: string | null }) {
   const shown = formatFieldValue(step.value);
+  const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(shown);
   const [reason, setReason] = useState('');
   const set = useSetCalculatorFieldOverride(bomItemId);
   const clear = useClearCalculatorFieldOverride(bomItemId);
-  const editable = calculator != null;
-  const changed = value.trim() !== shown;
   const num = Number(value);
-  const valid = Number.isFinite(num) && num > 0 && reason.trim().length >= 3;
+  const valid = Number.isFinite(num) && num > 0 && value.trim() !== shown && reason.trim().length >= 3;
   const busy = set.isPending || clear.isPending;
   const failure = (set.error ?? clear.error) as { message?: string } | null;
   const why = step.override
     ? `Engineer's value for this part: ${step.override.reason}`
     : step.kind === 'calculated' ? `${step.fieldName} = ${step.formula ?? ''}` : step.source ?? '';
+  const close = () => { setEditing(false); setValue(shown); setReason(''); };
 
   return (
-    <div className="space-y-1">
-      <div className="text-sm font-medium">{label(step)}</div>
-      <input
-        className={box}
-        inputMode="decimal"
-        aria-label={label(step)}
-        value={value}
-        readOnly={!editable}
-        onChange={(e) => { setValue(e.target.value); }}
-      />
-      <p className={`text-xs leading-snug ${step.kind === 'calculated' && !step.override ? 'font-mono text-muted-foreground' : 'text-muted-foreground'}`}>Why: {why}</p>
+    <div className="space-y-1 border-b border-border/30 pb-2 last:border-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-medium">{label(step)}</span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <span className={`text-sm font-semibold tabular-nums ${step.override ? 'text-amber-600 dark:text-amber-500' : ''}`}>{shown}</span>
+          {calculator && !editing && (
+            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label={`Edit ${step.fieldName} for this part`} title="Set this part's own value" onClick={() => { setEditing(true); }}>
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </span>
+      </div>
+      <p className={`text-xs leading-snug text-muted-foreground ${step.kind === 'calculated' && !step.override ? 'font-mono' : ''}`}>Why: {why}</p>
       {step.override && (
         <p className="text-xs text-amber-600 dark:text-amber-500">
           The calculator gives {formatFieldValue(step.override.original)}{step.unit ? ` ${step.unit}` : ''}.{' '}
-          {editable && (
+          {calculator && (
             <button type="button" className="underline disabled:opacity-50" disabled={busy} onClick={() => { clear.mutate({ calculator, field: step.fieldName }); }}>
               Back to the calculator&apos;s value
             </button>
           )}
         </p>
       )}
-      {editable && changed && (
+      {calculator && editing && (
         <form
-          className="space-y-1"
+          className="space-y-1.5 rounded-md bg-muted/40 p-2"
           onSubmit={(e) => {
             e.preventDefault();
-            set.mutate({ calculator, field: step.fieldName, value: num, reason: reason.trim() }, { onSuccess: () => { setReason(''); } });
+            set.mutate({ calculator, field: step.fieldName, value: num, reason: reason.trim() }, { onSuccess: close });
           }}
         >
+          <input className={box} inputMode="decimal" aria-label={`${label(step)} for this part`} value={value} autoFocus onChange={(e) => { setValue(e.target.value); }} />
           <input className={box} aria-label={`Why ${step.fieldName} differs for this part`} placeholder="Why this part differs (required)" value={reason} onChange={(e) => { setReason(e.target.value); }} />
           <div className="flex gap-2 text-xs">
             <button type="submit" className="rounded-md bg-brand-600 px-3 py-1 font-medium text-white disabled:opacity-50" disabled={busy || !valid}>
               {set.isPending ? 'Saving…' : 'Save and recalculate'}
             </button>
-            <button type="button" className="text-muted-foreground hover:underline" onClick={() => { setValue(shown); setReason(''); }}>Cancel</button>
+            <button type="button" className="text-muted-foreground hover:underline" onClick={close}>Cancel</button>
           </div>
-          {!Number.isFinite(num) || num <= 0 ? <p className="text-xs text-red-600">Enter a positive number.</p> : null}
+          {value.trim() !== '' && (!Number.isFinite(num) || num <= 0) && <p className="text-xs text-red-600">Enter a positive number.</p>}
         </form>
       )}
       {failure?.message && <p className="text-xs text-red-600">{failure.message}</p>}
