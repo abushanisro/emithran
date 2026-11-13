@@ -17,6 +17,8 @@ import { catalogSourceLabel, processLabel } from '@/lib/costing/tooling-catalog'
 interface ToolingSectionProps {
   bomItemId?: string;
   bomItem?: any;
+  /** The part's process group (the Cost Guide's Process Group): a new tooling item opens on its tooling catalog. */
+  partProcessGroup?: string | null;
   compact?: boolean;
   currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
   conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
@@ -37,7 +39,7 @@ const row = (item: unknown): ToolingRowView => item as ToolingRowView;
 /** A tool's name: its description, else its record type, else "Tooling" (an empty text is no name). */
 const toolName = (r: ToolingRowView): string => [r.description, r.toolingType?.replace(/_/g, ' ')].find((t) => t != null && t.trim() !== '') ?? 'Tooling';
 
-export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '$', conversionRate = 1 }: ToolingSectionProps) {
+export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, compact, currencySymbol = '$', conversionRate = 1 }: ToolingSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTooling, setEditTooling] = useState<any | null>(null);
   const [selectedProcess, setSelectedProcess] = useState<string | null>(null);
@@ -224,6 +226,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
           bomItem={bomItem}
           selectedProcess={selectedProcess}
           selectedSubProcess={selectedSubProcess}
+          partProcessGroup={partProcessGroup}
         />
       </div>
     );
@@ -424,6 +427,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
         bomItem={bomItem}
         selectedProcess={selectedProcess}
         selectedSubProcess={selectedSubProcess}
+        partProcessGroup={partProcessGroup}
       />
     </div>
   );
