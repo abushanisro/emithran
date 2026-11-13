@@ -108,13 +108,10 @@ export interface SandAlternative {
   mouldingProcess: string;
   mouldingMachine: string;
   chosen: boolean;
-  /** Null when the machine could not make a route at all (see `reason`). */
   cavities: number | null;
   totalUsd: number | null;
-  /** True when every step has a machine and the total is whole. */
+  /** True when every step has a machine and the total is whole (only the chosen route can be incomplete). */
   complete: boolean;
-  /** Steps no machine could do, or why the machine could not be used. */
-  reason: string | null;
 }
 
 /** A route before it is compared with the others. */
@@ -341,37 +338,37 @@ export function buildSandRoute(input: SandRouteInput): { route: SandRoute | null
   const classes = MOULDING_PROCESSES.filter((p) => !input.scenario.mouldingClass || p.machineClass === input.scenario.mouldingClass);
   const attempts: Attempt[] = [];
   const cache = new Map<string, ReturnType<typeof sharedFor>>();
-  const tried: Array<{ process: string; machine: string; attempt: Attempt }> = [];
   for (const p of classes) {
     for (const mould of input.machinesByClass[p.machineClass] ?? []) {
-      const attempt = routeOn(input, mould, p.process, cache);
-      attempts.push(attempt);
-      tried.push({ process: p.process, machine: mould.name, attempt });
+      attempts.push(routeOn(input, mould, p.process, cache));
     }
   }
   const routes = attempts.flatMap((a) => (a.route ? [a.route] : []));
   const complete = routes.filter((r) => r.complete).sort((a, b) => a.totalUsd! - b.totalUsd! || a.mouldingMachine.localeCompare(b.mouldingMachine));
   const fewest = [...routes].sort((a, b) => a.lines.filter(isGap).length - b.lines.filter(isGap).length)[0];
   const best = complete[0] ?? fewest;
-  if (best) return { route: { ...best, alternatives: alternativesOf(tried, best) }, missing: [] };
+  if (best) return { route: { ...best, alternatives: alternativesOf(attempts, best) }, missing: [] };
   const reasons = [...new Set(attempts.flatMap((a) => a.missing))];
   return { route: null, missing: reasons.length ? reasons.slice(0, 8) : ['no moulding machines of the sand process classes'] };
 }
 
 
-/** Every machine tried, the chosen one first, then the others by total (complete before incomplete), then the machines that could not make a route. */
-function alternativesOf(tried: ReadonlyArray<{ process: string; machine: string; attempt: Attempt }>, chosen: BuiltRoute): SandAlternative[] {
-  const rows = tried.map(({ process, machine, attempt }): SandAlternative => {
-    const r = attempt.route;
-    if (!r) return { mouldingProcess: process, mouldingMachine: machine, chosen: false, cavities: null, totalUsd: null, complete: false, reason: attempt.missing[0] ?? 'could not make a route' };
-    const gaps = r.lines.filter(isGap).map((l) => l.process);
-    return {
-      mouldingProcess: r.mouldingProcess, mouldingMachine: r.mouldingMachine, chosen: r.mouldingMachine === chosen.mouldingMachine && r.mouldingProcess === chosen.mouldingProcess,
-      cavities: r.cavities, totalUsd: r.totalUsd, complete: r.complete, reason: gaps.length ? `no machine for: ${gaps.join(', ')}` : null,
-    };
+/** Moulding machines shown for comparison: the chosen one and the next cheapest. */
+export const MOULDING_CHOICES = 3;
+
+/**
+ * The chosen moulding machine and the next cheapest that physically hold the part and make a whole route (every step has a machine), at most
+ * MOULDING_CHOICES. A machine whose flask cannot take the part, or whose route has a gap, is not a choice and is not listed.
+ */
+function alternativesOf(attempts: readonly Attempt[], chosen: BuiltRoute): SandAlternative[] {
+  const row = (r: BuiltRoute, isChosen: boolean): SandAlternative => ({
+    mouldingProcess: r.mouldingProcess, mouldingMachine: r.mouldingMachine, chosen: isChosen,
+    cavities: r.cavities, totalUsd: r.totalUsd, complete: r.complete,
   });
-  const rank = (a: SandAlternative) => (a.chosen ? 0 : a.cavities == null ? 3 : a.complete ? 1 : 2);
-  return rows.sort((a, b) => rank(a) - rank(b) || (a.totalUsd ?? Infinity) - (b.totalUsd ?? Infinity) || a.mouldingMachine.localeCompare(b.mouldingMachine));
+  const others = attempts
+    .flatMap(({ route }) => (route?.complete && !(route.mouldingMachine === chosen.mouldingMachine && route.mouldingProcess === chosen.mouldingProcess) ? [route] : []))
+    .sort((a, b) => a.totalUsd! - b.totalUsd! || a.mouldingMachine.localeCompare(b.mouldingMachine));
+  return [row(chosen, true), ...others.slice(0, MOULDING_CHOICES - 1).map((r) => row(r, false))];
 }
 
 /** The flask of a moulding machine; every machine that reached a route has one (cavitiesPerMould refuses a machine without flask length, width and height). */
