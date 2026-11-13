@@ -26,4 +26,9 @@ describe('machineChoice', () => {
     expect(c).toMatchObject({ capableCount: 0, checkedCount: 5, chosen: null });
     expect(c.candidates).toEqual([0, 1, 2].map((i) => ({ name: `M${i}`, status: 'rejected', perPartCost: null, reasons: [`reason ${i}`] })));
   });
+
+  it('keeps three significant figures below a cent (a fraction of a cent is not rounded to 0) and four decimals from a cent up', () => {
+    const c = machineChoice({ rule: 'cheapest', criteria: [], evals: [{ name: 'F1', reasons: [], cost: 0.000812345 }, { name: 'F2', reasons: [], cost: 0.00123456 }, { name: 'F3', reasons: [], cost: 33.023456 }], chosen: 'F1' });
+    expect(c.candidates.map((x) => x.perPartCost)).toEqual([0.000812, 0.00123, 33.0235]);
+  });
 });

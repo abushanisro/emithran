@@ -23,7 +23,8 @@ export interface ChoiceEval {
   rank?: number;
 }
 
-const r4 = (n: number) => Math.round(n * 10000) / 10000;
+/** A per-part cost: 4 decimals from a cent up, 3 significant figures below a cent (rounding those to 4 decimals made a fraction of a cent 0). */
+export const roundPerPart = (n: number) => (Math.abs(n) >= 0.01 ? Math.round(n * 10000) / 10000 : n === 0 ? 0 : Number(n.toPrecision(3)));
 
 /** Machines listed under "Why this machine": the chosen one and the next cheapest capable ones. */
 export const MACHINE_CHOICES = 3;
@@ -50,7 +51,7 @@ export function machineChoice(input: {
       ? capable.slice(0, MACHINE_CHOICES).map((e) => ({
         name: e.name,
         status: e.name === input.chosen ? 'chosen' as const : 'capable' as const,
-        perPartCost: e.cost != null ? r4(e.cost) : null,
+        perPartCost: e.cost != null ? roundPerPart(e.cost) : null,
         reasons: e.note ? [e.note] : [],
       }))
       : input.evals.slice(0, MACHINE_CHOICES).map((e) => ({ name: e.name, status: 'rejected' as const, perPartCost: null, reasons: e.reasons })),

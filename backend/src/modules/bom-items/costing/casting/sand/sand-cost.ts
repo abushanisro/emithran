@@ -1,5 +1,6 @@
 // What the cost summary needs of a sand casting, around the pure route (sand-route.ts): the scenario the user set, the part's measurements as the
 // route takes them, the material row, and the route's costs in the location's currency. Pure.
+import { roundPerPart } from '../machine-choice';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CoreRegion } from './sand-cores';
 import { COAT_CHOICES, DRY_METHODS } from './sand-refractory';
@@ -168,7 +169,7 @@ export function sandRouteToLocal(route: SandRoute, usdToLocal: number): SandRout
     setupCost: k(l.setupCost), runCost: k(l.runCost), totalCost: k(l.totalCost),
     hourlyRate: Math.round(l.hourlyRate * usdToLocal * 100) / 100,
     labourRate: l.labourRate != null ? Math.round(l.labourRate * usdToLocal * 100) / 100 : l.labourRate,
-    ...(l.machineChoice ? { machineChoice: { ...l.machineChoice, candidates: l.machineChoice.candidates.map((x) => ({ ...x, perPartCost: x.perPartCost != null ? Math.round(x.perPartCost * usdToLocal * 10000) / 10000 : null })) } } : {}),
+    ...(l.machineChoice ? { machineChoice: { ...l.machineChoice, candidates: l.machineChoice.candidates.map((x) => ({ ...x, perPartCost: x.perPartCost != null ? roundPerPart(x.perPartCost * usdToLocal) : null })) } } : {}),
   });
   return {
     ...route,
