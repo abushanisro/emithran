@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException, UnprocessableEntityException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../../../common/database/database.service';
 import type { MachiningNeedView } from '../../services/feature-tolerance.service';
 import {
@@ -10,6 +12,18 @@ import {
   type MachiningAllowanceResult,
   type MouldingMethod,
 } from './machining-allowance';
+
+export const ALLOWANCE_BASES = ['engineering_drawing', 'cad_model_pmi', 'customer_specification', 'engineering_estimate'] as const;
+
+/** An engineer's decision on one feature: machined with an allowance from a named source, or not machined. Always with a reason. */
+export interface AllowanceDecisionRequest {
+  featureKey: string;
+  machined: boolean;
+  allowanceMm?: number | null;
+  sides?: number | null;
+  basis?: string;
+  reason: string;
+}
 
 /**
  * The machining allowance of a cast part (machining-allowance.ts), read as the user: the part's current decisions, its organization's licensed
@@ -89,5 +103,33 @@ export class MachiningAllowanceService {
       })),
     });
     return { result, warnings: [] };
+  }
+
+  /**
+   * Records an engineer's decision (set_machining_allowance, migration 1002): the database checks the role, binds the part's geometry and
+   * supersedes the previous decision; this checks the shape first so the caller gets a precise error.
+   */
+  async decide(bomItemId: string, accessToken: string, body: AllowanceDecisionRequest): Promise<void> {
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    if (typeof body?.featureKey !== 'string' || !body.featureKey || body.featureKey.length > 200) throw new BadRequestException('featureKey is required');
+    if (typeof body.machined !== 'boolean') throw new BadRequestException('machined must be true or false');
+    if (reason.length < 3 || reason.length > 500) throw new BadRequestException('reason must be 3 to 500 characters: say where the value comes from');
+    let args: { p_allowance_mm: number | null; p_sides: number | null; p_basis: string };
+    if (body.machined) {
+      if (typeof body.allowanceMm !== 'number' || !Number.isFinite(body.allowanceMm) || body.allowanceMm <= 0) throw new BadRequestException('allowance must be a positive number of mm');
+      if (body.sides !== 1 && body.sides !== 2) throw new BadRequestException('sides must be 1 or 2');
+      if (!(ALLOWANCE_BASES as readonly string[]).includes(body.basis ?? '')) throw new BadRequestException(`basis must be one of ${ALLOWANCE_BASES.join(', ')}`);
+      args = { p_allowance_mm: body.allowanceMm, p_sides: body.sides, p_basis: body.basis! };
+    } else {
+      args = { p_allowance_mm: null, p_sides: null, p_basis: 'not_machined' };
+    }
+    const { error } = await this.databaseService.getClient(accessToken).rpc('set_machining_allowance', {
+      p_bom_item_id: bomItemId, p_feature_key: body.featureKey, p_machined: body.machined, ...args, p_reason: reason,
+    });
+    if (!error) return;
+    if (error.code === '42501') throw new ForbiddenException('Only a member of this organization (not a viewer) may record a machining allowance.');
+    if (error.code === 'P0002') throw new NotFoundException(`BOM item with ID ${bomItemId} not found`);
+    if (error.code === '22023') throw new UnprocessableEntityException(`${error.message}: analyse the part first.`);
+    throw new InternalServerErrorException(`Failed to save the machining allowance: ${error.message}`);
   }
 }

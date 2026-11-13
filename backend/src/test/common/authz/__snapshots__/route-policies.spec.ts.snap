@@ -303,6 +303,7 @@ org:member      POST /api/v1/bom-items/:id/custom-route-applications  BOMItemsCo
 org:member      POST /api/v1/bom-items/:id/drawing-analyses  BOMItemsController.analyzeDrawing
 org:member      POST /api/v1/bom-items/:id/files  BOMItemsController.uploadFiles
 org:member      POST /api/v1/bom-items/:id/machine-override  BOMItemsController.setMachineOverride
+org:member      POST /api/v1/bom-items/:id/machining-allowances  BOMItemsController.decideMachiningAllowance
 org:member      POST /api/v1/bom-items/:id/machining-calculator-inputs  BOMItemsController.resolveMachiningCalculatorInputs
 org:member      POST /api/v1/bom-items/:id/pmi-records/review  BOMItemsController.reviewPmiRecord
 org:member      POST /api/v1/bom-items/:id/reanalyze  BOMItemsController.reanalyze

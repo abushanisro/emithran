@@ -63,3 +63,46 @@ describe('MachiningAllowanceService', () => {
     expect(r.warnings[0]).toMatch(/relation does not exist/);
   });
 });
+
+// An engineer's decision is written by set_machining_allowance() (migration 1002), which checks the role and binds the geometry; the
+// service checks the shape first so the caller gets a precise error, and maps the database's refusals.
+describe('MachiningAllowanceService.decide', () => {
+  const rpcService = (rpcResult: { data?: unknown; error: { message: string; code?: string } | null }) => {
+    const calls: Array<{ fn: string; args: Record<string, unknown> }> = [];
+    const client = { rpc: (fn: string, args: Record<string, unknown>) => { calls.push({ fn, args }); return Promise.resolve(rpcResult); } };
+    return { calls, s: new MachiningAllowanceService({ getClient: () => client } as any) };
+  };
+  const ok = { featureKey: 'SimpleHole:h1', machined: true, allowanceMm: 1.5, sides: 2, basis: 'engineering_drawing', reason: 'drawing note 4' };
+
+  it('writes a machined decision through the database function', async () => {
+    const { calls, s } = rpcService({ data: {}, error: null });
+    await s.decide('i1', 't', ok);
+    expect(calls).toEqual([{ fn: 'set_machining_allowance', args: {
+      p_bom_item_id: 'i1', p_feature_key: 'SimpleHole:h1', p_machined: true, p_allowance_mm: 1.5, p_sides: 2, p_basis: 'engineering_drawing', p_reason: 'drawing note 4',
+    } }]);
+  });
+
+  it('writes "not machined" with no allowance', async () => {
+    const { calls, s } = rpcService({ data: {}, error: null });
+    await s.decide('i1', 't', { featureKey: 'PlanarFace:p1', machined: false, reason: 'cast to size' });
+    expect(calls[0]!.args).toMatchObject({ p_machined: false, p_allowance_mm: null, p_sides: null, p_basis: 'not_machined' });
+  });
+
+  it.each([
+    [{ ...ok, reason: ' ' }, /reason/],
+    [{ ...ok, allowanceMm: 0 }, /allowance/],
+    [{ ...ok, sides: 3 }, /sides/],
+    [{ ...ok, basis: 'guess' }, /basis/],
+    [{ ...ok, featureKey: '' }, /featureKey/],
+  ])('refuses a malformed decision before writing (%#)', async (body, message) => {
+    const { calls, s } = rpcService({ data: {}, error: null });
+    await expect(s.decide('i1', 't', body as any)).rejects.toThrow(message);
+    expect(calls).toEqual([]);
+  });
+
+  it('maps the database refusals: not a member, no analysed geometry', async () => {
+    await expect(rpcService({ error: { message: 'not a member of organization x', code: '42501' } }).s.decide('i1', 't', ok)).rejects.toMatchObject({ status: 403 });
+    await expect(rpcService({ error: { message: 'the part has no analysed geometry yet', code: '22023' } }).s.decide('i1', 't', ok)).rejects.toMatchObject({ status: 422 });
+    await expect(rpcService({ error: { message: 'item_not_found', code: 'P0002' } }).s.decide('i1', 't', ok)).rejects.toMatchObject({ status: 404 });
+  });
+});

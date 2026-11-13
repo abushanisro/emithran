@@ -14118,6 +14118,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/machining-allowances": {
+      "post": {
+        "operationId": "BOMItemsController_decideMachiningAllowance_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record whether one feature is machined and its allowance with its source and reason (members; append-only, bound to the current file)",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/machining-calculator-inputs": {
       "post": {
         "operationId": "BOMItemsController_resolveMachiningCalculatorInputs_v1",

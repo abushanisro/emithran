@@ -18,6 +18,7 @@ import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalc
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
 import { SandSnapshotsPanel } from '@/components/costing/SandSnapshotsPanel';
 import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
+import { MachiningAllowancePanel } from '@/components/features/casting-viewer/MachiningAllowancePanel';
 import { useCastingAnalyses, useRequestCastingAnalysis } from '@/lib/api/hooks/useCastingAnalyses';
 import { analysisState, requestFailure } from '@/lib/casting/analysis-view';
 import { GcdToleranceTab } from '@/components/features/manufacturing-intelligence/GcdToleranceTab';
@@ -6548,6 +6549,14 @@ function PartDetailTab({
       {isCastingFamily(fg?.classification?.family) ? (
         (item.familyClassification ?? fg?.classification?.family) === 'sand_cast' ? (
           // A sand-cast part's features come from its casting analysis (the worker's exact solid); the cad-engine's stay as the labelled fallback.
+          <>
+          <MachiningAllowancePanel
+            itemId={item.id}
+            allowance={cost?.machiningAllowance}
+            scenarioOverrides={item.scenarioOverrides}
+            selectedKey={selectedMachiningFeatureKey ?? null}
+            {...(onMachiningFeatureSelect ? { onSelect: onMachiningFeatureSelect } : {})}
+          />
           <SandCastingFeaturesPanel
             itemId={item.id}
             gating={cost?.sandCasting?.gating ?? null}
@@ -6562,6 +6571,7 @@ function PartDetailTab({
               />
             )}
           />
+          </>
         ) : (
           <DieCastingFeatureTreePanel
             fg={fg ?? null}
