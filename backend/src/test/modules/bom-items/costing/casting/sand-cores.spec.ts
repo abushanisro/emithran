@@ -121,13 +121,20 @@ describe('makeCoreStep', () => {
     expect(out.ok && out.sec - (25 / v('coreBoxSandBlowingRate')) * 60 - out.run.outputs['Cure Time']!).toBeCloseTo(540, 6);
   });
 
-  it('without the plant\'s settings the hot box is not costed and says what to set, never a default', () => {
+  // US 5,365,995 (Ford, "Method of curing hot box sand cores"): "the 120° F. critical cure temperature", "normal pattern operating temperatures (450 to
+  // 550° F.)", massive cores cured "to a shallower skin depth, 1/4 to 1/2 inch". Unset in the Cost Guide, the hot box uses these: the box at the range's
+  // lower bound (232 °C) and the skin at its upper bound (12.7 mm), both the slower cure.
+  it('without the Cost Guide settings the hot box uses the published values, named in the trace; a value set in the Cost Guide wins', () => {
     const m = byClass.sand_casting_hot_box.find((x) => spec$(x, 'max_corebox_length_mm') >= 300)!;
-    const none = { coreboxTempC: null, cureTempC: null, curedDepthMm: null };
-    const out = makeCoreStep({ ...ctx, hotBox: none }, m, core);
-    expect(out).toEqual({ ok: false, reasons: [expect.stringMatching(/^hot box: set the core box temperature .*the binder's cure temperature .*the depth of core cured before stripping/)] });
-    const one = makeCoreStep({ ...ctx, hotBox: { ...HOT_BOX, cureTempC: null } }, m, core);
-    expect(one).toEqual({ ok: false, reasons: ["hot box: set the binder's cure temperature (Cost Guide: hot box cure temperature)"] });
+    const out = makeCoreStep({ ...ctx, hotBox: { coreboxTempC: null, cureTempC: null, curedDepthMm: null } }, m, core);
+    if (!out.ok) throw new Error(out.reasons.join('; '));
+    const input = (field: string) => out.run.trace.find((t) => t.fieldName === field)!;
+    expect(input('Corebox Temperature')).toMatchObject({ value: 232.2, source: expect.stringContaining('US 5,365,995') as string });
+    expect(input('Cure Temperature')).toMatchObject({ value: 48.9, source: expect.stringContaining('US 5,365,995') as string });
+    expect(input('Required Cured Depth')).toMatchObject({ value: 12.7, source: expect.stringContaining('US 5,365,995') as string });
+    const set = makeCoreStep({ ...ctx, hotBox: { coreboxTempC: 260, cureTempC: null, curedDepthMm: null } }, m, core);
+    if (!set.ok) throw new Error(set.reasons.join('; '));
+    expect(set.run.trace.find((t) => t.fieldName === 'Corebox Temperature')).toMatchObject({ value: 260, source: expect.stringContaining('Cost Guide') as string });
   });
 
   it('settings that cannot cure anything are refused with the reason: the box must be hotter than the cure temperature, which must be above the sand\'s', () => {
@@ -140,10 +147,10 @@ describe('makeCoreStep', () => {
 
   it('with the hot box unusable another process makes the core, and the line says why, so the choice is not silent', () => {
     const line = coreLine({
-      ctx: { ...ctx, hotBox: { coreboxTempC: null, cureTempC: null, curedDepthMm: null } }, core, machinesByClass: byClass, batchSize: 250, costContext,
+      ctx: { ...ctx, hotBox: { ...HOT_BOX, cureTempC: 250 } }, core, machinesByClass: byClass, batchSize: 250, costContext,
     });
     expect(line.process).not.toBe('Hot Box');
-    expect(line.step.warnings.join(' ')).toMatch(/Hot box could not make a core: hot box: set the core box temperature/);
+    expect(line.step.warnings.join(' ')).toMatch(/Hot box could not make a core: hot box: the core box .* must be hotter than the binder/);
     expect(line.step.warnings.join(' ')).toContain(`${line.process} is used instead`);
   });
 

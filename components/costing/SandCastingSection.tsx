@@ -106,15 +106,15 @@ export function SandCastingSection({ overrides, onChange }: Props) {
       <NumberField
         label="Box temp, °C"
         value={number(SAND_SCENARIO_KEYS.hotBoxCoreboxTemp)}
-        placeholder="set for hot box cores"
+        placeholder="published: 232 (450 °F)"
         parse={parsePositive}
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCoreboxTemp]: v }); }}
-        title={`Hot box core making. ${HOT_BOX_GUIDANCE.coreboxTemp} Not in the reference data, so nothing is assumed: until the three hot box settings are set the hot box core is not costed.`}
+        title={`Hot box core making. ${HOT_BOX_GUIDANCE.coreboxTemp}`}
       />
       <NumberField
         label="Cure temp, °C"
         value={number(SAND_SCENARIO_KEYS.hotBoxCureTemp)}
-        placeholder="set for hot box cores"
+        placeholder="published: 48.9 (120 °F)"
         parse={parsePositive}
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCureTemp]: v }); }}
         title={`Hot box core making. ${HOT_BOX_GUIDANCE.cureTemp}`}
@@ -122,7 +122,7 @@ export function SandCastingSection({ overrides, onChange }: Props) {
       <NumberField
         label="Cured depth, mm"
         value={number(SAND_SCENARIO_KEYS.hotBoxCuredDepth)}
-        placeholder="set for hot box cores"
+        placeholder="published: 12.7 (1/2 in skin)"
         parse={parsePositive}
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCuredDepth]: v }); }}
         title={`Hot box core making. ${HOT_BOX_GUIDANCE.curedDepth}`}
