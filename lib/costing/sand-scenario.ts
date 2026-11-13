@@ -39,14 +39,13 @@ export const REFRACTORY_GUIDANCE = {
 } as const;
 
 /**
- * What the hot box physics needs from the plant (backend sand-cores.ts): no dataset holds these three settings, so none is assumed; without them the hot box
- * core is not costed and the route says what to set. The ranges are published guidance shown beside the fields, never applied for the user
- * (US patents 5,365,995 and 5,368,087: core box 230-260 C, 10-40 s cure, a skin of 1/4 to 1/2 inch on massive cores).
+ * The hot box settings (backend sand-cores.ts): empty, the published values of US 5,365,995 (Ford, "Method of curing hot box sand cores") are used, the box
+ * at the range's lower bound and the skin at its upper bound (the slower cure); a value set here wins.
  */
 export const HOT_BOX_GUIDANCE = {
-  coreboxTemp: 'The core box set point. Published range 230-260 C.',
-  cureTemp: "The temperature at which the binder cures: from the resin's datasheet.",
-  curedDepth: "The depth of core that must be cured before it is stripped (mm), the plant's strip criterion. Published: a few mm for fast cycles; 6-13 mm on massive cores takes minutes.",
+  coreboxTemp: 'The core box set point. Empty: 232 °C, the lower bound of the published 450-550 °F (US 5,365,995).',
+  cureTemp: "The binder's cure temperature. Empty: 48.9 °C, the published 120 °F critical cure temperature (US 5,365,995); your resin's datasheet value wins.",
+  curedDepth: "The depth of core cured before it is stripped (mm). Empty: 12.7 mm, the upper bound of the published 1/4-1/2 inch skin on massive cores (US 5,365,995); capped at half the core's section.",
 } as const;
 
 export const SAND_MOULDING_PROCESSES = [

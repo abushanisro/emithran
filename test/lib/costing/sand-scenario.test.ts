@@ -51,8 +51,12 @@ describe('sand scenario fields', () => {
     expect(parsePositive('-5')).toBe('invalid');
   });
 
-  it('the published ranges are shown as guidance text; none is a number the engine could take as a default', () => {
-    expect(HOT_BOX_GUIDANCE.coreboxTemp).toMatch(/230-260/);
-    expect(Object.values(HOT_BOX_GUIDANCE).every((t) => typeof t === 'string')).toBe(true);
+  it('the guidance names the published values the engine uses when a hot box field is empty, the same as the backend (US 5,365,995)', () => {
+    const cores = readFileSync(join(__dirname, '../../../backend/src/modules/bom-items/costing/casting/sand/sand-cores.ts'), 'utf8');
+    for (const [text, value] of [[HOT_BOX_GUIDANCE.coreboxTemp, '232'], [HOT_BOX_GUIDANCE.cureTemp, '48.9'], [HOT_BOX_GUIDANCE.curedDepth, '12.7']] as const) {
+      expect(text).toContain(value);
+      expect(text).toContain('US 5,365,995');
+      expect(cores).toContain(`value: ${value}`);
+    }
   });
 });
