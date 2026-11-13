@@ -41,3 +41,41 @@ export function buildCalculationTree(trace: readonly CalculationTraceStep[], roo
   };
   return node(root, new Set());
 }
+
+/** A calculator field as the calculator popup holds it (lib/api/calculators.ts CalculatorField). */
+interface PopupField {
+  fieldName: string;
+  displayLabel?: string;
+  fieldType: string;
+  unit?: string | null;
+  /** A calculated field's formula. */
+  defaultValue?: string | null;
+}
+
+const numberOrNull = (v: unknown): number | null => {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * The popup's calculator as calculation steps: each input with the value it holds now (seeded by the engine or edited) and its source, each result
+ * with its formula. A result that failed, or an input not set, has no value.
+ */
+export function calculatorSteps(
+  fields: readonly PopupField[],
+  inputs: Readonly<Record<string, unknown>>,
+  results: Readonly<Record<string, unknown>> | null,
+  provenance: Readonly<Record<string, string>>,
+): CalculationTraceStep[] {
+  return fields.map((f) => {
+    const base = { fieldName: f.fieldName, displayLabel: f.displayLabel ?? f.fieldName, unit: f.unit ?? null };
+    if (f.fieldType === 'calculated') {
+      const r = results?.[f.fieldName];
+      const raw = r != null && typeof r === 'object' ? ('error' in r ? null : (r as { value?: unknown }).value) : r;
+      return { ...base, kind: 'calculated', value: numberOrNull(raw), ...(f.defaultValue ? { formula: f.defaultValue } : {}) };
+    }
+    const source = provenance[f.fieldName];
+    return { ...base, kind: 'input', value: numberOrNull(inputs[f.fieldName]), ...(source ? { source } : {}) };
+  });
+}

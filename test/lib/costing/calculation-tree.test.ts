@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
-import { buildCalculationTree, type CalculationNode } from '@/lib/costing/calculation-tree';
+import { buildCalculationTree, calculatorSteps, type CalculationNode } from '@/lib/costing/calculation-tree';
 
 function must<T>(v: T | null | undefined): T {
   if (v == null) throw new Error('missing');
@@ -54,5 +54,31 @@ describe('buildCalculationTree', () => {
   it('never loops on a formula that names itself', () => {
     const root = tree([calc('X', 1, 's', '{X} + 1')]);
     expect(root.children).toEqual([]);
+  });
+});
+
+// The calculator popup's own calculator, as it runs live (its inputs as the engine seeded or the user edited them, its results), as the same steps.
+describe('calculatorSteps', () => {
+  const fields = [
+    { fieldName: 'Nominal Wall Thickness', displayLabel: 'Nominal Wall Thickness', fieldType: 'number', unit: 'mm' },
+    { fieldName: 'Press Dry Cycle Time', displayLabel: 'Press Dry Cycle Time', fieldType: 'number', unit: 's' },
+    { fieldName: 'Cooling Time', displayLabel: 'Cooling Time', fieldType: 'calculated', unit: 's', defaultValue: '{Nominal Wall Thickness} * 2' },
+    { fieldName: 'Cycle Time', displayLabel: 'Cycle Time', fieldType: 'calculated', unit: 's', defaultValue: '{Cooling Time} + {Press Dry Cycle Time}' },
+  ];
+
+  it('gives the inputs with their source and the results with their formula, in the calculator order', () => {
+    const steps = calculatorSteps(fields, { 'Nominal Wall Thickness': '2', 'Press Dry Cycle Time': 1.2 }, { 'Cooling Time': { value: 4 }, 'Cycle Time': 5.2 }, { 'Nominal Wall Thickness': 'CAD nominal wall thickness' });
+    expect(steps).toEqual([
+      { fieldName: 'Nominal Wall Thickness', displayLabel: 'Nominal Wall Thickness', kind: 'input', value: 2, unit: 'mm', source: 'CAD nominal wall thickness' },
+      { fieldName: 'Press Dry Cycle Time', displayLabel: 'Press Dry Cycle Time', kind: 'input', value: 1.2, unit: 's' },
+      { fieldName: 'Cooling Time', displayLabel: 'Cooling Time', kind: 'calculated', value: 4, unit: 's', formula: '{Nominal Wall Thickness} * 2' },
+      { fieldName: 'Cycle Time', displayLabel: 'Cycle Time', kind: 'calculated', value: 5.2, unit: 's', formula: '{Cooling Time} + {Press Dry Cycle Time}' },
+    ]);
+    expect(tree(steps, 'Cycle Time').children.map((c) => c.name)).toEqual(['Cooling Time', 'Press Dry Cycle Time']);
+  });
+
+  it('shows a result that failed, or an input not set yet, as no value (never 0)', () => {
+    const steps = calculatorSteps(fields, {}, { 'Cooling Time': { error: 'division by zero' } }, {});
+    expect(steps.map((s) => s.value)).toEqual([null, null, null, null]);
   });
 });
