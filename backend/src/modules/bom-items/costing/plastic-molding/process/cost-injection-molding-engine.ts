@@ -41,7 +41,7 @@ import { requiredClampForce, type ClampForceResult, type MaterialClampProperties
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
 import { runDeflashingTime, runInjectionCycleTime } from '../calculators/plastic-cycle-time';
-import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
+import { type ReferenceCalculators, withFieldOverrides, type CalculatorFieldOverrides } from '../../shared/calculators/reference-calculator';
 import {
   type CycleTimeResult,
   type GateType,
@@ -223,6 +223,8 @@ export interface InjectionMoldingCostInput {
    * calculator, as for heat treatment and machining. Absent = no calculator, so the cycle is a named gap, never a number. Not part of a saved calculation's inputs.
    */
   calculators?: ReferenceCalculators | null;
+  /** The part's own values for calculator fields (calculator_field_overrides, migration 1011), laid over the calculators for this calculation. */
+  calculatorOverrides?: CalculatorFieldOverrides | null;
   goodPartYield?: number | null;
   // The selected press's real clamp tonnage (t) and shot capacity (g), from its
   // machine record. Absent = no press: cavities are not sized and the molding
@@ -449,7 +451,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         cavityCount,
         // No per-part gate-count signal: the reference defaultNumberOfGatesPerCavity.
         gatesPerCavity: plasticRef.defaultGatesPerCavity,
-      }, input.calculators ?? null, mhrRate.machineClass === 'structural_foam_molding' ? 'structural_foam' : 'injection')
+      }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null, mhrRate.machineClass === 'structural_foam_molding' ? 'structural_foam' : 'injection')
     : { derivable: false, missing: [`Plastic reference data (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')})`] };
   const cycleGapReason = cycle.derivable ? null : cycle.calculatorProblem ? `Cycle time not derivable: ${cycle.calculatorProblem}.` : `Cycle time not derivable: missing ${cycle.missing.join('; ')}.`;
   if (cycleGapReason) warnings.push(cycleGapReason);
@@ -552,7 +554,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     const trim = runDeflashingTime({
       partingLineLengthMm: signals.partingLineLengthMm ?? null,
       rateMmPerS: plasticRef?.featureRules.manualFlashTrimmingRateMmPerS ?? null,
-    }, input.calculators ?? null);
+    }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
     if (trim.derivable) {
       const deflashLine = makeLine(UNCOSTED_OPERATION_LABELS.deflashing, null, batchSize, trim.cycleSec / 60, input.deburrRate);
       deflashLine.calculationTrace = trim.trace;
