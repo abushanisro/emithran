@@ -29,8 +29,11 @@ case "$STAGE_DIR" in */emithran-stage-run) ;; *) echo "STAGE_DIR must end in /em
 grep -q '^APP_ENV=stage$' "$ENV_FILE" || { echo "$ENV_FILE does not say APP_ENV=stage: refusing (nothing was changed)" >&2; exit 2; }
 command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo "Docker is not running" >&2; exit 2; }
 P=emithran-stage; services="backend frontend cad-engine ecad-engine"
+# The sand-casting worker runs when the settings name its socket (CASTING_WORKER_SOCKET, casting-worker/README.md): its compose profile is
+# enabled and it is built, tagged for rollback and recreated with the other services. Without the setting casting analyses are not waited for.
+profile=; if grep -qE '^CASTING_WORKER_SOCKET=.+' "$ENV_FILE"; then profile="--profile sand-casting"; services="$services casting-worker"; fi
 run() { if [ "${DRY_RUN:-}" = 1 ]; then echo "DRY: $*"; else "$@"; fi; }
-sd() { docker compose -p "$P" -f docker-compose.prod.yml -f docker-compose.data.yml --env-file "$ENV_FILE" "$@"; }
+sd() { docker compose -p "$P" $profile -f docker-compose.prod.yml -f docker-compose.data.yml --env-file "$ENV_FILE" "$@"; }
 old="$(cat "$STAGE_DIR/.release-sha" 2>/dev/null || echo unknown)"; oldshort="${old:0:8}"
 echo "== 1/5 preflight: staging runs ${oldshort}; releasing ${short} ($ref)"
 docker inspect "$P-postgres-1" >/dev/null 2>&1 || { echo "the staging database container $P-postgres-1 is not there: start the stack first" >&2; exit 2; }
