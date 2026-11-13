@@ -6,10 +6,10 @@
 // follows from it, unless the user chose one). Nothing is substituted: what the data or the measurements lack is named, and a step no machine
 // can do is a named gap line, which makes the route incomplete.
 import type { MachineChoiceDto, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
-import { machineChoice } from '../machine-choice';
+import { machineChoice, roundPerPart } from '../machine-choice';
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import type { ReferenceCalcRun, ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
-import type { CostContext } from '../casting-finishing';
+import { roundLineCost, type CostContext } from '../casting-finishing';
 import { coreboxTooling, coreLine, sandCores, type CoreboxTooling, type CoreRegion } from './sand-cores';
 import { cleanStep, degateStep, finishStep, inspectStep, shakeoutStep, type SandFinishContext } from './sand-finishing-steps';
 import { referenceYieldNote } from './sand-yield';
@@ -254,7 +254,11 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
   const gaps = lines.filter(isGap);
   // Scrapped parts are paid for by the good ones: the lines are divided by the product of the machines' good-part yields.
   const finalYield = steps.reduce((y, s) => y * (s.machine ? machineValue(s.machine, 'good_part_yield') ?? 1 : 1), 1) || 1;
-  const perGood = (l: ProcessLineCost): ProcessLineCost => (isGap(l) ? l : { ...l, setupCost: r2(l.setupCost / finalYield), runCost: r2(l.runCost / finalYield), totalCost: r2(l.totalCost / finalYield) });
+  // Per good casting: every cost of the line over the good-part yield, kept below a cent (roundLineCost), its other cost (energy, material) too.
+  const perGood = (l: ProcessLineCost): ProcessLineCost => (isGap(l) ? l : {
+    ...l, setupCost: roundLineCost(l.setupCost / finalYield), runCost: roundLineCost(l.runCost / finalYield), totalCost: roundLineCost(l.totalCost / finalYield),
+    ...(l.otherCostPerPartUsd != null ? { otherCostPerPartUsd: roundPerPart(l.otherCostPerPartUsd / finalYield) } : {}),
+  });
   const scaled = lines.map(perGood);
   const warnings = [...notes, ...steps.flatMap((s) => s.warnings)];
   if (cored.thin > 0) warnings.push(`${cored.thin} core${cored.thin > 1 ? 's' : ''} thinner than minSandCastableHoleDia: left solid and machined later.`);
