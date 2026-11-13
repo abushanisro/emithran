@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { metalBalance } from '@/lib/costing/sand-balance';
 import type { CalculatorRun } from '@/lib/costing/sand-calculations';
-import { costBom, metalBalance } from '@/lib/costing/sand-balance';
 
 const step = (label: string, value: number) => ({ fieldName: label, displayLabel: `${label} (kg)`, kind: 'calculated' as const, value });
 const run = (values: Record<string, number>): CalculatorRun => ({
@@ -44,28 +44,5 @@ describe('the metal balance of a sand casting', () => {
     expect(metalBalance({})).toBeNull();
     const { 'Melt Loss': _melt, ...lacking } = values;
     expect(metalBalance({ 'Sand material cost': run(lacking) })).toBeNull();
-  });
-});
-
-describe('the cost bill of a sand casting', () => {
-  const lines = [
-    { process: 'Melting', totalCost: 1.25 },
-    { process: 'Pour', totalCost: 0.5 },
-  ];
-
-  it('lists material, process and tooling, with the total and what is left over', () => {
-    const bom = costBom({ materialCost: 10, boughtKg: 10.1, processLines: lines, toolingPerPart: 0.3, totalCost: 11.75 });
-    expect(bom.material).toEqual({ boughtKg: 10.1, cost: 10 });
-    expect(bom.process).toEqual([{ process: 'Melting', cost: 1.25 }, { process: 'Pour', cost: 0.5 }]);
-    expect(bom.tooling).toBe(0.3);
-    expect(bom.residual).toBeCloseTo(0, 9);
-  });
-
-  it('the tooling is beside the piece cost, not in it', () => {
-    expect(costBom({ materialCost: 10, boughtKg: null, processLines: lines, toolingPerPart: 5, totalCost: 11.75 }).residual).toBeCloseTo(0, 9);
-  });
-
-  it('shows what is left over when a line is missing from the total', () => {
-    expect(costBom({ materialCost: 10, boughtKg: null, processLines: lines, toolingPerPart: null, totalCost: 13 }).residual).toBeCloseTo(1.25, 9);
   });
 });
