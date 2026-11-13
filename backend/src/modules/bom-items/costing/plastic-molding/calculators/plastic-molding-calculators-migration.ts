@@ -11,8 +11,9 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1007 the injection and structural foam calculators, version 2 (plasticizing and ejection; no pack phase), reverted by 1008
  *   1008 the injection and structural foam calculators, version 3: the version-1 fields and formulas again (fill + pack + cooling + mold open/close)
  *   1010 the injection molding deflashing calculator: the parting line length over the manual flash trimming rate
+ *   1012 the injection mold tooling calculator: components + toolroom labour, molds required, cost per part
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1012] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
@@ -46,6 +47,15 @@ const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 
       'operation maps to it; the injection engine runs it for the routed deflashing step.',
     ].join('\n'),
   },
+  1012: {
+    title: 'Injection mold tooling calculator -- components + toolroom labour, molds required, cost per part.',
+    rootCause: [
+      'The mold tooling cost was computed in code (mold-tooling-engine.ts and the injection engine): the reference lookups were real, but the prices,',
+      'hours and amortization were not visible as a calculation and could not be changed for a part. This calculator states them as formulas over',
+      'the staged lookups (formula registry F-16, F-17, F-18): the same numbers, now shown on the line with their sources, and a part\'s own value',
+      'for any field is honoured (calculator_field_overrides). A helper: no catalog operation maps to it.',
+    ].join('\n'),
+  },
 };
 
 /** The SQL of migrations/<number>_*.sql: the calculators of the spec that this migration writes. */
@@ -61,4 +71,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   976: '976_plastic_rim_fill_time_calculator.sql',
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
+  1012: '1012_plastic_mold_tooling_calculator.sql',
 };

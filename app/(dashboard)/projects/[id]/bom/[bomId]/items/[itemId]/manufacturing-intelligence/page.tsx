@@ -7621,13 +7621,33 @@ function MoldCavitiesSection({
 function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId: string; cost: CostSummaryDto; currencySymbol: string; conversionRate: number }) {
   const die = cost.dieTooling;
   const boxes = cost.coreboxTooling;
-  if (!die && !boxes) return null;
+  const mold = cost.tooling;
+  if (!die && !boxes && !mold) return null;
   const money = (usd: number | null | undefined, d = 2) =>
     usd == null ? 'not priced' : `${currencySymbol}${(usd * conversionRate).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d })}`;
   const perPart = (usd: number | null | undefined) => (usd == null ? 'not amortised' : `${money(usd, 4)}/part`);
   return (
     <div className="space-y-2 py-1">
       <p className="text-[10px] text-muted-foreground">Route tooling: kept out of the piece cost; the investment is listed in Invest (NRE).</p>
+      {mold && (
+        <details className="rounded border border-border px-3 py-2">
+          <summary className="cursor-pointer flex items-baseline justify-between gap-2 text-xs">
+            <span className="font-medium text-foreground">Injection mold ({mold.moldClass.replace('Class', 'SPI Class ')}){mold.moldsRequired != null ? ` × ${mold.moldsRequired}` : ''}</span>
+            <span className="tabular-nums">{money(mold.moldCostUsd, 2)} · {perPart(mold.moldCostPerPartUsd)}</span>
+          </summary>
+          {mold.calculationTrace && (
+            <div className="mt-2">
+              <CycleCalculator
+                trace={mold.calculationTrace}
+                bomItemId={itemId}
+                calculator={mold.calculatorName ?? null}
+                result="Tooling Cost Per Part"
+                first={['Purchased Components Cost', 'Design Cost', 'Machining Cost', 'Assembly Cost', 'Mold Cost', 'Molds Required', 'Tooling Investment']}
+              />
+            </div>
+          )}
+        </details>
+      )}
       {die && (
         <details className="rounded border border-border px-3 py-2">
           <summary className="cursor-pointer flex items-baseline justify-between gap-2 text-xs">

@@ -37,24 +37,18 @@ describe('resolvePlasticReference', () => {
   });
 });
 
-describe('computeMoldToolingCost on the real tables', () => {
+describe('computeMoldToolingCost on the real tables (the lookups; the prices are the tooling calculator\'s)', () => {
   it('counts Guide Pin at its real 0.25 h and says Guide Bush has no assembly time', () => {
-    const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling, toolroomRates: null, location: 'India' });
+    const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling });
     // Air Poppet 30x0.006 + Ejector Guide Pin Bushing 6x2 + Guide Pin 4x0.25 + Limit Switch 4x1 + Return Pin 6x1
     expect(r.estimatedAssemblyHrs).toBeCloseTo(30 * 0.006 + 6 * 2 + 4 * 0.25 + 4 * 1 + 6 * 1, 6);
     expect(r.warnings.some((w) => w.includes('No assembly time on file') && w.includes('Guide Bush'))).toBe(true);
     // Side-action hardware only with an undercut.
     expect(r.items.some((i) => i.componentName === 'Hydraulic Cylinder')).toBe(false);
-    // No toolroom rate for India in memory/: hours reported, not priced.
-    expect(r.labourCostUsd).toBeNull();
-    expect(r.warnings.some((w) => w.includes('NOT priced') && w.includes('India'))).toBe(true);
   });
 
-  it('prices the hours at the reference USA toolroom rates', () => {
-    const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling, toolroomRates: REF.toolroomRatesUsa, location: 'USA' });
+  it('reads the reference USA toolroom rates the tooling calculator prices the hours at', () => {
     expect(REF.toolroomRatesUsa).toEqual({ designUsdPerHr: 64.73, machiningUsdPerHr: 100.55, assemblyUsdPerHr: 76.81 });
-    expect(r.labourCostUsd).toBeCloseTo(
-      r.estimatedDesignHrs * 64.73 + r.estimatedMachiningHrs * 100.55 + r.estimatedAssemblyHrs * 76.81, 6);
   });
 });
 

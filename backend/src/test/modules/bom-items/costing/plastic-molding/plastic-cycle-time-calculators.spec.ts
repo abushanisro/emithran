@@ -27,11 +27,11 @@ function run(name: string, seeds: Record<string, import('../../../../../modules/
 describe('plastic molding calculator spec', () => {
   const spec = loadPlasticMoldingCalculatorSpec();
 
-  it('has one cycle-time calculator for each of the four molding processes, and the LSR and deflashing helpers no catalog operation maps to', () => {
+  it('has one cycle-time calculator for each of the four molding processes, and the LSR, deflashing and mold tooling helpers no catalog operation maps to', () => {
     expect(spec.processGroup).toBe('Plastic Molding');
     expect(spec.calculators.filter((c) => !c.helper).map((c) => c.operations[0]).sort()).toEqual(
       ['Compression Molding', 'Injection Molding', 'Reaction Injection Molding', 'Structural foam molding']);
-    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR, 'Injection Molding - Deflashing']);
+    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR, 'Injection Molding - Deflashing', 'Injection Mold - Tooling']);
   });
 
   it('every operation it computes is a process of the reference catalog (digital_factory_operations.csv)', () => {
@@ -42,7 +42,7 @@ describe('plastic molding calculator spec', () => {
   it('every input says where its value comes from, and every calculated field is a formula over earlier fields', () => {
     for (const c of spec.calculators) {
       for (const f of c.fields) expect(Boolean(f.formula) !== Boolean(f.source)).toBe(true);
-      expect(c.fields[c.fields.length - 1]!.name).toBe('Cycle Time');
+      expect(c.fields[c.fields.length - 1]!.name).toBe(c.output ?? 'Cycle Time');
     }
   });
 

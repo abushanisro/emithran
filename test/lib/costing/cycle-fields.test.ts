@@ -41,3 +41,20 @@ describe('formatFieldValue', () => {
     expect(formatFieldValue(null)).toBe('—');
   });
 });
+
+describe('cycleFields for another result (a tooling cost)', () => {
+  const tooling: CalculationTraceStep[] = [
+    input('Design Hours', 3.24, 'h', 'cmMoldBaseDesignHours'),
+    calc('Design Cost', 209.73, 'USD', '{Design Hours} * {Design Rate}'),
+    calc('Mold Cost', 4538.67, 'USD', '{Purchased Components Cost} + {Design Cost}'),
+    calc('Tooling Investment', 4538.67, 'USD', '{Mold Cost} * {Molds Required}'),
+    calc('Tooling Cost Per Part', 0.1513, 'USD', '{Tooling Investment} / {Parts}'),
+  ];
+  it('takes the named result and the named fields first', () => {
+    const f = cycleFields(tooling, { result: 'Tooling Cost Per Part', first: ['Design Cost', 'Tooling Investment'] });
+    if (!f) throw new Error('no result');
+    expect(f.cycle.fieldName).toBe('Tooling Cost Per Part');
+    expect(f.phases.map((s) => s.fieldName)).toEqual(['Design Cost', 'Tooling Investment']);
+    expect(f.others.map((s) => s.fieldName)).toEqual(['Design Hours', 'Mold Cost']);
+  });
+});

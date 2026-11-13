@@ -945,6 +945,19 @@ export interface DriverImpact {
   lines: Array<{ line: string; deltaPerPart: number }>;
 }
 
+/** An injection mold's tooling, as the tooling calculator costs it. */
+export interface InjectionMoldToolingDto {
+  moldClass: string;
+  moldCostUsd: number;
+  moldCostPerPartUsd: number;
+  moldsRequired?: number;
+  moldToolLifeShots?: number;
+  annualVolume?: number;
+  productionLifeYears?: number;
+  calculationTrace?: CalculationTraceStep[];
+  calculatorName?: string;
+}
+
 export interface CostSummaryDto {
   /** Molded parts: what each CAD cost driver is worth (the engine run again with only that driver moved one step), per part, in this summary's currency. */
   driverImpacts?: DriverImpact[];
@@ -1012,6 +1025,8 @@ export interface CostSummaryDto {
   machiningAllowance?: MachiningAllowanceSummary;
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */
   dieTooling?: DieToolingDto;
+  /** Injection molding: the mold, by its tooling calculator (backend ToolingCostDto, migration 1012); kept out of the piece cost. USD. */
+  tooling?: InjectionMoldToolingDto;
   /** Heat / surface / other secondary operations, shared by every family. See SecondaryOperationsDto. */
   secondaryOperations?: SecondaryOperationsDto;
   /** Coreboxes for gravity die casting sand cores (USD, separate from the piece cost). */

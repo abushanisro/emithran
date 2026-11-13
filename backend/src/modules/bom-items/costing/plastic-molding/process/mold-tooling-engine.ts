@@ -77,10 +77,6 @@ interface MoldToolingInput {
   slideOrLifterBundles: number;
   /** Staged tooling tables (plastic-reference.ts). */
   tables: MoldToolingTables;
-  /** Toolroom rates for the quote location, or null when none is on file for it. */
-  toolroomRates: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number } | null;
-  /** Quote location, named in the warning when toolroomRates is null. */
-  location: string;
 }
 
 interface MoldToolingResult {
@@ -89,13 +85,10 @@ interface MoldToolingResult {
   bomSubtotalUsd: number;
   /** Real component rows this mold genuinely needs but with no fixable cost/qty on file. */
   missingComponents: string[];
-  /** Design + machining + assembly hours; priced into labourCostUsd when rates are on file. */
+  /** Design and assembly hours, from the staged tables; the machining hours and every price are the tooling calculator's (mold-tooling-calculator.ts). */
   estimatedDesignHrs: number;
-  estimatedMachiningHrs: number;
   estimatedAssemblyHrs: number;
   estimatedAssemblyOperators: number;
-  /** Hours x toolroom rates, or null when the location has no toolroom rate on file. */
-  labourCostUsd: number | null;
   warnings: string[];
 }
 
@@ -140,9 +133,6 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
 
   const areaM2 = Math.max(input.moldBaseAreaMm2, 0) / 1_000_000;
   const estimatedDesignHrs = bracket(t.designHoursByArea, (r) => r.areaMm2, input.moldBaseAreaMm2).hours;
-  const estimatedMachiningHrs =
-    (areaM2 / t.plateMachiningRateM2PerHr) * 2 // cavity plate + core plate
-    + t.cavityPlateSetupHr + t.corePlateSetupHr;
   const estimatedAssemblyOperators = bracket(t.operatorsByArea, (r) => r.areaM2, areaM2).operators;
 
   const warnings = [SCOPE_WARNING];
@@ -163,23 +153,9 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   if (noAssemblyTime.length > 0) {
     warnings.push(`No assembly time on file (cmToolAssemblyTimes) for: ${noAssemblyTime.join(', ')}; not counted in assembly hours.`);
   }
-  const r = input.toolroomRates;
-  const labourCostUsd = r
-    ? estimatedDesignHrs * r.designUsdPerHr + estimatedMachiningHrs * r.machiningUsdPerHr + assemblyHrs * r.assemblyUsdPerHr
-    : null;
-  const totalHrs = estimatedDesignHrs + estimatedMachiningHrs + assemblyHrs;
-  if (labourCostUsd == null && totalHrs > 0) {
-    warnings.push(
-      `${totalHrs.toFixed(1)} toolmaker hours (design ${estimatedDesignHrs.toFixed(1)}h + machining ` +
-      `${estimatedMachiningHrs.toFixed(1)}h + assembly ${assemblyHrs.toFixed(1)}h) are NOT priced: memory/ has ` +
-      `toolroom rates for USA only, none for ${input.location}. The true tooling cost is materially higher.`,
-    );
-  }
-
   return {
     items, bomSubtotalUsd, missingComponents,
-    estimatedDesignHrs, estimatedMachiningHrs, estimatedAssemblyHrs: assemblyHrs, estimatedAssemblyOperators,
-    labourCostUsd,
+    estimatedDesignHrs, estimatedAssemblyHrs: assemblyHrs, estimatedAssemblyOperators,
     warnings,
   };
 }

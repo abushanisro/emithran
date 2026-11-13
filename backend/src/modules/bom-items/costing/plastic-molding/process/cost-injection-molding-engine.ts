@@ -41,6 +41,7 @@ import { requiredClampForce, type ClampForceResult, type MaterialClampProperties
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
 import { runDeflashingTime, runInjectionCycleTime } from '../calculators/plastic-cycle-time';
+import { runMoldTooling } from '../calculators/mold-tooling-calculator';
 import { type ReferenceCalculators, withFieldOverrides, type CalculatorFieldOverrides } from '../../shared/calculators/reference-calculator';
 import {
   type CycleTimeResult,
@@ -669,8 +670,6 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       slideBundles: signals.slideBundleCount ?? null,
       slideOrLifterBundles: signals.slideOrLifterBundleCount ?? 0,
       tables: plasticRef.tooling,
-      toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null,
-      location: input.location ?? '(unknown location)',
     });
     // Molds the job wears out: tblToolLife shots per tool for the material type,
     // the reference default (its median) for a type with no row.
@@ -679,31 +678,42 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     if (!lifeRow) {
       warnings.push(`No tblToolLife row for material type ${input.materialType ?? '(unknown)'}: mold life uses the reference default ${plasticRef.defaultToolLifeShots.toLocaleString()} shots.`);
     }
-    const moldsRequired = Math.max(1, Math.ceil(lifetimeShots / toolLifeShots));
-    const moldCostUsd = r2((moldTooling.bomSubtotalUsd + (moldTooling.labourCostUsd ?? 0)) * moldsRequired);
-    // Per-part tooling is cents at volume: four places, not two (3.18 cents must not read as 3).
-    const moldCostPerPartUsd = r4(moldCostUsd / (annualVol * prodLife));
-    toolingResult = {
-      moldClass: mold.moldClass,
-      moldLifeShotRating: mold.cycleRating,
-      moldCostUsd,
-      moldCostPerPartUsd,
-      annualVolume: annualVol,
-      productionLifeYears: prodLife,
-      moldBomSubtotalUsd: moldTooling.bomSubtotalUsd,
-      moldMissingComponents: moldTooling.missingComponents,
-      moldEstimatedDesignHrs: moldTooling.estimatedDesignHrs,
-      moldEstimatedMachiningHrs: moldTooling.estimatedMachiningHrs,
-      moldEstimatedAssemblyHrs: moldTooling.estimatedAssemblyHrs,
-      moldEstimatedAssemblyOperators: moldTooling.estimatedAssemblyOperators,
-      moldLabourCostUsd: moldTooling.labourCostUsd == null ? null : r2(moldTooling.labourCostUsd),
-      moldToolLifeShots: toolLifeShots,
-      moldsRequired,
-    };
+    // Every price, hour and amortization step is the tooling calculator's (migration 1012), shown on the line and changeable for the part.
+    const tooling = runMoldTooling({
+      components: moldTooling.items, componentsSubtotalUsd: moldTooling.bomSubtotalUsd, moldBaseAreaMm2,
+      designHours: moldTooling.estimatedDesignHrs, assemblyHours: moldTooling.estimatedAssemblyHrs, tables: plasticRef.tooling,
+      toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null, location: input.location ?? '(unknown location)',
+      annualVolume: annualVol, productionLifeYears: prodLife, cavityCount, toolLifeShots,
+      toolLifeSource: lifeRow ? `memory/Plastic Modeling/lookup/tblToolLife: ${input.materialType}` : `memory/Plastic Modeling/variables: defaultToolLife (no tblToolLife row for ${input.materialType ?? 'the material type'})`,
+    }, withFieldOverrides(input.calculators, input.calculatorOverrides));
+    if (!tooling.derivable) {
+      warnings.push(`Tooling not costed: missing ${tooling.missing.join('; ')}.`);
+    } else {
+      const o = tooling.outputs;
+      toolingResult = {
+        moldClass: mold.moldClass,
+        moldLifeShotRating: mold.cycleRating,
+        moldCostUsd: o['Tooling Investment']!,
+        moldCostPerPartUsd: tooling.perPartUsd,
+        annualVolume: annualVol,
+        productionLifeYears: prodLife,
+        moldBomSubtotalUsd: moldTooling.bomSubtotalUsd,
+        moldMissingComponents: moldTooling.missingComponents,
+        moldEstimatedDesignHrs: moldTooling.estimatedDesignHrs,
+        moldEstimatedMachiningHrs: o['Machining Hours']!,
+        moldEstimatedAssemblyHrs: moldTooling.estimatedAssemblyHrs,
+        moldEstimatedAssemblyOperators: moldTooling.estimatedAssemblyOperators,
+        moldLabourCostUsd: r2(o['Toolroom Labour Cost']!),
+        moldToolLifeShots: toolLifeShots,
+        moldsRequired: o['Molds Required']!,
+        calculationTrace: tooling.trace,
+        calculatorName: tooling.calculator.name,
+      };
+    }
     warnings.push(...moldTooling.warnings);
-    if (moldCostPerPartUsd > (materialCostPerKg / usdToLocal) * netWeightKg * 2) {
+    if (toolingResult && toolingResult.moldCostPerPartUsd > (materialCostPerKg / usdToLocal) * netWeightKg * 2) {
       warnings.push(
-        `Tooling-dominated: mold cost $${moldCostUsd.toFixed(0)} amortizes to $${moldCostPerPartUsd.toFixed(3)}/part — ` +
+        `Tooling-dominated: mold cost $${toolingResult.moldCostUsd.toFixed(0)} amortizes to $${toolingResult.moldCostPerPartUsd.toFixed(3)}/part — ` +
         `consider higher volumes or shared tooling (indicative tooling cost only)`,
       );
     }

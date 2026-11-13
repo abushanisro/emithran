@@ -543,6 +543,165 @@
         }
       ],
       "migration": 1010
+    },
+    {
+      "key": "injection_mold_tooling",
+      "name": "Injection Mold - Tooling",
+      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Not modelled yet, because the reference holds the data but no formula: the mold base and plate steel, core and cavity blocks, slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops and try-out (registry G-01 to G-08).",
+      "operations": [],
+      "helper": true,
+      "output": "Tooling Cost Per Part",
+      "results": [
+        "Machining Hours",
+        "Toolroom Labour Cost",
+        "Mold Cost",
+        "Molds Required",
+        "Tooling Investment"
+      ],
+      "fields": [
+        {
+          "name": "Purchased Components Cost",
+          "unit": "USD",
+          "source": {
+            "lookup": "cmStandardToolingComponents: unit cost x quantity of each standard component the mold needs"
+          }
+        },
+        {
+          "name": "Mold Base Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "CAD projected area x cavities per mold (the required mold window)"
+          }
+        },
+        {
+          "name": "Design Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmMoldBaseDesignHours: the first row whose mold-base area covers the mold"
+          }
+        },
+        {
+          "name": "Plate Machining Rate",
+          "unit": "m²/h",
+          "source": {
+            "lookup": "cmToolMachiningRates: Cavity Core Plate General Machining"
+          }
+        },
+        {
+          "name": "Plate Setup Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolMachiningSetups: cavity and core plate general machining, setups x hours"
+          }
+        },
+        {
+          "name": "Assembly Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolAssemblyTimes: hours per component x its quantity"
+          }
+        },
+        {
+          "name": "Design Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: designRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Machining Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: machiningRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Assembly Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: assemblyRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Annual Volume",
+          "unit": "parts/yr",
+          "source": {
+            "scenario": "annual volume"
+          }
+        },
+        {
+          "name": "Production Life",
+          "unit": "yr",
+          "source": {
+            "scenario": "production life"
+          }
+        },
+        {
+          "name": "Cavities per Mold",
+          "unit": null,
+          "source": {
+            "engine": "the costed cavity count"
+          }
+        },
+        {
+          "name": "Tool Life Shots",
+          "unit": "shots",
+          "source": {
+            "lookup": "tblToolLife: shots per tool for the material type, else the defaultToolLife variable"
+          }
+        },
+        {
+          "name": "Machining Hours",
+          "unit": "h",
+          "formula": "{Mold Base Area} / 1000000 / {Plate Machining Rate} * 2 + {Plate Setup Hours}"
+        },
+        {
+          "name": "Design Cost",
+          "unit": "USD",
+          "formula": "{Design Hours} * {Design Rate}"
+        },
+        {
+          "name": "Machining Cost",
+          "unit": "USD",
+          "formula": "{Machining Hours} * {Machining Rate}"
+        },
+        {
+          "name": "Assembly Cost",
+          "unit": "USD",
+          "formula": "{Assembly Hours} * {Assembly Rate}"
+        },
+        {
+          "name": "Toolroom Labour Cost",
+          "unit": "USD",
+          "formula": "{Design Cost} + {Machining Cost} + {Assembly Cost}"
+        },
+        {
+          "name": "Mold Cost",
+          "unit": "USD",
+          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost}"
+        },
+        {
+          "name": "Lifetime Shots",
+          "unit": "shots",
+          "formula": "{Annual Volume} / {Cavities per Mold} * {Production Life}"
+        },
+        {
+          "name": "Molds Required",
+          "unit": null,
+          "formula": "max(1, CEIL({Lifetime Shots} / {Tool Life Shots}))"
+        },
+        {
+          "name": "Tooling Investment",
+          "unit": "USD",
+          "formula": "floor({Mold Cost} * {Molds Required} * 100 + 0.5) / 100"
+        },
+        {
+          "name": "Tooling Cost Per Part",
+          "unit": "USD",
+          "formula": "floor({Tooling Investment} / ({Annual Volume} * {Production Life}) * 10000 + 0.5) / 10000"
+        }
+      ],
+      "migration": 1012
     }
   ]
 }
