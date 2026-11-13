@@ -15,6 +15,7 @@ import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../../../../../modu
 import { resinThermalProps } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
 import { runInjectionCycleTime } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-cycle-time';
 import { plasticMoldingCalculatorsByName } from '../../../../../modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculator-spec';
+import type { RibSignals } from '../../../../../modules/bom-items/costing/plastic-molding/process/rib-inserts';
 import { computeInjectionMoldedCostSummary } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import { expectSetupContract } from '../shared/setup-contract';
@@ -394,6 +395,18 @@ describe('slides and lifters in the mold (F-28)', () => {
     }));
     expect(unsized.validation?.unsupported.map((u) => u.id)).toContain('G-03');
     expect(unsized.warnings.join(' ')).toMatch(/slides and lifters \(the CAD bundles are not all recognised and sized\)/);
+  });
+});
+
+describe('rib inserts and their EDM in the mold (F-31)', () => {
+  it('prices the CAD-measured ribs taller than machinedRibThreshold and drops G-04; unmeasured ribs keep it a gap', () => {
+    const run = (ribs: RibSignals) => computeInjectionMoldedCostSummary(absPart({ annualVolume: 10_000, productionLifeYears: 3, signals: { ...absPart().signals, ribs } }));
+    const measured = run({ measured: [{ heightMm: 25, lengthMm: 300, thicknessMm: 2 }], unmeasured: 0 });
+    expect(measured.tooling?.moldRibInsertUsd).toBeGreaterThan(0);
+    expect(measured.validation?.unsupported.map((u) => u.id)).not.toContain('G-04');
+    const unmeasured = run({ measured: [], unmeasured: 3 });
+    expect(unmeasured.tooling?.moldRibInsertUsd).toBe(0);
+    expect(unmeasured.validation?.unsupported.map((u) => u.id)).toContain('G-04');
   });
 });
 

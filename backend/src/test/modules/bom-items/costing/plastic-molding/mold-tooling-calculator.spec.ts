@@ -21,7 +21,7 @@ const facts = (over: Partial<MoldToolingFacts> = {}): MoldToolingFacts => ({
   annualVolume: 10_000, productionLifeYears: 3, cavityCount: 1, toolLifeShots: 144_000, toolLifeSource: 'tblToolLife: ABS',
   moldBase: BASE, moldBaseRef: REF.moldBase, partHeightMm: 30,
   cavity: moldCavityLookup({ faceCount: 900, surfaceAreaMm2: 40_000, ref: REF.moldBase }), partSurfaceAreaMm2: 40_000,
-  extras: REF.moldExtras, pressClampTonnes: 102, sideActionBlocks: null, ...over,
+  extras: REF.moldExtras, pressClampTonnes: 102, sideActionBlocks: null, ribs: null, ...over,
 });
 const NONE = { small: 0, medium: 0, large: 0 };
 /** The mold assembly extras of the worked mold (F-27): 2 ejector pins (10,000 / 7,903.21 mm2), the sprue and ring, 3 try-outs of 12 h on a 102 t press. */
@@ -37,11 +37,12 @@ function expectedSteelUsd(): number {
 }
 
 describe('the mold tooling calculator', () => {
-  it('is a helper whose result is the tooling cost per part, at version 7 written by migration 1019 (1012 to 1018 are history)', () => {
+  it('is a helper whose result is the tooling cost per part, at version 8 written by migration 1020 (1012 to 1019 are history)', () => {
     const c = loadPlasticMoldingCalculatorSpec().calculators.find((x) => x.name === MOLD_TOOLING_CALCULATOR)!;
-    expect(c).toMatchObject({ helper: true, operations: [], migration: 1019, version: 7, output: 'Tooling Cost Per Part' });
+    expect(c).toMatchObject({ helper: true, operations: [], migration: 1020, version: 8, output: 'Tooling Cost Per Part' });
     expect(c.description).toMatch(/G-03 to G-08/);
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/1019_plastic_mold_cooling_lines.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1019));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1020_plastic_mold_rib_inserts_edm.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1020));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1019_plastic_mold_cooling_lines.sql'), 'utf8')).toContain('version 7');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1018_plastic_mold_heat_treatment.sql'), 'utf8')).toContain('version 6');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1017_plastic_mold_slides_lifters.sql'), 'utf8')).toContain('version 5');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1016_plastic_mold_assembly_extras.sql'), 'utf8')).toContain('version 4');
@@ -127,6 +128,32 @@ describe('the mold tooling calculator', () => {
     expect(r.outputs['Cooling Cost']).toBeCloseTo(lines * BASE.base.widthMm / 25.4 / 60 * 100.55 + lines * 2 * (1.25 + 2.5) + 2 * 55, 6);
     expect(r.trace.find((t) => t.fieldName === 'Water Line Pitch Factor')?.source).toMatch(/Approved rule/);
     expect(r.trace.find((t) => t.fieldName === 'Line Drilling Rate')?.source).toMatch(/Heater Line Drilling/);
+  });
+
+  it('makes a rib taller than 20 mm an insert of its footprint class: steel, pocket, graphite electrodes, EDM burn and labour', () => {
+    if ('missing' in BASE) throw new Error(BASE.missing.join());
+    const mb = REF.moldBase;
+    // a 25 mm tall rib 300 x 2 mm (0.93 in2: small), a 40 mm rib 500 x 2 mm (1.55 in2: medium), a 15 mm rib (machined, no insert)
+    const ribs = { measured: [{ heightMm: 25, lengthMm: 300, thicknessMm: 2 }, { heightMm: 40, lengthMm: 500, thicknessMm: 2 }, { heightMm: 15, lengthMm: 80, thicknessMm: 1 }], unmeasured: 0 };
+    const r = runMoldTooling(facts({ ribs }), CALCS);
+    if (!r.derivable) throw new Error(r.missing.join());
+    const bPlate = Math.max(mb.bPlateMinMm, (1 - mb.aPlateCavityRatio) * 30 + BASE.coreDepthBorderMm);
+    const steelMm3 = (1 + 9) * 645.16 * bPlate;
+    const electrode = 4.6875 * 2 + 31.6875 * 2;
+    const burnH = electrode * 0.05 * 16387.064 / 68.28 / 60;
+    const pocketH = steelMm3 / 136612 / 60 + 2;
+    expect(r.trace.find((t) => t.fieldName === 'Rib Inserts')?.value).toBe(2);
+    expect(r.outputs['Rib Insert Steel Cost']).toBeCloseTo(steelMm3 / 1e9 * mb.steel.densityKgM3 * mb.steel.priceUsdPerKg, 6);
+    expect(r.outputs['EDM Burn Hours']).toBeCloseTo(burnH, 9);
+    expect(r.outputs['EDM Cost']).toBeCloseTo(burnH * 74.3 + electrode * 2.25, 6);
+    expect(r.outputs['Rib Insert Pocket Hours']).toBeCloseTo(pocketH, 9);
+    expect(r.outputs['Rib Insert Labour Cost']).toBeCloseTo((3 + 5) * 64.73 + (2 * 5 + pocketH) * 100.55 + 2 * (1 + 0.25) * 76.81, 6);
+    expect(r.trace.find((t) => t.fieldName === 'Rib Inserts')?.source).toMatch(/1 small \+ 1 medium/);
+    expect(r.trace.find((t) => t.fieldName === 'Electrode Material Cost')?.source).toMatch(/graphite/);
+    // no tall ribs: no insert cost, and no pocket setup charged
+    const none = runMoldTooling(facts({ ribs: { measured: [{ heightMm: 15, lengthMm: 80, thicknessMm: 1 }], unmeasured: 0 } }), CALCS);
+    if (!none.derivable) throw new Error(none.missing.join());
+    expect(none.outputs['Rib Insert Cost']).toBe(0);
   });
 
   it('adds no side-action cost, and no CMM base hours, when no bundle was recognised', () => {

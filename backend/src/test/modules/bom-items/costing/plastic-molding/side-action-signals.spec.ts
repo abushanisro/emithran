@@ -48,7 +48,7 @@ describe('sideActionSignals', () => {
 });
 
 describe('slide hardware in the mold tooling', () => {
-  const base = { moldBaseAreaMm2: 50_000, cavityCount: 1, tables: REF.tooling, toolroomRates: null, location: 'India', scope: { runner: 'cold' as const, classUsesInserts: false, cavityTexture: 'None', sideActionsPriced: false } };
+  const base = { moldBaseAreaMm2: 50_000, cavityCount: 1, tables: REF.tooling, toolroomRates: null, location: 'India', scope: { runner: 'cold' as const, classUsesInserts: false, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false } };
   const has = (r: ReturnType<typeof computeMoldToolingCost>, name: string) => r.items.some((i) => i.componentName === name);
 
   it('is priced when a slide bundle was recognised, at the staged one-set quantity, and says so', () => {

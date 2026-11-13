@@ -173,7 +173,7 @@ describe('computeInjectionMoldedCostSummary', () => {
     expect(t.moldLabourCostUsd).toBeGreaterThan(0);
     expect(t.moldBaseSteelUsd).toBeGreaterThan(0);
     expect(t.moldCostUsd).toBeCloseTo((t.moldBomSubtotalUsd! + t.moldLabourCostUsd! + t.moldBaseSteelUsd! + t.moldCavityMachiningUsd! + t.moldPolishUsd!
-      + t.moldEjectorSystemUsd! + t.moldSprueAndLocatingRingUsd! + t.moldTryoutUsd! + t.moldSideActionUsd! + t.moldHeatTreatmentUsd! + t.moldCoolingUsd!) * t.moldsRequired!, 1);
+      + t.moldEjectorSystemUsd! + t.moldSprueAndLocatingRingUsd! + t.moldTryoutUsd! + t.moldSideActionUsd! + t.moldHeatTreatmentUsd! + t.moldCoolingUsd! + t.moldRibInsertUsd!) * t.moldsRequired!, 1);
   });
 
   it('prices side-action hardware only when the part has an undercut', () => {

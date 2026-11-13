@@ -367,6 +367,7 @@ class InjectionMoldedFeatureExtractor:
         rib_pairs = 0
         rib_separations: List[float] = []
         rib_heights: List[Optional[float]] = []
+        rib_lengths: List[Optional[float]] = []
         rib_data: List[Dict[str, Any]] = []  # per-rib centroid + dims for heatmap placement
         n_faces = len(wall_face_planes)
 
@@ -395,6 +396,8 @@ class InjectionMoldedFeatureExtractor:
                 if len(ext1) == 2 and len(ext2) == 2 and all(math.isfinite(v) for v in (*ext1, *ext2)):
                     measured = round(max(0.0, min(ext1[1], ext2[1]) - max(ext1[0], ext2[0])), 2)
                 rib_heights.append(measured)
+                # A rib wall is about its length x its height: the smaller wall over the measured height is the rib's length.
+                rib_lengths.append(round(min(_area1, _area2) / measured, 2) if measured else None)
                 height_est = measured if measured is not None else round(math.sqrt(max(_area1, _area2, 1.0)), 2)
                 rib_data.append({
                     "centroid": [
@@ -410,15 +413,20 @@ class InjectionMoldedFeatureExtractor:
         # Bin into 0.5 mm groups for DFM reporting
         binned: Dict[float, int] = {}
         bin_heights: Dict[float, List[float]] = {}
-        for s, h in zip(rib_separations, rib_heights):
+        bin_ribs: Dict[float, List[Dict[str, float]]] = {}
+        for s, h, length in zip(rib_separations, rib_heights, rib_lengths):
             bin_key = round(round(s / 0.5) * 0.5, 1)
             binned[bin_key] = binned.get(bin_key, 0) + 1
             bin_heights.setdefault(bin_key, [])
+            bin_ribs.setdefault(bin_key, [])
             if h is not None:
                 bin_heights[bin_key].append(h)
+                if length is not None:
+                    bin_ribs[bin_key].append({"height_mm": h, "length_mm": length, "thickness_mm": s})
 
         rib_groups = sorted(
-            [{"thickness_mm": k, "count": v, "heights_mm": sorted(bin_heights[k]), "max_height_mm": max(bin_heights[k]) if bin_heights[k] else None}
+            [{"thickness_mm": k, "count": v, "heights_mm": sorted(bin_heights[k]), "max_height_mm": max(bin_heights[k]) if bin_heights[k] else None,
+              "ribs": sorted(bin_ribs[k], key=lambda r: (r["height_mm"], r["length_mm"]))}
              for k, v in binned.items()],
             key=lambda x: x["thickness_mm"],
         )

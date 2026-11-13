@@ -414,10 +414,32 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
   },
 
+  {
+    id: 'F-31', version: 1, name: 'Rib inserts and their EDM',
+    expression: 'insert if rib height > threshold, class = smallest with area >= length x thickness;  steel = area x core plate height x density x price;  pocket = steel volume / pocket rate + setup;  EDM = electrode x burns x burn fraction / burn rate x EDM rate + electrode x burns x graphite price;  labour = design h(class) + cutter path + spotting + assembly',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'rib height, length, thickness', unit: 'mm', source: 'CAD (cad-engine _detect_ribs: measured along the pull; length = wall area / height)' },
+      { name: 'threshold', unit: 'mm', source: `${MEM}/variables: machinedRibThreshold` },
+      { name: 'area, electrode, burns, design h by class', unit: 'in2, in3, count, h', source: `${MEM}/variables: *InsertArea, *CalcRibInsertElectrodeSize, num*InsertsBurns, cmDesignHrsRibInsert*` },
+      { name: 'burn fraction, cutter path h, spotting h', unit: '-, h, h', source: `${MEM}/variables: edmElectrodeVolumeBurn, cutterPathHrsPerInsert, spottingHrsPerInsert` },
+      { name: 'burn rate, pocket rate, pocket setup, assembly h', unit: 'mm3/min, mm3/min, h, h', source: `${MEM}/lookup: cmToolMachiningRates EDM Electrode Burn / Insert Pocket Machining, cmToolMachiningSetups Insert Pocket, cmToolAssemblyTimes Rib Insert` },
+      { name: 'EDM rate, graphite price', unit: 'USD/h, USD/in3', source: `${MEM}/process/digital_factory_settings_usa: edmRateUsdPerHr, edmMaterialCostCarbonUsdPerIn3` },
+    ],
+    dependsOn: ['F-25'],
+    referenceSource: `${MEM}/variables + lookup + process`,
+    assumptions: [
+      'Approved rule (no class rule is on file): a rib is the smallest insert class whose area holds its footprint, length x thickness; a rib no class holds is a gap.',
+      'Graphite electrodes (approved; no default electrode material is on file), one electrode of the class size per burn.',
+      'The insert steel is the class area x the core (B) plate height, as the *InsertArea notes state, priced as the default tool steel.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
     ['G-03', 'Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle', 'tblSlideSizes; slideCycleRate; costPerHydraulicEjector'],
-    ['G-04', 'EDM of rib inserts (the CAD engine does not measure rib heights yet; heat treatment is F-29)', 'edmRateUsdPerHr; edmMaterialCost{Carbon,Copper}UsdPerIn3; edmElectrodeVolumeBurn; *RibInsertElectrodeSize; machinedRibThreshold'],
+    ['G-04', 'Rib inserts of CAD ribs not measured, or too large for an insert class (the others are F-31; heat treatment is F-29)', 'machinedRibThreshold; *InsertArea'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
     ['G-06', 'Water baffles (no count on file; the cooling lines are F-30)', 'waterBafflesCost'],
     ['G-07', 'Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them)', 'tblSpiType.Use Insert; costPerUnscrewingMechanism'],

@@ -34,6 +34,7 @@
 // engine then decides no mold class, tooling cost or machine fit rather than
 // deciding on a number the database does not hold.
 
+import type { RibInsertReference } from './process/rib-inserts';
 import MANIFEST from '../../../processes/memory-reference-domains.json';
 import { fingerprintRows } from './reference-fingerprint';
 
@@ -62,6 +63,12 @@ export const PLASTIC_VARIABLE_KEYS = [
   'cmmInspectionMultiplier', 'cmmInspectionAdder',
   // The cooling lines (F-30): the line diameter and the water hardware prices.
   'defaultWaterLineDiameter', 'waterHosesCost', 'waterManifoldFittingsCost', 'waterManifoldsCost',
+  // The rib inserts and their EDM (F-31).
+  'machinedRibThreshold', 'smallInsertArea', 'mediumInsertArea', 'largeInsertArea',
+  'smallCalcRibInsertElectrodeSize', 'mediumCalcRibInsertElectrodeSize', 'largeCalcRibInsertElectrodeSize',
+  'numSmallInsertsBurns', 'numMediumInsertsBurns', 'numLargeInsertsBurns',
+  'cmDesignHrsRibInsertSmall', 'cmDesignHrsRibInsertMedium', 'cmDesignHrsRibInsertLarge',
+  'cutterPathHrsPerInsert', 'spottingHrsPerInsert', 'edmElectrodeVolumeBurn',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -193,6 +200,8 @@ export interface PlasticReference {
 /** digital_factory_settings_usa toolroom rates, USD per hour. */
 export interface ToolroomRates {
   designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number; tryoutUsdPerHr: number;
+  /** edmRateUsdPerHr: the EDM burn (F-31). */
+  edmUsdPerHr: number;
   /** heatTreatRateUsdPerKg and stressReliefRateUsdPerKg: hardening and stress relief of the tool steel, per kg (F-29). */
   heatTreatUsdPerKg: number; stressReliefUsdPerKg: number;
 }
@@ -224,6 +233,8 @@ export interface MoldExtrasReference {
   waterFittingUsd: number;
   waterManifoldUsd: number;
   lineDrillingMmPerMin: number;
+  /** The rib inserts and their EDM (F-31, process/rib-inserts.ts). */
+  ribInsert: RibInsertReference;
 }
 
 export interface FeatureRules {
@@ -371,6 +382,25 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     tryoutUsdPerHr: rate('tryoutRateUsdPerHr'),
     heatTreatUsdPerKg: rate('heatTreatRateUsdPerKg'),
     stressReliefUsdPerKg: rate('stressReliefRateUsdPerKg'),
+    edmUsdPerHr: rate('edmRateUsdPerHr'),
+  };
+  const ribInsertAssemblyHours = assemblyTimes.find((a) => componentNameKey(a.name) === componentNameKey('Rib Insert'))?.hours;
+  if (!(ribInsertAssemblyHours != null && ribInsertAssemblyHours > 0)) missing.push('cmToolAssemblyTimes: Rib Insert assembly_time_hr');
+  const byClass = (small: string, medium: string, large: string) => ({ small: variable(small), medium: variable(medium), large: variable(large) });
+  const ribInsert: RibInsertReference = {
+    thresholdMm: variable('machinedRibThreshold'),
+    areaIn2: byClass('smallInsertArea', 'mediumInsertArea', 'largeInsertArea'),
+    electrodeIn3: byClass('smallCalcRibInsertElectrodeSize', 'mediumCalcRibInsertElectrodeSize', 'largeCalcRibInsertElectrodeSize'),
+    burns: byClass('numSmallInsertsBurns', 'numMediumInsertsBurns', 'numLargeInsertsBurns'),
+    designHours: byClass('cmDesignHrsRibInsertSmall', 'cmDesignHrsRibInsertMedium', 'cmDesignHrsRibInsertLarge'),
+    cutterPathHours: variable('cutterPathHrsPerInsert'),
+    spottingHours: variable('spottingHrsPerInsert'),
+    assemblyHours: ribInsertAssemblyHours ?? NaN,
+    electrodeBurnFraction: variable('edmElectrodeVolumeBurn'),
+    electrodeUsdPerIn3: rate('edmMaterialCostCarbonUsdPerIn3'),
+    burnRateMm3PerMin: named(rates, 'cmToolMachiningRates', 'EDM Electrode Burn', 'rate'),
+    pocketRateMm3PerMin: named(rates, 'cmToolMachiningRates', 'Insert Pocket Machining', 'rate'),
+    pocketSetupHours: setupHr('Insert Pocket'),
   };
   const ejectorPin = components.find((c) => componentNameKey(c.name) === componentNameKey('Ejector Pin'));
   const ejectorPinHours = assemblyTimes.find((a) => componentNameKey(a.name) === componentNameKey('Ejector Pin'))?.hours;
@@ -396,6 +426,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     waterFittingUsd: variable('waterManifoldFittingsCost'),
     waterManifoldUsd: variable('waterManifoldsCost'),
     lineDrillingMmPerMin: named(rates, 'cmToolMachiningRates', 'Heater Line Drilling', 'rate'),
+    ribInsert,
   };
 
   const system = text.get('useMetricOrImperialValues') === 'Imperial' ? 'Imperial' : text.get('useMetricOrImperialValues') === 'Metric' ? 'Metric' : null;

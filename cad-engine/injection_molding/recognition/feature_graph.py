@@ -61,7 +61,9 @@ def build_feature_graph(
             "id": f"rib-t{g['thickness_mm']}", "feature_type": vocabulary("Rib"), "variant": "legacy_antiparallel_pairs", "diameter_mm": None, "depth_mm": None,
             "attributes": {"thickness_mm": g["thickness_mm"], "count": g["count"], "confidence": rib_confidence,
                            # measured along the pull (feature_extractor._detect_ribs); absent from groups made before heights were measured
-                           **({"heights_mm": g["heights_mm"], "max_height_mm": g["max_height_mm"]} if "heights_mm" in g else {})},
+                           **({"heights_mm": g["heights_mm"], "max_height_mm": g["max_height_mm"]} if "heights_mm" in g else {}),
+                           # each measured rib: height and length (wall area / height) and thickness, for its insert footprint
+                           **({"ribs": g["ribs"]} if "ribs" in g else {})},
             "occurrences": [],
         })
     sa = side_actions or {}

@@ -9,12 +9,13 @@ import type { MoldBaseReference, MoldExtrasReference, MoldToolingTables, Toolroo
 import type { MoldBaseChoice } from '../process/mold-base';
 import type { MoldCavityLookup } from '../process/mold-cavity';
 import type { BlockSize, SideActionSignals } from '../side-action-signals';
+import { planRibInserts, ribInsertQuantities, type RibSignals } from '../process/rib-inserts';
 import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas } from './plastic-cycle-time';
 
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
 const OUTPUT = 'Tooling Cost Per Part';
 const REF = 'memory/Plastic Modeling';
-// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment), F-30 (cooling) are this
+// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment), F-30 (cooling), F-31 (rib inserts, EDM) are this
 // calculator's formulas; the seeds below supply their inputs.
 /** timePerTryoutBase's note: "basic hrs per tryout for <500T (x2 for bigger)". */
 const TRYOUT_DOUBLE_ABOVE_TONNES = 500;
@@ -52,6 +53,8 @@ export interface MoldToolingFacts {
   pressClampTonnes: number | null;
   /** The recognised slide and lifter bundles by size class (side-action-signals.ts); null when the CAD features were not recognised. */
   sideActionBlocks: SideActionSignals['blocks'] | null;
+  /** The ribs the CAD engine measured (rib-inserts.ts); null when the graph has none to read. */
+  ribs: RibSignals | null;
 }
 
 const SIZE_ORDER: readonly BlockSize[] = ['small', 'medium', 'large'];
@@ -100,6 +103,9 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
   const mb = f.moldBaseRef;
   const x = f.extras;
   const sa = sideActionBlocks(f.sideActionBlocks, x);
+  const ri = x.ribInsert;
+  const rq = ribInsertQuantities(planRibInserts(f.ribs, ri), ri);
+  const ribSource = `CAD ribs taller than machinedRibThreshold ${ri.thresholdMm} mm, classed by footprint (length x thickness) against {small,medium,large}InsertArea: ${rq.breakdown}`;
   const vars = `${REF}/variables`;
   const steel = `${REF}/process/digital_factory_tool_materials_usa: ${mb.steel.name} (digital_factory_settings_usa defaultToolMaterialName)`;
   const listed = f.components.map((c) => `${c.componentName} ${c.qty} x ${c.unitCostUsd}`).join(', ');
@@ -170,6 +176,22 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       'Water Hose Cost': { value: x.waterHoseUsd, source: `${vars}: waterHosesCost (2 per line)` },
       'Water Fitting Cost': { value: x.waterFittingUsd, source: `${vars}: waterManifoldFittingsCost (2 per line)` },
       'Water Manifold Cost': { value: x.waterManifoldUsd, source: `${vars}: waterManifoldsCost (one per side)` },
+      'Rib Inserts': { value: rq.inserts, source: ribSource, lookup: true },
+      'Rib Insert Area': { value: rq.areaIn2, source: `${rq.breakdown} x {small,medium,large}InsertArea ${ri.areaIn2.small} / ${ri.areaIn2.medium} / ${ri.areaIn2.large} in²`, lookup: true },
+      'Rib Insert Electrode Volume': {
+        value: rq.electrodeIn3, lookup: true,
+        source: `${rq.breakdown} x {small,medium,large}CalcRibInsertElectrodeSize ${ri.electrodeIn3.small} / ${ri.electrodeIn3.medium} / ${ri.electrodeIn3.large} in³ x num*InsertsBurns (one electrode per burn)`,
+      },
+      'Rib Insert Burned Volume': { value: rq.burnedIn3, source: `the electrode volume x edmElectrodeVolumeBurn ${ri.electrodeBurnFraction}` },
+      'Rib Insert Design Hours': { value: rq.designHours, source: `${rq.breakdown} x cmDesignHrsRibInsert{Small,Medium,Large} ${ri.designHours.small} / ${ri.designHours.medium} / ${ri.designHours.large} h`, lookup: true },
+      'Cutter Path Hours Per Insert': { value: ri.cutterPathHours, source: `${vars}: cutterPathHrsPerInsert` },
+      'Spotting Hours Per Insert': { value: ri.spottingHours, source: `${vars}: spottingHrsPerInsert` },
+      'Rib Insert Assembly Hours': { value: ri.assemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: Rib Insert`, lookup: true },
+      'Electrode Material Cost': { value: ri.electrodeUsdPerIn3, source: `${settings} edmMaterialCostCarbonUsdPerIn3 (graphite, the approved electrode material)` },
+      'EDM Burn Rate': { value: ri.burnRateMm3PerMin, source: `${REF}/lookup/cmToolMachiningRates: EDM Electrode Burn`, lookup: true },
+      'EDM Rate': { value: f.toolroomRates.edmUsdPerHr, source: `${settings} edmRateUsdPerHr` },
+      'Insert Pocket Rate': { value: ri.pocketRateMm3PerMin, source: `${REF}/lookup/cmToolMachiningRates: Insert Pocket Machining`, lookup: true },
+      'Insert Pocket Setup Hours': { value: ri.pocketSetupHours, source: `${REF}/lookup/cmToolMachiningSetups: Insert Pocket (setups x hours)`, lookup: true },
     },
   };
 }
