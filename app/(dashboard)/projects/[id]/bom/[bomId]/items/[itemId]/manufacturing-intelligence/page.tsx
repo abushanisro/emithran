@@ -12,6 +12,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'rea
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
 
+import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
@@ -44,6 +45,7 @@ import { CostTablePanel } from '@/components/features/manufacturing-intelligence
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
 import { routeMachineDrift } from '@/lib/costing/applied-route';
+import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
 import { formatCycleMin, formatCycleSec } from '@/lib/costing/format-cycle';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
@@ -2102,9 +2104,11 @@ function CostSummaryTab({
             {/* Expanded calculation breakdown */}
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
-                {/* The cycle's phases, as the line's calculator gave them when it was applied (process_cost_records.cycle_phases):
-                    each a step of the operation, with its time. */}
-                {(() => {
+                {/* The cycle: the live calculation, each field changeable for this part where the engine applies a part's own values; else the
+                    phases the line's calculator gave when it was applied (process_cost_records.cycle_phases). */}
+                {matchedEngineLine?.calculationTrace && cycleFields(matchedEngineLine.calculationTrace) ? (
+                  <CycleCalculator trace={matchedEngineLine.calculationTrace} bomItemId={item.id} calculator={matchedEngineLine.calculatorName ?? null} />
+                ) : (() => {
                   const phases = (proc as StoredProcessRow).cyclePhases ?? [];
                   return phases.length > 0 && (
                   <div>
@@ -2112,7 +2116,7 @@ function CostSummaryTab({
                     {phases.map((ph) => (
                       <div key={ph.name} className="flex justify-between gap-2 text-xs py-0.5 border-b border-border/10 last:border-0">
                         <span className="truncate">{ph.name}</span>
-                        <span className="text-muted-foreground tabular-nums shrink-0">{formatCycleSec(ph.seconds)}</span>
+                        <span className="text-muted-foreground tabular-nums shrink-0">{formatFieldValue(ph.seconds)} s</span>
                       </div>
                     ))}
                   </div>

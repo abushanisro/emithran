@@ -544,6 +544,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     if (Object.keys(cycle.lookups).length > 0) line.lookupMatches = cycle.lookups;
     // The stored calculator behind this line: the cost dialog opens it, filled with the inputs above, and runs the same formulas.
     if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
+    line.calculatorName = cycle.calculator.name;
     if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
   }
   processLines.push(line);
@@ -559,6 +560,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       const deflashLine = makeLine(UNCOSTED_OPERATION_LABELS.deflashing, null, batchSize, trim.cycleSec / 60, input.deburrRate);
       deflashLine.calculationTrace = trim.trace;
       if (trim.calculator.id) deflashLine.calculatorId = trim.calculator.id;
+      deflashLine.calculatorName = trim.calculator.name;
       if (trim.calculator.version != null) deflashLine.calculatorVersion = trim.calculator.version;
       processLines.push(deflashLine);
     } else {

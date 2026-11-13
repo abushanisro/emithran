@@ -88,6 +88,7 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
       line.calculationTrace = cycle.trace;
       if (Object.keys(cycle.lookups).length > 0) line.lookupMatches = cycle.lookups;
       if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
+      line.calculatorName = cycle.calculator.name;
       if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
     }
   } else if (input.rate.pressCycleTimeS != null) {

@@ -442,6 +442,8 @@ export interface ProcessLineCost {
   // line's cycle time, when resolved via resolvePhysicsQuantity. Absent for
   // processes not yet migrated onto that pipeline.
   calculatorId?: string;
+  /** The stored calculator's name: what a part's own field values are keyed by (calculator_field_overrides, migration 1011). Set where the engine applies them. */
+  calculatorName?: string;
   calculatorVersion?: number;
   // Present instead of a fabricated fallback number when resolvePhysicsQuantity
   // couldn't resolve this line's cycle time — the line still appears (never
