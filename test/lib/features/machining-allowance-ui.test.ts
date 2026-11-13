@@ -43,6 +43,8 @@ describe('machining allowance panel', () => {
     expect(sourceLine(feature({ source: { level: 3, kind: 'profile', id: 'p', ref: 'Foundry A v2 (foundry; rev 4)' } }))).toBe('Foundry A v2 (foundry; rev 4)');
     expect(sourceLine(feature({ source: { level: 1, kind: 'decision', id: 'd', ref: 'x', basis: 'engineering_drawing', reason: 'note 4', setBy: 'eng@x.com' } })))
       .toBe('Engineering drawing by eng@x.com: note 4');
+    expect(sourceLine(feature({ source: { level: 1, kind: 'drawing', id: null, ref: 'drawing 4471 rev B: "MACHINING ALLOWANCE 3 MM"' } })))
+      .toBe('From drawing 4471 rev B: "MACHINING ALLOWANCE 3 MM"');
   });
 
   it('shows the value per face and the sides', () => {

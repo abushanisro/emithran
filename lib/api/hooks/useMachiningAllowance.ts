@@ -23,7 +23,7 @@ export interface FeatureAllowance {
   unit: 'mm';
   source: {
     level: 1 | 2 | 3 | 4 | 5;
-    kind: 'decision' | 'dataset' | 'profile' | 'none';
+    kind: 'decision' | 'drawing' | 'dataset' | 'profile' | 'none';
     id: string | null;
     ref: string | null;
     basis?: string;

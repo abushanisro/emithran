@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  IsString, IsNumber, IsArray, IsOptional, ValidateNested, Min, Max,
+  IsString, IsNumber, IsArray, IsOptional, ValidateNested, Min, Max, Matches,
 } from 'class-validator';
 
 // Mirrors cad-engine/drawing_analyzer.py's real POST /drawing/analyze response
@@ -37,6 +37,29 @@ class ThreadCalloutDto {
 
   @IsString()
   extractionSource!: string;
+}
+
+/** The drawing's machining allowance callout, as printed (cad-engine drawing_analyzer._extract_machining_allowance). */
+export class MachiningAllowanceCalloutDto {
+  @IsString()
+  text!: string;
+
+  // mm per machined face; null when the drawing gives none, no millimetre unit, or two different values.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  allowance_mm!: number | null;
+
+  // RMAG grade A-K and DCTG grade 1-16 of an ISO 8062-3 callout; null when not printed.
+  @IsOptional()
+  @Matches(/^[A-K]$/)
+  rmag!: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(16)
+  dctg!: number | null;
 }
 
 class DrawingDimensionsDto {
@@ -122,6 +145,12 @@ export class DrawingIntelligenceDto {
   @IsOptional()
   @IsString()
   polygon_callout?: string;
+
+  // Optional for the same reason; null when the drawing has no allowance callout.
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MachiningAllowanceCalloutDto)
+  machining_allowance?: MachiningAllowanceCalloutDto | null;
 
   @IsString()
   complexity!: string;

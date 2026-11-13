@@ -491,6 +491,72 @@ _GEAR_SHAPING_RE = re.compile(r"\b(?:GEAR\s+SHAP(?:E|ED|ING)|SHAPED\s+(?:GEAR|TE
 _POLYGON_RE = re.compile(r"\b(ROTARY[\s\-]*BROACH(?:ED|ING)?|POLYGON(?:\s+TURN(?:ED|ING))?|HEX(?:AGON(?:AL)?)?\s+(?:SOCKET|HOLE|BROACH(?:ED)?|DRIVE)|SQUARE\s+(?:SOCKET|DRIVE))\b", re.I)
 
 
+# Machining allowance: the stock a casting drawing asks for on its machined faces. Two forms are read, exactly as printed:
+#   - the ISO 8062-3 general-tolerance callout "ISO 8062-3 – DCTG 10 – RMA 6 (RMAG H)" (older: "ISO 8062-CT12-RMA 6 (H)"):
+#     RMA is the allowance the drawing requires, in mm; RMAG and DCTG are the grades. No ISO table value is looked up here.
+#   - a note: "MACHINING ALLOWANCE 3 MM", "3 MM STOCK ON MACHINED FACES", "LEAVE 4 MM MACHINING STOCK", "ALLOW 2.5 MM FOR MACHINING".
+# A value counts only with a millimetre unit; two different values are not chosen between (the text is kept, the value is not).
+# The callouts are part-wide: the drawing text does not say which face a note points at.
+_NUM = r"(\d+(?:[.,]\d+)?)"
+_SEP = r"[\s\-–—:]*"
+_ISO_8062_RE = re.compile(
+    rf"ISO{_SEP}8062(?:{_SEP}-?3)?(?:{_SEP}(?:D?CTG?{_SEP}(\d{{1,2}})))?(?:{_SEP}RMA{_SEP}{_NUM}(?:\s*MM)?)?(?:{_SEP}\(?\s*(?:RMAG{_SEP})?([A-K])\s*\)?(?![A-Z]))?",
+    re.I,
+)
+_ISO_RMAG_RE = re.compile(rf"RMAG{_SEP}([A-K])\b", re.I)
+_ALLOWANCE_NOTE_RES = [
+    re.compile(rf"MACHIN(?:ING|E){_SEP}(?:ALLOWANCE|STOCK)(?:{_SEP}OF)?{_SEP}{_NUM}\s*MM\b", re.I),
+    re.compile(rf"{_NUM}\s*MM\s+(?:MACHIN(?:ING|E)\s+)?(?:ALLOWANCE|STOCK)\b", re.I),
+    re.compile(rf"\bALLOW\s+{_NUM}\s*MM\s+(?:FOR\s+)?MACHIN", re.I),
+]
+_ALLOWANCE_MENTION_RE = re.compile(r"MACHIN(?:ING|E)\s+(?:ALLOWANCE|STOCK)\b[^\n]{0,60}|(?:ALLOWANCE|STOCK)\s+FOR\s+MACHIN\w*[^\n]{0,40}", re.I)
+
+
+def _mm(text: str) -> float:
+    return float(text.replace(",", "."))
+
+
+def _extract_machining_allowance(flat: str) -> dict[str, Any] | None:
+    """The drawing's machining allowance callout: {text, allowance_mm, rmag, dctg}, or None when the drawing has none."""
+    texts: list[str] = []
+    values: set[float] = set()
+    rmag: str | None = None
+    dctg: int | None = None
+
+    for m in _ISO_8062_RE.finditer(flat):
+        grade_ct, rma, grade = m.group(1), m.group(2), m.group(3)
+        if not (rma or grade or _ISO_RMAG_RE.search(m.group(0))):
+            continue  # "ISO 8062-3 DCTG 10" alone is a dimensional tolerance, not an allowance
+        texts.append(" ".join(m.group(0).split()))
+        if rma:
+            values.add(_mm(rma))
+        if grade:
+            rmag = grade.upper()
+        if grade_ct:
+            dctg = int(grade_ct)
+
+    noted = False
+    for rx in _ALLOWANCE_NOTE_RES:
+        for m in rx.finditer(flat):
+            texts.append(" ".join(m.group(0).split()))
+            values.add(_mm(m.group(1)))
+            noted = True
+    if not noted and not texts:
+        mention = _ALLOWANCE_MENTION_RE.search(flat)
+        if mention:
+            texts.append(" ".join(mention.group(0).split()))
+
+    if not texts:
+        return None
+    unique = list(dict.fromkeys(texts))
+    return {
+        "text": " | ".join(unique)[:300],
+        "allowance_mm": values.pop() if len(values) == 1 else None,
+        "rmag": rmag,
+        "dctg": dctg,
+    }
+
+
 def _match_or_none(rx: "re.Pattern[str]", flat: str) -> str:
     m = rx.search(flat)
     return m.group(0).strip().upper() if m else "None"
@@ -640,6 +706,7 @@ _FALLBACK: dict[str, Any] = {
     "complexity": "medium",
     "threads": [], "gdt_callouts": [], "clearanceHoles": [],
     "general_tolerances": "",
+    "machining_allowance": None,
     "drawing_revision": "", "drawing_number": "",
     "drawing_notes": "",
     "drawing_intelligence_confidence": 0.0,
@@ -722,6 +789,7 @@ async def analyze_drawing(body: AnalyzeDrawingRequest) -> dict[str, Any]:
         "gdt_callouts":                [],
         "clearanceHoles":              [],
         "general_tolerances":          _extract_general_tolerance(tb, flat),
+        "machining_allowance":         _extract_machining_allowance(flat),
         "drawing_revision":            revision,
         "drawing_number":              drawing_no,
         "drawing_notes":               _extract_notes(flat),

@@ -53,6 +53,19 @@ describe('MachiningAllowanceService', () => {
     expect(p!.notes.join(' ')).toMatch(/estimate of 2.5 mm/);
   });
 
+  it("uses the drawing's stored allowance callout before the profile, quoting the drawing", async () => {
+    const saved = TABLES.bom_items;
+    TABLES.bom_items = { ...saved, drawing_intelligence: { drawing_number: '4471', drawing_revision: 'B',
+      machining_allowance: { text: 'MACHINING ALLOWANCE 3 MM', allowance_mm: 3, rmag: null, dctg: null } } };
+    try {
+      const [h] = (await service().resolve(args)).result!.features;
+      expect(h).toMatchObject({ status: 'specified', allowanceMm: 3, sides: 2, asCast: { asCastMm: 14 } });
+      expect(h!.source.ref).toBe('drawing 4471 rev B: "MACHINING ALLOWANCE 3 MM"');
+    } finally {
+      TABLES.bom_items = saved;
+    }
+  });
+
   it('shows nothing when machining need was not assessed', async () => {
     expect(await service().resolve({ ...args, need: { ...need, assessed: false, result: null } })).toEqual({ result: null, warnings: [] });
   });
