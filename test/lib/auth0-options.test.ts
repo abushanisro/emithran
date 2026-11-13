@@ -43,17 +43,29 @@ describe('Auth0 client options', () => {
     expect((await options()).session?.absoluteDuration).toBe(8 * 60 * 60);
   });
 
-  it("keeps the default profile claims plus the session id, which the idle timer uses instead of the token's sid", async () => {
+  // The session cookie carries only what the app reads: the person's name and picture (auth0-auth-provider) and the session id the idle
+  // timer keys on (session-source), plus sub, the identity. Email and role come from the backend (/me), so the rest is weight in every request.
+  it("keeps only the profile fields the app reads, with the session's own id instead of the token's sid", async () => {
     const { beforeSessionSaved } = await options();
     if (!beforeSessionSaved) throw new Error('beforeSessionSaved is not set');
     const session: SessionData = {
-      user: { sub: 'auth0|1', email: 'a@example.com', name: 'A', sid: 'from-the-id-token', nonce: 'n', at_hash: 'h' },
+      user: {
+        sub: 'auth0|1', email: 'a@example.com', email_verified: true, name: 'A', nickname: 'a', given_name: 'A', family_name: 'B',
+        picture: 'https://example.com/a.png', updated_at: '2026-11-13', sid: 'from-the-id-token', nonce: 'n', at_hash: 'h',
+      },
       tokenSet: { accessToken: 'at', expiresAt: 0 },
       internal: { sid: 'sid-1', createdAt: 0 },
     };
     const saved = await beforeSessionSaved(session, null);
-    expect(saved.user).toEqual({ sub: 'auth0|1', email: 'a@example.com', name: 'A', sid: 'sid-1' });
+    expect(saved.user).toEqual({ sub: 'auth0|1', name: 'A', picture: 'https://example.com/a.png', sid: 'sid-1' });
     expect(saved.tokenSet).toBe(session.tokenSet);
+  });
+
+  it('leaves out a profile field the ID token did not carry instead of saving it empty', async () => {
+    const { beforeSessionSaved } = await options();
+    if (!beforeSessionSaved) throw new Error('beforeSessionSaved is not set');
+    const saved = await beforeSessionSaved({ user: { sub: 'auth0|1' }, tokenSet: { accessToken: 'at', expiresAt: 0 }, internal: { sid: 's', createdAt: 0 } }, null);
+    expect(saved.user).toEqual({ sub: 'auth0|1', sid: 's' });
   });
 });
 
