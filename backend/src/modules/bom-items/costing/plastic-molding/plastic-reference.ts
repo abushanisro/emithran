@@ -49,7 +49,7 @@ export const PLASTIC_VARIABLE_KEYS = [
   'conventionalRunnerMaxPressureReductionFactor', 'hotRunnerMaxPressureReductionFactor', 'minInjectionPressure',
   // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
   'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilonForSlides', 'drawDirectionOrthogonalEpsilonForLifters',
-  'cmAutoIncludeManualFlashTrimming',
+  'cmAutoIncludeManualFlashTrimming', 'cmManualFlashTrimmingRate',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -148,6 +148,8 @@ export interface FeatureRules {
   lifterEpsilonDeg: number | null;
   /** variable cmAutoIncludeManualFlashTrimming: manual flash trimming is included by default for parts with no internal cutouts (compression molding). */
   autoManualFlashTrimming: boolean | null;
+  /** variable cmManualFlashTrimmingRate (Length/Time, read as mm/s): the linear rate of manual flash removal; null when not staged. */
+  manualFlashTrimmingRateMmPerS?: number | null;
 }
 
 export interface PlasticReferenceRows {
@@ -337,6 +339,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
         slideEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForSlides'),
         lifterEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForLifters'),
         autoManualFlashTrimming: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(text.get('cmAutoIncludeManualFlashTrimming')?.trim().toLowerCase()),
+        manualFlashTrimmingRateMmPerS: optionalPositive('cmManualFlashTrimmingRate'),
       },
     },
     missing: [],

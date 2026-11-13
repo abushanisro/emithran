@@ -11,4 +11,5 @@ export const REGISTRY_FORMULA_OF_FIELD: Readonly<Record<string, Readonly<Record<
   structural_foam: INJECTION,
   injection_lsr: { 'Cure Time': 'F-09', 'Fill Time': 'F-05', 'Press Dry Cycle Time': 'F-07', 'Cycle Time': 'F-08' },
   rim: { 'Fill Time': 'F-19' },
+  injection_deflash: { 'Cycle Time': 'F-24' },
 };

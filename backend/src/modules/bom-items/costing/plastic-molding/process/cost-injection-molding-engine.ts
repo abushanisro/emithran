@@ -40,7 +40,7 @@ import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
-import { runInjectionCycleTime } from '../calculators/plastic-cycle-time';
+import { runDeflashingTime, runInjectionCycleTime } from '../calculators/plastic-cycle-time';
 import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
 import {
   type CycleTimeResult,
@@ -471,6 +471,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     assemblyFeatureCount: input.signals?.assemblyFeatureCount ?? null,
     gateType: gate,
     partingComplexity: input.signals?.partingComplexity ?? null,
+    partingLineLengthMm: input.signals?.partingLineLengthMm ?? null,
     unscrewingCoreCount: (input.signals as any)?.unscrewingCoreCount ?? null,
     overmoldSubstrate: (input.signals as any)?.overmoldSubstrate ?? null,
   };
@@ -546,7 +547,22 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   processLines.push(line);
 
   if (routed.has('gate_trimming')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
-  if (routed.has('deflashing')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.deflashing));
+  // Deflashing: the parting line trimmed by hand, timed by its stored calculator (length / cmManualFlashTrimmingRate) and charged at the bench rate.
+  if (routed.has('deflashing')) {
+    const trim = runDeflashingTime({
+      partingLineLengthMm: signals.partingLineLengthMm ?? null,
+      rateMmPerS: plasticRef?.featureRules.manualFlashTrimmingRateMmPerS ?? null,
+    }, input.calculators ?? null);
+    if (trim.derivable) {
+      const deflashLine = makeLine(UNCOSTED_OPERATION_LABELS.deflashing, null, batchSize, trim.cycleSec / 60, input.deburrRate);
+      deflashLine.calculationTrace = trim.trace;
+      if (trim.calculator.id) deflashLine.calculatorId = trim.calculator.id;
+      if (trim.calculator.version != null) deflashLine.calculatorVersion = trim.calculator.version;
+      processLines.push(deflashLine);
+    } else {
+      warnings.push(`Deflashing not costed: missing ${trim.missing.join('; ')}.`);
+    }
+  }
   if (routed.has('side_action')) {
     warnings.push(uncostedOpWarning(
       UNCOSTED_OPERATION_LABELS.side_action,

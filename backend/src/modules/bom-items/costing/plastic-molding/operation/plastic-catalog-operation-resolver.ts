@@ -43,6 +43,8 @@ export interface PlasticFeature {
     stroke_mm?: number;
     /** PartingLine: through holes (internal cutouts). */
     internal_cutouts?: number;
+    /** PartingLine: the measured parting line length, mm. */
+    length_mm?: number;
   } | null;
   occurrences: ReadonlyArray<{ face_ids?: ReadonlyArray<number> | null }>;
 }

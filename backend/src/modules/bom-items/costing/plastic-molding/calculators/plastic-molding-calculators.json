@@ -514,6 +514,35 @@
       ],
       "version": 2,
       "migration": 976
+    },
+    {
+      "key": "injection_deflash",
+      "name": "Injection Molding - Deflashing",
+      "description": "Deflashing time = the parting line length / the manual flash trimming rate (formula registry F-24, ASSUMED). The parting line length is the CAD measurement of the PartingLine feature. The rate is the reference variable cmManualFlashTrimmingRate (75), staged for compression molding (Compression Molding:Manual Flash Trimming//PartingLine) and borrowed for injection molding, which has no staged rate. The reference types the rate only as Length/Time; it is read as mm/s, the unit that fits the reference's other Length/Time rates (grindSpeed 381, defaultAviInspectionSpeed 110, cmAirHoseCleaningRateLinear 100) and a manual trim (mm/min would put a 785 mm parting line at over 10 minutes). Routed when the parting line is complex (routing engine); internal cutouts and flash thickness are not modelled. A missing length or rate makes the line a named gap, never a default.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Parting Line Length",
+          "unit": "mm",
+          "source": {
+            "cad": "PartingLine feature length_mm (cad-engine parting_line_reading_v1)"
+          }
+        },
+        {
+          "name": "Manual Flash Trimming Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "cmManualFlashTrimmingRate (Length/Time, read as mm/s)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "floor({Parting Line Length} / {Manual Flash Trimming Rate} * 100 + 0.5) / 100"
+        }
+      ],
+      "migration": 1010
     }
   ]
 }
