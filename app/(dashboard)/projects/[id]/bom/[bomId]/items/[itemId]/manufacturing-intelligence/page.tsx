@@ -16,6 +16,7 @@ import { CopilotPanel } from '@/components/features/manufacturing-intelligence/C
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
+import { SandMouldingDetail } from '@/components/costing/SandMouldingDetail';
 import { SandSnapshotsPanel } from '@/components/costing/SandSnapshotsPanel';
 import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
 import { MachiningAllowancePanel } from '@/components/features/casting-viewer/MachiningAllowancePanel';
@@ -38,7 +39,6 @@ import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/co
 import { applyGate } from '@/lib/analysis/analysis-status';
 import { cueRefreshAnalysis } from '@/lib/analysis/refresh-analysis-cue';
 import { RefreshAnalysisButton } from '@/components/features/analysis/RefreshAnalysisButton';
-import { SandRouteSummary } from '@/components/costing/SandRouteSummary';
 import { QuoteValidationNote } from '@/components/features/manufacturing-intelligence/QuoteValidationNote';
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
 import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
@@ -73,6 +73,7 @@ import { sequenceProcessRows } from '@/lib/routing/process-sequence';
 
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { effectiveSheetThicknessMm } from '@/lib/costing/effective-sheet-thickness';
+import { splitSandRuns } from '@/lib/costing/sand-calculations';
 import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
@@ -1832,14 +1833,6 @@ function CostSummaryTab({
       {/* ── The cost sections below are the working view; the applied cost as a full table opens from here. ── */}
       <CostTablePanel itemId={item.id} refreshKey={costUpdatedAt} display={{ symbol: sym, fromUsd }} />
 
-      {/* Sand casting: what the route decided (machine, how the part was measured, cavities, cores, the machines compared). */}
-      {cost.sandCasting && (
-        <>
-          <SectionHeader label="Sand Casting Route" />
-          <div className="pl-2 pb-2"><SandRouteSummary route={cost.sandCasting} /></div>
-        </>
-      )}
-
       {/* ── DIRECT MATERIAL ── editable via RawMaterialsSection ── */}
       <SectionHeader label="Direct Material Costs" />
 
@@ -1865,6 +1858,15 @@ function CostSummaryTab({
           bomItemId={item.id}
           bomItem={item}
           location={factory}
+          {...(cost.sandCasting ? {
+            // A sand casting's metal: the balance and the calculators behind the material line (metal, risers, gating, core sand).
+            breakdownDetail: (
+              <div className="space-y-2 pt-2">
+                <SandMetalBalance runs={cost.calculatorRuns} />
+                <SandCalculatorRuns bomItemId={item.id} runs={splitSandRuns(cost.calculatorRuns).material} />
+              </div>
+            ),
+          } : {})}
           batchSize={effBatchSize}
           {...(batchSize !== undefined ? { costBatchSize: batchSize } : {})}
           compact
@@ -1881,14 +1883,6 @@ function CostSummaryTab({
           }}
         />
       </div>
-
-      {/* Sand casting: the metal behind the material line and the calculators behind the route (metal, risers, gating, core sand, core boxes). */}
-      {cost.sandCasting && (
-        <div className="pl-2 pb-2 space-y-2">
-          <SandMetalBalance runs={cost.calculatorRuns} />
-          <SandCalculatorRuns bomItemId={item.id} runs={cost.calculatorRuns} />
-        </div>
-      )}
 
       {/* ── DIRECT PROCESS COSTS ── engine rows shown only when no stored records exist ── */}
       <SectionHeader label="Direct Process Costs" />
@@ -2262,6 +2256,8 @@ function CostSummaryTab({
                   // A sand line's inputs read from a plant variable can be set for this part, under the input.
                   ? <SandLineTrace bomItemId={item.id} line={matchedEngineLine} />
                   : <CalculationTracePanel line={matchedEngineLine} />)}
+                {/* The moulding line: how the part was measured, cavities, cores, and the other moulding machines compared. */}
+                {cost.sandCasting && matchedEngineLine?.process === cost.sandCasting.mouldingProcess && <SandMouldingDetail route={cost.sandCasting} />}
                 {(heads > 1 || ppc > 1) && (
                   <div className="flex items-baseline justify-between gap-2 min-w-0">
                     <span className="text-xs text-muted-foreground truncate min-w-0">Heads × Parts/Cycle</span>
@@ -2489,7 +2485,7 @@ function CostSummaryTab({
 
       {/* ── TOOLING & FIXTURES ── */}
       <SectionHeader label="Tooling & Fixtures" />
-      <RouteTooling cost={cost} currencySymbol={sym} conversionRate={fromUsd} />
+      <RouteTooling itemId={item.id} cost={cost} currencySymbol={sym} conversionRate={fromUsd} />
       <div className="-mx-4">
         <ToolingSection bomItemId={item.id} bomItem={item} compact currencySymbol={sym} conversionRate={fromUsd} />
       </div>
@@ -7591,7 +7587,7 @@ function MoldCavitiesSection({
 // The tools the costed route needs (the die and the GDC coreboxes), from the
 // cost summary. Kept out of the piece cost like every tooling result: shown
 // here with their amortised per-part share, and as investment in Invest (NRE).
-function RouteTooling({ cost, currencySymbol, conversionRate }: { cost: CostSummaryDto; currencySymbol: string; conversionRate: number }) {
+function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId: string; cost: CostSummaryDto; currencySymbol: string; conversionRate: number }) {
   const die = cost.dieTooling;
   const boxes = cost.coreboxTooling;
   if (!die && !boxes) return null;
@@ -7617,6 +7613,7 @@ function RouteTooling({ cost, currencySymbol, conversionRate }: { cost: CostSumm
             <span className="tabular-nums">{money(boxes.costUsd, 0)} · {perPart(boxes.perPartUsd)}</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">{boxes.detail}</p>
+          <div className="mt-1"><SandCalculatorRuns bomItemId={itemId} runs={splitSandRuns(cost.calculatorRuns).tooling} /></div>
         </div>
       )}
     </div>

@@ -27,6 +27,14 @@ export interface CalculationEntry {
   noTraceReason: string | null;
 }
 
+/** The route's calculator runs by where they are shown: the core boxes under Tooling, the metal, gating, risers and core sand under the material. */
+export function splitSandRuns(runs: Record<string, CalculatorRun> | undefined): { material: Record<string, CalculatorRun>; tooling: Record<string, CalculatorRun> } {
+  const material: Record<string, CalculatorRun> = {};
+  const tooling: Record<string, CalculatorRun> = {};
+  for (const [key, run] of Object.entries(runs ?? {})) (key.startsWith('Sand core box') ? tooling : material)[key] = run;
+  return { material, tooling };
+}
+
 /** The calculator runs of the route (metal, risers, gating, core sand, core boxes), each carrying only what the backend sent. */
 export function calculatorRunEntries(runs: Record<string, CalculatorRun> | undefined): CalculationEntry[] {
   return Object.entries(runs ?? {}).map(([name, r]) => ({
