@@ -64,10 +64,18 @@ describe('a stored calculator must be in the database and be the version the eng
     // a current one is accepted, and so is every other calculator at version 1
     expect('def' in requirePlasticCalculator(CALCULATORS, RIM)).toBe(true);
     expect('def' in requirePlasticCalculator(CALCULATORS, INJECTION)).toBe(true);
+    // and the injection one at version 1 (pack on top of cooling, no plasticizing or ejection) is refused the same way
+    const oldInjection = { ...CALCULATORS, [INJECTION]: { ...CALCULATORS[INJECTION]!, version: 1 } };
+    const i = requirePlasticCalculator(oldInjection, INJECTION);
+    expect('problem' in i && i.problem).toContain('is version 1, and this engine needs version 2');
   });
 
   it('every runner says it was the calculator that was missing, with the same text, and gives no cycle', () => {
-    const inj = runInjectionCycleTime({ wallMm: 2, isLsr: false, real: realResinInputs('ABS'), model: realPlasticReference().cycleModel, press: realPress('Arburg Allrounder 420 C 1300 - 350').timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1 }, {}, 'injection');
+    const press = realPress('Arburg Allrounder 420 C 1300 - 350');
+    const inj = runInjectionCycleTime({
+      wallMm: 2, isLsr: false, real: realResinInputs('ABS'), model: realPlasticReference().cycleModel, press: press.timing, shotMeltVolumeMm3: 50_000, cavityCount: 1, gatesPerCavity: 1,
+      shotGppsMassG: 45, partHeightMm: 30, pressClampKn: press.clampKn,
+    }, {}, 'injection');
     const cm = runCompressionCycleTime({ pressCycleTimeS: 20, cureTimeMin: 3 }, {});
     const rim = runRimCycleTime({ machineCycleTimeS: 10, partVolumeMm3: 50_000, injectionRateMm3PerS: 100_000, cureTimeMin: 3 }, {});
     for (const r of [inj, cm, rim]) {
@@ -90,6 +98,8 @@ describe('what the cost line tells the engineer', () => {
   const part = (over: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCostInput => ({
     volume: 50_000, surfaceArea: 40_000, wallThicknessNominalMm: 2, materialGrade: 'ABS', materialCostPerKg: 3.046, materialDensityKgM3: 1040, materialSource: 'db',
     batchSize: 250, family: 'plastic_molded', mhrRate: { ...rate('injection_molding', PRESS.mhrUsd, 'Arburg Allrounder 420 C 1300 - 350'), setupTimeHr: 2 },
+    // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
+    bboxMinMm: 30,
     deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null), machineClampTonnes: PRESS.maxTonnage, machineShotCapacityG: PRESS.shotCapacityGrams,
     pressTiming: PRESS.timing, goodPartYield: PRESS.goodPartYield, calculators: CALCULATORS, materialClamp: realMaterialClamp('ABS'), realResinInputs: realResinInputs('ABS'), materialType: 'ABS',
     plasticReference: realPlasticReference(), location: 'USA', annualVolume: 100_000, productionLifeYears: 3, signals: { projectedAreaMm2: 10_000, undercutCount: 0 },

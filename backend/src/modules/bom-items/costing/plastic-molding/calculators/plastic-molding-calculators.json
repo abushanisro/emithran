@@ -5,7 +5,7 @@
     {
       "key": "injection",
       "name": "Injection Molding - Cycle Time",
-      "description": "Injection cycle time = (Fill + Pack + Cooling + Mold open/close) x Cycle Time Adjustment Factor (formula registry F-08, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula). Fill = shot melt volume / the press injection rate x the injectionTimeAdjustmentFactors for cavities and gates (F-05, VALIDATED). Pack = 35 % of cooling with a 2 s floor, the Menges gate-freeze rule (F-06, ASSUMED: the reference holds no hold time). Mold open/close = the press Euromap 6 dry cycle (F-07, VALIDATED). Not modelled, because the reference has no formula or press data: ejector travel, plasticizing, part and material handling, slides and lifters. Rounded as the engine does: cooling and pack to 0.1 s, fill and the total to 0.01 s.",
+      "description": "Injection cycle time = (Injection + Cooling + Plasticizing beyond cooling + Ejection) x Cycle Time Adjustment Factor (formula registry F-08 v2, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula); it runs from the end of filling to ejection, so holding pressure is inside it and is not added again. Injection = shot melt volume / (the press injection rate x injectionRateMultiplier) x the injectionTimeAdjustmentFactors for cavities and gates (F-05 v2, VALIDATED). Plasticizing = the shot's GPPS-equivalent mass / (the press plasticizing rate x plasticizingRateMultiplier), the press's own rate or else plasticizingRateByClampForce at its clamp force (F-20, ASSUMED); the screw recovers while the part cools, so only the part longer than cooling adds to the cycle. Ejection = mold open and close (the press Euromap 6 dry cycle, F-07) + the ejector stroke out and back: numEjectorCycles x 2 x ejectorDistanceFactor x the part height, at ejectorPercentMaxMachineVelocity of the platen speed, the speed being 2 x dryCycleStrokeFactor x the opening stroke / the dry cycle (F-21, ASSUMED: the reference states these variables, not the formula). Not modelled, because the reference has no formula or the part no input: robotic part handling (partHandlingTimes; the reference default ejection is gravity), material handling, slides and lifters. Rounded as the engine does: cooling to 0.1 s, the times and the total to 0.01 s.",
       "operations": [
         "Injection Molding"
       ],
@@ -115,6 +115,79 @@
           }
         },
         {
+          "name": "Injection Rate Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "injectionRateMultiplier"
+          }
+        },
+        {
+          "name": "Shot GPPS Mass",
+          "unit": "g",
+          "source": {
+            "engine": "shot mass of all cavities + runner as GPPS-equivalent grams (shot-size.ts)"
+          }
+        },
+        {
+          "name": "Press Plasticizing Rate",
+          "unit": "g/s",
+          "source": {
+            "machine": "rates.plasticizingRateGppsGPerS; when the press states none, plasticizingRateByClampForce at the press clamp force"
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "plasticizingRateByClampForce",
+          "sourceField": "Plasticizing Rate (g / s)"
+        },
+        {
+          "name": "Plasticizing Rate Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "plasticizingRateMultiplier"
+          }
+        },
+        {
+          "name": "Press Opening Stroke",
+          "unit": "mm",
+          "source": {
+            "machine": "limits.openingStrokeMm"
+          }
+        },
+        {
+          "name": "Dry Cycle Stroke Factor",
+          "unit": null,
+          "source": {
+            "variable": "dryCycleStrokeFactor"
+          }
+        },
+        {
+          "name": "Part Height",
+          "unit": "mm",
+          "source": {
+            "cad": "bounding box, the smallest side (along the pull direction)"
+          }
+        },
+        {
+          "name": "Ejector Distance Factor",
+          "unit": null,
+          "source": {
+            "variable": "ejectorDistanceFactor"
+          }
+        },
+        {
+          "name": "Ejector Velocity Percent",
+          "unit": "%",
+          "source": {
+            "variable": "ejectorPercentMaxMachineVelocity"
+          }
+        },
+        {
+          "name": "Number of Ejector Cycles",
+          "unit": null,
+          "source": {
+            "variable": "numEjectorCycles"
+          }
+        },
+        {
           "name": "Mold Wall Temperature",
           "unit": "°C",
           "formula": "{Mold Temperature} + {Mold Temperature Increase}"
@@ -130,32 +203,38 @@
           "formula": "floor({Nominal Wall Thickness} * {Nominal Wall Thickness} / (pi * pi * {Thermal Diffusivity}) * LN(4 / pi * ({Melt Temperature} - {Mold Wall Temperature}) / ({Ejection Temperature} - {Mold Wall Temperature})) * 10 + 0.5) / 10"
         },
         {
-          "name": "Fill Time",
+          "name": "Injection Time",
           "unit": "s",
-          "formula": "floor({Shot Melt Volume} / {Press Injection Rate} * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100"
+          "formula": "floor({Shot Melt Volume} / ({Press Injection Rate} * {Injection Rate Multiplier}) * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100"
         },
         {
-          "name": "Pack to Cooling Ratio",
-          "unit": null,
-          "formula": "0.35"
+          "name": "Plasticizing Time",
+          "unit": "s",
+          "formula": "floor({Shot GPPS Mass} / ({Press Plasticizing Rate} * {Plasticizing Rate Multiplier}) * 100 + 0.5) / 100"
         },
         {
-          "name": "Pack Time Minimum",
-          "unit": "s",
-          "formula": "2"
+          "name": "Press Platen Speed",
+          "unit": "mm/s",
+          "formula": "2 * {Dry Cycle Stroke Factor} * {Press Opening Stroke} / {Press Dry Cycle Time}"
         },
         {
-          "name": "Pack Time",
+          "name": "Ejector Stroke Time",
           "unit": "s",
-          "formula": "max({Pack Time Minimum}, floor({Cooling Time} * {Pack to Cooling Ratio} * 10 + 0.5) / 10)"
+          "formula": "floor({Number of Ejector Cycles} * 2 * {Ejector Distance Factor} * {Part Height} / ({Press Platen Speed} * {Ejector Velocity Percent} / 100) * 100 + 0.5) / 100"
+        },
+        {
+          "name": "Ejection Time",
+          "unit": "s",
+          "formula": "{Press Dry Cycle Time} + {Ejector Stroke Time}"
         },
         {
           "name": "Cycle Time",
           "unit": "s",
-          "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
+          "formula": "floor(({Injection Time} + {Cooling Time} + max(0, {Plasticizing Time} - {Cooling Time}) + {Ejection Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
       ],
-      "migration": 977
+      "migration": 1007,
+      "version": 2
     },
     {
       "key": "injection_lsr",
@@ -260,7 +339,7 @@
     {
       "key": "structural_foam",
       "name": "Structural Foam Molding - Cycle Time",
-      "description": "Structural foam uses the injection cycle model unchanged (the cost engine reuses it with a foam press): the reference holds no foam-specific cooling or fill formula, so foaming, which lengthens cooling, is NOT modelled and the cycle is understated for foam parts until a validated formula is supplied. Injection cycle time = (Fill + Pack + Cooling + Mold open/close) x Cycle Time Adjustment Factor (formula registry F-08, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula). Fill = shot melt volume / the press injection rate x the injectionTimeAdjustmentFactors for cavities and gates (F-05, VALIDATED). Pack = 35 % of cooling with a 2 s floor, the Menges gate-freeze rule (F-06, ASSUMED: the reference holds no hold time). Mold open/close = the press Euromap 6 dry cycle (F-07, VALIDATED). Not modelled, because the reference has no formula or press data: ejector travel, plasticizing, part and material handling, slides and lifters. Rounded as the engine does: cooling and pack to 0.1 s, fill and the total to 0.01 s.",
+      "description": "Structural foam uses the injection cycle model unchanged (the cost engine reuses it with a foam press): the reference holds no foam-specific cooling or fill formula, so foaming, which lengthens cooling, is NOT modelled and the cycle is understated for foam parts until a validated formula is supplied. Injection cycle time = (Injection + Cooling + Plasticizing beyond cooling + Ejection) x Cycle Time Adjustment Factor (formula registry F-08 v2, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula); it runs from the end of filling to ejection, so holding pressure is inside it and is not added again. Injection = shot melt volume / (the press injection rate x injectionRateMultiplier) x the injectionTimeAdjustmentFactors for cavities and gates (F-05 v2, VALIDATED). Plasticizing = the shot's GPPS-equivalent mass / (the press plasticizing rate x plasticizingRateMultiplier), the press's own rate or else plasticizingRateByClampForce at its clamp force (F-20, ASSUMED); the screw recovers while the part cools, so only the part longer than cooling adds to the cycle. Ejection = mold open and close (the press Euromap 6 dry cycle, F-07) + the ejector stroke out and back: numEjectorCycles x 2 x ejectorDistanceFactor x the part height, at ejectorPercentMaxMachineVelocity of the platen speed, the speed being 2 x dryCycleStrokeFactor x the opening stroke / the dry cycle (F-21, ASSUMED: the reference states these variables, not the formula). Not modelled, because the reference has no formula or the part no input: robotic part handling (partHandlingTimes; the reference default ejection is gravity), material handling, slides and lifters. Rounded as the engine does: cooling to 0.1 s, the times and the total to 0.01 s.",
       "operations": [
         "Structural foam molding"
       ],
@@ -370,6 +449,79 @@
           }
         },
         {
+          "name": "Injection Rate Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "injectionRateMultiplier"
+          }
+        },
+        {
+          "name": "Shot GPPS Mass",
+          "unit": "g",
+          "source": {
+            "engine": "shot mass of all cavities + runner as GPPS-equivalent grams (shot-size.ts)"
+          }
+        },
+        {
+          "name": "Press Plasticizing Rate",
+          "unit": "g/s",
+          "source": {
+            "machine": "rates.plasticizingRateGppsGPerS; when the press states none, plasticizingRateByClampForce at the press clamp force"
+          },
+          "dataSource": "machining_lookup",
+          "sourceTable": "plasticizingRateByClampForce",
+          "sourceField": "Plasticizing Rate (g / s)"
+        },
+        {
+          "name": "Plasticizing Rate Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "plasticizingRateMultiplier"
+          }
+        },
+        {
+          "name": "Press Opening Stroke",
+          "unit": "mm",
+          "source": {
+            "machine": "limits.openingStrokeMm"
+          }
+        },
+        {
+          "name": "Dry Cycle Stroke Factor",
+          "unit": null,
+          "source": {
+            "variable": "dryCycleStrokeFactor"
+          }
+        },
+        {
+          "name": "Part Height",
+          "unit": "mm",
+          "source": {
+            "cad": "bounding box, the smallest side (along the pull direction)"
+          }
+        },
+        {
+          "name": "Ejector Distance Factor",
+          "unit": null,
+          "source": {
+            "variable": "ejectorDistanceFactor"
+          }
+        },
+        {
+          "name": "Ejector Velocity Percent",
+          "unit": "%",
+          "source": {
+            "variable": "ejectorPercentMaxMachineVelocity"
+          }
+        },
+        {
+          "name": "Number of Ejector Cycles",
+          "unit": null,
+          "source": {
+            "variable": "numEjectorCycles"
+          }
+        },
+        {
           "name": "Mold Wall Temperature",
           "unit": "°C",
           "formula": "{Mold Temperature} + {Mold Temperature Increase}"
@@ -385,32 +537,38 @@
           "formula": "floor({Nominal Wall Thickness} * {Nominal Wall Thickness} / (pi * pi * {Thermal Diffusivity}) * LN(4 / pi * ({Melt Temperature} - {Mold Wall Temperature}) / ({Ejection Temperature} - {Mold Wall Temperature})) * 10 + 0.5) / 10"
         },
         {
-          "name": "Fill Time",
+          "name": "Injection Time",
           "unit": "s",
-          "formula": "floor({Shot Melt Volume} / {Press Injection Rate} * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100"
+          "formula": "floor({Shot Melt Volume} / ({Press Injection Rate} * {Injection Rate Multiplier}) * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100"
         },
         {
-          "name": "Pack to Cooling Ratio",
-          "unit": null,
-          "formula": "0.35"
+          "name": "Plasticizing Time",
+          "unit": "s",
+          "formula": "floor({Shot GPPS Mass} / ({Press Plasticizing Rate} * {Plasticizing Rate Multiplier}) * 100 + 0.5) / 100"
         },
         {
-          "name": "Pack Time Minimum",
-          "unit": "s",
-          "formula": "2"
+          "name": "Press Platen Speed",
+          "unit": "mm/s",
+          "formula": "2 * {Dry Cycle Stroke Factor} * {Press Opening Stroke} / {Press Dry Cycle Time}"
         },
         {
-          "name": "Pack Time",
+          "name": "Ejector Stroke Time",
           "unit": "s",
-          "formula": "max({Pack Time Minimum}, floor({Cooling Time} * {Pack to Cooling Ratio} * 10 + 0.5) / 10)"
+          "formula": "floor({Number of Ejector Cycles} * 2 * {Ejector Distance Factor} * {Part Height} / ({Press Platen Speed} * {Ejector Velocity Percent} / 100) * 100 + 0.5) / 100"
+        },
+        {
+          "name": "Ejection Time",
+          "unit": "s",
+          "formula": "{Press Dry Cycle Time} + {Ejector Stroke Time}"
         },
         {
           "name": "Cycle Time",
           "unit": "s",
-          "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
+          "formula": "floor(({Injection Time} + {Cooling Time} + max(0, {Plasticizing Time} - {Cooling Time}) + {Ejection Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
       ],
-      "migration": 977
+      "migration": 1007,
+      "version": 2
     },
     {
       "key": "compression",

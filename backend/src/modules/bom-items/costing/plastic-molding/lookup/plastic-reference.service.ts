@@ -28,6 +28,10 @@ interface PressRecord {
   dryCycleTimeS: number | null;
   /** good_part_yield (migration 633): share of shots that are good parts. */
   goodPartYield: number | null;
+  /** specs.plasticizing_rate_gpps_g_per_s (migration 832): GPPS grams the screw melts per second; absent for some presses. */
+  plasticizingRateGPerS: number | null;
+  /** specs.opening_stroke_mm (migration 832): the platen's full opening stroke. */
+  openingStrokeMm: number | null;
 }
 
 /**
@@ -137,6 +141,8 @@ export class PlasticReferenceService {
       injectionRateMm3PerS: num(r.specs?.injection_rate_mm3_per_s),
       dryCycleTimeS: num(r.press_cycle_time_s),
       goodPartYield: num(r.good_part_yield),
+      plasticizingRateGPerS: num(r.specs?.plasticizing_rate_gpps_g_per_s),
+      openingStrokeMm: num(r.specs?.opening_stroke_mm),
     }]));
   }
 }
