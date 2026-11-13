@@ -26,12 +26,16 @@ import {
 } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calculator as CalculatorIcon, Eye, Loader2, Play } from 'lucide-react';
+import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import {
   useCalculators,
   useCalculator,
   useExecuteCalculator,
 } from '@/lib/api/hooks/useCalculators';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
+import { useToolingCatalog, useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
+import type { ToolingCatalogItem } from '@/lib/api/tooling-catalogs';
+import { catalogItemFields, catalogSourceLine, defaultAmortization, processLabel } from '@/lib/costing/tooling-catalog';
 
 interface ToolingCostDialogProps {
   open: boolean;
@@ -43,109 +47,13 @@ interface ToolingCostDialogProps {
   selectedSubProcess?: string | null;
 }
 
-// Manufacturing Process Hierarchy
+/** A Machining operation (process_calculator_mappings): the only sub-processes with real data. */
 interface SubProcessDefinition {
   label: string;
-  toolTypes: string[];
 }
 
-interface ProcessDefinition {
-  label: string;
-  subProcesses: Record<string, SubProcessDefinition>;
-}
-
-// Machining's sub-process list is fetched dynamically below (real
-// process_calculator_mappings rows, processGroup='Machining') — never a
-// hardcoded sub-process list. The other domains here have no equivalent
-// real per-operation catalog to fetch from and are out of scope for this
-// fix; 'machining' is intentionally left without a static subProcesses
-// entry so a bug can't silently fall back to a stale hardcoded list.
-const MANUFACTURING_PROCESSES: Record<string, ProcessDefinition> = {
-  machining: {
-    label: 'Machining',
-    subProcesses: {},
-  },
-  injection_molding: {
-    label: 'Plastic Molding',
-    subProcesses: {
-      mold_making: { label: 'Mold Making', toolTypes: ['die', 'cutting_tool', 'measuring_tool'] },
-      injection: { label: 'Injection Process', toolTypes: ['die', 'fixture', 'test_equipment'] },
-      cooling: { label: 'Cooling System', toolTypes: ['special_tool', 'measuring_tool'] },
-      ejection: { label: 'Ejection System', toolTypes: ['special_tool', 'fixture'] }
-    }
-  },
-  sheet_metal: {
-    label: 'Sheet Metal',
-    subProcesses: {
-      cutting: { label: 'Cutting', toolTypes: ['cutting_tool', 'fixture', 'measuring_tool'] },
-      bending: { label: 'Bending', toolTypes: ['die', 'fixture', 'gauge'] },
-      punching: { label: 'Punching', toolTypes: ['punch', 'die', 'fixture'] },
-      stamping: { label: 'Stamping', toolTypes: ['die', 'punch', 'fixture'] },
-      welding: { label: 'Welding', toolTypes: ['fixture', 'jig', 'special_tool'] },
-      forming: { label: 'Forming', toolTypes: ['die', 'fixture', 'gauge'] }
-    }
-  },
-  casting: {
-    label: 'Casting',
-    subProcesses: {
-      sand_casting: { label: 'Sand Casting', toolTypes: ['die', 'fixture', 'special_tool'] },
-      investment_casting: { label: 'Investment Casting', toolTypes: ['die', 'fixture', 'measuring_tool'] },
-      die_casting: { label: 'Die Casting', toolTypes: ['die', 'fixture', 'test_equipment'] },
-      permanent_mold: { label: 'Permanent Mold', toolTypes: ['die', 'fixture', 'special_tool'] },
-      pattern_making: { label: 'Pattern Making', toolTypes: ['cutting_tool', 'measuring_tool', 'special_tool'] }
-    }
-  },
-  forging: {
-    label: 'Forging',
-    subProcesses: {
-      hot_forging: { label: 'Hot Forging', toolTypes: ['die', 'fixture', 'special_tool'] },
-      cold_forging: { label: 'Cold Forging', toolTypes: ['die', 'punch', 'fixture'] },
-      upset_forging: { label: 'Upset Forging', toolTypes: ['die', 'fixture', 'measuring_tool'] },
-      drop_forging: { label: 'Drop Forging', toolTypes: ['die', 'fixture', 'special_tool'] },
-      press_forging: { label: 'Press Forging', toolTypes: ['die', 'fixture', 'measuring_tool'] }
-    }
-  },
-  assembly: {
-    label: 'Assembly',
-    subProcesses: {
-      mechanical_assembly: { label: 'Mechanical Assembly', toolTypes: ['assembly_tool', 'fixture', 'measuring_tool'] },
-      welded_assembly: { label: 'Welded Assembly', toolTypes: ['fixture', 'jig', 'assembly_tool'] },
-      fastened_assembly: { label: 'Fastened Assembly', toolTypes: ['assembly_tool', 'fixture', 'gauge'] },
-      bonded_assembly: { label: 'Bonded Assembly', toolTypes: ['fixture', 'assembly_tool', 'special_tool'] }
-    }
-  },
-  finishing: {
-    label: 'Finishing',
-    subProcesses: {
-      surface_treatment: { label: 'Surface Treatment', toolTypes: ['fixture', 'special_tool', 'test_equipment'] },
-      painting: { label: 'Painting', toolTypes: ['fixture', 'special_tool', 'test_equipment'] },
-      plating: { label: 'Plating', toolTypes: ['fixture', 'special_tool', 'measuring_tool'] },
-      heat_treatment: { label: 'Heat Treatment', toolTypes: ['fixture', 'measuring_tool', 'test_equipment'] }
-    }
-  },
-  inspection: {
-    label: 'Quality Control & Inspection',
-    subProcesses: {
-      dimensional_inspection: { label: 'Dimensional Inspection', toolTypes: ['measuring_tool', 'gauge', 'test_equipment'] },
-      functional_testing: { label: 'Functional Testing', toolTypes: ['test_equipment', 'fixture', 'special_tool'] },
-      visual_inspection: { label: 'Visual Inspection', toolTypes: ['measuring_tool', 'gauge', 'special_tool'] },
-      material_testing: { label: 'Material Testing', toolTypes: ['test_equipment', 'special_tool', 'measuring_tool'] }
-    }
-  }
-};
-
-const TOOLING_TYPES = [
-  { value: 'cutting_tool', label: 'Cutting Tools (End Mills, Drills, etc.)', category: 'machining' },
-  { value: 'fixture', label: 'Fixtures & Work Holding', category: 'setup' },
-  { value: 'jig', label: 'Jigs & Templates', category: 'setup' },
-  { value: 'die', label: 'Dies & Molds', category: 'forming' },
-  { value: 'punch', label: 'Punches & Stamps', category: 'forming' },
-  { value: 'gauge', label: 'Go/No-Go Gauges', category: 'inspection' },
-  { value: 'measuring_tool', label: 'Measuring Tools', category: 'inspection' },
-  { value: 'special_tool', label: 'Special Purpose Tools', category: 'custom' },
-  { value: 'assembly_tool', label: 'Assembly Tools', category: 'assembly' },
-  { value: 'test_equipment', label: 'Test Equipment', category: 'inspection' },
-];
+/** The item picker's value for an item not in the catalog: it needs a tooling type and a reason. */
+const CUSTOM_ITEM = '__custom__';
 
 export function ToolingCostDialog({
   open,
@@ -171,6 +79,10 @@ export function ToolingCostDialog({
     leadTime: '',
     notes: '',
   });
+
+  // The catalog item picked ('' none yet, CUSTOM_ITEM for an item not in the catalog).
+  const [catalogItemId, setCatalogItemId] = useState<string>('');
+  const amortizationDefault = defaultAmortization((bomItem as Partial<BOMItem> | undefined)?.resolvedCostingInputs);
 
   // Calculator state
   const [calculatorOpen, setCalculatorOpen] = useState<boolean>(false);
@@ -198,7 +110,9 @@ export function ToolingCostDialog({
         leadTime: initialData.leadTime?.toString() || '',
         notes: initialData.notes || '',
       });
+      setCatalogItemId((initialData as { isCustom?: boolean }).isCustom ? CUSTOM_ITEM : '');
     } else {
+      setCatalogItemId('');
       // Reset form for new tooling
       setFormData({
         manufacturingProcess: selectedProcess || '',
@@ -208,7 +122,7 @@ export function ToolingCostDialog({
         specifications: '',
         unitCost: '',
         quantity: '1',
-        amortizationParts: '',
+        amortizationParts: amortizationDefault ? String(amortizationDefault.parts) : '',
         usagePercentage: '100',
         isCustom: false,
         supplier: '',
@@ -216,6 +130,7 @@ export function ToolingCostDialog({
         notes: '',
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on open; the default is read from the part as it is then
   }, [initialData, open, selectedProcess, selectedSubProcess]);
 
   // Calculate total cost per part
@@ -259,13 +174,28 @@ export function ToolingCostDialog({
     for (const m of rows) {
       if (!m.operation || seen.has(m.operation)) continue;
       seen.add(m.operation);
-      // No real per-operation tool-type recommendation data exists for
-      // Machining anywhere — an empty list here (not a fabricated guess)
-      // correctly falls through to "no recommendation, show all tool types".
-      ops.push([m.operation, { label: m.operation, toolTypes: [] }]);
+      ops.push([m.operation, { label: m.operation }]);
     }
     return ops.sort((a, b) => a[0].localeCompare(b[0]));
   }, [machiningMappingsData]);
+
+  // Processes with a tooling catalog, and the items of the one chosen (staged memory/ reference data).
+  const { data: catalogDomains = [] } = useToolingCatalogDomains(open);
+  const { data: catalog, isLoading: catalogLoading } = useToolingCatalog(open && formData.manufacturingProcess ? formData.manufacturingProcess : undefined);
+  const catalogItemsByKind = useMemo(() => {
+    const groups = new Map<string, ToolingCatalogItem[]>();
+    for (const item of catalog?.items ?? []) groups.set(item.kind, [...(groups.get(item.kind) ?? []), item]);
+    return [...groups.entries()];
+  }, [catalog]);
+  const pickedItem = catalog?.items.find((i) => i.id === catalogItemId) ?? null;
+  const isCustom = catalogItemId === CUSTOM_ITEM;
+
+  const pickCatalogItem = (id: string) => {
+    setCatalogItemId(id);
+    const item = catalog?.items.find((i) => i.id === id);
+    if (item) setFormData((prev) => ({ ...prev, ...catalogItemFields(item), isCustom: false }));
+    else if (id === CUSTOM_ITEM) setFormData((prev) => ({ ...prev, isCustom: true }));
+  };
 
   // Lookup table state (matching raw material pattern)
   const [lookupTableData, setLookupTableData] = useState<any>(null);
@@ -441,7 +371,7 @@ export function ToolingCostDialog({
       quantity: parseInt(formData.quantity) || 1,
       amortizationParts: parseInt(formData.amortizationParts) || 1,
       usagePercentage: parseFloat(formData.usagePercentage) || 100,
-      isCustom: formData.isCustom,
+      isCustom: isCustom || formData.isCustom,
       supplier: formData.supplier,
       leadTime: parseInt(formData.leadTime) || 0,
       notes: formData.notes,
@@ -452,30 +382,13 @@ export function ToolingCostDialog({
     onSubmit(submitData);
   };
 
-  const selectedTooling = TOOLING_TYPES.find(t => t.value === formData.toolingType);
-  const selectedProcessData = MANUFACTURING_PROCESSES[formData.manufacturingProcess];
   const isMachiningSelected = formData.manufacturingProcess === 'machining';
-  const availableSubProcesses = isMachiningSelected
-    ? machiningOperations
-    : (selectedProcessData ? Object.entries(selectedProcessData.subProcesses) : []);
-  const selectedSubProcessData: SubProcessDefinition | undefined = isMachiningSelected
-    ? machiningOperations.find(([key]) => key === formData.subProcess)?.[1]
-    : selectedProcessData?.subProcesses[formData.subProcess];
-
-  // Filter tooling types based on selected sub-process
-  const getRecommendedTools = () => {
-    if (!selectedSubProcessData?.toolTypes) {
-      return { recommended: [], others: TOOLING_TYPES };
-    }
-    
-    const recommendedTypes = selectedSubProcessData.toolTypes;
-    const recommended = TOOLING_TYPES.filter(tool => recommendedTypes.includes(tool.value));
-    const others = TOOLING_TYPES.filter(tool => !recommendedTypes.includes(tool.value));
-    
-    return { recommended, others };
-  };
-
-  const { recommended: recommendedTools, others: otherTools } = getRecommendedTools();
+  // Only Machining has real sub-processes (its operations); the other processes have none on file, so none are offered.
+  const availableSubProcesses = isMachiningSelected ? machiningOperations : [];
+  // A record saved before the catalog may name a process without one: it stays selectable so editing keeps it.
+  const processOptions = formData.manufacturingProcess && !catalogDomains.some((d) => d.key === formData.manufacturingProcess)
+    ? [...catalogDomains, { key: formData.manufacturingProcess, label: processLabel(formData.manufacturingProcess, catalogDomains) }]
+    : catalogDomains;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -486,13 +399,11 @@ export function ToolingCostDialog({
             {selectedProcess && selectedSubProcess && (
               <div className="flex items-center gap-2 mt-2">
                 <Badge variant="secondary" className="text-xs">
-                  {MANUFACTURING_PROCESSES[selectedProcess]?.label}
+                  {processLabel(selectedProcess, catalogDomains)}
                 </Badge>
                 <span className="text-xs text-muted-foreground">→</span>
                 <Badge variant="outline" className="text-xs">
-                  {selectedProcess === 'machining'
-                    ? (machiningOperations.find(([key]) => key === selectedSubProcess)?.[1]?.label ?? selectedSubProcess)
-                    : MANUFACTURING_PROCESSES[selectedProcess]?.subProcesses[selectedSubProcess]?.label}
+                  {machiningOperations.find(([key]) => key === selectedSubProcess)?.[1]?.label ?? selectedSubProcess}
                 </Badge>
               </div>
             )}
@@ -506,19 +417,18 @@ export function ToolingCostDialog({
               <Label htmlFor="manufacturingProcess">Manufacturing Process</Label>
               <Select
                 value={formData.manufacturingProcess}
-                onValueChange={(value) => setFormData(prev => ({ 
-                  ...prev, 
-                  manufacturingProcess: value,
-                  subProcess: '' // Reset sub-process when process changes
-                }))}
+                onValueChange={(value) => {
+                  setCatalogItemId('');
+                  setFormData(prev => ({ ...prev, manufacturingProcess: value, subProcess: '' }));
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select manufacturing process" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(MANUFACTURING_PROCESSES).map(([key, process]) => (
-                    <SelectItem key={key} value={key}>
-                      {process.label}
+                  {processOptions.map((d) => (
+                    <SelectItem key={d.key} value={d.key}>
+                      {d.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -530,13 +440,13 @@ export function ToolingCostDialog({
               <Select
                 value={formData.subProcess}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, subProcess: value }))}
-                disabled={!formData.manufacturingProcess}
+                disabled={availableSubProcesses.length === 0}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={
-                    !formData.manufacturingProcess 
-                      ? "Select process first" 
-                      : "Select sub-process"
+                    !formData.manufacturingProcess
+                      ? "Select process first"
+                      : availableSubProcesses.length === 0 ? "None on file for this process" : "Select sub-process"
                   } />
                 </SelectTrigger>
                 <SelectContent>
@@ -550,65 +460,67 @@ export function ToolingCostDialog({
             </div>
           </div>
 
-          {/* Recommended Tool Types — no real recommendation data exists for
-              Machining's operations, so this stays hidden for them rather
-              than showing an empty box. */}
-          {selectedSubProcessData && selectedSubProcessData.toolTypes.length > 0 && (
-            <div className="p-4 bg-primary/5 rounded-lg">
-              <Label className="text-sm font-medium">Recommended Tool Types for {selectedSubProcessData.label}:</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {selectedSubProcessData.toolTypes.map((toolType: string) => (
-                  <Badge key={toolType} variant="secondary" className="text-xs">
-                    {TOOLING_TYPES.find(t => t.value === toolType)?.label || toolType.replace('_', ' ')}
-                  </Badge>
+          {/* Catalog item: picking one fills the type, description, unit cost and typical quantity from the reference data. */}
+          <div className="space-y-2">
+            <Label htmlFor="catalogItem">Tooling Item *</Label>
+            <Select value={catalogItemId} onValueChange={pickCatalogItem} disabled={!formData.manufacturingProcess} required={!initialData}>
+              <SelectTrigger id="catalogItem">
+                <SelectValue placeholder={
+                  !formData.manufacturingProcess
+                    ? 'Select process first'
+                    : catalogLoading ? 'Loading catalog…' : initialData && !isCustom ? (formData.description || 'Select item') : 'Select from the catalog, or a custom item'
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                {catalogItemsByKind.map(([kind, items]) => (
+                  <div key={kind}>
+                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">{kind}</div>
+                    {items.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}{item.details ? ` · ${item.details}` : ''}
+                      </SelectItem>
+                    ))}
+                  </div>
                 ))}
+                <div className="border-t" />
+                <SelectItem value={CUSTOM_ITEM}>Custom item (not in the catalog)</SelectItem>
+              </SelectContent>
+            </Select>
+            {pickedItem && (
+              <p className="text-xs text-muted-foreground">Why: {catalogSourceLine(pickedItem)}</p>
+            )}
+            {catalog && catalog.unpriced.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Not offered, no price on file: {catalog.unpriced.map((u) => u.name).join(', ')}
+              </p>
+            )}
+          </div>
+
+          {isCustom && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="toolingType">Tooling Type *</Label>
+                <Input
+                  id="toolingType"
+                  value={formData.toolingType}
+                  onChange={(e) => { setFormData(prev => ({ ...prev, toolingType: e.target.value })); }}
+                  placeholder="e.g. Fixture"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customReason">Why it is not from the catalog *</Label>
+                <Input
+                  id="customReason"
+                  value={formData.notes}
+                  onChange={(e) => { setFormData(prev => ({ ...prev, notes: e.target.value })); }}
+                  placeholder="e.g. Supplier quote Q-1042"
+                  minLength={3}
+                  required
+                />
               </div>
             </div>
           )}
-
-          {/* Tooling Type */}
-          <div className="space-y-2">
-            <Label htmlFor="toolingType">Tooling Type *</Label>
-            <Select
-              value={formData.toolingType}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, toolingType: value }))}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select tooling type" />
-              </SelectTrigger>
-              <SelectContent>
-                {recommendedTools.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-xs font-semibold text-green-600 uppercase">
-                      Recommended for this process
-                    </div>
-                    {recommendedTools.map((tool) => (
-                      <SelectItem key={tool.value} value={tool.value}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-green-600">★</span>
-                          <span>{tool.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase border-t">
-                      Other tool types
-                    </div>
-                  </>
-                )}
-                {otherTools.map((tool) => (
-                  <SelectItem key={tool.value} value={tool.value}>
-                    {tool.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedTooling && (
-              <Badge variant="outline" className="text-xs">
-                {selectedTooling.category.replace('_', ' ').toUpperCase()}
-              </Badge>
-            )}
-          </div>
 
           {/* Description and Specifications */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -701,7 +613,9 @@ export function ToolingCostDialog({
               required
             />
             <p className="text-xs text-muted-foreground">
-              Number of parts over which to amortize the tooling cost
+              {amortizationDefault && formData.amortizationParts === String(amortizationDefault.parts)
+                ? `Why: the part's lifetime volume, ${amortizationDefault.why}`
+                : 'Number of parts over which to amortize the tooling cost'}
             </p>
           </div>
 
