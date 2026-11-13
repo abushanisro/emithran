@@ -9704,9 +9704,6 @@ export default function ManufacturingIntelligencePage() {
         <ShieldCheck className={`h-3 w-3 ${rerunningDfm ? 'animate-pulse' : ''}`} />
         Re-run DFM
       </button>
-      <button disabled className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border opacity-40 cursor-not-allowed shrink-0">
-        Compare Versions
-      </button>
       <button
         onClick={() => { void handleDownloadCostReport(); }}
         disabled={downloadingReport}

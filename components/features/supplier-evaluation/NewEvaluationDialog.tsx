@@ -259,7 +259,7 @@ export function NewEvaluationDialog({
                                 <div className="flex flex-col">
                                   <span className="font-medium">{bom.name}</span>
                                   <span className="text-xs text-muted-foreground">
-                                    v{bom.version} • {bom.totalItems} items • {bom.status}
+                                    {bom.totalItems} items • {bom.status}
                                   </span>
                                 </div>
                               </SelectItem>

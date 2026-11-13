@@ -35,7 +35,6 @@ export interface SelectedProject {
 export interface SelectedBOM {
   id: string;
   name: string;
-  version: string;
   status: string;
 }
 

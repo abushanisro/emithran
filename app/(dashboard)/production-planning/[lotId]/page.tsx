@@ -55,7 +55,6 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
       lotNumber: lot?.lotNumber || 'Unknown',
       scheduleName: tabValue === 'schedule' ? `${lot?.bomName || 'Unknown'}_${lot?.lotNumber || currentLotId}_Schedule` : null,
       bomName: lot?.bomName || 'Unknown',
-      bomVersion: lot?.bomVersion || 'Unknown',
       quantity: lot?.quantity || 0,
       status: lot?.status || 'Unknown',
       priority: lot?.priority || 'Unknown',
@@ -86,7 +85,6 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
           lotId: currentLotId,
           lotNumber: lot?.lotNumber || 'Unknown',
           bomName: lot?.bomName || 'Unknown', 
-          bomVersion: lot?.bomVersion || 'v1.0',
           type: lot?.type || 'unknown',
           quantity: lot?.quantity || 0
         },
@@ -207,7 +205,6 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
           lotNumber: lotResponse?.lot_number || lotResponse?.lotNumber || `LOT-${lotId.slice(0, 8)}`,
           type: lotResponse?.lot_type || lotResponse?.type || 'production',
           bomName: lotResponse?.bom_name || lotResponse?.bomName,
-          bomVersion: lotResponse?.bom_version || lotResponse?.bomVersion,
           quantity: lotResponse?.quantity,
           status: lotResponse?.status?.toUpperCase(),
           priority: lotResponse?.priority?.toUpperCase(),
@@ -299,7 +296,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            {lot.bomName} v{lot.bomVersion} • {lot.quantity} units
+            {lot.bomName} • {lot.quantity} units
           </p>
         </div>
       </div>

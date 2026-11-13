@@ -243,7 +243,7 @@ export function CreateProductionLotModal({ open, onOpenChange, projectId }: Crea
                               ) : (
                                 filteredBOMs.map((bom) => (
                                   <option key={bom.id} value={bom.id}>
-                                    {bom.name} • v{bom.version}
+                                    {bom.name}
                                   </option>
                                 ))
                               )}

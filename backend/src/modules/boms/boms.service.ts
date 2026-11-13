@@ -27,7 +27,7 @@ export class BOMsService {
     let queryBuilder = this.databaseService
       .getClient(accessToken)
       .from('boms')
-      .select('id, name, description, project_id, version, status, user_id, created_at, updated_at, bom_items(count)', { count: 'exact' })
+      .select('id, name, description, project_id, status, user_id, created_at, updated_at, bom_items(count)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -83,7 +83,7 @@ export class BOMsService {
     const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('boms')
-      .select('id, name, description, project_id, version, status, user_id, created_at, updated_at, bom_items(count)')
+      .select('id, name, description, project_id, status, user_id, created_at, updated_at, bom_items(count)')
       .eq('id', id)
       .single();
 
@@ -146,7 +146,6 @@ export class BOMsService {
         name: createBOMDto.name,
         description: createBOMDto.description,
         project_id: createBOMDto.projectId,
-        version: createBOMDto.version || '1.0',
         user_id: userId,
         organization_id: organizationId ?? null,
       })
@@ -183,12 +182,10 @@ export class BOMsService {
     const updateData: Partial<{
       name: string;
       description: string;
-      version: string;
       status: string;
     }> = {};
     if (updateBOMDto.name !== undefined) updateData.name = updateBOMDto.name;
     if (updateBOMDto.description !== undefined) updateData.description = updateBOMDto.description;
-    if (updateBOMDto.version !== undefined) updateData.version = updateBOMDto.version;
     if (updateBOMDto.status !== undefined) updateData.status = updateBOMDto.status;
 
     const { data, error } = await this.databaseService

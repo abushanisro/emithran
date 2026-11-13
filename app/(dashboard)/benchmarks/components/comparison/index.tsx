@@ -126,7 +126,7 @@ export function ComparisonView({
                     <td className="py-3 px-2">
                       <p className="font-medium">{bd.bom.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {bd.bom.version} · {bd.bom.status}
+                        {bd.bom.status}
                       </p>
                     </td>
                     <td className="text-right py-3 px-2 font-mono">{bd.metrics.totalParts}</td>

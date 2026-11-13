@@ -23,7 +23,6 @@ interface BOMItem {
 interface BOM {
   id: string;
   name: string;
-  version: string;
   items: BOMItem[];
 }
 
@@ -103,7 +102,7 @@ export function BOMSelectionCard({
               <SelectContent>
                 {boms.map((bom) => (
                   <SelectItem key={bom.id} value={bom.id}>
-                    {bom.name} <span className="text-xs text-muted-foreground">(v{bom.version})</span>
+                    {bom.name}
                   </SelectItem>
                 ))}
               </SelectContent>

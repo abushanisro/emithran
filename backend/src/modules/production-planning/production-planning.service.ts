@@ -175,8 +175,7 @@ export class ProductionPlanningService {
           *,
           bom:boms(
             id, 
-            name, 
-            version,
+            name,
             items:bom_items(
               id,
               name,
@@ -208,8 +207,7 @@ export class ProductionPlanningService {
           *,
           bom:boms(
             id, 
-            name, 
-            version
+            name
           )
         `)
         .eq('id', lotData.id)
@@ -267,8 +265,7 @@ export class ProductionPlanningService {
           *,
           bom:boms(
             id, 
-            name, 
-            version,
+            name,
             items:bom_items(
               id,
               name,
@@ -314,8 +311,7 @@ export class ProductionPlanningService {
           *,
           bom:boms(
             id,
-            name,
-            version
+            name
           )
         `)
         .eq('boms.user_id', userId)
@@ -410,8 +406,7 @@ export class ProductionPlanningService {
       .from('boms')
       .select(`
         id, 
-        name, 
-        version
+        name
       `)
       .eq('id', lotData.bom_id)
       .single();
@@ -763,7 +758,7 @@ export class ProductionPlanningService {
       .eq('id', id)
       .select(`
         *,
-        bom:boms(id, name, version)
+        bom:boms(id, name)
       `)
       .single();
 
@@ -1857,7 +1852,6 @@ export class ProductionPlanningService {
     const bom = data.bom ? {
       id: data.bom.id,
       name: data.bom.name,
-      version: data.bom.version,
       items: data.bom.items?.map((item: any) => ({
         id: item.id,
         partNumber: item.part_number,

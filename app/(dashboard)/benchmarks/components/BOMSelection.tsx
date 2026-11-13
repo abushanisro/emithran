@@ -100,7 +100,7 @@ export function BOMSelection({
                   </Button>
                   <p className="font-semibold pr-8">{bom.name}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {bom.version} · {bom.status}
+                    {bom.status}
                   </p>
                   <p className="text-xs text-green-600 mt-1">
                     Parts: {bomItemCounts[idx] ?? 0}
@@ -143,7 +143,7 @@ export function BOMSelection({
                             <div>
                               <p className="font-semibold">{bom.name}</p>
                               <p className="text-xs text-muted-foreground mt-0.5">
-                                {bom.version ?? "v1.0"} · {bom.status ?? "draft"} · Updated{" "}
+                                {bom.status ?? "draft"} · Updated{" "}
                                 {formatDate(bom.updatedAt ?? new Date().toISOString())}
                               </p>
                             </div>
@@ -176,7 +176,7 @@ export function BOMSelection({
                       <div>
                         <p className="font-semibold">{bom.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {bom.version ?? "v1.0"} · {bom.status ?? "draft"} · Updated{" "}
+                          {bom.status ?? "draft"} · Updated{" "}
                           {formatDate(bom.updatedAt ?? new Date().toISOString())}
                         </p>
                       </div>
