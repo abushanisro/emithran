@@ -226,8 +226,8 @@ RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open
 | G-04 | EDM and heat treatment | edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg | UNSUPPORTED |
 | G-05 | Mold texture | cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime | UNSUPPORTED |
 | G-06 | Cooling and water lines | tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables | UNSUPPORTED |
-| G-07 | Inserts and unscrewing mechanisms | insertInstallRate; cmInsertManualLoadingTime; defaultInsertCost; costPerUnscrewingMechanism; tblSpiType.Use Insert | UNSUPPORTED |
-| G-08 | Tool assembly extras: ejector system, sprue, locating ring, hot drops, try-out | ejector*, sprueBushingCost, locatingRingsCost, costPerStandardHotDrop, tryoutRateUsdPerHr | UNSUPPORTED |
+| G-07 | Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them) | tblSpiType.Use Insert; costPerUnscrewingMechanism | UNSUPPORTED |
+| G-08 | Hot drops (a hot runner: the number of drops is not on file) | costPerStandardHotDrop; costPerSVGHotDrop; defaultHotDropLayout | UNSUPPORTED |
 | G-09 | Handling, setup scrap and plasticizing in the cycle | partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS | UNSUPPORTED |
 | G-10 | Period costs: indirect overhead, SG&A, margin | sGandARate; markUpRate; machine indirect overhead | UNSUPPORTED |
 | G-11 | Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing | nothing staged | UNSUPPORTED |

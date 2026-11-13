@@ -5,7 +5,7 @@
  */
 import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
 import { runReferenceCalculator, type CalcSeed, type ReferenceCalculators } from '../../shared/calculators/reference-calculator';
-import type { MoldBaseReference, MoldToolingTables } from '../plastic-reference';
+import type { MoldBaseReference, MoldExtrasReference, MoldToolingTables, ToolroomRates } from '../plastic-reference';
 import type { MoldBaseChoice } from '../process/mold-base';
 import type { MoldCavityLookup } from '../process/mold-cavity';
 import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas } from './plastic-cycle-time';
@@ -13,6 +13,8 @@ import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas }
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
 const OUTPUT = 'Tooling Cost Per Part';
 const REF = 'memory/Plastic Modeling';
+/** timePerTryoutBase's note: "basic hrs per tryout for <500T (x2 for bigger)". */
+const TRYOUT_DOUBLE_ABOVE_TONNES = 500;
 
 export interface MoldToolingFacts {
   /** The standard components the mold needs, priced (mold-tooling-engine.ts). */
@@ -23,7 +25,7 @@ export interface MoldToolingFacts {
   assemblyHours: number;
   tables: MoldToolingTables;
   /** The quote location's toolroom rates; null when memory/ holds none for it (USA only). */
-  toolroomRates: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number } | null;
+  toolroomRates: ToolroomRates | null;
   location: string;
   annualVolume: number;
   productionLifeYears: number;
@@ -39,6 +41,10 @@ export interface MoldToolingFacts {
   /** The cavity machining rate for the part's complexity and size (mold-cavity.ts), or what is missing to choose it. */
   cavity: MoldCavityLookup | { missing: string[] };
   partSurfaceAreaMm2: number | null;
+  /** The ejector pins, sprue bushing, locating ring and try-out (F-27). */
+  extras: MoldExtrasReference;
+  /** The press the part runs on (t): the try-out hours double above 500 t. Null when no press is chosen. */
+  pressClampTonnes: number | null;
 }
 
 export type MoldToolingRun =
@@ -52,10 +58,12 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
   if ('missing' in f.moldBase) missing.push(...f.moldBase.missing.map((m) => `mold base: ${m}`));
   if (!(f.partHeightMm != null && f.partHeightMm > 0)) missing.push('the part height (CAD bounding box)');
   if ('missing' in f.cavity) missing.push(...f.cavity.missing.map((m) => `cavity: ${m}`));
+  if (!(f.pressClampTonnes != null && f.pressClampTonnes > 0)) missing.push('the press force (the try-out hours depend on it)');
   if (missing.length > 0 || !f.toolroomRates || 'missing' in f.moldBase || 'missing' in f.cavity) return { missing };
   const cav = f.cavity;
   const b = f.moldBase;
   const mb = f.moldBaseRef;
+  const x = f.extras;
   const vars = `${REF}/variables`;
   const steel = `${REF}/process/digital_factory_tool_materials_usa: ${mb.steel.name} (digital_factory_settings_usa defaultToolMaterialName)`;
   const listed = f.components.map((c) => `${c.componentName} ${c.qty} x ${c.unitCostUsd}`).join(', ');
@@ -100,6 +108,18 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
           + `cmMoldSurfaceCountThreshold ${mb.complexityFaceThresholds.simple} / ${mb.complexityFaceThresholds.average}, borrowed from compression molding)`,
       },
       'Polish Hours Per Sq Meter': { value: mb.finish.hoursPerSqM, source: `${REF}/lookup/SPIFinishes: ${mb.finish.name} (defaultCavityFinishIM)`, lookup: true },
+      'Area Per Ejector Pin': { value: x.areaPerEjectorPinMm2, source: `${vars}: areaCoveredPerEjectorPin` },
+      'Ejector Pin Cost': { value: x.ejectorPinUsd, source: `${REF}/lookup/cmStandardToolingComponents: Ejector Pin (its quantity "is calculated in the cost model")`, lookup: true },
+      'Ejector Pin Assembly Hours': { value: x.ejectorPinAssemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: Ejector Pin`, lookup: true },
+      'Sprue Bushing Cost': { value: x.sprueBushingUsd, source: `${vars}: sprueBushingCost (one per mold)` },
+      'Locating Ring Cost': { value: x.locatingRingUsd, source: `${vars}: locatingRingsCost (one per mold)` },
+      'Tryout Base Hours': { value: x.tryoutBaseHours, source: `${vars}: timePerTryoutBase` },
+      'Tryout Press Multiplier': {
+        value: f.pressClampTonnes! > TRYOUT_DOUBLE_ABOVE_TONNES ? 2 : 1,
+        source: `${vars}: timePerTryoutBase note "<500T (x2 for bigger)": the press is ${Math.round(f.pressClampTonnes!)} t`,
+      },
+      'Number of Tryouts': { value: x.tryouts, source: `${vars}: defaultNumTryOuts` },
+      'Tryout Rate': { value: f.toolroomRates.tryoutUsdPerHr, source: `${settings} tryoutRateUsdPerHr` },
     },
   };
 }

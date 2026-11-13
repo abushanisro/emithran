@@ -547,7 +547,7 @@
     {
       "key": "injection_mold_tooling",
       "name": "Injection Mold - Tooling",
-      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Cavity and core (formula registry F-26, ASSUMED): machined at tblHrsPerSqInch{Simple,Average,Complex} hours per square inch of part surface, the complexity from the CAD face count against cmMoldSurfaceCountThreshold{Simple,Average} (staged for compression molding and borrowed: the injection process states no rule), times the cavities, at the machining rate; polished to the default cavity finish (defaultCavityFinishIM, SPIFinishes hours per square meter) at the assembly (bench) rate, as no polishing rate is on file. Not modelled yet, because the reference holds the data but no formula: slides and lifters, EDM and heat treatment, texture, cooling lines, inserts, the ejector system, sprue, hot drops and try-out (registry G-03 to G-08).",
+      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Cavity and core (formula registry F-26, ASSUMED): machined at tblHrsPerSqInch{Simple,Average,Complex} hours per square inch of part surface, the complexity from the CAD face count against cmMoldSurfaceCountThreshold{Simple,Average} (staged for compression molding and borrowed: the injection process states no rule), times the cavities, at the machining rate; polished to the default cavity finish (defaultCavityFinishIM, SPIFinishes hours per square meter) at the assembly (bench) rate, as no polishing rate is on file. Mold assembly extras (formula registry F-27): the ejector pins, one per areaCoveredPerEjectorPin of the molded area, at the cmStandardToolingComponents Ejector Pin cost plus their cmToolAssemblyTimes hours at the assembly rate; one sprue bushing and one locating ring (sprueBushingCost, locatingRingsCost); the try-out, timePerTryoutBase hours per try-out (twice that on a press over 500 t, as its note states) x defaultNumTryOuts at the tryout rate. Not modelled yet: slides and lifters, EDM and heat treatment, cooling lines, and, where they apply, hot drops (hot runner), cavity inserts (SPI classes tblSpiType builds with inserts) and texture (a cavityTexture other than None) (registry G-03 to G-08).",
       "operations": [],
       "helper": true,
       "output": "Tooling Cost Per Part",
@@ -563,9 +563,14 @@
         "Cavity Machining Hours",
         "Cavity Machining Cost",
         "Polish Hours",
-        "Polish Cost"
+        "Polish Cost",
+        "Ejector Pins",
+        "Ejector System Cost",
+        "Sprue and Locating Ring Cost",
+        "Tryout Hours",
+        "Tryout Cost"
       ],
-      "version": 3,
+      "version": 4,
       "fields": [
         {
           "name": "Purchased Components Cost",
@@ -778,6 +783,69 @@
           }
         },
         {
+          "name": "Area Per Ejector Pin",
+          "unit": "mm²",
+          "source": {
+            "variable": "areaCoveredPerEjectorPin"
+          }
+        },
+        {
+          "name": "Ejector Pin Cost",
+          "unit": "USD",
+          "source": {
+            "lookup": "cmStandardToolingComponents: Ejector Pin unit cost (its quantity \"is calculated in the cost model\")"
+          }
+        },
+        {
+          "name": "Ejector Pin Assembly Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolAssemblyTimes: Ejector Pin"
+          }
+        },
+        {
+          "name": "Sprue Bushing Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "sprueBushingCost"
+          }
+        },
+        {
+          "name": "Locating Ring Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "locatingRingsCost"
+          }
+        },
+        {
+          "name": "Tryout Base Hours",
+          "unit": "h",
+          "source": {
+            "variable": "timePerTryoutBase"
+          }
+        },
+        {
+          "name": "Tryout Press Multiplier",
+          "unit": "",
+          "source": {
+            "engine": "timePerTryoutBase note: the hours are for a press under 500 t, twice that for a bigger one"
+          }
+        },
+        {
+          "name": "Number of Tryouts",
+          "unit": "",
+          "source": {
+            "variable": "defaultNumTryOuts"
+          }
+        },
+        {
+          "name": "Tryout Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: tryoutRateUsdPerHr"
+          }
+        },
+        {
           "name": "Machining Hours",
           "unit": "h",
           "formula": "{Mold Base Area} / 1000000 / {Plate Machining Rate} * 2 + {Plate Setup Hours}"
@@ -848,9 +916,34 @@
           "formula": "{Polish Hours} * {Assembly Rate}"
         },
         {
+          "name": "Ejector Pins",
+          "unit": "",
+          "formula": "CEIL({Mold Base Area} / {Area Per Ejector Pin})"
+        },
+        {
+          "name": "Ejector System Cost",
+          "unit": "USD",
+          "formula": "{Ejector Pins} * ({Ejector Pin Cost} + {Ejector Pin Assembly Hours} * {Assembly Rate})"
+        },
+        {
+          "name": "Sprue and Locating Ring Cost",
+          "unit": "USD",
+          "formula": "{Sprue Bushing Cost} + {Locating Ring Cost}"
+        },
+        {
+          "name": "Tryout Hours",
+          "unit": "h",
+          "formula": "{Tryout Base Hours} * {Tryout Press Multiplier} * {Number of Tryouts}"
+        },
+        {
+          "name": "Tryout Cost",
+          "unit": "USD",
+          "formula": "{Tryout Hours} * {Tryout Rate}"
+        },
+        {
           "name": "Mold Cost",
           "unit": "USD",
-          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost} + {Cavity Machining Cost} + {Polish Cost}"
+          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost} + {Cavity Machining Cost} + {Polish Cost} + {Ejector System Cost} + {Sprue and Locating Ring Cost} + {Tryout Cost}"
         },
         {
           "name": "Lifetime Shots",
@@ -873,7 +966,7 @@
           "formula": "floor({Tooling Investment} / ({Annual Volume} * {Production Life}) * 10000 + 0.5) / 10000"
         }
       ],
-      "migration": 1014
+      "migration": 1016
     }
   ]
 }

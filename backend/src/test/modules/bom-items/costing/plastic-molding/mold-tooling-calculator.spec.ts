@@ -20,8 +20,11 @@ const facts = (over: Partial<MoldToolingFacts> = {}): MoldToolingFacts => ({
   designHours: 3.24, assemblyHours: 23.18, tables: REF.tooling, toolroomRates: REF.toolroomRatesUsa, location: 'USA',
   annualVolume: 10_000, productionLifeYears: 3, cavityCount: 1, toolLifeShots: 144_000, toolLifeSource: 'tblToolLife: ABS',
   moldBase: BASE, moldBaseRef: REF.moldBase, partHeightMm: 30,
-  cavity: moldCavityLookup({ faceCount: 900, surfaceAreaMm2: 40_000, ref: REF.moldBase }), partSurfaceAreaMm2: 40_000, ...over,
+  cavity: moldCavityLookup({ faceCount: 900, surfaceAreaMm2: 40_000, ref: REF.moldBase }), partSurfaceAreaMm2: 40_000,
+  extras: REF.moldExtras, pressClampTonnes: 102, ...over,
 });
+/** The mold assembly extras of the worked mold (F-27): 2 ejector pins (10,000 / 7,903.21 mm2), the sprue and ring, 3 try-outs of 12 h on a 102 t press. */
+const EXTRAS_USD = 2 * (5 + 0.25 * 76.81) + (70 + 85) + 12 * 1 * 3 * 76.81;
 /** The plate steel by the formula, from the chosen base and the reference: what the calculator must give. */
 function expectedSteelUsd(): number {
   if ('missing' in BASE) throw new Error(BASE.missing.join());
@@ -33,11 +36,12 @@ function expectedSteelUsd(): number {
 }
 
 describe('the mold tooling calculator', () => {
-  it('is a helper whose result is the tooling cost per part, at version 3 written by migration 1014 (1012 and 1013 are history)', () => {
+  it('is a helper whose result is the tooling cost per part, at version 4 written by migration 1016 (1012 to 1014 are history)', () => {
     const c = loadPlasticMoldingCalculatorSpec().calculators.find((x) => x.name === MOLD_TOOLING_CALCULATOR)!;
-    expect(c).toMatchObject({ helper: true, operations: [], migration: 1014, version: 3, output: 'Tooling Cost Per Part' });
+    expect(c).toMatchObject({ helper: true, operations: [], migration: 1016, version: 4, output: 'Tooling Cost Per Part' });
     expect(c.description).toMatch(/G-03 to G-08/);
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/1014_plastic_mold_cavity_machining_polish.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1014));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1016_plastic_mold_assembly_extras.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1016));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1014_plastic_mold_cavity_machining_polish.sql'), 'utf8')).toContain('version 3');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1012_plastic_mold_tooling_calculator.sql'), 'utf8')).toContain(MOLD_TOOLING_CALCULATOR);
   });
 
@@ -52,12 +56,35 @@ describe('the mold tooling calculator', () => {
     // cavity: 40,000 mm2 = 62.0 in2 x 0.18 h/in2 (average, 900 faces) = 11.16 h x 100.55; polish: 0.04 m2 x 600 h/m2 = 24 h x 76.81
     expect(r.outputs['Cavity Machining Cost']).toBeCloseTo((40_000 / 645.16) * 0.18 * 100.55, 6);
     expect(r.outputs['Polish Cost']).toBeCloseTo(0.04 * 600 * 76.81, 6);
-    expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd() + r.outputs['Cavity Machining Cost']! + r.outputs['Polish Cost']!) * 100 + 0.5) / 100);
+    expect(r.outputs['Ejector Pins']).toBe(2);
+    expect(r.outputs['Ejector System Cost']).toBeCloseTo(2 * (5 + 0.25 * 76.81), 6);
+    expect(r.outputs['Sprue and Locating Ring Cost']).toBe(155);
+    expect(r.outputs['Tryout Hours']).toBe(36);
+    expect(r.outputs['Tryout Cost']).toBeCloseTo(36 * 76.81, 6);
+    expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd() + r.outputs['Cavity Machining Cost']! + r.outputs['Polish Cost']! + EXTRAS_USD) * 100 + 0.5) / 100);
+    expect(r.trace.find((t) => t.fieldName === 'Ejector Pin Cost')?.source).toMatch(/cmStandardToolingComponents: Ejector Pin/);
+    expect(r.trace.find((t) => t.fieldName === 'Tryout Press Multiplier')?.source).toMatch(/<500T \(x2 for bigger\)": the press is 102 t/);
+    expect(r.trace.find((t) => t.fieldName === 'Tryout Rate')?.source).toMatch(/tryoutRateUsdPerHr/);
     expect(r.perPartUsd).toBe(Math.floor(r.outputs['Tooling Investment']! / 30_000 * 10000 + 0.5) / 10000);
     expect(r.trace.find((t) => t.fieldName === 'Mold Base Width')?.source).toMatch(/tblStandardMoldBaseSizes: .*layoutNumCav/);
     expect(r.trace.find((t) => t.fieldName === 'Tool Steel Price')?.source).toMatch(/AISI P20/);
     expect(r.trace.find((t) => t.fieldName === 'Purchased Components Cost')?.source).toMatch(/cmStandardToolingComponents: Guide Pin 4 x 100/);
     expect(r.trace.find((t) => t.fieldName === 'Design Rate')?.source).toMatch(/designRateUsdPerHr/);
+  });
+
+  it('doubles the try-out hours on a press over 500 t, and needs a press to know them', () => {
+    const big = runMoldTooling(facts({ pressClampTonnes: 650 }), CALCS);
+    if (!big.derivable) throw new Error(big.missing.join());
+    expect(big.outputs['Tryout Hours']).toBe(72);
+    const none = runMoldTooling(facts({ pressClampTonnes: null }), CALCS);
+    expect(none.derivable).toBe(false);
+    if (!none.derivable) expect(none.missing.join(' ')).toMatch(/the press force \(the try-out hours depend on it\)/);
+  });
+
+  it('counts one ejector pin per areaCoveredPerEjectorPin of the mold window, rounded up', () => {
+    const r = runMoldTooling(facts({ moldBaseAreaMm2: 40_000 }), CALCS);
+    if (!r.derivable) throw new Error(r.missing.join());
+    expect(r.outputs['Ejector Pins']).toBe(Math.ceil(40_000 / 7903.21));
   });
 
   it('wears out ceil(lifetime shots / tool life) molds', () => {

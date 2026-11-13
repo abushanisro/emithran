@@ -185,7 +185,7 @@ describe('cost summary: worked ABS part', () => {
     expect(r.totalCost).toBeCloseTo(material + run, 6);
   });
 
-  it('tooling, USA, 10,000/yr x 3 yr: BOM 2,140 + labour 2,398.67 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 = 8,375.81, one mold, 0.2792 per part', () => {
+  it('tooling, USA, 10,000/yr x 3 yr: BOM 2,140 + labour 2,398.67 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 = 11,344.37, one mold, 0.3781 per part', () => {
     // BOM (no undercut: no Hydraulic Cylinder / Side Lock; Ejector Pin has no quantity; Electrical has no cost):
     //   Air Poppet 25x30 + Ejector Guide Pin Bushing 30x6 + Guide Bush 100x4 + Guide Pin 100x4 + Limit Switch 50x4 + Return Pin 35x6 = 2,140
     // design 3.24 h (area <= 59,253 mm2) x 64.73 = 209.73
@@ -196,6 +196,8 @@ describe('cost summary: worked ABS part', () => {
     //   396 x 446 x 337.975 mm = 59.69 dm3 x 7,850 kg/m3 = 468.58 kg x 1.86 USD/kg x 1.0 = 871.56
     // cavity: 40,000 mm2 = 62.0 in2, average (900 faces): tblHrsPerSqInchAverage row up to 100 in2 = 0.18 h/in2 -> 11.16 h x 100.55 = 1,122.14
     // polish: 0.04 m2 x SPI B3 600 h/m2 = 24 h x 76.81 (assembly rate) = 1,843.44
+    // ejector pins: ceil(10,000 / 7,903.21 mm2) = 2 x (5 + 0.25 h x 76.81) = 48.405; sprue bushing 70 + locating ring 85;
+    // try-out: 12 h x 1 (press under 500 t) x 3 try-outs x 76.81 = 2,765.16
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 10_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldBomSubtotalUsd).toBe(2140);
     expect(t.moldEstimatedDesignHrs).toBe(3.24);
@@ -207,15 +209,18 @@ describe('cost summary: worked ABS part', () => {
     expect(t.moldBaseSteelUsd).toBeCloseTo(871.56, 2);
     expect(t.moldCavityMachiningUsd).toBeCloseTo(1122.14, 2);
     expect(t.moldPolishUsd).toBeCloseTo(1843.44, 2);
-    expect(t.moldCostUsd).toBe(8375.81);
-    expect(t.moldCostPerPartUsd).toBe(0.2792);
+    expect(t.moldEjectorSystemUsd).toBeCloseTo(48.405, 6);
+    expect(t.moldSprueAndLocatingRingUsd).toBe(155);
+    expect(t.moldTryoutUsd).toBeCloseTo(2765.16, 6);
+    expect(t.moldCostUsd).toBe(11344.37);
+    expect(t.moldCostPerPartUsd).toBe(0.3781);
   });
 
-  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 8,375.81 = 175,891.92 USD, 0.0586 per part (regression: not rounded to 0.06)', () => {
+  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 11,344.375 = 238,231.78 USD, 0.0794 per part (regression: not rounded to 0.08)', () => {
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 1_000_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldsRequired).toBe(21);
-    expect(t.moldCostUsd).toBe(175_891.92);
-    expect(t.moldCostPerPartUsd).toBe(0.0586);
+    expect(t.moldCostUsd).toBe(238_231.78);
+    expect(t.moldCostPerPartUsd).toBe(0.0794);
   });
 });
 
@@ -242,14 +247,14 @@ describe('regressions', () => {
   });
 
   it('the tooling-dominated check compares USD tooling with the material price in USD, not in local currency', () => {
-    // 0.1513 USD/part tooling vs material 0.052 kg: at 3.046 USD/kg = 0.158 USD x 2 -> no warning in USD;
-    // the same part priced in INR (x85) must not change that verdict.
+    // 0.3781 USD/part tooling vs material 0.052 kg: at 3.046 USD/kg = 0.158 USD x 2 = 0.316 -> warns in USD;
+    // the same part priced in INR (x85) must not change that verdict (comparing with the INR material price would not warn).
     const toolingWarn = (usdToLocal: number) => computeInjectionMoldedCostSummary(absPart({
       materialCostPerKg: 3.046 * usdToLocal, usdToLocal, annualVolume: 10_000, productionLifeYears: 3,
     })).warnings.some((w) => w.startsWith('Tooling-dominated'));
-    expect(toolingWarn(1)).toBe(false);
-    expect(toolingWarn(85)).toBe(false);
-    // Light part: 5 cm3 = 5.2 g x 3.046 = 0.0158 USD x 2 < 0.1513 tooling -> warns, in either currency.
+    expect(toolingWarn(1)).toBe(true);
+    expect(toolingWarn(85)).toBe(true);
+    // Light part: 5 cm3 = 5.2 g x 3.046 = 0.0158 USD x 2 < its tooling per part -> warns, in either currency.
     const light = (usdToLocal: number) => computeInjectionMoldedCostSummary(absPart({
       volume: 5000, materialCostPerKg: 3.046 * usdToLocal, usdToLocal, annualVolume: 10_000, productionLifeYears: 3,
       signals: { projectedAreaMm2: 1000, undercutCount: 0 },
@@ -400,8 +405,9 @@ describe('quote validation: how far the quote can be trusted', () => {
   it('says what a real mold quote needs that the model cannot compute: a quote with a mold is not complete', () => {
     const v = part().validation!;
     expect(v.complete).toBe(false);
-    // G-11: ABS is hygroscopic, so material drying is routed, and no data exists for it
-    expect(v.unsupported.map((u) => u.id)).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08', 'G-09', 'G-10', 'G-11']);
+    // G-11: ABS is hygroscopic, so material drying is routed, and no data exists for it. The mold is a cold runner (no hot drops, G-08), an SPI class
+    // tblSpiType builds without inserts (G-07) and the default texture None (G-05): only the gaps that apply are listed.
+    expect(v.unsupported.map((u) => u.id)).toEqual(['G-03', 'G-04', 'G-06', 'G-09', 'G-10', 'G-11']);
   });
 
   it('without a volume there is no mold: the mold formulas and gaps are left out, the cycle and period gaps remain', () => {

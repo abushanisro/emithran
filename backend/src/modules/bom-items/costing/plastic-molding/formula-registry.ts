@@ -235,7 +235,7 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
       'Mold window area is the projected area times cavities with no allowance.',
       'One purchased-component set for any cavity count (investigation I-1).',
     ],
-    state: 'ASSUMED', implementedIn: 'process/mold-tooling-engine.ts', note: 'Excludes mold-base steel, EDM, texture, cooling, etc. (G-01..G-08).',
+    state: 'ASSUMED', implementedIn: 'process/mold-tooling-engine.ts', note: 'The plate steel is F-25, the cavity and core F-26, the assembly extras F-27; slides and lifters, EDM, heat treatment, cooling and, where they apply, inserts, texture and hot drops are not modelled (G-03..G-08).',
   },
   {
     id: 'F-17', version: 1, name: 'Molds required',
@@ -334,14 +334,35 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'process/mold-cavity.ts',
   },
 
+  {
+    id: 'F-27', version: 1, name: 'Mold assembly extras: ejector pins, sprue bushing, locating ring, try-out',
+    expression: 'pins = ceil(A_window / area_per_pin);  ejector = pins x (pin cost + pin assembly h x assembly rate);  sprue + ring;  try-out = base h x (2 if press > 500 t else 1) x try-outs x try-out rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'A_window', unit: 'mm2', source: 'CAD projected area x cavities (the required mold window)' },
+      { name: 'area_per_pin', unit: 'mm2', source: `${MEM}/variables: areaCoveredPerEjectorPin` },
+      { name: 'pin cost, pin assembly h', unit: 'USD, h', source: `${MEM}/lookup: cmStandardToolingComponents / cmToolAssemblyTimes Ejector Pin` },
+      { name: 'sprue, ring', unit: 'USD', source: `${MEM}/variables: sprueBushingCost, locatingRingsCost` },
+      { name: 'base h, try-outs', unit: 'h, count', source: `${MEM}/variables: timePerTryoutBase, defaultNumTryOuts` },
+      { name: 'try-out rate', unit: 'USD/h', source: `${MEM}/process/digital_factory_settings_usa: tryoutRateUsdPerHr` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/lookup + variables + process`,
+    assumptions: [
+      'One sprue bushing and one locating ring per mold (the variables give a unit cost, no quantity).',
+      'The 500 t threshold and the doubling are read from the timePerTryoutBase note ("<500T (x2 for bigger)"), as metric tonnes of press force.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
     ['G-03', 'Slides and lifters', 'tblSlideSizes; slide* and lifter* variables; costPerHydraulicEjector; slideCycleRate'],
     ['G-04', 'EDM and heat treatment', 'edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
     ['G-06', 'Cooling and water lines', 'tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables'],
-    ['G-07', 'Inserts and unscrewing mechanisms', 'insertInstallRate; cmInsertManualLoadingTime; defaultInsertCost; costPerUnscrewingMechanism; tblSpiType.Use Insert'],
-    ['G-08', 'Tool assembly extras: ejector system, sprue, locating ring, hot drops, try-out', 'ejector*, sprueBushingCost, locatingRingsCost, costPerStandardHotDrop, tryoutRateUsdPerHr'],
+    ['G-07', 'Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them)', 'tblSpiType.Use Insert; costPerUnscrewingMechanism'],
+    ['G-08', 'Hot drops (a hot runner: the number of drops is not on file)', 'costPerStandardHotDrop; costPerSVGHotDrop; defaultHotDropLayout'],
     ['G-09', 'Handling, setup scrap and plasticizing in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS'],
     ['G-10', 'Period costs: indirect overhead, SG&A, margin', 'sGandARate; markUpRate; machine indirect overhead'],
     ['G-11', 'Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing', 'nothing staged'],
