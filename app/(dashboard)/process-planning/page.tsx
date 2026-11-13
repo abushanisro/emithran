@@ -44,7 +44,6 @@ export default function ProcessPlanningPage() {
   interface LocalBOM {
     id: string;
     name: string;
-    version: string;
     items: LocalBOMItem[];
   }
 
@@ -63,7 +62,6 @@ export default function ProcessPlanningPage() {
     return bomsData.boms.map((bom) => ({
       id: bom.id,
       name: bom.name,
-      version: bom.version || '1.0',
       items: [], // Items will be fetched separately when BOM is selected
     }));
   }, [bomsData]);

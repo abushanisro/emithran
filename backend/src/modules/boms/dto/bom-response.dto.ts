@@ -17,9 +17,6 @@ export class BOMResponseDto {
   @ApiProperty({ example: 'uuid' })
   projectId: string;
 
-  @ApiProperty({ example: '1.0' })
-  version: string;
-
   @ApiProperty({ enum: ['draft', 'approved', 'released', 'obsolete'] })
   status: string;
 
@@ -58,7 +55,6 @@ export class BOMResponseDto {
     dto.name = row.name;
     dto.description = row.description || undefined;
     dto.projectId = row.project_id;
-    dto.version = row.version || '1.0';
     dto.status = row.status || 'draft';
     dto.totalItems = row.total_items || 0;
     dto.totalCost = row.total_cost || undefined;

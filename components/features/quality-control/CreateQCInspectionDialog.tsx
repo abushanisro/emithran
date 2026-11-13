@@ -112,27 +112,23 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
         if (lotDetails?.bom) {
           setSelectedBOM({
             id: resolvedBomId,
-            name: lotDetails.bom.name || 'Assigned BOM',
-            version: lotDetails.bom.version || '1.0'
+            name: lotDetails.bom.name || 'Assigned BOM'
           } as BOM);
         } else if (lotDetails?.bomName || lotDetails?.bom_name) {
           setSelectedBOM({
             id: resolvedBomId,
-            name: lotDetails.bomName || lotDetails.bom_name,
-            version: lotDetails.bomVersion || '1.0'
+            name: lotDetails.bomName || lotDetails.bom_name
           } as BOM);
         } else {
           setSelectedBOM({
             id: resolvedBomId,
-            name: `Production Lot BOM (${lotDetails?.lotNumber || 'Lot'})`,
-            version: '1.0'
+            name: `Production Lot BOM (${lotDetails?.lotNumber || 'Lot'})`
           } as BOM);
         }
       } catch (err) {
         setSelectedBOM({
           id: bomIdFromLot || lotId,
-          name: 'Production Lot BOM',
-          version: '1.0'
+          name: 'Production Lot BOM'
         } as BOM);
       }
     } catch (error: any) {
@@ -192,7 +188,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       return;
     }
 
-    const activeBom = selectedBOM || { id: selectedLot || 'general-bom', name: 'Production Lot BOM', version: '1.0' } as BOM;
+    const activeBom = selectedBOM || { id: selectedLot || 'general-bom', name: 'Production Lot BOM' } as BOM;
 
     let activeItems = selectedItems;
     if (activeItems.length === 0 && bomItems.length > 0) {
@@ -404,9 +400,9 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                       if (lot) {
                         const bomId = lot.bom?.id || lot.bomId || lot.bom_id;
                         if (lot.bom && lot.bom.name) {
-                          setSelectedBOM({ id: lot.bom.id, name: lot.bom.name, version: lot.bom.version } as BOM);
+                          setSelectedBOM({ id: lot.bom.id, name: lot.bom.name } as BOM);
                         } else {
-                          setSelectedBOM({ id: bomId || lotId, name: 'Loading…', version: '' } as BOM);
+                          setSelectedBOM({ id: bomId || lotId, name: 'Loading…' } as BOM);
                         }
                         // Load items and resolve exact BOM details
                         loadBOMItemsForLot(lotId, bomId);
@@ -460,7 +456,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                 <div className="space-y-2">
                   <Label>BOM Name</Label>
                   <Input
-                    value={selectedBOM ? `${selectedBOM.name} (v${selectedBOM.version})` : ''}
+                    value={selectedBOM?.name ?? ''}
                     placeholder="Select lot first to see BOM"
                     disabled
                   />

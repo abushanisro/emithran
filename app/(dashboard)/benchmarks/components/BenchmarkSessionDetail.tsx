@@ -90,7 +90,6 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
     const sessionBoms = (session.selectedBoms ?? []).map((b) => ({
       id: b.id,
       name: b.name,
-      version: b.version ?? '',
       status: b.status ?? '',
     }));
 
@@ -226,7 +225,6 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
         {
           id: bom.id,
           name: bom.name,
-          version: bom.version ?? '',
           status: bom.status ?? '',
         },
       ];
@@ -246,7 +244,6 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
         name: b.name,
         projectId: project?.id ?? '',
         projectName: project?.name ?? '',
-        version: b.version,
         status: b.status,
       };
     });

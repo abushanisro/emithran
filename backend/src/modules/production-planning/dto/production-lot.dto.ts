@@ -128,7 +128,6 @@ export class ProductionLotResponseDto {
   bom?: {
     id: string;
     name: string;
-    version: string;
     items?: {
       id: string;
       partNumber: string;

@@ -9,7 +9,7 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('mithran API Gateway')
     .setDescription('Manufacturing One-Stop Solution - API Gateway')
-    .setVersion('1.0')
+    .setVersion('0.1.0')
     .addBearerAuth()
     .addTag('Authentication')
     .addTag('Projects')

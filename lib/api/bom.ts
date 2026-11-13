@@ -23,7 +23,6 @@ export type BOMItem = {
 export type BOM = {
   id: string;
   projectId: string;
-  version: string;
   name: string;
   description?: string;
   status: 'draft' | 'approved' | 'released' | 'obsolete';
@@ -39,7 +38,6 @@ export type BOM = {
 
 export type CreateBOMData = {
   projectId: string;
-  version: string;
   name: string;
   description?: string;
   status?: BOM['status'];
@@ -61,7 +59,6 @@ export type UpdateBOMItemData = Partial<CreateBOMItemData>;
 export type BOMQuery = {
   projectId?: string;
   status?: BOM['status'];
-  version?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -99,7 +96,6 @@ export const bomApi = {
     const params = new URLSearchParams();
     if (query?.projectId) params.append('projectId', query.projectId);
     if (query?.status) params.append('status', query.status);
-    if (query?.version) params.append('version', query.version);
     if (query?.search) params.append('search', query.search);
     if (query?.page) params.append('page', query.page.toString());
     if (query?.limit) params.append('limit', query.limit.toString());
