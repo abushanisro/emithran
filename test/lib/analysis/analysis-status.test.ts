@@ -1,54 +1,44 @@
 import { describe, expect, it } from 'vitest';
 
-import { analysisNotReadyMessage, applyBlockReason, type AnalysisStatus } from '@/lib/analysis/analysis-status';
+import { analysisRunMessage, applyGate, type AnalysisStatus } from '@/lib/analysis/analysis-status';
 
 const status = (over: Partial<AnalysisStatus> = {}): AnalysisStatus => ({
   cad: 'ready', drawing: 'not_required', casting: 'not_required', ready: true, missing: [], ...over,
 });
 
-describe('applyBlockReason', () => {
-  it('lets Apply go ahead whatever else is missing: Apply Scenario starts the analysis itself', () => {
-    expect(applyBlockReason(status())).toBeNull();
-    expect(applyBlockReason(status({ cad: 'none', ready: false, missing: ['cad_features'] }))).toBeNull();
-    expect(applyBlockReason(status({ cad: 'stale', ready: false, missing: ['cad_features'] }))).toBeNull();
-    expect(applyBlockReason(undefined)).toBeNull();
+// Apply never starts an analysis: Refresh analysis (the top bar) does. Apply runs on an analysed part, waits while the casting analysis runs, and
+// otherwise sends the user to Refresh analysis.
+describe('applyGate', () => {
+  it('lets Apply run on an analysed part, and while the status is still loading (the backend refuses an unanalysed part anyway)', () => {
+    expect(applyGate(status())).toEqual({ kind: 'ok' });
+    expect(applyGate(undefined)).toEqual({ kind: 'ok' });
   });
 
-  it('waits only while the casting analysis it started is running', () => {
-    expect(applyBlockReason(status({ casting: 'running', ready: false, missing: ['casting_analysis'] }))).toMatch(/casting analysis is running/);
+  it('waits while the casting analysis runs', () => {
+    expect(applyGate(status({ casting: 'running', ready: false, missing: ['casting_analysis'] }))).toMatchObject({ kind: 'wait', reason: expect.stringMatching(/running/) as string });
   });
 
-  it('never mentions a separate refresh action', () => {
-    for (const s of [status({ casting: 'running', ready: false, missing: ['casting_analysis'] })]) {
-      expect(applyBlockReason(s) ?? '').not.toMatch(/refresh/i);
-    }
+  it('sends the user to Refresh analysis when the part is not analysed, saying what is missing', () => {
+    const g = applyGate(status({ cad: 'none', ready: false, missing: ['cad_features'] }));
+    expect(g.kind).toBe('analyse');
+    expect(g.kind === 'analyse' && g.reason).toMatch(/Refresh analysis/);
+    expect(g.kind === 'analyse' && g.reason).toMatch(/CAD features/);
+    const c = applyGate(status({ casting: 'failed', ready: false, missing: ['casting_analysis'] }));
+    expect(c.kind === 'analyse' && c.reason).toMatch(/casting analysis/);
   });
 });
 
-describe('analysisNotReadyMessage', () => {
-  it('is null when the part is ready', () => {
-    expect(analysisNotReadyMessage(status())).toBeNull();
+describe('analysisRunMessage', () => {
+  it('says the analysis is current, or that nothing needed redoing', () => {
+    expect(analysisRunMessage({ ran: ['cad_features'], status: status() })).toEqual({ ok: true, text: 'Analysis refreshed: the part is ready to apply.' });
+    expect(analysisRunMessage({ ran: [], status: status() })).toEqual({ ok: true, text: 'The analysis is already current.' });
   });
 
-  it('says the scenario was not applied, and why, when the run left something missing', () => {
-    expect(analysisNotReadyMessage(status({ cad: 'none', ready: false, missing: ['cad_features'] }))).toMatch(/CAD features could not be extracted/);
+  it('says what is left when the run could not finish everything', () => {
     const casting = { ready: false, missing: ['casting_analysis'] as AnalysisStatus['missing'] };
-    expect(analysisNotReadyMessage(status({ ...casting, casting: 'running' }))).toMatch(/Apply the scenario again when it finishes/);
-    expect(analysisNotReadyMessage(status({ ...casting, casting: 'failed' }))).toMatch(/failed/);
-    expect(analysisNotReadyMessage(status({ ...casting, casting: 'none' }))).toMatch(/could not be started/);
-  });
-
-  it('puts the CAD features first when both are missing', () => {
-    expect(analysisNotReadyMessage(status({ cad: 'none', casting: 'none', ready: false, missing: ['cad_features', 'casting_analysis'] }))).toMatch(/CAD features/);
-  });
-
-  it('never points the user at a refresh button', () => {
-    const all = [
-      status({ cad: 'none', ready: false, missing: ['cad_features'] }),
-      status({ ready: false, missing: ['casting_analysis'], casting: 'running' }),
-      status({ ready: false, missing: ['casting_analysis'], casting: 'failed' }),
-      status({ ready: false, missing: ['casting_analysis'], casting: 'none' }),
-    ];
-    for (const s of all) expect(analysisNotReadyMessage(s) ?? '').not.toMatch(/refresh/i);
+    expect(analysisRunMessage({ ran: ['casting_analysis'], status: status({ ...casting, casting: 'running' }) })).toMatchObject({ ok: true, text: expect.stringMatching(/started/) as string });
+    expect(analysisRunMessage({ ran: [], status: status({ cad: 'none', ready: false, missing: ['cad_features'] }) })).toMatchObject({ ok: false, text: expect.stringMatching(/CAD features could not be extracted/) as string });
+    expect(analysisRunMessage({ ran: [], status: status({ ...casting, casting: 'failed' }) })).toMatchObject({ ok: false, text: expect.stringMatching(/failed/) as string });
+    expect(analysisRunMessage({ ran: [], status: status({ ...casting, casting: 'none' }) })).toMatchObject({ ok: false, text: expect.stringMatching(/could not be started/) as string });
   });
 });

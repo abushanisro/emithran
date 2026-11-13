@@ -18,28 +18,28 @@ cannot drift. The duplication was in **who decides and who runs it**.
 |---|---|
 | Is the analysis current? (CAD features, drawing, casting; stale by engine version **or by the chosen process**) | backend `deriveAnalysisStatus` (`bom-items/analysis-status.ts`), served by `GET /bom-items/:id/analysis-status` |
 | Make it current | backend `POST /bom-items/:id/analysis-runs` (`AnalysisRunService.ensureCurrent`): runs exactly what the status says is missing (CAD, then the drawing if there is a PDF, then the casting analysis once the family is known), nothing else |
-| When to run it | **Apply Scenario**, as its first step (and the candidate-route "Apply Route"); the user never starts an analysis |
+| When to run it | **Refresh analysis** (top bar, `RefreshAnalysisButton`), the only place that starts one. Apply Scenario and Apply Route never do: on a part that is not analysed they point at Refresh analysis (`applyGate`, the button is highlighted) and the backend refuses them (409 `analysis_not_ready`) |
 
 `ensureCurrent` is **idempotent** (it does no work when everything is current), **single flight per item** (a double click or two tabs share one run), and
 fails the run only when the CAD analysis fails (nothing after it means anything without the features); a drawing that cannot be read or a casting worker
-that refuses leaves the geometry analysis standing and the returned status says what is still missing. The frontend words the returned status
-(`analysisNotReadyMessage`) and writes nothing until it is ready. The backend still refuses a route apply on an unanalysed part (409
-`analysis_not_ready`), so a client that skips the run is stopped there.
+that refuses leaves the geometry analysis standing and the returned status says what is still missing. The button words the returned status
+(`analysisRunMessage`). Both applies check the status with one rule (`RouteApplicationService.requireAnalysis`), so a client that skips the
+button is stopped there.
 
 `/reanalyze` and `/drawing-analyses` remain: a changed pull direction re-analyses the part, and both are used by the run.
 
-## Removed
+## Decision 2026-11-13: an explicit Refresh analysis, Apply never analyses
 
-The Refresh Analysis button, its hook (`useRefreshAnalysis`), its pulse/arrow/stale-badge state (`isStale`, `needsFirstAnalysis`, the analysis-version query),
-the page-only extractor-mismatch rule (`processNeedsReanalysis`), the `refreshing` prop threading, the "Re-analyse part" action of the CAD evidence panel,
-and every text that told the user to press Refresh Analysis. `test/app/refresh-analysis-removed.test.ts` keeps it from coming back (the electronics module
-is a different workflow with its own button and is not covered).
+Running the analysis inside Apply hid a long job (the CAD engine, then the casting worker) behind a button that says it applies a scenario, and Apply
+then failed for analysis reasons. Now the user starts the analysis with **Refresh analysis** in the top bar, sees it run and finish, and Apply only
+applies. What #204 removed stays removed: the client-orchestrated sequence, the page-only rules and the stale badges. The button calls the same one
+backend run, and the status stays the backend's. `test/app/analysis-entry-point.test.ts` keeps the run to that one button.
 
 ## Apply Scenario as one backend operation (`POST /bom-items/:id/scenario-applications`)
 
 `ScenarioApplicationService` is the single orchestration boundary and the only owner of the applied scenario's state:
 
-1. the analysis is made current (`AnalysisRunService`); nothing is written, and the state is untouched, if it cannot be;
+1. the part must be analysed (`RouteApplicationService.requireAnalysis`); nothing is written, and the state is untouched, when it is not;
 2. `begin_scenario_application` (migration 969), one statement under a row lock: one apply at a time per item, against the revision the caller saw
    (`409 scenario_revision_conflict`, `409 scenario_apply_in_progress`; an apply that began over 15 minutes ago and never finished may be taken over);
 3. the scenario fields: annual volume and material grade on the item, every scenario key in one atomic `merge_scenario_overrides`;

@@ -33,7 +33,7 @@ describe('applying a route requires the part to be analysed', () => {
     expect((error as ConflictException).getResponse()).toMatchObject({
       code: 'analysis_not_ready',
       missing: ['cad_features'],
-      message: expect.stringContaining('Apply Scenario does this'),
+      message: expect.stringContaining('Refresh analysis does this'),
     });
     expect(getRouteComparison).not.toHaveBeenCalled();
   });
