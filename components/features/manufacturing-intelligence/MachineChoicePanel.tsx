@@ -1,6 +1,7 @@
 'use client';
 
 import type { MachineChoiceDto } from '@/lib/api/hooks/useBOMItems';
+import { formatPerPartCost } from '@/lib/costing/format-cost';
 
 /**
  * Why a line runs on its machine (backend machine-choice.ts): the rule the engine chose by, the criteria a machine had to meet, the chosen machine
@@ -34,7 +35,7 @@ export function MachineChoicePanel({ choice, currencySymbol }: { choice: Machine
               {c.status === 'chosen' ? '✓ ' : ''}{c.name}
               {c.reasons.length > 0 && <span className="text-muted-foreground font-normal"> · {c.reasons.join('; ')}</span>}
             </span>
-            {c.perPartCost != null && <span className="tabular-nums shrink-0">{currencySymbol}{c.perPartCost.toFixed(4)}</span>}
+            {c.perPartCost != null && <span className="tabular-nums shrink-0">{currencySymbol}{formatPerPartCost(c.perPartCost)}</span>}
           </div>
         ))}
         {rejected.map((c) => (
