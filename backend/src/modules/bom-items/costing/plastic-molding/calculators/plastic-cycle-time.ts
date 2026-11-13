@@ -44,7 +44,7 @@ export function withRegistryFormulas(trace: readonly CalculationTraceStep[], cal
 }
 
 /** The migrations that create and update the plastic-molding calculators: what to apply to a database that lacks them or holds an older version. */
-export const PLASTIC_CALCULATOR_MIGRATIONS = '975 and 976';
+export const PLASTIC_CALCULATOR_MIGRATIONS = '975, 976, 977 and 1007';
 
 /**
  * The stored calculator of a name, when it is in the database AND is the version this engine was written for; otherwise why not. A calculator that is not there means the
@@ -74,14 +74,15 @@ export function runInjectionCycleTime(input: CycleTimeInput, calculators: Refere
   const run = runReferenceCalculator(calculators, name, seeded.seeds);
   if (run.missing.length > 0 || run.value == null) return { derivable: false, missing: run.missing.length > 0 ? run.missing : [`${name} produced no cycle time`] };
   const cool = run.outputs[input.isLsr ? 'Cure Time' : 'Cooling Time'];
-  const fill = run.outputs['Fill Time'];
-  if (cool == null || fill == null) return { derivable: false, missing: [`${name} produced no ${cool == null ? 'cooling' : 'fill'} time`] };
+  const fill = run.outputs[input.isLsr ? 'Fill Time' : 'Injection Time'];
+  if (cool == null || fill == null) return { derivable: false, missing: [`${name} produced no ${cool == null ? 'cooling' : 'injection'} time`] };
   return {
     derivable: true,
     fillSec: fill,
-    packSec: input.isLsr ? 0 : run.outputs['Pack Time'] ?? 0,
     coolSec: cool,
-    moldMotionSec: seeded.seeds['Press Dry Cycle Time']!.value,
+    plasticizingSec: input.isLsr ? 0 : run.outputs['Plasticizing Time'] ?? 0,
+    // Mold open/close for LSR (its calculator has no ejector stroke); open/close + the ejector stroke otherwise.
+    ejectionSec: input.isLsr ? seeded.seeds['Press Dry Cycle Time']!.value : run.outputs['Ejection Time'] ?? 0,
     totalCycleSec: run.value,
     trace: withRegistryFormulas(run.trace, name),
     lookups: run.lookups,

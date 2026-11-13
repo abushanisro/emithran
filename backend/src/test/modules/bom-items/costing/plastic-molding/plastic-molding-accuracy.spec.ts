@@ -30,6 +30,8 @@ const PRESS_NAME = 'Arburg Allrounder 420 C 1300 - 350';
 const MID = realPress(PRESS_NAME);
 const ABS_CLAMP = realMaterialClamp('ABS');
 const ABS_RESIN = realResinInputs('ABS');
+/** The version-2 cycle inputs a cooling example needs to be derivable (shot GPPS mass, part height, clamp force); cooling does not depend on them. */
+const V2 = { shotGppsMassG: 60, partHeightMm: 30, pressClampKn: MID.clampKn };
 
 const rate = (machineClass: string, usd: number, name: string | null) =>
   ({ rate: usd, labourRate: 30, source: 'mhr_database' as const, machineClass, machineName: name, commodityCode: null });
@@ -39,6 +41,8 @@ function absPart(overrides: Partial<InjectionMoldingCostInput> = {}): InjectionM
     volume: 50_000, surfaceArea: 40_000, wallThicknessNominalMm: 2, materialGrade: 'ABS',
     materialCostPerKg: 3.046, materialDensityKgM3: 1040, materialSource: 'db', batchSize: 1000, family: 'plastic_molded',
     mhrRate: rate('injection_molding', MID.mhrUsd, PRESS_NAME), deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null),
+    // The part's height along the pull: the ejector stroke of the cycle (calculator version 2).
+    bboxMinMm: 30,
     machineClampTonnes: MID.maxTonnage, machineShotCapacityG: MID.shotCapacityGrams, pressTiming: MID.timing, goodPartYield: MID.goodPartYield,
     calculators: plasticMoldingCalculatorsByName(),
     materialClamp: ABS_CLAMP, realResinInputs: ABS_RESIN, materialType: 'ABS', plasticReference: REF, location: 'USA',
@@ -110,7 +114,7 @@ describe('cooling and cycle time', () => {
     const t = resinThermalProps(ABS_RESIN, REF.cycleModel.moldTemperatureIncreaseC);
     if (!('props' in t)) throw new Error(t.missing.join());
     expect(t.props.alpha).toBeCloseTo(0.0797238, 6);
-    const c = runInjectionCycleTime({ wallMm: 2, isLsr: false, real: ABS_RESIN, model: REF.cycleModel, press: MID.timing, shotMeltVolumeMm3: 60_000, cavityCount: 1, gatesPerCavity: 1 }, plasticMoldingCalculatorsByName(), 'injection');
+    const c = runInjectionCycleTime({ wallMm: 2, isLsr: false, real: ABS_RESIN, model: REF.cycleModel, press: MID.timing, shotMeltVolumeMm3: 60_000, cavityCount: 1, gatesPerCavity: 1, ...V2 }, plasticMoldingCalculatorsByName(), 'injection');
     if (!c.derivable) throw new Error(c.missing.join());
     expect(c.coolSec).toBe(13.6);
   });
@@ -118,24 +122,28 @@ describe('cooling and cycle time', () => {
   it('cooling grows with wall squared: 4 mm is 4x the 2 mm time (54.3 s)', () => {
     // the molding mold-temperature increase is part of the reference: the 54.3 s is at the reference increase of 0 C
     const model = { ...REF.cycleModel, moldTemperatureIncreaseC: 0 };
-    const c = runInjectionCycleTime({ wallMm: 4, isLsr: false, real: ABS_RESIN, model, press: MID.timing, shotMeltVolumeMm3: 60_000, cavityCount: 1, gatesPerCavity: 1 }, plasticMoldingCalculatorsByName(), 'injection');
+    const c = runInjectionCycleTime({ wallMm: 4, isLsr: false, real: ABS_RESIN, model, press: MID.timing, shotMeltVolumeMm3: 60_000, cavityCount: 1, gatesPerCavity: 1, ...V2 }, plasticMoldingCalculatorsByName(), 'injection');
     if (!c.derivable) throw new Error(c.missing.join());
     expect(c.coolSec).toBe(54.3);
   });
 
-  it('cycle = fill 0.29 + pack 4.8 + cool 13.6 + dry 2.0 = 20.69 s', () => {
-    // fill: 56.16 g / 885 kg/m3 = 63,457.6 mm3 / 130,000 = 0.4881 s x 1.0 (1 cavity) x 0.6 (1 gate) = 0.2929 -> 0.29
-    // pack: max(2, 0.35 x 13.6 = 4.76 -> 4.8)
+  it('cycle = injection 1.17 + cool 13.6 + plasticizing beyond cooling 0 + ejection 2.79 = 17.56 s', () => {
+    // injection: 56.16 g / 885 kg/m3 = 63,457.6 mm3 / (130,000 x injectionRateMultiplier 0.25) = 1.9525 s x 1.0 (1 cavity) x 0.6 (1 gate) = 1.1715 -> 1.17
+    // plasticizing: 56.16 g x 893 / 885 = 56.67 GPPS g / (6.08 g/s, the 1,300 kN row of plasticizingRateByClampForce: the press states no rate, x 0.75)
+    //               = 12.43 s, under the 13.6 s cooling, so it adds nothing
+    // ejection: dry cycle 2.0 + 2 x 3 x 30 mm / (platen speed 2 x 0.7 x 650 / 2.0 = 455 mm/s x 50 %) = 2.0 + 0.79 = 2.79
+    // no pack phase: holding pressure is inside the Menges cooling time
     const c = runInjectionCycleTime({
       wallMm: 2, isLsr: false, real: ABS_RESIN, model: REF.cycleModel, press: MID.timing,
       shotMeltVolumeMm3: (0.05616 / 885) * 1e9, cavityCount: 1, gatesPerCavity: 1,
+      shotGppsMassG: 56.16 * REF.cycleModel.gppsMeltDensityKgM3 / 885, partHeightMm: 30, pressClampKn: MID.clampKn,
     }, plasticMoldingCalculatorsByName(), 'injection');
     if (!c.derivable) throw new Error(c.missing.join());
-    expect(c.fillSec).toBe(0.29);
-    expect(c.packSec).toBe(4.8);
+    expect(c.fillSec).toBe(1.17);
     expect(c.coolSec).toBe(13.6);
-    expect(c.moldMotionSec).toBe(2);
-    expect(c.totalCycleSec).toBe(20.69);
+    expect(c.plasticizingSec).toBe(12.43);
+    expect(c.ejectionSec).toBe(2.79);
+    expect(c.totalCycleSec).toBe(17.56);
   });
 });
 
@@ -170,11 +178,11 @@ describe('cost summary: worked ABS part', () => {
     expect(r.processLines.every((l) => !l.physicsGap)).toBe(true);
   });
 
-  it('prices material 56.16 g x 3.046 = 0.171063, press and operator 20.69 s x (29.18 + 30) USD/h = 0.340125, total 0.511188: to the millionth, not to the cent', () => {
+  it('prices material 56.16 g x 3.046 = 0.171063, press and operator 17.56 s x (29.18 + 30) USD/h = 0.288667, total 0.459730: to the millionth, not to the cent', () => {
     expect(r.grossWeightKg).toBeCloseTo(0.05616, 6);
-    expect(im.cycleTimeSec).toBe(20.69);
+    expect(im.cycleTimeSec).toBe(17.56);
     const material = 0.05616 * 3.046;
-    const run = (20.69 * (29.18 + 30)) / 3600;
+    const run = (17.56 * (29.18 + 30)) / 3600;
     expect(r.materialCost).toBeCloseTo(material, 6);
     expect(r.processLines[0]!.runCost).toBeCloseTo(run, 6);
     expect(r.totalProcessCost).toBeCloseTo(run, 6);

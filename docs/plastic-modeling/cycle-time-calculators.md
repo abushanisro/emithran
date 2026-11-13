@@ -10,9 +10,9 @@ Each of the four molding processes has one cycle-time calculator, stored in the 
 
 ## Injection Molding
 
-Calculator **Injection Molding - Cycle Time**, mapped to the catalog operation `Injection Molding` (22 fields).
+Calculator **Injection Molding - Cycle Time**, mapped to the catalog operation `Injection Molding` (33 fields).
 
-Injection cycle time = (Fill + Pack + Cooling + Mold open/close) x Cycle Time Adjustment Factor (formula registry F-08, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula). Fill = shot melt volume / the press injection rate x the injectionTimeAdjustmentFactors for cavities and gates (F-05, VALIDATED). Pack = 35 % of cooling with a 2 s floor, the Menges gate-freeze rule (F-06, ASSUMED: the reference holds no hold time). Mold open/close = the press Euromap 6 dry cycle (F-07, VALIDATED). Not modelled, because the reference has no formula or press data: ejector travel, plasticizing, part and material handling, slides and lifters. Rounded as the engine does: cooling and pack to 0.1 s, fill and the total to 0.01 s.
+Injection cycle time = (Injection + Cooling + Plasticizing beyond cooling + Ejection) x Cycle Time Adjustment Factor (formula registry F-08 v2, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula); it runs from the end of filling to ejection, so holding pressure is inside it and is not added again. Injection = shot melt volume / (the press injection rate x injectionRateMultiplier) x the injectionTimeAdjustmentFactors for cavities and gates (F-05 v2, VALIDATED). Plasticizing = the shot's GPPS-equivalent mass / (the press plasticizing rate x plasticizingRateMultiplier), the press's own rate or else plasticizingRateByClampForce at its clamp force (F-20, ASSUMED); the screw recovers while the part cools, so only the part longer than cooling adds to the cycle. Ejection = mold open and close (the press Euromap 6 dry cycle, F-07) + the ejector stroke out and back: numEjectorCycles x 2 x ejectorDistanceFactor x the part height, at ejectorPercentMaxMachineVelocity of the platen speed, the speed being 2 x dryCycleStrokeFactor x the opening stroke / the dry cycle (F-21, ASSUMED: the reference states these variables, not the formula). Not modelled, because the reference has no formula or the part no input: robotic part handling (partHandlingTimes; the reference default ejection is gravity), material handling, slides and lifters. Rounded as the engine does: cooling to 0.1 s, the times and the total to 0.01 s.
 
 ### Feature lookup table
 
@@ -48,14 +48,25 @@ Injection cycle time = (Fill + Pack + Cooling + Mold open/close) x Cycle Time Ad
 | 12 | Fill Factor for Gates |  | Lookup table: injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Gates Per Cavity and Number >= gates per cavity (first bracket) |  |
 | 13 | Press Dry Cycle Time | s | Machine record: time.dryCycleTimeS (Euromap 6: mold open and close, no material) | F-07 v1, VALIDATED |
 | 14 | Cycle Time Adjustment Factor |  | Reference variable: cycleTimeAdjustmentFactor |  |
-| 15 | Mold Wall Temperature | °C | `{Mold Temperature} + {Mold Temperature Increase}` |  |
-| 16 | Thermal Diffusivity | mm²/s | `{Thermal Conductivity of Melt} / ({Melt Density} * {Specific Heat of Melt} * 1000) * 1000000` |  |
-| 17 | Cooling Time | s | `floor({Nominal Wall Thickness} * {Nominal Wall Thickness} / (pi * pi * {Thermal Diffusivity}) * LN(4 / pi * ({Melt Temperature} - {Mold Wall Temperature}) / ({Ejection Temperature} - {Mold Wall Temperature})) * 10 + 0.5) / 10` | F-04 v1, ASSUMED |
-| 18 | Fill Time | s | `floor({Shot Melt Volume} / {Press Injection Rate} * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100` | F-05 v1, VALIDATED |
-| 19 | Pack to Cooling Ratio |  | `0.35` |  |
-| 20 | Pack Time Minimum | s | `2` |  |
-| 21 | Pack Time | s | `max({Pack Time Minimum}, floor({Cooling Time} * {Pack to Cooling Ratio} * 10 + 0.5) / 10)` | F-06 v1, ASSUMED |
-| 22 | Cycle Time | s | `floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100` | F-08 v1, ASSUMED |
+| 15 | Injection Rate Multiplier |  | Reference variable: injectionRateMultiplier |  |
+| 16 | Shot GPPS Mass | g | Cost engine: shot mass of all cavities + runner as GPPS-equivalent grams (shot-size.ts) |  |
+| 17 | Press Plasticizing Rate | g/s | Machine record: rates.plasticizingRateGppsGPerS; when the press states none, plasticizingRateByClampForce at the press clamp force |  |
+| 18 | Plasticizing Rate Multiplier |  | Reference variable: plasticizingRateMultiplier |  |
+| 19 | Press Opening Stroke | mm | Machine record: limits.openingStrokeMm |  |
+| 20 | Dry Cycle Stroke Factor |  | Reference variable: dryCycleStrokeFactor |  |
+| 21 | Part Height | mm | CAD: bounding box, the smallest side (along the pull direction) |  |
+| 22 | Ejector Distance Factor |  | Reference variable: ejectorDistanceFactor |  |
+| 23 | Ejector Velocity Percent | % | Reference variable: ejectorPercentMaxMachineVelocity |  |
+| 24 | Number of Ejector Cycles |  | Reference variable: numEjectorCycles |  |
+| 25 | Mold Wall Temperature | °C | `{Mold Temperature} + {Mold Temperature Increase}` |  |
+| 26 | Thermal Diffusivity | mm²/s | `{Thermal Conductivity of Melt} / ({Melt Density} * {Specific Heat of Melt} * 1000) * 1000000` |  |
+| 27 | Cooling Time | s | `floor({Nominal Wall Thickness} * {Nominal Wall Thickness} / (pi * pi * {Thermal Diffusivity}) * LN(4 / pi * ({Melt Temperature} - {Mold Wall Temperature}) / ({Ejection Temperature} - {Mold Wall Temperature})) * 10 + 0.5) / 10` | F-04 v1, ASSUMED |
+| 28 | Injection Time | s | `floor({Shot Melt Volume} / ({Press Injection Rate} * {Injection Rate Multiplier}) * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100` | F-05 v2, VALIDATED |
+| 29 | Plasticizing Time | s | `floor({Shot GPPS Mass} / ({Press Plasticizing Rate} * {Plasticizing Rate Multiplier}) * 100 + 0.5) / 100` | F-20 v1, ASSUMED |
+| 30 | Press Platen Speed | mm/s | `2 * {Dry Cycle Stroke Factor} * {Press Opening Stroke} / {Press Dry Cycle Time}` |  |
+| 31 | Ejector Stroke Time | s | `floor({Number of Ejector Cycles} * 2 * {Ejector Distance Factor} * {Part Height} / ({Press Platen Speed} * {Ejector Velocity Percent} / 100) * 100 + 0.5) / 100` |  |
+| 32 | Ejection Time | s | `{Press Dry Cycle Time} + {Ejector Stroke Time}` | F-21 v1, ASSUMED |
+| 33 | Cycle Time | s | `floor(({Injection Time} + {Cooling Time} + max(0, {Plasticizing Time} - {Cooling Time}) + {Ejection Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100` | F-08 v2, ASSUMED |
 
 Lookup table behind the two fill factors, `injectionTimeAdjustmentFactors` (the first row whose Number is at least the value is used; the last row covers the rest):
 
@@ -87,14 +98,14 @@ For a liquid silicone rubber the engine uses **Injection Molding - LSR Cycle Tim
 | 10 | LSR Activation Energy over R | K | `3500` |  |
 | 11 | Kelvin Offset | K | `273.15` |  |
 | 12 | Cure Time | s | `floor({LSR Pre-exponential Factor} * exp({LSR Activation Energy over R} / ({LSR Mold Temperature} + {Kelvin Offset})) * {Nominal Wall Thickness} * 10 + 0.5) / 10` | F-09 v1, ASSUMED |
-| 13 | Fill Time | s | `floor({Shot Melt Volume} / {Press Injection Rate} * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100` | F-05 v1, VALIDATED |
-| 14 | Cycle Time | s | `floor(({Fill Time} + {Cure Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100` | F-08 v1, ASSUMED |
+| 13 | Fill Time | s | `floor({Shot Melt Volume} / {Press Injection Rate} * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100` | F-22 v1, VALIDATED |
+| 14 | Cycle Time | s | `floor(({Fill Time} + {Cure Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100` | F-23 v1, ASSUMED |
 
 ## Structural Foam Molding
 
-Calculator **Structural Foam Molding - Cycle Time**, mapped to the catalog operation `Structural foam molding` (22 fields).
+Calculator **Structural Foam Molding - Cycle Time**, mapped to the catalog operation `Structural foam molding` (33 fields).
 
-Structural foam uses the injection cycle model unchanged (the cost engine reuses it with a foam press): the reference holds no foam-specific cooling or fill formula, so foaming, which lengthens cooling, is NOT modelled and the cycle is understated for foam parts until a validated formula is supplied. Injection cycle time = (Fill + Pack + Cooling + Mold open/close) x Cycle Time Adjustment Factor (formula registry F-08, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula). Fill = shot melt volume / the press injection rate x the injectionTimeAdjustmentFactors for cavities and gates (F-05, VALIDATED). Pack = 35 % of cooling with a 2 s floor, the Menges gate-freeze rule (F-06, ASSUMED: the reference holds no hold time). Mold open/close = the press Euromap 6 dry cycle (F-07, VALIDATED). Not modelled, because the reference has no formula or press data: ejector travel, plasticizing, part and material handling, slides and lifters. Rounded as the engine does: cooling and pack to 0.1 s, fill and the total to 0.01 s.
+Structural foam uses the injection cycle model unchanged (the cost engine reuses it with a foam press): the reference holds no foam-specific cooling or fill formula, so foaming, which lengthens cooling, is NOT modelled and the cycle is understated for foam parts until a validated formula is supplied. Injection cycle time = (Injection + Cooling + Plasticizing beyond cooling + Ejection) x Cycle Time Adjustment Factor (formula registry F-08 v2, ASSUMED). Cooling is the Menges plate-cooling equation, t = s^2 / (pi^2 alpha) x ln((4/pi)(Tm - Tw)/(Te - Tw)), alpha = k / (rho cp) (F-04, ASSUMED: memory/ holds no cooling formula); it runs from the end of filling to ejection, so holding pressure is inside it and is not added again. Injection = shot melt volume / (the press injection rate x injectionRateMultiplier) x the injectionTimeAdjustmentFactors for cavities and gates (F-05 v2, VALIDATED). Plasticizing = the shot's GPPS-equivalent mass / (the press plasticizing rate x plasticizingRateMultiplier), the press's own rate or else plasticizingRateByClampForce at its clamp force (F-20, ASSUMED); the screw recovers while the part cools, so only the part longer than cooling adds to the cycle. Ejection = mold open and close (the press Euromap 6 dry cycle, F-07) + the ejector stroke out and back: numEjectorCycles x 2 x ejectorDistanceFactor x the part height, at ejectorPercentMaxMachineVelocity of the platen speed, the speed being 2 x dryCycleStrokeFactor x the opening stroke / the dry cycle (F-21, ASSUMED: the reference states these variables, not the formula). Not modelled, because the reference has no formula or the part no input: robotic part handling (partHandlingTimes; the reference default ejection is gravity), material handling, slides and lifters. Rounded as the engine does: cooling to 0.1 s, the times and the total to 0.01 s.
 
 ### Feature lookup table
 
@@ -130,14 +141,25 @@ Structural foam uses the injection cycle model unchanged (the cost engine reuses
 | 12 | Fill Factor for Gates |  | Lookup table: injectionTimeAdjustmentFactors.Adjustment Factor where Attribute = Gates Per Cavity and Number >= gates per cavity (first bracket) |  |
 | 13 | Press Dry Cycle Time | s | Machine record: time.dryCycleTimeS (Euromap 6: mold open and close, no material) | F-07 v1, VALIDATED |
 | 14 | Cycle Time Adjustment Factor |  | Reference variable: cycleTimeAdjustmentFactor |  |
-| 15 | Mold Wall Temperature | °C | `{Mold Temperature} + {Mold Temperature Increase}` |  |
-| 16 | Thermal Diffusivity | mm²/s | `{Thermal Conductivity of Melt} / ({Melt Density} * {Specific Heat of Melt} * 1000) * 1000000` |  |
-| 17 | Cooling Time | s | `floor({Nominal Wall Thickness} * {Nominal Wall Thickness} / (pi * pi * {Thermal Diffusivity}) * LN(4 / pi * ({Melt Temperature} - {Mold Wall Temperature}) / ({Ejection Temperature} - {Mold Wall Temperature})) * 10 + 0.5) / 10` | F-04 v1, ASSUMED |
-| 18 | Fill Time | s | `floor({Shot Melt Volume} / {Press Injection Rate} * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100` | F-05 v1, VALIDATED |
-| 19 | Pack to Cooling Ratio |  | `0.35` |  |
-| 20 | Pack Time Minimum | s | `2` |  |
-| 21 | Pack Time | s | `max({Pack Time Minimum}, floor({Cooling Time} * {Pack to Cooling Ratio} * 10 + 0.5) / 10)` | F-06 v1, ASSUMED |
-| 22 | Cycle Time | s | `floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100` | F-08 v1, ASSUMED |
+| 15 | Injection Rate Multiplier |  | Reference variable: injectionRateMultiplier |  |
+| 16 | Shot GPPS Mass | g | Cost engine: shot mass of all cavities + runner as GPPS-equivalent grams (shot-size.ts) |  |
+| 17 | Press Plasticizing Rate | g/s | Machine record: rates.plasticizingRateGppsGPerS; when the press states none, plasticizingRateByClampForce at the press clamp force |  |
+| 18 | Plasticizing Rate Multiplier |  | Reference variable: plasticizingRateMultiplier |  |
+| 19 | Press Opening Stroke | mm | Machine record: limits.openingStrokeMm |  |
+| 20 | Dry Cycle Stroke Factor |  | Reference variable: dryCycleStrokeFactor |  |
+| 21 | Part Height | mm | CAD: bounding box, the smallest side (along the pull direction) |  |
+| 22 | Ejector Distance Factor |  | Reference variable: ejectorDistanceFactor |  |
+| 23 | Ejector Velocity Percent | % | Reference variable: ejectorPercentMaxMachineVelocity |  |
+| 24 | Number of Ejector Cycles |  | Reference variable: numEjectorCycles |  |
+| 25 | Mold Wall Temperature | °C | `{Mold Temperature} + {Mold Temperature Increase}` |  |
+| 26 | Thermal Diffusivity | mm²/s | `{Thermal Conductivity of Melt} / ({Melt Density} * {Specific Heat of Melt} * 1000) * 1000000` |  |
+| 27 | Cooling Time | s | `floor({Nominal Wall Thickness} * {Nominal Wall Thickness} / (pi * pi * {Thermal Diffusivity}) * LN(4 / pi * ({Melt Temperature} - {Mold Wall Temperature}) / ({Ejection Temperature} - {Mold Wall Temperature})) * 10 + 0.5) / 10` | F-04 v1, ASSUMED |
+| 28 | Injection Time | s | `floor({Shot Melt Volume} / ({Press Injection Rate} * {Injection Rate Multiplier}) * {Fill Factor for Cavities} * {Fill Factor for Gates} * 100 + 0.5) / 100` | F-05 v2, VALIDATED |
+| 29 | Plasticizing Time | s | `floor({Shot GPPS Mass} / ({Press Plasticizing Rate} * {Plasticizing Rate Multiplier}) * 100 + 0.5) / 100` | F-20 v1, ASSUMED |
+| 30 | Press Platen Speed | mm/s | `2 * {Dry Cycle Stroke Factor} * {Press Opening Stroke} / {Press Dry Cycle Time}` |  |
+| 31 | Ejector Stroke Time | s | `floor({Number of Ejector Cycles} * 2 * {Ejector Distance Factor} * {Part Height} / ({Press Platen Speed} * {Ejector Velocity Percent} / 100) * 100 + 0.5) / 100` |  |
+| 32 | Ejection Time | s | `{Press Dry Cycle Time} + {Ejector Stroke Time}` | F-21 v1, ASSUMED |
+| 33 | Cycle Time | s | `floor(({Injection Time} + {Cooling Time} + max(0, {Plasticizing Time} - {Cooling Time}) + {Ejection Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100` | F-08 v2, ASSUMED |
 
 Lookup table behind the two fill factors, `injectionTimeAdjustmentFactors` (the first row whose Number is at least the value is used; the last row covers the rest):
 
@@ -230,6 +252,6 @@ RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open
 | G-06 | Cooling and water lines | tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables | UNSUPPORTED |
 | G-07 | Inserts and unscrewing mechanisms | insertInstallRate; cmInsertManualLoadingTime; defaultInsertCost; costPerUnscrewingMechanism; tblSpiType.Use Insert | UNSUPPORTED |
 | G-08 | Tool assembly extras: ejector system, sprue, locating ring, hot drops, try-out | ejector*, sprueBushingCost, locatingRingsCost, costPerStandardHotDrop, tryoutRateUsdPerHr | UNSUPPORTED |
-| G-09 | Handling, setup scrap and plasticizing in the cycle | partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS | UNSUPPORTED |
+| G-09 | Part and material handling and setup scrap in the cycle | partHandlingTimes; materialHandling; scrapTimeInMinutes_* | UNSUPPORTED |
 | G-10 | Period costs: indirect overhead, SG&A, margin | sGandARate; markUpRate; machine indirect overhead | UNSUPPORTED |
 | G-11 | Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing | nothing staged | UNSUPPORTED |
