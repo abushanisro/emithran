@@ -37,11 +37,12 @@ function expectedSteelUsd(): number {
 }
 
 describe('the mold tooling calculator', () => {
-  it('is a helper whose result is the tooling cost per part, at version 6 written by migration 1018 (1012 to 1017 are history)', () => {
+  it('is a helper whose result is the tooling cost per part, at version 7 written by migration 1019 (1012 to 1018 are history)', () => {
     const c = loadPlasticMoldingCalculatorSpec().calculators.find((x) => x.name === MOLD_TOOLING_CALCULATOR)!;
-    expect(c).toMatchObject({ helper: true, operations: [], migration: 1018, version: 6, output: 'Tooling Cost Per Part' });
+    expect(c).toMatchObject({ helper: true, operations: [], migration: 1019, version: 7, output: 'Tooling Cost Per Part' });
     expect(c.description).toMatch(/G-03 to G-08/);
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/1018_plastic_mold_heat_treatment.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1018));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1019_plastic_mold_cooling_lines.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1019));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1018_plastic_mold_heat_treatment.sql'), 'utf8')).toContain('version 6');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1017_plastic_mold_slides_lifters.sql'), 'utf8')).toContain('version 5');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1016_plastic_mold_assembly_extras.sql'), 'utf8')).toContain('version 4');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1014_plastic_mold_cavity_machining_polish.sql'), 'utf8')).toContain('version 3');
@@ -65,7 +66,7 @@ describe('the mold tooling calculator', () => {
     expect(r.outputs['Tryout Hours']).toBe(36);
     expect(r.outputs['Tryout Cost']).toBeCloseTo(36 * 76.81, 6);
     expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd() + r.outputs['Cavity Machining Cost']! + r.outputs['Polish Cost']! + EXTRAS_USD
-      + r.outputs['Heat Treatment Cost']!) * 100 + 0.5) / 100);
+      + r.outputs['Heat Treatment Cost']! + r.outputs['Cooling Cost']!) * 100 + 0.5) / 100);
     // no slides: both rates are 2.11 USD/kg, so the whole stack is treated at 2.11
     expect(r.outputs['Heat Treatment Cost']).toBeCloseTo(r.outputs['Mold Base Steel Mass']! * 2.11, 6);
     expect(r.trace.find((t) => t.fieldName === 'Ejector Pin Cost')?.source).toMatch(/cmStandardToolingComponents: Ejector Pin/);
@@ -114,6 +115,18 @@ describe('the mold tooling calculator', () => {
     expect(r.outputs['Heat Treatment Cost']).toBeCloseTo(
       (cavityCore + r.outputs['Side Action Steel Mass']!) * rates.heatTreatUsdPerKg + (r.outputs['Mold Base Steel Mass']! - cavityCore) * rates.stressReliefUsdPerKg, 6);
     expect(r.trace.find((t) => t.fieldName === 'Heat Treat Rate')?.source).toMatch(/heatTreatRateUsdPerKg/);
+  });
+
+  it('cools the cavity plate with lines 3 diameters apart across it: drilling, 2 hoses and 2 fittings a line, a manifold a side', () => {
+    if ('missing' in BASE) throw new Error(BASE.missing.join());
+    const r = runMoldTooling(facts(), CALCS);
+    if (!r.derivable) throw new Error(r.missing.join());
+    const lines = Math.floor(BASE.base.lengthMm / (3 * 8));
+    expect(r.outputs['Water Lines']).toBe(lines);
+    expect(r.outputs['Water Line Drilling Hours']).toBeCloseTo(lines * BASE.base.widthMm / 25.4 / 60, 9);
+    expect(r.outputs['Cooling Cost']).toBeCloseTo(lines * BASE.base.widthMm / 25.4 / 60 * 100.55 + lines * 2 * (1.25 + 2.5) + 2 * 55, 6);
+    expect(r.trace.find((t) => t.fieldName === 'Water Line Pitch Factor')?.source).toMatch(/Approved rule/);
+    expect(r.trace.find((t) => t.fieldName === 'Line Drilling Rate')?.source).toMatch(/Heater Line Drilling/);
   });
 
   it('adds no side-action cost, and no CMM base hours, when no bundle was recognised', () => {

@@ -903,6 +903,8 @@ export interface ToolingCostDto {
   moldSideActionUsd?: number;
   /** The heat treatment of one mold's steel, USD (formula registry F-29): hardening the cavity, core and side-action steel, stress relief of the rest. */
   moldHeatTreatmentUsd?: number;
+  /** The cooling lines of one mold, USD (formula registry F-30): drilling, hoses, fittings, manifolds. */
+  moldCoolingUsd?: number;
   /** The tooling calculator's run (migration 1012): every input with its source and every formula with its value. */
   calculationTrace?: CalculationTraceStep[];
   /** The tooling calculator's name: a part's own field values are set by it (calculator_field_overrides). */

@@ -394,12 +394,32 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
   },
 
+  {
+    id: 'F-30', version: 1, name: 'Cooling lines',
+    expression: 'lines = max(1, floor(L / (3 x d)));  drilling h = lines x W / drill rate / 60;  cost = drilling h x machining rate + lines x 2 x (hose + fitting) + 2 x manifold',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'W, L', unit: 'mm', source: 'the standard mold base (F-25)' },
+      { name: 'd', unit: 'mm', source: `${MEM}/variables: defaultWaterLineDiameter` },
+      { name: 'drill rate', unit: 'mm/min', source: `${MEM}/lookup/cmToolMachiningRates: Heater Line Drilling` },
+      { name: 'hose, fitting, manifold', unit: 'USD', source: `${MEM}/variables: waterHosesCost, waterManifoldFittingsCost, waterManifoldsCost` },
+    ],
+    dependsOn: ['F-25'],
+    referenceSource: `${MEM}/variables + lookup`,
+    assumptions: [
+      'Approved rule (no line count is on file): water lines across the cavity plate, 3 line diameters apart along the mold base length, each the mold base width long.',
+      'Two hoses and two fittings per line and one manifold per side of the mold.',
+      'The lines are drilled at the Heater Line Drilling rate, the only line drilling rate on file.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
     ['G-03', 'Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle', 'tblSlideSizes; slideCycleRate; costPerHydraulicEjector'],
     ['G-04', 'EDM of rib inserts (the CAD engine does not measure rib heights yet; heat treatment is F-29)', 'edmRateUsdPerHr; edmMaterialCost{Carbon,Copper}UsdPerIn3; edmElectrodeVolumeBurn; *RibInsertElectrodeSize; machinedRibThreshold'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
-    ['G-06', 'Cooling and water lines', 'tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables'],
+    ['G-06', 'Water baffles (no count on file; the cooling lines are F-30)', 'waterBafflesCost'],
     ['G-07', 'Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them)', 'tblSpiType.Use Insert; costPerUnscrewingMechanism'],
     ['G-08', 'Hot drops (a hot runner: the number of drops is not on file)', 'costPerStandardHotDrop; costPerSVGHotDrop; defaultHotDropLayout'],
     ['G-09', 'Handling, setup scrap and plasticizing in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS'],

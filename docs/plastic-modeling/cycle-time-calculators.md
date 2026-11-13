@@ -225,7 +225,7 @@ RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open
 | G-03 | Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle | tblSlideSizes; slideCycleRate; costPerHydraulicEjector | UNSUPPORTED |
 | G-04 | EDM of rib inserts (the CAD engine does not measure rib heights yet; heat treatment is F-29) | edmRateUsdPerHr; edmMaterialCost{Carbon,Copper}UsdPerIn3; edmElectrodeVolumeBurn; *RibInsertElectrodeSize; machinedRibThreshold | UNSUPPORTED |
 | G-05 | Mold texture | cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime | UNSUPPORTED |
-| G-06 | Cooling and water lines | tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables | UNSUPPORTED |
+| G-06 | Water baffles (no count on file; the cooling lines are F-30) | waterBafflesCost | UNSUPPORTED |
 | G-07 | Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them) | tblSpiType.Use Insert; costPerUnscrewingMechanism | UNSUPPORTED |
 | G-08 | Hot drops (a hot runner: the number of drops is not on file) | costPerStandardHotDrop; costPerSVGHotDrop; defaultHotDropLayout | UNSUPPORTED |
 | G-09 | Handling, setup scrap and plasticizing in the cycle | partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS | UNSUPPORTED |

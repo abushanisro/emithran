@@ -7649,7 +7649,7 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
                 bomItemId={itemId}
                 calculator={mold.calculatorName ?? null}
                 result="Tooling Cost Per Part"
-                first={['Mold Base Steel Cost', 'Cavity Machining Cost', 'Polish Cost', 'Ejector System Cost', 'Sprue and Locating Ring Cost', 'Tryout Cost', 'Side Action Cost', 'Side Action Steel Cost', 'Side Action Machining Cost', 'Side Action CMM Cost', 'Heat Treatment Cost', 'Purchased Components Cost', 'Design Cost', 'Machining Cost', 'Assembly Cost', 'Mold Cost', 'Molds Required', 'Tooling Investment']}
+                first={['Mold Base Steel Cost', 'Cavity Machining Cost', 'Polish Cost', 'Ejector System Cost', 'Sprue and Locating Ring Cost', 'Tryout Cost', 'Side Action Cost', 'Side Action Steel Cost', 'Side Action Machining Cost', 'Side Action CMM Cost', 'Heat Treatment Cost', 'Cooling Cost', 'Purchased Components Cost', 'Design Cost', 'Machining Cost', 'Assembly Cost', 'Mold Cost', 'Molds Required', 'Tooling Investment']}
               />
             </div>
           )}
