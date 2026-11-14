@@ -378,18 +378,20 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
-    id: 'F-29', version: 1, name: 'Heat treatment of the mold steel',
-    expression: 'hardened = W x L x (A + B) x density + side-action steel;  relieved = mold base steel - W x L x (A + B) x density;  cost = hardened x heat treat rate + relieved x stress relief rate',
+    id: 'F-29', version: 2, name: 'Heat treatment of the mold steel, as its grade needs it',
+    expression: 'hardened = W x L x (A + B) x density + side-action steel;  relieved = mold base steel - W x L x (A + B) x density;  cost = hardened x heat treat rate x hardening(grade) + relieved x stress relief rate x stress relief(grade)',
     outputUnit: 'USD',
     inputs: [
       { name: 'W, L, A, B', unit: 'mm', source: 'the standard mold base and its A (cavity) and B (core) plates (F-25)' },
       { name: 'side-action steel', unit: 'kg', source: 'the slide and lifter blocks (F-28)' },
       { name: 'heat treat rate, stress relief rate', unit: 'USD/kg', source: `${MEM}/process/digital_factory_settings_usa: heatTreatRateUsdPerKg, stressReliefRateUsdPerKg` },
+      { name: 'hardening(grade), stress relief(grade)', unit: '0 or 1', source: 'reference/mold-steel-treatment-reference.csv (costing engineer research): heat_treatment_required, stress_relief_required' },
     ],
     dependsOn: ['F-25', 'F-28'],
     referenceSource: `${MEM}/process`,
     assumptions: [
-      'The steel that forms the part (the cavity and core plates and the slide and lifter blocks) is hardened; the rest of the mold base (clamp and support plates) is stress relieved. The reference gives the rates, not which steel is treated.',
+      'Version 2 (costing engineer research): treatment is charged only where the tool steel grade needs it by default. AISI P20 is supplied pre-hardened (28-34 HRC), so neither hardening nor stress relief is charged; a grade treated "when specified" is not charged until a hardness is specified.',
+      'Where charged, the steel that forms the part (cavity and core plates, slide and lifter blocks) is hardened and the rest of the mold base stress relieved.',
     ],
     state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
   },
@@ -411,6 +413,20 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
       'Two hoses and two fittings per line and one manifold per side of the mold.',
       'The lines are drilled at the Heater Line Drilling rate, the only line drilling rate on file.',
     ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
+  {
+    id: 'F-33', version: 1, name: 'Hot drops of a hot runner',
+    expression: 'drops = cavities x gates per cavity (hot runner; 0 on a cold runner);  cost = drops x hot drop price(defaultHotDropType)',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'gates per cavity', unit: 'count', source: `${MEM}/variables: defaultNumberOfGatesPerCavity` },
+      { name: 'hot drop price', unit: 'USD', source: `${MEM}/variables: costPerStandardHotDrop / costPerSVGHotDrop by defaultHotDropType` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/variables`,
+    assumptions: ['One hot drop per hot-runner gate (costing engineer research: drops = actual hot-runner gates, not cavities).'],
     state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
   },
 
@@ -461,7 +477,7 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
     ['G-06', 'Water baffles (no count on file; the cooling lines are F-30)', 'waterBafflesCost'],
     ['G-07', 'Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them)', 'tblSpiType.Use Insert; costPerUnscrewingMechanism'],
-    ['G-08', 'Hot drops (a hot runner: the number of drops is not on file)', 'costPerStandardHotDrop; costPerSVGHotDrop; defaultHotDropLayout'],
+    ['G-08', 'Hot-runner manifold and controller (no price on file; the hot drops are F-33)', 'manifoldPlateThickness; defaultHotDropLayout'],
     ['G-09', 'Handling, setup scrap and plasticizing in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS'],
     ['G-10', 'Period costs: indirect overhead, SG&A, margin', 'sGandARate; markUpRate; machine indirect overhead'],
     ['G-11', 'Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing', 'nothing staged'],

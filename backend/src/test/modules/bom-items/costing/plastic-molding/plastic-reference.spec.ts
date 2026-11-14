@@ -38,7 +38,7 @@ describe('resolvePlasticReference', () => {
 });
 
 describe('computeMoldToolingCost on the real tables (the lookups; the prices are the tooling calculator\'s)', () => {
-  const COLD = { runner: 'cold' as const, classUsesInserts: false, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false };
+  const COLD = { runner: 'cold' as const, classUsesInserts: false, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true };
 
   it('leaves the ejector pins to the calculator (their quantity "is calculated in the cost model"), not reported missing', () => {
     const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling, scope: COLD });
@@ -57,16 +57,16 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
 
   it('names only the gaps that apply to the mold: no hot drops on a cold runner, no inserts for a class built without, no texture for None', () => {
     expect(toolingGapIds(COLD)).toEqual(['G-03', 'G-04', 'G-06']);
-    expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth', sideActionsPriced: false, ribInsertsPriced: false })).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08']);
+    expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08']);
     // every bundle recognised and sized: the slides and lifters are priced (F-28), not a gap
     expect(toolingGapIds({ ...COLD, sideActionsPriced: true })).toEqual(['G-04', 'G-06']);
     // every rib measured and classed: the rib inserts are priced (F-31), not a gap
     expect(toolingGapIds({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toEqual(['G-06']);
-    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toMatch(/try-out, the slide and lifter blocks, the heat treatment, the cooling lines, the rib inserts and their EDM, and the toolroom hours; it does NOT include water baffles/);
+    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toMatch(/try-out, the slide and lifter blocks, the heat treatment the tool steel grade needs, the cooling lines, the rib inserts and their EDM, and the toolroom hours; it does NOT include water baffles/);
     const w = toolingScopeWarning(COLD);
     expect(w).toMatch(/includes .*the cavity and core machining and polish.*ejector pins, sprue bushing, locating ring, try-out/);
     expect(w).toMatch(/does NOT include slides and lifters \(the CAD bundles are not all recognised and sized\), the rib inserts and their EDM \(the CAD ribs are not all measured, or one is too large for an insert class\), water baffles \(no count on file\) \(/);
-    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false })).toMatch(/hot drops \(the number of drops is not on file\), cavity inserts/);
+    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toMatch(/the hot-runner manifold and controller \(no price on file\), cavity inserts/);
   });
 
   it('counts Guide Pin at its real 0.25 h and says Guide Bush has no assembly time', () => {
@@ -80,6 +80,7 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
 
   it('reads the reference USA toolroom rates the tooling calculator prices the hours at', () => {
     expect(REF.toolroomRatesUsa).toEqual({ designUsdPerHr: 64.73, machiningUsdPerHr: 100.55, assemblyUsdPerHr: 76.81, tryoutUsdPerHr: 76.81, heatTreatUsdPerKg: 2.11, stressReliefUsdPerKg: 2.11, edmUsdPerHr: 74.3 });
+    expect(REF.moldExtras.hotDrop).toEqual({ type: 'Standard', usd: 3750 });
   });
 });
 

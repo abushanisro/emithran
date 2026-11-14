@@ -37,6 +37,7 @@ import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
 import { computeMoldToolingCost, toolingGapIds } from './mold-tooling-engine';
 import { planRibInserts } from './rib-inserts';
+import { steelTreatment } from '../reference/im-reference';
 import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
@@ -696,10 +697,12 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     // Unscrewing cores add mold complexity beyond parting line — treat as additional undercut bump.
     const effectiveUndercutCount = (signals.undercutCount ?? 0) + ((signals as any).unscrewingCoreCount ?? 0);
     const mold = recommendMoldClass(lifetimeShots, plasticRef.spiClasses, signals.partingComplexity ?? null, effectiveUndercutCount);
+    const treatment = steelTreatment(plasticRef.moldBase.steel.name);
     const toolingScope = {
       runner: runnerSystemType, classUsesInserts: mold.useInsert, cavityTexture: plasticRef.moldExtras.cavityTexture,
       sideActionsPriced: signals.sideActionBlocks != null && signals.sideActionBlocks.unsized === 0,
       ribInsertsPriced: planRibInserts(signals.ribs ?? null, plasticRef.moldExtras.ribInsert).priced,
+      steelTreatmentKnown: treatment != null,
     };
     toolingGaps = toolingGapIds(toolingScope);
 
@@ -740,6 +743,9 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       pressClampTonnes: input.machineClampTonnes != null && input.machineClampTonnes > 0 ? input.machineClampTonnes : null,
       sideActionBlocks: signals.sideActionBlocks ?? null,
       ribs: signals.ribs ?? null,
+      steelTreatment: treatment,
+      runner: runnerSystemType,
+      gatesPerCavity: plasticRef.defaultGatesPerCavity,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides));
     if (!tooling.derivable) {
       warnings.push(`Tooling not costed: missing ${tooling.missing.join('; ')}.`);
@@ -771,6 +777,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         moldHeatTreatmentUsd: o['Heat Treatment Cost']!,
         moldCoolingUsd: o['Cooling Cost']!,
         moldRibInsertUsd: o['Rib Insert Cost']!,
+        moldHotDropUsd: o['Hot Drop Cost']!,
         calculationTrace: tooling.trace,
         calculatorName: tooling.calculator.name,
       };
@@ -829,7 +836,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
     ...(q.pressSelected ? ['F-11'] : []),
     ...(q.cycleDerivable ? [q.isLsr ? 'F-09' : 'F-04', ...(q.isLsr ? [] : ['F-06']), 'F-05', 'F-07', 'F-08'] : []),
     ...(q.yieldKnown ? ['F-13'] : []),
-    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27', 'F-28', 'F-29', 'F-30', 'F-31'] : []),
+    ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27', 'F-28', 'F-29', 'F-30', 'F-31', 'F-33'] : []),
   ];
 }
 

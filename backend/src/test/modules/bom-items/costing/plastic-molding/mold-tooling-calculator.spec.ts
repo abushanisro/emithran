@@ -8,6 +8,7 @@ import { withFieldOverrides } from '../../../../../modules/bom-items/costing/sha
 import { selectMoldBase } from '../../../../../modules/bom-items/costing/plastic-molding/process/mold-base';
 import { moldCavityLookup } from '../../../../../modules/bom-items/costing/plastic-molding/process/mold-cavity';
 import { realPlasticReference } from './real-plastic-reference';
+import { steelTreatment } from '../../../../../modules/bom-items/costing/plastic-molding/reference/im-reference';
 
 // The mold tooling cost by its stored calculator (migration 1012): the staged lookups in, every price, hour and amortization step a formula.
 const REF = realPlasticReference();
@@ -21,7 +22,8 @@ const facts = (over: Partial<MoldToolingFacts> = {}): MoldToolingFacts => ({
   annualVolume: 10_000, productionLifeYears: 3, cavityCount: 1, toolLifeShots: 144_000, toolLifeSource: 'tblToolLife: ABS',
   moldBase: BASE, moldBaseRef: REF.moldBase, partHeightMm: 30,
   cavity: moldCavityLookup({ faceCount: 900, surfaceAreaMm2: 40_000, ref: REF.moldBase }), partSurfaceAreaMm2: 40_000,
-  extras: REF.moldExtras, pressClampTonnes: 102, sideActionBlocks: null, ribs: null, ...over,
+  extras: REF.moldExtras, pressClampTonnes: 102, sideActionBlocks: null, ribs: null,
+  steelTreatment: steelTreatment(REF.moldBase.steel.name), runner: 'cold', gatesPerCavity: 1, ...over,
 });
 const NONE = { small: 0, medium: 0, large: 0 };
 /** The mold assembly extras of the worked mold (F-27): 2 ejector pins (10,000 / 7,903.21 mm2), the sprue and ring, 3 try-outs of 12 h on a 102 t press. */
@@ -37,11 +39,12 @@ function expectedSteelUsd(): number {
 }
 
 describe('the mold tooling calculator', () => {
-  it('is a helper whose result is the tooling cost per part, at version 8 written by migration 1020 (1012 to 1019 are history)', () => {
+  it('is a helper whose result is the tooling cost per part, at version 9 written by migration 1022 (1012 to 1020 are history)', () => {
     const c = loadPlasticMoldingCalculatorSpec().calculators.find((x) => x.name === MOLD_TOOLING_CALCULATOR)!;
-    expect(c).toMatchObject({ helper: true, operations: [], migration: 1020, version: 8, output: 'Tooling Cost Per Part' });
+    expect(c).toMatchObject({ helper: true, operations: [], migration: 1022, version: 9, output: 'Tooling Cost Per Part' });
     expect(c.description).toMatch(/G-03 to G-08/);
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/1020_plastic_mold_rib_inserts_edm.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1020));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1022_plastic_mold_steel_treatment_hot_drops.sql'), 'utf8')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1022));
+    expect(readFileSync(join(__dirname, '../../../../../../migrations/1020_plastic_mold_rib_inserts_edm.sql'), 'utf8')).toContain('version 8');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1019_plastic_mold_cooling_lines.sql'), 'utf8')).toContain('version 7');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1018_plastic_mold_heat_treatment.sql'), 'utf8')).toContain('version 6');
     expect(readFileSync(join(__dirname, '../../../../../../migrations/1017_plastic_mold_slides_lifters.sql'), 'utf8')).toContain('version 5');
@@ -67,9 +70,10 @@ describe('the mold tooling calculator', () => {
     expect(r.outputs['Tryout Hours']).toBe(36);
     expect(r.outputs['Tryout Cost']).toBeCloseTo(36 * 76.81, 6);
     expect(r.outputs['Tooling Investment']).toBe(Math.floor((2140 + r.outputs['Toolroom Labour Cost']! + expectedSteelUsd() + r.outputs['Cavity Machining Cost']! + r.outputs['Polish Cost']! + EXTRAS_USD
-      + r.outputs['Heat Treatment Cost']! + r.outputs['Cooling Cost']!) * 100 + 0.5) / 100);
-    // no slides: both rates are 2.11 USD/kg, so the whole stack is treated at 2.11
-    expect(r.outputs['Heat Treatment Cost']).toBeCloseTo(r.outputs['Mold Base Steel Mass']! * 2.11, 6);
+      + r.outputs['Heat Treatment Cost']! + r.outputs['Cooling Cost']! + r.outputs['Hot Drop Cost']!) * 100 + 0.5) / 100);
+    // the default tool steel AISI P20 is supplied pre-hardened (reference/mold-steel-treatment-reference.csv): no treatment is charged
+    expect(r.outputs['Heat Treatment Cost']).toBe(0);
+    expect(r.trace.find((t) => t.fieldName === 'Hardening Applies')?.source).toMatch(/AISI P20 \(pre-hardened \(quenched and tempered\)\) heat_treatment_required -> not charged/);
     expect(r.trace.find((t) => t.fieldName === 'Ejector Pin Cost')?.source).toMatch(/cmStandardToolingComponents: Ejector Pin/);
     expect(r.trace.find((t) => t.fieldName === 'Tryout Press Multiplier')?.source).toMatch(/<500T \(x2 for bigger\)": the press is 102 t/);
     expect(r.trace.find((t) => t.fieldName === 'Tryout Rate')?.source).toMatch(/tryoutRateUsdPerHr/);
@@ -97,14 +101,15 @@ describe('the mold tooling calculator', () => {
     // and it is in the mold cost
     const without = runMoldTooling(facts(), CALCS);
     if (!without.derivable) throw new Error(without.missing.join());
-    // (the blocks are also hardened, F-29)
-    expect(r.outputs['Mold Cost']! - without.outputs['Mold Cost']!).toBeCloseTo(r.outputs['Side Action Cost']! + r.outputs['Side Action Steel Mass']! * REF.toolroomRatesUsa.heatTreatUsdPerKg, 6);
+    // (P20 is not heat treated, F-29 version 2, so the blocks add only their own cost)
+    expect(r.outputs['Mold Cost']! - without.outputs['Mold Cost']!).toBeCloseTo(r.outputs['Side Action Cost']!, 6);
   });
 
-  it('hardens the cavity and core plates and the side-action blocks, and stress relieves the rest of the mold base', () => {
+  it('for a grade that is treated, hardens the cavity and core plates and the side-action blocks, and stress relieves the rest of the mold base', () => {
     if ('missing' in BASE) throw new Error(BASE.missing.join());
     const mb = REF.moldBase;
-    const r = runMoldTooling(facts({ sideActionBlocks: { slide: NONE, lifter: { ...NONE, small: 2 }, unsized: 0 } }), CALCS);
+    const treated = { steelGrade: 'X', deliveryCondition: 'annealed', hardening: true, stressRelief: true, confidence: 'source_backed', reviewRequired: true, source: 'test' };
+    const r = runMoldTooling(facts({ sideActionBlocks: { slide: NONE, lifter: { ...NONE, small: 2 }, unsized: 0 }, steelTreatment: treated }), CALCS);
     if (!r.derivable) throw new Error(r.missing.join());
     const a = Math.max(mb.aPlateMinMm, mb.aPlateCavityRatio * 30 + BASE.cavityDepthBorderMm);
     const b = Math.max(mb.bPlateMinMm, (1 - mb.aPlateCavityRatio) * 30 + BASE.coreDepthBorderMm);
@@ -154,6 +159,16 @@ describe('the mold tooling calculator', () => {
     const none = runMoldTooling(facts({ ribs: { measured: [{ heightMm: 15, lengthMm: 80, thicknessMm: 1 }], unmeasured: 0 } }), CALCS);
     if (!none.derivable) throw new Error(none.missing.join());
     expect(none.outputs['Rib Insert Cost']).toBe(0);
+  });
+
+  it('prices one hot drop per gate on a hot runner, and none on a cold runner', () => {
+    const hot = runMoldTooling(facts({ runner: 'hot', cavityCount: 2, gatesPerCavity: 2 }), CALCS);
+    if (!hot.derivable) throw new Error(hot.missing.join());
+    expect(hot.trace.find((t) => t.fieldName === 'Hot Drops')?.value).toBe(4);
+    expect(hot.outputs['Hot Drop Cost']).toBe(4 * 3750);
+    const cold = runMoldTooling(facts(), CALCS);
+    if (!cold.derivable) throw new Error(cold.missing.join());
+    expect(cold.outputs['Hot Drop Cost']).toBe(0);
   });
 
   it('adds no side-action cost, and no CMM base hours, when no bundle was recognised', () => {

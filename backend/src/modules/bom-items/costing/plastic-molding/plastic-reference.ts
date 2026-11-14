@@ -69,6 +69,8 @@ export const PLASTIC_VARIABLE_KEYS = [
   'numSmallInsertsBurns', 'numMediumInsertsBurns', 'numLargeInsertsBurns',
   'cmDesignHrsRibInsertSmall', 'cmDesignHrsRibInsertMedium', 'cmDesignHrsRibInsertLarge',
   'cutterPathHrsPerInsert', 'spottingHrsPerInsert', 'edmElectrodeVolumeBurn',
+  // The hot drops of a hot runner (F-33).
+  'costPerStandardHotDrop', 'costPerSVGHotDrop', 'defaultHotDropType',
 ] as const;
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -235,6 +237,8 @@ export interface MoldExtrasReference {
   lineDrillingMmPerMin: number;
   /** The rib inserts and their EDM (F-31, process/rib-inserts.ts). */
   ribInsert: RibInsertReference;
+  /** variables defaultHotDropType and its price (costPerStandardHotDrop or costPerSVGHotDrop), USD per drop (F-33). */
+  hotDrop: { type: string; usd: number };
 }
 
 export interface FeatureRules {
@@ -429,6 +433,10 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     waterManifoldUsd: variable('waterManifoldsCost'),
     lineDrillingMmPerMin: named(rates, 'cmToolMachiningRates', 'Heater Line Drilling', 'rate'),
     ribInsert,
+    hotDrop: ((type) => ({
+      type: type ?? '',
+      usd: type === 'SVG' ? variable('costPerSVGHotDrop') : type === 'Standard' ? variable('costPerStandardHotDrop') : (missing.push('variables: defaultHotDropType (Standard or SVG)'), NaN),
+    }))(text.get('defaultHotDropType')?.trim()),
   };
 
   const system = text.get('useMetricOrImperialValues') === 'Imperial' ? 'Imperial' : text.get('useMetricOrImperialValues') === 'Metric' ? 'Metric' : null;

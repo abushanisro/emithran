@@ -10,12 +10,13 @@ import type { MoldBaseChoice } from '../process/mold-base';
 import type { MoldCavityLookup } from '../process/mold-cavity';
 import type { BlockSize, SideActionSignals } from '../side-action-signals';
 import { planRibInserts, ribInsertQuantities, type RibSignals } from '../process/rib-inserts';
+import type { SteelTreatment } from '../reference/im-reference';
 import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas } from './plastic-cycle-time';
 
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
 const OUTPUT = 'Tooling Cost Per Part';
 const REF = 'memory/Plastic Modeling';
-// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment), F-30 (cooling), F-31 (rib inserts, EDM) are this
+// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment), F-30 (cooling), F-31 (rib inserts, EDM), F-33 (hot drops) are this
 // calculator's formulas; the seeds below supply their inputs.
 /** timePerTryoutBase's note: "basic hrs per tryout for <500T (x2 for bigger)". */
 const TRYOUT_DOUBLE_ABOVE_TONNES = 500;
@@ -55,6 +56,11 @@ export interface MoldToolingFacts {
   sideActionBlocks: SideActionSignals['blocks'] | null;
   /** The ribs the CAD engine measured (rib-inserts.ts); null when the graph has none to read. */
   ribs: RibSignals | null;
+  /** How the default tool steel grade is treated (reference/mold-steel-treatment-reference.csv); null when the grade has no row. */
+  steelTreatment: SteelTreatment | null;
+  /** The runner and the gates per cavity: a hot runner has one drop per gate (F-33). */
+  runner: 'hot' | 'cold';
+  gatesPerCavity: number;
 }
 
 const SIZE_ORDER: readonly BlockSize[] = ['small', 'medium', 'large'];
@@ -104,6 +110,10 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
   const x = f.extras;
   const sa = sideActionBlocks(f.sideActionBlocks, x);
   const ri = x.ribInsert;
+  const st = f.steelTreatment;
+  const treatmentSource = (column: string, applies: boolean | undefined) => st
+    ? `reference/mold-steel-treatment-reference.csv: ${st.steelGrade} (${st.deliveryCondition}) ${column} -> ${applies ? 'charged' : 'not charged'} (${st.confidence}${st.reviewRequired ? ', review required' : ''}; ${st.source})`
+    : `reference/mold-steel-treatment-reference.csv: no row for ${mb.steel.name}, not charged (named gap)`;
   const rq = ribInsertQuantities(planRibInserts(f.ribs, ri), ri);
   const ribSource = `CAD ribs taller than machinedRibThreshold ${ri.thresholdMm} mm, classed by footprint (length x thickness) against {small,medium,large}InsertArea: ${rq.breakdown}`;
   const vars = `${REF}/variables`;
@@ -192,6 +202,13 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       'EDM Rate': { value: f.toolroomRates.edmUsdPerHr, source: `${settings} edmRateUsdPerHr` },
       'Insert Pocket Rate': { value: ri.pocketRateMm3PerMin, source: `${REF}/lookup/cmToolMachiningRates: Insert Pocket Machining`, lookup: true },
       'Insert Pocket Setup Hours': { value: ri.pocketSetupHours, source: `${REF}/lookup/cmToolMachiningSetups: Insert Pocket (setups x hours)`, lookup: true },
+      'Hardening Applies': { value: st?.hardening ? 1 : 0, source: treatmentSource('heat_treatment_required', st?.hardening), lookup: true },
+      'Stress Relief Applies': { value: st?.stressRelief ? 1 : 0, source: treatmentSource('stress_relief_required', st?.stressRelief), lookup: true },
+      'Hot Drops': {
+        value: f.runner === 'hot' ? f.cavityCount * f.gatesPerCavity : 0,
+        source: f.runner === 'hot' ? `hot runner: ${f.cavityCount} cavit${f.cavityCount === 1 ? 'y' : 'ies'} x ${f.gatesPerCavity} gate(s) per cavity (defaultNumberOfGatesPerCavity), one drop per gate` : 'cold runner: no hot drops',
+      },
+      'Hot Drop Unit Cost': { value: x.hotDrop.usd, source: `${vars}: ${x.hotDrop.type === 'SVG' ? 'costPerSVGHotDrop' : 'costPerStandardHotDrop'} (defaultHotDropType ${x.hotDrop.type})` },
     },
   };
 }
