@@ -844,10 +844,9 @@ function buildProcessTree(
         });
       });
     } else if (isMachiningFamily) {
-      if (breakdown.some((b) => (b.occurrenceRefs ?? []).length > 0)) {
-        // Machining after a primary process: one row per machined feature
-        // instance ("Reaming // SimpleHole (SimpleHole:3)"), highlighting
-        // exactly that occurrence.
+      if (breakdown.some((b) => (b.occurrenceRefs ?? []).length > 0 || (b.faceIds ?? []).length > 0)) {
+        // One row per entry, highlighting exactly what it acts on: machined feature instances ("Reaming // SimpleHole (SimpleHole:3)"),
+        // tapped holes, the inspected holes, or the faces meeting at the sharp edges deburred (no feature lists those).
         breakdown.forEach((b, i) => {
           const refs = (b.occurrenceRefs ?? []).filter((r) => v2ById.get(r.featureId)?.occurrences[r.occurrenceIndex]);
           featureNodes.push({
@@ -855,7 +854,7 @@ function buildProcessTree(
             kind: 'feature',
             label: b.name,
             factory, machine,
-            ...(refs.length > 0 ? { v2Occurrences: refs } : {}),
+            ...(refs.length > 0 ? { v2Occurrences: refs } : (b.faceIds ?? []).length > 0 ? { faceOccurrences: [b.faceIds!] } : {}),
             attrs: [{ name: 'Time', value: formatEstCycleTime(b.timeSec) }],
           });
         });

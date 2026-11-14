@@ -1352,6 +1352,45 @@
           "unit": "s",
           "formula": "{Measured Minutes per Batch} / {Batch Size} * 60"
         }
+      ],
+      "supersededBy": 1029
+    },
+    {
+      "name": "Machining - Inspection",
+      "operation": "Inspection",
+      "machineClasses": [
+        "machining_inspection",
+        "special_inspection"
+      ],
+      "description": "Inspection time per part from memory/Machining: one analysis of the default inspection type (variables defaultInspectionType, its time from tblInspection) on the share of parts inspected (variables defaultInspectionSampleRatio), plus every part's final quality inspection (variables defaultFinalInspectionTime, min). The holes inspected (Special Inspection: Feature Inspection of SimpleHole, MultiStepHole, RingedHole) are listed on the line; the reference does not make the time per hole, so one analysis is one inspected part.",
+      "migration": 1029,
+      "fields": [
+        {
+          "name": "Time Per Analysis",
+          "unit": "s",
+          "source": "lookup",
+          "table": "tblInspection",
+          "column": "Time Per Analysis (s)"
+        },
+        {
+          "name": "Inspection Sample Ratio",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Final Inspection Time",
+          "unit": "min",
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time Per Analysis} * {Inspection Sample Ratio} + {Final Inspection Time} * 60"
+        }
       ]
     },
     {

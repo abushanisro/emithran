@@ -1,3 +1,5 @@
+import { inspectedOccurrences, type InspectionReference } from './costing/machining/inspection-reference';
+import { featuresRef, occurrenceByFace, occurrencesOfFaces, type FeatureOccurrenceRef } from './costing/machining/feature-occurrences';
 import { electricityUsd, loadLocationElectricity } from './costing/shared/location-electricity';
 import { castingSourcePath } from '../sand-casting/casting-source';
 import type { DbClient } from '../../common/db/postgrest-client';
@@ -104,8 +106,7 @@ import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candi
 import type { RouteComparisonDto, RouteComparisonResponseDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
 import { VALID_ROUTE_IDS } from './dto/apply-route.dto';
 import { resolveInspectionRule, SEVERITY_RANK } from './costing/shared/physics/gdt-severity';
-import type { GdtSeverity, InspectionMethod, InspectionRuleRow } from './costing/shared/physics/gdt-severity';
-import type { InspectionStagePolicy } from './costing/shared/core/default-rates.constants';
+import type { GdtSeverity, InspectionMethod } from './costing/shared/physics/gdt-severity';
 import { InspectionKnowledgeService } from '../manufacturing-knowledge/services/inspection-knowledge.service';
 import type { GdtAnalysisDto, GdtFeatureDto } from './dto/gdt-analysis.dto';
 import {
@@ -3488,8 +3489,6 @@ export class BOMItemsService {
     void this.writeSelectionSnapshots(id, accessToken, mhrRates, location);
 
     if (isMachiningFamily(family)) {
-      const inspectionRules = await this.inspectionKnowledge.getInspectionRules(accessToken);
-      const samplingPolicy = await this.resolveSamplingPolicy(item, accessToken);
 
       // Fix 2: Blank optimizer — select near-net stock (round bar / rectangular bar)
       // instead of bbox billet. Runs async but non-blocking: failure → billet fallback.
@@ -3597,6 +3596,7 @@ export class BOMItemsService {
         holeCount,
         holeGroups: this.resolveMachiningHoleGroups(fg, summary),
         sharpEdgeLengthMm: (fg?.machining_features?.edges?.sharp_edge_length_mm ?? null) as number | null,
+        sharpEdgeFaceIds: (fg?.machining_features?.edges?.sharp_edge_face_ids ?? null) as number[] | null,
         pocketCount: machiningFeatureCounts(fg?.machining_features)?.pockets ?? 0,
         materialGrade: grade,
         materialCostPerKg,
@@ -3615,9 +3615,8 @@ export class BOMItemsService {
         inspectionRate: preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
         surfaceTreatment: null,
         surfaceTreatmentDbRate,
-        samplingPerN: this.resolveSamplingPerN(item),
-        samplingPolicy,
-        gdtFeatures: this.extractGdtFeatures(item, fg, inspectionRules),
+        // memory/Machining inspection (inspection-reference.ts): the reference values and the holes it inspects.
+        inspectionReference: (await this.machiningLookup.getInspectionReference()).reference, inspectedFeatures: inspectedOccurrences(fg?.feature_graph_v2?.features as any),
         location,
         blankResult,
         machinabilityRating: machinabilityRating ?? undefined,
@@ -6494,11 +6493,6 @@ export class BOMItemsService {
     const waterjetAbrasivePricePerKg = await this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, locInfo.code, rates);
 
     if (isMachiningFamily(family)) {
-      // Same rules + sampling policy as getCostSummary — totals must match line for line
-      const inspection = {
-        rules: await this.inspectionKnowledge.getInspectionRules(accessToken),
-        policy: await this.resolveSamplingPolicy(item, accessToken),
-      };
       // Same real Deburr/Ream data getCostSummary resolves — route
       // comparison must price these identically, not diverge from the
       // primary quote (see this file's own "Single source of truth" rule
@@ -6519,7 +6513,7 @@ export class BOMItemsService {
         return attachToRoutes(await this.buildMilledRoutes(
           id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
           materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
-          inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
+          cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
           routeJigBoreTable, routeCylindricalGrindingParams, routeInternalGrindingParams, routeKeywayBroach, routeWireEdmParams,
           accessToken,
         ));
@@ -6527,7 +6521,7 @@ export class BOMItemsService {
       return attachToRoutes(await this.buildTurnedRoutes(
         id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
         materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
-        inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
+        cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
         routeCylindricalGrindingParams, routeInternalGrindingParams, routeJigBoreTable, routeKeywayBroach, routeWireEdmParams,
         routeTurningParams,
         accessToken,
@@ -7707,6 +7701,7 @@ export class BOMItemsService {
         holeCount: (summary.holeCount ?? item.holeCount ?? 0) as number,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, mhrRates, location,
         stockAllowancePerSideMm: milledAllowance.allowancePerSideMm,
+        inspectionReference: (await this.machiningLookup.getInspectionReference()).reference,
       });
       if (milledAlt) candidates.push(milledAlt);
     }
@@ -7812,10 +7807,12 @@ export class BOMItemsService {
     location: string;
     /** Reference per-side stock allowance (BlankOptimizerService.stockAllowanceFor); null = rule not staged. */
     stockAllowancePerSideMm: number | null;
+    /** The memory/Machining inspection reference (MachiningLookupService.getInspectionReference); null = inspection is a named gap. */
+    inspectionReference: InspectionReference | null;
   }): CandidateRouteDto | null {
     const { volume, surfaceArea, maxLength, maxWidth, maxHeight, finishedWeightKg,
             holeCount, materialCostPerKg, materialDensityKgM3, materialSource,
-            batchSize, mhrRates, location, stockAllowancePerSideMm } = args;
+            batchSize, mhrRates, location, stockAllowancePerSideMm, inspectionReference } = args;
 
     // The ONE bounding-box billet definition (blank-stock-candidates.ts),
     // with the reference stock-allowance rule — not a copy of its formula.
@@ -7832,8 +7829,8 @@ export class BOMItemsService {
       batchSize, family: 'milled', finishedWeightKg,
       deburrRate: preferRealRate(mhrRates.manualDeburr, mhrRates.deburring), inspectionRate: preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment: null, surfaceTreatmentDbRate: null,
-      samplingPerN: undefined, samplingPolicy: undefined,
-      gdtFeatures: [], location, blankResult,
+      inspectionReference, inspectedFeatures: [],
+      location, blankResult,
       machinabilityRating: undefined, featureOps: undefined,
       mhrRate: mhrRates.cnc3ax, tappingRate: mhrRates.tapping,
     };
@@ -8216,14 +8213,16 @@ export class BOMItemsService {
     if ((HOLE_OPS.has(operation) || BORE_GRIND_OPS.has(operation)) && holeGroups.length > 0) {
       const g = holeGroups.reduce((a, b) => (b.diameter_mm < a.diameter_mm ? b : a));
       const note = 'CAD: smallest drilled-hole group';
+      // Exactly those holes on the model (their feature_graph_v2 occurrences), for the eye beside each input.
+      const holesRef = featuresRef(`Ø${g.diameter_mm} holes`, g.occurrences);
       if (HOLE_OPS.has(operation)) {
-        set('Hole Diameter', g.diameter_mm, `${note} — diameter`);
-        set('Hole Depth', g.depth_mm, `${note} — depth`);
-        set('Holes', g.count, `${note} — holes of this diameter`);
+        set('Hole Diameter', g.diameter_mm, `${note} — diameter`, holesRef);
+        set('Hole Depth', g.depth_mm, `${note} — depth`, holesRef);
+        set('Holes', g.count, `${note} — holes of this diameter`, holesRef);
       } else {
-        set('Grind Diameter', g.diameter_mm, `${note} — bore diameter`);
-        set('Grind Length', g.depth_mm, `${note} — bore depth`);
-        set('Surfaces', g.count, `${note} — bores of this diameter`);
+        set('Grind Diameter', g.diameter_mm, `${note} — bore diameter`, holesRef);
+        set('Grind Length', g.depth_mm, `${note} — bore depth`, holesRef);
+        set('Surfaces', g.count, `${note} — bores of this diameter`, holesRef);
       }
     }
     if (['Rough Turning', 'Finish Turning', 'Cylindrical Grinding'].includes(operation)) {
@@ -8258,14 +8257,18 @@ export class BOMItemsService {
       const t = this.resolveThreads(drawingThreads, fg)[0];
       const d = t ? Number(/^M\s*(\d+(?:\.\d+)?)/i.exec(t.size)?.[1]) : NaN;
       const note = `${drawingThreads.length > 0 ? 'Drawing' : 'CAD'}: first thread group${t ? ` (${t.size})` : ''}`;
-      set('Thread Diameter', d, `${note} — nominal diameter`);
+      // The tapped holes, when the threads came from the CAD (a drawing's threads name no holes).
+      const tappedRef = t ? featuresRef(`${t.size} tapped holes`, t.occurrences) : undefined;
+      set('Thread Diameter', d, `${note} — nominal diameter`, tappedRef);
       set('Thread Pitch', t?.pitchMm ?? (Number.isFinite(d) ? isoCoarsePitchMm(d) : null), t?.pitchMm != null ? `${note} — pitch` : `${note} — ISO 261 coarse pitch`);
-      set('Thread Depth', t?.depthMm, `${note} — depth`);
-      set('Threads', t?.count, `${note} — threads of this size`);
+      set('Thread Depth', t?.depthMm, `${note} — depth`, tappedRef);
+      set('Threads', t?.count, `${note} — threads of this size`, tappedRef);
     }
     if (operation === 'Deburring') {
+      const edgeFaces = fg?.machining_features?.edges?.sharp_edge_face_ids as number[] | undefined;
       set('Sharp Edge Length', Number(fg?.machining_features?.edges?.sharp_edge_length_mm),
-        'CAD: total length of sharp B-Rep edges (seams and tangent edges excluded)');
+        'CAD: total length of sharp B-Rep edges (seams and tangent edges excluded)',
+        edgeFaces?.length ? { kind: 'faces', label: 'sharp edges', faceIds: [...edgeFaces] } : undefined);
     }
     // What the cost engine itself used for this part (same costing as the
     // page): this calculator's own line, verbatim; and the engine-derived
@@ -8404,13 +8407,15 @@ export class BOMItemsService {
   private resolveMachiningHoleGroups(
     fg: any,
     summary: any,
-  ): Array<{ diameter_mm: number; count: number; depth_mm?: number }> {
+  ): Array<{ diameter_mm: number; count: number; depth_mm?: number; occurrences?: FeatureOccurrenceRef[] }> {
     const features = fg?.machining_features?.features;
     if (!Array.isArray(features)) {
       return (summary?.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>;
     }
     const DRILLED = new Set(['through', 'blind', 'threaded', 'cross', 'pcd_pattern']);
-    const groups = new Map<number, { diameter_mm: number; count: number; depth_mm?: number }>();
+    // Each hole as the feature_graph_v2 occurrence it shares its faces with (feature-occurrences.ts): what its calculator inputs light.
+    const byFace = occurrenceByFace(fg?.feature_graph_v2?.features);
+    const groups = new Map<number, { diameter_mm: number; count: number; depth_mm?: number; occurrences?: FeatureOccurrenceRef[] }>();
     for (const f of features) {
       if (f?.type !== 'SimpleHole' || !DRILLED.has(f.variant)) continue;
       const diameter = Number(f.params?.diameter_mm);
@@ -8421,6 +8426,8 @@ export class BOMItemsService {
       const g = groups.get(key) ?? { diameter_mm: key, count: 0 };
       g.count += count;
       if (depth > 0) g.depth_mm = Math.max(g.depth_mm ?? 0, depth);
+      const occ = occurrencesOfFaces(f.face_ids, byFace);
+      if (occ.length > 0) g.occurrences = [...(g.occurrences ?? []), ...occ];
       groups.set(key, g);
     }
     return [...groups.values()];
@@ -8503,16 +8510,19 @@ export class BOMItemsService {
   private resolveThreads(
     drawingThreads: Array<{ size: string; count: number; pitchMm?: number }>,
     fg: any,
-  ): Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean }> {
+  ): Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }> {
+    // Drawing threads carry no geometry: they light no holes (a hole picked by size would be a guess).
     if (drawingThreads.length > 0) return this.normalizeThreadSpecs(drawingThreads);
     // Drawing not yet analyzed — synthesize from geometry-detected tapped holes.
     // depth_mm/through are real, already-computed fields on the CAD engine's
     // threaded SimpleHole feature (machining_feature_recognizer.py) — carried through here
     // instead of discarding them down to just the spec string.
-    const cncFeatures = (fg?.machining_features?.features ?? []) as Array<{ type: string; variant: string; params: any }>;
+    const cncFeatures = (fg?.machining_features?.features ?? []) as Array<{ type: string; variant: string; params: any; face_ids?: unknown[] }>;
     const tapped = cncFeatures.filter((f) => f.type === 'SimpleHole' && f.variant === 'threaded');
     if (tapped.length === 0) return [];
+    const byFace = occurrenceByFace(fg?.feature_graph_v2?.features);
     const raw = tapped.map((f) => ({
+      occurrences: occurrencesOfFaces(f.face_ids, byFace),
       // No thread spec on the feature = size unknown: tapping names it as a
       // missing input rather than pricing an assumed size.
       size: String(f.params?.spec ?? ''),
@@ -8528,9 +8538,9 @@ export class BOMItemsService {
   // duplicate sizes, averaging depth and combining isThrough (true only when
   // every merged hole in the group is through) across the merge.
   private normalizeThreadSpecs(
-    threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean }>,
-  ): Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean }> {
-    interface Group { count: number; pitchMm?: number; depthSum: number; depthCount: number; throughCount: number }
+    threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }>,
+  ): Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }> {
+    interface Group { count: number; pitchMm?: number; depthSum: number; depthCount: number; throughCount: number; occurrences: FeatureOccurrenceRef[] }
     const groups: Record<string, Group> = {};
     for (const t of threads) {
       const raw = String(t.size ?? (t as any).spec ?? '').trim().toUpperCase();
@@ -8540,7 +8550,8 @@ export class BOMItemsService {
       const count = Number(t.count) || 0;
       if (count <= 0) continue;
       const pitchMm = t.pitchMm ?? (metric?.[2] ? Number(metric[2]) : undefined);
-      const g: Group = groups[key] ?? { count: 0, pitchMm, depthSum: 0, depthCount: 0, throughCount: 0 };
+      const g: Group = groups[key] ?? { count: 0, pitchMm, depthSum: 0, depthCount: 0, throughCount: 0, occurrences: [] };
+      g.occurrences.push(...(t.occurrences ?? []));
       g.count += count;
       if (g.pitchMm == null && pitchMm != null) g.pitchMm = pitchMm;
       if (t.depthMm != null) { g.depthSum += t.depthMm * count; g.depthCount += count; }
@@ -8553,47 +8564,10 @@ export class BOMItemsService {
       ...(g.pitchMm != null ? { pitchMm: g.pitchMm } : {}),
       ...(g.depthCount > 0 ? { depthMm: Math.round((g.depthSum / g.depthCount) * 100) / 100 } : {}),
       ...(g.depthCount > 0 ? { isThrough: g.throughCount === g.depthCount } : {}),
+      ...(g.occurrences.length > 0 ? { occurrences: g.occurrences } : {}),
     }));
   }
 
-  // GD&T callouts from drawing intelligence → per-feature inspection-time input.
-  // When inspection_rules rows are supplied, per-callout time comes from the DB
-  // rule bands; the code matrix in gdt-severity.ts remains the fallback.
-  private extractGdtFeatures(
-    item: any,
-    fg: unknown,
-    rules: InspectionRuleRow[] = [],
-  ): Array<{ symbol: string; tolerance: number; timeMin?: number }> {
-    return resolveGdtCallouts(fg, item?.drawingIntelligence)
-      .map((c) => {
-        const symbol = c.type;
-        const tolerance = c.toleranceMm;
-        return {
-          symbol,
-          tolerance,
-          timeMin: rules.length > 0
-            ? resolveInspectionRule(rules, symbol, tolerance).inspectionTimeMin
-            : undefined,
-        };
-      });
-  }
-
-  // Per-item inspection sampling override: bom_items.validation_config.inspection.samplePerN
-  private resolveSamplingPerN(item: any): number | undefined {
-    const v = Number((item?.validationConfig as any)?.inspection?.samplePerN);
-    return Number.isFinite(v) && v >= 1 ? Math.floor(v) : undefined;
-  }
-
-  // Named quality plan (DB quality_plans row) selected per item via
-  // bom_items.validation_config.inspection.qualityPlan; null → code default.
-  private async resolveSamplingPolicy(
-    item: any,
-    accessToken: string,
-  ): Promise<InspectionStagePolicy | undefined> {
-    const planKey = (item?.validationConfig as any)?.inspection?.qualityPlan;
-    if (typeof planKey !== 'string' || !planKey.trim()) return undefined;
-    return (await this.inspectionKnowledge.getQualityPlan(accessToken, planKey.trim())) ?? undefined;
-  }
 
   // Same real drawing-extracted Ra field operation-sequencer.ts's
   // injectDrawingIntelligence already reads for the milled path
@@ -8638,7 +8612,6 @@ export class BOMItemsService {
     comparisonWarnings: string[],
     locInfo: (typeof LOCATION_INFO)[string],
     location: string,
-    inspection?: { rules: InspectionRuleRow[]; policy?: InspectionStagePolicy },
     surfaceTreatmentDbRate?: SurfaceTreatmentDbRate | null,
     deburrLinearSpeedMmPerSec?: number | null,
     reamTable?: any[] | null,
@@ -8697,6 +8670,7 @@ export class BOMItemsService {
       holeCount,
       holeGroups:           this.resolveMachiningHoleGroups(fg, summary),
       sharpEdgeLengthMm:    (fg?.machining_features?.edges?.sharp_edge_length_mm ?? null) as number | null,
+      sharpEdgeFaceIds:     (fg?.machining_features?.edges?.sharp_edge_face_ids ?? null) as number[] | null,
       pocketCount:          machiningFeatureCounts(fg?.machining_features)?.pockets ?? 0,
       materialGrade:        grade,
       materialCostPerKg,
@@ -8715,9 +8689,8 @@ export class BOMItemsService {
       inspectionRate:       preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment:     null,
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
-      samplingPerN:         this.resolveSamplingPerN(item),
-      samplingPolicy:       inspection?.policy,
-      gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
+      inspectionReference:  (await this.machiningLookup.getInspectionReference()).reference,
+      inspectedFeatures:    inspectedOccurrences(fg?.feature_graph_v2?.features as any),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
       deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,
@@ -8938,7 +8911,6 @@ export class BOMItemsService {
     comparisonWarnings: string[],
     locInfo: (typeof LOCATION_INFO)[string],
     location: string,
-    inspection?: { rules: InspectionRuleRow[]; policy?: InspectionStagePolicy },
     surfaceTreatmentDbRate?: SurfaceTreatmentDbRate | null,
     deburrLinearSpeedMmPerSec?: number | null,
     reamTable?: any[] | null,
@@ -8982,6 +8954,7 @@ export class BOMItemsService {
       holeCount,
       holeGroups:           this.resolveMachiningHoleGroups(fg, summary),
       sharpEdgeLengthMm:    (fg?.machining_features?.edges?.sharp_edge_length_mm ?? null) as number | null,
+      sharpEdgeFaceIds:     (fg?.machining_features?.edges?.sharp_edge_face_ids ?? null) as number[] | null,
       pocketCount:          0,
       materialGrade:        grade,
       materialCostPerKg,
@@ -9004,9 +8977,8 @@ export class BOMItemsService {
       inspectionRate:       preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment:     null,
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
-      samplingPerN:         this.resolveSamplingPerN(item),
-      samplingPolicy:       inspection?.policy,
-      gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
+      inspectionReference:  (await this.machiningLookup.getInspectionReference()).reference,
+      inspectedFeatures:    inspectedOccurrences(fg?.feature_graph_v2?.features as any),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
       deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,

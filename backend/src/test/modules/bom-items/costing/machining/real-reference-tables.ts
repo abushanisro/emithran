@@ -1,3 +1,4 @@
+import { resolveInspectionReference, type InspectionReference } from '../../../../../modules/bom-items/costing/machining/inspection-reference';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { DrillingTable } from '../../../../../modules/bom-items/costing/machining/lookup/drilling-table';
@@ -85,6 +86,16 @@ export function realCapabilityRules(): MachiningCapabilityRules {
   const { rules, missing } = resolveMachiningCapabilityRules(variables, gtol);
   if (!rules) throw new Error(`capability rules missing: ${missing.join('; ')}`);
   return rules;
+}
+
+/** The inspection reference (inspection-reference.ts) from the real memory/Machining variables and tblInspection. */
+export function realInspectionReference(): InspectionReference {
+  const variables = parseCsv(readFileSync(join(LOOKUP_DIR, '..', 'variables.csv'), 'utf-8'))
+    .map((r) => ({ key: r['variableName']!, value: r['stringValue'] ?? null }));
+  const table = read('tblInspection.csv').map((r) => ({ ...r, 'Time Per Analysis (s)': num(r['Time Per Analysis (s)']) }));
+  const { reference, missing } = resolveInspectionReference(variables, table);
+  if (!reference) throw new Error(`inspection reference missing: ${missing.join('; ')}`);
+  return reference;
 }
 
 /** One material code's grinding values from tblCylindricalGrinding (migration

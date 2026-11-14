@@ -53,7 +53,9 @@ export function CadEvidencePanel({
             <p className={`text-xs ${highlight.reconciles ? 'text-muted-foreground' : 'text-amber-600'}`}>
               {highlight.measured
                 ? <>{highlight.measured.label} = {Math.round(highlight.measured.value * 10) / 10} {highlight.measured.unit}</>
-                : highlight.wholePart && <>{highlight.wholePart.label}: measured over the whole part ({highlight.wholePart.faces} faces)</>}
+                : highlight.wholePart
+                  ? <>{highlight.wholePart.label}: measured over the whole part ({highlight.wholePart.faces} faces)</>
+                  : highlight.faceSet && <>{highlight.faceSet.label}: measured along {highlight.faceSet.faces} faces</>}
               {!highlight.reconciles && ` — ${highlight.note ?? 'these faces do not fully account for the extracted value'}`}
             </p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">

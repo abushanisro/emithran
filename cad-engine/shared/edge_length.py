@@ -125,3 +125,9 @@ def _concavity(edge: Any, f1: Any, f2: Any) -> str:
     except Exception:
         return "unknown"
     return "external" if kind == ChFiDS_Convex else "internal" if kind == ChFiDS_Concave else "unknown"
+
+
+def sharp_edge_faces(detailed: Dict[str, Any]) -> list:
+    """The faces that meet at a sharp edge, each once, sorted: what a sharp-edge length (deburring) is measured along, for 3D highlighting.
+    `detailed` is sharp_edge_length(..., detail=True); face ids are the same global OCC ordinals as the face_map."""
+    return sorted({fid for e in detailed.get("edges", []) for fid in e.get("face_ids", [])})

@@ -134,8 +134,15 @@ def analyze_part(
             # Real sharp-edge length (deburring path) measured from the
             # B-Rep — replaces the backend estimating it from surface area.
             try:
-                from shared.edge_length import sharp_edge_length  # type: ignore
-                machining_features_result["edges"] = sharp_edge_length(shape)
+                from shared.edge_length import sharp_edge_faces, sharp_edge_length  # type: ignore
+                _edges = sharp_edge_length(shape, detail=True)
+                machining_features_result["edges"] = {
+                    "sharp_edge_count": _edges["sharp_edge_count"],
+                    "sharp_edge_length_mm": _edges["sharp_edge_length_mm"],
+                    "total_edge_length_mm": _edges["total_edge_length_mm"],
+                    # The faces meeting at those edges: the deburring line's edge length is lit on them.
+                    "sharp_edge_face_ids": sharp_edge_faces(_edges),
+                }
             except Exception as _edge_exc:
                 logger.warning(f"[machining_features] edge length failed: {_edge_exc}")
             # Embed face_map so the frontend can resolve face_ids → STL triangle ranges.

@@ -3721,7 +3721,7 @@ export function ProcessCostDialog({
                             selectOptions={SELECT_FIELD_OPTIONS[field.fieldName]}
                             hasLookupEye={hasLookupEye}
                             cadEvidenceKey={cadEvidenceKey}
-                            cadHighlight={featureRef?.kind === 'features'
+                            cadHighlight={featureRef && (featureRef.kind === 'features' || featureRef.kind === 'faces')
                               ? cachedFeaturesHighlight(featureRef, bomItemData?.featureGraph?.feature_graph_v2)
                               : resolveFieldHighlight(cadEvidenceKey, bomItemData?.featureGraph?.feature_graph_v2)}
                             evidenceOn={activeEvidenceLabel === label}
