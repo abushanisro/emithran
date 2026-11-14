@@ -6168,9 +6168,24 @@ const INSTANCE_COLUMNS: { key: keyof FeatureInstance; label: string; digits: num
   { key: 'removedMm3', label: 'Removed mm³', digits: 1 },
 ];
 
-function MachiningFeatureInspectorPanel({ featureIds, fg, lines, currencySymbol }: { featureIds: string[]; fg: FeatureGraph; lines: readonly PricedLine[]; currencySymbol: string }) {
-  const ids = new Set(featureIds);
-  const matching = (fg.feature_graph_v2?.features ?? []).filter((f) => ids.has(f.id));
+function MachiningFeatureInspectorPanel({ featureIds, occurrences, fg, lines, currencySymbol }: {
+  featureIds: string[];
+  /** The row's exact instances (a tapping or inspection row): only these are counted, not every instance of their entries. */
+  occurrences?: { featureId: string; occurrenceIndex: number }[] | undefined;
+  fg: FeatureGraph;
+  lines: readonly PricedLine[];
+  currencySymbol: string;
+}) {
+  const ids = new Set([...featureIds, ...(occurrences ?? []).map((o) => o.featureId)]);
+  const picked = new Map<string, Set<number>>();
+  for (const o of occurrences ?? []) picked.set(o.featureId, new Set([...(picked.get(o.featureId) ?? []), o.occurrenceIndex]));
+  const matching = (fg.feature_graph_v2?.features ?? [])
+    .filter((f) => ids.has(f.id))
+    .map((f) => {
+      const keep = picked.get(f.id);
+      return keep ? { ...f, occurrences: f.occurrences.filter((_, i) => keep.has(i)) } : f;
+    })
+    .filter((f) => f.occurrences.length > 0);
   if (matching.length === 0) return null;
   const groups = groupFeaturesByType(matching);
   const total = groups.reduce((s, g) => s + g.occurrenceCount, 0);
@@ -6235,7 +6250,7 @@ function MachiningFeatureInspectorPanel({ featureIds, fg, lines, currencySymbol 
 
       <div className="px-3 py-3">
         <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Operations and cost of this feature</div>
-        <OperationCostRows lines={lines} featureIds={featureIds} currencySymbol={currencySymbol} />
+        <OperationCostRows lines={lines} featureIds={[...ids]} currencySymbol={currencySymbol} />
       </div>
     </div>
   );
@@ -8801,7 +8816,30 @@ function GeometricCostDriversPanel({
           {isThreadFeatureSelected && selectedId ? (
             <ThreadFeatureInspectorPanel selectedId={selectedId} item={item} />
           ) : isMachiningFeatureSelected && fg && selectedId ? (
-            <MachiningFeatureInspectorPanel featureIds={selected?.v2FeatureIds ?? []} fg={fg} lines={processLines ?? []} currencySymbol={currencySymbol ?? '$'} />
+            // The row's features, however it names them (a group's entries, one entry, or exact instances), then the row's own properties.
+            <div className="divide-y divide-border/50">
+              <MachiningFeatureInspectorPanel
+                featureIds={[...(selected?.v2FeatureIds ?? []), ...(selected?.v2FeatureId ? [selected.v2FeatureId] : [])]}
+                occurrences={selected?.v2Occurrences}
+                fg={fg}
+                lines={processLines ?? []}
+                currencySymbol={currencySymbol ?? '$'}
+              />
+              {selected?.attrs?.length ? (
+                <div className="p-2 space-y-0.5">
+                  <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground">{selected.label}</div>
+                  {selected.attrs.map((attr, i) => (
+                    <div key={i} className="flex items-baseline px-2 py-1.5 gap-2">
+                      <span className="text-[10px] text-muted-foreground w-36 shrink-0 truncate">{attr.name}</span>
+                      <span className="text-xs font-medium truncate tabular-nums">{attr.value}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {[selected?.v2FeatureIds?.length, selected?.v2FeatureId ? 1 : 0, selected?.v2Occurrences?.length, selected?.attrs?.length].every((n) => !n) && (
+                <div className="p-4 text-center text-[11px] text-muted-foreground">{selected?.label}: this step records no features or properties of its own.</div>
+              )}
+            </div>
           ) : !featureMetadata && selected?.attrs?.length ? (
             <div className="p-2 space-y-0.5">
               <div className="px-2 py-1 text-xs font-medium text-foreground">{selected.label}</div>
