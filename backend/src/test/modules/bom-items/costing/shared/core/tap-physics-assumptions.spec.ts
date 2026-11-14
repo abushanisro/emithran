@@ -34,8 +34,8 @@ describe('tap physics reports which of its inputs were assumed', () => {
   });
 
   it('flags a nominal that is not in the coarse series', () => {
-    // M7 is a real thread but off the common coarse series this table carries.
-    const r = resolveTapPhysicsInputs('M7', null, 5, 5, 'SECC');
+    // M13 is not an ISO 261 coarse-series diameter.
+    const r = resolveTapPhysicsInputs('M13', null, 5, 5, 'SECC');
     expect(r.pitchIsAssumed).toBe(true);
     expect(r.pitchMm).toBe(1.0);
   });

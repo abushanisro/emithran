@@ -505,7 +505,9 @@ describe('OD Turning — real per-pass depth-of-cut physics (tblGeneralTurning)'
     // costed ('none') rather than charged.
     expect(roughLine.setupTimeMin).toBe(0);
     expect(roughLine.setupTimeSource).toBe('none');
-    expect(finishLine.setupTimeMin).toBeUndefined();
+    // Finish turning runs in the rough-turning setup: it states a zero setup of its own, not an unresolved one.
+    expect(finishLine.setupTimeMin).toBe(0);
+    expect(finishLine.setupTimeSource).toBe('none');
   });
 
   it('reports a gap instead of estimating when real tblGeneralTurning data is not resolved', () => {
@@ -1036,14 +1038,24 @@ describe('Fix — drilling/tapping now use real material-aware physics (no more 
     expect(tapMin('SS304')).toBeGreaterThan(tapMin('AISI 1018'));
   });
 
-  it('leaves aluminium tapping unpriced and named: tblTapping covers 125-400 HB only', () => {
+  it('prices aluminium tapping from its own cut code row (30.11, 27.2 m/min fine band)', () => {
     const r = computeMillingCostSummary(
-      milledInput({ materialGrade: 'AL6061-T6', tappingTable: TAPPING, threads: [{ size: 'M6', count: 4, depthMm: 12 }] }),
+      milledInput({ materialGrade: 'AL6061-T6', tappingTable: TAPPING, threads: [{ size: 'M3×0.5', count: 4, depthMm: 5 }] }),
       mc('3_axis_mill'),
     );
     const tap = r.processLines.find((l) => l.process === 'Tapping')!;
-    expect(tap.cycleTimeMin).toBe(0);
-    expect(r.warnings.join(' ')).toContain('tblTapping row for aluminum');
+    expect(tap.cycleTimeMin).toBeGreaterThan(0);
+    expect(JSON.stringify(tap.calculationTrace)).toContain('material code 30.11');
+    expect(r.warnings.join(' ')).not.toContain('Tapping not priced');
+  });
+
+  it('a pitch finer than the table (M2 x 0.4) takes the fine-band speed', () => {
+    const r = computeMillingCostSummary(
+      milledInput({ materialGrade: 'AL6061-T6', tappingTable: TAPPING, threads: [{ size: 'M2', count: 4, depthMm: 5 }] }),
+      mc('3_axis_mill'),
+    );
+    expect(r.processLines.find((l) => l.process === 'Tapping')!.cycleTimeMin).toBeGreaterThan(0);
+    expect(r.warnings.join(' ')).not.toContain('Tapping not priced');
   });
 
   it('uses the real thread depth and never an assumed one', () => {
@@ -1183,7 +1195,7 @@ describe('checkMachiningCapability — real per-machine envelope (migration 755)
 // all (a pre-existing mislabel: cycleTimes.deburrMin reported boringMin).
 const REAM_TABLE = [
   { ToolType: 'Ream', MaterialCutCodeName: '1.0', Hardness: 125, HardnessSystem: 'Brinell', DiameterMm: 3, CuttingSpeedMPerMin: 22.6, FeedMm: 0.15 },
-  { ToolType: 'Ream', MaterialCutCodeName: '15.0', Hardness: 275, HardnessSystem: 'Brinell', DiameterMm: 3, CuttingSpeedMPerMin: 8.0, FeedMm: 0.10 },
+  { ToolType: 'Ream', MaterialCutCodeName: '5.0', Hardness: 275, HardnessSystem: 'Brinell', DiameterMm: 3, CuttingSpeedMPerMin: 8.0, FeedMm: 0.10 },
   // Real row copied verbatim from memory/Machining/lookup (tblReaming.csv): the aluminum-range
   // entry, so an aluminum part is inside the table's own hardness range.
   { ToolType: 'Ream', MaterialCutCodeName: '30.11', Hardness: 60, HardnessSystem: 'Brinell', DiameterMm: 3, CuttingSpeedMPerMin: 27.2, FeedMm: 0.3 },
@@ -1628,7 +1640,7 @@ describe('Cylindrical Grinding — new operation, real Ra<0.4µm-triggered, turn
 // Cylindrical Grinding's table — no 2-hop bridge needed here).
 const FINISH_BORING_TABLE = [
   { tool_type: 'Finish Bore', cut_type: 'Finish Boring', material_cut_code_name: '1.0', hardness: 125, diameter_mm: 3, cutting_speed_m_min: 30, feed_mm_rev: 0.05 },
-  { tool_type: 'Finish Bore', cut_type: 'Finish Boring', material_cut_code_name: '15.0', hardness: 275, diameter_mm: 3, cutting_speed_m_min: 15, feed_mm_rev: 0.03 },
+  { tool_type: 'Finish Bore', cut_type: 'Finish Boring', material_cut_code_name: '5.0', hardness: 275, diameter_mm: 3, cutting_speed_m_min: 15, feed_mm_rev: 0.03 },
   // Real row copied verbatim from memory/Machining/lookup (tblBoringV2__rows.csv): the aluminum-range
   // entry, so an aluminum part is inside the table's own hardness range.
   { tool_type: 'Finish Bore', cut_type: 'Finish Boring', material_cut_code_name: '30.11', hardness: 60, diameter_mm: 1, cutting_speed_m_min: 317.6, feed_mm_rev: 0.13 },
@@ -1655,7 +1667,7 @@ describe('Jig Boring — new operation, a real tier tighter than Reaming', () =>
   it(`adds a real Jig Boring line at the real ${RULES.jigBorePositionToleranceMm}mm threshold (inclusive) and tighter`, () => {
     const result = computeMillingCostSummary(
       milledInput({
-        tightestToleranceMm: RULES.jigBorePositionToleranceMm, holeGroups: [{ diameter_mm: 3, count: 2, depth_mm: 7.5 }],
+        materialGrade: 'AISI 1018', tightestToleranceMm: RULES.jigBorePositionToleranceMm, holeGroups: [{ diameter_mm: 3, count: 2, depth_mm: 7.5 }],
         jigBoreTable: FINISH_BORING_TABLE,
         jigBoreRate: rate(2000, { machineClass: 'jig_bore', machineName: 'SIP Hydroptic 6A' }),
       } as any),
@@ -1684,7 +1696,7 @@ describe('Jig Boring — new operation, a real tier tighter than Reaming', () =>
   it(`applies the real ${RULES.jigBoringRepetitions}x repeat-pass count on top of the real Finish Boring physics`, () => {
     const result = computeMillingCostSummary(
       milledInput({
-        tightestToleranceMm: 0.02, holeGroups: [{ diameter_mm: 3, count: 1, depth_mm: 7.5 }],
+        materialGrade: 'AISI 1018', tightestToleranceMm: 0.02, holeGroups: [{ diameter_mm: 3, count: 1, depth_mm: 7.5 }],
         jigBoreTable: FINISH_BORING_TABLE, jigBoreRate: rate(2000, { machineClass: 'jig_bore' }),
       } as any),
       mc('3_axis_mill'),
@@ -1738,7 +1750,7 @@ describe('Jig Boring — new operation, a real tier tighter than Reaming', () =>
   it('does not cost setup, and says so, when setup_time_hr is absent', () => {
     const result = computeMillingCostSummary(
       milledInput({
-        tightestToleranceMm: 0.02, holeGroups: [{ diameter_mm: 3, count: 1, depth_mm: 7.5 }],
+        materialGrade: 'AISI 1018', tightestToleranceMm: 0.02, holeGroups: [{ diameter_mm: 3, count: 1, depth_mm: 7.5 }],
         jigBoreTable: FINISH_BORING_TABLE, jigBoreRate: rate(2000, { machineClass: 'jig_bore' }),
       } as any),
       mc('3_axis_mill'),
@@ -1754,7 +1766,7 @@ describe('Jig Boring — new operation, a real tier tighter than Reaming', () =>
     const result = computeTurningCostSummary(
       milledInput({
         family: 'turned', mhrRate: rate(900, { machineClass: '2_axis_lathe' }),
-        tightestToleranceMm: 0.02, holeGroups: [{ diameter_mm: 3, count: 1, depth_mm: 7.5 }],
+        materialGrade: 'AISI 1018', tightestToleranceMm: 0.02, holeGroups: [{ diameter_mm: 3, count: 1, depth_mm: 7.5 }],
         jigBoreTable: FINISH_BORING_TABLE, jigBoreRate: rate(2000, { machineClass: 'jig_bore' }),
       } as any),
       mc('2_axis_lathe'),
@@ -2324,5 +2336,69 @@ describe('Internal Grinding covers every bore (a title-block Ra applies to every
     const small = run([{ diameter_mm: 10, count: 1, depth_mm: 25 }]);
     const large = run([{ diameter_mm: 30, count: 1, depth_mm: 40 }]);
     expect(run([{ diameter_mm: 10, count: 1, depth_mm: 25 }, { diameter_mm: 30, count: 1, depth_mm: 40 }])).toBeCloseTo(small + large, 2);
+  });
+});
+
+// The part that showed "Tapping — unresolved" and "Keyway Broaching — unresolved" and so could not be
+// applied: its CAD threads (M2x0.4 and M3x0.5, blind), its holes, and its 0.804 mm groove (milled: no
+// keyway candidate reaches the broach), against the reference tables.
+describe('Cannula Holder bottom (aluminum 6061, milled): every operation is priced', () => {
+  const result = computeMillingCostSummary(
+    milledInput({
+      volume: 11_272, surfaceArea: 8_103, maxLength: 54.33, maxWidth: 45.01, maxHeight: 44.4, finishedWeightKg: 0.03,
+      materialGrade: 'Aluminum, ANSI 6061', batchSize: 2500, tightestToleranceMm: null, gdtFeatureCount: 0, gdtFeatures: [],
+      holeCount: 5, holeGroups: [{ diameter_mm: 4, count: 4, depth_mm: 5.208 }, { diameter_mm: 18.4, count: 1, depth_mm: 21.73 }],
+      threads: [{ size: 'M2', count: 4, pitchMm: 0.4, depthMm: 5.1 }, { size: 'M3', count: 4, pitchMm: 0.5, depthMm: 5.04 }],
+      tappingTable: TAPPING, drillingTable: realDrillingTable(), keywayBroach: realKeywayBroachReference(), keywayCandidates: [],
+      // CAD sharp-edge length; tblDeburring Wire Wheel Brush (the reference default edge tool) speed for cut code 30.11.
+      sharpEdgeLengthMm: 1442.715, deburrLinearSpeedMmPerSec: 27.4, deburrMaterialCutCode: '30.11',
+    } as any),
+    mc('3_axis_mill'),
+  );
+
+  it('prices tapping for both thread sizes from the aluminum row', () => {
+    const tap = result.processLines.find((l) => l.process === 'Tapping')!;
+    expect(tap.cycleTimeMin).toBeGreaterThan(0);
+    expect(tap.physicsGap).toBeUndefined();
+    expect(JSON.stringify(tap.calculationTrace)).toContain('material code 30.11');
+  });
+
+  it('every line states its setup, so the route counts as fully costed (tapping on the mill and deburring were refused as "setup time was not resolved")', () => {
+    expect(result.processLines.filter((l) => l.setupTimeMin == null).map((l) => l.process)).toEqual([]);
+  });
+
+  it('leaves no operation unpriced, so the route can be applied', () => {
+    expect(result.processLines.filter((l) => l.physicsGap).map((l) => l.process)).toEqual([]);
+    expect(result.warnings.filter((w) => w.includes('not priced'))).toEqual([]);
+    expect(result.processLines.map((l) => l.process)).not.toContain('Keyway Broaching');
+  });
+});
+
+describe('the mill line is the Machining - Milling calculator over the part\'s sequenced operations', () => {
+  const featureOps = [
+    { name: 'Facing', timeSec: 45, source: 'fixed' }, { name: 'Rough Milling', timeSec: 120, source: 'feature' },
+    { name: 'Fine Finish Milling', timeSec: 300, source: 'feature' }, { name: 'Drilling', timeSec: 20, source: 'feature' },
+    { name: 'Center Drilling', timeSec: 10, source: 'feature' }, { name: 'Filleting', timeSec: 40, source: 'feature' },
+    { name: 'Tapping', timeSec: 99, source: 'feature' }, { name: 'Deburr', timeSec: 90, source: 'fixed' },
+  ];
+  const line = computeMillingCostSummary(milledInput({ featureOps }), mc('3_axis_mill')).processLines.find((l) => l.process === '3 Axis Mill')!;
+  const step = (name: string) => line.calculationTrace!.find((st) => st.fieldName === name)!.value;
+
+  it('carries the calculator and each operation group as an input (Tapping and Deburr are their own lines)', () => {
+    expect(line.calculatorId).toBe('Machining - Milling');
+    expect(step('Rough Milling Time')).toBe(120);
+    expect(step('Hole Making Time')).toBe(30);
+    expect(step('Edge Treatment Time')).toBe(40);
+    expect(step('Cutting Time')).toBe(535);
+  });
+
+  it('adds the rapids and tool-change allowance stored on the calculator (15 %)', () => {
+    expect(line.cycleTimeMin).toBeCloseTo((535 * 1.15) / 60, 4);
+  });
+
+  it('is a named gap, not a number, when the station has no calculator', () => {
+    const r = computeMillingCostSummary(milledInput({ featureOps, machiningCalculators: {} }), mc('3_axis_mill'));
+    expect(r.processLines.find((l) => l.process === '3 Axis Mill')!.physicsGap).toBeDefined();
+    expect(r.warnings.join(' ')).toContain('3 Axis Mill not priced');
   });
 });

@@ -62,7 +62,7 @@ import { MILLING_MRR, computeDrillCycle, computeTapCycle, computeRotaryCycleSec,
 import type { DrillingTable } from '../lookup/drilling-table';
 import type { MachiningCalculators } from '../calculators/machining-calculator';
 import type { MaterialClass } from '../process/cost-machining-engine';
-import { nearestByDiameterThenHardness, MACHINING_MATERIAL_HARDNESS_HB } from '../lookup/machining-material-hardness';
+import { nearestByDiameterThenHardness, MACHINING_MATERIAL } from '../lookup/machining-material-hardness';
 
 // drillOp/tapOp below call the same calculators cost-machining-engine.ts uses
 // (computeDrillCycle / computeTapCycle)
@@ -122,7 +122,7 @@ function counterboreTimeSec(
   counterboreTable: any[] | null | undefined,
 ): number {
   if (counterboreTable && counterboreTable.length > 0) {
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[matClass];
+    const targetHb = MACHINING_MATERIAL[matClass];
     const row = nearestByDiameterThenHardness(counterboreTable, diamMm, targetHb);
     if (row && typeof row.cutting_speed_m_min === 'number' && typeof row.feed_mm_rev === 'number') {
       const depth = depthMm > 0 ? depthMm : diamMm * DRILL_DEPTH_TO_DIAMETER_RATIO;
@@ -361,6 +361,12 @@ export function buildOperationSequence(
       case "Slot:radial":
         ops.push({ name: "Rough Milling", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature", cadFeatureType: ft });
         ops.push({ name: "Slot Milling", timeSec: count * 20, source: "feature", cadFeatureType: ft });
+        break;
+
+      case "Keyway:default":
+        // A keyway no broach in the reference cuts (keyway-routing.ts): the
+        // catalog's "Rough Milling//Keyway" on the mill.
+        ops.push({ name: "Rough Milling", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature", cadFeatureType: ft });
         break;
 
       case "SimpleHole:through":

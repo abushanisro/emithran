@@ -66,7 +66,8 @@ import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optim
 import { buildOperationSequence, injectDrawingIntelligence } from './costing/machining/operation/operation-sequencer';
 import type { OperationLine } from './costing/machining/operation/operation-sequencer';
 import { splitDeepHoleOccurrences, resolveDeepHoleRules } from './costing/machining/operation/deep-hole-routing';
-import { splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
+import { broachWidthRangeMm, splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
+import { machiningCatalogCompatibility } from './costing/machining/operation/catalog-compatibility';
 import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-routing';
 import { undercutCountFromDraftSummary } from './costing/plastic-molding/draft-signals';
 import { sideActionSignals } from './costing/plastic-molding/side-action-signals';
@@ -2218,6 +2219,7 @@ export class BOMItemsService {
     rates: RateSnapshot;
     locCurrencyCode: string;
     location: string;
+    stockForm?: string | null;
     warnings: string[];
   }) {
     return this.materialResolutionService.resolveMaterialForFamily(input);
@@ -2341,6 +2343,106 @@ export class BOMItemsService {
   }
 
   // ── eMithran-style feature-level breakdown helpers ─────────────────────────────
+
+  /**
+   * The part's CAD features as machining work: the features that go to their own machine (deep holes, broached
+   * keyways, wire EDM slots, rotary-broached and etched pockets) split out, and the rest sequenced into the milling
+   * operations with their times. ONE definition, used by the cost summary and by the route comparison, so the
+   * applied route is priced on the same operations the Cost tab lists.
+   */
+  private async machiningFeaturePlan(item: any, fg: any, grade: string | null, accessToken: string) {
+    const warnings: string[] = [];
+    const matClass = detectMaterialClass(grade);
+    const machinabilityRating = (fg?.machining_features?.material_machinability ?? null) as number | null;
+    const machinabilityFactor = machinabilityRating != null ? machinabilityRating / 75 : 1.0;
+    const fgv2Features = ((fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2 ?? null)?.features ?? null) as unknown[] | null;
+    const [counterboreTable, chamferParams, roundingParams, drillingTable, tappingTable, keywayBroach, operationSizeRanges, machiningCalculators] = await Promise.all([
+      this.machiningLookup.getCounterboreTable(),
+      this.machiningLookup.getChamferParams(matClass),
+      this.machiningLookup.getRoundingParams(matClass),
+      this.machiningLookup.getDrillingTable(),
+      this.machiningLookup.getTappingTable(),
+      this.machiningLookup.getKeywayBroachReference(),
+      this.machiningLookup.getOperationSizeRanges(),
+      this.resolveMachiningCalculators(accessToken),
+    ]);
+    const deepHoleRules = resolveDeepHoleRules(operationSizeRanges);
+    if (deepHoleRules.missing.length > 0) {
+      warnings.push(
+        `Deep-hole routing (Gun Drilling / Deep Bore) not applied — tblOperationSizeRanges is missing: ` +
+        `${deepHoleRules.missing.join(', ')}. Deep holes are costed as ordinary drilling.`,
+      );
+    }
+
+    const heatTreatment = ((item as any).heatTreatment ?? null) as string | null;
+
+    // Deep-hole routing (Gun Drilling / Deep Bore Machine — see
+    // deep-hole-routing.ts): split occurrences inside the reference
+    // Gun Drilling / Deep Boring size ranges (tblOperationSizeRanges) out BEFORE
+    // building the regular operation sequence, so they're never double-
+    // counted as a regular "Drill" op inside "CNC Milling" too.
+    const deepHoleSplit = splitDeepHoleOccurrences(fgv2Features, deepHoleRules.rules);
+    // Keyway Broaching (see keyway-routing.ts): same pre-filter pattern,
+    // chained after the deep-hole split so both filters compose —
+    // fgv2Features can carry both a deep hole AND a keyway on the same part.
+    const keywaySplit = splitKeywayOccurrences(deepHoleSplit.filteredFeatures, broachWidthRangeMm(keywayBroach));
+    // Wire EDM (see wire-edm-routing.ts): same pre-filter pattern, chained
+    // after the keyway split — only pulls real "slot" occurrences when a
+    // real heat-treat callout is present; otherwise a no-op pass-through.
+    const wireEdmSplit = splitWireEdmOccurrences(keywaySplit.filteredFeatures, heatTreatment);
+    // Chemical milling (drawing callout): pockets are etched, not milled —
+    // priced on the Secondary Processes page (chemical-milling-engine.ts).
+    const polygonSplit = splitPolygonPockets(wireEdmSplit.filteredFeatures, fg?.machining_features?.polygon_candidates, polygonCallout((item as any).drawingIntelligence));
+    if (polygonSplit.removedPocketOccurrences > 0) {
+      warnings.push(`Polygon callout: ${polygonSplit.removedPocketOccurrences} pocket(s) are polygon sockets — rotary broached, not milled.`);
+    }
+    const chemSplit = splitChemicallyMilledPockets(polygonSplit.filteredFeatures, chemicalMillingCallout((item as any).drawingIntelligence));
+    if (chemSplit.etchedPocketGroups > 0) {
+      warnings.push(`Chemical milling callout: ${chemSplit.etchedPocketGroups} pocket group(s) are etched, not milled — see Mask Cure / Scribe / Etch Cell / DeMask on the Secondary Processes page.`);
+    }
+
+    const rawFeatureOps = buildOperationSequence(
+      chemSplit.filteredFeatures, matClass, machinabilityFactor, grade,
+      counterboreTable, chamferParams.dataFound ? chamferParams.linearSpeedMmPerSec : null,
+      roundingParams.dataFound ? roundingParams.linearSpeedMmPerSec : null,
+      drillingTable,
+      machiningCalculators,
+      tappingTable,
+    );
+    // Ops the sequencer could not price from real inputs (missing CAD
+    // measurement or lookup row) — reported, never estimated.
+    const unpricedOpWarnings = rawFeatureOps
+      .filter((o) => o.missing)
+      .map((o) => `${o.name} not priced — missing real input: ${o.missing}.`);
+    // Fix 5: inject drawing intelligence overrides into the operation list
+    const allFeatureOps = injectDrawingIntelligence(
+      rawFeatureOps,
+      item.drawingIntelligence as Record<string, any> | null,
+      grade,
+      tappingTable,
+      machiningCalculators,
+    );
+
+    // Stage 3 pipeline log — confirms what the operation sequencer produced
+    this.logger.debug(
+      `[ops] count=${allFeatureOps.length} seq=${
+        allFeatureOps.length > 0
+          ? allFeatureOps.map(o => `${o.name}(${o.timeSec.toFixed(0)}s)`).join('→')
+          : 'empty'
+      }`,
+    );
+
+    // Safety net: if all machining ops (excluding Face Mill + Deburr) sum to < 30s,
+    // material_removed_mm3 is missing from the CAD engine response and the feature
+    // path would produce a wildly low cycle time. Fall back to bbox formula instead.
+    const featureMachiningTimeSec = allFeatureOps
+      .filter(o => o.name !== 'Face Mill' && o.name !== 'Deburr')
+      .reduce((s, o) => s + o.timeSec, 0);
+    const featureOps = (allFeatureOps.length > 0 && featureMachiningTimeSec >= 30)
+      ? allFeatureOps
+      : undefined;
+    return { warnings, deepHoleSplit, keywaySplit, wireEdmSplit, unpricedOpWarnings, featureMachiningTimeSec, featureOps, heatTreatment, machinabilityRating };
+  }
 
   /** Convert raw operation-sequencer output into grouped FeatureOp[] for the UI. */
   // featureType on each returned FeatureOp is the real, per-part CAD
@@ -3330,6 +3432,7 @@ export class BOMItemsService {
         rates,
         locCurrencyCode: locInfo.code,
         location,
+        stockForm: resolveScenarioStockForm(item.scenarioOverrides),
         warnings: materialWarnings,
       });
     const {
@@ -3449,81 +3552,9 @@ export class BOMItemsService {
         this.machiningLookup.getCapabilityRules(),
       ]);
       const machiningCalculators = await this.resolveMachiningCalculators(accessToken);
-      const deepHoleRules = resolveDeepHoleRules(operationSizeRanges);
-      if (deepHoleRules.missing.length > 0) {
-        materialWarnings.push(
-          `Deep-hole routing (Gun Drilling / Deep Bore) not applied — tblOperationSizeRanges is missing: ` +
-          `${deepHoleRules.missing.join(', ')}. Deep holes are costed as ordinary drilling.`,
-        );
-      }
-
-      const heatTreatment = ((item as any).heatTreatment ?? null) as string | null;
-
-      // Deep-hole routing (Gun Drilling / Deep Bore Machine — see
-      // deep-hole-routing.ts): split occurrences inside the reference
-      // Gun Drilling / Deep Boring size ranges (tblOperationSizeRanges) out BEFORE
-      // building the regular operation sequence, so they're never double-
-      // counted as a regular "Drill" op inside "CNC Milling" too.
-      const deepHoleSplit = splitDeepHoleOccurrences(fgv2Features, deepHoleRules.rules);
-      // Keyway Broaching (see keyway-routing.ts): same pre-filter pattern,
-      // chained after the deep-hole split so both filters compose —
-      // fgv2Features can carry both a deep hole AND a keyway on the same part.
-      const keywaySplit = splitKeywayOccurrences(deepHoleSplit.filteredFeatures);
-      // Wire EDM (see wire-edm-routing.ts): same pre-filter pattern, chained
-      // after the keyway split — only pulls real "slot" occurrences when a
-      // real heat-treat callout is present; otherwise a no-op pass-through.
-      const wireEdmSplit = splitWireEdmOccurrences(keywaySplit.filteredFeatures, heatTreatment);
-      // Chemical milling (drawing callout): pockets are etched, not milled —
-      // priced on the Secondary Processes page (chemical-milling-engine.ts).
-      const polygonSplit = splitPolygonPockets(wireEdmSplit.filteredFeatures, fg?.machining_features?.polygon_candidates, polygonCallout((item as any).drawingIntelligence));
-      if (polygonSplit.removedPocketOccurrences > 0) {
-        materialWarnings.push(`Polygon callout: ${polygonSplit.removedPocketOccurrences} pocket(s) are polygon sockets — rotary broached, not milled.`);
-      }
-      const chemSplit = splitChemicallyMilledPockets(polygonSplit.filteredFeatures, chemicalMillingCallout((item as any).drawingIntelligence));
-      if (chemSplit.etchedPocketGroups > 0) {
-        materialWarnings.push(`Chemical milling callout: ${chemSplit.etchedPocketGroups} pocket group(s) are etched, not milled — see Mask Cure / Scribe / Etch Cell / DeMask on the Secondary Processes page.`);
-      }
-
-      const rawFeatureOps = buildOperationSequence(
-        chemSplit.filteredFeatures, matClass, machinabilityFactor, grade,
-        counterboreTable, chamferParams.dataFound ? chamferParams.linearSpeedMmPerSec : null,
-        roundingParams.dataFound ? roundingParams.linearSpeedMmPerSec : null,
-        drillingTable,
-        machiningCalculators,
-        tappingTable,
-      );
-      // Ops the sequencer could not price from real inputs (missing CAD
-      // measurement or lookup row) — reported, never estimated.
-      const unpricedOpWarnings = rawFeatureOps
-        .filter((o) => o.missing)
-        .map((o) => `${o.name} not priced — missing real input: ${o.missing}.`);
-      // Fix 5: inject drawing intelligence overrides into the operation list
-      const allFeatureOps = injectDrawingIntelligence(
-        rawFeatureOps,
-        item.drawingIntelligence as Record<string, any> | null,
-        grade,
-        tappingTable,
-        machiningCalculators,
-      );
-
-      // Stage 3 pipeline log — confirms what the operation sequencer produced
-      this.logger.debug(
-        `[ops] count=${allFeatureOps.length} seq=${
-          allFeatureOps.length > 0
-            ? allFeatureOps.map(o => `${o.name}(${o.timeSec.toFixed(0)}s)`).join('→')
-            : 'empty'
-        }`,
-      );
-
-      // Safety net: if all machining ops (excluding Face Mill + Deburr) sum to < 30s,
-      // material_removed_mm3 is missing from the CAD engine response and the feature
-      // path would produce a wildly low cycle time. Fall back to bbox formula instead.
-      const featureMachiningTimeSec = allFeatureOps
-        .filter(o => o.name !== 'Face Mill' && o.name !== 'Deburr')
-        .reduce((s, o) => s + o.timeSec, 0);
-      const featureOps = (allFeatureOps.length > 0 && featureMachiningTimeSec >= 30)
-        ? allFeatureOps
-        : undefined;
+      const featurePlan = await this.machiningFeaturePlan(item, fg, grade, accessToken);
+      materialWarnings.push(...featurePlan.warnings);
+      const { deepHoleSplit, keywaySplit, wireEdmSplit, unpricedOpWarnings, featureMachiningTimeSec, featureOps, heatTreatment } = featurePlan;
 
       // Stage 4 pipeline log — confirms what the cost engine receives
       this.logger.debug(
@@ -5944,6 +5975,7 @@ export class BOMItemsService {
         rates,
         locCurrencyCode: locInfo.code,
         location,
+        stockForm: resolveScenarioStockForm(item.scenarioOverrides),
         warnings: comparisonWarnings,
       });
     const {
@@ -7623,6 +7655,7 @@ export class BOMItemsService {
         rates,
         locCurrencyCode: locInfo.code,
         location,
+        stockForm: resolveScenarioStockForm(item.scenarioOverrides),
         warnings: [],
       }),
       this.resolveMHRRates(accessToken, location, undefined, rates),
@@ -8501,13 +8534,15 @@ export class BOMItemsService {
     const groups: Record<string, Group> = {};
     for (const t of threads) {
       const raw = String(t.size ?? (t as any).spec ?? '').trim().toUpperCase();
-      const metric = raw.match(/^M\s*(\d+(?:\.\d+)?)/);
+      // "M2×0.4": the pitch the CAD engine or the drawing wrote into the size itself.
+      const metric = raw.match(/^M\s*(\d+(?:\.\d+)?)(?:\s*[×X*]\s*(\d+(?:\.\d+)?))?/);
       const key = metric ? `M${metric[1]}` : (raw || 'size not given');
       const count = Number(t.count) || 0;
       if (count <= 0) continue;
-      const g: Group = groups[key] ?? { count: 0, pitchMm: t.pitchMm, depthSum: 0, depthCount: 0, throughCount: 0 };
+      const pitchMm = t.pitchMm ?? (metric?.[2] ? Number(metric[2]) : undefined);
+      const g: Group = groups[key] ?? { count: 0, pitchMm, depthSum: 0, depthCount: 0, throughCount: 0 };
       g.count += count;
-      if (g.pitchMm == null && t.pitchMm != null) g.pitchMm = t.pitchMm;
+      if (g.pitchMm == null && pitchMm != null) g.pitchMm = pitchMm;
       if (t.depthMm != null) { g.depthSum += t.depthMm * count; g.depthCount += count; }
       if (t.isThrough) g.throughCount += count;
       groups[key] = g;
@@ -8635,7 +8670,27 @@ export class BOMItemsService {
     const maxHeight = ((item as any).maxHeight ?? 0) as number;
     const finishedWeightKg = ((item as any).weight ?? 0) as number;
 
+    // The same feature plan and blank the cost summary prices (machiningFeaturePlan), so a route is applied at
+    // the operations and stock the Cost tab shows.
+    const featurePlan = await this.machiningFeaturePlan(item, fg, grade, accessToken);
+    comparisonWarnings.push(...featurePlan.warnings);
+    const blankResult = await this.blankOptimizer.selectOptimalBlank(
+      { length: maxLength, width: maxWidth, height: maxHeight }, (item.volume ?? 0) as number, 'milled', accessToken,
+      resolveScenarioStockForm(item.scenarioOverrides),
+    );
+
     const baseInput: Omit<MachiningCostInput, 'mhrRate' | 'tappingRate'> = {
+      blankResult,
+      machinabilityRating:  featurePlan.machinabilityRating ?? undefined,
+      featureOps:           featurePlan.featureOps,
+      gunDrillCandidates:   featurePlan.deepHoleSplit.gunDrillCandidates,
+      deepBoreCandidates:   featurePlan.deepHoleSplit.deepBoreCandidates,
+      gunDrillTable:        await this.machiningLookup.getGunDrillingTable(),
+      deepBoreMaterials:    await this.machiningLookup.getDeepBoreMaterials(),
+      gunDrillRate:         mhrRates.gunDrill,
+      deepBoreRate:         mhrRates.deepBoreMachine,
+      keywayCandidates:     featurePlan.keywaySplit.keywayCandidates,
+      wireEdmCandidates:    featurePlan.wireEdmSplit.wireEdmCandidates,
       volume:               (item.volume ?? 0) as number,
       surfaceArea:          (item.surfaceArea ?? 0) as number,
       maxLength, maxWidth, maxHeight,
@@ -8700,6 +8755,13 @@ export class BOMItemsService {
       ['3_axis_mill', mhrRates.mill3ax],
       ['4_axis_mill', mhrRates.mill4ax],
       ['5_axis_mill', mhrRates.mill5ax],
+      // Turning machines with live tooling: offered for a milled part when the catalog says they make its features.
+      ['2_axis_lathe', mhrRates.lathe2ax],
+      ['3_axis_lathe', mhrRates.lathe3ax],
+      ['2_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed2ax],
+      ['3_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed3ax],
+      ['simultaneous_turning', mhrRates.simultaneousTurning],
+      ['machining_millturn', mhrRates.machiningMillturn],
     ]);
     const discoveredMilledClasses = await this.machineDiscoveryService.getEligibleClasses(
       'primary_milling', location, accessToken,
@@ -8711,9 +8773,21 @@ export class BOMItemsService {
         '(migration 781) must be run against the live database before Route Comparison can offer milling routes.',
       );
     }
-    const milledMachineClasses: MachineClassId[] = discoveredMilledClasses
-      .filter((cls) => primaryRateByClass.has(cls))
-      .map((cls) => cls as MachineClassId);
+    // Every primary machine of the location is a candidate. What each can make is read from the reference
+    // operation catalog against the operation each CAD feature needs (catalog-compatibility.ts): a mill is
+    // costed; a turning machine is costed only when the catalog gives it every one of the part's operations,
+    // and is otherwise listed with the operations it lacks.
+    const stations = loadMachiningCalculatorSpec().stations;
+    const operationCatalog = await this.machiningLookup.getOperationCatalog();
+    const partFeatures = (fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2)?.features as unknown[] | undefined;
+    const compatibilityOf = (cls: string) => machiningCatalogCompatibility(partFeatures, operationCatalog, stations[cls] ?? cls);
+    const turningClasses = (await this.machineDiscoveryService.getEligibleClasses('primary_turning', location, accessToken))
+      .filter((cls) => primaryRateByClass.has(cls));
+    const milledMachineClasses: MachineClassId[] = [
+      ...discoveredMilledClasses.filter((cls) => primaryRateByClass.has(cls)),
+      ...turningClasses.filter((cls) => compatibilityOf(cls)?.status === 'compatible'),
+    ].map((cls) => cls as MachineClassId);
+    const cannotMake = turningClasses.filter((cls) => compatibilityOf(cls)?.status === 'incompatible');
 
     const pocketCount = machiningFeatureCounts(fg?.machining_features)?.pockets ?? 0;
     // Same feature gate the cost summary uses — a route below the class the
@@ -8792,8 +8866,23 @@ export class BOMItemsService {
         routeComplexityScore:      computeRouteComplexityScore(
           holeCount, pocketCount, threadCount, routeSetups, baseInput.gdtFeatureCount,
         ),
+        compatibility: compatibilityOf(mc),
       };
     });
+    // Listed, never costed: the machine cannot make the part, and the reason is each operation it lacks.
+    for (const cls of cannotMake) {
+      const compatibility = compatibilityOf(cls)!;
+      const reasons = compatibility.incompatibilities.map((i) => `${i.count} x ${i.featureType}: ${i.reason}`);
+      routes.push({
+        routeId: cls as unknown as RouteId, routeLabel: this.humanizeMachineClass(cls), processFamily: 'cutting', toolingVolumeNote: null,
+        autoRoutable: false, processLines: [], materialCost: 0, abrasiveCost: 0, totalProcessCost: 0, totalCost: null,
+        isFeasible: false, dataComplete: false, dataGaps: [],
+        cycleTimes: { cuttingMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: 0 },
+        badges: { lowestCost: false, fastest: false, bestQuality: false },
+        capability: { cuttingCapable: false, pressBrakeCapable: true, overallCapable: false, confidence: 'high', estimatedTonnage: null, reasonCodes: [], warnings: reasons },
+        warnings: reasons, ratesSource: primaryRateByClass.get(cls)!.source, machineCapabilityWarnings: reasons, compatibility,
+      });
+    }
 
     // Badges — only among capable routes. The lowest-cost capable route here is
     // by construction the route getCostSummary quotes on (same pick function).

@@ -1,52 +1,49 @@
 import type { MaterialClass } from '../process/cost-machining-engine';
 
-// Real Machining lookup tables (tblCounterboring/tblReaming/tblChamfering/
-// tblDeburring) key their real speed/feed/tool-life rows by a numeric
-// material_cut_code with real hardness/hardness_system fields, but NO name
-// legend anywhere in the reference data — verified directly (grepped every
-// memory/machining/ file and every migration for material_cut_code
-// alongside a readable name field; none exists), not assumed.
+// Machining lookup tables key their speed/feed rows by a material cut code
+// with a hardness. The cut code's integer part is the material family, as
+// the reference materials number it (memory/Multi-Spindle Maching/Materials/
+// materials_table.csv "Cut Code": Steel 1.x / 2.x, Stainless Steel 5.x,
+// Titanium 23.x, Aluminum 30.x, Copper and Brass 33.x, Thermoplastic 51.x,
+// Thermoset 52.x; 3.x is high-alloy / tool steel in the same numbering).
 //
-// Rather than fabricate a code->material-name mapping, this bridges
-// through the one real physical property both sides genuinely share:
-// hardness. A harder material cuts slower — resolving to the lookup row
-// whose own real hardness is nearest this class's real representative
-// hardness is standard machining practice (this IS how speeds/feeds are
-// actually selected from a materials handbook), not a guess.
+// A row is matched inside the material's own family first, then by the
+// hardness nearest the class's representative Brinell hardness. Hardness
+// alone crosses families: stainless at HB275 landed on Hastelloy X (20.23,
+// HB275) and copper at HB100 on an aluminum row (30.12, HB100).
 //
-// Representative hardness per MaterialClass, derived from the ONE real
-// Brinell-hardness dataset in this repo (memory/sheetmetal/rawmetrial/
-// rawmetalusa.json, 101 real named material grades — computed
-// programmatically 2026-09-16, not eyeballed):
-//   aluminum:     HB60  — median of 29 real AA-series entries, uniform at HB60
-//   mild_steel:   HB125 — MODE of 37 real low/mild-carbon entries (AISI 10xx
-//                 hot/cold worked, ASTM A36; excludes the AISI 1095
-//                 high-carbon spring-steel outlier at HB1034 and every
-//                 stainless-labeled entry) — 14 of 37 sit exactly at HB125,
-//                 which also matches tblCounterboring/tblDeburring's own
-//                 material_cut_code "1.0" hardness exactly, corroborating
-//                 the bridge.
-//   stainless:    HB275 — median of 14 real stainless grades (AISI
-//                 301/303/304/304L/316/316L/316Ti/321/440B, 15-5PH/17-4PH,
-//                 A240/A351CF8/AISI441)
-//   copper_alloy: HB100 — median of 7 real copper/brass entries
-// titanium/tool_steel/plastic have NO real Brinell data anywhere in this
-// repo (titanium's 2 real rawmetalusa.json entries both have
-// HardnessSystem=null; no P20/H13/D2/M2 tool-steel entry exists at all;
-// plastics use an incompatible hardness scale entirely) — a genuine,
-// disclosed gap. They carry no hardness (NaN), and the matchers below only
-// match a finite value inside a table's own tabulated range, so these classes
-// resolve to null (reported missing by the caller) instead of borrowing the
-// hardest or softest steel row.
-export const MACHINING_MATERIAL_HARDNESS_HB: Record<MaterialClass, number> = {
-  aluminum: 60,
-  mild_steel: 125,
-  stainless: 275,
-  copper_alloy: 100,
-  titanium: Number.NaN,
-  tool_steel: Number.NaN,
-  plastic: Number.NaN,
+// Representative hardness (memory/sheetmetal/rawmetrial/rawmetalusa.json):
+// aluminum HB60 (29 AA grades), mild steel HB125 (mode of 37 low-carbon
+// grades), stainless HB275 (median of 14 grades), copper alloy HB100 (median
+// of 7). Titanium, tool steel and plastic have no Brinell value in the
+// reference (NaN), so they resolve to null and the caller names the gap.
+export interface MachiningMaterial { hb: number; cutCodeFamilies: readonly number[] }
+
+export const MACHINING_MATERIAL: Record<MaterialClass, MachiningMaterial> = {
+  aluminum: { hb: 60, cutCodeFamilies: [30] },
+  mild_steel: { hb: 125, cutCodeFamilies: [1, 2] },
+  stainless: { hb: 275, cutCodeFamilies: [5] },
+  copper_alloy: { hb: 100, cutCodeFamilies: [33] },
+  titanium: { hb: Number.NaN, cutCodeFamilies: [23] },
+  tool_steel: { hb: Number.NaN, cutCodeFamilies: [3] },
+  plastic: { hb: Number.NaN, cutCodeFamilies: [51, 52] },
 };
+
+/** A material to match rows for: a class entry, or a bare hardness (no family filter). */
+type MaterialTarget = MachiningMaterial | number;
+
+const targetHb = (t: MaterialTarget): number => (typeof t === 'number' ? t : t.hb);
+
+function rowCutCode(row: any): number | null {
+  const c = Number(row.MaterialCutCodeName ?? row.material_cut_code ?? row['Material Cut Code Name'] ?? row.material_cut_code_name);
+  return Number.isFinite(c) ? c : null;
+}
+
+/** The rows of the material's own cut-code family. A table with no cut code column is returned whole. */
+function familyRows<T>(rows: T[], t: MaterialTarget): T[] {
+  if (typeof t === 'number' || !rows.some((r) => rowCutCode(r) != null)) return rows;
+  return rows.filter((r) => t.cutCodeFamilies.includes(Math.trunc(rowCutCode(r) ?? Number.NaN)));
+}
 
 function rowHardness(row: any): number | null {
   const h = row.hardness ?? row.Hardness;
@@ -66,9 +63,10 @@ function tableHardnesses(rows: unknown[]): number[] {
   return rows.map(rowHardness).filter((h): h is number => h != null);
 }
 
-export function nearestByHardness<T>(rows: T[], targetHb: number): T | null {
-  if (!withinRange(tableHardnesses(rows), targetHb)) return null;
-  return nearestHardnessRow(rows, targetHb);
+export function nearestByHardness<T>(allRows: T[], target: MaterialTarget): T | null {
+  const rows = familyRows(allRows, target);
+  if (!withinRange(tableHardnesses(rows), targetHb(target))) return null;
+  return nearestHardnessRow(rows, targetHb(target));
 }
 
 // Nearest row by hardness with no range check — only called once the caller
@@ -104,16 +102,16 @@ function rowDiameter(row: any): number | null {
 // pattern sheet-metal-lookup.service.ts already uses (getLaserParams:
 // nearest thickness then nearest power; getPlasmaCutRateParams: nearest
 // power then nearest thickness), not a new convention.
-export function nearestByDiameterThenHardness<T>(rows: T[], diameterMm: number, targetHb: number): T | null {
-  const withDiam = rows.filter((r) => rowDiameter(r) != null);
+export function nearestByDiameterThenHardness<T>(rows: T[], diameterMm: number, target: MaterialTarget): T | null {
+  const withDiam = familyRows(rows, target).filter((r) => rowDiameter(r) != null);
   if (withDiam.length === 0) return null;
   const diameters = [...new Set(withDiam.map((r) => rowDiameter(r)!))].sort((a, b) => a - b);
   // Both axes bounded against the whole table's own range.
   if (!withinRange(diameters, diameterMm)) return null;
-  if (!withinRange(tableHardnesses(withDiam), targetHb)) return null;
+  if (!withinRange(tableHardnesses(withDiam), targetHb(target))) return null;
   const nearestDiam = diameters.reduce((best, d) => (Math.abs(d - diameterMm) < Math.abs(best - diameterMm) ? d : best), diameters[0]);
   const atDiam = withDiam.filter((r) => rowDiameter(r) === nearestDiam);
-  return nearestHardnessRow(atDiam, targetHb);
+  return nearestHardnessRow(atDiam, targetHb(target));
 }
 
 // Some real tables (deep_bore_drill_lookup.json/deep_bore_trepan_lookup.json,

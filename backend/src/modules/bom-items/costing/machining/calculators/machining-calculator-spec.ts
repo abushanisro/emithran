@@ -22,9 +22,16 @@ interface SpecField {
   formula?: string;
 }
 
+/** An operation written as this in the spec is the station itself: the calculator prices the machine's own line ("3 Axis Mill"). */
+export const STATION_OPERATION = '{station}';
+
 interface SpecCalculator {
   name: string;
   operation: string;
+  /** The migration that ships this calculator; unset = migration 804 (the original set, never regenerated differently). */
+  migration?: number;
+  /** A later migration that ships this calculator again: it was added to the spec after migration 804 had been applied, so databases that ran the earlier 804 never received it. */
+  reissue?: number;
   description: string;
   machineClasses: string[];
   fields: SpecField[];
@@ -49,7 +56,7 @@ export function loadMachiningCalculatorSpec(): MachiningCalculatorSpec {
     for (const cls of classes) {
       if (!raw.stations[cls]) throw new Error(`machining calculator "${c.name}": no catalog station for machine class "${cls}"`);
     }
-    return { name: c.name, operation: c.operation, description: c.description, machineClasses: classes, fields };
+    return { name: c.name, operation: c.operation, description: c.description, machineClasses: classes, fields, ...(c.migration ? { migration: c.migration } : {}), ...(c.reissue ? { reissue: c.reissue } : {}) };
   });
   return { stations: raw.stations, calculators, retire: raw.retire };
 }
@@ -71,8 +78,9 @@ export function specFieldToRow(f: SpecField, order: number): MachiningCalculator
 
 /** The spec as the per-operation calculator set the engine receives (ids are the spec names). */
 export function specAsCalculators(s: MachiningCalculatorSpec = loadMachiningCalculatorSpec()): MachiningCalculators {
-  return Object.fromEntries(s.calculators.map((c) => [c.operation, {
-    calculatorId: c.name, name: c.name, version: 1,
-    fields: c.fields.map((f, i) => specFieldToRow(f, i + 1)),
-  }]));
+  return Object.fromEntries(s.calculators.flatMap((c) => {
+    const def = { calculatorId: c.name, name: c.name, version: 1, fields: c.fields.map((f, i) => specFieldToRow(f, i + 1)) };
+    const operations = c.operation === STATION_OPERATION ? c.machineClasses.map((cls) => s.stations[cls]!) : [c.operation];
+    return operations.map((op) => [op, def]);
+  }));
 }

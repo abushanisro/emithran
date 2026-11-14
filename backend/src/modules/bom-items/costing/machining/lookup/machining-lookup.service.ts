@@ -5,11 +5,12 @@ import type { DrillingTable } from './drilling-table';
 import type { HobbingReference, KeywayBroachReference, RotaryBroachReference, SurfaceGrindingParams } from '../calculators/machining-lookup-seeds';
 import type { GearQualityRow } from '../operation/gear-routing';
 import {
-  MACHINING_MATERIAL_HARDNESS_HB,
+  MACHINING_MATERIAL,
   nearestByHardness,
   nearestByDiameterThenHardness,
   nearestByDiameterKey,
 } from './machining-material-hardness';
+import { readAllRows } from '../../../../../common/database/read-all-rows';
 import { MACHINING_REFERENCE_SOURCE_VERSION } from './machining-lookup-tables';
 import { rowKeys } from '../calculators/machining-source-refs';
 import { SETUP_AXIS_VARIABLE_KEYS, resolveSetupAxisRule, type SetupAxisRule } from '../setup-axis-rule';
@@ -29,7 +30,7 @@ import {
 // real logic directly without depending on this injectable service class.
 // Re-exported here for any existing caller of this file expecting them
 // from this module.
-export { MACHINING_MATERIAL_HARDNESS_HB, nearestByHardness, nearestByDiameterThenHardness };
+export { MACHINING_MATERIAL, nearestByHardness, nearestByDiameterThenHardness };
 
 interface DrillingPhysicsParams {
   cuttingSpeedMPerMin: number;
@@ -110,6 +111,13 @@ interface TurningParams {
   finishFeedMmPerRev: number;
   dataFound: boolean;
   materialCutCode?: string;
+}
+
+/** The tblDeburring row of the given deburring tool type for a material, or null (no tool type, no such tool, or no row of the material). */
+export function edgeDeburrRow(rows: any[], toolType: string | null | undefined, materialClass: MaterialClass): any | null {
+  if (!toolType) return null;
+  const row = nearestByHardness(rows.filter((r) => r.tool_type === toolType), MACHINING_MATERIAL[materialClass]);
+  return row && typeof row.linear_speed_mm_s === 'number' ? row : null;
 }
 
 @Injectable()
@@ -237,6 +245,21 @@ export class MachiningLookupService {
     return this.capabilityRules;
   }
 
+  /** Every reference catalog operation key, "<Process>:<Operation>//<Feature>" (memory/Machining/operations_full__operations.csv); null when not staged or unreadable. */
+  private operationCatalog: string[] | null = null;
+  async getOperationCatalog(): Promise<string[] | null> {
+    if (this.operationCatalog) return this.operationCatalog;
+    // 1174 rows: more than one PostgREST page, so it is read in pages (a single read would stop at 1000).
+    const db = this.database.getPrivilegedClient('reference-data: machining operation catalog, global shared');
+    const { data, error } = await readAllRows<{ key: string }>((from, to) => db
+      .from('machining_reference_data').select('key')
+      .eq('category', 'operation').eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
+      .order('id').range(from, to));
+    if (error || !data.length) return null;
+    this.operationCatalog = data.map((r) => r.key);
+    return this.operationCatalog;
+  }
+
   async getOperationSizeRanges(): Promise<any[] | null> {
     return this.loadTable('tblOperationSizeRanges');
   }
@@ -262,7 +285,7 @@ export class MachiningLookupService {
     const noData: CounterboreParams = { cuttingSpeedMPerMin: 0, feedMmPerRev: 0, depthMaxMm: null, dataFound: false };
     const rows = await this.loadTable('tblCounterboring');
     if (!rows?.length) return noData;
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const targetHb = MACHINING_MATERIAL[materialClass];
     const row = nearestByDiameterThenHardness(rows, diameterMm, targetHb);
     if (!row || typeof row.cutting_speed_m_min !== 'number' || typeof row.feed_mm_rev !== 'number') return noData;
     return {
@@ -291,7 +314,7 @@ export class MachiningLookupService {
     const noData: ReamParams = { cuttingSpeedMPerMin: 0, feedMm: 0, dataFound: false };
     const rows = await this.loadTable('tblReaming');
     if (!rows?.length) return noData;
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const targetHb = MACHINING_MATERIAL[materialClass];
     const row = nearestByDiameterThenHardness(rows, diameterMm, targetHb);
     if (!row || typeof row.CuttingSpeedMPerMin !== 'number' || typeof row.FeedMm !== 'number') return noData;
     return {
@@ -409,19 +432,27 @@ export class MachiningLookupService {
     const noData: EdgeToolParams = { linearSpeedMmPerSec: 0, dataFound: false };
     const rows = await this.loadTable('tblChamfering');
     if (!rows?.length) return noData;
-    const row = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[materialClass]);
+    const row = nearestByHardness(rows, MACHINING_MATERIAL[materialClass]);
     if (!row || typeof row.linear_speed_mm_s !== 'number') return noData;
     return { linearSpeedMmPerSec: row.linear_speed_mm_s, dataFound: true, materialCutCode: row.material_cut_code_name };
   }
 
   // ── Deburring (tblDeburring_lookup_table.json, 1182 real rows) ──────────
+  // A material code has one row per deburring tool (13 tool types). The tool is the reference's default
+  // edge-deburring tool (variables defaultExternalEdgeDeburrToolType, "Wire Wheel Brush"); the internal-edge
+  // default (Wire Tube Brush) has the same speed on every material code. Taking the table's first row read the
+  // "Deburring Brush", which the table itself marks deburr_type "Unused".
   async getDeburrParams(materialClass: MaterialClass): Promise<EdgeToolParams> {
     const noData: EdgeToolParams = { linearSpeedMmPerSec: 0, dataFound: false };
     const rows = await this.loadTable('tblDeburring');
     if (!rows?.length) return noData;
-    const row = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[materialClass]);
-    if (!row || typeof row.linear_speed_mm_s !== 'number') return noData;
-    // A material code has one row per deburring tool: the code, deburr type and tool series identify the one read.
+    const { data } = await this.database
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+      .from('machining_reference_data').select('value')
+      .eq('category', 'variable').eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
+      .eq('key', 'defaultExternalEdgeDeburrToolType').maybeSingle();
+    const row = edgeDeburrRow(rows, (data as { value?: string } | null)?.value, materialClass);
+    if (!row) return noData;
     const match = { table: 'tblDeburring', row: rowKeys(row, ['material_cut_code_name', 'deburr_type', 'tool_series']) };
     return { linearSpeedMmPerSec: row.linear_speed_mm_s, dataFound: true, materialCutCode: row.material_cut_code_name, match };
   }
@@ -439,7 +470,7 @@ export class MachiningLookupService {
     const noData: EdgeToolParams = { linearSpeedMmPerSec: 0, dataFound: false };
     const rows = await this.loadTable('tblCornerRoundingMill');
     if (!rows?.length) return noData;
-    const row = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[materialClass]) as any;
+    const row = nearestByHardness(rows, MACHINING_MATERIAL[materialClass]) as any;
     if (!row || typeof row.LinearSpeedMmPerS !== 'number') return noData;
     return { linearSpeedMmPerSec: row.LinearSpeedMmPerS, dataFound: true };
   }
@@ -453,7 +484,7 @@ export class MachiningLookupService {
     const noData: DrillingPhysicsParams = { cuttingSpeedMPerMin: 0, feedMmPerRev: 0, dataFound: false };
     const rows = await this.loadTable('tblGunDrilling');
     if (!rows?.length) return noData;
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const targetHb = MACHINING_MATERIAL[materialClass];
     const row = nearestByDiameterThenHardness(rows, diameterMm, targetHb);
     const speed = row?.['Cutting Speed (m / min)'];
     const feed = row?.['Feed (mm / rev)'];
@@ -481,7 +512,7 @@ export class MachiningLookupService {
     const noData: DrillingPhysicsParams = { cuttingSpeedMPerMin: 0, feedMmPerRev: 0, dataFound: false };
     const materials = await this.getDeepBoreMaterials();
     if (!materials?.length) return noData;
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const targetHb = MACHINING_MATERIAL[materialClass];
     const row = nearestByHardness(materials, targetHb);
     const speed = row?.cutting_speed_m_min;
     const feed = nearestByDiameterKey(row?.feed_mm_rev_by_diameter, diameterMm);
@@ -524,7 +555,7 @@ export class MachiningLookupService {
     const turningTable = await this.loadObjectTable('tblGeneralTurning');
     const turningMaterials: any[] | undefined = turningTable?.materials;
     if (!Array.isArray(turningMaterials) || turningMaterials.length === 0) return null;
-    const code = nearestByHardness(turningMaterials, MACHINING_MATERIAL_HARDNESS_HB[materialClass])?.material_cut_code;
+    const code = nearestByHardness(turningMaterials, MACHINING_MATERIAL[materialClass])?.material_cut_code;
     if (!code) return null;
     const rows = await this.loadTable('tblReciprocatingSurfaceGrinding');
     const row = rows?.find((r: any) => r.MaterialCutCodeName != null && Number(r.MaterialCutCodeName) === Number(code));
@@ -555,7 +586,7 @@ export class MachiningLookupService {
     const turningTable = await this.loadObjectTable('tblGeneralTurning');
     const turningMaterials: any[] | undefined = turningTable?.materials;
     if (!Array.isArray(turningMaterials) || turningMaterials.length === 0) return noData;
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const targetHb = MACHINING_MATERIAL[materialClass];
     const code = nearestByHardness(turningMaterials, targetHb)?.material_cut_code;
     if (!code) return noData;
 
@@ -648,7 +679,7 @@ export class MachiningLookupService {
     const turningTable = await this.loadObjectTable('tblGeneralTurning');
     const turningMaterials: any[] | undefined = turningTable?.materials;
     if (!Array.isArray(turningMaterials) || turningMaterials.length === 0) return noData;
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const targetHb = MACHINING_MATERIAL[materialClass];
     const code = nearestByHardness(turningMaterials, targetHb)?.material_cut_code;
     if (!code) return noData;
 
@@ -684,7 +715,7 @@ export class MachiningLookupService {
     const turningTable = await this.loadObjectTable('tblGeneralTurning');
     const turningMaterials: any[] | undefined = turningTable?.materials;
     if (!Array.isArray(turningMaterials) || turningMaterials.length === 0) return noData;
-    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const targetHb = MACHINING_MATERIAL[materialClass];
     const row = nearestByHardness(turningMaterials, targetHb) as any;
     const rough = row?.operations?.medium_rough_turning;
     const finish = row?.operations?.finish_turning;

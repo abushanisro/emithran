@@ -170,6 +170,26 @@ describe('calculator resolution by machine class', () => {
   it('resolves nothing from an empty match set', () => {
     expect(unambiguousMapping([])).toBeUndefined();
   });
+
+  // drill_press covers Counterboring, Countersinking and Drill Press: a saved
+  // Counterboring line is the Counterboring row, with nothing to choose.
+  it('resolves an ambiguous class by the line\'s own operation', () => {
+    const rows = [{ operation: 'Counterboring' }, { operation: 'Countersinking' }, { operation: 'Drill Press' }];
+    expect(unambiguousMapping(rows, 'counterboring')).toBe(rows[0]);
+    expect(unambiguousMapping(rows, 'Reaming')).toBeUndefined();
+  });
+
+  // A "3 Axis Mill" line moved to a 5 axis mill: the class has Drilling, Reaming, Tapping and its own
+  // station row; the machine's own line is the station row, and only for a station line.
+  it('resolves a machine\'s own line to the new class\'s station row', () => {
+    const rows = [
+      { operation: '5 Axis Mill', processRoute: '5 Axis Mill' },
+      { operation: 'Drilling', processRoute: '5 Axis Mill' }, { operation: 'Tapping', processRoute: '5 Axis Mill' },
+    ];
+    expect(unambiguousMapping(rows, '3 Axis Mill', true)).toBe(rows[0]);
+    expect(unambiguousMapping(rows, '3 Axis Mill')).toBeUndefined();
+    expect(unambiguousMapping(rows, 'Tapping', true)).toBe(rows[2]);
+  });
 });
 
 describe('optionsKeepingSelection', () => {

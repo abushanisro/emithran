@@ -45,8 +45,8 @@ const milled: MachiningCostInput = {
   inspectionRate: rate(450, { machineClass: 'cmm', machineName: null, commodityCode: null }),
   surfaceTreatment: null, machiningCalculators: CALCS, capabilityRules: RULES, location: 'India',
   drillingTable: DRILLING, tappingTable: realTappingTable(),
-  sharpEdgeLengthMm: 600, deburrLinearSpeedMmPerSec: 18.8,
-  deburrMatch: { table: 'tblDeburring', row: { material_cut_code_name: '1.0', deburr_type: 'Unused', tool_series: 'Virtual Debuiring Brush' } },
+  sharpEdgeLengthMm: 600, deburrLinearSpeedMmPerSec: 22.7,
+  deburrMatch: { table: 'tblDeburring', row: { material_cut_code_name: '1.0', deburr_type: 'Edge', tool_series: 'Virtual Debuiring Wire Wheel Brush' } },
 };
 const milling = computeMillingCostSummary(milled, '3_axis_mill' as MachineClassId);
 
@@ -102,7 +102,7 @@ describe('machining calculator inputs carry where they were read (SourceRef)', (
   it('Deburring: the edge speed is the tblDeburring row the speed came from', () => {
     expect(inputStep(traceOf('Deburring'), 'Edge Speed')!.ref).toEqual({
       kind: 'lookup', domain: 'machining', table: 'tblDeburring', column: 'linear_speed_mm_s',
-      row: { material_cut_code_name: '1.0', deburr_type: 'Unused', tool_series: 'Virtual Debuiring Brush' },
+      row: { material_cut_code_name: '1.0', deburr_type: 'Edge', tool_series: 'Virtual Debuiring Wire Wheel Brush' },
     });
   });
 

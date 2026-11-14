@@ -1,4 +1,4 @@
-import { splitKeywayOccurrences } from '../../../../../../modules/bom-items/costing/machining/operation/keyway-routing';
+import { broachWidthRangeMm, splitKeywayOccurrences } from '../../../../../../modules/bom-items/costing/machining/operation/keyway-routing';
 
 // Pure function, zero DB dependency — no mocking needed or used, per this
 // project's standing rule against mocked-database spec files.
@@ -95,5 +95,26 @@ describe('splitKeywayOccurrences', () => {
     const result = splitKeywayOccurrences([offVocabulary]);
     expect(result.keywayCandidates).toEqual([]);
     expect(result.filteredFeatures).toEqual([offVocabulary]);
+  });
+});
+
+describe('a keyway no broach in the reference cuts is milled', () => {
+  // Cannula Holder bottom: a 0.804 mm wide x 34 mm groove; the narrowest reference broach is 1.61 mm.
+  const range = broachWidthRangeMm({ pullRows: [{ 'Keyway Width (mm)': 1.61 }, { 'Keyway Width (mm)': 2.41 }], shimRows: [{ 'Keyway Width (mm)': 25.4 }] });
+  const feature = (width_mm: number) => ({ feature_type: 'Keyway', variant: 'default', occurrences: [{ length_mm: 34, width_mm, depth_mm: 0.675 }] });
+
+  it('reads the width range from both broach tables', () => {
+    expect(range).toEqual({ min: 1.61, max: 25.4 });
+    expect(broachWidthRangeMm({ pullRows: [], shimRows: [] })).toBeNull();
+  });
+  it('keeps a keyway narrower than every broach as a milled feature', () => {
+    const r = splitKeywayOccurrences([feature(0.804)], range);
+    expect(r.keywayCandidates).toEqual([]);
+    expect(r.filteredFeatures).toHaveLength(1);
+  });
+  it('still broaches a keyway inside the range', () => {
+    const r = splitKeywayOccurrences([feature(6)], range);
+    expect(r.keywayCandidates).toEqual([{ lengthMm: 34, widthMm: 6, depthMm: 0.675, count: 1 }]);
+    expect(r.filteredFeatures).toEqual([]);
   });
 });

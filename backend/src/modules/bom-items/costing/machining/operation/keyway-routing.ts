@@ -10,7 +10,8 @@
 // that file's own now-corrected comment). That collapse is now removed on
 // the cad-engine side (cnc_feature_recognizer.py, geo_v44) so "keyway"
 // reaches the backend as its own real type. operation-sequencer.ts's switch
-// still has no "keyway" case, and correctly so: a keyway is not milled at
+// has a "keyway" case only for a keyway no reference broach cuts (see
+// broachWidthRangeMm below): any other keyway is not milled at
 // all — it's broached, a fundamentally different, real machine_class
 // ("broach", migrations 737/738/753 already stage/activate 4 real linear-
 // stroke machines for it) with its own real physics (linear stroke speed,
@@ -53,8 +54,18 @@ interface KeywaySplitResult {
   keywayCandidates: KeywayCandidate[];
 }
 
+/** The narrowest and widest keyway any broach in the reference tables cuts; null when the tables hold no width. */
+export function broachWidthRangeMm(ref: { pullRows: any[]; shimRows: any[] } | null | undefined): { min: number; max: number } | null {
+  const widths = [...(ref?.pullRows ?? []), ...(ref?.shimRows ?? [])]
+    .map((r) => r['Keyway Width (mm)']).filter((w): w is number => typeof w === 'number' && w > 0);
+  return widths.length > 0 ? { min: Math.min(...widths), max: Math.max(...widths) } : null;
+}
+
 export function splitKeywayOccurrences(
   fgv2Features: unknown[] | null | undefined,
+  // A keyway outside every broach's width is not broached: it stays a milled
+  // feature (the catalog's "Rough Milling // Keyway"). Omitted = all broached.
+  broachWidthMm?: { min: number; max: number } | null,
 ): KeywaySplitResult {
   if (!Array.isArray(fgv2Features) || fgv2Features.length === 0) {
     return { filteredFeatures: fgv2Features ?? [], keywayCandidates: [] };
@@ -83,7 +94,8 @@ export function splitKeywayOccurrences(
       // before geo_v44) — keep as a generic feature rather than silently
       // dropping it, so it still gets SOME cost (default-case milling) until
       // the part is reprocessed with real length/width/depth.
-      if (lengthMm == null || widthMm == null || depthMm == null) {
+      const milled = broachWidthMm != null && widthMm != null && (widthMm < broachWidthMm.min || widthMm > broachWidthMm.max);
+      if (lengthMm == null || widthMm == null || depthMm == null || milled) {
         unresolved.push(occ);
         continue;
       }

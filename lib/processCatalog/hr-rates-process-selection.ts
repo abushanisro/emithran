@@ -162,8 +162,22 @@ export function calculatorMappingsForMachineClass<T extends { machineClass?: str
  * stamping formula and show nothing on screen about it, so an ambiguous class
  * resolves to nothing and the caller surfaces the alternatives instead.
  */
-export function unambiguousMapping<T>(mappingsForClass: readonly T[]): T | undefined {
-  return mappingsForClass.length === 1 ? mappingsForClass[0] : undefined;
+export function unambiguousMapping<T extends { operation?: string | null; processRoute?: string | null }>(
+  mappingsForClass: readonly T[],
+  lineOperation?: string | null,
+  // The line is its machine's own line (saved operation = saved route, e.g. "3 Axis Mill" / "3 Axis Mill").
+  isStationLine = false,
+): T | undefined {
+  if (mappingsForClass.length === 1) return mappingsForClass[0];
+  // The line's own operation is a fact about it, not a preference: a
+  // Counterboring line on a drill press is the class's Counterboring row.
+  const op = lineOperation?.trim().toLowerCase();
+  const named = op ? mappingsForClass.filter((m) => m.operation?.trim().toLowerCase() === op) : [];
+  if (named.length === 1) return named[0];
+  // A machine's own line moved to another machine class is that class's own line: its station row
+  // (operation = route), e.g. a 3 Axis Mill line moved to a 5 axis mill is the "5 Axis Mill" row.
+  const stations = isStationLine ? mappingsForClass.filter((m) => !!m.operation && m.operation === m.processRoute) : [];
+  return stations.length === 1 ? stations[0] : undefined;
 }
 
 /**

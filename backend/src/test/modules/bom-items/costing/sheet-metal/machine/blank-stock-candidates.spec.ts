@@ -1,7 +1,7 @@
 import {
   roundBarCandidates, hexBarCandidates, rectangularBarCandidates,
   selectBestAutoCandidate, selectForcedFormCandidate, billetFallback,
-  sortedDimensions, scoreCandidate,
+  sortedDimensions, scoreCandidate, requiredSection, squareBarCandidates, plateCandidates, preferredSizeAtLeast,
   type StockProfile, type BoundingBox,
 } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/blank-stock-candidates';
 import { resolveStockAllowanceRule, stockAllowancePerSideMm } from '../../../../../../modules/bom-items/costing/machining/stock-allowance';
@@ -190,5 +190,54 @@ describe('billetFallback', () => {
     const result = billetFallback({ length: 100, width: 50, height: 20 }, 1, null);
     expect(result.sizeLabel).toBe('100×50×20 billet');
     expect(result.stockAllowancePerSideMm).toBeNull();
+  });
+});
+
+describe('requiredSection — the stock a part needs', () => {
+  // Cannula Holder bottom: 45.0 x 44.4 mm section, allowance 5% of 45.0 = 2.25 mm per side.
+  it('a prismatic part needs a round bar of its section diagonal: Ø50 cannot hold 45 x 44.4', () => {
+    const s = requiredSection(45.01, 44.4, 2.25, false);
+    expect(s.W).toBeCloseTo(49.51, 2);
+    expect(s.minDiam).toBeCloseTo(Math.hypot(49.51, 48.9), 2);
+    expect(roundBarCandidates([{ form: 'round_bar', size_a_mm: 50, size_b_mm: null }], s.minDiam, 60, 1)).toEqual([]);
+  });
+  it('a turned part needs its OD plus the allowance', () => {
+    expect(requiredSection(20, 20, 1, true).minDiam).toBe(22);
+  });
+  it('adds nothing when the allowance rule is not staged', () => {
+    expect(requiredSection(20, 10, null, true)).toEqual({ W: 20, H: 10, minDiam: 20 });
+  });
+});
+
+describe('square bar, plate and round tube: the reference stock forms sized from the preferred-size series', () => {
+  // tblPreferredSizes (memory/Multi-Spindle Maching), the sizes valid in both unit systems around this part.
+  const SIZES = [40, 44.45, 45, 50, 50.8, 55, 57.15, 60, 63.5, 65];
+  // Cannula Holder bottom with its 2.25 mm per side allowance: section 49.51 x 48.9, bar length 59.33.
+  const bbox: BoundingBox = { length: 54.33, width: 45.01, height: 44.4 };
+
+  it('takes the smallest preferred size that is large enough, or none', () => {
+    expect(preferredSizeAtLeast(SIZES, 49.51)).toBe(50);
+    expect(preferredSizeAtLeast(SIZES, 50)).toBe(50);
+    expect(preferredSizeAtLeast(SIZES, 70)).toBeNull();
+  });
+
+  it('square bar: a 50 x 50 bar holds the 49.51 x 48.9 section', () => {
+    const [c] = squareBarCandidates(SIZES, 49.51, 48.9, 59.33, 11274);
+    expect(c).toMatchObject({ form: 'square_bar', sizeLabel: '50×50 square bar' });
+    expect(c!.billetVolMm3).toBeCloseTo(50 * 50 * 59.33, 2);
+  });
+
+  it('plate: 50 mm plate holds the 44.4 mm dimension plus allowance, sawn to 59 x 50', () => {
+    const [c] = plateCandidates(SIZES, bbox, 2.25, 11274);
+    expect(c).toMatchObject({ form: 'plate', sizeLabel: '50 mm plate, 59×50 blank' });
+    expect(c!.billetVolMm3).toBeCloseTo(58.83 * 49.51 * 50, 1);
+  });
+
+  it('a chosen square bar or plate is used; a round tube says why it cannot be', () => {
+    expect(selectForcedFormCandidate('square_bar', [], bbox, 11274, 59.33, 69.6, 49.51, 48.9, 2.25, SIZES).form).toBe('square_bar');
+    expect(selectForcedFormCandidate('plate', [], bbox, 11274, 59.33, 69.6, 49.51, 48.9, 2.25, SIZES).form).toBe('plate');
+    const tube = selectForcedFormCandidate('round_tube', [], bbox, 11274, 59.33, 69.6, 49.51, 48.9, 2.25, SIZES);
+    expect(tube.form).toBe('billet');
+    expect(tube.requestedFormUnavailable?.reason).toMatch(/bore through the part axis/);
   });
 });

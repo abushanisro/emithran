@@ -50,3 +50,26 @@ describe('stock-price', () => {
     expect(resolveStockPrice(ROWS, 'Generic Unobtainium', 'milled', 'India')).toBeNull();
   });
 });
+
+describe('a Stock Form chosen in the scenario is the form the material is priced on', () => {
+  it('prices a milled part on the chosen form, and a billet on plate', () => {
+    expect(machiningStockPriceForm('milled')).toBe('plate');
+    expect(machiningStockPriceForm('milled', 'round_bar')).toBe('round_bar');
+    expect(machiningStockPriceForm('milled', 'square_bar')).toBe('square_bar');
+    expect(machiningStockPriceForm('milled', 'billet')).toBe('plate');
+    expect(machiningStockPriceForm('turned', 'hex_bar')).toBe('hex_bar');
+  });
+
+  it('a family that is not machined has no stock price, whatever was chosen', () => {
+    expect(machiningStockPriceForm('sheet_metal', 'round_bar')).toBeNull();
+  });
+
+  it('reads that form\'s own row', () => {
+    const all = rows();
+    const material = all[0]!.raw_material_name!;
+    const round = resolveStockPrice(all, material, 'milled', 'India', 'round_bar');
+    const plate = resolveStockPrice(all, material, 'milled', 'India');
+    expect(round?.form).toBe('round_bar');
+    expect(plate?.form).toBe('plate');
+  });
+});
