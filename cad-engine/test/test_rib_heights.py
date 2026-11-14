@@ -54,3 +54,16 @@ def test_without_extents_the_height_is_not_measured_and_the_group_says_so():
     out = ex._detect_ribs(planes, nominal_wall_mm=2.0)
     assert out["rib_data"][0]["height_source"] == "estimated_from_area"
     assert out["rib_groups"] == [{"thickness_mm": 1.0, "count": 1, "heights_mm": [], "max_height_mm": None, "ribs": []}]
+
+
+def test_sharp_edges_are_classified_as_outside_or_inside_corners_and_counted_in_the_plastic_graph():
+    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from injection_molding.recognition.core import recognize_core
+    # a 100 x 60 x 20 block with an open 40 x 20 x 10 pocket: 16 outside creases (12 of the block, 4 pocket rim), 8 inside (4 floor, 4 walls)
+    part = BRepAlgoAPI_Cut(box(100, 60, 20), box(40, 20, 20, at=(30, 20, 10))).Shape()
+    g = recognize_core(part, [100.0, 60.0, 20.0], 0.3, 5.0)["feature_graph"]
+    sharp = {i["variant"]: i for i in g["items"] if i["feature_type"] == "SharpEdge"}
+    assert sharp["external"]["attributes"]["count"] == 16
+    assert sharp["internal"]["attributes"]["count"] == 8
+    assert sharp["external"]["attributes"]["radius_mm"] == 0.0
+    assert "SharpEdge" not in g["not_yet_recognized"]
