@@ -7,6 +7,7 @@ import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/co
 import { formatFieldValue } from '@/lib/costing/cycle-fields';
 import { checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
+import { ReferenceTable } from './ReferenceTable';
 import { strokeFactorColumnOf, withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
 import type { CadEvidence } from './CadEvidencePanel';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -3897,130 +3898,33 @@ export function ProcessCostDialog({
             </Button>
           </div>
 
-          {/* Hint */}
-          <div className="shrink-0 px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex flex-wrap items-center gap-x-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-            Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
-            {lookupTableData.note && <span className="text-foreground ml-1">{lookupTableData.note}</span>}
-            {lookupTableData.matchedRowKeys && (
-              <span className="text-primary font-medium ml-1">
-                {Array.isArray(lookupTableData.matchedRowKeys)
-                  ? 'The value in use is interpolated between the two rows outlined below.'
-                  : 'The row outlined below is the one currently in use.'}
-              </span>
-            )}
-          </div>
-
-          <div
-            className="flex-1 min-h-0 px-3 pb-3 relative overflow-auto"
-            style={{
-              pointerEvents: 'auto',
-              zIndex: 10000
+          <ReferenceTable
+            columns={lookupTableData.column_definitions}
+            rows={lookupTableData.rows}
+            fieldLabel={lookupTableData.fieldLabel}
+            note={<>
+              {lookupTableData.note && <span className="text-foreground">{lookupTableData.note} </span>}
+              {lookupTableData.matchedRowKeys && (
+                <span className="font-medium text-primary">
+                  {Array.isArray(lookupTableData.matchedRowKeys)
+                    ? 'The value in use is interpolated between the two rows marked ★.'
+                    : 'The row marked ★ is the one in use.'}
+                </span>
+              )}
+            </>}
+            isCurrent={(row) => isMatchedLookupRow(row, lookupTableData.matchedRowKeys)}
+            currentTitle={`Currently used for ${lookupTableData.fieldLabel}`}
+            currentRowRef={matchedCurrentRowRef}
+            onPick={(value) => {
+              if (selectedLookupField) setCalculatorInputs((prev: Record<string, any>) => ({ ...prev, [selectedLookupField.fieldName]: value }));
+              // Close only the reference table, after the input update has been queued.
+              setTimeout(() => {
+                setShowLookupTable(false);
+                setSelectedLookupField(null);
+                setLookupTableData(null);
+              }, 0);
             }}
-            onClick={(e) => { e.stopPropagation(); }}
-            onScroll={(e) => { e.stopPropagation(); }}
-          >
-            <div className="w-full">
-              <table className="w-full border-collapse text-sm bg-background">
-                <thead>
-                  {/* The heading row stays pinned while the rows scroll. */}
-                  <tr>
-                    <th className="sticky top-0 z-10 bg-muted border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
-                      #
-                    </th>
-                    {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
-                      const isOutputCol = colIdx === lookupTableData.column_definitions.length - 1;
-                      return (
-                        <th
-                          key={col.name}
-                          className={`sticky top-0 z-10 bg-muted border border-border text-left text-xs font-semibold py-1 px-2 whitespace-nowrap ${isOutputCol ? 'text-primary' : 'text-foreground'
-                            }`}
-                        >
-                          {col.label}
-                          {isOutputCol && <span className="ml-1 text-primary/60">(↵ select)</span>}
-                          {col.unit && (
-                            <span className="text-primary/70 ml-1">({col.unit})</span>
-                          )}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {lookupTableData.rows.map((row: any, rowIndex: number) => {
-                    const outputCol = lookupTableData.column_definitions[lookupTableData.column_definitions.length - 1];
-                    const getVal = (col: any) => {
-                      const camel = col.name.replace(/_([a-z])/g, (_: string, l: string) => l.toUpperCase());
-                      return row[col.name] !== undefined ? row[col.name] : row[camel];
-                    };
-                    const outputValue = outputCol ? getVal(outputCol) : undefined;
-                    // This row IS the exact one the lookup already resolved
-                    // for the field the "eye" button was clicked on — every
-                    // key in matchedRowKeys (the snapshot taken at
-                    // resolution time) must match this row's own value.
-                    // Numeric comparison tolerates string-vs-number typing
-                    // differences between the two API responses; real
-                    // lookup values never differ by a meaningful amount.
-                    const isCurrentMatch = isMatchedLookupRow(row, lookupTableData.matchedRowKeys);
-                    return (
-                      <tr
-                        key={rowIndex}
-                        ref={isCurrentMatch ? matchedCurrentRowRef : undefined}
-                        className={`hover:bg-primary/10 cursor-pointer transition-colors${isCurrentMatch ? ' ring-2 ring-inset ring-primary bg-primary/10' : ''}`}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          e.nativeEvent?.stopImmediatePropagation?.();
-                          
-                          if (selectedLookupField && outputValue !== undefined) {
-                            setCalculatorInputs((prev: Record<string, any>) => ({
-                              ...prev,
-                              [selectedLookupField.fieldName]: typeof outputValue === "number"
-                                ? outputValue
-                                : parseFloat(outputValue) || outputValue,
-                            }));
-                          }
-                          
-                          // Use setTimeout to ensure state updates don't conflict
-                          setTimeout(() => {
-                            // Close ONLY lookup table after selection
-                            setShowLookupTable(false);
-                            setSelectedLookupField(null);
-                            setLookupTableData(null);
-                          }, 0);
-                          
-                          return false;
-                        }}
-                        title={isCurrentMatch
-                          ? `Currently used for ${lookupTableData.fieldLabel}`
-                          : (outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`)}
-                      >
-                        <td className={`border border-border text-center text-xs py-0.5 px-1 font-mono ${isCurrentMatch ? 'text-primary bg-primary/20' : 'text-muted-foreground bg-muted/20'}`}>
-                          {isCurrentMatch ? '★' : rowIndex + 1}
-                        </td>
-                        {lookupTableData.column_definitions.map((col: any) => {
-                          const value = getVal(col);
-                          const isOutput = col.name === outputCol?.name;
-                          return (
-                            <td
-                              key={col.name}
-                              className={`border border-border py-0.5 px-2 text-xs whitespace-nowrap${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
-                            >
-                              {value !== undefined && value !== null ? String(value) : '—'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          />
         </div>
         </>
         ))()}
