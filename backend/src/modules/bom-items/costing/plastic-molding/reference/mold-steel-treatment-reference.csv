@@ -1,0 +1,6 @@
+steel_grade,equivalent,delivery_condition,initial_hardness_hrc_min,initial_hardness_hrc_max,heat_treatment_required,stress_relief_required,confidence,source_name,source_url,source_checked,review_required,retrieved,notes
+AISI P20,1.2311,pre-hardened (quenched and tempered),28,34,false,when_specified,source_backed,P20 / 1.2311 technical datasheet; 1.2311 delivery and stress-relieving data,,false,true,2026-11-14,"Charging a full hardening of a pre-hardened P20 part double-counts its treatment."
+AISI H13,1.2344,annealed (through-hardenable),,,when_specified,when_specified,source_backed,Uddeholm Orvar Supreme (H13),,false,true,2026-11-14,"Hot-work tool steel: hardening charged when the target hardness is specified."
+AISI 4140,,depends on supply specification,,,requires_certificate,requires_certificate,source_backed,Open-source steel data (research summary),,false,true,2026-11-14,"Condition and hardness depend on the material certificate."
+AISI 1020,,low-carbon,,,not_default,when_specified,source_backed,Open-source steel data (research summary),,false,true,2026-11-14,"Not a through-hardened cavity steel: needs a specified surface treatment or another grade."
+UNS S42000,1.2083,hardenable stainless,,,when_specified,when_specified,source_backed,Uddeholm Mirrax ESR (420-type stainless mold steel),,false,true,2026-11-14,"Grade- and section-dependent treatment."

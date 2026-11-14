@@ -1,0 +1,7 @@
+parameter,value_min,value_max,unit,applicability,confidence,source_name,source_url,source_checked,review_required,retrieved,notes
+dryer_type_default,,,machine-mounted desiccant hopper dryer,all hygroscopic resins,engineering_estimate,Costing engineer recommendation,,false,true,2026-11-14,"Central desiccant optional (conveying allocated separately); hot-air hopper only where the grade permits; vacuum optional for PET and specialty."
+drying_capacity,12,135,kg/h,desiccant dryer configurations,source_backed,Labotek desiccant dryer technical specifications,,false,true,2026-11-14,"Hopper capacities 60 / 120 / 180 / 225 litres."
+energy_consumption,0.048,0.087,kWh/kg,"depends on resin and process conditions; rises when throughput is below dryer capacity",source_backed,Labotek desiccant dryer technical specifications; Conair energy-efficiency white paper,,false,true,2026-11-14,"Do not apply one value to every resin or dryer."
+dew_point,-50,-35,degC,"baseline -35; high-temperature versions down to -50",source_backed,Labotek desiccant dryer technical specifications,,false,true,2026-11-14,
+dryer_hourly_rate,,,USD/h,,unresolved,,,false,true,2026-11-14,"Needs equipment quotations or annualised cost / productive hours."
+loading_labour,,,min/batch,,unresolved,,,false,true,2026-11-14,"Needs production records."

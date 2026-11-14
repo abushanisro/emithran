@@ -1,0 +1,7 @@
+parameter,value_min,value_max,unit,applicability,confidence,source_name,source_url,source_checked,review_required,retrieved,notes
+cooling_channel_spacing,3,4,x channel diameter (centre to centre),drilled cooling channels,source_backed,Conformal Cooling Channel Design for Improving Temperature Distribution in Injection Molding (open-access study),,false,true,2026-11-14,"8 mm: 24-32 mm; 10 mm: 30-40 mm; 12 mm: 36-48 mm. Emithran default: 3 x (configurable)."
+cooling_channel_to_surface,2,3,x channel diameter (centre to mold surface),drilled cooling channels,source_backed,Conformal Cooling Channel Design (open-access study),,false,true,2026-11-14,
+cooling_circuit_layout,,,,,source_backed,Autodesk Moldflow documentation: cooling circuits,,false,true,2026-11-14,"Series circuits preferred for balanced flow; parallel circuits need hydraulic balancing; bubblers and baffles for deep cores. No fixed circuits-per-mold or baffle-per-line rule."
+rib_thickness,0.4,0.6,x nominal wall (at base),plastic part design,source_backed,Eastman / Stratasys / Protolabs design guidelines,,false,true,2026-11-14,"Part-design guideline, not a mold insert selection rule."
+rib_height,2.5,3,x nominal wall,plastic part design,source_backed,Eastman / Stratasys / Protolabs design guidelines,,false,true,2026-11-14,"A rib taller than this does not by itself need a steel insert."
+rib_spacing,2,,x wall thickness (minimum),plastic part design,source_backed,Eastman / Stratasys / Protolabs design guidelines,,false,true,2026-11-14,
