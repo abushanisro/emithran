@@ -480,10 +480,8 @@ export interface ProcessLineCost {
   // sm_lookup_* DB table row, or the currently selected machine), then every
   // calculated field in evaluation order with its real DB-stored formula
   // string and the value it evaluated to. Present only for processes wired to
-  // a real DB calculator (Laser Cutting, Press Brake so far) — absent
-  // elsewhere, not a fabricated placeholder. Powers the "Download calculation"
-  // PDF export so costing/manufacturing engineering can verify the number
-  // independent of this app.
+  // a real DB calculator — absent elsewhere, not a fabricated placeholder.
+  // Shown in the Cost tab's calculation trace and the calculator dialog.
   calculationTrace?: CalculationTraceStep[];
   /** Plastic molding: the dataset, engine and formula versions this line was calculated with; persisted into process_cost_records.calculation_breakdown (migration 972). */
   calculationSnapshot?: import('../costing/plastic-molding/calculation-snapshot').CalculationSnapshot;

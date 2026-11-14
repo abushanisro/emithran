@@ -129,11 +129,9 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
 }
 
 /**
- * On-screen calculation trace — the same real audit trail (inputs with
+ * On-screen calculation trace — the real audit trail (inputs with
  * provenance, formulas with their real DB formula string, calculator
- * identity/version, confidence, and structured gaps) that already powers
- * the "Download calculation (PDF)" export, rendered inline instead of only
- * inside a downloaded file. Renders nothing when the line was never
+ * identity/version, confidence, and structured gaps). Renders nothing when the line was never
  * migrated onto the Manufacturing Physics Calculator pipeline (no trace, no
  * gap, no confidence at all) — never a fabricated placeholder.
  */
