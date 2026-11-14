@@ -543,6 +543,8 @@ export class MaterialResolutionService {
     matlState: string | null;
     /** Reference clamp properties (migration 831); nulls when not on file for this material. */
     clampProperties: MaterialClampProperties;
+    /** The raw_materials row every value above was read from (its id and name), so a calculator input can open it; null when no row matched. */
+    materialRecord: { id: string; name: string } | null;
   }> {
     const { accessToken, grade, family, materialCol, rates, locCurrencyCode, location, warnings } = input;
 
@@ -637,6 +639,7 @@ export class MaterialResolutionService {
               flowLengthRatio: best.imFlowLengthRatio,
               referenceMaterial: best.imReferenceMaterial,
             },
+            materialRecord: { id: best.id, name: best.materialGrade ?? best.material ?? grade },
           };
         }
       } catch {
@@ -675,6 +678,7 @@ export class MaterialResolutionService {
       stockForm: null,
       matlState: null,
       clampProperties: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null },
+      materialRecord: null,
     };
   }
 }

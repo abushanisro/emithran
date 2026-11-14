@@ -89,6 +89,8 @@ interface MoldToolingResult {
   missingComponents: string[];
   /** Design and assembly hours, from the staged tables; the machining hours and every price are the tooling calculator's (mold-tooling-calculator.ts). */
   estimatedDesignHrs: number;
+  /** The mold_base_area_mm2 of the cmMoldBaseDesignHours row the design hours were read from. */
+  designHoursRowAreaMm2: number;
   estimatedAssemblyHrs: number;
   estimatedAssemblyOperators: number;
   warnings: string[];
@@ -161,7 +163,8 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   const bomSubtotalUsd = items.reduce((s, i) => s + i.totalCostUsd, 0);
 
   const areaM2 = Math.max(input.moldBaseAreaMm2, 0) / 1_000_000;
-  const estimatedDesignHrs = bracket(t.designHoursByArea, (r) => r.areaMm2, input.moldBaseAreaMm2).hours;
+  const designRow = bracket(t.designHoursByArea, (r) => r.areaMm2, input.moldBaseAreaMm2);
+  const estimatedDesignHrs = designRow.hours;
   const estimatedAssemblyOperators = bracket(t.operatorsByArea, (r) => r.areaM2, areaM2).operators;
 
   const warnings = [toolingScopeWarning(input.scope)];
@@ -184,7 +187,7 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   }
   return {
     items, bomSubtotalUsd, missingComponents,
-    estimatedDesignHrs, estimatedAssemblyHrs: assemblyHrs, estimatedAssemblyOperators,
+    estimatedDesignHrs, designHoursRowAreaMm2: designRow.areaMm2, estimatedAssemblyHrs: assemblyHrs, estimatedAssemblyOperators,
     warnings,
   };
 }

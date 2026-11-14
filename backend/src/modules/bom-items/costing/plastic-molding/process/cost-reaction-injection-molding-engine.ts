@@ -31,6 +31,7 @@ import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-meta
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import { type ReferenceCalculators, withFieldOverrides, type CalculatorFieldOverrides } from '../../shared/calculators/reference-calculator';
 import { runRimCycleTime } from '../calculators/plastic-cycle-time';
+import type { MachineRecord, MaterialRecord } from '../calculators/plastic-input-sources';
 
 interface ReactionInjectionMoldingCostInput {
   batchSize: number;
@@ -45,6 +46,9 @@ interface ReactionInjectionMoldingCostInput {
   /** The CAD net part volume (mm3) and the machine's staged injection rate (mm3/s): the fill time is the one over the other (formula registry F-19). Absent = no fill time, so a named gap. */
   partVolumeMm3?: number | null;
   injectionRateMm3PerS?: number | null;
+  /** The HR Rates record the injection rate was read from and the Raw Materials record of the cure time: the calculator dialog opens them. */
+  machineRecord?: MachineRecord | null;
+  materialRecord?: MaterialRecord | null;
   /** The stored cycle-time calculators by name (migrations 975, 976): the dry cycle plus fill plus cure time is computed by "Reaction Injection Molding - Cycle Time". Absent = a named gap, no cycle. */
   calculators?: ReferenceCalculators | null;
   /** The part's own values for calculator fields (calculator_field_overrides, migration 1011), laid over the calculators for this calculation. */
@@ -65,6 +69,7 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
   const cycle = runRimCycleTime({
     machineCycleTimeS: input.rate.pressCycleTimeS ?? null, partVolumeMm3: input.partVolumeMm3 ?? null,
     injectionRateMm3PerS: input.injectionRateMm3PerS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null,
+    machine: input.machineRecord ?? null, material: input.materialRecord ?? null,
   }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
   const effectiveRate: MHRRateInput = { ...input.rate, pressCycleTimeS: cycle.derivable ? cycle.cycleSec : null };
 
