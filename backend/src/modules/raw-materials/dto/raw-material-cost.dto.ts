@@ -67,6 +67,11 @@ export class CreateRawMaterialCostDto {
   @IsString()
   materialDescription?: string;
 
+  @ApiPropertyOptional({ description: 'The blank the cost engine sized for the part, as it describes it', example: '59×50×49 billet' })
+  @IsOptional()
+  @IsString()
+  stockLabel?: string;
+
   @ApiPropertyOptional({ description: 'Country', example: 'INDIA' })
   @IsOptional()
   @IsString()
@@ -216,6 +221,11 @@ export class UpdateRawMaterialCostDto {
   @IsOptional()
   @IsString()
   materialDescription?: string;
+
+  @ApiPropertyOptional({ description: 'The blank the cost engine sized for the part, as it describes it' })
+  @IsOptional()
+  @IsString()
+  stockLabel?: string;
 
   @ApiPropertyOptional({ description: 'Country' })
   @IsOptional()
@@ -397,6 +407,9 @@ export class RawMaterialCostResponseDto {
   @ApiProperty({ description: 'Material description' })
   materialDescription: string;
 
+  @ApiPropertyOptional({ description: 'The blank the cost engine sized for the part; absent when none was recorded' })
+  stockLabel?: string | null;
+
   @ApiProperty({ description: 'Material ID' })
   materialId: string;
 
@@ -495,6 +508,7 @@ export class RawMaterialCostResponseDto {
       materialType: row.material_type || '',
       materialGroup: row.material_group || '',
       materialDescription: row.material_description || '',
+      stockLabel: row.stock_label ?? null,
       materialId: row.material_id || '',
       country: row.country || '',
       quarter: row.quarter || 'q1',

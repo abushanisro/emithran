@@ -1197,6 +1197,10 @@ function makeLine(
     setupCost: r2(setupCost),
     runCost: r2(runCost),
     totalCost: r2(setupCost + runCost),
+    // Every machining line is timed at the machine's hour rate alone (rate.rate: its direct and indirect overhead):
+    // the cycle is all machine cost and no operator cost is charged. Stated so the cost table need not guess the split.
+    machineCostPerPart: r2(runCost),
+    laborCostPerPart: 0,
     // Four decimals (0.006 s): two decimals of a minute is 0.6 s, which turned
     // a real 2.63 s drilling cycle into a displayed 2.4 s.
     cycleTimeMin: Math.round(cycleTimeMin * 10000) / 10000,
@@ -1314,6 +1318,8 @@ function computeInspectionLine(
   // constant — see resolveSetupMinutes().
   const setupResolution = resolveSetupMinutes({
     process: 'Inspection',
+    // The inspection station's reference record states its setup, and states 0: a recorded zero, not a gap.
+    referenceSetupTimeHr: inspectionRate.referenceSetupTimeHr,
     machineSetupTimeHr: inspectionRate.setupTimeHr,
     machineName: inspectionRate.machineName,
   });

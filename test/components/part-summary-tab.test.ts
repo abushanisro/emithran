@@ -54,6 +54,17 @@ describe('PartSummaryView: the six panels of the Part Summary', () => {
     expect(html(BACK_COVER)).toContain('width:78.4%');
   });
 
+  it('the bars are coloured by category, the same colour in the stacked bar and its row, and the stock is a line of the panel', () => {
+    const markup = html({ ...BACK_COVER, material: { ...BACK_COVER.material, stock: '59×50×49 billet' } });
+    expect(markup.split('background-color:#ec4899').length - 1).toBe(3); // stacked segment, swatch, row bar
+    expect(markup).toContain('flex-basis:78.4%');
+    expect(text(markup)).toContain('Stock:|59×50×49 billet');
+  });
+
+  it('the panels are laid out by the width of the pane, not the viewport', () => {
+    expect(html(BACK_COVER)).toContain('repeat(auto-fit,minmax(min(100%,15rem),1fr))');
+  });
+
   it('cost by process: a Process and % table', () => {
     expect(out).toContain('Process|%');
     expect(out).toContain('Injection Molding|100.0');

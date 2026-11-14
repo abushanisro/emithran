@@ -36,21 +36,31 @@ export class PartSummaryService {
       item: { lengthMm: item.maxLength, widthMm: item.maxWidth, heightMm: item.maxHeight, surfaceAreaMm2: item.surfaceArea, volumeMm3: item.volume },
       inputs: { batchSize: inputs.batchSize, location: inputs.location, annualVolume: inputs.annualVolume, productionLifeYears: inputs.productionLifeYears },
       table: applied ? table : null,
-      material: await this.material(token, item.materialGrade ?? null),
+      material: await this.material(token, item.id, item.materialGrade ?? null),
     });
   }
 
+  /** The blank the applied material record was costed from (raw_material_cost_records.stock_label); null when none was recorded. */
+  private async appliedStock(token: string, itemId: string): Promise<string | null> {
+    const { data } = await this.database.getUserClient(token).from('raw_material_cost_records').select('stock_label')
+      .eq('bom_item_id', itemId).eq('is_active', true).not('stock_label', 'is', null).limit(1);
+    return ((data ?? [])[0] as { stock_label?: string | null } | undefined)?.stock_label ?? null;
+  }
+
   /** The material's row in the library, by its grade; null when the grade is not one row (nothing is guessed from a partial match). */
-  private async material(token: string, grade: string | null) {
+  private async material(token: string, itemId: string, grade: string | null) {
+    // The stock is the blank the applied cost was sized on; the library's stock form stands in where none was recorded.
+    const stock = await this.appliedStock(token, itemId);
+    const onlyStock = stock ? { name: null, stockForm: stock, priceSource: null, priceVersion: null } : null;
     const g = grade?.trim();
-    if (!g) return null;
+    if (!g) return onlyStock;
     const client = this.database.getUserClient(token);
     const { data, error } = await client.from('raw_materials').select('name, stock_form, price_source, price_version')
       .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`).limit(5);
-    if (error || !data || data.length === 0) return null;
+    if (error || !data || data.length === 0) return onlyStock;
     const rows = data as Array<{ name: string; stock_form: string | null; price_source: string | null; price_version: string | null }>;
     const exact = rows.filter((r) => r.name === g);
     const row = exact.length === 1 ? exact[0]! : rows.length === 1 ? rows[0]! : null;
-    return row ? { name: row.name, stockForm: row.stock_form, priceSource: row.price_source, priceVersion: row.price_version } : null;
+    return row ? { name: row.name, stockForm: stock ?? row.stock_form, priceSource: row.price_source, priceVersion: row.price_version } : onlyStock;
   }
 }

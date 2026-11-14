@@ -1973,7 +1973,10 @@ export class BOMItemsService {
     } | undefined,
     fxRates: RateSnapshot,
   ) {
-    return this.rateResolutionService.resolveMHRRates(accessToken, location, physics, fxRates);
+    const rates = await this.rateResolutionService.resolveMHRRates(accessToken, location, physics, fxRates);
+    // The machining inspection station's reference record states its setup hours, and states 0: carried on the rate
+    // so a recorded zero setup is priced as zero and not reported as a missing setup time.
+    return { ...rates, machiningInspection: await this.withReferenceSetup(rates.machiningInspection, accessToken) };
   }
 
   // Delegates to RateResolutionService — see that class for the real
@@ -2169,8 +2172,15 @@ export class BOMItemsService {
       await this.databaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read')
         .from('machining_reference_data').select('raw')
         .eq('category', 'machine').eq('key', key).limit(1));
-    const v = (data?.[0] as { raw?: { time?: { setupTimeHr?: unknown } } } | undefined)?.raw?.time?.setupTimeHr;
+    // The machine tool records write time.setupTimeHr; the station records (inspection, manual deburr) time.setup_time_hr.
+    const time = (data?.[0] as { raw?: { time?: { setupTimeHr?: unknown; setup_time_hr?: unknown } } } | undefined)?.raw?.time;
+    const v = time?.setupTimeHr ?? time?.setup_time_hr;
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  }
+
+  /** The rate with its reference setup hours attached (MHRRateInput.referenceSetupTimeHr), so a recorded zero setup is priced as zero and not reported as missing. */
+  private async withReferenceSetup(rate: MHRRateInput, accessToken: string): Promise<MHRRateInput> {
+    return { ...rate, referenceSetupTimeHr: await this.machiningReferenceSetupHr(rate, accessToken) };
   }
 
   /**

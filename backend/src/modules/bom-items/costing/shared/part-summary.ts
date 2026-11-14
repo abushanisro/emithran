@@ -80,7 +80,7 @@ const CATEGORY_LABELS: Record<CostCategoryKey, string> = {
 const NOT_MODELLED = {
   secondaryFactory: 'The cost model records one Digital Factory per part: no secondary factory is on file.',
   toolshop: 'The cost model does not record a toolshop for the part.',
-  stock: 'The material row in the library has no stock form.',
+  stock: 'No stock was recorded when the cost was applied (apply the scenario again), and the material row in the library has no stock form.',
   fullyBurdenedCost: 'Not modelled: the period costs (indirect overhead, SG&A, margin) have no authoritative formula in the reference data, so a fully burdened cost would be an estimate.',
   targetCost: 'Not modelled: no target cost is on file.',
   targetMass: 'Not modelled: no target mass is on file.',

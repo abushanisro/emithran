@@ -263,6 +263,7 @@ export class RawMaterialCostService {
       material_type: createDto.materialType || '',
       material_group: createDto.materialGroup || '',
       material_description: createDto.materialDescription || '',
+      stock_label: createDto.stockLabel || null,
       country: createDto.country || '',
       quarter: createDto.quarter || 'q1',
 
@@ -397,6 +398,7 @@ export class RawMaterialCostService {
     if (updateDto.materialType !== undefined) updateData.material_type = updateDto.materialType;
     if (updateDto.materialGroup !== undefined) updateData.material_group = updateDto.materialGroup;
     if (updateDto.materialDescription !== undefined) updateData.material_description = updateDto.materialDescription;
+    if (updateDto.stockLabel !== undefined) updateData.stock_label = updateDto.stockLabel || null;
     if (updateDto.country !== undefined) updateData.country = updateDto.country;
     if (updateDto.quarter !== undefined) updateData.quarter = updateDto.quarter;
     if (updateDto.materialCostId !== undefined) updateData.material_cost_id = updateDto.materialCostId;
