@@ -130,11 +130,16 @@ export class MachiningLookupService {
   // lifetime, matching loadCalculatorCatalog's own cachedRead discipline
   // elsewhere in this module (just a plain Map here since there's no
   // per-request invalidation need for static reference data).
+  /** The machining reference data is global and shared (no user rows): every read of it goes through this one privileged client. */
+  private get referenceDb() {
+    return this.database.getPrivilegedClient('reference-data: machining lookup tables, global shared');
+  }
+
   private tableCache = new Map<string, any>();
 
   private async loadTable(key: string): Promise<any[] | null> {
     if (this.tableCache.has(key)) return this.tableCache.get(key) as any[] | null;
-    const db = this.database.getPrivilegedClient('reference-data: machining lookup tables, global shared');
+    const db = this.referenceDb;
     const { data, error } = await db
       .from('machining_reference_data')
       .select('raw')
@@ -163,7 +168,7 @@ export class MachiningLookupService {
   // key is ever fetched through both loaders).
   private async loadObjectTable(key: string): Promise<any | null> {
     if (this.tableCache.has(key)) return this.tableCache.get(key);
-    const db = this.database.getPrivilegedClient('reference-data: machining lookup tables, global shared');
+    const db = this.referenceDb;
     const { data, error } = await db
       .from('machining_reference_data')
       .select('raw')
@@ -193,8 +198,7 @@ export class MachiningLookupService {
    *  read error is not cached; a genuinely missing variable is named. */
   async getSetupAxisRule(): Promise<{ rule: SetupAxisRule | null; missing: string[] }> {
     if (this.setupAxisRule) return this.setupAxisRule;
-    const { data, error } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data, error } = await this.referenceDb
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -210,8 +214,7 @@ export class MachiningLookupService {
   private deburrPassesPerEdge: number | null = null;
   async getDeburrPassesPerEdge(): Promise<number | null> {
     if (this.deburrPassesPerEdge != null) return this.deburrPassesPerEdge;
-    const { data, error } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data, error } = await this.referenceDb
       .from('machining_reference_data')
       .select('value')
       .eq('category', 'variable')
@@ -230,8 +233,7 @@ export class MachiningLookupService {
    *  variables plus tblGtolProcessCapabilities. A read error is not cached. */
   async getCapabilityRules(): Promise<{ rules: MachiningCapabilityRules | null; missing: string[] }> {
     if (this.capabilityRules) return this.capabilityRules;
-    const { data, error } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data, error } = await this.referenceDb
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -250,7 +252,7 @@ export class MachiningLookupService {
   async getOperationCatalog(): Promise<string[] | null> {
     if (this.operationCatalog) return this.operationCatalog;
     // 1174 rows: more than one PostgREST page, so it is read in pages (a single read would stop at 1000).
-    const db = this.database.getPrivilegedClient('reference-data: machining operation catalog, global shared');
+    const db = this.referenceDb;
     const { data, error } = await readAllRows<{ key: string }>((from, to) => db
       .from('machining_reference_data').select('key')
       .eq('category', 'operation').eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
@@ -346,8 +348,7 @@ export class MachiningLookupService {
   async getHobbingReference(): Promise<HobbingReference | null> {
     const [hobRows, ansiRows] = await Promise.all([this.loadTable('tblHobbing'), this.loadTable('tblAnsiHobbing')]);
     if (!hobRows?.length && !ansiRows?.length) return null;
-    const { data } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data } = await this.referenceDb
       .from('machining_reference_data')
       .select('value')
       .eq('category', 'variable')
@@ -369,8 +370,7 @@ export class MachiningLookupService {
   })
   async getGearReference(): Promise<{ qualityRows: GearQualityRow[]; defaultQuality: string | null; shaving: { rows: any[]; maxWorkpieceRpm: number | null } }> {
     const [quality, shavingRows] = await Promise.all([this.loadObjectTable('tblGearQuality'), this.loadTable('tblShaving')]);
-    const { data } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data } = await this.referenceDb
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -397,8 +397,7 @@ export class MachiningLookupService {
     const rows = await this.loadTable('tblRotaryBroaching');
     if (!rows?.length) return null;
     const keys = ['rotaryBroachFeedAdjustment', 'pilotRotaryBroachHoleDiamPercentIncreaseHex', 'pilotRotaryBroachHoleDiamPercentIncreaseSquare', 'pilotRotaryBroachHoleLengthPercentIncrease'];
-    const { data } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data } = await this.referenceDb
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -446,8 +445,7 @@ export class MachiningLookupService {
     const noData: EdgeToolParams = { linearSpeedMmPerSec: 0, dataFound: false };
     const rows = await this.loadTable('tblDeburring');
     if (!rows?.length) return noData;
-    const { data } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data } = await this.referenceDb
       .from('machining_reference_data').select('value')
       .eq('category', 'variable').eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
       .eq('key', 'defaultExternalEdgeDeburrToolType').maybeSingle();
@@ -641,8 +639,7 @@ export class MachiningLookupService {
       this.loadTable('tblShimTypeKeywayBroach'),
     ]);
     if (!pullRows?.length && !shimRows?.length) return null;
-    const { data } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data } = await this.referenceDb
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
