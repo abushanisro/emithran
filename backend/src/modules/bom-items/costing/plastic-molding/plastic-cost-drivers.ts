@@ -52,7 +52,7 @@ export function plasticCostDrivers(f: PlasticCostDriverFacts): PlasticCostDriver
   const side = sideActionSignals(s.plasticFeatureGraph);
 
   if (positive(f.volumeMm3)) add({ name: 'Part volume', unit: 'mm³', value: f.volumeMm3, group: 'Material and shot', use: 'priced', feeds: 'Part weight and material cost; shot volume and fill time', evidence: 'part_volume' });
-  if (positive(f.surfaceAreaMm2)) add({ name: 'Surface area', unit: 'mm²', value: f.surfaceAreaMm2, group: 'Material and shot', use: 'not_priced', feeds: 'Finishing hours (finishingHrsPerSqMeter is keyed by surface area) and gate trimming, which are not priced yet' });
+  if (positive(f.surfaceAreaMm2)) add({ name: 'Surface area', unit: 'mm²', value: f.surfaceAreaMm2, group: 'Material and shot', use: 'priced', feeds: 'Visual inspection (memory/Secondary process visualInspectTimeStandard per m²) and the mold cavity machining and polish; finishing hours (finishingHrsPerSqMeter) and gate trimming are not priced yet' });
 
   if (positive(s.wallThicknessNominalMm)) add({ name: 'Nominal wall thickness', unit: 'mm', value: s.wallThicknessNominalMm, group: 'Cycle time', use: 'priced', feeds: 'Cooling and pack time of the cycle-time calculator', evidence: 'wall_thickness' });
   if (positive(s.wallThicknessMinMm)) add({ name: 'Thinnest wall', unit: 'mm', value: s.wallThicknessMinMm, group: 'Cycle time', use: 'dfm', feeds: 'Recorded with the route; not a cycle-time input' });
@@ -63,8 +63,8 @@ export function plasticCostDrivers(f: PlasticCostDriverFacts): PlasticCostDriver
 
   if (side) {
     add({ name: 'Undercut features', unit: 'pcs', value: side.undercutFeatures, group: 'Side actions and inserts', use: 'priced', feeds: 'Mold class (more than 2 raises it); slide and lifter hardware is required but not priced yet' });
-    if (side.slideBundles > 0) add({ name: 'Slide bundles', unit: 'pcs', value: side.slideBundles, group: 'Side actions and inserts', use: 'not_priced', feeds: 'Slide hardware (tblSlideSizes) is required but not priced yet' });
-    if (side.slideOrLifterBundles > 0) add({ name: 'Slide-or-lifter bundles', unit: 'pcs', value: side.slideOrLifterBundles, group: 'Side actions and inserts', use: 'not_priced', feeds: 'A lifter or a slide serves these; the choice and its hardware are not priced yet' });
+    if (side.slideBundles > 0) add({ name: 'Slide bundles', unit: 'pcs', value: side.slideBundles, group: 'Side actions and inserts', use: 'priced', feeds: 'The slide movement in each shot (slideCycleRate, F-32) and the slide blocks in the mold tooling (F-28)' });
+    if (side.slideOrLifterBundles > 0) add({ name: 'Slide-or-lifter bundles', unit: 'pcs', value: side.slideOrLifterBundles, group: 'Side actions and inserts', use: 'priced', feeds: 'Costed as lifters: their blocks in the mold tooling (F-28); a lifter rides on the ejection and adds no cycle time' });
   } else if (signals.undercutCount != null) {
     add({ name: 'Undercut faces', unit: 'pcs', value: signals.undercutCount, group: 'Side actions and inserts', use: 'priced', feeds: 'Mold class; side-action hardware is not priced yet' });
   }

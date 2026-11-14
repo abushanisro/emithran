@@ -7,6 +7,7 @@
  * What the engine decides stays here, not in a formula: whether an input exists, and whether the Menges equation has a solution (the eject temperature must lie
  * between the mold wall and the melt). Both come back as named missing inputs, never a default.
  */
+import type { WeightCheckReference } from '../reference/im-reference';
 import type { CalcSeed } from '../../shared/calculators/reference-calculator';
 import { bracketFactor, hasMengesSolution, resinThermalProps, type CycleTimeInput } from '../process/cycle-time';
 
@@ -44,6 +45,41 @@ export function slideMovementSeeds(input: { slideStrokeMm: number | null; rateMm
     'Slide Cycle Rate': { value: input.rateMmPerS!, source: `${REF}/variables: slideCycleRate (Velocity, read as mm/s)` },
     'Cavities per Mold': { value: input.cavities, source: 'The costed cavity count' },
   } };
+}
+
+// Formula registry (plastic-molding/formula-registry.ts): F-34 is the visual inspection calculator's formula.
+export const VISUAL_INSPECTION_CALCULATOR = 'Injection Molding - Visual Inspection';
+
+/** Seeds for the visual inspection calculator (F-34): the CAD surface area and the secondary-process inspection rate and share, or what is missing. */
+export function visualInspectionSeeds(input: { surfaceAreaMm2: number | null; minPerM2: number | null; percent: number | null }): SeedResult {
+  const missing: string[] = [];
+  if (!positive(input.surfaceAreaMm2)) missing.push('the part surface area (CAD)');
+  if (!positive(input.minPerM2)) missing.push('the visual inspection rate (memory/Secondary process visualInspectTimeStandard)');
+  if (!positive(input.percent)) missing.push('the share of parts inspected (memory/Secondary process defaultPercentToBeTested)');
+  if (missing.length > 0) return { missing };
+  return { seeds: {
+    'Part Surface Area': { value: input.surfaceAreaMm2!, source: 'CAD part surface area' },
+    'Visual Inspection Rate': { value: input.minPerM2!, source: 'memory/Secondary process/variables_inherited: visualInspectTimeStandard (average time per surface area to visually inspect a part)' },
+    'Percent Inspected': { value: input.percent!, source: 'memory/Secondary process/variables_inherited: defaultPercentToBeTested' },
+  } };
+}
+
+// Formula registry (plastic-molding/formula-registry.ts): F-35 is the weight check calculator's formula.
+export const WEIGHT_CHECK_CALCULATOR = 'Injection Molding - Weight Check';
+
+/** Seeds for the weight check calculator (F-35) from the reference package, or what is missing. Each input says its confidence and source. */
+export function weightCheckSeeds(ref: WeightCheckReference): SeedResult {
+  const fields: Array<[string, keyof WeightCheckReference]> = [
+    ['Time Per Check', 'timePerCheckS'], ['Sampling Interval', 'samplingInterval'], ['Scale Price', 'scalePriceUsd'], ['Equipment Life', 'lifeYr'],
+    ['Salvage Factor', 'salvagePct'], ['Maintenance Factor', 'maintenancePct'], ['Installation Factor', 'installationPct'], ['Scheduled Hours', 'scheduledHours'],
+    ['Uptime', 'uptimePct'], ['Utilization', 'utilization'],
+  ];
+  const missing = fields.filter(([, k]) => ref[k] == null).map(([name]) => `${name} (reference package)`);
+  if (missing.length > 0) return { missing };
+  return { seeds: Object.fromEntries(fields.map(([name, k]) => {
+    const v = ref[k]!;
+    return [name, { value: v.value, source: `${v.source} (${v.confidence})`, lookup: true }];
+  })) };
 }
 
 export type SeedResult = { seeds: Record<string, CalcSeed> } | { missing: string[] };

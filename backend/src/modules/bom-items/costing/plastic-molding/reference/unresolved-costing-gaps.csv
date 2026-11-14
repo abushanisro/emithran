@@ -1,8 +1,8 @@
 item,needs,decision,retrieved
-dryer_hourly_rate,"equipment quotations, or annualised cost / productive operating hours",gap,2026-11-14
-scale_hourly_rate,"the selected scale, its service life and annual utilisation",gap,2026-11-14
+dryer_hourly_rate,"a new-equipment quotation: only used-equipment prices are published (dryer-equipment-reference.csv, provisional)",provisional until a quote,2026-11-14
 cooling_circuits_per_mold,mold geometry (circuits from the cooling layout),no fixed default,2026-11-14
 baffle_count,"geometry: deep-core regions; no defensible universal depth-to-width ratio",hold,2026-11-14
-texture_price_per_m2,supplier quotation or verified historical price table,hold costing,2026-11-14
+texture_price_per_m2,"supplier quotation: Akron Metal Etching (textureame.com) states 'There is no price per square inch'; Lightmotif laser texturing gives time (minutes to an hour per cm2), not price",hold costing,2026-11-14
 rib_insert_threshold,"geometry: depth, access, steel behind, electrode access, cooling; no universal threshold",engineering review,2026-11-14
 slide_motion_overlap,"the mold timing sequence (overlap with mold open/close); no universal percentage",timing model,2026-11-14
+hot_runner_manifold_price,"a supplier quotation: the only open price is an Indian marketplace 4-drop system (INR 1,00,000, no specification; indiamart.com/libesh-engineeringworks)",gap,2026-11-14

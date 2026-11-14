@@ -37,12 +37,12 @@ import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
 import { computeMoldToolingCost, toolingGapIds } from './mold-tooling-engine';
 import { planRibInserts } from './rib-inserts';
-import { steelTreatment } from '../reference/im-reference';
+import { steelTreatment, weightCheckReference } from '../reference/im-reference';
 import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
-import { runDeflashingTime, runInjectionCycleTime, runSlideMovementTime } from '../calculators/plastic-cycle-time';
+import { runDeflashingTime, runInjectionCycleTime, runSlideMovementTime, runVisualInspectionTime, runWeightCheck } from '../calculators/plastic-cycle-time';
 import { runMoldTooling } from '../calculators/mold-tooling-calculator';
 import { selectMoldBase } from './mold-base';
 import { moldCavityLookup } from './mold-cavity';
@@ -310,6 +310,16 @@ function resolveSubtype(input: InjectionMoldingCostInput): MoldingSubtype {
  * spread over the batch. The cycle's two parts are kept apart on the line (machineCostPerPart / laborCostPerPart); with the setup share (setupCost,
  * machine and labour together) they add up to the line's cost.
  */
+/**
+ * A step with no setup of its own: a per-part bench step (deflashing, visual inspection) has no changeover, and the slide movement runs on the
+ * press, whose setup the injection line already charges. Recorded as 0 with source 'none', not left unresolved, so the route is complete.
+ */
+function noOwnSetup(line: ProcessLineCost): ProcessLineCost {
+  line.setupTimeMin = 0;
+  line.setupTimeSource = 'none';
+  return line;
+}
+
 function makeLine(
   process: string,
   setupMin: number | null,
@@ -572,7 +582,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       rateMmPerS: plasticRef?.featureRules.manualFlashTrimmingRateMmPerS ?? null,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
     if (trim.derivable) {
-      const deflashLine = makeLine(UNCOSTED_OPERATION_LABELS.deflashing, null, batchSize, trim.cycleSec / 60, input.deburrRate);
+      const deflashLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.deflashing, null, batchSize, trim.cycleSec / 60, input.deburrRate));
       deflashLine.calculationTrace = trim.trace;
       if (trim.calculator.id) deflashLine.calculatorId = trim.calculator.id;
       deflashLine.calculatorName = trim.calculator.name;
@@ -592,7 +602,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         cavities: cavityCount,
       }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
       if (move.derivable) {
-        const slideLine = makeLine(UNCOSTED_OPERATION_LABELS.side_action, null, batchSize, move.cycleSec / 60, mhrRate);
+        const slideLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.side_action, null, batchSize, move.cycleSec / 60, mhrRate));
         slideLine.calculationTrace = move.trace;
         if (move.calculator.id) slideLine.calculatorId = move.calculator.id;
         slideLine.calculatorName = move.calculator.name;
@@ -627,9 +637,44 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (routed.has('ultrasonic_welding')) {
     warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.ultrasonic_welding, `${signals.assemblyFeatureCount ?? '?'} assembly/weld feature(s)`));
   }
-  if (routed.has('visual_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.visual_inspection));
+  // Visual inspection: the part surface at the secondary-process inspection rate (F-34), charged at the bench rate.
+  if (routed.has('visual_inspection')) {
+    const look = runVisualInspectionTime({
+      surfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null,
+      minPerM2: plasticRef?.featureRules.visualInspectMinPerM2 ?? null,
+      percent: plasticRef?.featureRules.inspectedPercent ?? null,
+    }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
+    if (look.derivable) {
+      const inspectLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.visual_inspection, null, batchSize, look.cycleSec / 60, input.deburrRate));
+      inspectLine.calculationTrace = look.trace;
+      if (look.calculator.id) inspectLine.calculatorId = look.calculator.id;
+      inspectLine.calculatorName = look.calculator.name;
+      if (look.calculator.version != null) inspectLine.calculatorVersion = look.calculator.version;
+      processLines.push(inspectLine);
+    } else {
+      warnings.push(`${UNCOSTED_OPERATION_LABELS.visual_inspection} not costed: missing ${look.missing.join('; ')}.`);
+    }
+  }
   if (routed.has('dimensional_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
-  if (routed.has('weight_check')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.weight_check));
+  // Weight check: the press operator weighs one part every sampling interval on a bench scale (F-35), at the operator rate plus the scale's rate.
+  if (routed.has('weight_check')) {
+    const weigh = runWeightCheck(weightCheckReference(), withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
+    if (weigh.derivable && weigh.scaleRateUsdPerHr != null && mhrRate.labourRate != null) {
+      const scaleRate: MHRRateInput = {
+        rate: weigh.scaleRateUsdPerHr, labourRate: mhrRate.labourRate, operators: 1, source: mhrRate.source,
+        machineClass: 'weight_check', machineName: 'Bench scale (reference)', commodityCode: null,
+      };
+      const weighLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.weight_check, null, batchSize, weigh.cycleSec / 60, scaleRate));
+      weighLine.calculationTrace = weigh.trace;
+      if (weigh.calculator.id) weighLine.calculatorId = weigh.calculator.id;
+      weighLine.calculatorName = weigh.calculator.name;
+      if (weigh.calculator.version != null) weighLine.calculatorVersion = weigh.calculator.version;
+      processLines.push(weighLine);
+    } else {
+      const why = !weigh.derivable ? weigh.missing.join('; ') : `the operator labour rate of ${mhrRate.machineName ?? 'the press'}`;
+      warnings.push(`${UNCOSTED_OPERATION_LABELS.weight_check} not costed: missing ${why}.`);
+    }
+  }
 
   // ── Totals ──────────────────────────────────────────────────────────────────
   const totalProcessCost = r6(processLines.reduce((s, l) => s + l.totalCost, 0));
@@ -794,7 +839,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   // How far the quote can be trusted, and the snapshot that lets it be reproduced: a material that cannot be molded is the one finding above, there
   // is no quote to qualify.
   const validation = sizing.materialGap ? undefined : buildQuoteValidation(
-    usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null }),
+    usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null, routedVisualInspection: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.visual_inspection), routedWeightCheck: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.weight_check) }),
     unsupportedFormulas({ toolingGaps: toolingResult != null ? toolingGaps : [], routed }),
   );
   if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, PLASTIC_ENGINE_BUILD, input as unknown as Record<string, unknown>, cycle.derivable ? [cycle.calculator] : []);
@@ -829,7 +874,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
 }
 
 /** The registered formulas this quote computed (formula-registry.ts). F-03 and F-12 and F-14 are always part of the quote: a runner allowance, a press line, material. */
-function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelected: boolean; cycleDerivable: boolean; yieldKnown: boolean; tooling: boolean }): string[] {
+function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelected: boolean; cycleDerivable: boolean; yieldKnown: boolean; tooling: boolean; routedVisualInspection: boolean; routedWeightCheck: boolean }): string[] {
   return [
     'F-02', 'F-03', 'F-10', 'F-12', 'F-14',
     ...(q.clampDerivable ? ['F-01'] : []),
@@ -837,6 +882,8 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
     ...(q.cycleDerivable ? [q.isLsr ? 'F-09' : 'F-04', ...(q.isLsr ? [] : ['F-06']), 'F-05', 'F-07', 'F-08'] : []),
     ...(q.yieldKnown ? ['F-13'] : []),
     ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27', 'F-28', 'F-29', 'F-30', 'F-31', 'F-33'] : []),
+    ...(q.routedWeightCheck ? ['F-35'] : []),
+    ...(q.routedVisualInspection ? ['F-34'] : []),
   ];
 }
 
@@ -846,7 +893,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
  * route needs that have no data at all.
  */
 function unsupportedFormulas(q: { toolingGaps: readonly string[]; routed: ReadonlySet<string> }): string[] {
-  const noData = ['material_drying', 'visual_inspection', 'ultrasonic_welding', 'secondary_cure_oven', 'lsr_compound_dosing'].some((op) => q.routed.has(op));
+  const noData = ['material_drying', 'ultrasonic_welding', 'secondary_cure_oven', 'lsr_compound_dosing'].some((op) => q.routed.has(op));
   return [
     ...q.toolingGaps,
     'G-09', 'G-10',

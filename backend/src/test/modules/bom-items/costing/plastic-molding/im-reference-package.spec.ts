@@ -33,7 +33,7 @@ function load(file: string) {
   return { header: header!, rows: body.map((r) => ({ cells: r.length, ...Object.fromEntries(header!.map((h, i) => [h, r[i] ?? ''])) }) as Record<string, string> & { cells: number }) };
 }
 
-const CITED = ['material-drying-reference.csv', 'dryer-equipment-reference.csv', 'mold-steel-treatment-reference.csv', 'mold-design-reference.csv', 'quality-inspection-reference.csv'];
+const CITED = ['material-drying-reference.csv', 'dryer-equipment-reference.csv', 'mold-steel-treatment-reference.csv', 'mold-design-reference.csv', 'quality-inspection-reference.csv', 'equipment-economics-reference.csv'];
 const CONFIDENCE = new Set(['source_backed', 'engineering_estimate', 'provisional', 'unresolved']);
 const num = (s: string) => (s === '' ? null : Number(s));
 
@@ -50,9 +50,9 @@ describe('injection-molding reference package', () => {
       expect(r.retrieved).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       // a value with a confidence other than unresolved names its source
       if (r.confidence !== 'unresolved') expect(r.source_name).not.toBe('');
-      // a source not checked here is reviewed before use; a checked one has a link or is our own staged memory/ file
+      // a source not checked here is reviewed before use; a checked one has a link, or is a file of this repository (memory/ or backend/)
       if (r.source_checked === 'false') expect(r.review_required).toBe('true');
-      else expect(r.source_url !== '' || r.source_name!.startsWith('memory/')).toBe(true);
+      else expect(r.source_url !== '' || /^(memory|backend)\//.test(r.source_name!)).toBe(true);
       if (r.source_url) expect(r.source_url).toMatch(/^https:\/\//);
     }
   });
@@ -63,11 +63,11 @@ describe('injection-molding reference package', () => {
 
   it('drying: one row per resin, ranges in order, PA6 GF provisional (transferred from PA6), ABS grade-dependent, PA66 not inheriting PA6', () => {
     const rows = load('material-drying-reference.csv').rows;
-    expect(rows.map((r) => r.material)).toEqual(['PA6', 'PA6 GF', 'PC', 'PBT', 'PET', 'ABS']);
+    expect(rows.map((r) => r.material)).toEqual(['PA6', 'PA6 GF', 'PC', 'PBT', 'PET', 'ABS', 'PA11 GF', 'PA11']);
     for (const r of rows) {
       expect(num(r.drying_temp_c_min!)!).toBeLessThanOrEqual(num(r.drying_temp_c_max!)!);
       expect(num(r.drying_time_h_min!)!).toBeLessThanOrEqual(num(r.drying_time_h_max!)!);
-      expect(r.dryer_type).toBe('desiccant');
+      expect(r.dryer_type).toMatch(/desiccant/);
     }
     expect(rows.find((r) => r.material === 'PA6 GF')).toMatchObject({ confidence: 'provisional', applicability: 'transferred_from_PA6' });
     expect(rows.find((r) => r.material === 'ABS')?.applicability).toBe('grade_dependent');
@@ -85,16 +85,17 @@ describe('injection-molding reference package', () => {
     expect(p20).toMatchObject({ heat_treatment_required: 'false', initial_hardness_hrc_min: '28', initial_hardness_hrc_max: '34' });
   });
 
-  it('weight check uses the engineer defaults (10 s, 1 in 1,000, press operator); the scale rate is unresolved', () => {
+  it('weight check uses the engineer defaults (10 s, 1 in 1,000, press operator) and a cited scale price; its rate is derived, not stored', () => {
     const rows = load('quality-inspection-reference.csv').rows.filter((r) => r.operation === 'weight_check');
     expect(rows.find((r) => r.parameter === 'time_per_check')).toMatchObject({ value: '10', unit: 's', confidence: 'engineering_estimate' });
     expect(rows.find((r) => r.parameter === 'sampling_interval')?.value).toBe('1000');
-    expect(rows.find((r) => r.parameter === 'scale_hourly_rate')).toMatchObject({ value: '', confidence: 'unresolved' });
+    expect(rows.find((r) => r.parameter === 'scale_price')).toMatchObject({ value: '1051.99', unit: 'USD', confidence: 'source_backed' });
+    expect(rows.find((r) => r.parameter === 'scale_hourly_rate')).toMatchObject({ value: '', applicability: 'derived' });
   });
 
   it('lists what stays unresolved, each with what it needs', () => {
     const { rows } = load('unresolved-costing-gaps.csv');
-    expect(rows.map((r) => r.item)).toEqual(['dryer_hourly_rate', 'scale_hourly_rate', 'cooling_circuits_per_mold', 'baffle_count', 'texture_price_per_m2', 'rib_insert_threshold', 'slide_motion_overlap']);
+    expect(rows.map((r) => r.item)).toEqual(['dryer_hourly_rate', 'cooling_circuits_per_mold', 'baffle_count', 'texture_price_per_m2', 'rib_insert_threshold', 'slide_motion_overlap', 'hot_runner_manifold_price']);
     for (const r of rows) expect(r.needs).not.toBe('');
   });
 });

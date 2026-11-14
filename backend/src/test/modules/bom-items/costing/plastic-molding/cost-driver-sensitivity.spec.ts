@@ -37,10 +37,10 @@ describe('driverImpacts', () => {
     expect(d.lines.find((l) => l.line === 'Material')!.deltaPerPart).toBeGreaterThan(0);
   });
 
-  it('a driver the engine does not read is worth exactly nothing, which is how "not priced" is proven', () => {
+  it('surface area now prices the visual inspection (memory/Secondary process), and only that line moves', () => {
     const d = impacts()['Surface area']!;
-    expect(d.deltaPerPart).toBe(0);
-    expect(d.lines).toEqual([]);
+    expect(d.deltaPerPart).toBeGreaterThan(0);
+    expect(d.lines.map((l) => l.line)).toEqual(['Visual Inspection']);
   });
 
   it('the lines add up to the change', () => {

@@ -175,15 +175,22 @@ describe('cost summary: worked ABS part', () => {
     expect(r.processLines.every((l) => !l.physicsGap)).toBe(true);
   });
 
-  it('prices material 56.16 g x 3.046 = 0.171063, press and operator 20.69 s x (29.18 + 30) USD/h = 0.340125, total 0.511188: to the millionth, not to the cent', () => {
+  it('prices material 56.16 g x 3.046 = 0.171063, press and operator 20.69 s x (29.18 + 30) USD/h = 0.340125, visual inspection 0.04 m2 x 5 min/m2 = 12 s x 30 USD/h = 0.1, weight check 10 s / 1,000 parts x (30 + scale 0.0377) USD/h, total 0.611271: to the millionth, not to the cent', () => {
     expect(r.grossWeightKg).toBeCloseTo(0.05616, 6);
     expect(im.cycleTimeSec).toBe(20.69);
     const material = 0.05616 * 3.046;
     const run = (20.69 * (29.18 + 30)) / 3600;
     expect(r.materialCost).toBeCloseTo(material, 6);
     expect(r.processLines[0]!.runCost).toBeCloseTo(run, 6);
-    expect(r.totalProcessCost).toBeCloseTo(run, 6);
-    expect(r.totalCost).toBeCloseTo(material + run, 6);
+    // the bench rate (deburring, operator 30 USD/h): 40,000 mm2 = 0.04 m2 x 5 min/m2 (memory/Secondary process visualInspectTimeStandard) x 100 % = 12 s
+    const inspect = (12 * 30) / 3600;
+    expect(r.processLines.find((l) => l.process === 'Visual Inspection')?.totalCost).toBeCloseTo(inspect, 6);
+    // weight check (F-35): 10 s every 1,000 parts by the operator (30 USD/h) on the OHAUS scale, its rate by the migration 580 pattern
+    const scale = (1051.99 / 10 + 1051.99 * 0.05 + 1051.99 * 0.2 / 10) / (6240 * 0.8 * 0.95);
+    const weigh = (10 / 1000) * (30 + scale) / 3600;
+    expect(r.processLines.find((l) => l.process === 'Weight Check')?.totalCost).toBeCloseTo(weigh, 6);
+    expect(r.totalProcessCost).toBeCloseTo(run + inspect + weigh, 6);
+    expect(r.totalCost).toBeCloseTo(material + run + inspect + weigh, 6);
   });
 
   it('tooling, USA, 10,000/yr x 3 yr: BOM 2,140 + labour 2,398.67 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 0 (P20, pre-hardened) + cooling 715.29 = 12,059.66, one mold, 0.4020 per part', () => {
@@ -449,7 +456,7 @@ describe('operations the model does not cost', () => {
   });
 
   it('an operation with nothing in the reference still says there is no sourced data', () => {
-    expect(warn({}, 'Generic ABS')).toMatch(/Visual Inspection required[^\n]*no sourced time\/rate data exists/);
+    expect(warn({}, 'Generic ABS')).toMatch(/Material Drying required[^\n]*no sourced time\/rate data exists/);
   });
 });
 

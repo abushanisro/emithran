@@ -417,6 +417,39 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
+    id: 'F-35', version: 1, name: 'Weight check',
+    expression: 't = time per check / sampling interval (s per part);  scale rate = (P (1 - salvage) / life + P x maintenance + P x installation / life) / (6240 x uptime x utilization);  cost = t / 3600 x (operator rate + scale rate)',
+    outputUnit: 's',
+    inputs: [
+      { name: 'time per check, sampling interval', unit: 's, parts', source: 'reference/quality-inspection-reference.csv (costing engineer defaults)' },
+      { name: 'P', unit: 'USD', source: 'reference/quality-inspection-reference.csv: OHAUS Defender 3000 bench scale, Zoro US listing' },
+      { name: 'life, salvage, maintenance, installation, uptime, utilization, scheduled hours', unit: '-', source: 'reference/equipment-economics-reference.csv (memory/ press economics, migration 580)' },
+    ],
+    dependsOn: [],
+    referenceSource: 'reference/quality-inspection-reference.csv + equipment-economics-reference.csv',
+    assumptions: [
+      'The costing engineer\'s defaults: 10 s per check, 1 check per 1,000 parts, by the press operator (engineering estimates).',
+      'The scale is depreciated with the press economics of memory/ (10 years, 20 % installation, 5 % maintenance, 80 % uptime, 0.95 utilization).',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
+    id: 'F-34', version: 1, name: 'Visual inspection',
+    expression: 't = A_m2 x visualInspectTimeStandard (min/m2) x 60 x defaultPercentToBeTested / 100 (s per part)',
+    outputUnit: 's',
+    inputs: [
+      { name: 'A_m2', unit: 'm2', source: 'CAD part surface area' },
+      { name: 'visualInspectTimeStandard', unit: 'min/m2', source: 'memory/Secondary process/variables_inherited' },
+      { name: 'defaultPercentToBeTested', unit: '%', source: 'memory/Secondary process/variables_inherited' },
+    ],
+    dependsOn: [],
+    referenceSource: 'memory/Secondary process/variables_inherited',
+    assumptions: ['The secondary-process inspection rate applies to a molded part; charged at the bench rate, like deflashing.'],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
     id: 'F-33', version: 1, name: 'Hot drops of a hot runner',
     expression: 'drops = cavities x gates per cavity (hot runner; 0 on a cold runner);  cost = drops x hot drop price(defaultHotDropType)',
     outputUnit: 'USD',
