@@ -409,6 +409,9 @@ export function ProcessCostDialog({
   // to re-derive the match themselves.
   // An interpolated lookup holds the two real rows it sits between.
   const [calculatorMatchedRowKeys, setCalculatorMatchedRowKeys] = useState<Record<string, Record<string, any> | Record<string, any>[]>>({});
+  // Where an input's value was read when the dialog itself resolved it (a machining calculator's inputs re-resolved for edited keys): it
+  // replaces the engine seed's ref for that field. null = the value has no source to open (the engineer entered it).
+  const [calculatorInputRefs, setCalculatorInputRefs] = useState<Record<string, SourceRef | null>>({});
   // Scrolls the "eye" viewer straight to the highlighted (currently-used)
   // row when it opens — see the matchedCurrentRowRef assignment below.
   const matchedCurrentRowRef = useRef<HTMLTableRowElement | null>(null);
@@ -1157,6 +1160,7 @@ export function ProcessCostDialog({
     setCalculatorError(null);
     setCalculatorInputs({});
     setCalculatorInputProvenance({});
+    setCalculatorInputRefs({});
     setCalculatorInputGaps({});
     // Don't reset selectedCalculatorId for processCalculator as we want to keep it selected
     if (calculatorTarget !== 'processCalculator') {
@@ -1328,6 +1332,7 @@ export function ProcessCostDialog({
         inputs: Record<string, number>;
         provenance: Record<string, string>;
         lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
+        refs?: Record<string, SourceRef>;
         missing: string[];
       }>(`/bom-items/${bomItemData.id}/machining-calculator-inputs`, {
         calculatorId,
@@ -1350,6 +1355,11 @@ export function ProcessCostDialog({
         ...prev,
         ...Object.fromEntries(Object.entries(pick(d.lookupMatches)).map(([f, m]) => [f, m.row])),
       }));
+      // Every value taken from this response carries its own source (or none), never the engine seed's for a different row.
+      setCalculatorInputRefs((prev) => ({
+        ...prev,
+        ...Object.fromEntries(Object.keys(pick(d.inputs)).map((f) => [f, d.refs?.[f] ?? null])),
+      }));
       setMachiningMissing(d.missing ?? []);
     } catch (err: any) {
       setMachiningMissing([`Could not read this calculator's inputs from the database: ${err?.message ?? String(err)}`]);
@@ -1364,6 +1374,7 @@ export function ProcessCostDialog({
     if (!field || field.dataSource === MACHINING_LOOKUP_DATA_SOURCE) return;
     machiningEditedRef.current.add(fieldName);
     setCalculatorInputProvenance((prev) => ({ ...prev, [fieldName]: 'Entered in the calculator' }));
+    setCalculatorInputRefs((prev) => ({ ...prev, [fieldName]: null }));
     const current = calculatorInputsRef.current;
     const keys = Object.fromEntries(
       [...machiningEditedRef.current]
@@ -1389,6 +1400,7 @@ export function ProcessCostDialog({
       machiningEditedRef.current = new Set();
       setCalculatorInputs(seed ? { ...seed.inputs } : {});
       setCalculatorInputProvenance(seed ? { ...seed.provenance } : {});
+      setCalculatorInputRefs({});
       setCalculatorInputGaps({});
       setCalculatorMatchedRowKeys(seed
         ? Object.fromEntries(Object.entries(seed.lookupMatches).map(([f, m]) => [f, m.row]))
@@ -2232,6 +2244,7 @@ export function ProcessCostDialog({
   onShowEvidenceRef.current = onShowEvidence;
   /** Where the engine read an input of the open calculator (SourceRef on its trace step); undefined for a value it did not read from a record. */
   const sourceRefFor = (fieldName: string): SourceRef | undefined => {
+    if (fieldName in calculatorInputRefs) return calculatorInputRefs[fieldName] ?? undefined;
     const seed = engineSeedRef.current?.calculatorId === selectedCalculatorId ? engineSeedRef.current : engineSeedsRef.current[selectedCalculatorId] ?? null;
     return seed?.refs[fieldName];
   };
@@ -2504,6 +2517,7 @@ export function ProcessCostDialog({
       setSelectedCalculatorId('');
       setCalculatorInputs({});
       setCalculatorInputProvenance({});
+      setCalculatorInputRefs({});
       setCalculatorResults(null);
       setCalculatorError(null);
       setCalculatorTarget(null);
