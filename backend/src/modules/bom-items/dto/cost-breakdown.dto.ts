@@ -101,6 +101,11 @@ export type SourceRef =
   | { kind: 'material'; materialId: string; materialName: string; column: string }
   /** Measured on the part's CAD faces (costing/shared/cad-evidence.ts). */
   | { kind: 'cad'; evidence: CadEvidenceKey }
+  /**
+   * Particular features of the part's feature graph (feature_graph_v2 ids, with the occurrence when one instance is meant): the CAD faces of
+   * exactly those features, e.g. the holes a hole count counted or the tapped holes a thread count counted.
+   */
+  | { kind: 'features'; label: string; features: Array<{ featureId: string; occurrenceIndex?: number }> }
   /** Computed by another calculator: its steps (each with its own source), and the CAD faces it rests on when there are any. */
   | { kind: 'calculation'; name: string; evidence: CadEvidenceKey | null; steps: CalculationTraceStep[] }
   /** A sheet-metal reference table served by name (SheetMetalSourceTable): the row the value came from, and the column it is in. */

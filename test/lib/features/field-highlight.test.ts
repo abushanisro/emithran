@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { checkAgainstInput, resolveFieldHighlight } from '@/lib/features/field-highlight';
+import { cachedFeaturesHighlight, checkAgainstInput, featuresHighlight, resolveFieldHighlight } from '@/lib/features/field-highlight';
 import type { FeatureGraphV2 } from '@/lib/types/manufacturing';
 
 const graph: FeatureGraphV2 = {
@@ -189,5 +189,37 @@ describe('whole-part evidence (a casting\'s volume or surface on a graph without
 
   it('the part surface lights every face too', () => {
     expect(faces(resolveFieldHighlight('part_surface', casting)!.node)).toEqual([0, 1, 2]);
+  });
+});
+
+describe('featuresHighlight (a SourceRef naming particular features)', () => {
+  const part: FeatureGraphV2 = {
+    metadata: { face_map: [] },
+    features: [
+      { id: 'hole_d4', feature_type: 'SimpleHole', diameter_mm: 4, occurrences: [{ centroid: [0, 0, 0], face_ids: [1, 2] }, { centroid: [1, 0, 0], face_ids: [3, 4] }] },
+      { id: 'hole_d2', feature_type: 'SimpleHole', diameter_mm: 2, occurrences: [{ centroid: [2, 0, 0], face_ids: [5] }] },
+      { id: 'pocket', feature_type: 'PocketV2', occurrences: [{ centroid: [3, 0, 0], face_ids: [9] }] },
+    ],
+  };
+
+  it('lights every instance of the named features and nothing else, counting them', () => {
+    const h = featuresHighlight({ label: 'holes', features: [{ featureId: 'hole_d4' }, { featureId: 'hole_d2' }] }, part)!;
+    expect(faces(h.node)).toEqual([1, 2, 3, 4, 5]);
+    expect(h.measured).toEqual({ value: 3, unit: 'count', label: 'holes' });
+    expect(checkAgainstInput(h, 3).reconciles).toBe(true);
+    expect(checkAgainstInput(h, 5).reconciles).toBe(false);
+  });
+
+  it('lights only the named instance when an occurrence is given', () => {
+    expect(faces(featuresHighlight({ label: 'one hole', features: [{ featureId: 'hole_d4', occurrenceIndex: 1 }] }, part)!.node)).toEqual([3, 4]);
+  });
+
+  it('is null when none of the features is on this graph (re-analysed since): nothing is guessed', () => {
+    expect(featuresHighlight({ label: 'gone', features: [{ featureId: 'hole_d9' }] }, part)).toBeNull();
+  });
+
+  it('returns the same object for the same graph and ref (memoized dialog rows)', () => {
+    const ref = { label: 'holes', features: [{ featureId: 'hole_d2' }] };
+    expect(cachedFeaturesHighlight(ref, part)).toBe(cachedFeaturesHighlight(ref, part));
   });
 });

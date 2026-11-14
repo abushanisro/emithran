@@ -179,3 +179,45 @@ export function checkAgainstInput(highlight: FieldHighlight, inputValue: unknown
     note: `the input holds ${shown(value)} but these faces measure ${shown(measured)} ${unit}`,
   };
 }
+
+/**
+ * The faces of particular features (a SourceRef of kind 'features'): every occurrence of a feature named without one, else only the named
+ * occurrence. The measured value is the number of instances lit, so an input that counts them (Holes 5) is checked against it. Null when the
+ * graph has none of them (re-analysed since, or analysed before face ids): the eye then says so instead of lighting a guess.
+ */
+export function featuresHighlight(
+  ref: { label: string; features: readonly { featureId: string; occurrenceIndex?: number }[] },
+  graph: FeatureGraphV2 | null | undefined,
+): FieldHighlight | null {
+  if (!graph) return null;
+  const byId = new Map(graph.features.map((f) => [f.id, f]));
+  const occurrences: FeatureOccurrence[] = [];
+  for (const r of ref.features) {
+    const f = byId.get(r.featureId);
+    if (!f) continue;
+    const picked = r.occurrenceIndex == null ? f.occurrences : [f.occurrences[r.occurrenceIndex]].filter((o): o is FeatureOccurrence => o != null);
+    occurrences.push(...picked.filter((o) => o.face_ids.length > 0));
+  }
+  if (occurrences.length === 0) return null;
+  return {
+    node: { id: `features_${ref.label}`, feature_type: byId.get(ref.features[0]?.featureId ?? '')?.feature_type ?? 'Blank', occurrences: occurrences.map((o) => ({ centroid: o.centroid, face_ids: o.face_ids })) },
+    measured: { value: occurrences.length, unit: 'count', label: ref.label },
+    reconciles: true,
+  };
+}
+
+const featuresCache = new WeakMap<FeatureGraphV2, WeakMap<object, FieldHighlight | null>>();
+
+/** featuresHighlight, computed once per (graph, ref): the dialog's rows are memoized and need the same object between renders. */
+export function cachedFeaturesHighlight(
+  ref: { label: string; features: readonly { featureId: string; occurrenceIndex?: number }[] },
+  graph: FeatureGraphV2 | null | undefined,
+): FieldHighlight | null {
+  if (!graph) return null;
+  let byRef = featuresCache.get(graph);
+  if (!byRef) featuresCache.set(graph, byRef = new WeakMap());
+  if (byRef.has(ref)) return byRef.get(ref) ?? null;
+  const h = featuresHighlight(ref, graph);
+  byRef.set(ref, h);
+  return h;
+}
