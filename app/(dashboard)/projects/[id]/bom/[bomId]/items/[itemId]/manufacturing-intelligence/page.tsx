@@ -68,7 +68,7 @@ import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
 import { generateCalculationReportPdf } from '@/lib/utils/calculation-report';
 import { RouteCompareList } from '@/components/features/workflow/RouteCompareList';
 import { RouteStepEditor } from '@/components/features/workflow/RouteStepEditor';
-import { treePathForFeature } from '@/lib/features/tree-feature-path';
+import { featuresOfHighlight, treePathForFeature } from '@/lib/features/tree-feature-path';
 import { AddProcessOperationBar } from '@/components/features/workflow/AddProcessOperationBar';
 import type { AddOperationOption } from '@/components/features/workflow/AddOperationPicker';
 import { adaptRoutesToTree, RouteTreeValidationError, type RouteNode } from '@/lib/routing/route-tree';
@@ -10071,7 +10071,8 @@ export default function ManufacturingIntelligencePage() {
   const onSelectHighlight = (node: FeatureNodeV2 | null) => {
     // The feature's own row in the Manufacturing Process tree is selected and revealed with it, so the tree and the
     // Selected panel show what the 3D model shows. A feature with no row in the tree selects none.
-    const path = treePathForFeature(tree, node?.id);
+    // Which features the highlight shows, by its faces when the card built it under an id of its own (featuresOfHighlight).
+    const path = treePathForFeature(tree, featuresOfHighlight(node, fg?.feature_graph_v2?.features));
     setSelectedNodeId(path?.at(-1) ?? null);
     if (path) setExpandedNodes((prev) => new Set([...prev, ...path.slice(0, -1)]));
     setSelectedDirectV2Feature(node);
