@@ -23,15 +23,40 @@ function matchRank(node: FeatureTreeNode, featureId: string): number {
  * The ids from the root down to the row that stands for the feature, or null when no row does. The row of the
  * entry itself wins over a row that only groups it; between equal rows the first in tree order wins.
  */
-export function treePathForFeature(root: FeatureTreeNode | null | undefined, featureId: string | null | undefined): string[] | null {
-  if (!root || !featureId) return null;
+export function treePathForFeature(
+  root: FeatureTreeNode | null | undefined,
+  featureId: string | readonly string[] | null | undefined,
+): string[] | null {
+  const ids = (typeof featureId === 'string' ? [featureId] : featureId ?? []).filter(Boolean);
+  if (!root || ids.length === 0) return null;
   let best: { rank: number; path: string[] } | null = null;
   const walk = (node: FeatureTreeNode, ancestors: string[]) => {
     const path = [...ancestors, node.id];
-    const rank = matchRank(node, featureId);
+    const rank = Math.max(...ids.map((id) => matchRank(node, id)));
     if (rank > (best?.rank ?? 0)) best = { rank, path };
     for (const child of node.children ?? []) walk(child, path);
   };
   walk(root, []);
   return (best as { rank: number; path: string[] } | null)?.path ?? null;
+}
+
+type GraphFeature = { id: string; occurrences?: ReadonlyArray<{ face_ids?: readonly number[] }> };
+type Highlight = { id: string; occurrences?: ReadonlyArray<{ face_ids?: readonly number[] }> };
+
+/**
+ * The feature_graph_v2 entries a highlight shows. A card builds its highlight under its own id ("detected_pocket", "gcd-Ø4 hole", a merged
+ * "hl-…"), so the id names a feature only when it is one; otherwise the highlight is the features its faces belong to, most shared faces
+ * first. Faces are what the model lights, so this is exactly what the card shows, whatever it was built from.
+ */
+export function featuresOfHighlight(highlight: Highlight | null | undefined, features: readonly GraphFeature[] | null | undefined): string[] {
+  if (!highlight) return [];
+  const all = features ?? [];
+  if (all.some((f) => f.id === highlight.id)) return [highlight.id];
+  const shown = new Set((highlight.occurrences ?? []).flatMap((o) => o.face_ids ?? []));
+  if (shown.size === 0) return [];
+  return all
+    .map((f) => ({ id: f.id, shared: (f.occurrences ?? []).flatMap((o) => o.face_ids ?? []).filter((x) => shown.has(x)).length }))
+    .filter((f) => f.shared > 0)
+    .sort((a, b) => b.shared - a.shared)
+    .map((f) => f.id);
 }
