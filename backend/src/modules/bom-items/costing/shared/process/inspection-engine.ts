@@ -126,6 +126,12 @@ export interface InspectionPlan {
   featureBreakdown: FeatureOp[];
   rate: MHRRateInput;
   warnings: string[];
+  /**
+   * Per feature whose check time the plan resolved, the inspection_operation_defaults row it was read from (feature + method, the
+   * table's key): the escalated method's row, or the visual row it falls back to. Absent for a feature not checked, or timed from the
+   * fallback constant (no row on file).
+   */
+  sourceRows: Partial<Record<InspectionOperationDefaultRow['feature'], { feature: InspectionOperationDefaultRow['feature']; method: InspectionMethod }>>;
 }
 
 // What the caller resolved for this plan's cycle time — mirrors every other
@@ -173,7 +179,7 @@ export function planInspection(input: InspectionInput): InspectionPlan {
       holesToInspect: 0, bendsToInspect: 0, threadsToInspect: 0,
       visualPassBaseSec: 0, holeCheckSec: 0, bendCheckSec: 0, threadGaugeSec: 0,
       hasThicknessCheck: false, thicknessCheckSec: 0, hasDimensionCheck: false, dimensionCheckSec: 0,
-      amortizeDivisor: 1, featureBreakdown: [], rate: input.rate, warnings,
+      amortizeDivisor: 1, featureBreakdown: [], rate: input.rate, warnings, sourceRows: {},
     };
   }
 
@@ -226,9 +232,13 @@ export function planInspection(input: InspectionInput): InspectionPlan {
     }
   }
 
+  const sourceRows: InspectionPlan['sourceRows'] = {};
   const getSec = (feature: InspectionOperationDefaultRow['feature'], m: InspectionMethod): { sec: number; dataFound: boolean } => {
     const row = defaultsByKey.get(`${feature}:${m}`) ?? defaultsByKey.get(`${feature}:visual`);
-    if (row) return { sec: row.cycle_time_sec, dataFound: true };
+    if (row) {
+      sourceRows[feature] = { feature: row.feature, method: row.method };
+      return { sec: row.cycle_time_sec, dataFound: true };
+    }
     return { sec: FALLBACK_SEC[feature] ?? 0, dataFound: false };
   };
 
@@ -285,7 +295,7 @@ export function planInspection(input: InspectionInput): InspectionPlan {
     skip: false, method, holesToInspect, bendsToInspect, threadsToInspect,
     visualPassBaseSec: visualBase.sec, holeCheckSec, bendCheckSec, threadGaugeSec,
     hasThicknessCheck, thicknessCheckSec, hasDimensionCheck, dimensionCheckSec,
-    amortizeDivisor, featureBreakdown, rate, warnings,
+    amortizeDivisor, featureBreakdown, rate, warnings, sourceRows,
   };
 }
 

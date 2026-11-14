@@ -16,6 +16,13 @@ import {
 import { expandSearchTermSpellingVariants } from '../../raw-materials/material-search-spelling';
 import { escapeLikePattern, ilikeContains } from '../../../common/db/postgrest-filter';
 
+/** The raw_materials column density, UTS and shear strength were read from, for a calculator input's source (SourceRef 'material'). */
+export interface MaterialSourceColumns {
+  densityKgM3: 'density_kg_m3' | 'density' | null;
+  utsMpa: 'uts_mpa' | 'ultimate_tensile_strength' | null;
+  shearStrengthMpa: 'shear_strength_mpa' | 'shearing_strength' | null;
+}
+
 interface MatchedMaterialRow {
   id: string;
   material: string | null; materialGrade: string | null; materialGroup: string | null; materialType: string | null;
@@ -25,6 +32,8 @@ interface MatchedMaterialRow {
   hasCost: boolean;
   shape: string | null; locCost: number | null; indiaCost: number | null; densityKgM3: number | null;
   shearStrengthMpa: number | null; utsMpa: number | null; yieldStrengthMpa: number | null;
+  /** The raw_materials column each of these values was read from (newer column first, then the legacy one); null when neither holds it. */
+  sourceColumns: MaterialSourceColumns;
   meltingTempC: number | null; moldTempC: number | null; ejectDeflectionTempC: number | null;
   specificHeatMeltJgC: number | null; thermalConductivityMeltWMK: number | null;
   cureTimeMinFromMaterial: number | null;
@@ -374,9 +383,15 @@ export class MaterialResolutionService {
       const thermalConductivityMeltWMK = (row.thermal_conductivity_melt as number | null) ?? null;
       const cureTimeMinFromMaterial = (row.cure_time_min as number | null) ?? null;
       const numOrNull = (v: unknown) => (v == null ? null : Number(v));
+      const sourceColumns: MaterialSourceColumns = {
+        densityKgM3: row.density_kg_m3 != null ? 'density_kg_m3' : densityGCm3 != null ? 'density' : null,
+        utsMpa: row.uts_mpa != null ? 'uts_mpa' : row.ultimate_tensile_strength != null ? 'ultimate_tensile_strength' : null,
+        shearStrengthMpa: row.shear_strength_mpa != null ? 'shear_strength_mpa' : row.shearing_strength != null ? 'shearing_strength' : null,
+      };
       return {
         // ranker identity
         id: row.id as string,
+        sourceColumns,
         material: (row.grade as string | null) ?? null,
         materialGrade: (row.name as string | null) ?? null,
         materialGroup: (row.material_group as string | null) ?? null,
@@ -543,6 +558,8 @@ export class MaterialResolutionService {
     matlState: string | null;
     /** Reference clamp properties (migration 831); nulls when not on file for this material. */
     clampProperties: MaterialClampProperties;
+    /** The matched raw_materials record, and the column each property was read from; null when no row matched. */
+    materialRecord: { id: string; name: string; columns: MaterialSourceColumns } | null;
   }> {
     const { accessToken, grade, family, materialCol, rates, locCurrencyCode, location, warnings } = input;
 
@@ -637,6 +654,7 @@ export class MaterialResolutionService {
               flowLengthRatio: best.imFlowLengthRatio,
               referenceMaterial: best.imReferenceMaterial,
             },
+            materialRecord: { id: best.id, name: best.materialGrade ?? best.material ?? grade, columns: best.sourceColumns },
           };
         }
       } catch {
@@ -675,6 +693,7 @@ export class MaterialResolutionService {
       stockForm: null,
       matlState: null,
       clampProperties: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null },
+      materialRecord: null,
     };
   }
 }

@@ -10,8 +10,3 @@ export function withOutputColumnLast<T extends ReferenceColumn>(columns: readonl
   return [...columns.filter((c) => c.name !== outputColumn), ...columns.filter((c) => c.name === outputColumn)];
 }
 
-/** The Lookup Table 1 column for the part complexity named in an input's source text ("... 22.0 t machine, inter part"). */
-export function strokeFactorColumnOf(provenance: string | undefined): 'simple' | 'intermediate' | 'complex' | undefined {
-  const m = /\b(simple|inter|complex)\s+part\b/i.exec(provenance ?? '')?.[1]?.toLowerCase();
-  return m === 'simple' ? 'simple' : m === 'inter' ? 'intermediate' : m === 'complex' ? 'complex' : undefined;
-}
