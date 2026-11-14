@@ -2647,6 +2647,9 @@ export function ProcessCostDialog({
   // The selected machine's own labour rate; a line with no machine (Inspection: labour, no equipment)
   // keeps the labour rate the cost engine costed it with, which the page passes in.
   const lineOnlyLabourRate = !selectedMHR && Number(editData?.liveLabourRate) > 0 ? Number(editData.liveLabourRate) : null;
+  // What the saved line charges beyond machine and crew time (a melt's energy, USD per part; process_cost_records.other_cost_per_part):
+  // part of its total, kept when the line is saved, so the preview below shows it too.
+  const lineOtherCostUsd = Number(editData?.otherCostPerPart) > 0 ? Number(editData.otherCostPerPart) : 0;
   const effectiveLaborRate = machineLabour ? machineLabour.rate : (lineOnlyLabourRate ?? 0);
 
   // Cost preview: calls the exact same eMithranTerms()-based engine that computes the
@@ -2831,7 +2834,7 @@ export function ProcessCostDialog({
       partsPerCycle: parseFloat(partsPerCycle as string) || 0,
       scrap: parseFloat(scrap as string) || 0,
       machineValue: parseFloat(machineValue as string) || 0,
-      totalCost,
+      totalCost: totalCost + lineOtherCostUsd,
       facilityId,
       facilityRateId,
     });
@@ -3427,11 +3430,16 @@ export function ProcessCostDialog({
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-primary">
                       {currencySymbol}{(() => {
-                        const displayTotal = totalCost * conversionRate;
+                        const displayTotal = (totalCost + lineOtherCostUsd) * conversionRate;
                         return displayTotal > 0 && displayTotal < 0.01 ? displayTotal.toFixed(4) : displayTotal.toFixed(2);
                       })()}
                     </span>
                   </div>
+                  {lineOtherCostUsd > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Includes {currencySymbol}{(lineOtherCostUsd * conversionRate).toFixed(4)} per part this line charges beyond machine and crew time (energy, consumables); it is kept when you save.
+                    </p>
+                  )}
                   {/* Why the number above is not a real total, when it is not. A
                       zero here has three genuinely different causes and they must
                       not all read as "this operation is free": the inputs are
