@@ -34,6 +34,19 @@ describe('featureInstances', () => {
   });
 });
 
+describe('featureInstances: how a feature is reached', () => {
+  it('carries the corner radius (0 = sharp), the wall behind it and the tool axis the CAD analysis measured', () => {
+    const measured = feat('m', 'PocketV2', 'default', [
+      { extents_mm: [40, 20, 0], corner_radius_mm: 0, min_wall_mm: 1.2, tool_axis: [0, 0, 1], tool_axis_bidirectional: false },
+      { extents_mm: [40, 20, 0], tool_axis: [0, 0.6428, 0.766], tool_axis_bidirectional: true },
+    ]);
+    const [a, b] = featureInstances([measured]);
+    expect(a).toMatchObject({ cornerRadiusMm: 0, minWallMm: 1.2, toolAxis: '0, 0, 1' });
+    expect(b).toMatchObject({ toolAxis: '0, 0.64, 0.77 (either way)' });
+    expect(Object.keys(b ?? {})).not.toContain('cornerRadiusMm');
+  });
+});
+
 describe('operationCosts', () => {
   const lines = [
     { process: '3 Axis Mill', machineName: 'Makino V22', hourlyRate: 72, featureBreakdown: [

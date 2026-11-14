@@ -28,6 +28,12 @@ export interface FeatureInstance {
   radiusMm?: number;
   areaMm2?: number;
   removedMm3?: number;
+  /** A pocket's tightest inside corner; 0 = sharp. */
+  cornerRadiusMm?: number;
+  /** The thinnest material behind the instance's faces. */
+  minWallMm?: number;
+  /** The direction the tool approaches from; "either way" appended when both ends are open. */
+  toolAxis?: string;
   thread?: string;
 }
 
@@ -63,6 +69,11 @@ export function featureInstances(features: readonly FeatureNodeV2[]): FeatureIns
         radiusMm: positive(o.radius_mm),
         areaMm2: positive(o.area_mm2),
         removedMm3,
+        cornerRadiusMm: typeof o.corner_radius_mm === 'number' && o.corner_radius_mm >= 0 ? o.corner_radius_mm : undefined,
+        minWallMm: positive(o.min_wall_mm),
+        toolAxis: Array.isArray(o.tool_axis) && o.tool_axis.length === 3
+          ? `${(o.tool_axis as number[]).map((c) => Number(c.toFixed(2))).join(', ')}${o.tool_axis_bidirectional === true ? ' (either way)' : ''}`
+          : undefined,
         thread: typeof o.spec === 'string' && o.spec ? o.spec : undefined,
       }));
     }

@@ -193,7 +193,9 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v59"  # bumped 2026-10-15: (36) pmi.records carry a content `fingerprint` (and
+    CACHE_VERSION = "geo_v60"  # bumped 2026-11-14: (37) machining feature_graph_v2 occurrences carry tool_axis /
+    # tool_axis_bidirectional (holes, pockets, cutouts), a pocket's corner_radius_mm and min_wall_mm (machining/feature_access.py).
+    # Previous: geo_v59, 2026-10-15: (36) pmi.records carry a content `fingerprint` (and
     # `datum_refs_fingerprint`) and pmi.source.file_sha256: what an engineer's approval of a decoded value is bound to.
     # Previous: geo_v58, 2026-10-15: (35) pmi.records: typed engineering records (native PMI, decoded
     # graphics flagged for review, unresolved) with limits and engine-feature association (shared/pmi_records.py).

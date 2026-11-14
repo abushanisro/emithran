@@ -3,6 +3,7 @@
 // Every check names the limit and where it is from. A check whose limit is not staged, or whose measurement the
 // CAD analysis does not report, is listed as not evaluated with the reason: never shown as passed.
 // Pure: no database, no engine.
+import { requiredMilledClassFromToolAxes, type SetupAxisRule } from '../setup-axis-rule';
 
 export type DfmSeverity = 'critical' | 'major' | 'minor';
 
@@ -13,9 +14,18 @@ export interface MachiningDfmReference {
   variables: Readonly<Record<string, number | null | undefined>>;
   /** Standard drill diameters, mm (tblDrillSizeChart); null = not staged. */
   drillSizesMm: readonly number[] | null;
+  /** The setup rule (perpendicularCountFor3AM, maxOblique4AMSetups, allowed angle deviation); null = not staged. */
+  setupRule: SetupAxisRule | null;
+  /** The material's wall thickness limits, mm (tblMachiningMinWall); null = not staged for the material. */
+  minWall: { recommendedMm: number; feasibleMm: number } | null;
 }
 
 export interface MachiningDfmPart {
+  /**
+   * True when the CAD analysis measured how each feature is reached (feature_graph_v2.metadata.feature_access): tool
+   * axis, pocket corner radius and the wall behind each feature. False = an analysis from before that measurement.
+   */
+  accessMeasured: boolean;
   /** Bounding dimensions, mm; any missing = the part-shape checks are not evaluated. */
   dimensionsMm: ReadonlyArray<number | null | undefined>;
   weightKg: number | null | undefined;
@@ -57,6 +67,26 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 const fmt = (v: number, digits = 2) => String(Number(v.toFixed(digits)));
 const SEVERITY_ORDER: DfmSeverity[] = ['critical', 'major', 'minor'];
 
+/**
+ * The instances reached along a direction that is neither the part's commonest tool line nor square to it: the ones
+ * that make a setup oblique.
+ */
+function obliqueInstances(features: Feature[], rule: SetupAxisRule): Instance[] {
+  const tol = rule.allowedAngleDeviationDeg + 0.02;
+  const withAxis = features.flatMap((f) => (f.occurrences ?? []).flatMap((o, i) => {
+    const a = Array.isArray(o.tool_axis) && o.tool_axis.length === 3 ? (o.tool_axis as number[]) : null;
+    return a ? [{ featureId: f.id!, occurrenceIndex: i, faces: Array.isArray(o.face_ids) ? (o.face_ids as number[]) : [], axis: a }] : [];
+  }));
+  const angle = (a: number[], b: number[]) => {
+    const d = Math.abs(a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!) / (Math.hypot(...a) * Math.hypot(...b));
+    return (Math.acos(Math.min(1, d)) * 180) / Math.PI;
+  };
+  // The commonest line: the axis the most instances share (either way along it).
+  const main = withAxis.map((x) => ({ x, n: withAxis.filter((y) => angle(x.axis, y.axis) <= tol).length })).sort((a, b) => b.n - a.n)[0]?.x.axis;
+  if (!main) return [];
+  return withAxis.filter((x) => { const a = angle(x.axis, main); return a > tol && Math.abs(a - 90) > tol; }).map((x) => ({ featureId: x.featureId, occurrenceIndex: x.occurrenceIndex, faces: x.faces, value: 0 }));
+}
+
 /** The bound of an operation's row in tblOperationSizeRanges, or null when the row or the bound is absent (-1). */
 function bound(ref: MachiningDfmReference, operation: string, side: 'LowerBound' | 'UpperBound', comment?: string): number | null {
   const row = (ref.sizeRanges ?? []).find((r) => r.OperationName === operation && (!comment || r.Comment === comment));
@@ -83,13 +113,15 @@ export function evaluateMachiningDfm(features: readonly unknown[] | null | undef
   const check = (c: {
     rule: string; name: string; unit: string; source: string; what: string; recommendation: string;
     judged: Instance[]; nothing: string; worst: 'highest' | 'lowest';
+    /** Set when nothing to measure means the check holds (the analysis looked and found none). */
+    nothingPasses?: boolean;
     levels: Array<{ severity: DfmSeverity; limit: number | null; exceeds: (value: number, limit: number) => boolean; says: string }>;
   }) => {
     const levels = c.levels.filter((l): l is typeof l & { limit: number } => l.limit != null);
     const limit = levels.map((l) => `${l.says} ${fmt(l.limit)}${c.unit} (${l.severity})`).join(', ');
     const base = { rule: c.rule, name: c.name, limit: limit || 'not staged', source: c.source };
     if (levels.length === 0) { checks.push({ ...base, status: 'not_evaluated', detail: `The limit is not staged (${c.source}).` }); return; }
-    if (c.judged.length === 0) { checks.push({ ...base, status: 'not_evaluated', detail: c.nothing }); return; }
+    if (c.judged.length === 0) { checks.push({ ...base, status: c.nothingPasses ? 'passed' : 'not_evaluated', detail: c.nothing }); return; }
     const worstOf = (xs: Instance[]) => xs.reduce((a, b) => ((c.worst === 'highest' ? b.value > a.value : b.value < a.value) ? b : a)).value;
     let remaining = c.judged;
     let failed = false;
@@ -227,11 +259,71 @@ export function evaluateMachiningDfm(features: readonly unknown[] | null | undef
     levels: [{ severity: 'minor', limit: ref.variables.pickWeight ?? null, exceeds: above, says: 'above' }],
   });
 
-  // ── What the CAD analysis does not measure yet ─────────────────────────────
-  const unmeasured = (rule: string, name: string, detail: string) => checks.push({ rule, name, limit: '—', source: '—', status: 'not_evaluated', detail });
-  unmeasured('InternalCornerRadius', 'Pocket internal corner radius', 'The CAD analysis does not report the corner radii of pockets.');
-  unmeasured('ThinWall', 'Wall thickness between features', 'The CAD analysis does not measure wall thickness on a machined part.');
-  unmeasured('ToolAccess', 'Tool access and number of setups', 'The CAD analysis carries no tool axis per feature.');
+  // ── Corners, walls and tool access: measured by the CAD analysis (machining/feature_access.py) ──────────────
+  const STALE = 'This analysis is from before the measurement: use Refresh analysis.';
+  const measured = part.accessMeasured;
+  const pocketDepth = (o: Record<string, unknown>) => size(o).depth;
+  const corners = instances(['PocketV2'], (_f, o) => (typeof o.corner_radius_mm === 'number' && o.corner_radius_mm >= 0 ? o.corner_radius_mm : null));
+  check({
+    rule: 'SharpInternalCorner', name: 'Pocket internal corners are rounded', unit: ' mm radius', worst: 'lowest',
+    source: 'geometry: a rotating cutter leaves its own radius in an inside corner',
+    what: 'pockets have a sharp inside corner', nothing: measured ? 'No pocket has an inside corner between its walls.' : STALE, nothingPasses: measured,
+    recommendation: 'Add a corner radius (a third of the pocket depth or more), or a relief at the corner. A sharp inside corner cannot be milled: it needs EDM or a broach.',
+    judged: corners,
+    levels: [{ severity: 'critical', limit: 0.01, exceeds: below, says: 'below' }],
+  });
+  check({
+    rule: 'CornerCutterReach', name: 'Pocket depth to corner cutter diameter', unit: ' : 1', worst: 'highest',
+    source: 'variables: easyL2DRatio, maxMillingLToDRatio, difficultL2DRatio',
+    what: 'pockets have corners too tight for their depth', nothing: measured ? 'No pocket has a rounded inside corner with a measured depth.' : STALE, nothingPasses: measured,
+    recommendation: 'Enlarge the corner radius or make the pocket shallower. The cutter that finishes the corner is no larger than twice the radius and must reach the pocket depth.',
+    judged: instances(['PocketV2'], (_f, o) => {
+      const r = num(o.corner_radius_mm);
+      const depth = pocketDepth(o);
+      return r && depth ? depth / (2 * r) : null;
+    }),
+    levels: [
+      { severity: 'critical', limit: ref.variables.difficultL2DRatio ?? null, exceeds: above, says: 'above' },
+      { severity: 'major', limit: ref.variables.maxMillingLToDRatio ?? null, exceeds: above, says: 'above' },
+      { severity: 'minor', limit: ref.variables.easyL2DRatio ?? null, exceeds: above, says: 'above' },
+    ],
+  });
+  // Blend faces (edge rounds, grooves) and free-form regions are left out: the wall behind a blend reads the blend, not a wall.
+  check({
+    rule: 'ThinWall', name: 'Wall thickness behind features', unit: ' mm', worst: 'lowest',
+    source: 'tblMachiningMinWall (eMithran baseline: recommended and feasible minimum wall for the material)',
+    what: 'features have a thin wall behind them', nothing: measured ? 'No feature has a measured wall.' : STALE,
+    recommendation: 'Thicken the wall. A thin wall deflects and chatters under the cutter: it is cut in light passes and may not hold tolerance.',
+    judged: instances(['SimpleHole', 'MultiStepHole', 'PocketV2', 'Slot', 'Keyway', 'Cutout', 'PlanarFace', 'CurvedWall'], (f, o) => (notGroove(f) ? num(o.min_wall_mm) : null)),
+    levels: [
+      { severity: 'critical', limit: ref.minWall?.feasibleMm ?? null, exceeds: below, says: 'below' },
+      { severity: 'major', limit: ref.minWall?.recommendedMm ?? null, exceeds: below, says: 'below' },
+    ],
+  });
+
+  // Tool access: the setups the features' tool axes need, against the reference setup rule.
+  const access = { rule: 'ToolAccess', name: 'Tool access and number of setups', source: 'variables: perpendicularCountFor3AM, maxOblique4AMSetups' };
+  const axes = requiredMilledClassFromToolAxes(all as Parameters<typeof requiredMilledClassFromToolAxes>[0], ref.setupRule);
+  if (!ref.setupRule || !measured || axes.required == null) {
+    checks.push({ ...access, limit: ref.setupRule ? `up to ${ref.setupRule.perpendicularCountFor3AM} perpendicular setups, ${ref.setupRule.maxOblique4AMSetups} oblique` : 'not staged', status: 'not_evaluated', detail: !ref.setupRule ? 'The setup rule is not staged.' : !measured ? STALE : 'No feature has a tool axis.' });
+  } else {
+    const limit = `up to ${ref.setupRule.perpendicularCountFor3AM} perpendicular setups and ${ref.setupRule.maxOblique4AMSetups} oblique on a 3 axis mill`;
+    const detail = `${axes.principalSetups} perpendicular, ${axes.obliqueSetups} oblique setup${axes.obliqueSetups === 1 ? '' : 's'}`;
+    const needs = axes.required === '3_axis_mill' ? null : axes.required === '4_axis_mill' ? '4 axis mill' : '5 axis mill';
+    checks.push({ ...access, limit, status: needs ? 'failed' : 'passed', detail });
+    if (needs) {
+      // The features reached along a direction that is not one of the part's commonest are the ones to look at.
+      const oblique = axes.obliqueSetups > 0 ? obliqueInstances(all, ref.setupRule) : [];
+      findings.push({
+        rule: 'ToolAccess', severity: axes.required === '5_axis_mill' ? 'major' : 'minor',
+        label: `The part needs a ${needs}: ${axes.reason}`, limit, source: access.source,
+        recommendation: 'Bring the features onto fewer directions, square to each other, so the part is finished in fewer setups on a 3 axis mill.',
+        featureIds: [...new Set(oblique.map((x) => x.featureId))],
+        occurrences: oblique.map((x) => ({ featureId: x.featureId, occurrenceIndex: x.occurrenceIndex })),
+        faces: [...new Set(oblique.flatMap((x) => x.faces))],
+      });
+    }
+  }
 
   findings.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
   // The part-level findings point at no feature.

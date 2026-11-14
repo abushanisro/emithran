@@ -325,6 +325,13 @@ export class MachiningLookupService {
     return this.loadTable('tblOperationSizeRanges');
   }
 
+  /** The material class's recommended and feasible minimum wall, mm (tblMachiningMinWall), or null when the table or the row is not staged. */
+  async getMachiningMinWall(materialClass: MaterialClass): Promise<{ recommendedMm: number; feasibleMm: number } | null> {
+    const row = ((await this.loadTable('tblMachiningMinWall')) ?? []).find((r) => r.MaterialClass === materialClass);
+    const wall = { recommendedMm: Number(row?.RecommendedMinWallMm), feasibleMm: Number(row?.FeasibleMinWallMm) };
+    return Number.isFinite(wall.recommendedMm) && wall.recommendedMm > 0 && Number.isFinite(wall.feasibleMm) && wall.feasibleMm > 0 ? wall : null;
+  }
+
   /** The standard drill diameters, mm (tblDrillSizeChart), or null when the chart is not staged. */
   async getDrillSizesMm(): Promise<number[] | null> {
     const sizes = (await this.loadObjectTable('tblDrillSizeChart'))?.sizes;

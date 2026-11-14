@@ -6167,6 +6167,8 @@ const INSTANCE_COLUMNS: { key: keyof FeatureInstance; label: string; digits: num
   { key: 'radiusMm', label: 'Radius mm', digits: 2 },
   { key: 'areaMm2', label: 'Area mm²', digits: 1 },
   { key: 'removedMm3', label: 'Removed mm³', digits: 1 },
+  { key: 'cornerRadiusMm', label: 'Corner R mm', digits: 2 },
+  { key: 'minWallMm', label: 'Wall mm', digits: 2 },
 ];
 
 function MachiningFeatureInspectorPanel({ featureIds, occurrences, fg, lines, currencySymbol }: {
@@ -6262,6 +6264,7 @@ function MachiningFeatureMeasurements({ features }: { features: FeatureNodeV2[] 
   const rows = featureInstances(features);
   const columns = INSTANCE_COLUMNS.filter((c) => rows.some((r) => r[c.key] !== undefined));
   const hasThread = rows.some((r) => r.thread);
+  const hasAxis = rows.some((r) => r.toolAxis);
   const removed = rows.reduce((s, r) => s + (r.removedMm3 ?? 0), 0);
   const area = rows.reduce((s, r) => s + (r.areaMm2 ?? 0), 0);
   const depths = rows.map((r) => r.depthMm).filter((v): v is number => v !== undefined);
@@ -6291,6 +6294,7 @@ function MachiningFeatureMeasurements({ features }: { features: FeatureNodeV2[] 
               <th className="text-left font-medium pb-1 pr-2">#</th>
               <th className="text-left font-medium pb-1 pr-2">Type</th>
               {hasThread && <th className="text-left font-medium pb-1 pr-2">Thread</th>}
+              {hasAxis && <th className="text-left font-medium pb-1 pr-2 whitespace-nowrap">Tool axis</th>}
               {columns.map((c) => <th key={c.key} className="text-right font-medium pb-1 pl-2 whitespace-nowrap">{c.label}</th>)}
             </tr>
           </thead>
@@ -6300,6 +6304,7 @@ function MachiningFeatureMeasurements({ features }: { features: FeatureNodeV2[] 
                 <td className="py-0.5 pr-2 tabular-nums text-muted-foreground">{r.index}</td>
                 <td className="py-0.5 pr-2 whitespace-nowrap">{r.featureType}{r.variant !== 'default' ? ` · ${r.variant}` : ''}</td>
                 {hasThread && <td className="py-0.5 pr-2 whitespace-nowrap">{r.thread ?? '—'}</td>}
+                {hasAxis && <td className="py-0.5 pr-2 whitespace-nowrap tabular-nums">{r.toolAxis ?? '—'}</td>}
                 {columns.map((c) => (
                   <td key={c.key} className="py-0.5 pl-2 text-right tabular-nums">
                     {typeof r[c.key] === 'number' ? fmt(r[c.key] as number, c.digits) : '—'}
