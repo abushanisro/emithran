@@ -57,6 +57,11 @@ describe('buildSandRoute on a gray iron casting with one core (real sand data)',
     expect(route!.coresMade).toBe(1);
   });
 
+  it('marks the steps that act on the whole casting, so the process tree highlights the part (not the cores, the mould or the gates)', () => {
+    const whole = route!.lines.filter((l) => l.actsOnWholePart).map((l) => l.process);
+    expect(whole).toEqual(['Melting', 'Pour', 'Cooling', 'Shakeout', 'Cleaning', 'Finishing', 'Visual Inspection']);
+  });
+
   it('the metal poured is the casting plus its risers and gating, and the yield follows from it', () => {
     const g = route!.gating;
     expect(route!.material.pouredKg).toBeCloseTo(route!.material.netKg + g.risersKg + g.gatingKg, 3);

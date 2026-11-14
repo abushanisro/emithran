@@ -833,6 +833,8 @@ export interface ProcessLineCost {
   /** Sheet metal: the reference-catalog operations this step performs on the
    *  part's own CAD features (backend catalog-operation-resolver.ts). */
   catalogOperations?: CatalogOperation[];
+  /** The step acts on the whole part (a sand casting's melting, pouring, cooling, ...): the process tree highlights all of it. */
+  actsOnWholePart?: boolean;
   /** GD&T callouts this line (Inspection) covers — see GdtCallout above. */
   gdtCallouts?: GdtCallout[];
   /** Full end-to-end audit trail (real inputs + provenance, then calculated

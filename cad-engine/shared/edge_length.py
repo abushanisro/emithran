@@ -39,7 +39,7 @@ from OCC.Core.TopTools import (
 SMOOTH_ANGLE_TOLERANCE_RAD = math.radians(1.0)
 
 
-def sharp_edge_length(shape: Any, detail: bool = False) -> Dict[str, Any]:
+def sharp_edge_length(shape: Any, detail: bool = False, concavity: bool = False) -> Dict[str, Any]:
     """Returns {"sharp_edge_length_mm", "sharp_edge_count", "total_edge_length_mm"}.
 
     detail=True (additive, existing aggregate-only callers unaffected) also
@@ -47,6 +47,10 @@ def sharp_edge_length(shape: Any, detail: bool = False) -> Dict[str, Any]:
     -- the per-edge list Die Casting's SharpEdge feature_graph_v2 occurrences
     need for 3D highlighting. face_ids are global OCC face ordinals, the same
     numbering every other detector's face_map/stable_face_id uses.
+
+    concavity=True (with detail) adds "concavity" to each edge: "external" where the two faces meet in a convex crease (an outside corner),
+    "internal" where they meet in a concave one (an inside corner), "unknown" where OCC cannot tell (ChFi3d.DefineConnectType). Plastic design
+    rules give the two different minimum radii.
     """
     breplib.EncodeRegularity(shape, SMOOTH_ANGLE_TOLERANCE_RAD)
     edge_faces = TopTools_IndexedDataMapOfShapeListOfShape()
@@ -99,6 +103,7 @@ def sharp_edge_length(shape: Any, detail: bool = False) -> Dict[str, Any]:
                 "length_mm": round(length, 3),
                 "face_ids": [fid for fid in face_ids if fid >= 0],
                 "midpoint_mm": midpoint,
+                **({"concavity": _concavity(edge, f1, f2)} if concavity else {}),
             })
 
     result: Dict[str, Any] = {
@@ -109,3 +114,14 @@ def sharp_edge_length(shape: Any, detail: bool = False) -> Dict[str, Any]:
     if detail:
         result["edges"] = edges_detail
     return result
+
+
+def _concavity(edge: Any, f1: Any, f2: Any) -> str:
+    """external (convex), internal (concave) or unknown, for the crease between two faces along an edge."""
+    try:
+        from OCC.Core.ChFi3d import chfi3d
+        from OCC.Core.ChFiDS import ChFiDS_Convex, ChFiDS_Concave
+        kind = chfi3d.DefineConnectType(edge, f1, f2, 1e-6, False)
+    except Exception:
+        return "unknown"
+    return "external" if kind == ChFiDS_Convex else "internal" if kind == ChFiDS_Concave else "unknown"
