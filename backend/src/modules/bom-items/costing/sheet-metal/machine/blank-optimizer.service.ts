@@ -98,12 +98,16 @@ export class BlankOptimizerService {
    * migration 816), read once per process. A read error is not cached; a
    * genuinely absent rule is.
    */
+  /** machining_reference_data is global and shared (no user rows): every read of it goes through this one privileged client. */
+  private get referenceDb() {
+    return this.database.getPrivilegedClient('reference-data: machining_reference_data and stock_profiles, global shared');
+  }
+
   private allowanceRule: { rule: StockAllowanceRule | null; missing: string[] } | null = null;
 
   private async loadStockAllowanceRule(): Promise<{ rule: StockAllowanceRule | null; missing: string[] }> {
     if (this.allowanceRule) return this.allowanceRule;
-    const { data, error } = await this.database
-      .getPrivilegedClient('reference-data: machining_reference_data and stock_profiles, global shared')
+    const { data, error } = await this.referenceDb
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -129,8 +133,7 @@ export class BlankOptimizerService {
   private preferredSizes: number[] | null = null;
   private async loadPreferredSizes(): Promise<number[]> {
     if (this.preferredSizes) return this.preferredSizes;
-    const { data, error } = await this.database
-      .getPrivilegedClient('reference-data: machining_reference_data and stock_profiles, global shared')
+    const { data, error } = await this.referenceDb
       .from('machining_reference_data').select('raw')
       .eq('category', 'lookup_table').eq('source_version', '2026-Multi-Spindle').eq('key', 'tblPreferredSizes').maybeSingle();
     if (error || !Array.isArray(data?.raw)) return [];
