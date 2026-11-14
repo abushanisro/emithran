@@ -47,6 +47,7 @@ import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hook
 import { routeMachineDrift } from '@/lib/costing/applied-route';
 import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
 import { formatCycleMin, formatCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
+import { featureInstances, machiningCostDrivers, operationCosts, type FeatureInstance, type PricedLine } from '@/lib/features/machining-feature-detail';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -6108,11 +6109,72 @@ function SustainabilityTab({ item, batchSize, factory }: { item: BOMItem; batchS
 
 // Detail for a machining catalog-type node in the process tree: exactly the
 // feature_graph_v2 entries that node groups (ProcessTreeNode.v2FeatureIds).
-function MachiningFeatureInspectorPanel({ featureIds, occurrences, fg }: {
+const fmtOpTime = (sec: number) => (sec < 60 ? `${sec.toFixed(1)} s` : `${(sec / 60).toFixed(1)} min`);
+
+// The priced operations of a part or of one feature: time, cost at the machine rate, and share of the total.
+function OperationCostRows({ lines, featureIds, currencySymbol }: { lines: readonly PricedLine[]; featureIds?: readonly string[]; currencySymbol: string }) {
+  const ops = operationCosts(lines, featureIds);
+  if (ops.length === 0) {
+    return <p className="text-[10px] text-muted-foreground">No priced operation yet. Apply a route, then Recalculate Cost.</p>;
+  }
+  const totalSec = ops.reduce((s, o) => s + o.timeSec, 0);
+  const totalCost = ops.reduce((s, o) => s + o.cost, 0);
+  return (
+    <table className="w-full text-[11px] border-collapse">
+      <thead>
+        <tr className="text-[9px] uppercase tracking-wider text-muted-foreground">
+          <th className="text-left font-medium pb-1">Operation</th>
+          <th className="text-right font-medium pb-1">Qty</th>
+          <th className="text-right font-medium pb-1">Time</th>
+          <th className="text-right font-medium pb-1">Cost</th>
+          <th className="text-right font-medium pb-1">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {ops.map((o, i) => (
+          <tr key={`${o.process}:${o.operation}:${i}`} className="border-t border-border/40">
+            <td className="py-1 pr-2">
+              <div className="font-medium text-foreground">{o.operation}</div>
+              <div className="text-[9px] text-muted-foreground">{o.process}{o.machine ? ` · ${o.machine}` : ''}</div>
+            </td>
+            <td className="py-1 text-right tabular-nums text-muted-foreground">×{o.count}</td>
+            <td className="py-1 text-right tabular-nums">{fmtOpTime(o.timeSec)}</td>
+            <td className="py-1 text-right tabular-nums">{currencySymbol}{o.cost.toFixed(2)}</td>
+            <td className="py-1 text-right tabular-nums text-muted-foreground">{totalSec > 0 ? `${((o.timeSec / totalSec) * 100).toFixed(0)}%` : '—'}</td>
+          </tr>
+        ))}
+        <tr className="border-t border-border font-medium">
+          <td className="pt-1">Total cutting</td>
+          <td />
+          <td className="pt-1 text-right tabular-nums">{fmtOpTime(totalSec)}</td>
+          <td className="pt-1 text-right tabular-nums">{currencySymbol}{totalCost.toFixed(2)}</td>
+          <td />
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+// The columns of the instance table: only those at least one instance has a value for.
+const INSTANCE_COLUMNS: { key: keyof FeatureInstance; label: string; digits: number }[] = [
+  { key: 'diameterMm', label: 'Ø mm', digits: 2 },
+  { key: 'lengthMm', label: 'Length mm', digits: 2 },
+  { key: 'widthMm', label: 'Width mm', digits: 2 },
+  { key: 'heightMm', label: 'Height mm', digits: 2 },
+  { key: 'depthMm', label: 'Depth mm', digits: 2 },
+  { key: 'depthToDiameter', label: 'Depth : Ø', digits: 1 },
+  { key: 'radiusMm', label: 'Radius mm', digits: 2 },
+  { key: 'areaMm2', label: 'Area mm²', digits: 1 },
+  { key: 'removedMm3', label: 'Removed mm³', digits: 1 },
+];
+
+function MachiningFeatureInspectorPanel({ featureIds, occurrences, fg, lines, currencySymbol }: {
   featureIds: string[];
   /** The row's exact instances (a tapping or inspection row): only these are counted, not every instance of their entries. */
   occurrences?: { featureId: string; occurrenceIndex: number }[] | undefined;
   fg: FeatureGraph;
+  lines: readonly PricedLine[];
+  currencySymbol: string;
 }) {
   const ids = new Set([...featureIds, ...(occurrences ?? []).map((o) => o.featureId)]);
   const picked = new Map<string, Set<number>>();
@@ -6183,6 +6245,100 @@ function MachiningFeatureInspectorPanel({ featureIds, occurrences, fg }: {
           {catalogOperations.length > 0 ? catalogOperations.join(', ') : '—'}
         </span>
       </div>
+
+      <MachiningFeatureMeasurements features={matching} />
+
+      <div className="px-3 py-3">
+        <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Operations and cost of this feature</div>
+        <OperationCostRows lines={lines} featureIds={[...ids]} currencySymbol={currencySymbol} />
+      </div>
+    </div>
+  );
+}
+
+// Totals and one row per physical instance, with the measurements the CAD engine reported.
+function MachiningFeatureMeasurements({ features }: { features: FeatureNodeV2[] }) {
+  const rows = featureInstances(features);
+  const columns = INSTANCE_COLUMNS.filter((c) => rows.some((r) => r[c.key] !== undefined));
+  const hasThread = rows.some((r) => r.thread);
+  const removed = rows.reduce((s, r) => s + (r.removedMm3 ?? 0), 0);
+  const area = rows.reduce((s, r) => s + (r.areaMm2 ?? 0), 0);
+  const depths = rows.map((r) => r.depthMm).filter((v): v is number => v !== undefined);
+  const totals: [string, string][] = [
+    ...(removed > 0 ? [['Volume removed', `${fmt(removed, 1)} mm³`] as [string, string]] : []),
+    ...(area > 0 ? [['Surface area', `${fmt(area, 1)} mm²`] as [string, string]] : []),
+    ...(depths.length > 0 ? [['Deepest', `${fmt(Math.max(...depths), 2)} mm`] as [string, string]] : []),
+  ];
+  if (columns.length === 0 && !hasThread) return null;
+  return (
+    <>
+      {totals.length > 0 && (
+        <div className="px-3 py-2.5 flex flex-col gap-1">
+          {totals.map(([name, value]) => (
+            <div key={name} className="flex items-baseline gap-2">
+              <span className="text-[10px] text-muted-foreground w-28 shrink-0">{name}</span>
+              <span className="text-[11px] font-medium tabular-nums">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="px-3 py-3 overflow-x-auto">
+        <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Instances ({rows.length})</div>
+        <table className="w-full text-[11px] border-collapse">
+          <thead>
+            <tr className="text-[9px] uppercase tracking-wider text-muted-foreground">
+              <th className="text-left font-medium pb-1 pr-2">#</th>
+              <th className="text-left font-medium pb-1 pr-2">Type</th>
+              {hasThread && <th className="text-left font-medium pb-1 pr-2">Thread</th>}
+              {columns.map((c) => <th key={c.key} className="text-right font-medium pb-1 pl-2 whitespace-nowrap">{c.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.index} className="border-t border-border/40">
+                <td className="py-0.5 pr-2 tabular-nums text-muted-foreground">{r.index}</td>
+                <td className="py-0.5 pr-2 whitespace-nowrap">{r.featureType}{r.variant !== 'default' ? ` · ${r.variant}` : ''}</td>
+                {hasThread && <td className="py-0.5 pr-2 whitespace-nowrap">{r.thread ?? '—'}</td>}
+                {columns.map((c) => (
+                  <td key={c.key} className="py-0.5 pl-2 text-right tabular-nums">
+                    {typeof r[c.key] === 'number' ? fmt(r[c.key] as number, c.digits) : '—'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// The Cost Drivers tab of a machined part: what in the geometry drives the cost, and where the time goes.
+function MachiningCostDriverList({ features, lines, currencySymbol }: { features: FeatureNodeV2[]; lines: readonly PricedLine[]; currencySymbol: string }) {
+  const drivers = machiningCostDrivers(features);
+  const groups = [...new Set(drivers.map((d) => d.group))];
+  return (
+    <div className="divide-y divide-border/50">
+      <div className="px-3 py-3">
+        <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Time and cost by operation</div>
+        <OperationCostRows lines={lines} currencySymbol={currencySymbol} />
+      </div>
+      {groups.map((group) => (
+        <div key={group} className="px-3 py-3">
+          <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">{group}</div>
+          <div className="flex flex-col gap-1.5">
+            {drivers.filter((d) => d.group === group).map((d) => (
+              <div key={d.name}>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[11px] text-foreground flex-1">{d.name}</span>
+                  <span className="text-xs font-medium tabular-nums text-right">{d.value}</span>
+                </div>
+                <div className="text-[9px] text-muted-foreground leading-snug">{d.why}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -8309,7 +8465,7 @@ function PlasticCostDriverList({ drivers, impacts, currencySymbol }: { drivers: 
 
 function GeometricCostDriversPanel({
   tree, summary, fg, selectedId, onSelect, maximized, onMaximize,
-  selectedHoleGroup, selectedBend, dfmWarnings, item, onSelectHighlight, driverImpacts, currencySymbol,
+  selectedHoleGroup, selectedBend, dfmWarnings, item, onSelectHighlight, driverImpacts, currencySymbol, processLines,
 }: {
   tree: ProcessTreeNode;
   summary: FeatureGraphSummary;
@@ -8325,6 +8481,7 @@ function GeometricCostDriversPanel({
   onSelectHighlight: (node: FeatureNodeV2 | null) => void;
   driverImpacts?: DriverImpact[] | undefined;
   currencySymbol?: string | undefined;
+  processLines?: readonly PricedLine[] | undefined;
 }) {
   type GCDTab = 'geo' | 'cost' | 'props' | 'detail' | 'design';
   const [tab, setTab] = useState<GCDTab>('geo');
@@ -8364,6 +8521,8 @@ function GeometricCostDriversPanel({
   const leaves = collectLeaves(tree);
   const selected = selectedId ? findNode(tree, selectedId) : null;
   const typedCostDrivers = fg?.summary?.costDrivers ?? [];
+  // A machined part's cost drivers are read from its features, not from the summary's short list.
+  const machiningFeatures = isMachiningTreeFamily(family) ? fg?.feature_graph_v2?.features ?? [] : [];
   const isFeatureSelected = !!(selectedHoleGroup || selectedBend);
 
   // Look up per-instance occurrence data from Feature Graph v2 for the selected feature.
@@ -8549,7 +8708,9 @@ function GeometricCostDriversPanel({
       {/* Cost Drivers tab */}
       {tab === 'cost' && (
         <div className="flex-1 overflow-y-auto divide-y divide-border/40">
-          {typedCostDrivers.length > 0 && typedCostDrivers.every((cd) => cd.group) ? (
+          {machiningFeatures.length > 0 ? (
+            <MachiningCostDriverList features={machiningFeatures} lines={processLines ?? []} currencySymbol={currencySymbol ?? '$'} />
+          ) : typedCostDrivers.length > 0 && typedCostDrivers.every((cd) => cd.group) ? (
             <PlasticCostDriverList drivers={typedCostDrivers} impacts={driverImpacts ?? []} currencySymbol={currencySymbol ?? '$'} />
           ) : typedCostDrivers.length > 0 ? (
             typedCostDrivers.map((cd, i) => (
@@ -8661,6 +8822,8 @@ function GeometricCostDriversPanel({
                 featureIds={[...(selected?.v2FeatureIds ?? []), ...(selected?.v2FeatureId ? [selected.v2FeatureId] : [])]}
                 occurrences={selected?.v2Occurrences}
                 fg={fg}
+                lines={processLines ?? []}
+                currencySymbol={currencySymbol ?? '$'}
               />
               {selected?.attrs?.length ? (
                 <div className="p-2 space-y-0.5">
@@ -10146,7 +10309,7 @@ export default function ManufacturingIntelligencePage() {
     onSelectHighlight, onShowEvidence: setCadEvidence, activeEvidenceLabel: cadEvidence?.fieldLabel ?? null,
   };
   const treeProps = { item, fg, tree, expanded: expandedNodes, selectedId: selectedNodeId, onToggle: toggleNode, onSelect: handleTreeSelect, factory, maximized, onMaximize: maximize };
-  const driversProps = { tree, summary, fg, selectedId: selectedNodeId, onSelect: setSelectedNodeId, maximized, onMaximize: maximize, selectedHoleGroup, selectedBend, dfmWarnings: fg?.dfmWarnings ?? [], item, onSelectHighlight, driverImpacts: pageCostSummary?.driverImpacts, currencySymbol: pageCostSummary?.currencySymbol };
+  const driversProps = { tree, summary, fg, selectedId: selectedNodeId, onSelect: setSelectedNodeId, maximized, onMaximize: maximize, selectedHoleGroup, selectedBend, dfmWarnings: fg?.dfmWarnings ?? [], item, onSelectHighlight, driverImpacts: pageCostSummary?.driverImpacts, currencySymbol: pageCostSummary?.currencySymbol, processLines: pageCostSummary?.processLines };
 
   // ── Maximized view ──────────────────────────────────────────────────────────
   if (maximized) {
