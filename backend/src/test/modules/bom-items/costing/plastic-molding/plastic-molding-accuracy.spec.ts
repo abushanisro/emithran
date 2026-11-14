@@ -186,7 +186,7 @@ describe('cost summary: worked ABS part', () => {
     expect(r.totalCost).toBeCloseTo(material + run, 6);
   });
 
-  it('tooling, USA, 10,000/yr x 3 yr: BOM 2,140 + labour 2,398.67 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 988.70 + cooling 715.29 = 13,048.36, one mold, 0.4349 per part', () => {
+  it('tooling, USA, 10,000/yr x 3 yr: BOM 2,140 + labour 2,398.67 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 0 (P20, pre-hardened) + cooling 715.29 = 12,059.66, one mold, 0.4020 per part', () => {
     // BOM (no undercut: no Hydraulic Cylinder / Side Lock; Ejector Pin has no quantity; Electrical has no cost):
     //   Air Poppet 25x30 + Ejector Guide Pin Bushing 30x6 + Guide Bush 100x4 + Guide Pin 100x4 + Limit Switch 50x4 + Return Pin 35x6 = 2,140
     // design 3.24 h (area <= 59,253 mm2) x 64.73 = 209.73
@@ -199,7 +199,7 @@ describe('cost summary: worked ABS part', () => {
     // polish: 0.04 m2 x SPI B3 600 h/m2 = 24 h x 76.81 (assembly rate) = 1,843.44
     // ejector pins: ceil(10,000 / 7,903.21 mm2) = 2 x (5 + 0.25 h x 76.81) = 48.405; sprue bushing 70 + locating ring 85;
     // try-out: 12 h x 1 (press under 500 t) x 3 try-outs x 76.81 = 2,765.16
-    // heat treatment: no slides, and both rates are 2.11 USD/kg, so the whole 468.58 kg stack x 2.11 = 988.70
+    // heat treatment: the tool steel is AISI P20, supplied pre-hardened (reference/mold-steel-treatment-reference.csv): none is charged
     // cooling: floor(446 / (3 x 8 mm)) = 18 lines x 396 mm / 25.4 mm/min / 60 = 4.677 h x 100.55 = 470.29 + 18 x 2 x (1.25 + 2.50) + 2 x 55 = 715.29
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 10_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldBomSubtotalUsd).toBe(2140);
@@ -215,17 +215,17 @@ describe('cost summary: worked ABS part', () => {
     expect(t.moldEjectorSystemUsd).toBeCloseTo(48.405, 6);
     expect(t.moldSprueAndLocatingRingUsd).toBe(155);
     expect(t.moldTryoutUsd).toBeCloseTo(2765.16, 6);
-    expect(t.moldHeatTreatmentUsd).toBeCloseTo(988.70, 1);
+    expect(t.moldHeatTreatmentUsd).toBe(0);
     expect(t.moldCoolingUsd).toBeCloseTo(715.29, 2);
-    expect(t.moldCostUsd).toBe(13048.36);
-    expect(t.moldCostPerPartUsd).toBe(0.4349);
+    expect(t.moldCostUsd).toBe(12059.66);
+    expect(t.moldCostPerPartUsd).toBe(0.402);
   });
 
-  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 13,048.37 = 274,015.65 USD, 0.0913 per part (regression: not rounded to 0.09)', () => {
+  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 12,059.66 = 253,252.85 USD, 0.0844 per part (regression: not rounded to 0.08)', () => {
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 1_000_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldsRequired).toBe(21);
-    expect(t.moldCostUsd).toBe(274_015.65);
-    expect(t.moldCostPerPartUsd).toBe(0.0913);
+    expect(t.moldCostUsd).toBe(253_252.85);
+    expect(t.moldCostPerPartUsd).toBe(0.0844);
   });
 });
 

@@ -13,5 +13,5 @@ export const REGISTRY_FORMULA_OF_FIELD: Readonly<Record<string, Readonly<Record<
   rim: { 'Fill Time': 'F-19' },
   injection_deflash: { 'Cycle Time': 'F-24' },
   injection_slide_movement: { 'Cycle Time': 'F-32' },
-  injection_mold_tooling: { 'Mold Base Steel Cost': 'F-25', 'Cavity Machining Cost': 'F-26', 'Polish Cost': 'F-26', 'Ejector System Cost': 'F-27', 'Sprue and Locating Ring Cost': 'F-27', 'Tryout Cost': 'F-27', 'Side Action Cost': 'F-28', 'Side Action Steel Cost': 'F-28', 'Side Action Machining Cost': 'F-28', 'Side Action CMM Cost': 'F-28', 'Heat Treatment Cost': 'F-29', 'Cooling Cost': 'F-30', 'Rib Insert Cost': 'F-31', 'EDM Cost': 'F-31', 'Mold Cost': 'F-16', 'Molds Required': 'F-17', 'Tooling Cost Per Part': 'F-18' },
+  injection_mold_tooling: { 'Mold Base Steel Cost': 'F-25', 'Cavity Machining Cost': 'F-26', 'Polish Cost': 'F-26', 'Ejector System Cost': 'F-27', 'Sprue and Locating Ring Cost': 'F-27', 'Tryout Cost': 'F-27', 'Side Action Cost': 'F-28', 'Side Action Steel Cost': 'F-28', 'Side Action Machining Cost': 'F-28', 'Side Action CMM Cost': 'F-28', 'Heat Treatment Cost': 'F-29', 'Cooling Cost': 'F-30', 'Rib Insert Cost': 'F-31', 'Hot Drop Cost': 'F-33', 'EDM Cost': 'F-31', 'Mold Cost': 'F-16', 'Molds Required': 'F-17', 'Tooling Cost Per Part': 'F-18' },
 };
