@@ -230,4 +230,4 @@ RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open
 | G-08 | Hot-runner manifold and controller (no price on file; the hot drops are F-33) | manifoldPlateThickness; defaultHotDropLayout | UNSUPPORTED |
 | G-09 | Handling, setup scrap and plasticizing in the cycle | partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS | UNSUPPORTED |
 | G-10 | Period costs: indirect overhead, SG&A, margin | sGandARate; markUpRate; machine indirect overhead | UNSUPPORTED |
-| G-11 | Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing | nothing staged | UNSUPPORTED |
+| G-11 | Ultrasonic welding, cure oven, LSR dosing (nothing staged); material drying when its inputs are incomplete (F-36: a resin with no drying row, no electricity price, or a dryer class with no price) | nothing staged | UNSUPPORTED |

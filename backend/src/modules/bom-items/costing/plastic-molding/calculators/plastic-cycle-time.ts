@@ -14,7 +14,7 @@ import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
 import { cadEvidenceKey } from '../../shared/cad-evidence';
-import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, visualInspectionSeeds, weightCheckSeeds, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR, VISUAL_INSPECTION_CALCULATOR, WEIGHT_CHECK_CALCULATOR } from './plastic-cycle-time-seeds';
+import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, visualInspectionSeeds, weightCheckSeeds, materialDryingSeeds, MATERIAL_DRYING_CALCULATOR, type MaterialDryingInput, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR, VISUAL_INSPECTION_CALCULATOR, WEIGHT_CHECK_CALCULATOR } from './plastic-cycle-time-seeds';
 import type { WeightCheckReference } from '../reference/im-reference';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
@@ -123,6 +123,14 @@ export function runSlideMovementTime(input: { slideStrokeMm: number | null; rate
 /** The visual inspection time per part (F-34), by the stored visual inspection calculator, or what is missing. */
 export function runVisualInspectionTime(input: { surfaceAreaMm2: number | null; minPerM2: number | null; percent: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(VISUAL_INSPECTION_CALCULATOR, visualInspectionSeeds(input), calculators);
+}
+
+/** The material drying (F-36): the press time per part and the dryer's hourly cost, by the stored material drying calculator, or what is missing. */
+export function runMaterialDrying(input: MaterialDryingInput, calculators: ReferenceCalculators | null | undefined): PressCycle & { dryerHourlyUsd?: number } {
+  const run = runPress(MATERIAL_DRYING_CALCULATOR, materialDryingSeeds(input), calculators);
+  if (!run.derivable) return run;
+  const rate = run.trace.find((t) => t.fieldName === 'Dryer Hourly Cost')?.value;
+  return typeof rate === 'number' ? { ...run, dryerHourlyUsd: rate } : { derivable: false, missing: ['the dryer hourly cost (Dryer Hourly Cost)'] };
 }
 
 /** The weight check time per part and the scale's hourly rate (F-35), by the stored weight check calculator, or what is missing. */

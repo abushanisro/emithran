@@ -1,3 +1,4 @@
+import { loadLocationElectricity } from '../../shared/location-electricity';
 import { sandFeaturesFromCastingResult, type SandFeature } from './sand-catalog-operations';
 import { Injectable } from '@nestjs/common';
 import type { DbClient } from '../../../../../common/db/postgrest-client';
@@ -83,10 +84,7 @@ export class SandCostService {
 
   /** The location's sourced electricity price (location_electricity_prices, migration 1004); null when it has none or it cannot be read. */
   async electricityOf(client: DbClient, location: string): Promise<LocationElectricity | null> {
-    const { data, error } = await client.from('location_electricity_prices').select('price_per_kwh, currency, basis').eq('location', location).maybeSingle();
-    if (error || !data) return null;
-    const row = data as { price_per_kwh: number | string; currency: string; basis: string };
-    return { pricePerKwh: Number(row.price_per_kwh), currency: row.currency, basis: row.basis };
+    return loadLocationElectricity(client, location);
   }
 
   /** The sand material whose name or grade equals the BOM item's material grade, case-insensitively; null when the grade is not a sand material. */

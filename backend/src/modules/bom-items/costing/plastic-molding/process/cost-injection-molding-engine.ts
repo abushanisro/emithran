@@ -37,12 +37,12 @@ import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
 import { computeMoldToolingCost, toolingGapIds } from './mold-tooling-engine';
 import { planRibInserts } from './rib-inserts';
-import { steelTreatment, weightCheckReference } from '../reference/im-reference';
+import { dryerModels, dryingConditionFor, equipmentEconomics, steelTreatment, weightCheckReference } from '../reference/im-reference';
 import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
-import { runDeflashingTime, runInjectionCycleTime, runSlideMovementTime, runVisualInspectionTime, runWeightCheck } from '../calculators/plastic-cycle-time';
+import { runDeflashingTime, runInjectionCycleTime, runMaterialDrying, runSlideMovementTime, runVisualInspectionTime, runWeightCheck } from '../calculators/plastic-cycle-time';
 import { runMoldTooling } from '../calculators/mold-tooling-calculator';
 import { selectMoldBase } from './mold-base';
 import { moldCavityLookup } from './mold-cavity';
@@ -206,6 +206,8 @@ export interface InjectionMoldingCostInput {
   family: string;
   mhrRate: MHRRateInput;        // selected injection molding machine rate
   deburrRate: MHRRateInput;     // bench/secondary ops reuse the finishing rate
+  /** The location's electricity price in USD (location_electricity_prices); null when it has none: the drying energy is then a named gap. */
+  electricity?: { usdPerKwh: number; source: string } | null;
   inspectionRate: MHRRateInput;
   // Routing signals beyond what the fields above cover. Optional so callers
   // without Phase-2 extraction keep working; when absent the router applies
@@ -575,6 +577,28 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   processLines.push(line);
 
   if (routed.has('gate_trimming')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
+  // Material drying (F-36): a machine-mounted desiccant dryer runs with the press, so its hour (ownership + rated energy) is charged with the press
+  // time per part. No operator: the hopper is fed with the press's material handling (no handling time is on file for a machine-mounted dryer).
+  if (routed.has('material_drying')) {
+    const dry = runMaterialDrying({
+      grade: materialGrade, condition: dryingConditionFor(materialGrade), resinPerPartKg: shotWeightKg > 0 ? shotWeightKg : null,
+      pressTimePerPartSec: inCycleMin > 0 ? inCycleMin * 60 : null, dryers: dryerModels(), electricity: input.electricity ?? null, economics: equipmentEconomics(),
+    }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
+    if (dry.derivable && dry.dryerHourlyUsd != null) {
+      const dryerRate: MHRRateInput = {
+        rate: dry.dryerHourlyUsd, labourRate: 0, operators: 0, source: mhrRate.source,
+        machineClass: 'material_drying', machineName: 'Machine-mounted desiccant dryer (reference)', commodityCode: null,
+      };
+      const dryLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.material_drying, null, batchSize, dry.cycleSec / 60, dryerRate));
+      dryLine.calculationTrace = dry.trace;
+      if (dry.calculator.id) dryLine.calculatorId = dry.calculator.id;
+      dryLine.calculatorName = dry.calculator.name;
+      if (dry.calculator.version != null) dryLine.calculatorVersion = dry.calculator.version;
+      processLines.push(dryLine);
+    } else {
+      warnings.push(`${UNCOSTED_OPERATION_LABELS.material_drying} not costed: missing ${dry.derivable ? 'the dryer hourly cost' : dry.missing.join('; ')}.`);
+    }
+  }
   // Deflashing: the parting line trimmed by hand, timed by its stored calculator (length / cmManualFlashTrimmingRate) and charged at the bench rate.
   if (routed.has('deflashing')) {
     const trim = runDeflashingTime({
@@ -839,8 +863,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   // How far the quote can be trusted, and the snapshot that lets it be reproduced: a material that cannot be molded is the one finding above, there
   // is no quote to qualify.
   const validation = sizing.materialGap ? undefined : buildQuoteValidation(
-    usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null, routedVisualInspection: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.visual_inspection), routedWeightCheck: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.weight_check) }),
-    unsupportedFormulas({ toolingGaps: toolingResult != null ? toolingGaps : [], routed }),
+    usedFormulas({ isLsr, clampDerivable: clampPerCavity.derivable, pressSelected: machineClampTonnes != null, cycleDerivable: cycle.derivable, yieldKnown: yieldFrac != null, tooling: toolingResult != null, routedVisualInspection: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.visual_inspection), routedWeightCheck: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.weight_check), routedDrying: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.material_drying) }),
+    unsupportedFormulas({ toolingGaps: toolingResult != null ? toolingGaps : [], routed, dryingCosted: processLines.some((l) => l.process === UNCOSTED_OPERATION_LABELS.material_drying) }),
   );
   if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, PLASTIC_ENGINE_BUILD, input as unknown as Record<string, unknown>, cycle.derivable ? [cycle.calculator] : []);
 
@@ -874,7 +898,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
 }
 
 /** The registered formulas this quote computed (formula-registry.ts). F-03 and F-12 and F-14 are always part of the quote: a runner allowance, a press line, material. */
-function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelected: boolean; cycleDerivable: boolean; yieldKnown: boolean; tooling: boolean; routedVisualInspection: boolean; routedWeightCheck: boolean }): string[] {
+function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelected: boolean; cycleDerivable: boolean; yieldKnown: boolean; tooling: boolean; routedVisualInspection: boolean; routedWeightCheck: boolean; routedDrying: boolean }): string[] {
   return [
     'F-02', 'F-03', 'F-10', 'F-12', 'F-14',
     ...(q.clampDerivable ? ['F-01'] : []),
@@ -883,6 +907,7 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
     ...(q.yieldKnown ? ['F-13'] : []),
     ...(q.tooling ? ['F-15', 'F-16', 'F-17', 'F-18', 'F-25', 'F-26', 'F-27', 'F-28', 'F-29', 'F-30', 'F-31', 'F-33'] : []),
     ...(q.routedWeightCheck ? ['F-35'] : []),
+    ...(q.routedDrying ? ['F-36'] : []),
     ...(q.routedVisualInspection ? ['F-34'] : []),
   ];
 }
@@ -892,8 +917,10 @@ function usedFormulas(q: { isLsr: boolean; clampDerivable: boolean; pressSelecte
  * priced (it is priced from components and hours only), the cycle's handling and plasticizing and the period costs always, and the operations the
  * route needs that have no data at all.
  */
-function unsupportedFormulas(q: { toolingGaps: readonly string[]; routed: ReadonlySet<string> }): string[] {
-  const noData = ['material_drying', 'ultrasonic_welding', 'secondary_cure_oven', 'lsr_compound_dosing'].some((op) => q.routed.has(op));
+function unsupportedFormulas(q: { toolingGaps: readonly string[]; routed: ReadonlySet<string>; dryingCosted: boolean }): string[] {
+  // Material drying is costed from the reference package (F-36); routed but not costed (an input missing), it stays a gap.
+  const noData = ['ultrasonic_welding', 'secondary_cure_oven', 'lsr_compound_dosing'].some((op) => q.routed.has(op))
+    || (q.routed.has('material_drying') && !q.dryingCosted);
   return [
     ...q.toolingGaps,
     'G-09', 'G-10',

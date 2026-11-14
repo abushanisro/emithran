@@ -1,5 +1,6 @@
 // What the cost summary needs of a sand casting, around the pure route (sand-route.ts): the scenario the user set, the part's measurements as the
 // route takes them, the material row, and the route's costs in the location's currency. Pure.
+import { electricityUsd, type LocationElectricity } from '../../shared/location-electricity';
 import { roundPerPart } from '../machine-choice';
 import { roundLineCost } from '../casting-finishing';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
@@ -36,9 +37,7 @@ export const SAND_SCENARIO_KEYS = {
  * no lifetime volume (null), and the tooling is not costed rather than spread over a made-up volume.
  */
 /** A location's electricity price as stored (location_electricity_prices, migration 1004): in its own currency, with its source. */
-export interface LocationElectricity { pricePerKwh: number; currency: string; basis: string }
-
-const p4 = (n: number) => String(Math.round(n * 10000) / 10000);
+export type { LocationElectricity } from '../../shared/location-electricity';
 
 /**
  * The energy price the route charges: the Cost Guide's for this part, else the location's sourced electricity price converted to USD, else
@@ -47,13 +46,9 @@ const p4 = (n: number) => String(Math.round(n * 10000) / 10000);
 function energyPrice(override: number | null, location: string | undefined, row: LocationElectricity | null | undefined, toUsd: (value: number, currency: string) => number | null, warnings: string[]): { usdPerKwh: number; source: string } | null {
   if (override != null) return { usdPerKwh: override, source: 'energy price set in the Cost Guide (USD/kWh)' };
   if (!row) return null;
-  const usd = row.currency === 'USD' ? row.pricePerKwh : toUsd(row.pricePerKwh, row.currency);
-  if (usd == null || !(usd > 0)) {
-    warnings.push(`The ${location ?? 'location'} electricity price is in ${row.currency}, which has no exchange rate to USD: energy is not charged.`);
-    return null;
-  }
-  const converted = row.currency === 'USD' ? '' : ` = ${p4(usd)} USD/kWh`;
-  return { usdPerKwh: usd, source: `${location ?? 'location'} electricity price: ${p4(row.pricePerKwh)} ${row.currency}/kWh (${row.basis})${converted}` };
+  const priced = electricityUsd(row, location, toUsd);
+  if (!priced) warnings.push(`The ${location ?? 'location'} electricity price is in ${row.currency}, which has no exchange rate to USD: energy is not charged.`);
+  return priced;
 }
 
 export function sandScenario(input: {

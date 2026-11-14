@@ -27,11 +27,11 @@ function run(name: string, seeds: Record<string, import('../../../../../modules/
 describe('plastic molding calculator spec', () => {
   const spec = loadPlasticMoldingCalculatorSpec();
 
-  it('has one cycle-time calculator for each of the four molding processes, and the LSR, deflashing, slide movement, visual inspection, weight check and mold tooling helpers no catalog operation maps to', () => {
+  it('has one cycle-time calculator for each of the four molding processes, and the LSR, deflashing, slide movement, visual inspection, weight check, material drying and mold tooling helpers no catalog operation maps to', () => {
     expect(spec.processGroup).toBe('Plastic Molding');
     expect(spec.calculators.filter((c) => !c.helper).map((c) => c.operations[0]).sort()).toEqual(
       ['Compression Molding', 'Injection Molding', 'Reaction Injection Molding', 'Structural foam molding']);
-    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR, 'Injection Molding - Deflashing', 'Injection Molding - Slide Movement', 'Injection Molding - Visual Inspection', 'Injection Molding - Weight Check', 'Injection Mold - Tooling']);
+    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR, 'Injection Molding - Deflashing', 'Injection Molding - Slide Movement', 'Injection Molding - Visual Inspection', 'Injection Molding - Weight Check', 'Injection Molding - Material Drying', 'Injection Mold - Tooling']);
   });
 
   it('every operation it computes is a process of the reference catalog (digital_factory_operations.csv)', () => {

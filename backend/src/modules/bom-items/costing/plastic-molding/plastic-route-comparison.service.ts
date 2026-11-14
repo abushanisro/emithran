@@ -1,3 +1,4 @@
+import { electricityUsd, loadLocationElectricity } from '../shared/location-electricity';
 import { Injectable } from '@nestjs/common';
 
 import { CalculatorFieldOverridesService, overridesByCalculator } from '../../services/calculator-field-overrides.service';
@@ -162,6 +163,8 @@ export class PlasticRouteComparisonService {
         materialMatlState: rcMatlState, materialClamp: rcClampProperties, realResinInputs: rcRealResinInputs,
       },
       plasticReference: { plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing },
+      electricity: electricityUsd(await loadLocationElectricity(client, location), location,
+        (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),
       calculators, calculatorOverrides,
       currencySymbol: locInfo.symbol, usdToLocal: rcUsdToLocal,
       deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
