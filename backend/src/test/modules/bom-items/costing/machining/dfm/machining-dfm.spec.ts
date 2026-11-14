@@ -53,6 +53,16 @@ describe('evaluateMachiningDfm', () => {
     expect(narrow.label).toContain('lowest 1 mm');
   });
 
+  it('a floor not walled on both sides (an open step, a rib top) does not limit the cutter: neither its width nor its reach is judged', () => {
+    const step = { id: 's', feature_type: 'PocketV2', variant: 'default', occurrences: [{ extents_mm: [45, 0.8, 0], depth_mm: 20, width_confined: false, face_ids: [210] }] };
+    const r = run([step]);
+    expect(r.findings.filter((f) => f.rule === 'ToolReach' || f.rule === 'NarrowMilledFeature')).toEqual([]);
+    expect(checkOf(r, 'NarrowMilledFeature').detail).toContain('walled on both sides');
+    // The same floor between two walls is judged, on its measured depth.
+    const channel = { ...step, occurrences: [{ ...step.occurrences[0], width_confined: true }] };
+    expect(run([channel]).findings.find((f) => f.rule === 'ToolReach')).toMatchObject({ severity: 'critical' });
+  });
+
   it('findings come most severe first', () => {
     const r = run([hole('h', 4, [20]), pocket('p', [[40, 1, 20]])]);
     expect(r.findings.map((f) => f.severity)).toEqual(['critical', 'major', 'minor']);

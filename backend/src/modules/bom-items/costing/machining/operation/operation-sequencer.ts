@@ -150,21 +150,24 @@ interface PocketFinishGroup { toolMm: number; floorMm2: number; wallMm2: number;
 
 /**
  * The finishing passes of a group of pockets, one entry per cutter. A pocket's floor is its CAD length x width and its
- * depth the removed volume over that floor. The cutter is the standard finishing end mill, or the pocket's width when
- * that is narrower; a cutter as wide as the pocket leaves both walls finished, so walls (perimeter x depth) are a
- * separate pass only in a pocket wider than the cutter. null = a pocket has no CAD size.
+ * depth the measured depth_mm (an analysis from before that measurement: the removed volume over the floor). The cutter
+ * is the standard finishing end mill, or the pocket's width when walls on both sides confine it to less (width_confined;
+ * an open step does not). A cutter as wide as the pocket leaves both walls finished, so walls (the walled share of the
+ * perimeter x depth) are a separate pass only where the cutter is narrower than the floor. null = a pocket has no CAD size.
  */
 function pocketFinishGroups(occurrences: any[], standardToolMm: number): PocketFinishGroup[] | null {
   const groups = new Map<number, PocketFinishGroup>();
   for (const o of occurrences) {
     const [lengthMm, widthMm] = (Array.isArray(o.extents_mm) ? o.extents_mm.map(Number) : []).sort((a: number, b: number) => b - a);
     if (!(lengthMm > 0 && widthMm > 0)) return null;
-    const toolMm = Math.max(0.1, Math.min(standardToolMm, Math.floor(widthMm * 10) / 10));
+    const confined = o.width_confined !== false;
+    const toolMm = confined ? Math.max(0.1, Math.min(standardToolMm, Math.floor(widthMm * 10) / 10)) : standardToolMm;
     const floorMm2 = lengthMm * widthMm;
-    const depthMm = (o.material_removed_mm3 ?? 0) / floorMm2;
+    const depthMm = o.depth_mm > 0 ? Number(o.depth_mm) : (o.material_removed_mm3 ?? 0) / floorMm2;
+    const walledShare = typeof o.walled_fraction === 'number' ? o.walled_fraction : 1;
     const g = groups.get(toolMm) ?? { toolMm, floorMm2: 0, wallMm2: 0, pockets: 0 };
     g.floorMm2 += floorMm2;
-    if (widthMm > standardToolMm) g.wallMm2 += 2 * (lengthMm + widthMm) * depthMm;
+    if (!confined || widthMm > standardToolMm) g.wallMm2 += walledShare * 2 * (lengthMm + widthMm) * depthMm;
     g.pockets += 1;
     groups.set(toolMm, g);
   }

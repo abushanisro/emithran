@@ -278,9 +278,8 @@ def _box_with_pocket():
 
 def _box_with_bounded_recess():
     """A rectangular recess elongated in-plane, bounded on all 4 in-plane
-    sides and by the box's own top/bottom -- the milled path's real,
-    observed classification for this shape is 'keyway' (see this file's own
-    module docstring for why 'slot' specifically is unreachable today)."""
+    ends and back and by the box's own top/bottom, open along its other
+    long side (the box's x=0 face)."""
     box = BRepPrimAPI_MakeBox(60.0, 50.0, 40.0).Shape()
     tool = BRepPrimAPI_MakeBox(gp_Pnt(-1.0, 10.0, 14.0), 7.0, 30.0, 6.0).Shape()
     return BRepAlgoAPI_Cut(box, tool).Shape()
@@ -296,11 +295,15 @@ def test_real_recessed_pocket_is_detected_and_boundary_faces_are_not():
     assert p.face_ids
 
 
-def test_real_elongated_bounded_recess_is_detected_as_keyway():
+def test_real_elongated_recess_open_along_one_long_side_is_a_pocket_not_a_keyway():
+    # The recess is walled at its back and two ends and open along its other long side: nothing confines a
+    # cutter across its 6 mm width, so it is a pocket (a keyway is a channel with a wall on both sides).
     tree = _recognize(_box_with_bounded_recess(), "milled")
-    keyways = _by_type(tree, "Keyway")
-    assert len(keyways) >= 1, "a real elongated bounded recess must be detected"
-    for f in keyways:
+    assert _by_type(tree, "Keyway") == []
+    pockets = _by_type(tree, "PocketV2")
+    assert len(pockets) >= 1, "a real elongated bounded recess must be detected"
+    for f in pockets:
         assert f.params["length_mm"] == 30.0
         assert f.params["width_mm"] == 6.0
+        assert f.params["width_confined"] is False
         assert f.face_ids
