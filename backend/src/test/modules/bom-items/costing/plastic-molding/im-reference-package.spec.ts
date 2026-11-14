@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { dryingConditionFor } from '../../../../../modules/bom-items/costing/plastic-molding/reference/im-reference';
+import { dryerModels, dryingConditionFor, equipmentEconomics, readReferenceCsv, steelTreatment, weightCheckReference } from '../../../../../modules/bom-items/costing/plastic-molding/reference/im-reference';
 
 // The injection-molding reference package (plastic-molding/reference/*.csv): the costing engineer's open-source research, kept as cited data
 // before the cost model reads any of it. Every row says how far it can be trusted (source_backed / engineering_estimate / provisional /
@@ -107,5 +107,14 @@ describe('injection-molding reference package', () => {
     expect(dryingConditionFor('Generic Polycarbonate')).toMatchObject({ material: 'PC', tempC: '120' });
     expect(dryingConditionFor('Generic ABS')).toMatchObject({ material: 'ABS' });
     expect(dryingConditionFor('Polypropylene')).toBeNull();
+  });
+
+  it('a reference file missing from the build gives no rows, and every reader then reports a gap instead of failing the cost summary', () => {
+    expect(readReferenceCsv('not-in-the-build.csv')).toEqual([]);
+    expect(dryingConditionFor('Generic Nylon, Type 11 40% Glass', [])).toBeNull();
+    expect(steelTreatment('AISI P20', [])).toBeNull();
+    expect(dryerModels([])).toEqual([]);
+    expect(Object.values(equipmentEconomics([])).every((v) => v == null)).toBe(true);
+    expect(Object.values(weightCheckReference([], [])).every((v) => v == null)).toBe(true);
   });
 });
