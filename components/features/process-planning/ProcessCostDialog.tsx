@@ -5,7 +5,7 @@ import { longestBendLineMm } from '@/lib/features/bend-line-length';
 import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
 import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
 import { formatFieldValue } from '@/lib/costing/cycle-fields';
-import { checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
+import { cachedFeaturesHighlight, checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
 import { ReferenceTable } from './ReferenceTable';
 import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
@@ -55,7 +55,7 @@ import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
 import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
+import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, showsFeatures, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
 import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
@@ -3685,8 +3685,11 @@ export function ProcessCostDialog({
                         // The CAD eye is offered for every input the cost engine declared as measured on CAD
                         // faces (trace step `evidence`), or whose shown source is CAD extraction. Where the
                         // analysis did not record those faces, the panel asks to re-analyse.
+                        // An input that names particular features (a hole count, the tapped holes) lights exactly those; any other CAD input its measurement's faces.
+                        const featureRef = showsFeatures(sourceRefFor(field.fieldName)) ? sourceRefFor(field.fieldName) : undefined;
                         const cadEvidenceKey = onShowEvidence
-                          ? (engineSeedRef.current?.calculatorId === selectedCalculatorId
+                          ? (featureRef ? 'features' : undefined)
+                            ?? (engineSeedRef.current?.calculatorId === selectedCalculatorId
                               ? engineSeedRef.current
                               : engineSeedsRef.current[selectedCalculatorId] ?? null)?.evidence?.[field.fieldName]
                             ?? cadEvidenceKeyFor(field.fieldName, calculatorInputProvenance[field.fieldName])
@@ -3703,7 +3706,9 @@ export function ProcessCostDialog({
                             selectOptions={SELECT_FIELD_OPTIONS[field.fieldName]}
                             hasLookupEye={hasLookupEye}
                             cadEvidenceKey={cadEvidenceKey}
-                            cadHighlight={resolveFieldHighlight(cadEvidenceKey, bomItemData?.featureGraph?.feature_graph_v2)}
+                            cadHighlight={featureRef?.kind === 'features'
+                              ? cachedFeaturesHighlight(featureRef, bomItemData?.featureGraph?.feature_graph_v2)
+                              : resolveFieldHighlight(cadEvidenceKey, bomItemData?.featureGraph?.feature_graph_v2)}
                             evidenceOn={activeEvidenceLabel === label}
                             tonnageCheck={field.fieldName === 'Selected Tonnage' ? tonnageCheckOf(calculatorResults, calculatorInputs) : null}
                             onChange={handleFieldChange}
