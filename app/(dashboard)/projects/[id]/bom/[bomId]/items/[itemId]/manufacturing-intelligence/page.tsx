@@ -68,6 +68,7 @@ import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
 import { generateCalculationReportPdf } from '@/lib/utils/calculation-report';
 import { RouteCompareList } from '@/components/features/workflow/RouteCompareList';
 import { RouteStepEditor } from '@/components/features/workflow/RouteStepEditor';
+import { AddProcessOperationBar } from '@/components/features/workflow/AddProcessOperationBar';
 import type { AddOperationOption } from '@/components/features/workflow/AddOperationPicker';
 import { adaptRoutesToTree, RouteTreeValidationError, type RouteNode } from '@/lib/routing/route-tree';
 import { selectTopRoutes, type RouteSortMode } from '@/lib/routing/route-sort';
@@ -1424,9 +1425,13 @@ function lastApplyError(item: { scenarioOverrides?: Record<string, unknown> | nu
   return applied?.status === 'failed' && applied.error ? applied.error : null;
 }
 
+/** An operation picked in the Workflow Builder to add to the part by hand: opened in the Edit Process Cost dialog as a new line. */
+interface AddProcessRequest { key: number; processRoute: string; operation: string; machineClass: string | null; category: string | null }
+
 function CostSummaryTab({
-  item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight, onShowEvidence, activeEvidenceLabel,
+  item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest,
 }: {
+  addProcessRequest?: AddProcessRequest | null | undefined;
   item: BOMItem; batchSize: number | undefined; appliedRouteId?: string | null; factory?: string;
   fg?: FeatureGraph | null | undefined;
   onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
@@ -1595,6 +1600,21 @@ function CostSummaryTab({
   // the display side in lib/routing/process-sequence.ts. Callers now pass the
   // real next free op number, the same "last saved op_nbr + 10" convention the
   // Add Process button already uses.
+
+  // An operation added from the Workflow Builder: the same new-line dialog as "Add Process", opened on that
+  // process and operation, so its machine, calculator and cycle time are set there. Each request opens once.
+  const handledAddRequestRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!addProcessRequest || handledAddRequestRef.current === addProcessRequest.key) return;
+    handledAddRequestRef.current = addProcessRequest.key;
+    const lastOpNbr = sortedStoredProcs[sortedStoredProcs.length - 1]?.opNbr || 0;
+    setProcDialogPrefill({
+      opNbr: lastOpNbr + 10, processGroup: 'Machining', category: addProcessRequest.category ?? '',
+      processRoute: addProcessRequest.processRoute, operation: addProcessRequest.operation, machineClass: addProcessRequest.machineClass ?? '',
+    });
+    setProcDialogAutoOpenCalculator(false);
+    setProcDialogOpen(true);
+  }, [addProcessRequest, sortedStoredProcs]);
 
   const handleProcDialogSubmit = async (data: any) => {
     const existing = existingProcRecords?.records?.find(
@@ -3676,8 +3696,10 @@ function orderingWarnings(orderedProcesses: string[]): Record<string, string> {
 
 function RouteSelectionDialog({
   open, onClose, onApplied, partFamily, currentRouteId, onSelectRoute, factory = 'USA',
-  itemId, batchSize, existingCuttingRouteId, existingSteps, cost,
+  itemId, batchSize, existingCuttingRouteId, existingSteps, cost, onAddOperation,
 }: {
+  /** Machining: add a catalog process and operation to the part by hand (opens it as a new line on the Cost tab). */
+  onAddOperation?: (op: Omit<AddProcessRequest, 'key'>) => void;
   open: boolean;
   // Cancel / backdrop-dismiss / Escape — genuinely closing without applying.
   // Falls back to Auto routing if no manual route had ever been applied yet.
@@ -3971,7 +3993,7 @@ function RouteSelectionDialog({
   // this used to need: the hierarchy is real and worth showing, but it was
   // being used as a mandatory drill-down rather than as orientation, so
   // adding one known operation cost four interactions and offered no search.
-  const { data: allMappingsData } = useProcessCalculatorMappings({ limit: 1000 }, { enabled: open && isSheetMetal });
+  const { data: allMappingsData } = useProcessCalculatorMappings({ limit: 1000 }, { enabled: open && (isSheetMetal || isMachining) });
   const addOperationOptions: AddOperationOption[] = (allMappingsData?.mappings ?? [])
     .filter((m) => m.isActive)
     // Already in the chain, under either naming system (catalog operation
@@ -4345,6 +4367,15 @@ function RouteSelectionDialog({
               }}
             />
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
+              {/* Machining: add any catalog process and operation by hand. It opens as a new line on the Cost tab,
+                  where its machine and calculator set the cycle time; nothing is added without them. */}
+              {isMachining && onAddOperation && (
+                <AddProcessOperationBar
+                  rows={allMappingsData?.mappings ?? []}
+                  processGroup="Machining"
+                  onAdd={(row) => { onAddOperation({ processRoute: row.processRoute, operation: row.operation, machineClass: row.machineClass ?? null, category: row.machineCategory ?? null }); }}
+                />
+              )}
               {!selectedRouteDto ? (
                 <p className="text-xs text-muted-foreground">Select a route on the left to see its full operation chain.</p>
               ) : (
@@ -7804,8 +7835,9 @@ function AnalysisTabsPanel({
   projectId,
   item, fg, batchSize, productionLife, factory, selectedMachiningFeatureKey, onMachiningFeatureSelect,
   file3dUrl, onFile3dUrlExpired, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
-  onSelectHighlight, onShowEvidence, activeEvidenceLabel,
+  onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest,
 }: {
+  addProcessRequest?: AddProcessRequest | null;
   projectId: string;
   item: BOMItem; fg: FeatureGraph | null;
   batchSize: number | undefined; productionLife: number | null; factory: string;
@@ -7853,7 +7885,7 @@ function AnalysisTabsPanel({
         )}
 
         {tab === 'cost' && (
-          <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} onShowEvidence={onShowEvidence} activeEvidenceLabel={activeEvidenceLabel} />
+          <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} onShowEvidence={onShowEvidence} activeEvidenceLabel={activeEvidenceLabel} addProcessRequest={addProcessRequest} />
         )}
 
         {tab === 'validation' && item && (
@@ -8903,6 +8935,8 @@ export default function ManufacturingIntelligencePage() {
   };
   // ── Right panel tab — lifted so the inspector bridge button can switch it ─────
   const [rightTab, setRightTab] = useState<RightTabKey>('copilot');
+  // An operation the engineer added by hand in the Workflow Builder: handed to the Cost tab, which opens it as a new line.
+  const [addProcessRequest, setAddProcessRequest] = useState<AddProcessRequest | null>(null);
 
   // ── Vendor hotspot context — set when user jumps from inspector to Vendor tab ─
   const [vendorHotspotContext, setVendorHotspotContext] = useState<{
@@ -10048,7 +10082,7 @@ export default function ManufacturingIntelligencePage() {
     dfmScores,
   };
   const analysisProps = {
-    projectId,
+    projectId, addProcessRequest,
     item, fg, batchSize, productionLife, factory,
     selectedMachiningFeatureKey, onMachiningFeatureSelect: setSelectedMachiningFeatureKey,
     file3dUrl,
@@ -10148,6 +10182,13 @@ export default function ManufacturingIntelligencePage() {
           currentRouteId={selectedManualRoute?.id ?? null}
           existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
           existingSteps={selectedManualRoute?.dynamicSteps}
+          onAddOperation={(op) => {
+          // The builder closes as on Cancel (no route staged = back to Auto) and the Cost tab opens the new line.
+          setAddProcessRequest({ ...op, key: Date.now() });
+          setRightTab('cost');
+          setRouteDialogOpen(false);
+          if (!selectedManualRoute) setProcessRouting('auto');
+        }}
           onSelectRoute={(route) => {
             // Staging only — nothing is written here. Apply Scenario performs
             // the real apply-route/apply-custom-route call (plus any pending
@@ -10375,6 +10416,13 @@ export default function ManufacturingIntelligencePage() {
         currentRouteId={selectedManualRoute?.id ?? null}
         existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
         existingSteps={selectedManualRoute?.dynamicSteps}
+        onAddOperation={(op) => {
+          // The builder closes as on Cancel (no route staged = back to Auto) and the Cost tab opens the new line.
+          setAddProcessRequest({ ...op, key: Date.now() });
+          setRightTab('cost');
+          setRouteDialogOpen(false);
+          if (!selectedManualRoute) setProcessRouting('auto');
+        }}
         onSelectRoute={(route) => {
           // Staging only — nothing is written here. Apply Scenario performs
           // the real apply-route/apply-custom-route call (plus any pending
