@@ -10,7 +10,7 @@ import type { MachiningCalculatorField, MachiningCalculators } from './machining
  * stations (bom-items.service.ts resolveMachiningCalculators) and which lookup
  * tables the calculators name (machining-lookup-tables.ts).
  */
-interface SpecField {
+export interface SpecField {
   name: string;
   unit: string | null;
   source?: 'cad' | 'lookup' | 'machine' | 'bom' | 'drawing' | 'engine' | 'default';
@@ -18,6 +18,10 @@ interface SpecField {
   /** Other tables the same input can come from (the trace names the one used). */
   alsoTables?: string[];
   column?: string;
+  /** A lookup row is the material's row that also has these column values (tblShaping "Cut Type": 1). */
+  where?: Record<string, string | number>;
+  /** A lookup row is the material's row whose `column` is nearest the product of these inputs (the bevel cutter diameter nearest Module x Teeth). */
+  nearest?: { column: string; product: string[] };
   default?: number;
   formula?: string;
 }

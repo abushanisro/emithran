@@ -36,7 +36,17 @@
     "wire_edm": "Wire EDM",
     "reciprocating_surface_grinder": "Reciprocating Surface Grinder",
     "hob_machine": "Hob Machine",
-    "shaver": "Shaver"
+    "shaver": "Shaver",
+    "rotary_surface_grinder": "Rotary Surface Grinder",
+    "bevel_gear_cutting_machine": "Bevel Gear Cutting Machine",
+    "automated_deburr": "Automated Deburr",
+    "drill_press": "Drill Press",
+    "stock_prep_mill": "Stock Prep Mill",
+    "stock_prep_lathe": "Stock Prep Lathe",
+    "manual_bench_cell": "Bench Operation",
+    "3_axis_router": "3 Axis Router",
+    "5_axis_router": "5 Axis Router",
+    "shaper": "Shaper"
   },
   "calculators": [
     {
@@ -1658,6 +1668,524 @@
           "name": "Cycle Time",
           "unit": "s",
           "formula": "{Cutting Time} * (1 + {Rapids and Tool Change Allowance} / 100)"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Rotary Surface Grinding",
+      "operation": "{station}",
+      "machineClasses": [
+        "rotary_surface_grinder"
+      ],
+      "migration": 1030,
+      "description": "Rotary-table surface grinding: the wheel covers the face, so each table revolution is one pass. Rough passes take the allowance down to the finish stock, one finish pass removes it, and spark-out is the reference multiple of the finish time (variables sparkOutMultiplier). Speeds and downfeeds from tblRotarySurfaceGrinding for the material.",
+      "fields": [
+        {
+          "name": "Path Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Faces",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Grinding Allowance",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "variables",
+          "column": "finishGrindingDepth"
+        },
+        {
+          "name": "Spark Out Multiplier",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "sparkOutMultiplier"
+        },
+        {
+          "name": "Table Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblRotarySurfaceGrinding",
+          "column": "TableSpeedMPerMin"
+        },
+        {
+          "name": "Rough Downfeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblRotarySurfaceGrinding",
+          "column": "RoughDownfeedMm"
+        },
+        {
+          "name": "Finish Downfeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblRotarySurfaceGrinding",
+          "column": "FinishDownfeedMm"
+        },
+        {
+          "name": "Finish Stock",
+          "unit": "mm",
+          "formula": "min({Finish Downfeed}, {Grinding Allowance})"
+        },
+        {
+          "name": "Rough Passes",
+          "unit": null,
+          "formula": "round(max({Grinding Allowance} - {Finish Stock}, 0) / {Rough Downfeed})"
+        },
+        {
+          "name": "Revolution Time",
+          "unit": "s",
+          "formula": "pi * {Path Diameter} / ({Table Speed} * 1000 / 60)"
+        },
+        {
+          "name": "Time per Face",
+          "unit": "s",
+          "formula": "({Rough Passes} + 1 + {Spark Out Multiplier}) * {Revolution Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Face} * {Faces}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Straight Bevel Gear Cutting",
+      "operation": "Straight BG Face Milling",
+      "machineClasses": [
+        "bevel_gear_cutting_machine"
+      ],
+      "migration": 1030,
+      "description": "Straight bevel gear cutting: every tooth space is cut across the face width by a cutter the size of the pitch diameter (straightBevelCutterDiameterToPitchDiameterRatio), at the tblStraightBevelGearCutting cutting speed, feed per tooth and blades per side for the material and that cutter diameter.",
+      "fields": [
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Module",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Face Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cutter to Pitch Diameter Ratio",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "straightBevelCutterDiameterToPitchDiameterRatio"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblStraightBevelGearCutting",
+          "column": "Cutting Speed (m / min)",
+          "nearest": {
+            "column": "Diameter (mm)",
+            "product": [
+              "Module",
+              "Teeth"
+            ]
+          }
+        },
+        {
+          "name": "Feed per Tooth",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblStraightBevelGearCutting",
+          "column": "Feed Per Tooth (mm)",
+          "nearest": {
+            "column": "Diameter (mm)",
+            "product": [
+              "Module",
+              "Teeth"
+            ]
+          }
+        },
+        {
+          "name": "Blades per Side",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblStraightBevelGearCutting",
+          "column": "Blades Per Side",
+          "nearest": {
+            "column": "Diameter (mm)",
+            "product": [
+              "Module",
+              "Teeth"
+            ]
+          }
+        },
+        {
+          "name": "Pitch Diameter",
+          "unit": "mm",
+          "formula": "{Module} * {Teeth}"
+        },
+        {
+          "name": "Cutter Diameter",
+          "unit": "mm",
+          "formula": "{Pitch Diameter} * {Cutter to Pitch Diameter Ratio}"
+        },
+        {
+          "name": "Cutter Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Cutter Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Cutter Speed} * {Feed per Tooth} * {Blades per Side}"
+        },
+        {
+          "name": "Time per Tooth",
+          "unit": "s",
+          "formula": "{Face Width} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Teeth} * {Time per Tooth}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Spiral Bevel Gear Cutting",
+      "operation": "Spiral BG Face Milling",
+      "machineClasses": [
+        "bevel_gear_cutting_machine"
+      ],
+      "migration": 1030,
+      "description": "Spiral bevel gear cutting: every tooth space is cut across the face width by a cutter the size of the pitch diameter (spiralBevelCutterDiameterToPitchDiameterRatio), at the tblSpiralBevelGearCutting cutting speed, feed per tooth and blades per side for the material and that cutter diameter.",
+      "fields": [
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Module",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Face Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cutter to Pitch Diameter Ratio",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "spiralBevelCutterDiameterToPitchDiameterRatio"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblSpiralBevelGearCutting",
+          "column": "Cutting Speed (m / min)",
+          "nearest": {
+            "column": "Diameter (mm)",
+            "product": [
+              "Module",
+              "Teeth"
+            ]
+          }
+        },
+        {
+          "name": "Feed per Tooth",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblSpiralBevelGearCutting",
+          "column": "Feed Per Tooth (mm)",
+          "nearest": {
+            "column": "Diameter (mm)",
+            "product": [
+              "Module",
+              "Teeth"
+            ]
+          }
+        },
+        {
+          "name": "Blades per Side",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblSpiralBevelGearCutting",
+          "column": "Blades Per Side",
+          "nearest": {
+            "column": "Diameter (mm)",
+            "product": [
+              "Module",
+              "Teeth"
+            ]
+          }
+        },
+        {
+          "name": "Pitch Diameter",
+          "unit": "mm",
+          "formula": "{Module} * {Teeth}"
+        },
+        {
+          "name": "Cutter Diameter",
+          "unit": "mm",
+          "formula": "{Pitch Diameter} * {Cutter to Pitch Diameter Ratio}"
+        },
+        {
+          "name": "Cutter Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Cutter Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Cutter Speed} * {Feed per Tooth} * {Blades per Side}"
+        },
+        {
+          "name": "Time per Tooth",
+          "unit": "s",
+          "formula": "{Face Width} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Teeth} * {Time per Tooth}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Shaping",
+      "operation": "{station}",
+      "machineClasses": [
+        "shaper"
+      ],
+      "migration": 1030,
+      "description": "Gear shaping: the cutter is fed radially to tooth depth, generates the teeth in one roughing revolution, then one finishing revolution. tblShaping gives three cut types per material with no legend; type 1 (the lowest stroke rate) is read as roughing and type 3 (the finest rotary feed) as finishing. Each stroke adds the reference dwells (variables shapingDwellTimePerStroke, numDwellsPerShapingStroke).",
+      "fields": [
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Module",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Tooth Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Dwell Time",
+          "unit": "s",
+          "source": "lookup",
+          "table": "variables",
+          "column": "shapingDwellTimePerStroke"
+        },
+        {
+          "name": "Dwells per Stroke",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "numDwellsPerShapingStroke"
+        },
+        {
+          "name": "Rough Stroke Rate",
+          "unit": "strokes/min",
+          "source": "lookup",
+          "table": "tblShaping",
+          "column": "Stroke Rate",
+          "where": {
+            "Cut Type": 1
+          }
+        },
+        {
+          "name": "Radial Feed",
+          "unit": "mm/stroke",
+          "source": "lookup",
+          "table": "tblShaping",
+          "column": "Radial Feed Per Stroke (mm)",
+          "where": {
+            "Cut Type": 1
+          }
+        },
+        {
+          "name": "Rough Rotary Feed",
+          "unit": "mm/stroke",
+          "source": "lookup",
+          "table": "tblShaping",
+          "column": "Rotary Feed Per Stroke (mm)",
+          "where": {
+            "Cut Type": 1
+          }
+        },
+        {
+          "name": "Finish Stroke Rate",
+          "unit": "strokes/min",
+          "source": "lookup",
+          "table": "tblShaping",
+          "column": "Stroke Rate",
+          "where": {
+            "Cut Type": 3
+          }
+        },
+        {
+          "name": "Finish Rotary Feed",
+          "unit": "mm/stroke",
+          "source": "lookup",
+          "table": "tblShaping",
+          "column": "Rotary Feed Per Stroke (mm)",
+          "where": {
+            "Cut Type": 3
+          }
+        },
+        {
+          "name": "Pitch Diameter",
+          "unit": "mm",
+          "formula": "{Module} * {Teeth}"
+        },
+        {
+          "name": "Rough Strokes",
+          "unit": null,
+          "formula": "{Tooth Depth} / {Radial Feed} + pi * {Pitch Diameter} / {Rough Rotary Feed}"
+        },
+        {
+          "name": "Finish Strokes",
+          "unit": null,
+          "formula": "pi * {Pitch Diameter} / {Finish Rotary Feed}"
+        },
+        {
+          "name": "Dwell per Stroke",
+          "unit": "s",
+          "formula": "{Dwell Time} * {Dwells per Stroke}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Rough Strokes} * (60 / {Rough Stroke Rate} + {Dwell per Stroke}) + {Finish Strokes} * (60 / {Finish Stroke Rate} + {Dwell per Stroke})"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Automated Deburring",
+      "operation": "Automated Deburring",
+      "machineClasses": [
+        "automated_deburr"
+      ],
+      "migration": 1030,
+      "sameFieldsAs": "Machining - Deburring",
+      "description": "Automated deburring of every sharp edge: CAD sharp-edge length at the tblDeburring edge speed of the reference default edge tool for the material."
+    },
+    {
+      "name": "Machining - Drill Press",
+      "operation": "{station}",
+      "machineClasses": [
+        "drill_press"
+      ],
+      "migration": 1030,
+      "sameFieldsAs": "Machining - Drilling",
+      "description": "Drilling on a drill press: CAD hole diameter and depth, cutting speed and feed from tblDrilling for the material and drill construction."
+    },
+    {
+      "name": "Machining - Stock Prep Mill",
+      "operation": "{station}",
+      "machineClasses": [
+        "stock_prep_mill"
+      ],
+      "migration": 1030,
+      "sameFieldsAs": "Machining - Milling",
+      "description": "Preparing the stock on a mill before the part is machined: the time of each milling operation group on the stock, plus the allowance for rapid moves and tool changes."
+    },
+    {
+      "name": "Machining - Stock Prep Lathe",
+      "operation": "{station}",
+      "machineClasses": [
+        "stock_prep_lathe"
+      ],
+      "migration": 1030,
+      "sameFieldsAs": "Machining - Rough Turning",
+      "description": "Preparing the stock on a lathe before the part is machined: rough turning of the bar to the stock diameter, cutting data from tblGeneralTurning for the material."
+    },
+    {
+      "name": "Machining - Bench Operation",
+      "operation": "{station}",
+      "machineClasses": [
+        "manual_bench_cell"
+      ],
+      "migration": 1030,
+      "description": "Bench work on a machined part: identing and the spark test, each at its reference time (variables defaultIdentingTime, in seconds, and defaultSparkTestTime, in minutes).",
+      "fields": [
+        {
+          "name": "Identing Time",
+          "unit": "s",
+          "source": "lookup",
+          "table": "variables",
+          "column": "defaultIdentingTime"
+        },
+        {
+          "name": "Spark Test Time",
+          "unit": "min",
+          "source": "lookup",
+          "table": "variables",
+          "column": "defaultSparkTestTime"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Identing Time} + {Spark Test Time} * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Routering",
+      "operation": "{station}",
+      "machineClasses": [
+        "3_axis_router",
+        "5_axis_router"
+      ],
+      "migration": 1030,
+      "description": "Routering a profile: the cut length taken in passes of the depth one pass removes. The reference holds no router feed table, so the feed rate and the depth per pass are entered for the material and cutter in use.",
+      "fields": [
+        {
+          "name": "Cut Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cut Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Depth per Pass",
+          "unit": "mm",
+          "source": "machine"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "source": "machine"
+        },
+        {
+          "name": "Passes",
+          "unit": null,
+          "formula": "CEIL({Cut Depth} / {Depth per Pass})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cut Length} * {Passes} / {Feed Rate} * 60"
         }
       ]
     }

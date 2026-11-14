@@ -41,6 +41,16 @@ describe('machining calculator spec ↔ migration ↔ engine', () => {
     for (const name of ['Surface Grinding', 'Hobbing', 'Shaving', 'Rotary Broaching']) expect(committed).toContain(`Machining - ${name}`);
   });
 
+  it('the second batch of calculators ships in 1030: ten more reference processes get one', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1030_machining_calculators_batch_2.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1030, spec));
+    for (const station of ['Rotary Surface Grinder', 'Shaper', 'Drill Press', 'Stock Prep Mill', 'Stock Prep Lathe', 'Bench Operation', '3 Axis Router', '5 Axis Router']) {
+      expect(calcs[station]?.name).toMatch(/^Machining - /);
+    }
+    expect(calcs['Straight BG Face Milling']?.name).toBe('Machining - Straight Bevel Gear Cutting');
+    expect(calcs['Automated Deburring']?.name).toBe('Machining - Automated Deburring');
+  });
+
   it('the milling calculator prices the line of every mill station, and of the live-tool turning machines', () => {
     expect(['3 Axis Mill', '4 Axis Mill', '5 Axis Mill', 'MillTurn', '3 Axis Lathe'].map((station) => calcs[station]?.name)).toEqual(Array(5).fill('Machining - Milling'));
   });

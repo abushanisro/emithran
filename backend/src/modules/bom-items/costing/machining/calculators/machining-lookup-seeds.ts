@@ -9,6 +9,7 @@ import {
 } from '../lookup/machining-material-hardness';
 import type { MachiningCapabilityRules } from '../capability-rules';
 import type { CalcSeed } from './machining-calculator';
+import type { SpecField } from './machining-calculator-spec';
 import { calculationRef, lookupSeed, MACHINING_REFERENCE_DOMAIN, resultStep, rowKeys, seedStep, variableSeed } from './machining-source-refs';
 
 /**
@@ -657,20 +658,74 @@ export function rechuckLookupSeeds(ctx: MachiningLookupContext): LookupSeeds {
  * lookup-table inputs (Index Transfer reads the machine record, Inspection
  * the drawing and sampling policy).
  */
+/** What a spec-defined lookup needs: the staged tables and variables its fields name, and the material. */
+export interface SpecLookupData {
+  matClass: MaterialClass;
+  tables: Record<string, any[] | null | undefined>;
+  variables: Record<string, number | null | undefined>;
+  /** The material's cut code, for a table that has no hardness column to match the material by. */
+  cutCode: number | null;
+}
+
+const cutCodeOf = (row: any): number => Number(row.MaterialCutCodeName ?? row['Material Cut Code Name'] ?? row.material_cut_code ?? row.material_cut_code_name);
+
+/**
+ * The lookup inputs of a calculator whose spec fields say where each value is (machining-calculators.json:
+ * table + column, a variables key, an optional `where` and `nearest`). One resolver for every such calculator,
+ * so a new operation needs a spec entry and no resolver of its own. A value that cannot be read is named.
+ */
+export function specLookupSeeds(fields: readonly SpecField[], data: SpecLookupData, keys: Record<string, number>): LookupSeeds {
+  const out: LookupSeeds = { seeds: {}, missing: [] };
+  for (const f of fields) {
+    if (f.source !== 'lookup' || !f.table || !f.column) continue;
+    if (f.table === 'variables') {
+      const v = data.variables[f.column];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        out.seeds[f.name] = { value: v, source: `variables: ${f.column}`, lookup: true, match: { table: 'variables', row: { key: f.column } } };
+      } else out.missing.push(`${f.name}: variables ${f.column} is not staged`);
+      continue;
+    }
+    const all = data.tables[f.table];
+    if (!all?.length) { out.missing.push(`${f.name}: ${f.table} (machining_reference_data) could not be read`); continue; }
+    const rows = all.filter((r) => Object.entries(f.where ?? {}).every(([col, v]) => String(r[col]) === String(v)));
+    // The material's rows: by hardness inside its cut-code family, or by its cut code when the table has no hardness.
+    const byHardness = nearestByHardness(rows, MACHINING_MATERIAL[data.matClass]);
+    const code = byHardness ? cutCodeOf(byHardness) : data.cutCode;
+    let candidates = code == null ? [] : rows.filter((r) => cutCodeOf(r) === code);
+    const key: Record<string, string | number> = { ...(f.where ?? {}) };
+    if (f.nearest && candidates.length > 0) {
+      const target = f.nearest.product.reduce((p, name) => p * (keys[name] ?? Number.NaN), 1);
+      if (!Number.isFinite(target)) { out.missing.push(`${f.name}: ${f.nearest.product.join(' and ')} (the ${f.table} row is chosen by them)`); continue; }
+      const col = f.nearest.column;
+      const best = candidates.reduce((a, r) => (Math.abs(Number(r[col]) - target) < Math.abs(Number(a[col]) - target) ? r : a));
+      candidates = [best];
+      key[col] = best[col];
+    }
+    const value = Number(candidates[0]?.[f.column]);
+    if (!Number.isFinite(value)) { out.missing.push(`${f.name}: ${f.table} has no row for ${data.matClass}`); continue; }
+    out.seeds[f.name] = {
+      value, lookup: true,
+      source: `${f.table}: material code ${code}${Object.entries(key).map(([c, v]) => `, ${c} ${v}`).join('')}`,
+      match: { table: f.table, row: { MaterialCutCodeName: code as number, ...key } },
+    };
+  }
+  return out;
+}
+
 export function machiningLookupSeeds(
   operation: string,
   ctx: MachiningLookupContext,
   keys: Record<string, number>,
 ): LookupSeeds | null {
   switch (operation) {
-    case 'Drilling': return drillingLookupSeeds(ctx, keys);
+    case 'Drilling': case 'Drill Press': return drillingLookupSeeds(ctx, keys);
     case 'Reaming': return reamingLookupSeeds(ctx, keys);
     case 'Tapping': return tappingLookupSeeds(ctx, keys);
     case 'Jig Boring': return jigBoringLookupSeeds(ctx, keys);
     case 'Gun Drilling': return gunDrillingLookupSeeds(ctx, keys);
     case 'Deep Bore Machine': return deepBoreLookupSeeds(ctx, keys);
     case 'Parting': return partingLookupSeeds(ctx, keys);
-    case 'Rough Turning': return roughTurningLookupSeeds(ctx);
+    case 'Rough Turning': case 'Stock Prep Lathe': return roughTurningLookupSeeds(ctx);
     case 'Finish Turning': return finishTurningLookupSeeds(ctx);
     case 'Cylindrical Grinding': return grindingLookupSeeds(ctx);
     case 'Internal Grinding': return grindingLookupSeeds(ctx, undefined, 'tblInternalGrinding');
@@ -681,7 +736,7 @@ export function machiningLookupSeeds(
     case 'Rotary Broaching': return rotaryBroachingLookupSeeds(ctx, keys);
     case 'Keyway Broaching': return keywayBroachingLookupSeeds(ctx, keys);
     case 'Wire EDM': return wireEdmLookupSeeds(ctx);
-    case 'Deburring': return deburringLookupSeeds(ctx);
+    case 'Deburring': case 'Automated Deburring': return deburringLookupSeeds(ctx);
     case 'Secondary Setup (Rechuck)': return rechuckLookupSeeds(ctx);
     default: return null;
   }

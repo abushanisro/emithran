@@ -252,8 +252,7 @@ export class MachiningLookupService {
   private inspectionReference: { reference: InspectionReference | null; missing: string[] } | null = null;
   async getInspectionReference(): Promise<{ reference: InspectionReference | null; missing: string[] }> {
     if (this.inspectionReference?.reference) return this.inspectionReference;
-    const { data, error } = await this.database
-      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+    const { data, error } = await this.referenceDb
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -280,6 +279,28 @@ export class MachiningLookupService {
     if (error || !data.length) return null;
     this.operationCatalog = data.map((r) => r.key);
     return this.operationCatalog;
+  }
+
+  /** A staged lookup table by name, for a calculator whose spec names the table (specLookupSeeds). */
+  async getTable(name: string): Promise<any[] | null> {
+    return this.loadTable(name);
+  }
+
+  /** The named machining variables as numbers; a variable that is absent or not a number is null. */
+  async getVariables(names: readonly string[]): Promise<Record<string, number | null>> {
+    if (names.length === 0) return {};
+    const { data } = await this.referenceDb
+      .from('machining_reference_data').select('key, value')
+      .eq('category', 'variable').eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION).in('key', [...names]);
+    const byKey = new Map(((data ?? []) as Array<{ key: string; value: string | null }>).map((r) => [r.key, Number(r.value)]));
+    return Object.fromEntries(names.map((n) => [n, Number.isFinite(byKey.get(n)) ? byKey.get(n)! : null]));
+  }
+
+  /** The material class's cut code, read from tblReaming (every cut code, each with its hardness): for tables with no hardness column. */
+  async getMaterialCutCode(materialClass: MaterialClass): Promise<number | null> {
+    const row = nearestByHardness((await this.loadTable('tblReaming')) ?? [], MACHINING_MATERIAL[materialClass]) as any;
+    const code = Number(row?.MaterialCutCodeName);
+    return Number.isFinite(code) ? code : null;
   }
 
   async getOperationSizeRanges(): Promise<any[] | null> {
