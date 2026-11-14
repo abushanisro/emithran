@@ -73,6 +73,12 @@ describe('machining calculator spec ↔ migration ↔ engine', () => {
     expect(calcs['Countersinking']?.name).toBe('Machining - Countersinking');
   });
 
+  it('part setup (load, unload, reorient) has a calculator, shipped in 1037', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1037_machining_part_setup_calculator.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1037, spec));
+    expect(calcs['Part Setup']?.name).toBe('Machining - Part Setup');
+  });
+
   it('the milling calculator prices the line of every mill station, and of the live-tool turning machines', () => {
     expect(['3 Axis Mill', '4 Axis Mill', '5 Axis Mill', 'MillTurn', '3 Axis Lathe'].map((station) => calcs[station]?.name)).toEqual(Array(5).fill('Machining - Milling'));
   });

@@ -2349,6 +2349,26 @@ export class BOMItemsService {
 
   // ── eMithran-style feature-level breakdown helpers ─────────────────────────────
 
+  /** The setups the part's feature tool axes need (principal plus oblique, setup-axis-rule.ts), or null when they are not derived. */
+  private async partSetupsFromToolAxes(fg: any): Promise<number | null> {
+    const axes = requiredMilledClassFromToolAxes(fg?.feature_graph_v2?.features, (await this.machiningLookup.getSetupAxisRule()).rule);
+    const setups = axes.principalSetups + axes.obliqueSetups;
+    return axes.required != null && setups > 0 ? setups : null;
+  }
+
+  /** The reference's individual part setup inputs (componentLoadTime and its two variables), with the setups the part's tool axes need. */
+  private async partSetupInput(setups: number | null): Promise<NonNullable<MachiningCostInput['partSetup']>> {
+    const [loadTable, variables] = await Promise.all([
+      this.machiningLookup.getComponentLoadTime(),
+      this.machiningLookup.getVariables(['partSetupTimeAdjustmentFactor', 'repetitionsOfIndividualPartSetup']),
+    ]);
+    return {
+      loadTable, setups,
+      adjustmentFactor: variables['partSetupTimeAdjustmentFactor'] ?? null,
+      repetitions: variables['repetitionsOfIndividualPartSetup'] ?? null,
+    };
+  }
+
   /**
    * The part's CAD features as machining work: the features that go to their own machine (deep holes, broached
    * keyways, wire EDM slots, rotary-broached and etched pockets) split out, and the rest sequenced into the milling
@@ -3626,6 +3646,7 @@ export class BOMItemsService {
         blankResult,
         machinabilityRating: machinabilityRating ?? undefined,
         millingRemovalRateMm3PerMin: await this.machiningLookup.getMillingRemovalRate(detectMaterialClass(grade)),
+        partSetup: await this.partSetupInput(await this.partSetupsFromToolAxes(fg)),
         featureOps: featureOps,
         processIdentityByMachineClass: cncProcessIdentities,
         deburrLinearSpeedMmPerSec: deburrParams.dataFound ? deburrParams.linearSpeedMmPerSec : null,
@@ -8773,6 +8794,7 @@ export class BOMItemsService {
       blankResult,
       machinabilityRating:  featurePlan.machinabilityRating ?? undefined,
         millingRemovalRateMm3PerMin: await this.machiningLookup.getMillingRemovalRate(detectMaterialClass(grade)),
+        partSetup: await this.partSetupInput(await this.partSetupsFromToolAxes(fg)),
       featureOps:           featurePlan.featureOps,
       gunDrillCandidates:   featurePlan.deepHoleSplit.gunDrillCandidates,
       deepBoreCandidates:   featurePlan.deepHoleSplit.deepBoreCandidates,
