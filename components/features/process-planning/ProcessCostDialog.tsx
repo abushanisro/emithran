@@ -1130,6 +1130,21 @@ export function ProcessCostDialog({
     }
   }, [calculatorOpen, calculatorTarget, userOverrodeCalculator, defaultCalculatorForOperation, selectedCalculatorId]);
 
+  // The line moved to another machine class (a different Category): the calculator and inputs of the class it
+  // left do not describe it. The calculator becomes the new class's own (none when it has none), and the inputs
+  // are read again for it. A calculator the engineer picked by hand for this class is kept.
+  const calculatorClassRef = useRef(selectedMachineClass);
+  useEffect(() => {
+    const previous = calculatorClassRef.current;
+    calculatorClassRef.current = selectedMachineClass;
+    if (!previous || !selectedMachineClass || previous === selectedMachineClass) return;
+    setSelectedCalculatorId(defaultCalculatorForOperation ?? '');
+    setCalculatorInputs({});
+    setCalculatorInputProvenance({});
+    setCalculatorResults(null);
+    setCalculatorError(null);
+  }, [selectedMachineClass, defaultCalculatorForOperation]);
+
   // The saved machine belongs to a different class than the one now in play —
   // which, since Category drives the list, means it is not in the chosen
   // Category. Clear it so auto-select can pick a machine that really is.

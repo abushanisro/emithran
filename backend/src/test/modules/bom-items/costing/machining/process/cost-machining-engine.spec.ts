@@ -2392,6 +2392,16 @@ describe('the mill line is the Machining - Milling calculator over the part\'s s
     expect(step('Cutting Time')).toBe(535);
   });
 
+  it('each operation-group input names the CAD features it was computed on, so the calculator can show them on the model', () => {
+    const withIds = featureOps.map((o) => (o.name === 'Rough Milling' ? { ...o, featureIds: ['PocketV2-default_c16', 'Keyway-default_c1'] } : o));
+    const l = computeMillingCostSummary(milledInput({ featureOps: withIds }), mc('3_axis_mill')).processLines.find((x) => x.process === '3 Axis Mill')!;
+    expect(l.calculationTrace!.find((st) => st.fieldName === 'Rough Milling Time')!.ref).toEqual({
+      kind: 'features', label: 'Rough Milling Time', features: [{ featureId: 'PocketV2-default_c16' }, { featureId: 'Keyway-default_c1' }],
+    });
+    // Facing is not tied to a feature: no reference rather than an empty one.
+    expect(l.calculationTrace!.find((st) => st.fieldName === 'Facing Time')!.ref).toBeUndefined();
+  });
+
   it('adds the rapids and tool-change allowance stored on the calculator (15 %)', () => {
     expect(line.cycleTimeMin).toBeCloseTo((535 * 1.15) / 60, 4);
   });
