@@ -180,16 +180,12 @@ export function resolveScenarioCavityCount(
 
 // ── Machining Stock Form (BlankOptimizerService's "Let eMithran Decide" override) ──
 //
-// Persisted scenario stock-form choice for CNC parts, e.g. "Round Bar" picked
-// explicitly over the auto-decided candidate. Restricted to the forms
-// BlankOptimizerService can actually source from real stock_profiles data
-// (round_bar/hex_bar/rectangular_bar) plus the explicit 'billet' opt-out —
-// 'plate'/'square_bar'/'round_tube' are not accepted here because there is no
-// real stock data to honor them with (see StockForm's own doc comment in
-// blank-optimizer.service.ts) — an unrecognized value is treated the same as
-// unset (auto-decide), never silently coerced into one of the real forms.
-type ScenarioStockForm = 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'billet';
-const VALID_SCENARIO_STOCK_FORMS: ReadonlySet<string> = new Set(['round_bar', 'hex_bar', 'rectangular_bar', 'billet']);
+// Persisted scenario stock-form choice for machined parts, e.g. "Round Bar" picked explicitly over the
+// auto-decided candidate: the six forms the reference prices for machining stock (memory/Stock Maching
+// materials: round, hex, rectangular and square bar, plate, round tube) plus the explicit 'billet'. An
+// unrecognized value is treated the same as unset (auto-decide), never coerced into a form.
+type ScenarioStockForm = 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'square_bar' | 'plate' | 'round_tube' | 'billet';
+const VALID_SCENARIO_STOCK_FORMS: ReadonlySet<string> = new Set(['round_bar', 'hex_bar', 'rectangular_bar', 'square_bar', 'plate', 'round_tube', 'billet']);
 
 /** Persisted scenario Stock Form override. null = unset ("Let eMithran Decide"). */
 export function resolveScenarioStockForm(

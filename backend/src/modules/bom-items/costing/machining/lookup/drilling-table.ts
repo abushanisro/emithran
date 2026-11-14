@@ -1,5 +1,5 @@
 import type { MaterialClass } from '../process/cost-machining-engine';
-import { MACHINING_MATERIAL_HARDNESS_HB, nearestByHardness } from './machining-material-hardness';
+import { MACHINING_MATERIAL, nearestByHardness } from './machining-material-hardness';
 
 /**
  * Real straight-drill cutting data — tblDrilling (machining_reference_data,
@@ -59,7 +59,7 @@ export function resolveDrillingParams(
   materialClass: MaterialClass,
 ): DrillingParams | null {
   if (!table?.materials?.length || !(diameterMm > 0)) return null;
-  const row = nearestByHardness(table.materials, MACHINING_MATERIAL_HARDNESS_HB[materialClass]);
+  const row = nearestByHardness(table.materials, MACHINING_MATERIAL[materialClass]);
   if (!row?.material_cut_code || typeof row.hardness !== 'number') return null;
 
   const constructionPoints = Object.entries(table.construction_by_diameter ?? {})

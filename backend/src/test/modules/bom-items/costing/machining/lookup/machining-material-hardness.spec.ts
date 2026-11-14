@@ -1,5 +1,5 @@
 import {
-  MACHINING_MATERIAL_HARDNESS_HB,
+  MACHINING_MATERIAL,
   nearestByHardness,
   nearestByDiameterThenHardness,
   nearestByDiameterKey,
@@ -10,32 +10,32 @@ import {
 // name legend anywhere in the reference data (verified, not assumed —
 // searched every memory/machining/ file and every migration). This bridges
 // through real hardness instead of fabricating a code->name mapping.
-describe('MACHINING_MATERIAL_HARDNESS_HB — every MaterialClass has a real or disclosed-fallback value', () => {
+describe('MACHINING_MATERIAL — every MaterialClass has a real or disclosed-fallback value', () => {
   it('covers all 7 MaterialClass values', () => {
-    const classes: Array<keyof typeof MACHINING_MATERIAL_HARDNESS_HB> = [
+    const classes: Array<keyof typeof MACHINING_MATERIAL> = [
       'aluminum', 'mild_steel', 'stainless', 'titanium', 'copper_alloy', 'tool_steel', 'plastic',
     ];
     for (const c of classes) {
-      expect(typeof MACHINING_MATERIAL_HARDNESS_HB[c]).toBe('number');
+      expect(typeof MACHINING_MATERIAL[c].hb).toBe('number');
     }
   });
 
   it('orders real classes by real relative hardness (aluminum softest, stainless hardest of the real 4)', () => {
-    expect(MACHINING_MATERIAL_HARDNESS_HB.aluminum).toBeLessThan(MACHINING_MATERIAL_HARDNESS_HB.copper_alloy);
-    expect(MACHINING_MATERIAL_HARDNESS_HB.copper_alloy).toBeLessThan(MACHINING_MATERIAL_HARDNESS_HB.mild_steel);
-    expect(MACHINING_MATERIAL_HARDNESS_HB.mild_steel).toBeLessThan(MACHINING_MATERIAL_HARDNESS_HB.stainless);
+    expect(MACHINING_MATERIAL.aluminum.hb).toBeLessThan(MACHINING_MATERIAL.copper_alloy.hb);
+    expect(MACHINING_MATERIAL.copper_alloy.hb).toBeLessThan(MACHINING_MATERIAL.mild_steel.hb);
+    expect(MACHINING_MATERIAL.mild_steel.hb).toBeLessThan(MACHINING_MATERIAL.stainless.hb);
   });
 
   it('titanium, tool steel and plastic carry no hardness (no reference data) rather than a stand-in', () => {
-    expect(MACHINING_MATERIAL_HARDNESS_HB.titanium).toBeNaN();
-    expect(MACHINING_MATERIAL_HARDNESS_HB.tool_steel).toBeNaN();
-    expect(MACHINING_MATERIAL_HARDNESS_HB.plastic).toBeNaN();
+    expect(MACHINING_MATERIAL.titanium.hb).toBeNaN();
+    expect(MACHINING_MATERIAL.tool_steel.hb).toBeNaN();
+    expect(MACHINING_MATERIAL.plastic.hb).toBeNaN();
   });
 
   it('so every matcher reports them missing instead of borrowing the hardest/softest row', () => {
     const rows = [{ hardness: 30, diameter_mm: 6 }, { hardness: 1050, diameter_mm: 6 }];
-    expect(nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB.titanium)).toBeNull();
-    expect(nearestByDiameterThenHardness(rows, 6, MACHINING_MATERIAL_HARDNESS_HB.plastic)).toBeNull();
+    expect(nearestByHardness(rows, MACHINING_MATERIAL.titanium)).toBeNull();
+    expect(nearestByDiameterThenHardness(rows, 6, MACHINING_MATERIAL.plastic)).toBeNull();
   });
 });
 
@@ -132,5 +132,22 @@ describe('nearestByDiameterKey', () => {
 
   it('ignores non-numeric keys rather than throwing', () => {
     expect(nearestByDiameterKey({ foo: 1, '12.0': 0.04 } as any, 12)).toBe(0.04);
+  });
+});
+
+describe('rows are matched inside the material\'s own cut-code family', () => {
+  const rows = [
+    { MaterialCutCodeName: '5.21', Hardness: 200 }, { MaterialCutCodeName: '5.12', Hardness: 330 },
+    { MaterialCutCodeName: '20.23', Hardness: 275 },
+    { MaterialCutCodeName: '30.12', Hardness: 100 }, { MaterialCutCodeName: '33.3', Hardness: 100 },
+  ];
+  it('stainless at HB275 takes a stainless row, not the Hastelloy row of the same hardness', () => {
+    expect(nearestByHardness(rows, MACHINING_MATERIAL.stainless)?.MaterialCutCodeName).toBe('5.12');
+  });
+  it('copper at HB100 takes the copper row, not the aluminum row listed before it', () => {
+    expect(nearestByHardness(rows, MACHINING_MATERIAL.copper_alloy)?.MaterialCutCodeName).toBe('33.3');
+  });
+  it('a material whose family the table does not hold is missing', () => {
+    expect(nearestByHardness(rows, MACHINING_MATERIAL.mild_steel)).toBeNull();
   });
 });

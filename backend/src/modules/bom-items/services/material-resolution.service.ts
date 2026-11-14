@@ -510,6 +510,8 @@ export class MaterialResolutionService {
     locCurrencyCode: string;
     /** Quote location (e.g. India): picks the stock-form price (material_stock_prices). */
     location: string;
+    /** The scenario's Stock Form choice (resolveScenarioStockForm): the stock form the material is priced on; unset = the family's own. */
+    stockForm?: string | null;
     warnings: string[];
   }): Promise<{
     materialCostPerKg: number; materialDensityKgM3: number; materialSource: 'db' | 'default';
@@ -544,7 +546,7 @@ export class MaterialResolutionService {
     /** Reference clamp properties (migration 831); nulls when not on file for this material. */
     clampProperties: MaterialClampProperties;
   }> {
-    const { accessToken, grade, family, materialCol, rates, locCurrencyCode, location, warnings } = input;
+    const { accessToken, grade, family, materialCol, rates, locCurrencyCode, location, warnings, stockForm } = input;
 
     let ambiguityNote: string | null = null;
     if (grade) {
@@ -602,13 +604,13 @@ export class MaterialResolutionService {
           // price at this location when one is on file (stock-price.ts), converted
           // at today's FX snapshot; else the material's raw_materials price.
           const locationStockPrices = await this.loadStockPrices(client, location);
-          const stock = resolveStockPrice(locationStockPrices, best.material, family, location);
+          const stock = resolveStockPrice(locationStockPrices, best.material, family, location, stockForm);
           if (stock) {
             warnings.push(
               `Material priced on ${stock.form.replace('_', ' ')} stock for ${location}: ${stock.pricePerKg} ${stock.currencyCode}/kg (${stock.source}).`,
             );
-          } else if (machiningStockPriceForm(family) && locationStockPrices.length > 0) {
-            warnings.push(`No ${machiningStockPriceForm(family)!.replace('_', ' ')} stock price on file for "${best.material ?? grade}" in ${location}; priced from raw_materials.`);
+          } else if (machiningStockPriceForm(family, stockForm) && locationStockPrices.length > 0) {
+            warnings.push(`No ${machiningStockPriceForm(family, stockForm)!.replace('_', ' ')} stock price on file for "${best.material ?? grade}" in ${location}; priced from raw_materials.`);
           }
           return {
             materialCostPerKg: stock

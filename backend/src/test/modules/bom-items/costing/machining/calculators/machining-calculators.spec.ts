@@ -1,8 +1,8 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { runMachiningCalculator, CYCLE_TIME_FIELD, type CalcSeed } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculator';
-import { loadMachiningCalculatorSpec, specAsCalculators } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculator-spec';
-import { buildMachiningCalculatorsMigrationSql } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculators-migration';
+import { loadMachiningCalculatorSpec, specAsCalculators, STATION_OPERATION } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculator-spec';
+import { buildMachiningCalculatorMigrationSql, buildMachiningCalculatorsMigrationSql } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculators-migration';
 
 // Contract between the machining calculator spec, its migration, and the
 // engine: one definition of every machining formula, stored in the database,
@@ -15,6 +15,22 @@ describe('machining calculator spec ↔ migration ↔ engine', () => {
   it('the committed migration is exactly what the spec generates', () => {
     const committed = readFileSync(join(ROOT, 'migrations/804_machining_calculators.sql'), 'utf-8');
     expect(committed).toBe(buildMachiningCalculatorsMigrationSql(spec));
+  });
+
+  it('a calculator added later ships in its own migration, and 804 does not change for it', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1027_machining_milling_calculator.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1027, spec));
+    expect(buildMachiningCalculatorsMigrationSql(spec)).not.toContain('Machining - Milling');
+  });
+
+  it('the calculators added to the spec after 804 was applied ship again in 1028, so a database that ran the earlier 804 gets them', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1028_machining_calculators_missing_after_804.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1028, spec));
+    for (const name of ['Surface Grinding', 'Hobbing', 'Shaving', 'Rotary Broaching']) expect(committed).toContain(`Machining - ${name}`);
+  });
+
+  it('the milling calculator prices the line of every mill station, and of the live-tool turning machines', () => {
+    expect(['3 Axis Mill', '4 Axis Mill', '5 Axis Mill', 'MillTurn', '3 Axis Lathe'].map((station) => calcs[station]?.name)).toEqual(Array(5).fill('Machining - Milling'));
   });
 
   it.each(spec.calculators.map((c) => [c.name, c] as const))('%s: every formula references only its own fields, and it outputs Cycle Time', (_name, c) => {
@@ -30,7 +46,9 @@ describe('machining calculator spec ↔ migration ↔ engine', () => {
     const seeds: Record<string, CalcSeed> = Object.fromEntries(
       c.fields.filter((f) => !f.formula && f.source !== 'default').map((f) => [f.name, { value: 2, source: 'test' }]),
     );
-    const run = runMachiningCalculator(calcs, c.operation, seeds);
+    // A station calculator is keyed by each station it prices ("3 Axis Mill", ...).
+    const operation = c.operation === STATION_OPERATION ? spec.stations[c.machineClasses[0]!]! : c.operation;
+    const run = runMachiningCalculator(calcs, operation, seeds);
     expect(run.missing).toEqual([]);
     expect(Number.isFinite(run.sec)).toBe(true);
     expect(run.sec).toBeGreaterThanOrEqual(0);

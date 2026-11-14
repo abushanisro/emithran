@@ -6,8 +6,18 @@
  */
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { buildMachiningCalculatorsMigrationSql } from '../src/modules/bom-items/costing/machining/calculators/machining-calculators-migration';
+import { buildMachiningCalculatorMigrationSql, buildMachiningCalculatorsMigrationSql } from '../src/modules/bom-items/costing/machining/calculators/machining-calculators-migration';
 
 const OUT = join(__dirname, '../migrations/804_machining_calculators.sql');
 writeFileSync(OUT, buildMachiningCalculatorsMigrationSql());
 console.log(`wrote ${OUT}`);
+
+// Calculators added after 804, each in the migration the spec names.
+const LATER: Record<number, string> = {
+  1027: '1027_machining_milling_calculator.sql',
+  1028: '1028_machining_calculators_missing_after_804.sql',
+};
+for (const [n, file] of Object.entries(LATER)) {
+  writeFileSync(join(__dirname, '../migrations', file), buildMachiningCalculatorMigrationSql(Number(n)));
+  console.log(`wrote ${file}`);
+}

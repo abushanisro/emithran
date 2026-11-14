@@ -23,7 +23,14 @@ export interface StockPriceRow {
   source: string;
 }
 
-export function machiningStockPriceForm(family: string): StockPriceForm | null {
+// A Stock Form chosen in the scenario is priced as that form (a billet is sawn from plate); with no choice the
+// family's own stock applies.
+export function machiningStockPriceForm(family: string, chosenForm?: string | null): StockPriceForm | null {
+  if (chosenForm && (family === 'milled' || isTurnedFamily(family))) {
+    // A billet is sawn from plate. A round tube cannot be sized yet (no bore from CAD), so the blank falls back
+    // to a billet (blank-stock-candidates.ts) and is priced as one.
+    return chosenForm === 'billet' || chosenForm === 'round_tube' ? 'plate' : (chosenForm as StockPriceForm);
+  }
   if (family === 'milled') return 'plate';
   if (isTurnedFamily(family)) return 'round_bar';
   return null;
@@ -41,8 +48,9 @@ export function resolveStockPrice(
   materialName: string | null | undefined,
   family: string,
   location: string,
+  chosenForm?: string | null,
 ): StockPrice | null {
-  const form = machiningStockPriceForm(family);
+  const form = machiningStockPriceForm(family, chosenForm);
   if (!form || !materialName) return null;
   const row = rows.find((r) =>
     r.raw_material_name != null && r.raw_material_name.toLowerCase() === materialName.toLowerCase()

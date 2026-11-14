@@ -170,13 +170,14 @@ describe('resolveScenarioStockForm', () => {
     expect(resolveScenarioStockForm(undefined)).toBeNull();
     expect(resolveScenarioStockForm(null)).toBeNull();
   });
-  it('rejects forms with no real stock data rather than silently coercing them', () => {
-    // 'plate' has a schema column (migration 350) but zero real seeded rows;
-    // 'square_bar'/'round_tube' are not real distinct forms in stock_profiles
-    // at all — see StockForm's own doc comment in blank-stock-candidates.ts.
-    expect(resolveScenarioStockForm({ stockForm: 'plate' })).toBeNull();
-    expect(resolveScenarioStockForm({ stockForm: 'square_bar' })).toBeNull();
-    expect(resolveScenarioStockForm({ stockForm: 'round_tube' })).toBeNull();
+  it('accepts every stock form the reference prices for machining stock (plate, square bar, round tube: sized from the preferred-size series)', () => {
+    expect(resolveScenarioStockForm({ stockForm: 'plate' })).toBe('plate');
+    expect(resolveScenarioStockForm({ stockForm: 'square_bar' })).toBe('square_bar');
+    expect(resolveScenarioStockForm({ stockForm: 'round_tube' })).toBe('round_tube');
+  });
+
+  it('treats a value that is not a stock form as unset, never coercing it into one', () => {
+    expect(resolveScenarioStockForm({ stockForm: 'i_beam' })).toBeNull();
     expect(resolveScenarioStockForm({ stockForm: 123 as any })).toBeNull();
   });
 });

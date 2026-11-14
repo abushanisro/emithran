@@ -1,14 +1,60 @@
-import { loadMachiningCalculatorSpec, specFieldToRow, type MachiningCalculatorSpec } from './machining-calculator-spec';
+import { loadMachiningCalculatorSpec, specFieldToRow, STATION_OPERATION, type MachiningCalculatorSpec } from './machining-calculator-spec';
 
 /**
  * The SQL of migrations/804_machining_calculators.sql, built from the spec.
  * scripts/generate-machining-calculators-migration.ts writes it to disk; a
  * test asserts the committed migration still equals it.
  */
-export function buildMachiningCalculatorsMigrationSql(spec: MachiningCalculatorSpec = loadMachiningCalculatorSpec()): string {
-  const out: string[] = [];
 const q = (v: string | number | null | undefined) =>
   v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `$q$${v}$q$`;
+
+type SpecCalculator = MachiningCalculatorSpec['calculators'][number];
+
+/** One calculator: its row, its fields, and its catalog mapping on every machine class that runs it. */
+function calculatorSql(spec: MachiningCalculatorSpec, c: SpecCalculator, displayOrder: number): string {
+  const rows = c.fields.map((f, i) => specFieldToRow(f, i + 1));
+  const operation = c.operation === STATION_OPERATION ? 's.station' : q(c.operation);
+  return `
+-- ${c.name}
+DO $calc$
+DECLARE v_id UUID;
+BEGIN
+  SELECT id INTO v_id FROM public.calculators WHERE name = ${q(c.name)} AND user_id IS NULL AND retired_at IS NULL;
+  IF v_id IS NULL THEN
+    INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
+    VALUES (NULL, ${q(c.name)}, 'process', 'single', false, true, true, ${q(c.description)})
+    RETURNING id INTO v_id;
+  ELSE
+    UPDATE public.calculators SET description = ${q(c.description)}, updated_at = now() WHERE id = v_id;
+  END IF;
+
+  DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
+  INSERT INTO public.calculator_fields
+    (calculator_id, field_name, display_label, field_type, unit, data_source, source_table, source_field, default_value, display_order, is_required)
+  VALUES
+${rows.map((r) => `    (v_id, ${q(r.field_name)}, ${q(r.display_label)}, ${q(r.field_type)}, ${q(r.unit)}, ${q(r.data_source)}, ${q(r.source_table)}, ${q(r.source_field)}, ${q(r.default_value as string | null)}, ${r.display_order}, ${r.field_type !== 'calculated'})`).join(',\n')};
+
+  INSERT INTO public.process_calculator_mappings
+    (process_group, process_route, operation, calculator_id, calculator_name, is_active, display_order, machine_class, canonical_process_id)
+  SELECT 'Machining', s.station, ${operation}, v_id, ${q(c.name)}, true, ${displayOrder}, s.cls,
+         (SELECT pt.id FROM public.process_taxonomy pt WHERE pt.process_group = 'Machining' AND pt.process_name = s.station LIMIT 1)
+  FROM (VALUES ${c.machineClasses.map((cls) => `(${q(cls)}, ${q(spec.stations[cls]!)})`).join(', ')}) AS s(cls, station)
+  ON CONFLICT (process_group, process_route, operation) DO UPDATE
+  SET calculator_id = EXCLUDED.calculator_id,
+      calculator_name = EXCLUDED.calculator_name,
+      machine_class = EXCLUDED.machine_class,
+      is_active = true,
+      canonical_process_id = EXCLUDED.canonical_process_id;
+END
+$calc$;
+`;
+}
+
+export function buildMachiningCalculatorsMigrationSql(fullSpec: MachiningCalculatorSpec = loadMachiningCalculatorSpec()): string {
+  // Migration 804 holds the calculators with no migration of their own; later ones ship separately
+  // (buildMachiningCalculatorMigrationSql) so this file never changes once applied.
+  const spec = { ...fullSpec, calculators: fullSpec.calculators.filter((c) => !c.migration) };
+  const out: string[] = [];
 
 
 out.push(`-- 804: Machining calculators -- every machining cycle-time formula as a real
@@ -75,43 +121,7 @@ WHERE user_id IS NOT NULL
   AND name IN (${spec.retire.map((n) => q(n)).join(', ')});
 `);
 
-spec.calculators.forEach((c, ci) => {
-  const rows = c.fields.map((f, i) => specFieldToRow(f, i + 1));
-  out.push(`
--- ${c.name}
-DO $calc$
-DECLARE v_id UUID;
-BEGIN
-  SELECT id INTO v_id FROM public.calculators WHERE name = ${q(c.name)} AND user_id IS NULL AND retired_at IS NULL;
-  IF v_id IS NULL THEN
-    INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, ${q(c.name)}, 'process', 'single', false, true, true, ${q(c.description)})
-    RETURNING id INTO v_id;
-  ELSE
-    UPDATE public.calculators SET description = ${q(c.description)}, updated_at = now() WHERE id = v_id;
-  END IF;
-
-  DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
-  INSERT INTO public.calculator_fields
-    (calculator_id, field_name, display_label, field_type, unit, data_source, source_table, source_field, default_value, display_order, is_required)
-  VALUES
-${rows.map((r) => `    (v_id, ${q(r.field_name)}, ${q(r.display_label)}, ${q(r.field_type)}, ${q(r.unit)}, ${q(r.data_source)}, ${q(r.source_table)}, ${q(r.source_field)}, ${q(r.default_value as string | null)}, ${r.display_order}, ${r.field_type !== 'calculated'})`).join(',\n')};
-
-  INSERT INTO public.process_calculator_mappings
-    (process_group, process_route, operation, calculator_id, calculator_name, is_active, display_order, machine_class, canonical_process_id)
-  SELECT 'Machining', s.station, ${q(c.operation)}, v_id, ${q(c.name)}, true, ${700 + ci}, s.cls,
-         (SELECT pt.id FROM public.process_taxonomy pt WHERE pt.process_group = 'Machining' AND pt.process_name = s.station LIMIT 1)
-  FROM (VALUES ${c.machineClasses.map((cls) => `(${q(cls)}, ${q(spec.stations[cls]!)})`).join(', ')}) AS s(cls, station)
-  ON CONFLICT (process_group, process_route, operation) DO UPDATE
-  SET calculator_id = EXCLUDED.calculator_id,
-      calculator_name = EXCLUDED.calculator_name,
-      machine_class = EXCLUDED.machine_class,
-      is_active = true,
-      canonical_process_id = EXCLUDED.canonical_process_id;
-END
-$calc$;
-`);
-});
+spec.calculators.forEach((c, ci) => { out.push(calculatorSql(spec, c, 700 + ci)); });
 
 const expected = spec.calculators.map((c) => `(${q(c.name)}, ${c.fields.length}, ${c.machineClasses.length})`).join(',\n    ');
 out.push(`
@@ -137,4 +147,44 @@ COMMIT;
 `);
 
   return out.join('');
+}
+
+/**
+ * The SQL of a later migration that adds the calculators the spec marks with
+ * that migration number (migrations/<n>_machining_<...>_calculator.sql).
+ * Same per-calculator block as migration 804, with its own post-check.
+ */
+export function buildMachiningCalculatorMigrationSql(migration: number, spec: MachiningCalculatorSpec = loadMachiningCalculatorSpec()): string {
+  const added = spec.calculators.filter((c) => (c.migration ?? c.reissue) === migration);
+  if (added.length === 0) throw new Error(`no machining calculator is marked for migration ${migration}`);
+  const expected = added.map((c) => `(${q(c.name)}, ${c.fields.length}, ${c.machineClasses.length})`).join(',\n    ');
+  return `-- ${migration}: ${added.map((c) => c.name).join(', ')}
+--
+-- GENERATED by scripts/generate-machining-calculators-migration.ts from
+-- src/modules/bom-items/costing/machining/calculators/machining-calculators.json.
+-- Do not edit by hand: change the spec and regenerate.
+--
+-- Requires migration 804. Self-contained, idempotent, post-checked.
+
+BEGIN;
+${added.map((c) => calculatorSql(spec, c, 700 + spec.calculators.indexOf(c))).join('')}
+DO $post$
+DECLARE bad TEXT;
+BEGIN
+  SELECT string_agg(e.name, ', ') INTO bad
+  FROM (VALUES
+    ${expected}
+  ) AS e(name, field_count, mapping_count)
+  LEFT JOIN public.calculators c ON c.name = e.name AND c.user_id IS NULL AND c.retired_at IS NULL
+  WHERE c.id IS NULL
+     OR (SELECT count(*) FROM public.calculator_fields f WHERE f.calculator_id = c.id) <> e.field_count
+     OR (SELECT count(*) FROM public.process_calculator_mappings m WHERE m.calculator_id = c.id AND m.is_active) <> e.mapping_count;
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION 'migration ${migration}: calculators incomplete: %', bad;
+  END IF;
+END
+$post$;
+
+COMMIT;
+`;
 }

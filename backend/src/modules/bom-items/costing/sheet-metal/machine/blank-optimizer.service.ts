@@ -3,7 +3,7 @@ import { DatabaseService } from '../../../../../common/database/database.service
 import { isTurnedFamily } from '../../../../../domain/part-family';
 import {
   type BoundingBox, type BlankResult, type StockForm, type StockProfile,
-  sortedDimensions, roundBarCandidates, hexBarCandidates, rectangularBarCandidates,
+  sortedDimensions, requiredSection, roundBarCandidates, hexBarCandidates, rectangularBarCandidates, squareBarCandidates, plateCandidates,
   selectBestAutoCandidate, selectForcedFormCandidate, billetFallback, BAR_LENGTH_ALLOWANCE_MM,
 } from './blank-stock-candidates';
 
@@ -37,23 +37,24 @@ export class BlankOptimizerService {
   ): Promise<BlankResult> {
     try {
       const profiles = await this.loadStockProfiles(accessToken);
+      const preferredSizes = await this.loadPreferredSizes();
       const allowance = (await this.stockAllowanceFor(bbox)).allowancePerSideMm;
       const turnedFamily = isTurnedFamily(family);
-      const { L, W, H } = turnedFamily && turnedAxis
+      const part = turnedFamily && turnedAxis
         ? { L: turnedAxis.lengthMm, W: turnedAxis.diameterMm, H: turnedAxis.diameterMm }
         : sortedDimensions(bbox);
-      const barLen = L + BAR_LENGTH_ALLOWANCE_MM;
-      const minDiam = Math.max(W, H) * 1.03;
+      const barLen = part.L + BAR_LENGTH_ALLOWANCE_MM;
+      const { W, H, minDiam } = requiredSection(part.W, part.H, allowance, turnedFamily);
 
       if (forcedForm) {
-        return selectForcedFormCandidate(forcedForm, profiles, bbox, partVolMm3, barLen, minDiam, W, H, allowance);
+        return selectForcedFormCandidate(forcedForm, profiles, bbox, partVolMm3, barLen, minDiam, W, H, allowance, preferredSizes);
       }
 
       if (profiles.length === 0) return billetFallback(bbox, partVolMm3, allowance);
 
       const candidates =
         family === "turned" || family === "mill_turn"
-          // Turning: must fit inside a round bar diameter ≥ max(W, H) × 1.03
+          // Turning: a round bar of at least the OD plus the stock allowance
           ? roundBarCandidates(profiles, minDiam, barLen, partVolMm3)
           // Milled: try round bar (if roughly cylindrical), hex bar (if
           // roughly hexagonal), and rectangular bar — real stock_profiles
@@ -63,6 +64,8 @@ export class BlankOptimizerService {
               ...roundBarCandidates(profiles, minDiam, barLen, partVolMm3),
               ...hexBarCandidates(profiles, minDiam, barLen, partVolMm3),
               ...rectangularBarCandidates(profiles, W, H, barLen, partVolMm3),
+              ...squareBarCandidates(preferredSizes, W, H, barLen, partVolMm3),
+              ...plateCandidates(preferredSizes, bbox, allowance, partVolMm3),
             ];
 
       const best = selectBestAutoCandidate(candidates, bbox, allowance);
@@ -117,6 +120,23 @@ export class BlankOptimizerService {
     const { rule, missing } = await this.loadStockAllowanceRule();
     if (!rule) return { allowancePerSideMm: null, missing };
     return { allowancePerSideMm: stockAllowancePerSideMm(rule, bbox), missing: [] };
+  }
+
+  /**
+   * The reference preferred stock sizes valid in every unit system (tblPreferredSizes, memory/Multi-Spindle Maching,
+   * migration 787): the sizes square bar and plate are bought in. Read once; a read error is not remembered.
+   */
+  private preferredSizes: number[] | null = null;
+  private async loadPreferredSizes(): Promise<number[]> {
+    if (this.preferredSizes) return this.preferredSizes;
+    const { data, error } = await this.database
+      .getPrivilegedClient('reference-data: machining_reference_data and stock_profiles, global shared')
+      .from('machining_reference_data').select('raw')
+      .eq('category', 'lookup_table').eq('source_version', '2026-Multi-Spindle').eq('key', 'tblPreferredSizes').maybeSingle();
+    if (error || !Array.isArray(data?.raw)) return [];
+    this.preferredSizes = [...new Set((data!.raw as Array<{ sizeMm?: unknown; unitSystem?: string }>)
+      .filter((r) => r.unitSystem === 'both' && typeof r.sizeMm === 'number' && r.sizeMm > 0).map((r) => r.sizeMm as number))];
+    return this.preferredSizes;
   }
 
   private async loadStockProfiles(accessToken: string): Promise<StockProfile[]> {

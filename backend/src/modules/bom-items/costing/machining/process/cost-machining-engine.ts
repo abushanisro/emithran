@@ -395,6 +395,35 @@ function realProcessName(machineClass: MachineClassId): string {
   return entry?.machineClassKeywords?.[0] ?? (machineClass as unknown as string);
 }
 
+// The "Machining - Milling" calculator input each sequenced operation counts toward (operation-sequencer.ts
+// names, which are the reference catalog's). An operation not listed is "Other Operations Time".
+const MILLING_TIME_INPUT: Record<string, string> = {
+  'Facing': 'Facing Time',
+  'Rough Milling': 'Rough Milling Time', 'Bulk Milling': 'Rough Milling Time',
+  'Fine Finish Milling': 'Finish Milling Time',
+  'Contouring': 'Contouring Time', 'Perimeter Milling': 'Contouring Time',
+  'Slot Milling': 'Slot and Groove Milling Time', 'Groove Milling': 'Slot and Groove Milling Time',
+  'Center Drilling': 'Hole Making Time', 'Drilling': 'Hole Making Time', 'Counterboring': 'Hole Making Time', 'Countersinking': 'Hole Making Time',
+  'Chamfering': 'Edge Treatment Time', 'Filleting': 'Edge Treatment Time',
+};
+
+/** The milling calculator's inputs: the part's sequenced operation times by group, with the operations behind each. */
+function millingSeeds(featureOps: NonNullable<MachiningCostInput['featureOps']>): Record<string, CalcSeed> {
+  const groups = new Map<string, { sec: number; ops: Set<string> }>(
+    [...new Set(Object.values(MILLING_TIME_INPUT)), 'Other Operations Time'].map((g) => [g, { sec: 0, ops: new Set<string>() }]),
+  );
+  for (const o of featureOps) {
+    if (MILLING_DOUBLE_BILLED_ELSEWHERE.has(o.name)) continue;
+    const g = groups.get(MILLING_TIME_INPUT[o.name] ?? 'Other Operations Time')!;
+    g.sec += o.timeSec;
+    g.ops.add(o.name);
+  }
+  return Object.fromEntries([...groups].map(([field, g]) => [field, {
+    value: g.sec,
+    source: g.ops.size > 0 ? `CAD features: ${[...g.ops].join(', ')} (operation sequence)` : 'CAD features: none of this group on the part',
+  }]));
+}
+
 // ── Drill cycle time (real, material-aware physics) ──────────────────────────
 // Replaces the previous flat per-diameter-bucket table (8/14/22/40 sec,
 // identical regardless of material) with resolveDrillingSpeedFeed()'s real,
@@ -991,9 +1020,14 @@ function computeDeburringLine(
   const missing = run.sec == null ? (why.length ? why : run.missing) : [];
   if (missing.length > 0) warnings.push(`Deburring not priced — missing real input: ${missing.join('; ')}.`);
   const min = (run.sec ?? 0) / 60;
+  // Deburring is its own station: its own setup, resolved as Inspection's is.
+  const setup = resolveSetupMinutes({ process: 'Deburring', machineSetupTimeHr: deburrRate.setupTimeHr, machineName: deburrRate.machineName });
+  if (setup.warning) warnings.push(setup.warning);
+  const setupCost = r2((setup.setupMin / 60) * deburrRate.rate / Math.max(input.batchSize, 1));
   return withRun(
-    makeLine('Deburring', 0, r2((min / 60) * deburrRate.rate), min, deburrRate, input.processIdentityByMachineClass),
-    { ...run, missing },
+    makeLine('Deburring', setupCost, r2((min / 60) * deburrRate.rate), min, deburrRate, input.processIdentityByMachineClass,
+      { setupTimeMin: setup.setupMin, setupTimeSource: setup.source }),
+    { ...run, missing }, setup.setupMin > 0 ? setupTraceSteps(setup, deburrRate.machineName, input.batchSize) : [],
   );
 }
 
@@ -1075,13 +1109,13 @@ function makeLine(
   cycleTimeMin: number,
   rate: MHRRateInput,
   processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
-  // Raw, un-amortised setup minutes + which resolveSetupMinutes() tier they
-  // came from — only passed by call sites that actually resolved a real
-  // setup (the 'Setup' and 'Inspection' lines); every other line has no
-  // setup component and correctly leaves these unset, matching
-  // ProcessLineCost.setupTimeMin's own "optional, not every producer
-  // populates it" contract.
-  setupDisclosure?: { setupTimeMin: number; setupTimeSource: SetupTimeResolution['source'] },
+  // Un-amortised setup minutes and the resolveSetupMinutes() tier they came
+  // from. A line with no setup of its own (an operation on a machine whose
+  // setup another line of the route already charges: finish turning after
+  // rough turning, rigid tapping on the mill) states exactly that: 0 minutes,
+  // source 'none'. Left unset it read as "setup not resolved" and the whole
+  // route was refused as not fully costed.
+  setupDisclosure: { setupTimeMin: number; setupTimeSource: SetupTimeResolution['source'] } = { setupTimeMin: 0, setupTimeSource: 'none' },
 ): ProcessLineCost {
   // An operation run on another machine (rate.hostMachineClass) takes that
   // machine's Process/Category, and its own name as the Operation — never the
@@ -1108,7 +1142,8 @@ function makeLine(
     machineName: rate.machineName,
     commodityCode: rate.commodityCode,
     labourRate: rate.labourRate ?? null,
-    ...(setupDisclosure ? { setupTimeMin: setupDisclosure.setupTimeMin, setupTimeSource: setupDisclosure.setupTimeSource } : {}),
+    setupTimeMin: setupDisclosure.setupTimeMin,
+    setupTimeSource: setupDisclosure.setupTimeSource,
   };
 }
 
@@ -1453,6 +1488,7 @@ export function computeMillingCostSummary(
   const mrr = MILLING_MRR[matClass] * machinabilityFactor;
 
   let cncMillingMin = 0;
+  let millRun: CalcRun | null = null;
   if (Array.isArray(input.featureOps) && input.featureOps.length > 0) {
     // Root-caused live (2026-09-18): buildOperationSequence() (the feature
     // sequencer) emits its OWN "Tapping" entry for every tapped hole (real
@@ -1465,10 +1501,10 @@ export function computeMillingCostSummary(
     // mhrRate) — see MILLING_DOUBLE_BILLED_ELSEWHERE's own doc comment
     // above for why this exact set and why it's shared, not local.
     // 15% rapids/ATC overhead added on top of pure cutting time.
-    const totalFeatureSec = input.featureOps
-      .filter((o) => !MILLING_DOUBLE_BILLED_ELSEWHERE.has(o.name))
-      .reduce((s, o) => s + o.timeSec, 0);
-    cncMillingMin = (totalFeatureSec / 60) * 1.15;
+    // The line's time is the "Machining - Milling" calculator of this machine's station: each catalog
+    // operation group's time on the part's features, plus the rapids / tool-change allowance.
+    millRun = runMachiningCalculator(input.machiningCalculators, realProcessName(machineClass), millingSeeds(input.featureOps));
+    cncMillingMin = (millRun.sec ?? 0) / 60;
   } else {
     // Bbox-subtraction fallback (used when CAD engine did not return feature_graph_v2)
     const materialRemovalMm3 = Math.max(0, billetVolMm3 - volume);
@@ -1490,11 +1526,14 @@ export function computeMillingCostSummary(
   // Finish Milling split needs the power-limited MRR model, staged
   // variables.json + tblEngagementLengthPower, not yet built — a disclosed,
   // known-generic gap, not a fabricated name).
-  if (cncMillingMin > 0 || setupCostVal > 0) {
-    processLines.push(makeLine(
+  // An unpriced mill line stays on the route as a named gap; it is never dropped.
+  if (cncMillingMin > 0 || setupCostVal > 0 || millRun?.missing.length) {
+    const millLine = makeLine(
       realProcessName(machineClass), setupCostVal, r2((cncMillingMin / 60) * mhrRate.rate), cncMillingMin, mhrRate,
       input.processIdentityByMachineClass, setupDisclosure,
-    ));
+    );
+    if (millRun?.missing.length) warnings.push(`${millLine.process} not priced — missing real input: ${millRun.missing.join('; ')}.`);
+    processLines.push(millRun ? withRun(millLine, millRun) : millLine);
   }
   if (cncMillingMin <= 0) {
     warnings.push('Volume data unavailable — milling time estimated at 0');

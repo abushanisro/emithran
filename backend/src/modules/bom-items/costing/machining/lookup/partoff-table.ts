@@ -1,5 +1,5 @@
 import type { MaterialClass } from '../process/cost-machining-engine';
-import { MACHINING_MATERIAL_HARDNESS_HB, nearestByHardness } from './machining-material-hardness';
+import { MACHINING_MATERIAL, nearestByHardness } from './machining-material-hardness';
 
 /**
  * Real part-off (parting) cutting data — tblVirtualPartoffInsertCutData
@@ -38,7 +38,7 @@ export function resolvePartoffParams(
   materialClass: MaterialClass,
 ): PartoffParams | null {
   if (!rows?.length || !(cutDepthMm > 0)) return null;
-  const nearest = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[materialClass]);
+  const nearest = nearestByHardness(rows, MACHINING_MATERIAL[materialClass]);
   if (!nearest) return null;
   const candidates = rows
     .filter((r) => r.MaterialCutCodeName === nearest.MaterialCutCodeName && r.Hardness === nearest.Hardness)

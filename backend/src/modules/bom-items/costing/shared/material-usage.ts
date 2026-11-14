@@ -39,6 +39,9 @@ const STOCK_DRIVEN_FORMS: ReadonlyArray<BlankSpecDto['form']> = [
   'round_bar',
   'hex_bar',
   'rectangular_bar',
+  'square_bar',
+  'plate',
+  'round_tube',
   'billet',
   'extrusion',
 ];

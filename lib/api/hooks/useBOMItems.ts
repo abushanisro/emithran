@@ -1179,7 +1179,7 @@ export interface InjectionMoldingBreakdown {
 }
 
 export interface BlankSpecDto {
-  form: 'sheet' | 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'billet' | 'extrusion' | 'casting' | 'granules';
+  form: 'sheet' | 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'square_bar' | 'plate' | 'round_tube' | 'billet' | 'extrusion' | 'casting' | 'granules';
   sizeLabel: string;
   grossWeightKg: number;
   netWeightKg: number;

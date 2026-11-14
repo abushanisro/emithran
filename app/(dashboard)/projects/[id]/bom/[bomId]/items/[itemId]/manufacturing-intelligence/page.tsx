@@ -1396,6 +1396,17 @@ function partProcessGroup(item: BOMItem, fg: FeatureGraph | null | undefined): s
   return (item.scenarioOverrides?.processGroup as string | undefined) || familyToProcessGroupLabel(item.familyClassification ?? fg?.classification?.family) || null;
 }
 
+/** The applied route is no longer one the engine offers for this part (the part's process changed since). */
+function appliedRouteIsStale(appliedRouteId: string | null | undefined, routes: ReadonlyArray<{ routeId: string }> | undefined): boolean {
+  return !!appliedRouteId && !!routes && routes.length > 0 && !routes.some((r) => r.routeId === appliedRouteId);
+}
+
+/** Why the last Apply was refused (scenario_overrides.appliedScenario), or null when it was not. */
+function lastApplyError(item: { scenarioOverrides?: Record<string, unknown> | null }): string | null {
+  const applied = item.scenarioOverrides?.['appliedScenario'] as { status?: string; error?: string } | undefined;
+  return applied?.status === 'failed' && applied.error ? applied.error : null;
+}
+
 function CostSummaryTab({
   item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight, onShowEvidence, activeEvidenceLabel,
 }: {
@@ -1911,6 +1922,16 @@ function CostSummaryTab({
       {!hasStoredMat && hasStoredProcs && (
         <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 mb-2 text-xs text-amber-600 dark:text-amber-400">
           Process costs below were computed from a material that was removed — they are excluded from the total. Remove them or add a material to recalculate.
+        </div>
+      )}
+
+      {/* The saved operations come from a route that is not one of this part's routes any more (its
+          process changed, e.g. Sheet Metal to Machining) and no later Apply replaced them. */}
+      {hasStoredProcs && appliedRouteIsStale(persistedAppliedRouteId, comparison?.routes) && (
+        <div className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 mb-2 text-xs text-destructive">
+          The operations below are the route applied earlier (<strong>{persistedAppliedRouteId}</strong>), which is not a
+          route for this part&apos;s current process. They stay until an Apply succeeds
+          {lastApplyError(item) ? <>; the last Apply was refused: {lastApplyError(item)}</> : null}.
         </div>
       )}
 
@@ -7565,20 +7586,17 @@ function InvestmentTab({
 
 // ── BlankStockSection ─────────────────────────────────────────────────────────
 
-// Stock forms BlankOptimizerService can actually source from real
-// stock_profiles data (migration 350) — kept in sync by hand with
-// StockForm in blank-optimizer.service.ts. 'Plate'/'Square Bar'/'Round
-// Tube' (shown in the reference USA Digital Factory tool this mirrors) are
-// deliberately NOT offered here: 'plate' has a schema column but zero real
-// seeded sizes, 'square_bar' isn't a distinct real form (a rectangular_bar
-// row with size_a == size_b already covers it), and 'round_tube' needs a
-// bore dimension nothing in stock_profiles or CAD extraction provides today
-// — offering them would either silently no-op or require fabricating stock
-// sizes that don't exist in the real reference data.
+// The stock forms the reference prices for machining stock (memory/Stock Maching materials: round, hex,
+// rectangular and square bar, plate, round tube) plus Billet, a block sawn to the part's own size. Square bar and
+// plate sizes come from the reference preferred-size series; round tube needs a bore through the part axis and
+// says so when the CAD analysis gives none.
 const MACHINING_STOCK_FORM_OPTIONS: readonly { value: string; label: string }[] = [
   { value: 'round_bar', label: 'Round Bar' },
   { value: 'hex_bar', label: 'Hex Bar' },
   { value: 'rectangular_bar', label: 'Rectangular Bar' },
+  { value: 'square_bar', label: 'Square Bar' },
+  { value: 'plate', label: 'Plate' },
+  { value: 'round_tube', label: 'Round Tube' },
   { value: 'billet', label: 'Billet' },
 ];
 
@@ -7587,7 +7605,7 @@ const MACHINING_STOCK_FORM_OPTIONS: readonly { value: string; label: string }[] 
 // Stock panel itself does, without a second, divergent label map.
 const BLANK_STOCK_FORM_LABELS: Record<string, string> = {
   sheet: 'Sheet', round_bar: 'Round Bar', hex_bar: 'Hex Bar',
-  rectangular_bar: 'Rect Bar', billet: 'Billet',
+  rectangular_bar: 'Rect Bar', square_bar: 'Square Bar', plate: 'Plate', round_tube: 'Round Tube', billet: 'Billet',
   extrusion: 'Extrusion', casting: 'Casting', granules: 'Granules',
 };
 

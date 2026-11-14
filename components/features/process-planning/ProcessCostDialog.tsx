@@ -872,16 +872,13 @@ export function ProcessCostDialog({
     [activeMappings, selectedMachineClass],
   );
 
-  const selectedMapping = useMemo(
-    () => unambiguousMapping(calculatorMappingsForClass),
-    [calculatorMappingsForClass],
-  );
-
   // The class's catalog identity (route/operation), which may be a row with no
   // calculator yet — see identityMappings.
+  // The line is its machine's own line ("3 Axis Mill" / "3 Axis Mill"): on another class it is that class's own line.
+  const isStationLine = !!savedOperation && savedOperation === savedProcessRoute;
   const classCatalogRow = useMemo(
-    () => unambiguousMapping(identityMappings(calculatorMappingsForMachineClass(catalogData?.mappings ?? [], selectedMachineClass))),
-    [catalogData, selectedMachineClass],
+    () => unambiguousMapping(identityMappings(calculatorMappingsForMachineClass(catalogData?.mappings ?? [], selectedMachineClass)), null, isStationLine),
+    [catalogData, selectedMachineClass, isStationLine],
   );
 
   // The saved operation is offered only while the line stays on its saved
@@ -910,6 +907,11 @@ export function ProcessCostDialog({
     savedOperation: savedLiveOperation,
     savedApplies: savedOperationApplies,
   });
+  // The class's one catalog row, or the row of this line's own operation.
+  const selectedMapping = useMemo(
+    () => unambiguousMapping(calculatorMappingsForClass, selectedOperation, isStationLine),
+    [calculatorMappingsForClass, selectedOperation, isStationLine],
+  );
   // A pick belongs to one open dialog: closing it forgets the pick.
   useEffect(() => { if (!open) setOperationChoice(null); }, [open]);
   // The route + operation this line will be saved with.
@@ -1002,13 +1004,13 @@ export function ProcessCostDialog({
   // with the calculator it would apply — shown to the engineer instead of one
   // being picked for them. Empty whenever the class is unambiguous.
   const ambiguousCalculatorChoices = useMemo(() => {
-    if (calculatorMappingsForClass.length < 2) return [] as { operation: string; calculatorId: string | null; calculatorName: string }[];
+    if (selectedMapping || calculatorMappingsForClass.length < 2) return [] as { operation: string; calculatorId: string | null; calculatorName: string }[];
     return calculatorMappingsForClass.map((m: any) => ({
       operation: String(m.operation ?? '—'),
       calculatorId: resolveCalculatorId(m),
       calculatorName: String(m.calculatorName ?? ''),
     }));
-  }, [calculatorMappingsForClass, resolveCalculatorId]);
+  }, [selectedMapping, calculatorMappingsForClass, resolveCalculatorId]);
 
 
 

@@ -2,7 +2,7 @@ import type { MaterialClass } from '../process/cost-machining-engine';
 import { resolveDrillingParams, type DrillingTable } from '../lookup/drilling-table';
 import { resolvePartoffParams } from '../lookup/partoff-table';
 import {
-  MACHINING_MATERIAL_HARDNESS_HB,
+  MACHINING_MATERIAL,
   nearestByDiameterKey,
   nearestByDiameterThenHardness,
   nearestByHardness,
@@ -110,7 +110,7 @@ export function reamingLookupSeeds(ctx: MachiningLookupContext, keys: Record<str
   const out: LookupSeeds = { seeds: {}, missing: [] };
   const d = holeDiameterKey(keys, 'Reaming', out);
   if (d == null) return out;
-  const row = ctx.reamTable?.length ? nearestByDiameterThenHardness(ctx.reamTable, d, MACHINING_MATERIAL_HARDNESS_HB[ctx.matClass]) : null;
+  const row = ctx.reamTable?.length ? nearestByDiameterThenHardness(ctx.reamTable, d, MACHINING_MATERIAL[ctx.matClass]) : null;
   if (!row) { out.missing.push(`tblReaming row for ${ctx.matClass} at Ø${d} mm`); return out; }
   out.seeds = speedFeed(row.CuttingSpeedMPerMin, row.FeedMm, `tblReaming: Ø${row.DiameterMm} mm, ${row.Hardness} HB`,
     { table: 'tblReaming', row: { DiameterMm: row.DiameterMm, Hardness: row.Hardness, MaterialCutCodeName: row.MaterialCutCodeName } });
@@ -118,22 +118,22 @@ export function reamingLookupSeeds(ctx: MachiningLookupContext, keys: Record<str
 }
 
 /**
- * Tapping cutting speed from tblTapping: the material code nearest this
- * material class's hardness, then that code's row at the tabulated pitch
- * nearest the thread's (the table gives a fine 0.5 / 1.0 mm and a coarse
- * 3.0 / 6.35 mm pitch band per code; a tie goes to the smaller pitch, as in
- * every nearest-row matcher here). Both are kept inside the table's own
- * range; outside it the speed is missing, never extrapolated.
+ * Tapping cutting speed from tblTapping: the material's row at the tabulated
+ * pitch nearest the thread's (a tie goes to the smaller pitch). The table
+ * gives one speed for its fine band (0.5 and 1.0 mm) and one for its coarse
+ * band (3.0 and 6.35 mm), so a pitch finer than 0.5 mm (M1 to M2.5) takes the
+ * fine-band speed. A pitch coarser than the table's largest is missing.
  */
 export function resolveTappingRow(rows: any[] | null | undefined, pitchMm: number, matClass: MaterialClass): any | null {
   if (!rows?.length) return null;
-  const pitches = [...new Set(rows.map((r) => r.MetricPitchMm).filter(positive))].sort((a, b) => a - b);
-  if (pitches.length === 0 || pitchMm < pitches[0]! || pitchMm > pitches[pitches.length - 1]!) return null;
-  const material = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[matClass]);
+  const material = nearestByHardness(rows, MACHINING_MATERIAL[matClass]);
   if (!material) return null;
   const atCode = rows.filter((r) => r.MaterialCutCodeName === material.MaterialCutCodeName && positive(r.MetricPitchMm) && positive(r.CuttingSpeedMPerMin));
-  if (atCode.length === 0) return null;
-  return atCode.reduce((best, r) => (Math.abs(r.MetricPitchMm - pitchMm) < Math.abs(best.MetricPitchMm - pitchMm) ? r : best), atCode[0]);
+  if (atCode.length === 0 || pitchMm > Math.max(...atCode.map((r) => r.MetricPitchMm))) return null;
+  return atCode.reduce((best, r) => {
+    const d = Math.abs(r.MetricPitchMm - pitchMm) - Math.abs(best.MetricPitchMm - pitchMm);
+    return d < 0 || (d === 0 && r.MetricPitchMm < best.MetricPitchMm) ? r : best;
+  }, atCode[0]);
 }
 
 export function tappingLookupSeeds(ctx: MachiningLookupContext, keys: Record<string, number>): LookupSeeds {
@@ -143,7 +143,7 @@ export function tappingLookupSeeds(ctx: MachiningLookupContext, keys: Record<str
   const row = resolveTappingRow(ctx.tappingTable, pitch, ctx.matClass);
   if (!row) {
     out.missing.push(ctx.tappingTable?.length
-      ? `tblTapping row for ${ctx.matClass} at pitch ${pitch} mm (outside the table's material / pitch range)`
+      ? `tblTapping row for ${ctx.matClass} at pitch ${pitch} mm (the table has no row for this material, or the pitch is coarser than its largest)`
       : 'tblTapping (machining_reference_data) could not be read');
     return out;
   }
@@ -163,7 +163,7 @@ export function jigBoringLookupSeeds(ctx: MachiningLookupContext, keys: Record<s
   } else out.missing.push('tblGtolProcessCapabilities Jig Boring Num Repetitions');
   const d = holeDiameterKey(keys, 'Jig Boring', out);
   if (d == null) return out;
-  const row = ctx.finishBoringTable?.length ? nearestByDiameterThenHardness(ctx.finishBoringTable, d, MACHINING_MATERIAL_HARDNESS_HB[ctx.matClass]) : null;
+  const row = ctx.finishBoringTable?.length ? nearestByDiameterThenHardness(ctx.finishBoringTable, d, MACHINING_MATERIAL[ctx.matClass]) : null;
   if (!row) { out.missing.push(`tblBoringV2 Finish Boring row for ${ctx.matClass} at Ø${d} mm`); return out; }
   Object.assign(out.seeds, speedFeed(row.cutting_speed_m_min, row.feed_mm_rev, `tblBoringV2 Finish Boring: Ø${row.diameter_mm} mm, ${row.hardness} HB`,
     { table: 'tblBoringV2', row: { cut_type: 'Finish Boring', diameter_mm: row.diameter_mm, hardness: row.hardness } }));
@@ -174,7 +174,7 @@ export function gunDrillingLookupSeeds(ctx: MachiningLookupContext, keys: Record
   const out: LookupSeeds = { seeds: {}, missing: [] };
   const d = holeDiameterKey(keys, 'Gun Drilling', out);
   if (d == null) return out;
-  const row = ctx.gunDrillTable?.length ? nearestByDiameterThenHardness(ctx.gunDrillTable, d, MACHINING_MATERIAL_HARDNESS_HB[ctx.matClass]) : null;
+  const row = ctx.gunDrillTable?.length ? nearestByDiameterThenHardness(ctx.gunDrillTable, d, MACHINING_MATERIAL[ctx.matClass]) : null;
   const speed = row?.['Cutting Speed (m / min)'];
   const feed = row?.['Feed (mm / rev)'];
   if (!positive(speed) || !positive(feed)) { out.missing.push(`tblGunDrilling row for ${ctx.matClass} at Ø${d} mm`); return out; }
@@ -187,7 +187,7 @@ export function deepBoreLookupSeeds(ctx: MachiningLookupContext, keys: Record<st
   const out: LookupSeeds = { seeds: {}, missing: [] };
   const d = holeDiameterKey(keys, 'Deep Bore Machine', out);
   if (d == null) return out;
-  const row = ctx.deepBoreMaterials?.length ? nearestByHardness(ctx.deepBoreMaterials, MACHINING_MATERIAL_HARDNESS_HB[ctx.matClass]) : null;
+  const row = ctx.deepBoreMaterials?.length ? nearestByHardness(ctx.deepBoreMaterials, MACHINING_MATERIAL[ctx.matClass]) : null;
   const speed = row?.cutting_speed_m_min;
   const feed = nearestByDiameterKey(row?.feed_mm_rev_by_diameter, d);
   if (!positive(speed) || feed == null) { out.missing.push(`deep_bore_drill_lookup row for ${ctx.matClass} at Ø${d} mm`); return out; }
@@ -308,7 +308,7 @@ export function shavingLookupSeeds(ctx: MachiningLookupContext): LookupSeeds {
   const ref = ctx.shaving;
   if (!ref?.rows.length) { out.missing.push('tblShaving (machining_reference_data) could not be read'); return out; }
   const rows = ref.rows.filter((r) => String(r['Hardness System'] ?? '').toLowerCase() === 'brinell');
-  const row = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[ctx.matClass]);
+  const row = nearestByHardness(rows, MACHINING_MATERIAL[ctx.matClass]);
   if (!row || !positive(row['Strokes']) || !positive(row['Cutting Speed (m / min)']) || !positive(row['Feed Per Rev (mm / rev)'])) {
     out.missing.push(`tblShaving row for ${ctx.matClass}`);
     return out;
@@ -349,7 +349,7 @@ export function rotaryBroachingLookupSeeds(ctx: MachiningLookupContext, keys: Re
   const ref = ctx.rotaryBroach;
   if (!ref?.rows.length) { out.missing.push('tblRotaryBroaching (machining_reference_data) could not be read'); return out; }
   const rows = ref.rows.filter((r) => String(r.HardnessSystem ?? '').toLowerCase() === 'brinell');
-  const material = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[ctx.matClass]);
+  const material = nearestByHardness(rows, MACHINING_MATERIAL[ctx.matClass]);
   if (!material) { out.missing.push(`tblRotaryBroaching row for ${ctx.matClass}`); return out; }
   const atCode = rows.filter((r) => r.MaterialCutCodeName === material.MaterialCutCodeName)
     .sort((a, b) => Number(a.WidthAcrossFlatsMm) - Number(b.WidthAcrossFlatsMm));
@@ -418,7 +418,7 @@ export function hobbingLookupSeeds(ctx: MachiningLookupContext, keys: Record<str
   const dp = 25.4 / module;
   const rows = ref.hobRows.filter((r) => String(r['Hardness System'] ?? '').toLowerCase() === 'brinell');
   const pitches = [...new Set(rows.map((r) => r['Diametral Pitch']).filter(positive))].sort((a, b) => a - b);
-  const material = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[ctx.matClass]);
+  const material = nearestByHardness(rows, MACHINING_MATERIAL[ctx.matClass]);
   if (!material || pitches.length === 0 || dp < pitches[0]! || dp > pitches[pitches.length - 1]!) {
     out.missing.push(`tblHobbing row for ${ctx.matClass} at diametral pitch ${dp.toFixed(2)} (module ${module.toFixed(3)} mm)`);
     return out;
@@ -467,7 +467,7 @@ export function resolveKeywayBroach(ref: KeywayBroachReference | null | undefine
   if (!ref) return null;
   const pick = (all: any[]) => {
     const rows = brinellRows(all).filter((r) => positive(r['Keyway Width (mm)']));
-    const material = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[matClass]);
+    const material = nearestByHardness(rows, MACHINING_MATERIAL[matClass]);
     if (!material) return null;
     const atCode = rows.filter((r) => r['Material Cut Code Name'] === material['Material Cut Code Name']);
     const widths = [...new Set(atCode.map((r) => r['Keyway Width (mm)'] as number))].sort((a, b) => a - b);
