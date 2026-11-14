@@ -46,7 +46,7 @@ interface ReactionInjectionMoldingCostInput {
   /** The CAD net part volume (mm3) and the machine's staged injection rate (mm3/s): the fill time is the one over the other (formula registry F-19). Absent = no fill time, so a named gap. */
   partVolumeMm3?: number | null;
   injectionRateMm3PerS?: number | null;
-  /** The HR Rates record the injection rate was read from and the Raw Materials record of the cure time: the calculator dialog opens them. */
+  /** The HR Rates record the dry cycle and the injection rate were read from and the Raw Materials record of the cure time: the calculator dialog opens them. */
   machineRecord?: MachineRecord | null;
   materialRecord?: MaterialRecord | null;
   /** The stored cycle-time calculators by name (migrations 975, 976): the dry cycle plus fill plus cure time is computed by "Reaction Injection Molding - Cycle Time". Absent = a named gap, no cycle. */

@@ -8,9 +8,8 @@
  * between the mold wall and the melt). Both come back as named missing inputs, never a default.
  *
  * Each seed also carries where it was read, structured (plastic-input-sources.ts), when that place is one the calculator dialog can open: a staged variable or
- * lookup row, the press's HR Rates record, the resin's Raw Materials record, the CAD faces. Not every input has one: the press's dry cycle
- * (mhr_records.press_cycle_time_s) is a record column the HR Rates viewer does not list; the CAD parting line and slide stroke have no face evidence yet; the
- * shot melt volume and the resin per part are computed by the engine, not by a calculator, so there are no steps to open; the bundled reference package
+ * lookup row, the press's HR Rates record, the resin's Raw Materials record, the CAD faces. Not every input has one: the CAD parting line and slide stroke
+ * have no face evidence yet; the shot melt volume and the resin per part are computed by the engine, not by a calculator, so there are no steps to open; the bundled reference package
  * (reference/*.csv), the location electricity price, the cavity count and the scenario are not served by any viewer.
  */
 import type { DryerModel, DryingCondition, ReferenceValue, WeightCheckReference } from '../reference/im-reference';
@@ -162,7 +161,11 @@ function commonSeeds(input: CycleTimeInput, missing: string[]): Record<string, C
   else missing.push('press injection rate (injectionRateMm3PerS)');
 
   const dry = input.press?.dryCycleTimeS ?? null;
-  if (positive(dry)) seeds['Press Dry Cycle Time'] = { value: dry, source: 'Press reference record: time.dryCycleTimeS (Euromap 6, mold open and close)' };
+  if (positive(dry)) {
+    seeds['Press Dry Cycle Time'] = withRef(
+      { value: dry, source: 'Press reference record: time.dryCycleTimeS (Euromap 6, mold open and close)' }, machineColumn(input.press?.record, 'press_cycle_time_s'),
+    );
+  }
   else missing.push('press dry cycle time (dryCycleTimeS)');
 
   // Computed by the engine from the CAD volume, the runner allowance and the melt density (no calculator, so no steps to open): its CAD faces are its evidence.
@@ -226,9 +229,14 @@ export function injectionCycleTimeSeeds(input: CycleTimeInput): SeedResult {
  * Seeds for the compression calculator: the machine's press open/close time and the material's cure time in minutes. A grade with no cure time on file is seeded 0, as
  * the engine always has (it then costs the press motion alone and says the cycle is understated): never a typical value.
  */
-export function pressCycleTimeSeeds(input: { pressCycleTimeS: number | null; cureTimeMin: number | null; material?: MaterialRecord | null }): SeedResult {
+export function pressCycleTimeSeeds(input: { pressCycleTimeS: number | null; cureTimeMin: number | null; machine?: MachineRecord | null; material?: MaterialRecord | null }): SeedResult {
   if (!positive(input.pressCycleTimeS)) return { missing: ['press open/close time (press_cycle_time_s)'] };
-  return { seeds: { 'Press Open/Close Time': { value: input.pressCycleTimeS, source: 'Machine record: press_cycle_time_s' }, 'Material Cure Time': cureSeed(input.cureTimeMin, input.material) } };
+  return {
+    seeds: {
+      'Press Open/Close Time': withRef({ value: input.pressCycleTimeS, source: 'Machine record: press_cycle_time_s' }, machineColumn(input.machine, 'press_cycle_time_s')),
+      'Material Cure Time': cureSeed(input.cureTimeMin, input.material),
+    },
+  };
 }
 
 /** The material's cure time; the 0 seeded for a grade without one was read from nowhere, so it carries no ref. */
@@ -256,7 +264,7 @@ export function rimCycleTimeSeeds(input: {
   if (missing.length > 0) return { missing };
   return {
     seeds: {
-      'Machine Dry Cycle Time': { value: input.machineCycleTimeS!, source: 'Machine record: press_cycle_time_s (time.dryCycleTimeS)' },
+      'Machine Dry Cycle Time': withRef({ value: input.machineCycleTimeS!, source: 'Machine record: press_cycle_time_s (time.dryCycleTimeS)' }, machineColumn(input.machine, 'press_cycle_time_s')),
       'Part Volume': { value: input.partVolumeMm3!, source: 'CAD net part volume (mm3)', ref: { kind: 'cad', evidence: 'part_volume' } },
       'Cavities per Mold': { value: 1, source: 'Cost engine: the RIM engine prices one part per press cycle' },
       'Machine Injection Rate': withRef(

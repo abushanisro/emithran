@@ -98,8 +98,11 @@ describe('the injection molding cycle inputs carry where they were read', () => 
     expectServedLookup(refOf(trace, 'Fill Factor for Gates'));
   });
 
-  it('a value with no place the dialog can open carries none: the dry cycle (a column the HR Rates viewer does not list), the computed shot volume', () => {
-    expect(refOf(trace, 'Press Dry Cycle Time')).toBeUndefined();
+  it('the press dry cycle opens the press record at press_cycle_time_s', () => {
+    expect(refOf(trace, 'Press Dry Cycle Time')).toEqual({ ...refOf(trace, 'Press Injection Rate'), column: 'press_cycle_time_s' });
+  });
+
+  it('a value with no place the dialog can open carries none: the computed shot volume', () => {
     expect(refOf(trace, 'Shot Melt Volume')).toBeUndefined();
   });
 
@@ -107,6 +110,7 @@ describe('the injection molding cycle inputs carry where they were read', () => 
     const bare = computeInjectionMoldedCostSummary(part({ pressTiming: PRESS.timing, materialRecord: null }));
     const t = lineNamed(bare.processLines, 'Injection Molding - Cycle Time').calculationTrace;
     expect(refOf(t, 'Press Injection Rate')).toBeUndefined();
+    expect(refOf(t, 'Press Dry Cycle Time')).toBeUndefined();
     expect(refOf(t, 'Melt Temperature')).toBeUndefined();
     expect(bare.totalCost).toBe(result.totalCost);
   });
@@ -187,14 +191,17 @@ describe('the mold tooling inputs', () => {
 });
 
 describe('compression and reaction injection molding', () => {
-  it('compression: the cure time opens the material record; the press open/close time has no viewer column', () => {
+  it('compression: the cure time opens the material record, the press open/close time the press record', () => {
+    const press = { id: 'mhr-cm-1', name: 'Compression press', machineClass: 'compression_molding', location: 'India' };
     const r = computeCompressionMoldingCost({
       batchSize: 250, partWeightKg: 0.2, rate: { ...rate('compression_molding', 40, 'Compression press'), pressCycleTimeS: 26.2, setupTimeHr: 1 },
-      cureTimeMinFromMaterial: 3, materialRecord: { id: 'rm-smc', name: 'SMC' }, calculators: CALCULATORS,
+      cureTimeMinFromMaterial: 3, machineRecord: press, materialRecord: { id: 'rm-smc', name: 'SMC' }, calculators: CALCULATORS,
     });
     const trace = r.processLines[0]!.calculationTrace;
     expect(refOf(trace, 'Material Cure Time')).toEqual({ kind: 'material', materialId: 'rm-smc', materialName: 'SMC', column: 'cure_time_min' });
-    expect(refOf(trace, 'Press Open/Close Time')).toBeUndefined();
+    expect(refOf(trace, 'Press Open/Close Time')).toEqual({
+      kind: 'machine', machineId: 'mhr-cm-1', machineName: 'Compression press', machineClass: 'compression_molding', location: 'India', column: 'press_cycle_time_s',
+    });
   });
 
   it('compression: a grade with no cure time is seeded 0 from nowhere, so no ref', () => {
@@ -215,6 +222,6 @@ describe('compression and reaction injection molding', () => {
     expect(refOf(trace, 'Machine Injection Rate')).toEqual({ kind: 'machine', machineId: 'mhr-rim-1', machineName: 'RIM press', machineClass: 'reaction_injection_molding', location: 'India', column: 'injection_rate_mm3_per_s' });
     expect(refOf(trace, 'Part Volume')).toEqual({ kind: 'cad', evidence: 'part_volume' });
     expect(refOf(trace, 'Material Cure Time')).toMatchObject({ kind: 'material', materialId: 'rm-pu', column: 'cure_time_min' });
-    expect(refOf(trace, 'Machine Dry Cycle Time')).toBeUndefined();
+    expect(refOf(trace, 'Machine Dry Cycle Time')).toEqual({ ...refOf(trace, 'Machine Injection Rate'), column: 'press_cycle_time_s' });
   });
 });
