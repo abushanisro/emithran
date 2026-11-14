@@ -119,7 +119,7 @@ import {
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
-import { isMachiningTreeFamily, showsCatalogOperations } from '@/lib/features/process-tree-family';
+import { isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
@@ -937,6 +937,11 @@ function buildProcessTree(
       }
     }
 
+    // A step that acts on the whole part (a sand casting's melting, pouring, cooling, ...): the part is its feature, highlighted whole.
+    if (featureNodes.length === 0 && matchedCostLine?.actsOnWholePart) {
+      featureNodes.push({ id: `whole_part_${opIdx}`, kind: 'feature', label: 'Whole casting', factory, machine, wholePart: true });
+    }
+
     // A secondary process (CMM, cleaning, NDT, packaging): what it acts on, from
     // the secondary-process engine's own result for this step.
     const secondary = featureNodes.length === 0
@@ -954,7 +959,7 @@ function buildProcessTree(
     }
 
     // Any step not covered above: its own cost line's feature breakdown, as is.
-    if (featureNodes.length === 0 && breakdown.length > 0) {
+    if (featureNodes.length === 0 && breakdown.length > 0 && showsStepTextRows(family)) {
       breakdown.forEach((b, i) => {
         const ids = (b.featureIds ?? []).filter((id) => v2ById.has(id));
         featureNodes.push({
@@ -971,7 +976,7 @@ function buildProcessTree(
       });
     }
     // Nothing real to show: say so, rather than a stand-in step name.
-    if (featureNodes.length === 0) {
+    if (featureNodes.length === 0 && showsStepTextRows(family)) {
       featureNodes.push({
         id: `nodata_${opIdx}`,
         kind: 'feature',

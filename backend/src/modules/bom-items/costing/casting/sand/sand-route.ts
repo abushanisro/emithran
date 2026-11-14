@@ -203,9 +203,11 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   const machines = (c: string) => input.machinesByClass[c] ?? [];
   const step = (process: string, machineClass: string, evaluate: Parameters<typeof selectAndCost>[0]['evaluate'], criteria: string[]): CostedStep =>
     selectAndCost({ process, machineClass, machines: machines(machineClass), evaluate, criteria, ...common });
+  // A step that acts on the whole casting (the metal it becomes, its surface): the process tree highlights the part for it.
+  const wholePart = (s: CostedStep): CostedStep => ({ ...s, line: { ...s.line, actsOnWholePart: true } });
 
   const before: CostedStep[] = [];
-  const melt = step('Melting', 'sand_casting_melting', (m) => meltStep(ctx, m), ['The furnace reaches the pouring temperature', "The furnace holds one mould's metal (furnaceCapacitySafetyFactor)", 'A machine hour rate on file or from the HR Rates engine']);
+  const melt = wholePart(step('Melting', 'sand_casting_melting', (m) => meltStep(ctx, m), ['The furnace reaches the pouring temperature', "The furnace holds one mould's metal (furnaceCapacitySafetyFactor)", 'A machine hour rate on file or from the HR Rates engine']));
   before.push(melt);
   for (const core of cored.cores) {
     before.push(coreLine({ ctx, core, machinesByClass: input.machinesByClass, batchSize: scenario.batchSize, costContext: input.costContext, chosenProcess: scenario.chosenCoreProcess }).step);
@@ -213,13 +215,13 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   // The cores coated and dried, and glued into an assembly (only what the user chose to coat; the gluing needs two cores or more).
   before.push(...coreRefractoryLines(ctx, scenario.refractory ?? PLANT_REFRACTORY, cored.cores.map((c) => c.region), { machinesByClass: input.machinesByClass, ...common }));
   const after: CostedStep[] = [
-    step('Pour', 'sand_casting_pour', (m) => pourStep(ctx, m), ['The ladle holds one mould', 'A pouring coefficient for the material']),
-    step('Cooling', 'sand_casting_cooling', (m) => coolStep(ctx, m, mould.machineClass === PIT_CLASS), ["Chvorinov's rule on the casting's modulus"]),
-    step('Shakeout', 'sand_casting_shakeout', (m) => shakeoutStep(ctx, m), ["The machine takes one mould's metal and core sand"]),
+    wholePart(step('Pour', 'sand_casting_pour', (m) => pourStep(ctx, m), ['The ladle holds one mould', 'A pouring coefficient for the material'])),
+    wholePart(step('Cooling', 'sand_casting_cooling', (m) => coolStep(ctx, m, mould.machineClass === PIT_CLASS), ["Chvorinov's rule on the casting's modulus"])),
+    wholePart(step('Shakeout', 'sand_casting_shakeout', (m) => shakeoutStep(ctx, m), ["The machine takes one mould's metal and core sand"])),
     step('Degating', 'sand_casting_degating', (m) => degateStep(ctx, m), ['A machine that cuts (a feed rate)', 'It takes the part and cuts across the widest gate or riser']),
-    step('Cleaning', 'sand_casting_cleaning', (m) => cleanStep(ctx, m), ["It takes the part's weight, height and width"]),
-    step('Finishing', 'sand_casting_finishing', (m) => finishStep(ctx, m), ['It takes the part', "A grinding speed factor for the material's cut code"]),
-    step('Visual Inspection', 'sand_casting_visual_inspection', (m) => inspectStep(ctx, m), ['A machine hour rate on file']),
+    wholePart(step('Cleaning', 'sand_casting_cleaning', (m) => cleanStep(ctx, m), ["It takes the part's weight, height and width"])),
+    wholePart(step('Finishing', 'sand_casting_finishing', (m) => finishStep(ctx, m), ['It takes the part', "A grinding speed factor for the material's cut code"])),
+    wholePart(step('Visual Inspection', 'sand_casting_visual_inspection', (m) => inspectStep(ctx, m), ['A machine hour rate on file'])),
   ];
   return { missing: [], shared: { ctx, gating, metal: metal.run, coresMade: cored.cores.length, coresLeftSolid: cored.thin, netKg, pouredKg, notes, before, after, cores: cored.cores } };
 }
