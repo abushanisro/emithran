@@ -83,6 +83,7 @@ import { ApplyScenarioDto, type ScenarioApplicationResult } from './dto/apply-sc
 import { PartSummaryService } from './services/part-summary.service';
 import type { PartSummary } from './costing/shared/part-summary';
 import { PlasticDfmService, MOLDING_PROCESS_NAMES } from './costing/plastic-molding/dfm/plastic-dfm.service';
+import { MachiningDfmService } from './costing/machining/dfm/machining-dfm.service';
 import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
 import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
@@ -125,6 +126,7 @@ export class BOMItemsController {
     private readonly nreService: NreService,
     private readonly dfmScoringService: DFMScoringService,
     private readonly plasticDfm: PlasticDfmService,
+    private readonly machiningDfm: MachiningDfmService,
     private readonly partSummaries: PartSummaryService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     private readonly databaseService: DatabaseService,
@@ -512,6 +514,18 @@ export class BOMItemsController {
     if (process && chosen !== process) throw new BadRequestException(`process must be one of: ${MOLDING_PROCESS_NAMES.join(', ')}`);
     const item = await this.bomItemsService.findOne(id, user.id, token);
     return this.plasticDfm.evaluate({ featureGraph: item.featureGraph, grade: item.materialGrade ?? null, process: chosen, client: this.databaseService.getClient(token) });
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/machining-dfm')
+  @ApiOperation({ summary: 'Design-for-machining checks of a part against the machining reference limits; findings carry the features and faces to highlight' })
+  @ApiResponse({ status: 200, description: 'The findings, and every check with its limit, source and status (passed, failed, or not evaluated with why)' })
+  async getMachiningDfm(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    return this.machiningDfm.evaluate({
+      featureGraph: item.featureGraph,
+      part: { dimensionsMm: [item.maxLength, item.maxWidth, item.maxHeight], weightKg: item.weight },
+    });
   }
 
   @OrgRole('viewer')

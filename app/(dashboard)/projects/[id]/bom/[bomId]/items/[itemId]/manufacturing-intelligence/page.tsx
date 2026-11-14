@@ -25,6 +25,7 @@ import { GcdToleranceTab } from '@/components/features/manufacturing-intelligenc
 import { MachineChoicePanel } from '@/components/features/manufacturing-intelligence/MachineChoicePanel';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
 import { MachineSpecPanel } from '@/components/features/manufacturing-intelligence/MachineSpecPanel';
+import { MachiningDfmCheckRows, MachiningDfmFindings } from '@/components/features/manufacturing-intelligence/MachiningDfmFindings';
 import { SecondaryOperationsPicker } from '@/components/features/manufacturing-intelligence/SecondaryOperationsPicker';
 import { VendorNetworkPanel } from '@/components/features/manufacturing-intelligence/VendorNetworkPanel';
 import { CalculationTracePanel } from '@/components/features/process-planning/CalculationTracePanel';
@@ -7086,6 +7087,8 @@ function ValidationTab({
   const { data: dccCost } = useCostSummary(item.id, batchSize, factory);
   const dccNodes = drawingCadConsistencyNodes(dccCost?.drawingCadConsistency ?? []);
   const v2FeaturesForDcc = fg?.feature_graph_v2?.features ?? [];
+  // A machined part's design-for-machining checks are listed with the DFM checks below.
+  const machinedFeatures = isMachiningTreeFamily(item.familyClassification ?? fg?.classification.family ?? '') ? v2FeaturesForDcc : [];
   const resolveDccHighlight = (ids: string[] | undefined): FeatureNodeV2 | null => {
     if (!ids?.length) return null;
     const idSet = new Set(ids);
@@ -7370,9 +7373,14 @@ function ValidationTab({
               DFM Checks ({checks.length})
             </span>
           </div>
-          {checks.length === 0 ? (
+          {machinedFeatures.length > 0 ? (
+            <div className="divide-y divide-border/30 border border-border/40 rounded text-[11px] mb-1.5">
+              <MachiningDfmCheckRows itemId={item.id} features={machinedFeatures} onSelectHighlight={onSelectHighlight} />
+            </div>
+          ) : null}
+          {checks.length === 0 ? (machinedFeatures.length > 0 ? null : (
             <p className="text-xs text-muted-foreground pl-4">No DFM checks available.</p>
-          ) : (
+          )) : (
             <div className="divide-y divide-border/30 border border-border/40 rounded text-[11px]">
               {checks.map((c) => (
                 <div key={c.id} className="px-2 py-1.5 flex items-start gap-2">
@@ -7449,7 +7457,12 @@ function ValidationTab({
 
 // ── DesignGuidanceTab ─────────────────────────────────────────────────────────
 
-function DesignGuidanceTab({ fg, plastic }: { fg: FeatureGraph | null; plastic?: { itemId: string; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined }) {
+function DesignGuidanceTab({ fg, plastic, machining }: {
+  fg: FeatureGraph | null;
+  plastic?: { itemId: string; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined;
+  /** A machined part: its checks against the machining reference limits replace the empty placeholder. */
+  machining?: { itemId: string; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined;
+}) {
   // On a molded part the fixed-threshold warnings the rule-based engine replaced are not shown (an analysis stored before the change still holds them).
   const warnings = (fg?.dfmWarnings ?? []).filter((w) => !plastic || !isSupersededPlasticWarning(w));
 
@@ -7471,7 +7484,8 @@ function DesignGuidanceTab({ fg, plastic }: { fg: FeatureGraph | null; plastic?:
   return (
     <div className="p-3 space-y-2">
       {plastic && <PlasticDfmFindings itemId={plastic.itemId} onSelectHighlight={plastic.onSelectHighlight} />}
-      {warnings.length === 0 ? (plastic ? null : (
+      {machining && <MachiningDfmFindings itemId={machining.itemId} features={fg.feature_graph_v2?.features ?? []} onSelectHighlight={machining.onSelectHighlight} />}
+      {warnings.length === 0 ? (plastic || machining ? null : (
         <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
           <span className="text-lg">✅</span>
           <p className="text-xs text-center">No DFM warnings — design looks manufacturable.</p>
@@ -8859,7 +8873,7 @@ function GeometricCostDriversPanel({
       {/* Design / DFM tab */}
       {tab === 'design' && (
         <div className="flex-1 overflow-y-auto min-h-0">
-          <DesignGuidanceTab fg={fg} plastic={isIM ? { itemId: item.id, onSelectHighlight } : undefined} />
+          <DesignGuidanceTab fg={fg} plastic={isIM ? { itemId: item.id, onSelectHighlight } : undefined} machining={machiningFeatures.length > 0 ? { itemId: item.id, onSelectHighlight } : undefined} />
         </div>
       )}
     </div>

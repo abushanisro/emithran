@@ -325,6 +325,13 @@ export class MachiningLookupService {
     return this.loadTable('tblOperationSizeRanges');
   }
 
+  /** The standard drill diameters, mm (tblDrillSizeChart), or null when the chart is not staged. */
+  async getDrillSizesMm(): Promise<number[] | null> {
+    const sizes = (await this.loadObjectTable('tblDrillSizeChart'))?.sizes;
+    if (!Array.isArray(sizes)) return null;
+    return sizes.map((r: { drill_size_mm?: unknown }) => Number(r.drill_size_mm)).filter((d) => Number.isFinite(d) && d > 0);
+  }
+
   // ── Part load / unload / reorientation by equipment, weight and size (componentLoadTime).
   async getComponentLoadTime(): Promise<any[] | null> {
     return this.loadTable('componentLoadTime');

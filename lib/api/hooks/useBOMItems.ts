@@ -556,6 +556,43 @@ export function usePlasticDfm(bomItemId: string | undefined, enabled: boolean) {
   });
 }
 
+export type MachiningDfmSeverity = 'critical' | 'major' | 'minor';
+export interface MachiningDfmFinding {
+  rule: string;
+  severity: MachiningDfmSeverity;
+  label: string;
+  limit: string;
+  source: string;
+  recommendation: string;
+  featureIds: string[];
+  occurrences: { featureId: string; occurrenceIndex: number }[];
+  faces: number[];
+}
+export interface MachiningDfmCheck {
+  rule: string;
+  name: string;
+  limit: string;
+  source: string;
+  status: 'passed' | 'failed' | 'not_evaluated';
+  detail: string;
+}
+export interface MachiningDfmView {
+  status: 'ok' | 'no_analysis';
+  result: { findings: MachiningDfmFinding[]; checks: MachiningDfmCheck[] } | null;
+  reasons: string[];
+}
+
+/** The design-for-machining checks of a machined part against the machining reference limits (evaluated when asked). */
+export function useMachiningDfm(bomItemId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['bom-items', bomItemId, 'machining-dfm'],
+    queryFn: async () => apiClient.get<MachiningDfmView>(`/bom-items/${bomItemId ?? ''}/machining-dfm`),
+    enabled: useAuthEnabledWith(!!bomItemId && enabled),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
 // ── Cost Summary ──────────────────────────────────────────────────────────────
 
 // ── Machine selection (physics-based capability engine) ──────────────────────

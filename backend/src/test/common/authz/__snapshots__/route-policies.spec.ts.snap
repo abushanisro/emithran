@@ -92,6 +92,7 @@ org:viewer      GET /api/v1/bom-items/:id/feature-tolerances  BOMItemsController
 org:viewer      GET /api/v1/bom-items/:id/file-url/:fileType  BOMItemsController.getFileUrl
 org:viewer      GET /api/v1/bom-items/:id/file-url/dxf  BOMItemsController.getDxfFileUrl
 org:viewer      GET /api/v1/bom-items/:id/gdt-analysis  BOMItemsController.getGdtAnalysis
+org:viewer      GET /api/v1/bom-items/:id/machining-dfm  BOMItemsController.getMachiningDfm
 org:viewer      GET /api/v1/bom-items/:id/machining-need  BOMItemsController.getMachiningNeed
 org:viewer      GET /api/v1/bom-items/:id/manufacturing-implications  BOMItemsController.getManufacturingImplications
 org:viewer      GET /api/v1/bom-items/:id/material-intelligence  BOMItemsController.getMaterialIntelligence
