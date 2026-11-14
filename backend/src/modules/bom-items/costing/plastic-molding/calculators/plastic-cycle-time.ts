@@ -14,7 +14,8 @@ import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
 import { cadEvidenceKey } from '../../shared/cad-evidence';
-import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR } from './plastic-cycle-time-seeds';
+import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, visualInspectionSeeds, weightCheckSeeds, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR, VISUAL_INSPECTION_CALCULATOR, WEIGHT_CHECK_CALCULATOR } from './plastic-cycle-time-seeds';
+import type { WeightCheckReference } from '../reference/im-reference';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
 export function calculatorFingerprint(def: ReferenceCalculatorDef): string {
@@ -117,6 +118,19 @@ export function runDeflashingTime(input: { partingLineLengthMm: number | null; r
 /** The time the hydraulic slides add to each part (F-32), by the stored slide movement calculator, or what is missing. */
 export function runSlideMovementTime(input: { slideStrokeMm: number | null; rateMmPerS: number | null; cavities: number }, calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(SLIDE_MOVEMENT_CALCULATOR, slideMovementSeeds(input), calculators);
+}
+
+/** The visual inspection time per part (F-34), by the stored visual inspection calculator, or what is missing. */
+export function runVisualInspectionTime(input: { surfaceAreaMm2: number | null; minPerM2: number | null; percent: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(VISUAL_INSPECTION_CALCULATOR, visualInspectionSeeds(input), calculators);
+}
+
+/** The weight check time per part and the scale's hourly rate (F-35), by the stored weight check calculator, or what is missing. */
+export function runWeightCheck(ref: WeightCheckReference, calculators: ReferenceCalculators | null | undefined): PressCycle & { scaleRateUsdPerHr?: number } {
+  const run = runPress(WEIGHT_CHECK_CALCULATOR, weightCheckSeeds(ref), calculators);
+  if (!run.derivable) return run;
+  const rate = run.trace.find((t) => t.fieldName === 'Scale Rate')?.value;
+  return typeof rate === 'number' ? { ...run, scaleRateUsdPerHr: rate } : { derivable: false, missing: ['the scale rate (Scale Rate)'] };
 }
 
 /** The cycle of a reaction injection molding (dry cycle + fill + cure time), by the stored calculator. */

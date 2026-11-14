@@ -6,6 +6,8 @@ import {
   PLASTIC_LOOKUP_KEYS,
   PLASTIC_REFERENCE_SOURCE_VERSION,
   PLASTIC_VARIABLE_KEYS,
+  SECONDARY_PROCESS_SOURCE_VERSION,
+  SECONDARY_VARIABLE_KEYS,
   resolvePlasticReference,
   canonicalReferenceRows,
   type CanonicalReferenceRows,
@@ -47,19 +49,22 @@ export class PlasticReferenceService {
   async getReference(): Promise<{ reference: PlasticReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
     const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
-    const [vars, lookups, gpps] = await Promise.all([
+    const [vars, secondaryVars, lookups, gpps] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
         .in('key', [...PLASTIC_VARIABLE_KEYS]),
+      db.from('machining_reference_data').select('key, value')
+        .eq('category', 'variable').eq('source_version', SECONDARY_PROCESS_SOURCE_VERSION)
+        .in('key', [...SECONDARY_VARIABLE_KEYS]),
       db.from('machining_reference_data').select('key, raw')
         .eq('category', 'lookup_table').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
         .in('key', [...PLASTIC_LOOKUP_KEYS]),
       this.loadGpps(db),
     ]);
-    const error = vars.error ?? lookups.error ?? gpps.error;
+    const error = vars.error ?? secondaryVars.error ?? lookups.error ?? gpps.error;
     if (error) return { reference: null, missing: [`Plastic reference data (${error.message})`] };
     const rows = {
-      variables: vars.data ?? [],
+      variables: [...(vars.data ?? []), ...(secondaryVars.data ?? [])],
       lookups: Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
       gppsMaterial: gpps.data ?? undefined,
     };

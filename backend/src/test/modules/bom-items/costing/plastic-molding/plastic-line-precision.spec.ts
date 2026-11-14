@@ -45,7 +45,7 @@ describe('a molding line keeps the precision of the database, not of a cent', ()
   it('the parts of the line add up to the line (setup + run = total; machine + labor = run), which cents never did: 0.30 + 0.07 was shown as 0.36', () => {
     expect(line.setupCost + line.runCost).toBeCloseTo(line.totalCost, 5);
     expect(line.machineCostPerPart! + line.laborCostPerPart!).toBeCloseTo(line.runCost, 5);
-    expect(r.totalProcessCost).toBeCloseTo(line.totalCost, 5);
+    expect(r.totalProcessCost).toBeCloseTo(r.processLines.reduce((s, l) => s + l.totalCost, 0), 5);
     expect(r.totalCost).toBeCloseTo(r.materialCost + r.totalProcessCost, 5);
   });
 

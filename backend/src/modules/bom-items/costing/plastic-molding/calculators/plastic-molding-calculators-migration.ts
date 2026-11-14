@@ -21,14 +21,26 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1020 the injection mold tooling calculator, version 8: the rib inserts and their EDM
  *   1021 the injection molding slide movement calculator: the hydraulic slides' movement in each shot
  *   1022 the injection mold tooling calculator, version 9: heat treatment by steel grade, and the hot drops
+ *   1023 the injection molding visual inspection and weight check calculators
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1022] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1022, 1023] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
+  1023: {
+    title: 'Injection molding visual inspection and weight check calculators.',
+    rootCause: [
+      'Visual inspection is routed for every molded part, but it was reported as having no sourced data. An audit of memory/ found it staged under',
+      'Secondary process (2026-Secondary): visualInspectTimeStandard, 5 min per square metre of part surface, and defaultPercentToBeTested, 100 %.',
+      'This calculator times the inspection as the surface area x that rate x the share inspected, per part (formula registry F-34). A helper: the',
+      'injection engine runs it for the routed visual inspection and charges it at the bench rate. The weight check calculator times one check of 10 s',
+      'every 1,000 parts by the press operator (the costing engineer\'s defaults) and derives the bench scale\'s hourly rate from its price (OHAUS',
+      'Defender 3000) with the machine-hour rate pattern of migration 580 (formula registry F-35).',
+    ].join('\n'),
+  },
   1022: {
     title: 'Injection mold tooling calculator, version 9 -- heat treatment by steel grade, and the hot drops.',
     rootCause: [
@@ -92,4 +104,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   1010: '1010_plastic_deflashing_calculator.sql',
   1021: '1021_plastic_slide_movement_calculator.sql',
   1022: '1022_plastic_mold_steel_treatment_hot_drops.sql',
+  1023: '1023_plastic_inspection_calculators.sql',
 };

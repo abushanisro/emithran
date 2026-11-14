@@ -72,6 +72,13 @@ export const PLASTIC_VARIABLE_KEYS = [
   // The hot drops of a hot runner (F-33).
   'costPerStandardHotDrop', 'costPerSVGHotDrop', 'defaultHotDropType',
 ] as const;
+/**
+ * Variables of memory/Secondary process (source_version 2026-Secondary) the plastic model reads: the visual inspection time per surface area and the
+ * share of parts inspected (F-34). Loaded next to the plastic variables; no key repeats a plastic one.
+ */
+export const SECONDARY_PROCESS_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === 'secondary_process')!.sourceVersion;
+export const SECONDARY_VARIABLE_KEYS = ['visualInspectTimeStandard', 'defaultPercentToBeTested'] as const;
+
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
   'cmStandardToolingComponents',
@@ -254,6 +261,9 @@ export interface FeatureRules {
   manualFlashTrimmingRateMmPerS?: number | null;
   /** variable slideCycleRate (Velocity, read as mm/s): how fast a hydraulic slide moves (F-32); null when not staged. */
   slideCycleRateMmPerS?: number | null;
+  /** memory/Secondary process visualInspectTimeStandard (min/m2) and defaultPercentToBeTested (%): visual inspection (F-34); null when not staged. */
+  visualInspectMinPerM2?: number | null;
+  inspectedPercent?: number | null;
 }
 
 export interface PlasticReferenceRows {
@@ -557,6 +567,8 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
         autoManualFlashTrimming: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(text.get('cmAutoIncludeManualFlashTrimming')?.trim().toLowerCase()),
         manualFlashTrimmingRateMmPerS: optionalPositive('cmManualFlashTrimmingRate'),
         slideCycleRateMmPerS: optionalPositive('slideCycleRate'),
+        visualInspectMinPerM2: optionalPositive('visualInspectTimeStandard'),
+        inspectedPercent: optionalPositive('defaultPercentToBeTested'),
       },
     },
     missing: [],

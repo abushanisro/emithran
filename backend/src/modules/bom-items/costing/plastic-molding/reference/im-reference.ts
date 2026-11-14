@@ -30,6 +30,31 @@ export function readReferenceCsv(file: string): Array<Record<string, string>> {
   return body.filter((r) => r.some((c) => c !== '')).map((r) => Object.fromEntries(header!.map((h, i) => [h, r[i] ?? ''])));
 }
 
+/** A value of the reference package with its unit, confidence and source, for a calculator input. */
+export interface ReferenceValue { value: number; unit: string; confidence: string; source: string }
+
+function referenceValue(rows: ReadonlyArray<Record<string, string>>, match: (r: Record<string, string>) => boolean, file: string): ReferenceValue | null {
+  const r = rows.find(match);
+  const value = r ? Number(r['value']) : NaN;
+  if (!r || r['value'] === '' || !Number.isFinite(value)) return null;
+  return { value, unit: r['unit'] ?? '', confidence: r['confidence'] ?? '', source: `reference/${file}: ${r['source_name']}` };
+}
+
+/** The weight check (quality-inspection-reference.csv) and the equipment economics its scale rate is derived with (equipment-economics-reference.csv). */
+export function weightCheckReference(
+  quality: ReadonlyArray<Record<string, string>> = readReferenceCsv('quality-inspection-reference.csv'),
+  economics: ReadonlyArray<Record<string, string>> = readReferenceCsv('equipment-economics-reference.csv'),
+) {
+  const q = (p: string) => referenceValue(quality, (r) => r['operation'] === 'weight_check' && r['parameter'] === p, 'quality-inspection-reference.csv');
+  const e = (p: string) => referenceValue(economics, (r) => r['parameter'] === p, 'equipment-economics-reference.csv');
+  return {
+    timePerCheckS: q('time_per_check'), samplingInterval: q('sampling_interval'), scalePriceUsd: q('scale_price'),
+    lifeYr: e('life'), maintenancePct: e('annual_maintenance_factor'), installationPct: e('installation_factor'), salvagePct: e('salvage_factor'),
+    uptimePct: e('uptime'), utilization: e('utilization'), scheduledHours: e('scheduled_hours'),
+  };
+}
+export type WeightCheckReference = ReturnType<typeof weightCheckReference>;
+
 export interface SteelTreatment {
   steelGrade: string;
   deliveryCondition: string;

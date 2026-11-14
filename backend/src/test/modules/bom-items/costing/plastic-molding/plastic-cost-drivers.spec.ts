@@ -25,18 +25,18 @@ describe('plasticCostDrivers', () => {
     expect(d['Parting complexity']).toMatchObject({ value: 0.5, use: 'priced' });
   });
 
-  it('counts side-action features from the recognised graph and says slides and lifters are not priced', () => {
+  it('counts side-action features from the recognised graph: slides and lifters are priced (their blocks, and the slide movement)', () => {
     const d = by(plasticCostDrivers(facts()));
     expect(d['Undercut features']).toMatchObject({ value: 2, use: 'priced' });
-    expect(d['Slide-or-lifter bundles']).toMatchObject({ value: 2, use: 'not_priced' });
+    expect(d['Slide-or-lifter bundles']).toMatchObject({ value: 2, use: 'priced' });
     expect(d['Slide bundles']).toBeUndefined();
   });
 
-  it('says what is not read: holes and finishing are not priced, the findings are findings', () => {
+  it('says what is not read: holes are not priced, surface area now prices the visual inspection, the findings are findings', () => {
     const d = by(plasticCostDrivers(facts()));
     expect(d['Holes']).toMatchObject({ value: 28, use: 'dfm' });
     expect(d['Distinct hole sizes']).toMatchObject({ value: 4, use: 'dfm' });
-    expect(d['Surface area']).toMatchObject({ use: 'not_priced' });
+    expect(d['Surface area']).toMatchObject({ use: 'priced' });
     expect(d['Undrafted faces']).toMatchObject({ value: 15, use: 'dfm' });
     expect(d['Average draft angle']).toMatchObject({ value: 0, use: 'dfm' });
   });
