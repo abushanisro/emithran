@@ -9,7 +9,7 @@ import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 export type SourceRef =
   | { kind: 'variable'; domain: string; name: string }
   | { kind: 'lookup'; domain: string; table: string; column: string; row: Record<string, string | number> | null }
-  | { kind: 'machine'; machineId: string; machineName: string; machineClass: string; location: string | null; column: string }
+  | { kind: 'machine'; machineId: string; machineName: string; machineClass?: string; location?: string | null; column: string }
   | { kind: 'material'; materialId: string; materialName: string; column: string }
   | { kind: 'cad'; evidence: string }
   | { kind: 'calculation'; name: string; evidence: string | null; steps: CalculationTraceStep[] };

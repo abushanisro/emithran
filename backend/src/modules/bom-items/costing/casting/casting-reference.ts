@@ -63,6 +63,8 @@ type ChamberType = 'hot' | 'cold';
 const CHAMBER_BY_CODE: Record<number, ChamberType> = { 1: 'hot', 2: 'cold' };
 
 export interface CastingMaterial {
+  /** The raw_materials record the alloy was read from (its values' source); null when not known. */
+  id: string | null;
   name: string;
   materialType: string | null;
   densityKgM3: number | null;
@@ -269,13 +271,14 @@ export function resolveCastingReference(rows: CastingReferenceRows): { reference
  * and Zinc-Aluminum rows that Chamber Type marks 1, so it is not used.)
  */
 interface CastingMaterialRows {
-  row: { name: string | null; material_type: string | null; density_kg_m3: unknown; cost_usa: unknown; cut_code: unknown };
+  row: { id?: unknown; name: string | null; material_type: string | null; density_kg_m3: unknown; cost_usa: unknown; cut_code: unknown };
   properties: Readonly<Record<string, number | null>>;
 }
 
 export function resolveCastingMaterial({ row, properties: p }: CastingMaterialRows): CastingMaterial {
   const chamberCode = p['chamber_type'] ?? null;
   return {
+    id: row.id != null && row.id !== '' ? String(row.id) : null,
     name: String(row.name ?? ''),
     materialType: row.material_type || null,
     densityKgM3: num(row.density_kg_m3),

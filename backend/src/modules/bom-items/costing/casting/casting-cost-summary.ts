@@ -17,7 +17,7 @@ import type { SandRoute } from './sand/sand-route';
 import { gatingLayout, GATING_CALCULATOR, RISERS_CALCULATOR } from './sand/sand-gating';
 import { CORE_BOX, CORE_SAND } from './sand/sand-cores';
 import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
-import { castingSeed, runView } from './casting-calculator-seeds';
+import { castingSeed, runView, type AlloyRecord } from './casting-calculator-seeds';
 import type { DieToolingResult } from './die-tooling';
 import { computeSustainability } from '../shared/core/cost-engine';
 import { HPDC_PROCESS, type HpdcResult } from './hpdc-engine';
@@ -94,7 +94,7 @@ export function buildCastingCostSummary(input: {
   cores?: { lines: ProcessLineCost[]; corebox: { boxes: number; costUsd: number; perPartUsd: number | null; detail: string; run: CalculatorRunDto } | null; warnings: string[] } | null;
   /** Die casting: the calculators and the alloy the metal is computed from. */
   calculators?: ReferenceCalculators | null;
-  alloy?: { name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
+  alloy?: (AlloyRecord & { densityKgM3: number | null; yieldLossFactor: number | null }) | null;
   /** Die casting: melted metal per part (the Melting calculator); null when not derived. */
   meltedKg?: number | null;
   /** Calculator runs behind other values of this summary (trim force, ...). */
@@ -116,16 +116,16 @@ export function buildCastingCostSummary(input: {
   if (input.process === 'die_casting' && input.alloy) {
     const alloy = input.alloy;
     const net = runReferenceCalculator(input.calculators, 'Net Material Usage', {
-      ...(input.partVolumeMm3 > 0 ? { 'Part Volume': castingSeed.cad(input.partVolumeMm3, 'part volume (mm³)') } : {}),
-      ...(alloy.densityKgM3 != null && alloy.densityKgM3 > 0 ? { Density: castingSeed.alloy(alloy.name, 'Density (kg/m^3)', alloy.densityKgM3) } : {}),
+      ...(input.partVolumeMm3 > 0 ? { 'Part Volume': castingSeed.cad(input.partVolumeMm3, 'part volume (mm³)', 'part_volume') } : {}),
+      ...(alloy.densityKgM3 != null && alloy.densityKgM3 > 0 ? { Density: castingSeed.alloy(alloy, 'density_kg_m3', 'Density (kg/m^3)', alloy.densityKgM3) } : {}),
     }, 'Net Usage');
     calculatorRuns['Net Material Usage'] = runView('Die Casting - Net Material Usage', 'Net Usage', net);
     if (net.value == null) warnings.push(`Part weight not derived (${net.missing.join('; ')}): material not costed.`);
     else {
       netKg = net.value;
       const gross = runReferenceCalculator(input.calculators, 'Gross Material Usage', {
-        'Net Usage': castingSeed.calculator(net.value, 'Net Material Usage'),
-        ...(alloy.yieldLossFactor != null ? { 'Yield Loss Factor': castingSeed.alloy(alloy.name, 'Yield Loss Factor', alloy.yieldLossFactor) } : {}),
+        'Net Usage': castingSeed.calculator(net.value, 'Net Material Usage', net, 'part_volume'),
+        ...(alloy.yieldLossFactor != null ? { 'Yield Loss Factor': castingSeed.alloy(alloy, 'yield_loss_factor', 'Yield Loss Factor', alloy.yieldLossFactor) } : {}),
       }, 'Gross Usage');
       calculatorRuns['Gross Material Usage'] = runView('Die Casting - Gross Material Usage', 'Gross Usage', gross);
       if (gross.value != null) chargedKg = gross.value;

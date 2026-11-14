@@ -137,7 +137,7 @@ describe('gravity die casting cycle (memory/Die Casting)', () => {
     const s = buildCastingCostSummary({
       family: 'die_cast', process: 'die_casting', hpdc: r, materialGrade: al380.name, materialCostPerKg: 5,
       materialDensityKgM3: al380.densityKgM3!, materialSource: 'db', partVolumeMm3: 30_000, batchSize: 1000, warnings: [], ratesSource: 'test',
-      calculators, alloy: { name: al380.name, densityKgM3: al380.densityKgM3, yieldLossFactor: al380.yieldLossFactor },
+      calculators, alloy: { id: al380.id, name: al380.name, densityKgM3: al380.densityKgM3, yieldLossFactor: al380.yieldLossFactor },
       meltedKg: (r.shotVolumeMm3! / r.cavities!.count / 1e9) * al380.densityKgM3!,
     });
     const kg = (30_000 / 1e9) * al380.densityKgM3!;

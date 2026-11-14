@@ -3997,7 +3997,7 @@ export class BOMItemsService {
       let machiningAllowance: MachiningAllowanceResult | null = null;
       // Die casting: what the metal calculators of the summary need.
       let metal: {
-        calculators: ReferenceCalculators; alloy: { name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
+        calculators: ReferenceCalculators; alloy: { id: string | null; name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
         meltedKg: number | null; calculatorRuns: Record<string, CalculatorRunDto>;
       } | null = null;
 
@@ -4017,7 +4017,7 @@ export class BOMItemsService {
           readFinishingMachines(client, 'casting_pm_melting', location),
           this.calculatorCatalogService.loadDieCastingCalculators(accessToken),
         ]);
-        const alloyRef = castingAlloy ? { name: castingAlloy.name, densityKgM3: castingAlloy.densityKgM3, yieldLossFactor: castingAlloy.yieldLossFactor } : null;
+        const alloyRef = castingAlloy ? { id: castingAlloy.id, name: castingAlloy.name, densityKgM3: castingAlloy.densityKgM3, yieldLossFactor: castingAlloy.yieldLossFactor } : null;
 
         // Cleaning after casting and Visual Inspection at the end (memory/Die
         // Casting machines and tblVisualInspection), every die-cast part,
@@ -4031,14 +4031,14 @@ export class BOMItemsService {
         // The part weight every finishing line uses (calculator Net Material Usage).
         const netRun = castingAlloy && (item.volume ?? 0) > 0 && castingAlloy.densityKgM3 != null
           ? runReferenceCalculator(castingCalcs, 'Net Material Usage', {
-              'Part Volume': castingSeed.cad(item.volume as number, 'part volume (mm³)'),
-              Density: castingSeed.alloy(castingAlloy.name, 'Density (kg/m^3)', castingAlloy.densityKgM3),
+              'Part Volume': castingSeed.cad(item.volume as number, 'part volume (mm³)', 'part_volume'),
+              Density: castingSeed.alloy(castingAlloy, 'density_kg_m3', 'Density (kg/m^3)', castingAlloy.densityKgM3),
             }, 'Net Usage')
           : null;
         const partMassKg = netRun?.value ?? null;
         const c = cleaningLine({
           machines: local(cleaners), calculators: castingCalcs,
-          partWeight: partMassKg != null ? castingSeed.calculator(partMassKg, 'Net Material Usage') : null,
+          partWeight: netRun?.value != null ? castingSeed.calculator(netRun.value, 'Net Material Usage', netRun, 'part_volume') : null,
           partDimsMm: [((item as any).maxLength ?? 0) as number, ((item as any).maxWidth ?? 0) as number, ((item as any).maxHeight ?? 0) as number],
           batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_cleaning', costContext: zeroCtx,
         });
@@ -4048,7 +4048,7 @@ export class BOMItemsService {
           batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_visual_inspection', costContext: zeroCtx,
         });
         const t = trimLine({
-          machines: local(trimPresses), calculators: castingCalcs, alloyName: castingAlloy?.name ?? null, partsPerStroke: refSet.reference?.variables.defaultNumberOfTrimmedParts ?? null,
+          machines: local(trimPresses), calculators: castingCalcs, alloy: castingAlloy, partsPerStroke: refSet.reference?.variables.defaultNumberOfTrimmedParts ?? null,
           partingPerimeterMm: (summary.castingPartingPerimeterMm as number | null) ?? null, partMassKg,
           dimensions: refSet.reference?.grindingDimensions ?? [], shearStrengthMpa: castingAlloy?.shearStrengthMpa ?? null,
           batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_trim', costContext: zeroCtx,
@@ -4178,11 +4178,11 @@ export class BOMItemsService {
           const ductileUsd = ductileRaw != null && ductileRaw !== '' && Number.isFinite(Number(ductileRaw)) ? Number(ductileRaw) : null;
           const melt = meltingLine({
             furnaces: furnaces, calculators: castingCalcs,
-            ductileIron: ductile && ductileUsd != null ? { name: ductile.name, costPerKg: ductileUsd * usdToLocal } : null,
+            ductileIron: ductile && ductileUsd != null ? { id: ductile.id, name: ductile.name, costPerKg: ductileUsd * usdToLocal } : null,
             regionConvFactor: refSet.reference?.variables.regionConvFactor ?? NaN,
             furnaceCapacitySafetyFactor: refSet.reference?.variables.furnaceCapacitySafetyFactor ?? NaN,
-            shotVolumeMm3: line.shotVolumeMm3, cavities: line.cavities?.count ?? null,
-            alloyName: castingAlloy?.name ?? null, densityKgM3: castingAlloy?.densityKgM3 ?? null,
+            shotVolumeMm3: line.shotVolumeMm3, shotVolumeRun: line.shotVolumeRun, cavities: line.cavities?.count ?? null,
+            alloy: castingAlloy, densityKgM3: castingAlloy?.densityKgM3 ?? null,
             injectionTempC: castingAlloy?.injectionTempC ?? null,
             batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_melting',
           });
