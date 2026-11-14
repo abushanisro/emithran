@@ -102,6 +102,8 @@ export interface MHRRateInput {
   // realBench branches) — lets a persisted process_cost_records row link back
   // to it as mhrId, same as every machineSelection-based class already can.
   mhrRecordId?: string | null;
+  /** The machine's setup hours as its memory reference record states them, where 0 is a recorded zero (resolveSetupMinutes referenceSetupTimeHr). Absent when not looked up. */
+  referenceSetupTimeHr?: number | null;
   // 'bm-mhr-<id>' — mhr_benchmark_rates row id, prefixed exactly like
   // mhr.service.ts#getBenchmarkRates() already does, when this rate came from
   // the benchmark fallback instead of a real imported machine. Without either

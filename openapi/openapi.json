@@ -3091,6 +3091,11 @@
             "example": 0,
             "type": "number"
           },
+          "stockLabel": {
+            "description": "The blank the cost engine sized for the part, as it describes it",
+            "example": "59×50×49 billet",
+            "type": "string"
+          },
           "unitCost": {
             "description": "Unit cost in INR (₹/unit)",
             "example": 81,
@@ -7048,6 +7053,10 @@
             "example": 36.7,
             "type": "number"
           },
+          "stockLabel": {
+            "description": "The blank the cost engine sized for the part; absent when none was recorded",
+            "type": "object"
+          },
           "totalCost": {
             "description": "Total cost in INR",
             "example": 20034.68,
@@ -10360,6 +10369,10 @@
           "scrap": {
             "description": "Scrap percentage",
             "type": "number"
+          },
+          "stockLabel": {
+            "description": "The blank the cost engine sized for the part, as it describes it",
+            "type": "string"
           },
           "unitCost": {
             "description": "Unit cost in INR (₹/unit)",

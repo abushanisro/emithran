@@ -61,7 +61,13 @@ export class MaterialCostSnapshotService {
     );
     // The geometry does not change with the Digital Factory, the price per kg does.
     const staleAgainstLocation = !!existing && (existing.country ?? '') !== location;
-    if (existing && !staleAgainstNesting && !staleAgainstLocation) return { action: 'kept', recordId: existing.id, usage: null };
+    // The blank the engine sized, as it describes it ("59×50×49 billet"): what the Part Summary shows as the stock.
+    const stockLabel = summary.blankSpec?.sizeLabel?.trim() || undefined;
+    if (existing && !staleAgainstNesting && !staleAgainstLocation) {
+      // A kept record written before the stock was recorded, or for a blank since resized within tolerance, takes the current label.
+      if (stockLabel && existing.stockLabel !== stockLabel) await this.costRecords.update(existing.id, { stockLabel } as never, userId, token);
+      return { action: 'kept', recordId: existing.id, usage: null };
+    }
 
     // Retire every active record first; one that cannot be retired stops the apply (a second active record doubles the material cost).
     for (const r of active) {
@@ -96,6 +102,7 @@ export class MaterialCostSnapshotService {
         materialGroup: material?.materialGroup,
         materialType: material?.materialType,
         materialDescription: material?.materialDescription,
+        ...(stockLabel ? { stockLabel } : {}),
         country: location,
         netUsage: usage.netUsage,
         grossUsage: usage.grossUsage,

@@ -282,6 +282,27 @@ describe('inspection line — memory/Machining reference (one analysis per inspe
     expect(insp.setupCost).toBe(0);
     expect(result.warnings.some((w) => w.includes('setup not costed') && w.includes('setup_time_hr'))).toBe(true);
   });
+
+  it('a station whose reference record states a zero setup is priced at zero, from the machine, with no warning', () => {
+    // memory/Machining inspection_usa.csv: Default, time.setup_time_hr 0.0. A recorded zero is not a missing setup.
+    const result = computeMillingCostSummary(
+      milledInput({ batchSize: 48, inspectionRate: rate(14.2, { machineClass: 'machining_inspection', machineName: 'Default', referenceSetupTimeHr: 0 }) }),
+      mc('3_axis_mill'),
+    );
+    const insp = inspOf(result);
+    expect(insp.setupTimeSource).toBe('machine');
+    expect(insp.setupCost).toBe(0);
+    expect(result.warnings.some((w) => w.includes('Inspection') && w.includes('setup not costed'))).toBe(false);
+  });
+
+  it('every line states its cycle as machine cost and no labour: the cost table reads the split, it does not guess it', () => {
+    const result = computeMillingCostSummary(milledInput({ batchSize: 48 }), mc('3_axis_mill'));
+    expect(result.processLines.length).toBeGreaterThan(1);
+    for (const line of result.processLines) {
+      expect(line.machineCostPerPart).toBe(line.runCost);
+      expect(line.laborCostPerPart).toBe(0);
+    }
+  });
 });
 
 describe('machining inputs light exactly the features they counted', () => {
