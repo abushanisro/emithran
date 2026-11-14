@@ -102,7 +102,22 @@ export type SourceRef =
   /** Measured on the part's CAD faces (costing/shared/cad-evidence.ts). */
   | { kind: 'cad'; evidence: CadEvidenceKey }
   /** Computed by another calculator: its steps (each with its own source), and the CAD faces it rests on when there are any. */
-  | { kind: 'calculation'; name: string; evidence: CadEvidenceKey | null; steps: CalculationTraceStep[] };
+  | { kind: 'calculation'; name: string; evidence: CadEvidenceKey | null; steps: CalculationTraceStep[] }
+  /** A sheet-metal reference table served by name (SheetMetalSourceTable): the row the value came from, and the column it is in. */
+  | { kind: 'smTable'; table: SheetMetalSourceTable; column: string; row: Record<string, string | number> | null };
+
+/**
+ * The sheet-metal reference tables a calculator input can be read from, each served whole to the calculator dialog: the sm_lookup_* cost
+ * tables and inspection_operation_defaults by GET /processes/sm-lookup-tables/by-name/:table (sm-lookup-bridge.config.ts allowlist), and the
+ * machine-library tables of sm_reference_data by their own endpoints (turret-reference-tables.ts, ProcessesService): turret_machines
+ * (/turret-machines-table), waterjet_machines (/waterjet-machines-table), deslag_allowance (/deslag-allowance-table) and stroke_rate_factor
+ * (/stroke-rate-factor-table, Lookup Table 1). Row keys are the served table's own column names.
+ */
+export const SHEET_METAL_LIBRARY_TABLES = ['turret_machines', 'waterjet_machines', 'deslag_allowance', 'stroke_rate_factor'] as const;
+export type SheetMetalSourceTable =
+  | (typeof SHEET_METAL_LIBRARY_TABLES)[number]
+  | 'inspection_operation_defaults'
+  | `sm_lookup_${string}`;
 
 export interface CalculationTraceStep {
   fieldName: string;         // real calculator_fields.field_name, e.g. "Cutting Speed"

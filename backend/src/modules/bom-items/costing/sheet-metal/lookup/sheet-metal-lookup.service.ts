@@ -93,11 +93,16 @@ export function roundUpToStandardTonnageClass(requiredTonnage: number): number {
 
 // ── Public interfaces ──────────────────────────────────────────────────────────
 
+/** The sm_lookup_* row a value was read from, by the columns that identify it (the calculator dialog outlines this row). */
+export type LookupRowKeys = Record<string, string | number>;
+
 export interface LaserCutParams {
   cuttingSpeedMPerMin: number;
   pierceTimeMin: number;
   kerfMm: number;
   dataFound: boolean;
+  /** sm_lookup_laser_cut row the values were read from; absent when none was found. */
+  row?: LookupRowKeys;
 }
 
 interface WaterjetCutParams {
@@ -105,6 +110,8 @@ interface WaterjetCutParams {
   pierceTimeMin: number;
   kerfMm: number;
   dataFound: boolean;
+  /** sm_lookup_waterjet_cut row the values were read from; absent when none was found. */
+  row?: LookupRowKeys;
 }
 
 interface RouterCutParams {
@@ -348,6 +355,7 @@ export class SheetMetalLookupService {
       pierceTimeMin,
       kerfMm,
       dataFound: true,
+      row: { material, laser_technology: technology, thickness_mm: Number(row.thickness_mm), laser_power_w: Number(row.laser_power_w) },
     };
   }
 
@@ -385,6 +393,7 @@ export class SheetMetalLookupService {
       pierceTimeMin: Number(row.pierce_time_sec) / 60,
       kerfMm: Number(row.kerf_mm),
       dataFound: true,
+      row: { material, thickness_mm: Number(row.thickness_mm) },
     };
   }
 
@@ -497,7 +506,7 @@ export class SheetMetalLookupService {
   // reached in production, by machine tonnage and part complexity. The row nearest to
   // the machine tonnage is used (the table steps 10, 20, 30, 50 t ...).
   @ReferenceMemo()
-  async getStrokeRateFactor(tonnageT: number, complexity: 'simple' | 'inter' | 'complex'): Promise<number | null> {
+  async getStrokeRateFactor(tonnageT: number, complexity: 'simple' | 'inter' | 'complex'): Promise<{ factor: number; tonnageT: number; column: 'simple' | 'intermediate' | 'complex' } | null> {
     if (!(tonnageT > 0)) return null;
     const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
@@ -507,15 +516,15 @@ export class SheetMetalLookupService {
       .like('key', 'strokeRateFactor:%');
     if (error || !data?.length) return null;
     const column = complexity === 'inter' ? 'intermediate' : complexity;
-    let best: { distance: number; factor: number } | null = null;
+    let best: { distance: number; factor: number; tonnageT: number } | null = null;
     for (const row of data as Array<{ raw: Record<string, unknown> | null }>) {
       const rowTonnage = row.raw?.tonnage_t;
       const factor = row.raw?.[column];
       if (typeof rowTonnage !== 'number' || typeof factor !== 'number' || factor <= 0) continue;
       const distance = Math.abs(rowTonnage - tonnageT);
-      if (!best || distance < best.distance) best = { distance, factor };
+      if (!best || distance < best.distance) best = { distance, factor, tonnageT: rowTonnage };
     }
-    return best?.factor ?? null;
+    return best ? { factor: best.factor, tonnageT: best.tonnageT, column } : null;
   }
 
   @ReferenceMemo()
@@ -525,7 +534,7 @@ export class SheetMetalLookupService {
   ): Promise<TurretPunchMachineParams> {
     const noData: TurretPunchMachineParams = {
       nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false,
-      punchRateCyclesPerMin: 0, strokeRateFactor: null, machineTonnageT: null,
+      punchRateCyclesPerMin: 0, strokeRateFactor: null, machineTonnageT: null, strokeRateFactorRow: null,
     };
     if (!machineName) return noData;
 
@@ -549,6 +558,7 @@ export class SheetMetalLookupService {
       ? raw.punch_rate_cycles_min : 0;
     let machineTonnageT: number | null = null;
     let strokeRateFactor: number | null = null;
+    let strokeRateFactorRow: TurretPunchMachineParams['strokeRateFactorRow'] = null;
     if (punchRate > 0) {
       const { data: lib } = await db
         .from('sm_reference_data')
@@ -556,7 +566,11 @@ export class SheetMetalLookupService {
         .eq('category', 'machine')
         .eq('key', `Turret Press (Punch Press):${machineName}`);
       machineTonnageT = pressForceTonnes(pressForceKnOf(lib ?? []));
-      if (machineTonnageT != null) strokeRateFactor = await this.getStrokeRateFactor(machineTonnageT, complexity);
+      const factor = machineTonnageT != null ? await this.getStrokeRateFactor(machineTonnageT, complexity) : null;
+      if (factor) {
+        strokeRateFactor = factor.factor;
+        strokeRateFactorRow = { tonnageT: factor.tonnageT, column: factor.column };
+      }
     }
 
     return {
@@ -566,6 +580,7 @@ export class SheetMetalLookupService {
       punchRateCyclesPerMin: punchRate,
       strokeRateFactor,
       machineTonnageT,
+      strokeRateFactorRow,
     };
   }
 
@@ -1006,7 +1021,7 @@ export class SheetMetalLookupService {
 
   // ── Table 2: Handling time (min) for given weight kg ───────────────────────
   @ReferenceMemo()
-  async getHandlingTime(weightKg: number): Promise<{ minutes: number; dataFound: boolean }> {
+  async getHandlingTime(weightKg: number): Promise<{ minutes: number; dataFound: boolean; row?: LookupRowKeys }> {
     const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_handling_time')
@@ -1020,20 +1035,20 @@ export class SheetMetalLookupService {
       // data extrapolated at the boundary, not a fallback.
       const { data: last } = await db
         .from('sm_lookup_handling_time')
-        .select('handling_min')
+        .select('weight_max_kg, handling_min')
         .order('weight_max_kg', { ascending: false })
         .limit(1);
       return last?.[0]
-        ? { minutes: Number(last[0].handling_min), dataFound: true }
+        ? { minutes: Number(last[0].handling_min), dataFound: true, row: { weight_max_kg: Number(last[0].weight_max_kg) } }
         : { minutes: 0, dataFound: false };
     }
-    return { minutes: Number(data[0].handling_min), dataFound: true };
+    return { minutes: Number(data[0].handling_min), dataFound: true, row: { weight_max_kg: Number(data[0].weight_max_kg) } };
   }
 
   // ── Table 3A/B: Tool setup time (min) ─────────────────────────────────────
   // type='press' → keyValue = tonnage; type='brake' → keyValue = tool length mm
   @ReferenceMemo()
-  async getToolSetupTime(type: 'press' | 'brake', keyValue: number): Promise<{ minutes: number; dataFound: boolean }> {
+  async getToolSetupTime(type: 'press' | 'brake', keyValue: number): Promise<{ minutes: number; dataFound: boolean; row?: LookupRowKeys }> {
     const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_tool_setup')
@@ -1050,7 +1065,7 @@ export class SheetMetalLookupService {
       (b, r) => Math.abs(r.kv - keyValue) < Math.abs(b.kv - keyValue) ? r : b,
       rows[0],
     );
-    return { minutes: best.t, dataFound: true };
+    return { minutes: best.t, dataFound: true, row: { setup_type: type, key_value: best.kv } };
   }
 
   // ── Table 4: Manual stroke time (sec) ─────────────────────────────────────

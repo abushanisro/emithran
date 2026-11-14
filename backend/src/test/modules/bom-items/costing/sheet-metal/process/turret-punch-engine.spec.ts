@@ -67,7 +67,7 @@ describe('computeTurretPunchCost — no calculator time is a data gap, not a $0 
 });
 
 describe('turretMissingInputs — why the calculator could not be seeded', () => {
-  const full = { nibbleMmPerMin: 2398.5, toolChangeSec: 1.5, dataFound: true, punchRateCyclesPerMin: 500, strokeRateFactor: 0.62, machineTonnageT: 30.6 };
+  const full = { nibbleMmPerMin: 2398.5, toolChangeSec: 1.5, dataFound: true, punchRateCyclesPerMin: 500, strokeRateFactor: 0.62, machineTonnageT: 30.6, strokeRateFactorRow: { tonnageT: 30, column: 'simple' as const } };
 
   it('says no machine was selected, not that data is missing, when the route has no machine', () => {
     const why = turretMissingInputs(null, null)!;

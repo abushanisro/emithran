@@ -8,7 +8,7 @@ import { formatFieldValue } from '@/lib/costing/cycle-fields';
 import { checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
 import { ReferenceTable } from './ReferenceTable';
-import { strokeFactorColumnOf, withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
+import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
 import type { CadEvidence } from './CadEvidencePanel';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
@@ -53,9 +53,9 @@ import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
 import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
-import { isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
+import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { calculationPanel, evidenceOfRef, lookupPanel, opensTable, recordPanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
+import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
 import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
@@ -78,6 +78,17 @@ const isTurretReferenceField = (fieldName: string, machineClass: string | undefi
 const WATERJET_PIERCE_DELAY_FIELD = 'Pierce Delay Per Start';
 const isWaterjetReferenceField = (fieldName: string, machineClass: string | undefined) =>
   machineClass === 'waterjet' && fieldName === WATERJET_PIERCE_DELAY_FIELD;
+
+/** A sheet-metal table an smTable ref names, from the endpoint that serves it: a machine-library table's own, else the sm_lookup_* passthrough. */
+function fetchSheetMetalTable(api: typeof import('@/lib/api/processes').processesApi, table: string) {
+  if (!isSheetMetalLibraryTable(table)) return api.getSmLookupTableByName(table);
+  switch (table) {
+    case 'turret_machines': return api.getTurretMachinesTable();
+    case 'waterjet_machines': return api.getWaterjetMachinesTable();
+    case 'deslag_allowance': return api.getDeslagAllowanceTable();
+    case 'stroke_rate_factor': return api.getStrokeRateFactorTable();
+  }
+}
 
 /** Required vs selected tonnage from the calculator's last run, or null while it has no required force. */
 function tonnageCheckOf(results: Record<string, any> | null | undefined, inputs: Record<string, any>): TonnageCheck | null {
@@ -187,7 +198,7 @@ function computeAdHocMatchedRow(
   if (tableName === 'inspection_operation_defaults') {
     const feature = INSPECTION_FEATURE_BY_FIELD[fieldName];
     if (!feature || !Number.isFinite(num)) return null;
-    return rows.find((r) => r.feature === feature && Math.abs(Number(r.cycleTimeSec) - num) < 1e-6) ?? null;
+    return rows.find((r) => r.feature === feature && Math.abs(Number(columnValue(r, 'cycle_time_sec')) - num) < 1e-6) ?? null;
   }
   if (tableName === 'surface_treatment_rates') {
     if (!Number.isFinite(num)) return rows.find((r) => r.location === location) ?? null;
@@ -199,12 +210,10 @@ function computeAdHocMatchedRow(
     // multiple matched PEM specs (see ProcessCostDialog's PEM featureBreakdown
     // block), no single row produced it, so this correctly falls through to
     // null (no highlight) rather than guessing one of the contributing rows.
-    // Row keys are raw DB columns (snake_case) here, not camelCase — this
-    // table is fetched via getSmLookupTableByName's live passthrough
-    // (buildLiveSmLookupTablePayload's rowData: r), which returns the row
-    // exactly as stored, unlike the other ad-hoc cases above.
+    // The passthrough returns the row as stored, but the API camelCases every
+    // response key: cells are read by either spelling (columnValue).
     if (!Number.isFinite(num)) return null;
-    return rows.find((r) => Math.abs(Number(r.insertion_cycle_sec) - num) < 1e-6) ?? null;
+    return rows.find((r) => Math.abs(Number(columnValue(r, 'insertion_cycle_sec')) - num) < 1e-6) ?? null;
   }
   if (tableName === 'sm_lookup_roll_forming') {
     // Single real row (migration 442) — match against whichever column this
@@ -213,7 +222,7 @@ function computeAdHocMatchedRow(
     // highlight instead of always pointing at the one row regardless.
     const col = fieldName === 'Setup Time' ? 'setup_time_min' : 'line_speed_m_min';
     if (!Number.isFinite(num)) return null;
-    return rows.find((r) => Math.abs(Number(r[col]) - num) < 1e-6) ?? null;
+    return rows.find((r) => Math.abs(Number(columnValue(r, col)) - num) < 1e-6) ?? null;
   }
   return null;
 }
@@ -2242,8 +2251,14 @@ export function ProcessCostDialog({
   const handleViewLookup = useCallback((field: CalculatorField) => { void viewLookupRef.current(field); }, []);
   const onShowEvidenceRef = useRef(onShowEvidence);
   onShowEvidenceRef.current = onShowEvidence;
-  /** Where the engine read an input of the open calculator (SourceRef on its trace step); undefined for a value it did not read from a record. */
+  /**
+   * Where the engine read an input of the open calculator (SourceRef on its trace step); undefined for a value it did not read from a
+   * record. A machine-dependent input is re-derived here for the machine selected in this dialog (autoPopulateFromBOM), so the engine's
+   * source for its own machine does not describe the value shown: it has none.
+   */
   const sourceRefFor = (fieldName: string): SourceRef | undefined => {
+    if (isMachineDependentField(fieldName)) return undefined;
+    // A value re-read for this dialog (a machining lookup re-resolved for an edited key) carries its own source, or none.
     if (fieldName in calculatorInputRefs) return calculatorInputRefs[fieldName] ?? undefined;
     const seed = engineSeedRef.current?.calculatorId === selectedCalculatorId ? engineSeedRef.current : engineSeedsRef.current[selectedCalculatorId] ?? null;
     return seed?.refs[fieldName];
@@ -2282,6 +2297,7 @@ export function ProcessCostDialog({
         else if (ref.kind === 'machine') panel = recordPanel(await processesApi.getRecordSourceTable('machine', ref.machineId, ref.column));
         else if (ref.kind === 'material') panel = recordPanel(await processesApi.getRecordSourceTable('material', ref.materialId, ref.column));
         else if (ref.kind === 'calculation') panel = calculationPanel(ref);
+        else if (ref.kind === 'smTable') panel = smTablePanel(ref, await fetchSheetMetalTable(processesApi, ref.table), current);
         else return;
         setLookupTableData({ fieldName: field.fieldName, fieldLabel: field.displayLabel || field.fieldName, tableId: null, ...panel });
         setShowLookupTable(true);
@@ -2321,22 +2337,25 @@ export function ProcessCostDialog({
         return;
       }
 
-      // Turret Press: the machine table (punch rate, tool change, nibble speed) with the selected
-      // machine marked, or Lookup Table 1 with the row of that machine's tonnage marked.
+      // Turret Press, for an input the engine did not read (no ref: the calculator opened without the
+      // engine's turret line, or a value typed here): the machine table (punch rate, tool change, nibble
+      // speed) with the selected machine marked, or Lookup Table 1 with the row of that machine's tonnage
+      // marked, to pick a value from. An engine-read input opens its own row and column through its ref.
       if (isTurretReferenceField(field.fieldName, selectedMachineClass)) {
         const machineName = selectedMHR?.machineName;
         let table: any;
         let matchedRowKeys: Record<string, unknown> | null = machineName ? { machine_name: machineName } : null;
-        let outputColumn: string | undefined = TURRET_FIELD_COLUMN[field.fieldName];
+        const outputColumn: string | undefined = TURRET_FIELD_COLUMN[field.fieldName];
         if (field.fieldName === STROKE_RATE_FACTOR_FIELD) {
-          outputColumn = strokeFactorColumnOf(calculatorInputProvenance[field.fieldName]);
           const [factors, machines] = await Promise.all([processesApi.getStrokeRateFactorTable(), processesApi.getTurretMachinesTable()]);
           table = factors;
-          const tonnage = Number(((machines.rows ?? []) as any[]).find((r) => r.machine_name === machineName)?.machine_tonnage_t);
+          // Response keys arrive camelCased: read cells by either spelling.
+          const tonnage = Number(columnValue(((machines.rows ?? []) as any[]).find((r) => columnValue(r, 'machine_name') === machineName), 'machine_tonnage_t'));
+          const tonnageOf = (r: any) => Number(columnValue(r, 'tonnage_t'));
           const nearest = Number.isFinite(tonnage)
-            ? ((factors.rows ?? []) as any[]).reduce<any>((best, r) => (best == null || Math.abs(r.tonnage_t - tonnage) < Math.abs(best.tonnage_t - tonnage) ? r : best), null)
+            ? ((factors.rows ?? []) as any[]).reduce<any>((best, r) => (best == null || Math.abs(tonnageOf(r) - tonnage) < Math.abs(tonnageOf(best) - tonnage) ? r : best), null)
             : null;
-          matchedRowKeys = nearest ? { tonnage_t: nearest.tonnage_t } : null;
+          matchedRowKeys = nearest ? { tonnage_t: tonnageOf(nearest) } : null;
         } else {
           table = await processesApi.getTurretMachinesTable();
         }

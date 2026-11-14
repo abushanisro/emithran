@@ -55,6 +55,8 @@ export interface TurretPunchMachineParams {
   strokeRateFactor: number | null;
   /** Machine tonnage the factor was looked up for (press force / 9.80665). */
   machineTonnageT: number | null;
+  /** The Lookup Table 1 row the factor was read from (its tonnage_t) and the complexity column; null when no factor. */
+  strokeRateFactorRow: { tonnageT: number; column: 'simple' | 'intermediate' | 'complex' } | null;
 }
 
 export interface LaserPunchParams {

@@ -165,6 +165,10 @@ import { surfaceCalloutOf } from './costing/surface/surface-callout';
 import type { CalculatorRunDto, SecondaryOperationsDto, SecondaryOptionDto } from './dto/cost-breakdown.dto';
 import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto, SourceRef } from './dto/cost-breakdown.dto';
 import { cadEvidenceKey } from './costing/shared/cad-evidence';
+import { sourceRefOfSeed } from './costing/shared/seed-source-ref';
+import {
+  deburrTimeRef, inspectionSeedRefs, laserCutSeedRefs, materialSeedRefs, pressBrakeSeedRefs, smVariableRef, turretSeedRefs, waterjetSeedRefs,
+} from './costing/sheet-metal/lookup/sheet-metal-source-refs';
 import { realBendLengthsMm } from './costing/shared/bend-lengths';
 import { cachedRead } from './costing/shared/core/request-cache';
 import { ReferenceMemo } from '../../common/cache/reference-memo';
@@ -2694,6 +2698,7 @@ export class BOMItemsService {
         'Burr Edge Length': 'CAD feature extraction — cut edge length (the burr sits on the cut edge)',
         'Deburr Time Per mm': rate?.source ?? `no deburr time rate on file for "${cand.machineName}"`,
       },
+      ...(rate && deburrTimeRef(cand) ? { seedRefs: { 'Deburr Time Per mm': deburrTimeRef(cand)! } } : {}),
     });
   }
 
@@ -2703,11 +2708,11 @@ export class BOMItemsService {
    * the reference standard sheet (standardSheetWidth/Length). Null only when
    * neither is on file — a real data gap, reported by the caller.
    */
-  async resolveNestingSheet(laserMachineName: string | null | undefined): Promise<(NestingSheet & { source: string }) | null> {
+  async resolveNestingSheet(laserMachineName: string | null | undefined): Promise<(NestingSheet & { source: string; fromStandardSheet: boolean }) | null> {
     const machineSheet = await this.smLookup.getNominalSheetForMachine(laserMachineName);
-    if (machineSheet) return { ...machineSheet, source: `Nominal sheet of "${laserMachineName}" (machine library)` };
+    if (machineSheet) return { ...machineSheet, source: `Nominal sheet of "${laserMachineName}" (machine library)`, fromStandardSheet: false };
     const standard = await this.smLookup.getStandardSheet();
-    return standard ? { ...standard, source: 'Standard sheet (standardSheetWidth/Length)' } : null;
+    return standard ? { ...standard, source: 'Standard sheet (standardSheetWidth/Length)', fromStandardSheet: true } : null;
   }
 
   /**
@@ -3328,7 +3333,7 @@ export class BOMItemsService {
         warnings: materialWarnings,
       });
     const {
-      materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
+      materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa, utsSource, materialRecord,
       meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, stockForm, matlState, clampProperties,
     } = resolvedMaterial;
     // Real per-grade Injection Molding thermal properties (Phase 1
@@ -4650,6 +4655,7 @@ export class BOMItemsService {
               (smLaserPowerEstimated ? ` at an ESTIMATED (not verified) machine power` : ''),
             'Piercing Time Per Start': `sm_lookup_laser_cut (laser_technology=${smLaserTechnology}) — same row as Cutting Speed`,
           },
+          seedRefs: laserCutSeedRefs(smLaserParams),
           lookupTableByField: {
             'Cutting Speed': 'sm_lookup_laser_cut',
             'Piercing Time Per Start': 'sm_lookup_laser_cut',
@@ -4736,6 +4742,10 @@ export class BOMItemsService {
           lookupResolutions: {
             'Time Per Stroke': smStrokeResult.resolution,
           },
+          seedRefs: pressBrakeSeedRefs({
+            stroke: smStrokeResult, handling: smHandlingResult, toolSetup: smBrakeSetupResult,
+            material: materialRecord, utsFromRecord: utsSource === 'db',
+          }),
         })
       : this.emptyPhysicsResult(['Cycle Time', 'Setup Time']);
     const smBendCycleTimeSec = smBendCalc.outputs['Cycle Time'];
@@ -4861,6 +4871,7 @@ export class BOMItemsService {
             'Thickness': 'Effective CAD thickness (override-aware)',
             'Material Density': 'raw_materials lookup',
           },
+          seedRefs: materialSeedRefs(materialRecord, { 'Material Density': 'densityKgM3' }),
         })
       : null;
     const smNetWeightKg = !hasValidDimensions
@@ -4954,6 +4965,16 @@ export class BOMItemsService {
           'Sheet Width': nestingSheet.source,
           'Sheet Length': nestingSheet.source,
           ...(hasQty ? { 'Batch Quantity': 'Order/batch quantity' } : {}),
+        },
+        seedRefs: {
+          ...materialSeedRefs(materialRecord, { 'Material Density': 'densityKgM3', 'Shear Strength': 'shearStrengthMpa' }),
+          // The net weight is the Net Material Usage calculator's result (the fallback formula, when that calculator is not mapped, has no steps).
+          ...(smNetWeightCalc?.outputs['Net Usage'] != null
+            ? { 'Net Weight Per Part': { kind: 'calculation' as const, name: 'Sheet Metal - Net Material Usage', evidence: 'flat_pattern_area' as const, steps: smNetWeightCalc.trace } }
+            : {}),
+          ...(nestingSheet.fromStandardSheet
+            ? { 'Sheet Width': smVariableRef('standardSheetWidth'), 'Sheet Length': smVariableRef('standardSheetLength') }
+            : {}),
         },
         itemId: item.id,
         userId,
@@ -5119,6 +5140,7 @@ export class BOMItemsService {
             'Has Dimension Check': 'Real geometry — overall dimensions known',
             'Dimension Check Time': `inspection_operation_defaults — dimension check time for ${smInspectionPlan.method} method`,
           },
+          seedRefs: inspectionSeedRefs(smInspectionPlan),
         });
     const smInspectionLineResult = finalizeInspectionLine(smInspectionInput, smInspectionPlan, {
       cycleTimeSec: smInspectionCalc.outputs['Total Time'],
@@ -5926,6 +5948,7 @@ export class BOMItemsService {
       });
     const {
       materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa: rcShearStrengthMpa,
+      utsSource: rcUtsSource, materialRecord: rcMaterialRecord,
       meltingTempC: rcMeltingTempC, moldTempC: rcMoldTempC, ejectionTempC: rcEjectionTempC,
       specificHeatMeltJgC: rcSpecificHeatMeltJgC, thermalConductivityMeltWMK: rcThermalConductivityMeltWMK,
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
@@ -6147,6 +6170,7 @@ export class BOMItemsService {
               (rcLaserPowerEstimated ? ` at an ESTIMATED (not verified) machine power` : ''),
             'Piercing Time Per Start': 'sm_lookup_laser_cut — same row as Cutting Speed',
           },
+          seedRefs: laserCutSeedRefs(rcLaserParams),
           lookupTableByField: {
             'Cutting Speed': 'sm_lookup_laser_cut',
             'Piercing Time Per Start': 'sm_lookup_laser_cut',
@@ -6215,6 +6239,7 @@ export class BOMItemsService {
               (rcCo2LaserPowerEstimated ? ` at an ESTIMATED (not verified) machine power` : ''),
             'Piercing Time Per Start': 'sm_lookup_laser_cut (laser_technology=co2) — same row as Cutting Speed',
           },
+          seedRefs: laserCutSeedRefs(rcCo2LaserParams),
           lookupTableByField: {
             'Cutting Speed': 'sm_lookup_laser_cut',
             'Piercing Time Per Start': 'sm_lookup_laser_cut',
@@ -6264,6 +6289,7 @@ export class BOMItemsService {
             'Cutting Speed': `sm_lookup_laser_cut (fiber) — ${grade || 'material'}, ${thk}mm sheet at ${rcLaser3dPowerW ?? 'unknown'} W (selected 3D laser)`,
             'Piercing Time Per Start': 'sm_lookup_laser_cut (fiber) — same row as Cutting Speed',
           },
+          seedRefs: laserCutSeedRefs(rcLaser3dParams),
           lookupTableByField: {
             'Cutting Speed': 'sm_lookup_laser_cut',
             'Piercing Time Per Start': 'sm_lookup_laser_cut',
@@ -6670,6 +6696,10 @@ export class BOMItemsService {
         lookupResolutions: {
           'Time Per Stroke': rcStrokeResult.resolution,
         },
+        seedRefs: pressBrakeSeedRefs({
+          stroke: rcStrokeResult, handling: rcHandlingResult, toolSetup: rcBrakeSetupResult,
+          material: rcMaterialRecord, utsFromRecord: rcUtsSource === 'db',
+        }),
       });
 
       if (rcBendCalc.calculatorId) rcTraces.set(rcBendCalc.calculatorId, rcBendCalc.trace);
@@ -6866,6 +6896,7 @@ export class BOMItemsService {
               'Has Dimension Check': 'Real geometry — overall dimensions known',
               'Dimension Check Time': `inspection_operation_defaults — dimension check time for ${rcInspectionPlan.method} method`,
             },
+            seedRefs: inspectionSeedRefs(rcInspectionPlan),
           });
       const rcInspectionResult = finalizeInspectionLine(rcInspectionInput, rcInspectionPlan, {
         cycleTimeSec: rcInspectionCalc.outputs['Total Time'],
@@ -7246,6 +7277,7 @@ export class BOMItemsService {
             'Nibble Speed (mm/min)': `${mhrRates.turret.machineName} — nibble rate x tool step (diameter - overlap)`,
             'Lot size': 'Batch Size entered on this process cost form',
           },
+          seedRefs: turretSeedRefs(mhrRates.turret.machineName, rcTurretPunchMachineParams),
         })
       : this.emptyPhysicsResult(['Cycle Time (sec)']);
     const rcTurretCycleTimeSec = rcTurretCalc.outputs['Cycle Time (sec)'];
@@ -7300,6 +7332,17 @@ export class BOMItemsService {
             'Lot Size': 'Batch Size entered on this process cost form',
           },
           lookupTableByField: { 'Cutting Speed': 'sm_lookup_waterjet_cut' },
+          seedRefs: waterjetSeedRefs({
+            machineName: mhrRates.waterjet.machineName!,
+            referenceMachineName: WATERJET_REFERENCE_MACHINE,
+            cutRow: rcWaterjetParams!.row,
+            tableSpeedMmPerMin: rcWaterjetParams!.cuttingSpeedMmPerMin,
+            machineTubeMm: rcWaterjetTubeMm!,
+            referenceTubeMm: rcWaterjetRefTubeMm!,
+            speedFactor: rcWaterjetSpeedFactor!,
+            material: grade || 'material',
+            thicknessMm: thk,
+          }),
         })
       : this.emptyPhysicsResult(['Total Time', 'Cutting Time']);
     const rcWaterjetCycleSec = rcWaterjetCalc.outputs['Total Time'];
@@ -9087,6 +9130,9 @@ export class BOMItemsService {
     // a value a calculator form can hold as a scalar input) -- every other
     // physics_key/formula calculator ignores this.
     ctx?: { itemId?: string; userId?: string },
+    // Per seeded field, where its value was read, structured (SourceRef): the calculator dialog's eye opens it. A field measured on CAD
+    // needs none here: its ref comes from its evidence key (sourceRefOfSeed).
+    seedRefs: Record<string, SourceRef> = {},
   ): Promise<{ values: Record<string, number | undefined>; trace: CalculationTraceStep[]; gapReasonOverride?: string }> {
     const emptyValues = Object.fromEntries(targetFieldNames.map((n) => [n, undefined])) as Record<string, number | undefined>;
     try {
@@ -9162,6 +9208,9 @@ export class BOMItemsService {
           const hasSeed = seedScope[f.field_name] !== undefined;
           const hasDefault = f.default_value !== undefined && f.default_value !== null && f.default_value !== '';
           if (!hasSeed && !hasDefault) continue; // genuinely unset — omit, don't fabricate
+          const evidence = cadEvidenceKey(f.field_name, seedProvenance[f.field_name]);
+          // Only a seeded value was read from a source; a calculator default has none to open.
+          const ref = hasSeed ? sourceRefOfSeed(seedRefs[f.field_name], evidence) : undefined;
           trace.push({
             fieldName: f.field_name,
             displayLabel: f.display_label ?? f.field_name,
@@ -9169,7 +9218,8 @@ export class BOMItemsService {
             value: hasSeed ? (seedScope[f.field_name] as any) : (typeof val === 'number' || typeof val === 'string' ? val : (val ?? f.default_value)),
             unit: f.unit ?? null,
             source: seedProvenance[f.field_name] ?? (hasSeed ? 'Provided value' : "Calculator's own default value"),
-            ...(cadEvidenceKey(f.field_name, seedProvenance[f.field_name]) ? { evidence: cadEvidenceKey(f.field_name, seedProvenance[f.field_name])! } : {}),
+            ...(evidence ? { evidence } : {}),
+            ...(ref ? { ref } : {}),
           });
         } else {
           if (val === undefined || (val && typeof val === 'object' && 'error' in val)) continue; // unresolved — omit, don't fabricate
@@ -9330,6 +9380,9 @@ export class BOMItemsService {
       // failing — a caller not yet upgraded still gets a real gap, just a
       // less detailed one.
       lookupResolutions?: Record<string, LookupResolution>;
+      // Field name -> where its value was read, structured (SourceRef): the lookup-table row, the variable, the material record, ... The
+      // calculator dialog's eye opens it. A CAD-measured field gets its ref from its evidence key without being listed here.
+      seedRefs?: Record<string, SourceRef>;
       // Disambiguates machine classes that host MULTIPLE distinct
       // operations with their own calculators — e.g. 'drill_press' covers
       // Counterboring, Countersinking, and Reaming, each a different real
@@ -9417,6 +9470,7 @@ export class BOMItemsService {
     const { values, trace: rawTrace, gapReasonOverride } = await this.evaluateCalculatorFields(
       accessToken, calculatorId, params.seedScope, params.targetFieldNames, params.seedProvenance,
       { itemId: params.itemId, userId: params.userId },
+      params.seedRefs,
     );
 
     // Tag each step physics/lookup (rule 3): a 'calculated' step is a
