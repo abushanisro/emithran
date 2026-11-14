@@ -51,6 +51,14 @@ describe('machining calculator spec ↔ migration ↔ engine', () => {
     expect(calcs['Automated Deburring']?.name).toBe('Machining - Automated Deburring');
   });
 
+  it('the milling operations of the sequencer each have a calculator, shipped in 1031', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1031_machining_mill_operation_calculators.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1031, spec));
+    for (const op of ['Facing', 'Rough Milling', 'Bulk Milling', 'Fine Finish Milling', 'Contouring', 'Perimeter Milling', 'Slot Milling', 'Center Drilling', 'Chamfering', 'Filleting', 'Groove Milling']) {
+      expect(calcs[op]?.name).toBe(`Machining - ${op}`);
+    }
+  });
+
   it('the milling calculator prices the line of every mill station, and of the live-tool turning machines', () => {
     expect(['3 Axis Mill', '4 Axis Mill', '5 Axis Mill', 'MillTurn', '3 Axis Lathe'].map((station) => calcs[station]?.name)).toEqual(Array(5).fill('Machining - Milling'));
   });
