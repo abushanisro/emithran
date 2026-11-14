@@ -2,6 +2,7 @@ import { INSPECTION_TABLE, INSPECTION_VARIABLE_KEYS, resolveInspectionReference,
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../../../common/database/database.service';
 import type { MaterialClass } from '../process/cost-machining-engine';
+import type { MillingFinishingRow } from '../operation/operation-sequencer';
 import type { DrillingTable } from './drilling-table';
 import type { HobbingReference, KeywayBroachReference, RotaryBroachReference, SurfaceGrindingParams } from '../calculators/machining-lookup-seeds';
 import type { GearQualityRow } from '../operation/gear-routing';
@@ -286,6 +287,16 @@ export class MachiningLookupService {
     const row = ((await this.loadTable('tblMillingRemovalRate')) ?? []).find((r) => r.MaterialClass === materialClass);
     const rate = Number(row?.RemovalRateMm3PerMin);
     return Number.isFinite(rate) && rate > 0 ? rate : null;
+  }
+
+  /** The material class's finishing cutter (tblMillingFinishing), or null when the table or a value of the row is not staged. */
+  async getMillingFinishing(materialClass: MaterialClass): Promise<MillingFinishingRow | null> {
+    const row = ((await this.loadTable('tblMillingFinishing')) ?? []).find((r) => r.MaterialClass === materialClass);
+    const finishing = {
+      toolDiameterMm: Number(row?.ToolDiameterMm), teeth: Number(row?.Teeth),
+      cuttingSpeedMPerMin: Number(row?.CuttingSpeedMPerMin), feedPerToothPerDiameter: Number(row?.FeedPerToothPerDiameter),
+    };
+    return Object.values(finishing).every((v) => Number.isFinite(v) && v > 0) ? finishing : null;
   }
 
   /** A staged lookup table by name, for a calculator whose spec names the table (specLookupSeeds). */

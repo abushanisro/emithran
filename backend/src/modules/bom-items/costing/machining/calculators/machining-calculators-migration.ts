@@ -149,13 +149,19 @@ COMMIT;
   return out.join('');
 }
 
+/** A calculator's place in the current spec; a superseded entry has the place of the entry that replaced it. */
+const order = (spec: MachiningCalculatorSpec, c: SpecCalculator) => spec.calculators.findIndex((x) => x.name === c.name);
+
 /**
  * The SQL of a later migration that adds the calculators the spec marks with
  * that migration number (migrations/<n>_machining_<...>_calculator.sql).
  * Same per-calculator block as migration 804, with its own post-check.
  */
 export function buildMachiningCalculatorMigrationSql(migration: number, spec: MachiningCalculatorSpec = loadMachiningCalculatorSpec()): string {
-  const added = spec.calculators.filter((c) => (c.migration ?? c.reissue) === migration);
+  // A calculator this migration shipped and a later one replaced is still generated here, as it was: an applied migration never changes.
+  const shipped = loadMachiningCalculatorSpec({ includeSuperseded: true }).calculators.filter((c) => c.supersededBy && c.migration === migration);
+  const added = [...spec.calculators.filter((c) => (c.migration ?? c.reissue) === migration), ...shipped]
+    .sort((x, y) => order(spec, x) - order(spec, y));
   if (added.length === 0) throw new Error(`no machining calculator is marked for migration ${migration}`);
   const expected = added.map((c) => `(${q(c.name)}, ${c.fields.length}, ${c.machineClasses.length})`).join(',\n    ');
   return `-- ${migration}: ${added.map((c) => c.name).join(', ')}
@@ -167,7 +173,7 @@ export function buildMachiningCalculatorMigrationSql(migration: number, spec: Ma
 -- Requires migration 804. Self-contained, idempotent, post-checked.
 
 BEGIN;
-${added.map((c) => calculatorSql(spec, c, 700 + spec.calculators.indexOf(c))).join('')}
+${added.map((c) => calculatorSql(spec, c, 700 + order(spec, c))).join('')}
 DO $post$
 DECLARE bad TEXT;
 BEGIN

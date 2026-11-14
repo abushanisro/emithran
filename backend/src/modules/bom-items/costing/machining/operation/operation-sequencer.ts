@@ -137,6 +137,40 @@ function counterboreTimeSec(
 // "- Rough Milling", "- Fine Finish Milling", ...): this file states which operation a feature needs and hands the
 // calculator the feature's CAD measurements; it holds no time, rate or factor of its own.
 
+/** The finishing cutter of a material class (tblMillingFinishing): the end mill used where a feature forces no smaller one, and how it runs. */
+export interface MillingFinishingRow {
+  toolDiameterMm: number;
+  teeth: number;
+  cuttingSpeedMPerMin: number;
+  /** Feed per tooth over the tool diameter: the chip load scales with the cutter. */
+  feedPerToothPerDiameter: number;
+}
+
+interface PocketFinishGroup { toolMm: number; floorMm2: number; wallMm2: number; pockets: number }
+
+/**
+ * The finishing passes of a group of pockets, one entry per cutter. A pocket's floor is its CAD length x width and its
+ * depth the removed volume over that floor. The cutter is the standard finishing end mill, or the pocket's width when
+ * that is narrower; a cutter as wide as the pocket leaves both walls finished, so walls (perimeter x depth) are a
+ * separate pass only in a pocket wider than the cutter. null = a pocket has no CAD size.
+ */
+function pocketFinishGroups(occurrences: any[], standardToolMm: number): PocketFinishGroup[] | null {
+  const groups = new Map<number, PocketFinishGroup>();
+  for (const o of occurrences) {
+    const [lengthMm, widthMm] = (Array.isArray(o.extents_mm) ? o.extents_mm.map(Number) : []).sort((a: number, b: number) => b - a);
+    if (!(lengthMm > 0 && widthMm > 0)) return null;
+    const toolMm = Math.max(0.1, Math.min(standardToolMm, Math.floor(widthMm * 10) / 10));
+    const floorMm2 = lengthMm * widthMm;
+    const depthMm = (o.material_removed_mm3 ?? 0) / floorMm2;
+    const g = groups.get(toolMm) ?? { toolMm, floorMm2: 0, wallMm2: 0, pockets: 0 };
+    g.floorMm2 += floorMm2;
+    if (widthMm > standardToolMm) g.wallMm2 += 2 * (lengthMm + widthMm) * depthMm;
+    g.pockets += 1;
+    groups.set(toolMm, g);
+  }
+  return [...groups.values()].sort((a, b) => b.toolMm - a.toolMm);
+}
+
 /** One operation timed by its calculator: the time and its steps, or the missing inputs named (time 0). */
 function calcOp(
   calculators: MachiningCalculators | null,
@@ -249,6 +283,8 @@ export function buildOperationSequence(
   // The material's milling removal rate (tblMillingRemovalRate). Null = not on file: every operation that divides a
   // volume by it is a named gap.
   removalRateMm3PerMin: number | null = null,
+  // The material's finishing cutter (tblMillingFinishing). Null = not on file: every finishing pass is a named gap.
+  finishing: MillingFinishingRow | null = null,
 ): OperationLine[] {
   if (!Array.isArray(fgv2Features) || fgv2Features.length === 0) return [];
 
@@ -266,12 +302,42 @@ export function buildOperationSequence(
   const volumeOp = (operation: string, removedMm3: number) => calcOp(calculators, operation, {
     'Removed Volume': { value: removedMm3, source: 'CAD: volume the features remove' }, ...mrrSeed,
   });
-  const contourOp = (operation: string, areaMm2: number) => calcOp(calculators, operation, {
-    'Contour Area': { value: areaMm2, source: 'CAD: area of the faces' }, ...mrrSeed,
+  // A finishing pass is a tool path at the cutter's feed: the cutter and how it runs in this material, from the table.
+  const cutterSeeds = (toolMm: number, toolWhy: string): Record<string, CalcSeed> => {
+    if (!finishing) return {};
+    const fromTable = (value: number, column: string, note = ''): CalcSeed => ({
+      value, lookup: true, source: `tblMillingFinishing: ${matClass} ${column}${note}`,
+      match: { table: 'tblMillingFinishing', row: { MaterialClass: matClass } },
+    });
+    return {
+      'Tool Diameter': toolMm === finishing.toolDiameterMm
+        ? fromTable(toolMm, 'ToolDiameterMm')
+        : { value: toolMm, source: toolWhy },
+      'Teeth': fromTable(finishing.teeth, 'Teeth'),
+      'Cutting Speed': fromTable(finishing.cuttingSpeedMPerMin * machinabilityFactor, 'CuttingSpeedMPerMin', ` ${finishing.cuttingSpeedMPerMin} m/min x machinability factor ${machinabilityFactor}`),
+      'Feed per Tooth per Diameter': fromTable(finishing.feedPerToothPerDiameter, 'FeedPerToothPerDiameter'),
+    };
+  };
+  const standardToolMm = finishing?.toolDiameterMm ?? Number.POSITIVE_INFINITY;
+  const contourOp = (operation: string, wallMm2: number, surfaceMm2: number, faces: number) => calcOp(calculators, operation, {
+    'Wall Area': { value: wallMm2, source: 'CAD: area of the walls' },
+    'Surface Area': { value: surfaceMm2, source: 'CAD: area of the free-form surfaces' },
+    'Faces': { value: faces, source: 'CAD: faces to contour' },
+    ...cutterSeeds(standardToolMm, ''),
   });
-  const finishOp = (areaMm2: number, pockets: number) => calcOp(calculators, 'Fine Finish Milling', {
-    'Finish Area': { value: areaMm2, source: 'CAD: area of the planar faces' },
-    'Pockets': { value: pockets, source: 'CAD: pockets to finish' }, ...mrrSeed,
+  const faceFinishOp = (areaMm2: number, faces: number) => calcOp(calculators, 'Fine Finish Milling', {
+    'Floor Area': { value: areaMm2, source: 'CAD: area of the planar faces' },
+    'Wall Area': { value: 0, source: 'A planar face has no wall' },
+    'Faces': { value: faces, source: 'CAD: planar faces to finish' },
+    ...cutterSeeds(standardToolMm, ''),
+  });
+  const pocketFinishOp = (g: PocketFinishGroup) => calcOp(calculators, 'Fine Finish Milling', {
+    'Floor Area': { value: g.floorMm2, source: `CAD: floor of ${g.pockets} pocket(s), length x width` },
+    'Wall Area': g.wallMm2 > 0
+      ? { value: g.wallMm2, source: 'CAD: pocket perimeter x depth (removed volume over the floor area)' }
+      : { value: 0, source: 'The cutter is as wide as the pocket: the walls are finished with the floor' },
+    'Faces': { value: g.pockets, source: 'CAD: pockets to finish' },
+    ...cutterSeeds(g.toolMm, `CAD: pocket width ${g.toolMm} mm, narrower than the standard finishing cutter`),
   });
   const countOp = (operation: string, field: string, n: number) => calcOp(calculators, operation, { [field]: { value: n, source: 'CAD: feature count' } });
   // An edge with a CAD diameter is timed by its length (pi x D per edge) at the table's edge speed; one without, per edge.
@@ -313,6 +379,9 @@ export function buildOperationSequence(
       0,
     );
 
+    // The faces a finishing pass enters: a region with no area is not one.
+    const faceCount = occurrences.filter((o: any) => (o.area_mm2 ?? 0) > 0).length;
+
     // Representative depth: first occurrence, fallback 2.5×D
     const depthMm: number = occurrences[0]?.depth_mm ?? diamMm * 2.5;
 
@@ -332,7 +401,12 @@ export function buildOperationSequence(
         // "Rough Milling//PocketV2" is the real catalog op; no PocketV2-specific
         // finish row exists, so the real generic "Fine Finish Milling" is reused.
         ops.push({ name: "Rough Milling", ...volumeOp('Rough Milling', totalRemovedMm3), source: "feature", cadFeatureType: ft });
-        ops.push({ name: "Fine Finish Milling", ...finishOp(0, count), source: "feature", cadFeatureType: ft });
+        {
+          // One finishing line per cutter the pockets need; a pocket with no CAD size is a named gap.
+          const groups = pocketFinishGroups(occurrences, standardToolMm);
+          if (!groups) ops.push({ name: "Fine Finish Milling", timeSec: 0, missing: 'the CAD length and width of every pocket', source: "feature", cadFeatureType: ft });
+          for (const g of groups ?? []) ops.push({ name: "Fine Finish Milling", ...pocketFinishOp(g), source: "feature", cadFeatureType: ft, count: g.pockets });
+        }
         break;
 
       case "Slot:straight":
@@ -435,19 +509,18 @@ export function buildOperationSequence(
         break;
 
       case "PlanarFace:default":
-        ops.push({ name: "Fine Finish Milling", ...finishOp(totalAreaMm2, 0), source: "feature", cadFeatureType: ft });
+        ops.push({ name: "Fine Finish Milling", ...faceFinishOp(totalAreaMm2, faceCount), source: "feature", cadFeatureType: ft });
         break;
 
       case "CurvedWall:default":
       case "CurvedSurface:default":
         // The real catalog uses the same "Contouring" op for both feature types.
-        ops.push({ name: "Contouring", ...contourOp('Contouring', totalAreaMm2), source: "feature", cadFeatureType: ft });
+        ops.push({ name: "Contouring", ...(ft === 'CurvedWall' ? contourOp('Contouring', totalAreaMm2, 0, faceCount) : contourOp('Contouring', 0, totalAreaMm2, faceCount)), source: "feature", cadFeatureType: ft });
         break;
 
       case "Cutout:default":
-        // Non-circular through-opening: real perimeter milling pass, same
-        // MRR-reuse model as the face regions (totalAreaMm2 = real wall area).
-        ops.push({ name: "Perimeter Milling", ...contourOp('Perimeter Milling', totalAreaMm2), source: "feature", cadFeatureType: ft });
+        // Non-circular through-opening: its wall (totalAreaMm2) followed with the side of the cutter.
+        ops.push({ name: "Perimeter Milling", ...contourOp('Perimeter Milling', totalAreaMm2, 0, faceCount), source: "feature", cadFeatureType: ft });
         break;
 
       default:
@@ -459,7 +532,7 @@ export function buildOperationSequence(
         }
     }
     for (let i = firstOpOfFeature; i < ops.length; i++) {
-      ops[i]!.count = instanceCount;
+      ops[i]!.count ??= instanceCount;
       if (typeof f.id === "string" && f.id) ops[i]!.featureIds = [f.id];
     }
   }

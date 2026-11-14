@@ -69,7 +69,9 @@ export function loadMachiningCalculatorSpec(opts: { includeSuperseded?: boolean 
     const classes: string[] = Array.isArray(c.machineClasses)
       ? c.machineClasses
       : String(c.machineClasses).split('+').flatMap((g: string) => groups[g] ?? []);
-    const fields: SpecField[] = c.fields ?? byName.get(c.sameFieldsAs)?.fields;
+    // A superseded entry copies the superseded entry it named, so the migration that shipped it never changes.
+    const copied = entries.find((e: any) => e.name === c.sameFieldsAs && !!e.supersededBy === !!c.supersededBy) ?? byName.get(c.sameFieldsAs);
+    const fields: SpecField[] = c.fields ?? copied?.fields;
     if (!fields) throw new Error(`machining calculator "${c.name}" has no fields`);
     for (const cls of classes) {
       if (!raw.stations[cls]) throw new Error(`machining calculator "${c.name}": no catalog station for machine class "${cls}"`);
