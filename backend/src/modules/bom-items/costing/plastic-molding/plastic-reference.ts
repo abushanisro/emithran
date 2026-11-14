@@ -34,6 +34,7 @@
 // engine then decides no mold class, tooling cost or machine fit rather than
 // deciding on a number the database does not hold.
 
+import type { RibInsertReference } from './process/rib-inserts';
 import MANIFEST from '../../../processes/memory-reference-domains.json';
 import { fingerprintRows } from './reference-fingerprint';
 
@@ -49,8 +50,35 @@ export const PLASTIC_VARIABLE_KEYS = [
   'conventionalRunnerMaxPressureReductionFactor', 'hotRunnerMaxPressureReductionFactor', 'minInjectionPressure',
   // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
   'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilonForSlides', 'drawDirectionOrthogonalEpsilonForLifters',
-  'cmAutoIncludeManualFlashTrimming',
+  'cmAutoIncludeManualFlashTrimming', 'cmManualFlashTrimmingRate', 'slideCycleRate',
+  // The mold base and its plate stack (mold-base.ts).
+  'aPlateFlatCavityRatio', 'aPlateMinThickness', 'bPlateMinThickness', 'betweenPartsMoldBorder',
+  'topClampPlateThickness', 'bottomClampPlateThickness', 'supportPlateThickness', 'useMetricOrImperialValues',
+  // The cavity and core: machining by complexity and the polish of the default finish (mold-cavity.ts).
+  'defaultCavityFinishIM', 'cmMoldSurfaceCountThresholdSimple', 'cmMoldSurfaceCountThresholdAverage',
+  // The mold assembly extras (mold-tooling-calculator.ts, F-27): ejector pins, sprue, locating ring, try-out; and the default cavity texture.
+  'areaCoveredPerEjectorPin', 'sprueBushingCost', 'locatingRingsCost', 'timePerTryoutBase', 'defaultNumTryOuts', 'cavityTexture_IM',
+  // The slide and lifter blocks (F-28): their volume by size class, and the CMM hours to inspect them.
+  'smallSlideVolume', 'mediumSlideVolume', 'largeSlideVolume', 'smallLifterVolume', 'mediumLifterVolume', 'largeLifterVolume',
+  'cmmInspectionMultiplier', 'cmmInspectionAdder',
+  // The cooling lines (F-30): the line diameter and the water hardware prices.
+  'defaultWaterLineDiameter', 'waterHosesCost', 'waterManifoldFittingsCost', 'waterManifoldsCost',
+  // The rib inserts and their EDM (F-31).
+  'machinedRibThreshold', 'smallInsertArea', 'mediumInsertArea', 'largeInsertArea',
+  'smallCalcRibInsertElectrodeSize', 'mediumCalcRibInsertElectrodeSize', 'largeCalcRibInsertElectrodeSize',
+  'numSmallInsertsBurns', 'numMediumInsertsBurns', 'numLargeInsertsBurns',
+  'cmDesignHrsRibInsertSmall', 'cmDesignHrsRibInsertMedium', 'cmDesignHrsRibInsertLarge',
+  'cutterPathHrsPerInsert', 'spottingHrsPerInsert', 'edmElectrodeVolumeBurn',
+  // The hot drops of a hot runner (F-33).
+  'costPerStandardHotDrop', 'costPerSVGHotDrop', 'defaultHotDropType',
 ] as const;
+/**
+ * Variables of memory/Secondary process (source_version 2026-Secondary) the plastic model reads: the visual inspection time per surface area and the
+ * share of parts inspected (F-34). Loaded next to the plastic variables; no key repeats a plastic one.
+ */
+export const SECONDARY_PROCESS_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === 'secondary_process')!.sourceVersion;
+export const SECONDARY_VARIABLE_KEYS = ['visualInspectTimeStandard', 'defaultPercentToBeTested'] as const;
+
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
   'cmStandardToolingComponents',
@@ -63,6 +91,9 @@ export const PLASTIC_LOOKUP_KEYS = [
   'digital_factory_settings_usa',
   'injectionTimeAdjustmentFactors',
   'layoutNumCav',
+  'tblStandardMoldBaseSizes', 'tblEdgeMoldBorderX', 'tblEdgeMoldBorderY', 'tblCavityPlateDepthBorder', 'tblCorePlateDepthBorder',
+  'digital_factory_tool_materials_usa',
+  'tblHrsPerSqInchSimple', 'tblHrsPerSqInchAverage', 'tblHrsPerSqInchComplex', 'SPIFinishes',
 ] as const;
 
 /** The reference material whose melt density converts GPPS-rated shot size (see header). */
@@ -109,6 +140,38 @@ export interface CycleModel {
   gppsMeltDensityKgM3: number;
 }
 
+/** What sizes and prices a mold base, from memory/Plastic Modeling. Lengths in mm. */
+export interface MoldBaseReference {
+  /** tblStandardMoldBaseSizes of the system useMetricOrImperialValues names (Metric: the mm sizes, Imperial: the inch sizes, converted). */
+  bases: Array<{ name: string; widthMm: number; lengthMm: number }>;
+  system: 'Metric' | 'Imperial';
+  /** tblEdgeMoldBorderX / Y: the steel beside the cavities, by the press force (first row whose force covers it). */
+  edgeBorderXByKn: Array<{ maxKn: number; mm: number }>;
+  edgeBorderYByKn: Array<{ maxKn: number; mm: number }>;
+  /** tblCavityPlateDepthBorder / tblCorePlateDepthBorder (inches in the table, mm here): the steel behind the cavity, by the press force. */
+  cavityDepthBorderByKn: Array<{ maxKn: number; mm: number }>;
+  coreDepthBorderByKn: Array<{ maxKn: number; mm: number }>;
+  /** layoutNumCav: how a cavity count is laid out. */
+  layouts: Array<{ cavities: number; widthWise: number; lengthWise: number; runnerCoefficient: number }>;
+  betweenPartsMm: number;
+  aPlateCavityRatio: number;
+  aPlateMinMm: number;
+  bPlateMinMm: number;
+  topClampMm: number;
+  bottomClampMm: number;
+  supportPlateMm: number;
+  /** digital_factory_settings_usa defaultToolMaterialName, and its row of digital_factory_tool_materials_usa. */
+  steel: { name: string; densityKgM3: number; priceUsdPerKg: number; moldBaseCostFactor: number };
+  /** tblHrsPerSqInch{Simple,Average,Complex}: cavity machining hours per square inch of part surface, by the surface area (in2, the first row covering it). */
+  cavityHoursPerSqInByComplexity: Record<MoldComplexity, Array<{ upToSqIn: number; hoursPerSqIn: number }>>;
+  /** cmMoldSurfaceCountThreshold{Simple,Average}: the face counts up to which a part is simple, then average (staged for compression molding). */
+  complexityFaceThresholds: { simple: number; average: number };
+  /** defaultCavityFinishIM and its SPIFinishes row: the polish hours per square meter of cavity surface. */
+  finish: { name: string; hoursPerSqM: number };
+}
+
+export type MoldComplexity = 'Simple' | 'Average' | 'Complex';
+
 export interface PlasticReference {
   /** The staged dataset these rows belong to (e.g. '2026-Plastic') and a fingerprint of the exact rows read: a saved calculation records both (calculation-snapshot.ts). */
   sourceVersion: string;
@@ -123,20 +186,66 @@ export interface PlasticReference {
   /** variables defaultNumberOfGatesPerCavity. */
   defaultGatesPerCavity: number;
   shotSizeSafetyFactor: number;
-  /** Ordered cheapest (lowest rating) first. */
-  spiClasses: Array<{ moldClass: MoldClass; cycleRating: number }>;
+  /** Ordered cheapest (lowest rating) first. useInsert: tblSpiType Use Insert, whether the class builds its cavity as inserts (null when not staged). */
+  spiClasses: Array<{ moldClass: MoldClass; cycleRating: number; useInsert: boolean | null }>;
   tooling: MoldToolingTables;
   /** tblToolLife: shots one mold lasts, by raw_materials material_type. */
   toolLifeShotsByType: Array<{ materialType: string; shots: number }>;
   /** variables defaultToolLife: for a material type with no tblToolLife row. */
   defaultToolLifeShots: number;
   /** digital_factory_settings_usa, Default profile. USA only: no other location is on file. */
-  toolroomRatesUsa: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number };
+  toolroomRatesUsa: ToolroomRates;
+  /** The mold assembly extras: the ejector pins, sprue bushing, locating ring and try-out, and the default cavity texture (F-27). */
+  moldExtras: MoldExtrasReference;
+  /** The mold base: standard sizes, borders, the plate stack and the default tool steel (mold-base.ts). */
+  moldBase: MoldBaseReference;
   /**
    * Variables that decide which catalog operation a recognised feature needs. Optional, unlike the rest of the reference: a database without them
    * still costs the part, and the operations the missing variable would decide are reported undecided (plastic-catalog-operation-resolver.ts).
    */
   featureRules: FeatureRules;
+}
+
+/** digital_factory_settings_usa toolroom rates, USD per hour. */
+export interface ToolroomRates {
+  designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number; tryoutUsdPerHr: number;
+  /** edmRateUsdPerHr: the EDM burn (F-31). */
+  edmUsdPerHr: number;
+  /** heatTreatRateUsdPerKg and stressReliefRateUsdPerKg: hardening and stress relief of the tool steel, per kg (F-29). */
+  heatTreatUsdPerKg: number; stressReliefUsdPerKg: number;
+}
+
+/** What the mold's assembly extras cost, from memory/Plastic Modeling (F-27). */
+export interface MoldExtrasReference {
+  /** variables areaCoveredPerEjectorPin (mm2): one ejector pin per this much of the molded area. */
+  areaPerEjectorPinMm2: number;
+  /** cmStandardToolingComponents Ejector Pin unit cost (its quantity "is calculated in the cost model") and cmToolAssemblyTimes Ejector Pin hours. */
+  ejectorPinUsd: number;
+  ejectorPinAssemblyHours: number;
+  /** variables sprueBushingCost and locatingRingsCost: one of each per mold. */
+  sprueBushingUsd: number;
+  locatingRingUsd: number;
+  /** variables timePerTryoutBase (hours per try-out below 500 t, twice that above) and defaultNumTryOuts. */
+  tryoutBaseHours: number;
+  tryouts: number;
+  /** variables cavityTexture_IM: the default cavity texture ("None": no texture). */
+  cavityTexture: string;
+  /** variables {small,medium,large}{Slide,Lifter}Volume (in3): the block steel of a slide or lifter of each size class (F-28). */
+  slideVolumeIn3: { small: number; medium: number; large: number };
+  lifterVolumeIn3: { small: number; medium: number; large: number };
+  /** variables cmmInspectionMultiplier and cmmInspectionAdder: the CMM hours to inspect the slides and lifters. */
+  cmmHoursPerSideAction: number;
+  cmmBaseHours: number;
+  /** The cooling lines (F-30): variables defaultWaterLineDiameter (mm) and the water hardware prices; cmToolMachiningRates Heater Line Drilling (mm/min). */
+  waterLineDiameterMm: number;
+  waterHoseUsd: number;
+  waterFittingUsd: number;
+  waterManifoldUsd: number;
+  lineDrillingMmPerMin: number;
+  /** The rib inserts and their EDM (F-31, process/rib-inserts.ts). */
+  ribInsert: RibInsertReference;
+  /** variables defaultHotDropType and its price (costPerStandardHotDrop or costPerSVGHotDrop), USD per drop (F-33). */
+  hotDrop: { type: string; usd: number };
 }
 
 export interface FeatureRules {
@@ -148,6 +257,13 @@ export interface FeatureRules {
   lifterEpsilonDeg: number | null;
   /** variable cmAutoIncludeManualFlashTrimming: manual flash trimming is included by default for parts with no internal cutouts (compression molding). */
   autoManualFlashTrimming: boolean | null;
+  /** variable cmManualFlashTrimmingRate (Length/Time, read as mm/s): the linear rate of manual flash removal; null when not staged. */
+  manualFlashTrimmingRateMmPerS?: number | null;
+  /** variable slideCycleRate (Velocity, read as mm/s): how fast a hydraulic slide moves (F-32); null when not staged. */
+  slideCycleRateMmPerS?: number | null;
+  /** memory/Secondary process visualInspectTimeStandard (min/m2) and defaultPercentToBeTested (%): visual inspection (F-34); null when not staged. */
+  visualInspectMinPerM2?: number | null;
+  inspectedPercent?: number | null;
 }
 
 export interface PlasticReferenceRows {
@@ -239,6 +355,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
   const spiClasses = table('tblSpiType').map((r) => ({
     moldClass: `Class${num(r['Spi Type'])}` as MoldClass,
     cycleRating: num(r['Num Annual Mold Cycles']),
+    useInsert: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(String(r['Use Insert'] ?? '').trim().toLowerCase()),
   }));
   if (spiClasses.some((c) => c.cycleRating == null)) missing.push('tblSpiType: Num Annual Mold Cycles');
 
@@ -278,6 +395,115 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     designUsdPerHr: rate('designRateUsdPerHr'),
     machiningUsdPerHr: rate('machiningRateUsdPerHr'),
     assemblyUsdPerHr: rate('assemblyRateUsdPerHr'),
+    tryoutUsdPerHr: rate('tryoutRateUsdPerHr'),
+    heatTreatUsdPerKg: rate('heatTreatRateUsdPerKg'),
+    stressReliefUsdPerKg: rate('stressReliefRateUsdPerKg'),
+    edmUsdPerHr: rate('edmRateUsdPerHr'),
+  };
+  const ribInsertAssemblyHours = assemblyTimes.find((a) => componentNameKey(a.name) === componentNameKey('Rib Insert'))?.hours;
+  if (!(ribInsertAssemblyHours != null && ribInsertAssemblyHours > 0)) missing.push('cmToolAssemblyTimes: Rib Insert assembly_time_hr');
+  const byClass = (small: string, medium: string, large: string) => ({ small: variable(small), medium: variable(medium), large: variable(large) });
+  const ribInsert: RibInsertReference = {
+    thresholdMm: variable('machinedRibThreshold'),
+    areaIn2: byClass('smallInsertArea', 'mediumInsertArea', 'largeInsertArea'),
+    electrodeIn3: byClass('smallCalcRibInsertElectrodeSize', 'mediumCalcRibInsertElectrodeSize', 'largeCalcRibInsertElectrodeSize'),
+    burns: byClass('numSmallInsertsBurns', 'numMediumInsertsBurns', 'numLargeInsertsBurns'),
+    designHours: byClass('cmDesignHrsRibInsertSmall', 'cmDesignHrsRibInsertMedium', 'cmDesignHrsRibInsertLarge'),
+    cutterPathHours: variable('cutterPathHrsPerInsert'),
+    spottingHours: variable('spottingHrsPerInsert'),
+    assemblyHours: ribInsertAssemblyHours ?? NaN,
+    electrodeBurnFraction: variable('edmElectrodeVolumeBurn'),
+    electrodeUsdPerIn3: rate('edmMaterialCostCarbonUsdPerIn3'),
+    burnRateMm3PerMin: named(rates, 'cmToolMachiningRates', 'EDM Electrode Burn', 'rate'),
+    pocketRateMm3PerMin: named(rates, 'cmToolMachiningRates', 'Insert Pocket Machining', 'rate'),
+    pocketSetupHours: setupHr('Insert Pocket'),
+  };
+  const ejectorPin = components.find((c) => componentNameKey(c.name) === componentNameKey('Ejector Pin'));
+  const ejectorPinHours = assemblyTimes.find((a) => componentNameKey(a.name) === componentNameKey('Ejector Pin'))?.hours;
+  if (!(ejectorPin?.unitCostUsd != null && ejectorPin.unitCostUsd > 0)) missing.push('cmStandardToolingComponents: Ejector Pin unit_cost_usd');
+  if (!(ejectorPinHours != null && ejectorPinHours > 0)) missing.push('cmToolAssemblyTimes: Ejector Pin assembly_time_hr');
+  const texture = text.get('cavityTexture_IM')?.trim() || null;
+  if (!texture) missing.push('variables: cavityTexture_IM');
+  const moldExtras: MoldExtrasReference = {
+    areaPerEjectorPinMm2: variable('areaCoveredPerEjectorPin'),
+    ejectorPinUsd: ejectorPin?.unitCostUsd ?? NaN,
+    ejectorPinAssemblyHours: ejectorPinHours ?? NaN,
+    sprueBushingUsd: variable('sprueBushingCost'),
+    locatingRingUsd: variable('locatingRingsCost'),
+    tryoutBaseHours: variable('timePerTryoutBase'),
+    tryouts: variable('defaultNumTryOuts'),
+    cavityTexture: texture ?? '',
+    slideVolumeIn3: { small: variable('smallSlideVolume'), medium: variable('mediumSlideVolume'), large: variable('largeSlideVolume') },
+    lifterVolumeIn3: { small: variable('smallLifterVolume'), medium: variable('mediumLifterVolume'), large: variable('largeLifterVolume') },
+    cmmHoursPerSideAction: variable('cmmInspectionMultiplier'),
+    cmmBaseHours: variable('cmmInspectionAdder'),
+    waterLineDiameterMm: variable('defaultWaterLineDiameter'),
+    waterHoseUsd: variable('waterHosesCost'),
+    waterFittingUsd: variable('waterManifoldFittingsCost'),
+    waterManifoldUsd: variable('waterManifoldsCost'),
+    lineDrillingMmPerMin: named(rates, 'cmToolMachiningRates', 'Heater Line Drilling', 'rate'),
+    ribInsert,
+    hotDrop: ((type) => ({
+      type: type ?? '',
+      usd: type === 'SVG' ? variable('costPerSVGHotDrop') : type === 'Standard' ? variable('costPerStandardHotDrop') : (missing.push('variables: defaultHotDropType (Standard or SVG)'), NaN),
+    }))(text.get('defaultHotDropType')?.trim()),
+  };
+
+  const system = text.get('useMetricOrImperialValues') === 'Imperial' ? 'Imperial' : text.get('useMetricOrImperialValues') === 'Metric' ? 'Metric' : null;
+  if (!system) missing.push('variables: useMetricOrImperialValues');
+  const IN = 25.4;
+  const bases = table('tblStandardMoldBaseSizes')
+    .filter((r) => (system === 'Imperial' ? r['Reference Uom'] === 'inches' : r['Reference Uom'] === 'mm'))
+    .map((r) => {
+      const k = r['Reference Uom'] === 'inches' ? IN : 1;
+      return { name: String(r['Mold Base Name']), widthMm: (num(r['Actual Width']) ?? NaN) * k, lengthMm: (num(r['Actual Length']) ?? NaN) * k };
+    })
+    .sort((a, b) => a.widthMm * a.lengthMm - b.widthMm * b.lengthMm);
+  if (bases.length === 0 || bases.some((b) => !(b.widthMm > 0 && b.lengthMm > 0))) missing.push('tblStandardMoldBaseSizes: Actual Width / Actual Length');
+  const byForce = (key: string, col: string, factor = 1) => table(key)
+    .map((r) => ({ maxKn: num(r['Max Press Force (kN)']) ?? NaN, mm: (num(r[col]) ?? NaN) * factor }))
+    .sort((a, b) => a.maxKn - b.maxKn);
+  const edgeBorderXByKn = byForce('tblEdgeMoldBorderX', 'Edge Mold Border X (mm)');
+  const edgeBorderYByKn = byForce('tblEdgeMoldBorderY', 'Edge Mold Border Y (mm)');
+  const cavityDepthBorderByKn = byForce('tblCavityPlateDepthBorder', 'Cavity Plate Depth Border (in)', IN);
+  const coreDepthBorderByKn = byForce('tblCorePlateDepthBorder', 'Core Plate Depth Border (in)', IN);
+  if ([...edgeBorderXByKn, ...edgeBorderYByKn, ...cavityDepthBorderByKn, ...coreDepthBorderByKn].some((r) => !Number.isFinite(r.maxKn + r.mm))) {
+    missing.push('tblEdgeMoldBorderX/Y, tblCavity/CorePlateDepthBorder: non-numeric cell');
+  }
+  const layouts = table('layoutNumCav').map((r) => ({
+    cavities: num(r['number_of_cavities']) ?? NaN, widthWise: num(r['cavities_width_wise']) ?? NaN,
+    lengthWise: num(r['cavities_length_wise']) ?? NaN, runnerCoefficient: num(r['coefficient_runner_region_width']) ?? NaN,
+  }));
+  if (layouts.some((l) => !Number.isFinite(l.cavities + l.widthWise + l.lengthWise + l.runnerCoefficient))) missing.push('layoutNumCav: non-numeric cell');
+  const steelName = typeof settings?.['defaultToolMaterialName'] === 'string' ? settings['defaultToolMaterialName'] : null;
+  const steelRow = table('digital_factory_tool_materials_usa').find((r) => r['name'] === steelName);
+  if (!steelRow) missing.push(`digital_factory_tool_materials_usa: the default tool material ${steelName ?? '(defaultToolMaterialName not set)'}`);
+  const hoursByArea = (key: string, label: string) => table(key)
+    .map((r) => ({ upToSqIn: num(r[`Surface Area ${label} (in^2)`]) ?? NaN, hoursPerSqIn: num(r[`Hrs Per Sq Inch ${label} (hr)`]) ?? NaN }))
+    .sort((a, b) => a.upToSqIn - b.upToSqIn);
+  const cavityHoursPerSqInByComplexity = {
+    Simple: hoursByArea('tblHrsPerSqInchSimple', 'Simple'),
+    Average: hoursByArea('tblHrsPerSqInchAverage', 'Average'),
+    Complex: hoursByArea('tblHrsPerSqInchComplex', 'Complex'),
+  };
+  if (Object.values(cavityHoursPerSqInByComplexity).some((rows) => rows.length === 0 || rows.some((r) => !(r.upToSqIn > 0 && r.hoursPerSqIn > 0)))) {
+    missing.push('tblHrsPerSqInch{Simple,Average,Complex}: non-numeric cell');
+  }
+  const finishName = text.get('defaultCavityFinishIM') ?? null;
+  const finishRow = table('SPIFinishes').find((r) => r['Finish Name'] === finishName);
+  if (!finishRow) missing.push(`SPIFinishes: the default cavity finish ${finishName ?? '(defaultCavityFinishIM not set)'}`);
+  const moldBase: MoldBaseReference = {
+    bases, system: system ?? 'Metric', edgeBorderXByKn, edgeBorderYByKn, cavityDepthBorderByKn, coreDepthBorderByKn, layouts,
+    betweenPartsMm: variable('betweenPartsMoldBorder'), aPlateCavityRatio: variable('aPlateFlatCavityRatio'),
+    aPlateMinMm: variable('aPlateMinThickness'), bPlateMinMm: variable('bPlateMinThickness'),
+    topClampMm: variable('topClampPlateThickness'), bottomClampMm: variable('bottomClampPlateThickness'), supportPlateMm: variable('supportPlateThickness'),
+    steel: {
+      name: steelName ?? '', densityKgM3: num(steelRow?.['densityKgPerM3']) ?? NaN, priceUsdPerKg: num(steelRow?.['materialCostUsdPerKg']) ?? NaN,
+      moldBaseCostFactor: num(steelRow?.['moldBaseCostFactor']) ?? NaN,
+    },
+    cavityHoursPerSqInByComplexity,
+    complexityFaceThresholds: { simple: variable('cmMoldSurfaceCountThresholdSimple'), average: variable('cmMoldSurfaceCountThresholdAverage') },
+    finish: { name: finishName ?? '', hoursPerSqM: num(finishRow?.['Hrs Per Sq Meter (hr / m^2)']) ?? NaN },
   };
 
   const fillFactors = (attribute: string) => table('injectionTimeAdjustmentFactors')
@@ -327,16 +553,22 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       cavityLayouts,
       defaultGatesPerCavity,
       shotSizeSafetyFactor,
-      spiClasses: (spiClasses as Array<{ moldClass: MoldClass; cycleRating: number }>).sort((a, b) => a.cycleRating - b.cycleRating),
+      spiClasses: (spiClasses as Array<{ moldClass: MoldClass; cycleRating: number; useInsert: boolean | null }>).sort((a, b) => a.cycleRating - b.cycleRating),
       tooling: { components, assemblyTimes, operatorsByArea, designHoursByArea, plateMachiningRateM2PerHr, cavityPlateSetupHr, corePlateSetupHr },
       toolLifeShotsByType,
       defaultToolLifeShots,
       toolroomRatesUsa,
+      moldExtras,
+      moldBase,
       featureRules: {
         maxNoCoreInsertDiameterMm: optionalPositive('maxNoCoreInsertDiameter'),
         slideEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForSlides'),
         lifterEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForLifters'),
         autoManualFlashTrimming: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(text.get('cmAutoIncludeManualFlashTrimming')?.trim().toLowerCase()),
+        manualFlashTrimmingRateMmPerS: optionalPositive('cmManualFlashTrimmingRate'),
+        slideCycleRateMmPerS: optionalPositive('slideCycleRate'),
+        visualInspectMinPerM2: optionalPositive('visualInspectTimeStandard'),
+        inspectedPercent: optionalPositive('defaultPercentToBeTested'),
       },
     },
     missing: [],

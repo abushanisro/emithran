@@ -24,11 +24,11 @@ export class CostTableService {
     if (!item) throw new NotFoundException(`BOM item ${id} not found`);
 
     const [processes, materials, logistics, procured, tooling] = await Promise.all([
-      active<ProcessRecord>('process_cost_records', 'id, operation, process_name, process_group, machine_name, cycle_time, setup_cost_per_part, total_cost_per_part, op_nbr, created_at, parts_per_cycle, scrap, setup_time, batch_size, machine_rate, labor_rate, timing_source, setup_time_source, machine_cost_per_part, labor_cost_per_part'),
+      active<ProcessRecord>('process_cost_records', 'id, operation, process_name, process_group, machine_name, cycle_time, setup_cost_per_part, total_cost_per_part, op_nbr, created_at, parts_per_cycle, scrap, setup_time, batch_size, machine_rate, labor_rate, timing_source, setup_time_source, machine_cost_per_part, labor_cost_per_part, cycle_phases'),
       active<MaterialRecord>('raw_material_cost_records', 'id, material_name, unit_cost, net_usage, total_cost, material_utilization_rate'),
       active<LogisticsRecord>('packaging_logistics_cost_records', 'id, cost_name, total_cost'),
       active<ProcuredRecord>('procured_parts_cost_records', 'id, part_name, total_cost'),
-      active<ToolingRecord>('tooling_cost_records', 'id, tooling_type, description, unit_cost, quantity, total_cost, total_tooling_investment'),
+      active<ToolingRecord>('tooling_cost_records', 'id, tooling_type, description, unit_cost, quantity, total_cost, total_tooling_investment, is_custom, catalog_source'),
     ]);
 
     const row = item as { id: string; name: string; annual_volume: number | null };

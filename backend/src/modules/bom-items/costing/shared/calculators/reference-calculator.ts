@@ -33,7 +33,32 @@ export interface ReferenceCalculatorDef {
   name: string;
   version: number;
   fields: ReferenceCalculatorField[];
+  /** A part's own values for some of its fields, by field name (calculator_field_overrides, migration 1011): set with withFieldOverrides. */
+  overrides?: Readonly<Record<string, FieldOverride>>;
 }
+
+/** A part's own value for one calculator field, with the reason (calculator_field_overrides). */
+export interface FieldOverride {
+  value: number;
+  reason: string;
+}
+
+/** Per calculator name, the part's own field values. */
+export type CalculatorFieldOverrides = Readonly<Record<string, Readonly<Record<string, FieldOverride>>>>;
+
+/**
+ * The calculators with a part's own field values laid over them, for one calculation. The stored definitions are never edited: a calculator with
+ * overrides is a copy, the others are the same objects. No overrides: the calculators as given.
+ */
+export function withFieldOverrides(calculators: ReferenceCalculators | null | undefined, overrides: CalculatorFieldOverrides | null | undefined): ReferenceCalculators | null | undefined {
+  if (!calculators || !overrides || Object.keys(overrides).length === 0) return calculators;
+  return Object.fromEntries(Object.entries(calculators).map(([key, def]) => {
+    const own = overrides[def.name];
+    return [key, own && Object.keys(own).length > 0 ? { ...def, overrides: own } : def];
+  }));
+}
+
+const overrideSource = (o: FieldOverride, was: string) => `Engineer's value for this part: ${o.reason} (instead of ${was})`;
 
 /** Calculator per operation / calculator key ("Drilling", "High Pressure Die Casting", ...). */
 export type ReferenceCalculators = Record<string, ReferenceCalculatorDef>;
@@ -98,7 +123,11 @@ export function runReferenceCalculator(
 
   for (const f of ordered) {
     if (f.field_type === 'calculated') continue;
-    const seed = seeds[f.field_name];
+    const own = def.overrides?.[f.field_name];
+    const seeded = seeds[f.field_name];
+    const seed: CalcSeed | undefined = own
+      ? { value: own.value, source: overrideSource(own, seeded ? `${round(seeded.value)}, ${seeded.source}` : 'no seeded value') }
+      : seeded;
     if (seed && Number.isFinite(seed.value)) {
       scope[f.field_name] = seed.value;
       if (seed.match) lookups[f.field_name] = seed.match;
@@ -106,6 +135,7 @@ export function runReferenceCalculator(
         fieldName: f.field_name, displayLabel: f.display_label ?? f.field_name, kind: 'input',
         value: round(seed.value), unit: f.unit ?? null, source: seed.source,
         ...(seed.lookup ? { stepType: 'lookup' as const } : {}),
+        ...(own ? { override: { original: seeded && Number.isFinite(seeded.value) ? round(seeded.value) : null, reason: own.reason } } : {}),
       });
     } else if (hasValue(f.default_value) && Number.isFinite(Number(f.default_value))) {
       scope[f.field_name] = Number(f.default_value);
@@ -128,7 +158,17 @@ export function runReferenceCalculator(
     id: f.field_name, field_name: f.field_name, field_type: f.field_type,
     default_value: f.default_value ?? null, display_order: f.display_order ?? null,
   }));
-  const { scope: out } = evaluateCalculatorFormulas(rows, [], scope);
+  // A calculated field the part sets is evaluated first as the calculator states it (the trace shows what it would have been), then fixed at the part's
+  // value as an input, so every later formula uses it.
+  const calcOverrides = ordered.filter((f) => f.field_type === 'calculated' && def.overrides?.[f.field_name]);
+  const stated = calcOverrides.length > 0 ? evaluateCalculatorFormulas(rows, [], { ...scope }).scope : null;
+  const fixed = Object.fromEntries(calcOverrides.map((f) => [f.field_name, def.overrides![f.field_name]!.value]));
+  const { scope: out } = evaluateCalculatorFormulas(
+    rows.map((r) => (r.field_name in fixed ? { ...r, field_type: 'number', default_value: null } : r)),
+    [],
+    { ...scope, ...fixed },
+  );
+  for (const [name, v] of Object.entries(fixed)) out[normalizeFieldName(name)] = v;
 
   const outputs: Record<string, number> = {};
   const formulas: CalculationTraceStep[] = ordered
@@ -137,10 +177,13 @@ export function runReferenceCalculator(
       const v = out[normalizeFieldName(f.field_name)];
       const finite = typeof v === 'number' && Number.isFinite(v);
       if (finite) outputs[f.field_name] = v as number;
+      const own = def.overrides?.[f.field_name];
+      const was = stated?.[normalizeFieldName(f.field_name)];
       return {
         fieldName: f.field_name, displayLabel: f.display_label ?? f.field_name, kind: 'calculated' as const,
         value: finite ? round(v as number) : null,
         unit: f.unit ?? null, formula: String(f.default_value ?? ''), stepType: 'physics' as const,
+        ...(own ? { source: overrideSource(own, 'the formula'), override: { original: typeof was === 'number' && Number.isFinite(was) ? round(was) : null, reason: own.reason } } : {}),
       };
     });
 

@@ -14,10 +14,11 @@ interface User {
 import { catalogRowForLine, identityRows, type CatalogRow } from '../process-catalog/catalog-row-for-line';
 import { MISSING_ANALYSIS_TEXT } from '../analysis-status';
 import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from '../dto/apply-route.dto';
-import type { PhysicsGap } from '../dto/cost-breakdown.dto';
+import type { CalculationTraceStep, PhysicsGap } from '../dto/cost-breakdown.dto';
+import { cyclePhasesOf } from '../costing/shared/cycle-phases';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
 import { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
-import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge } from '../costing/shared/core/engine-kernel';
+import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge, persistableCycleSec } from '../costing/shared/core/engine-kernel';
 import { RouteResultDto } from '../dto/route-comparison.dto';
 import { PersistedLineCurrency, resolvePersistedCostCurrencyBasis } from '../costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from '../costing/shared/core/persisted-process-cost';
@@ -44,7 +45,7 @@ export class RouteApplicationService {
    * An apply writes a route from the part's analysis: refuse it until every analysis the part needs is finished and current. A route
    * computed without the CAD features rests on a bounding box and a guess, and is not the part's.
    */
-  private async requireAnalysis(id: string, user: User, token: string): Promise<void> {
+  async requireAnalysis(id: string, user: User, token: string): Promise<void> {
     const status = await this.analysisStatusService.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
     if (status.ready) return;
     throw new ConflictException({
@@ -60,6 +61,8 @@ export class RouteApplicationService {
     dto: ApplyRouteDto,
     user: User,
     token: string,
+    /** Apply the recommended route instead when the asked one is no longer one of the part's routes (its process changed). Off for a route chosen by id. */
+    options: { fallbackToRecommended?: boolean } = {},
   ): Promise<ApplyRouteResult> {
     return this.audit.auditedRowChange('bom_items', id, 'cost.applied', async () => {
     await this.requireAnalysis(id, user, token);
@@ -87,7 +90,9 @@ export class RouteApplicationService {
     const batchSize = comparison.resolvedInputs.batchSize;
 
     // 2. Resolve 'auto' to the engine's own recommendation, from THIS comparison.
-    const routeId = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
+    const askedFor = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
+    const replaced = !!askedFor && options.fallbackToRecommended === true && !comparison.routes.some((r) => r.routeId === askedFor);
+    const routeId = replaced ? comparison.recommendedRouteId : askedFor;
     if (!routeId && comparison.noCompatibleProcessMessage) {
       // Every route is ruled out by a feature its process cannot make: say so, with each route's reason, and choose nothing.
       const reasons = comparison.routes.flatMap((r) => (r.compatibility?.incompatibilities ?? []).map((i) => `${r.routeLabel}: ${i.count} x ${i.featureType} (${i.reason})`));
@@ -162,6 +167,7 @@ export class RouteApplicationService {
       operations: insertedOps,
       routeLabel: route.routeLabel,
       routeId:    routeId,
+      ...(replaced ? { replacedRouteId: askedFor } : {}),
     };
   }, { route: dto.routeId, custom: false });
   }
@@ -391,8 +397,12 @@ export class RouteApplicationService {
       /** The cycle's machine / labour split when the engine states it (ProcessLineCost); persisted into machine_cost_per_part / labor_cost_per_part (migration 970). */
       machineCostPerPart?: number;
       laborCostPerPart?: number;
+      /** What the line charges beyond machine and crew time, USD (ProcessLineCost.otherCostPerPartUsd); persisted into other_cost_per_part (migration 1005). */
+      otherCostPerPartUsd?: number;
       /** The versions the line was calculated with (ProcessLineCost.calculationSnapshot); persisted into calculation_breakdown (migration 972). */
       calculationSnapshot?: object;
+      /** The stored calculator's run (ProcessLineCost.calculationTrace); its cycle phases are persisted into cycle_phases (migration 1009). */
+      calculationTrace?: CalculationTraceStep[];
     }>,
     batchSize: number,
     location: string,
@@ -415,7 +425,7 @@ export class RouteApplicationService {
      */
     currencyContext: PersistedLineCurrency,
   ): Promise<string[]> {
-    // process_cost_records.cycle_time is NUMERIC(12,2) holding SECONDS. This
+    // process_cost_records.cycle_time is NUMERIC(12,4) holding SECONDS (migration 1006). This
     // check used to justify itself by citing migration 034's
     // CHECK (cycle_time >= 1) and calling an unresolved cycle time
     // "schema-impossible to persist". It was not: 034 declares that constraint
@@ -594,7 +604,7 @@ export class RouteApplicationService {
       // real precision the schema already supports on every applied route —
       // confirmed live: a genuine 19.2s Inspection line saved as 19s, then
       // visibly disagreed with its own calculator's exact recomputation.
-      const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
+      const cycleTimeSec = persistableCycleSec(line.cycleTimeMin);
       const perPart = isPerPartCharge(line);
       // Labour is the rate the engine costed this line with — the selected
       // machine's own memory/ LHR (line.labourRate). No lhr_benchmark_rates or
@@ -724,6 +734,10 @@ export class RouteApplicationService {
         calculation_breakdown:     line.calculationSnapshot ?? null,
         machine_cost_per_part:     line.machineCostPerPart ?? null,
         labor_cost_per_part:       line.laborCostPerPart ?? null,
+        // What the line charges beyond machine and crew time (energy, a consumable), USD like total_cost_per_part (migration 1005).
+        other_cost_per_part:       line.otherCostPerPartUsd ?? null,
+        // The phases of the cycle as the line's stored calculator gave them (migration 1009); null when the line has no calculator cycle.
+        cycle_phases:              cyclePhasesOf(line.calculationTrace),
         // Costed-operation provenance (migration 718).
         //
         // line_hourly_rate is line.hourlyRate verbatim and UNROUNDED -- the

@@ -1,11 +1,12 @@
 // The refractory coating of the mould and of the cores, its drying, and the gluing of the cores into an assembly: route steps the plant data defines
 // (memory/Sand casting: the coating methods' application rate and output, the coating densities, the preparation times, the oven beds, the crew sizes and
-// singleCoreAssemblyTime) and the calculators "Refractory coat", "Refractory drying" and "Core assembly" compute. Coating is the user's choice (most
-// castings are not coated), and the drying time and the coating price are the plant's own settings: none is assumed, so a coating chosen without a drying time
-// is a named gap, and a coating without a price is costed for time only and says so.
+// singleCoreAssemblyTime) and the calculators "Refractory coat", "Refractory drying" and "Core assembly" compute. What is coated and how it is dried follow the
+// plant's variables unless the Cost Guide says otherwise: the cores are coated (defaultCoreRefractoryCoatingInclusion), the mould is not (the data has no
+// inclusion default for it), the drying is the cheaper of the oven and air at the plant's times (defaultOvenDryAndCoolTime, defaultAirDryAndCoolTime). A drying
+// time neither set nor in the data is a named gap; the coating has no price in the data, so it is costed for time and drying only and says so.
 import type { CostContext } from '../casting-finishing';
 import type { CostedStep, SandRouteContext, StepOutcome } from './sand-steps';
-import { runStep, selectAndCost } from './sand-steps';
+import { energyBasisOf, runStep, selectAndCost } from './sand-steps';
 import type { SandFinishContext } from './sand-finishing-steps';
 import { machineValue, type SandMachine } from './sand-machines';
 import { valuesProvider } from './sand-seeds';
@@ -20,17 +21,29 @@ export type RefractoryChoice = (typeof COAT_CHOICES)[number];
 export const DRY_METHODS = ['oven', 'air'] as const;
 export type DryMethod = (typeof DRY_METHODS)[number];
 
-/** What the user chose for the coating (Cost Guide). Nothing is coated unless chosen; the drying and the price are null until set. */
+/** What the Cost Guide says of the coating; null is the plant's default (what is coated, the cheaper drying, the plant's drying time). */
 export interface RefractorySettings {
-  coat: RefractoryChoice;
+  /** What is coated; null: the plant's default (the cores, defaultCoreRefractoryCoatingInclusion). */
+  coat: RefractoryChoice | null;
+  /** Oven or air; null: the cheaper of the two. */
   dryMethod: DryMethod | null;
-  /** The plant's time for a load in the oven, or on the air-dry area (minutes). */
+  /** A load's drying time (minutes); null: the plant's (defaultOvenDryAndCoolTime, defaultAirDryAndCoolTime). */
   dryMinutes: number | null;
   /** USD per kg of coating; unset: the coating is not charged and the line says so. */
   pricePerKg: number | null;
 }
 
+/** "Not coated", chosen in the Cost Guide. */
 export const NO_REFRACTORY: RefractorySettings = { coat: 'none', dryMethod: null, dryMinutes: null, pricePerKg: null };
+/** Nothing chosen: the plant's defaults throughout. */
+export const PLANT_REFRACTORY: RefractorySettings = { coat: null, dryMethod: null, dryMinutes: null, pricePerKg: null };
+
+/** What is coated: the Cost Guide's choice, else the cores when the plant includes their coating by default. */
+function coatOf(settings: RefractorySettings, ref: SandRouteContext['ref']): RefractoryChoice {
+  return settings.coat ?? (ref.text('defaultCoreRefractoryCoatingInclusion') === 'true' ? 'cores' : 'none');
+}
+
+const DRY_TIME_VARIABLE = { oven: 'defaultOvenDryAndCoolTime', air: 'defaultAirDryAndCoolTime' } as const;
 
 // The dryers are the machines of the two refractory drying classes (seeded by migration 851). The people who coat, and who glue cores, are the work centre
 // the data names "Default" for the refractory processes: the air-dry file holds it (labour 30.49 and indirect overhead 14.09 USD/h, no machine), and the two
@@ -45,15 +58,6 @@ const WORK_CENTRE = CLASSES.air;
 export const REFRACTORY_CLASSES: readonly string[] = Object.values(CLASSES);
 
 const fail = (...reasons: string[]): StepOutcome => ({ ok: false, reasons });
-
-/** What is needed of the settings once something is coated: the drying method and time. */
-export function refractorySettingsProblems(s: RefractorySettings): string[] {
-  if (s.coat === 'none') return [];
-  const problems: string[] = [];
-  if (s.dryMethod == null) problems.push('the drying method (oven or air) is not set in the Cost Guide');
-  if (s.dryMinutes == null) problems.push("the plant's drying time is not set in the Cost Guide");
-  return problems;
-}
 
 /** The coating the plant's defaults name: its method's row of tblRefractoryCoating and its density in processConsumables. */
 function coating(ctx: SandRouteContext): { rate: number; output: number; density: number; method: string; liquid: string } | { missing: string[] } {
@@ -115,7 +119,7 @@ export function coatStep(ctx: SandFinishContext, m: SandMachine, what: 'mould' |
  * Drying the coated mould or cores. One load is what the bed less racking holds of the item (the flask, or the casting's cores together); the drying time is
  * the plant's own. The oven's energy is its power over the drying time, shared by the castings a load makes, priced with the energy price when set.
  */
-export function dryStep(ctx: SandFinishContext, m: SandMachine, method: DryMethod, minutes: number, itemVolumeMm3: number, itemsPerCasting: number): StepOutcome {
+export function dryStep(ctx: SandFinishContext, m: SandMachine, method: DryMethod, minutes: { value: number; source: string }, itemVolumeMm3: number, itemsPerCasting: number): StepOutcome {
   const oven = method === 'oven';
   const prepVariable = oven ? 'defaultRefractoryCoatingOvenDryPreparationTime' : 'defaultRefractoryCoatingAirDryPreparationTime';
   const absent = ctx.ref.absent({ numbers: [prepVariable, ...(oven ? ['defaultRefractoryCoatOvenAvailableFactor'] : [])] });
@@ -133,14 +137,14 @@ export function dryStep(ctx: SandFinishContext, m: SandMachine, method: DryMetho
       prep_hr: { value: ctx.ref.number(prepVariable)!, source: `Sand casting variable ${prepVariable}` },
       batch_size: { value: ctx.batchSize, source: 'batch size of the scenario' },
     },
-    { scenario: valuesProvider({ refractory_dry_minutes: { value: minutes, source: "the plant's drying time for a load, set in the Cost Guide (min)" } }) },
+    { scenario: valuesProvider({ refractory_dry_minutes: minutes }) },
   );
   if (!('run' in r)) return fail(...r.reasons);
   const perLoad = r.run.outputs['Items per Load'];
   if (perLoad == null || perLoad < 1) return fail(`one item (${(itemVolumeMm3 / 1e9).toFixed(3)} m³) does not fit the bed less racking`);
   const kwh = r.run.outputs['Energy'] ?? 0;
-  const notes = kwh > 0 && !priced ? [`The drying energy (${kwh.toFixed(3)} kWh per casting) is not charged: the energy price is not set in the Cost Guide.`] : [];
-  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? kwh * ctx.energyPricePerKwh! : 0, notes };
+  const notes = kwh > 0 && !priced ? [`The drying energy (${kwh.toFixed(3)} kWh per casting) is not charged: no energy price for the location or in the Cost Guide.`] : [];
+  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: priced ? kwh * ctx.energyPricePerKwh! : 0, notes, ...(priced && kwh > 0 ? { energyBasis: energyBasisOf(ctx) } : {}) };
 }
 
 /** Gluing the cores of a casting into an assembly: one glue for each core after the first. */
@@ -168,7 +172,8 @@ export function coreRefractoryLines(ctx: SandFinishContext, settings: Refractory
   const step = (process: string, cls: string, crew: number | null, evaluate: (m: SandMachine) => StepOutcome, criteria: string[]): CostedStep =>
     selectAndCost({ process, machineClass: cls, machines: crew == null ? machines(cls) : crewed(machines(cls), crew), evaluate, criteria, ...common });
   const operators = ctx.ref.number('defaultMoldRefractoryCoatingNumOperators');
-  const coats = settings.coat === 'cores' || settings.coat === 'both';
+  const coat = coatOf(settings, ctx.ref);
+  const coats = coat === 'cores' || coat === 'both';
   if (coats && cores.length > 0) {
     const areas = cores.map((c) => c.areaMm2);
     const area = areas.every((a): a is number => a != null) ? areas.reduce((s, a) => s + a, 0) : null;
@@ -183,7 +188,8 @@ export function coreRefractoryLines(ctx: SandFinishContext, settings: Refractory
 
 /** The lines of the mould's side: the cavity coated and the mould dried. Nothing when the mould is not to be coated. */
 export function mouldRefractoryLines(ctx: SandFinishContext, settings: RefractorySettings, flaskVolumeMm3: number, common: Common): CostedStep[] {
-  if (!(settings.coat === 'mould' || settings.coat === 'both')) return [];
+  const coat = coatOf(settings, ctx.ref);
+  if (!(coat === 'mould' || coat === 'both')) return [];
   const machines = (c: string) => common.machinesByClass[c] ?? [];
   const step = (process: string, cls: string, crew: number | null, evaluate: (m: SandMachine) => StepOutcome, criteria: string[]): CostedStep =>
     selectAndCost({ process, machineClass: cls, machines: crew == null ? machines(cls) : crewed(machines(cls), crew), evaluate, criteria, ...common });
@@ -196,16 +202,29 @@ export function mouldRefractoryLines(ctx: SandFinishContext, settings: Refractor
 
 type StepFn = (process: string, cls: string, crew: number | null, evaluate: (m: SandMachine) => StepOutcome, criteria: string[]) => CostedStep;
 
-/** The drying line of an item: a named gap until the drying method and time are set. */
+/**
+ * The drying line of an item: the chosen method, else the cheaper of the oven and air; the time is the Cost Guide's, else the plant's for that method. A
+ * method with no time in either is a named gap.
+ */
 function dryLine(ctx: SandFinishContext, settings: RefractorySettings, step: StepFn, what: 'mould' | 'cores', itemVolumeMm3: number, itemsPerCasting: number): CostedStep {
-  const oven = settings.dryMethod !== 'air';
-  const cls = oven ? CLASSES.oven : CLASSES.air;
-  const crewVariable = oven ? 'defaultRefractoryOvenDryNumberLaborers' : 'defaultRefractoryAirDryNumberLaborers';
-  const process = `Refractory Coat ${oven ? 'Oven' : 'Air'} Dry (${what === 'mould' ? 'mould' : 'cores'})`;
-  const problems = refractorySettingsProblems(settings);
-  return step(process, cls, ctx.ref.number(crewVariable) ?? 1, (m) =>
-    problems.length > 0 || settings.dryMethod == null || settings.dryMinutes == null
-      ? fail(...problems)
-      : dryStep(ctx, m, settings.dryMethod, settings.dryMinutes, itemVolumeMm3, itemsPerCasting),
-  ['A work-centre rate on file', 'The item fits the bed less racking', "The plant's drying time is set"]);
+  const lineFor = (method: DryMethod): CostedStep => {
+    const oven = method === 'oven';
+    const cls = oven ? CLASSES.oven : CLASSES.air;
+    const crewVariable = oven ? 'defaultRefractoryOvenDryNumberLaborers' : 'defaultRefractoryAirDryNumberLaborers';
+    const process = `Refractory Coat ${oven ? 'Oven' : 'Air'} Dry (${what === 'mould' ? 'mould' : 'cores'})`;
+    const plant = ctx.ref.number(DRY_TIME_VARIABLE[method]);
+    const minutes = settings.dryMinutes != null
+      ? { value: settings.dryMinutes, source: 'drying time for a load, set in the Cost Guide (min)' }
+      : plant != null ? { value: plant, source: `Sand casting variable ${DRY_TIME_VARIABLE[method]} (min)` } : null;
+    return step(process, cls, ctx.ref.number(crewVariable) ?? 1, (m) =>
+      minutes == null
+        ? fail(`no drying time: none set in the Cost Guide and no ${DRY_TIME_VARIABLE[method]} in the plant data`)
+        : dryStep(ctx, m, method, minutes, itemVolumeMm3, itemsPerCasting),
+    ['A work-centre rate on file', 'The item fits the bed less racking', 'A drying time (Cost Guide, else the plant data)']);
+  };
+  if (settings.dryMethod) return lineFor(settings.dryMethod);
+  // The cheaper whole line of the two; a gap only when neither can be costed.
+  const both = DRY_METHODS.map(lineFor);
+  const costed = both.filter((s) => s.line.physicsGap == null).sort((a, b) => a.line.totalCost - b.line.totalCost);
+  return costed[0] ?? both[0]!;
 }

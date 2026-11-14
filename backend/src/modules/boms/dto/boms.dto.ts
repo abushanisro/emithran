@@ -16,11 +16,6 @@ export class CreateBOMDto {
   @IsUUID()
   projectId: string;
 
-  @ApiPropertyOptional({ example: '1.0' })
-  @IsOptional()
-  @IsString()
-  version?: string;
-
   @ApiPropertyOptional({ enum: ['draft', 'approved', 'released', 'obsolete'] })
   @IsOptional()
   @IsString()

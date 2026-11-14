@@ -463,15 +463,17 @@ export class MaterialResolutionService {
    * material property comes from. null when the grade matches no row or the
    * row carries no code.
    */
-  async resolveCutCode(accessToken: string, grade: string, family: string = 'unknown'): Promise<{ cutCode: number | null; materialName: string | null; materialGroup: string | null; materialType: string | null }> {
+  async resolveCutCode(accessToken: string, grade: string, family: string = 'unknown'): Promise<{ cutCode: number | null; materialName: string | null; materialGroup: string | null; materialType: string | null; materialClass: string | null }> {
+    const none = { cutCode: null, materialName: null, materialGroup: null, materialType: null, materialClass: null };
     const g = grade?.trim();
-    if (!g) return { cutCode: null, materialName: null, materialGroup: null, materialType: null };
+    if (!g) return none;
     const client = this.databaseService.getClient(accessToken);
     const { row } = await this.matchBestRawMaterialRow(client, g, family, 'cost');
-    if (!row) return { cutCode: null, materialName: null, materialGroup: null, materialType: null };
-    const { data } = await client.from('raw_materials').select('cut_code').eq('id', row.id).maybeSingle();
+    if (!row) return none;
+    const { data } = await client.from('raw_materials').select('cut_code, material_class').eq('id', row.id).maybeSingle();
     const code = data?.cut_code != null ? Number(data.cut_code) : NaN;
-    return { cutCode: Number.isFinite(code) ? code : null, materialName: row.materialGrade ?? row.material, materialGroup: row.materialGroup, materialType: row.materialType };
+    const materialClass = typeof data?.material_class === 'string' && data.material_class.trim() ? data.material_class.trim() : null;
+    return { cutCode: Number.isFinite(code) ? code : null, materialName: row.materialGrade ?? row.material, materialGroup: row.materialGroup, materialType: row.materialType, materialClass };
   }
 
   /**

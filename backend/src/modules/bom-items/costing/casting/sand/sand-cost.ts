@@ -1,5 +1,8 @@
 // What the cost summary needs of a sand casting, around the pure route (sand-route.ts): the scenario the user set, the part's measurements as the
 // route takes them, the material row, and the route's costs in the location's currency. Pure.
+import { electricityUsd, type LocationElectricity } from '../../shared/location-electricity';
+import { roundPerPart } from '../machine-choice';
+import { roundLineCost } from '../casting-finishing';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CoreRegion } from './sand-cores';
 import { COAT_CHOICES, DRY_METHODS } from './sand-refractory';
@@ -33,11 +36,31 @@ export const SAND_SCENARIO_KEYS = {
  * The scenario as the route takes it. The core-box tooling is amortised over annual volume x production life; with either missing there is
  * no lifetime volume (null), and the tooling is not costed rather than spread over a made-up volume.
  */
+/** A location's electricity price as stored (location_electricity_prices, migration 1004): in its own currency, with its source. */
+export type { LocationElectricity } from '../../shared/location-electricity';
+
+/**
+ * The energy price the route charges: the Cost Guide's for this part, else the location's sourced electricity price converted to USD, else
+ * none (energy is then not charged, and each line says so). Never assumed.
+ */
+function energyPrice(override: number | null, location: string | undefined, row: LocationElectricity | null | undefined, toUsd: (value: number, currency: string) => number | null, warnings: string[]): { usdPerKwh: number; source: string } | null {
+  if (override != null) return { usdPerKwh: override, source: 'energy price set in the Cost Guide (USD/kWh)' };
+  if (!row) return null;
+  const priced = electricityUsd(row, location, toUsd);
+  if (!priced) warnings.push(`The ${location ?? 'location'} electricity price is in ${row.currency}, which has no exchange rate to USD: energy is not charged.`);
+  return priced;
+}
+
 export function sandScenario(input: {
   overrides: Record<string, unknown> | null | undefined;
   batchSize: number;
   annualVolume: number | null;
   productionLifeYears: number | null;
+  /** The Digital Factory location and its electricity price (null when the location has none). */
+  location?: string;
+  locationElectricity?: LocationElectricity | null;
+  /** Converts an amount in a currency to USD with the app's exchange rates; null when there is no rate. */
+  toUsd?: (value: number, currency: string) => number | null;
 }): { scenario: Omit<SandScenario, 'lifetimeVolume'> & { lifetimeVolume: number | null }; warnings: string[] } {
   const o = input.overrides ?? {};
   const processName = typeof o[SAND_SCENARIO_KEYS.mouldingProcess] === 'string' ? (o[SAND_SCENARIO_KEYS.mouldingProcess] as string) : null;
@@ -53,14 +76,17 @@ export function sandScenario(input: {
       cavities: cavity != null && Number.isInteger(cavity) && cavity > 0 ? cavity : null,
       mouldingClass,
       chosenCoreProcess: typeof o[SAND_SCENARIO_KEYS.coreProcess] === 'string' ? (o[SAND_SCENARIO_KEYS.coreProcess] as string) : null,
-      energyPricePerKwh: positive(o[SAND_SCENARIO_KEYS.energyPrice]),
+      ...(() => {
+        const e = energyPrice(positive(o[SAND_SCENARIO_KEYS.energyPrice]), input.location, input.locationElectricity, input.toUsd ?? (() => null), warnings);
+        return { energyPricePerKwh: e?.usdPerKwh ?? null, energyPriceSource: e?.source ?? null };
+      })(),
       hotBox: {
         coreboxTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCoreboxTemp]),
         cureTempC: positive(o[SAND_SCENARIO_KEYS.hotBoxCureTemp]),
         curedDepthMm: positive(o[SAND_SCENARIO_KEYS.hotBoxCuredDepth]),
       },
       refractory: {
-        coat: COAT_CHOICES.find((c) => c === o[SAND_SCENARIO_KEYS.refractoryCoat]) ?? 'none',
+        coat: COAT_CHOICES.find((c) => c === o[SAND_SCENARIO_KEYS.refractoryCoat]) ?? null,
         dryMethod: DRY_METHODS.find((m) => m === o[SAND_SCENARIO_KEYS.refractoryDryMethod]) ?? null,
         dryMinutes: positive(o[SAND_SCENARIO_KEYS.refractoryDryMinutes]),
         pricePerKg: positive(o[SAND_SCENARIO_KEYS.refractoryCoatPrice]),
@@ -136,9 +162,10 @@ export function sandRouteToLocal(route: SandRoute, usdToLocal: number): SandRout
   const k = (v: number) => Math.round(v * usdToLocal * 100) / 100;
   const line = (l: ProcessLineCost): ProcessLineCost => ({
     ...l,
-    setupCost: k(l.setupCost), runCost: k(l.runCost), totalCost: k(l.totalCost),
+    setupCost: roundLineCost(l.setupCost * usdToLocal), runCost: roundLineCost(l.runCost * usdToLocal), totalCost: roundLineCost(l.totalCost * usdToLocal),
     hourlyRate: Math.round(l.hourlyRate * usdToLocal * 100) / 100,
     labourRate: l.labourRate != null ? Math.round(l.labourRate * usdToLocal * 100) / 100 : l.labourRate,
+    ...(l.machineChoice ? { machineChoice: { ...l.machineChoice, candidates: l.machineChoice.candidates.map((x) => ({ ...x, perPartCost: x.perPartCost != null ? roundPerPart(x.perPartCost * usdToLocal) : null })) } } : {}),
   });
   return {
     ...route,
@@ -146,6 +173,5 @@ export function sandRouteToLocal(route: SandRoute, usdToLocal: number): SandRout
     material: { ...route.material, costUsd: route.material.costUsd != null ? k(route.material.costUsd) : null },
     tooling: { perPartUsd: Math.round(route.tooling.perPartUsd * usdToLocal * 10000) / 10000, items: route.tooling.items.map((t) => ({ ...t, toolingCostUsd: k(t.toolingCostUsd), perPartUsd: Math.round(t.perPartUsd * usdToLocal * 10000) / 10000 })) },
     totalUsd: route.totalUsd != null ? k(route.totalUsd) : null,
-    alternatives: route.alternatives.map((a) => ({ ...a, totalUsd: a.totalUsd != null ? k(a.totalUsd) : null })),
   };
 }

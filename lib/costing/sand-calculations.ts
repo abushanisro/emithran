@@ -1,4 +1,4 @@
-import type { CalculationTraceStep, ProcessLineCost } from '@/lib/api/hooks/useBOMItems';
+import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 
 /** Mirrors the backend's CalculatorRunDto (cost-breakdown.dto.ts). */
 export interface CalculatorRun {
@@ -12,12 +12,11 @@ export interface CalculatorRun {
   missing: string[];
 }
 
-/** One row of the calculations list: a route step or a calculator run, with the trace behind its number. */
+/** One calculator run behind the sand-casting cost, with the trace behind its number. */
 export interface CalculationEntry {
   key: string;
   title: string;
-  kind: 'route step' | 'calculator run';
-  /** The headline figure, already worded ("12.5 min", "3.2 kg"); null when the calculator gave none. */
+  /** The headline figure, already worded ("3.2 kg"); null when the calculator gave none. */
   result: string | null;
   trace: CalculationTraceStep[];
   calculatorId: string | null;
@@ -28,40 +27,26 @@ export interface CalculationEntry {
   noTraceReason: string | null;
 }
 
-const NO_TRACE_LINE = 'This step is priced without a calculator trace: its figures come from the machine and rate records, not a formula.';
-const NO_TRACE_RUN = 'The calculator returned no trace.';
+/** The route's calculator runs by where they are shown: the core boxes under Tooling, the metal, gating, risers and core sand under the material. */
+export function splitSandRuns(runs: Record<string, CalculatorRun> | undefined): { material: Record<string, CalculatorRun>; tooling: Record<string, CalculatorRun> } {
+  const material: Record<string, CalculatorRun> = {};
+  const tooling: Record<string, CalculatorRun> = {};
+  for (const [key, run] of Object.entries(runs ?? {})) (key.startsWith('Sand core box') ? tooling : material)[key] = run;
+  return { material, tooling };
+}
 
-/** Route steps first (in route order), then the calculator runs, each carrying only what the backend sent. */
-export function calculationEntries(
-  processLines: ProcessLineCost[] | undefined,
-  runs: Record<string, CalculatorRun> | undefined,
-): CalculationEntry[] {
-  const lines: CalculationEntry[] = (processLines ?? []).map((l, i) => {
-    const trace = l.calculationTrace ?? [];
-    return {
-      key: `line:${i}:${l.process}`,
-      title: l.process,
-      kind: 'route step',
-      result: Number.isFinite(l.cycleTimeMin) ? `${round(l.cycleTimeMin)} min` : null,
-      trace,
-      calculatorId: l.calculatorId ?? null,
-      calculatorVersion: l.calculatorVersion ?? null,
-      missing: [],
-      noTraceReason: trace.length ? null : NO_TRACE_LINE,
-    };
-  });
-  const calculators: CalculationEntry[] = Object.entries(runs ?? {}).map(([name, r]) => ({
+/** The calculator runs of the route (metal, risers, gating, core sand, core boxes), each carrying only what the backend sent. */
+export function calculatorRunEntries(runs: Record<string, CalculatorRun> | undefined): CalculationEntry[] {
+  return Object.entries(runs ?? {}).map(([name, r]) => ({
     key: `run:${name}`,
     title: r.name || name,
-    kind: 'calculator run',
     result: r.value == null ? null : `${round(r.value)}${r.output ? ` ${r.output}` : ''}`,
     trace: r.trace,
     calculatorId: r.calculatorId,
     calculatorVersion: r.calculatorVersion,
     missing: r.missing,
-    noTraceReason: r.trace.length ? null : NO_TRACE_RUN,
+    noTraceReason: r.trace.length ? null : 'The calculator returned no trace.',
   }));
-  return [...lines, ...calculators];
 }
 
 function round(n: number): number {

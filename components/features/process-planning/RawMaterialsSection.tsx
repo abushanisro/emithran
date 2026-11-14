@@ -25,6 +25,8 @@ interface RawMaterialsSectionProps {
    */
   costBatchSize?: number;
   compact?: boolean; // render without the outer card chrome (for embedding inside other panels)
+  /** Process-specific detail shown under each record's cost breakdown (a sand casting's metal balance and calculators). */
+  breakdownDetail?: React.ReactNode;
   currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
   conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
   /** Called after the last material record for this item is deleted. Use to cascade-clear stale process records. */
@@ -206,7 +208,7 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, bla
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, costBatchSize, compact, currencySymbol = '$', conversionRate = 1, onAllMaterialsDeleted }: RawMaterialsSectionProps) {
+export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, costBatchSize, compact, breakdownDetail, currencySymbol = '$', conversionRate = 1, onAllMaterialsDeleted }: RawMaterialsSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMaterial, setEditMaterial] = useState<any | null>(null);
   const [openBreakdownId, setOpenBreakdownId] = useState<string | null>(null);
@@ -373,6 +375,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
               {openBreakdownId === m.id && (
                 <div className="px-3 py-2 bg-muted/20 border-b border-border">
                   <RawMaterialBreakdown m={m} currencySymbol={currencySymbol} conversionRate={conversionRate} blankSpec={blankSpec} />
+                  {breakdownDetail}
                 </div>
               )}
             </React.Fragment>
@@ -499,6 +502,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
                             <tr>
                               <td colSpan={colSpan} className="px-3 py-3 bg-muted/20 border-b border-border">
                                 <RawMaterialBreakdown m={material} currencySymbol={currencySymbol} conversionRate={conversionRate} blankSpec={blankSpec} />
+                                {breakdownDetail}
                               </td>
                             </tr>
                           )}

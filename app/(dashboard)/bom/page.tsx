@@ -71,7 +71,6 @@ function BOMManagementContent() {
   const [bomFormData, setBomFormData] = useState({
     name: '',
     description: '',
-    version: '1.0',
     status: 'draft' as 'draft' | 'approved' | 'released' | 'obsolete',
   });
 
@@ -103,7 +102,6 @@ function BOMManagementContent() {
         name: bomFormData.name,
         ...(bomFormData.description ? { description: bomFormData.description } : {}),
         projectId: targetProjectId,
-        version: bomFormData.version,
         status: bomFormData.status,
       });
 
@@ -111,7 +109,6 @@ function BOMManagementContent() {
       setBomFormData({
         name: '',
         description: '',
-        version: '1.0',
         status: 'draft',
       });
       refetch();
@@ -122,7 +119,6 @@ function BOMManagementContent() {
     setBomFormData({
       name: '',
       description: '',
-      version: '1.0',
       status: 'draft',
     });
     setIsCreateDialogOpen(false);
@@ -133,7 +129,6 @@ function BOMManagementContent() {
     setBomFormData({
       name: bom.name,
       description: bom.description || '',
-      version: bom.version,
       status: bom.status || 'draft',
     });
     setIsEditDialogOpen(true);
@@ -150,7 +145,6 @@ function BOMManagementContent() {
         data: {
           name: bomFormData.name,
           description: bomFormData.description,
-          version: bomFormData.version,
           status: bomFormData.status,
         },
       });
@@ -160,7 +154,6 @@ function BOMManagementContent() {
       setBomFormData({
         name: '',
         description: '',
-        version: '1.0',
         status: 'draft',
       });
       refetch();
@@ -188,8 +181,7 @@ function BOMManagementContent() {
   const filteredBoms = searchQuery
     ? boms.filter(
         (bom) =>
-          bom.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (bom.version && bom.version.toLowerCase().includes(searchQuery.toLowerCase()))
+          bom.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : boms;
 
@@ -334,7 +326,6 @@ function BOMManagementContent() {
                   <TableRow>
                     <TableHead>BOM Name</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Version</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Items</TableHead>
                     <TableHead className="text-right">Total Cost</TableHead>
@@ -356,9 +347,6 @@ function BOMManagementContent() {
                         <p className="text-sm text-muted-foreground">
                           {bom.description || 'No description'}
                         </p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm">v{bom.version}</p>
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -472,15 +460,6 @@ function BOMManagementContent() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="version">Version</Label>
-                <Input
-                  id="version"
-                  value={bomFormData.version}
-                  onChange={(e) => setBomFormData((prev) => ({ ...prev, version: e.target.value }))}
-                  placeholder="1.0"
-                />
-              </div>
-              <div className="grid gap-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
@@ -547,15 +526,6 @@ function BOMManagementContent() {
                     <SelectItem value="obsolete">Obsolete</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-version">Version</Label>
-                <Input
-                  id="edit-version"
-                  value={bomFormData.version}
-                  onChange={(e) => setBomFormData((prev) => ({ ...prev, version: e.target.value }))}
-                  placeholder="1.0"
-                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-description">Description</Label>

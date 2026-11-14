@@ -225,6 +225,9 @@ export function buildCastingCostSummary(input: {
     ...(input.dieTooling ? { dieTooling: dieToolingDto(input.dieTooling) } : {}),
     ...(input.processChoice ? { dieCastingProcess: input.processChoice } : {}),
     ...(Object.keys(calculatorRuns).length ? { calculatorRuns } : {}),
+    // The metal the part is charged with, whatever the casting process: the material record is written from this one figure.
+    ...(sand ? (sand.material.boughtKg != null ? { castingMetal: { partKg: netKg, chargedKg: sand.material.boughtKg } } : {})
+      : dc && netKg > 0 ? { castingMetal: { partKg: r3(netKg), chargedKg: r3(chargedKg) } } : {}),
     ...(input.cores?.corebox ? {
       coreboxTooling: {
         boxes: input.cores.corebox.boxes, detail: input.cores.corebox.detail,
@@ -232,7 +235,7 @@ export function buildCastingCostSummary(input: {
         perPartUsd: input.cores.corebox.perPartUsd != null ? Math.round(input.cores.corebox.perPartUsd * 10000) / 10000 : null,
       },
     } : {}),
-    ...(sand ? { sandCasting: { mouldingProcess: sand.mouldingProcess, mouldingMachine: sand.mouldingMachine, cavities: sand.cavities, coresMade: sand.coresMade, coresLeftSolid: sand.coresLeftSolid, complete: sand.complete, measuredBy: input.sand?.measuredBy ?? 'cad-engine', gating: gatingLayout(sand.gating), flask: sand.flask, alternatives: sand.alternatives.map(({ totalUsd, ...a }) => ({ ...a, totalCost: totalUsd })) } } : {}),
+    ...(sand ? { sandCasting: { mouldingProcess: sand.mouldingProcess, mouldingMachine: sand.mouldingMachine, cavities: sand.cavities, coresMade: sand.coresMade, coresLeftSolid: sand.coresLeftSolid, complete: sand.complete, measuredBy: input.sand?.measuredBy ?? 'cad-engine', gating: gatingLayout(sand.gating), flask: sand.flask } } : {}),
     ...(sand && sand.tooling.items.length ? {
       coreboxTooling: {
         boxes: sand.tooling.items.reduce((n, t) => n + t.boxes, 0),

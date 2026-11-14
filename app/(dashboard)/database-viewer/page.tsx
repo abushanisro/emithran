@@ -189,7 +189,6 @@ export default function DatabaseViewerPage() {
                       <div className="mt-2 text-xs text-muted-foreground space-y-1">
                         <div>ID: {bom.id}</div>
                         <div>Project: {bom.projectId}</div>
-                        {bom.version && <div>Version: {bom.version}</div>}
                       </div>
                     </div>
                   ))}

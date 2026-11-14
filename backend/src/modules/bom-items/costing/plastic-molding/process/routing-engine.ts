@@ -11,6 +11,8 @@
 // instead of silently guessing (docs/ENGINEERING.md: wrong zeros are worse than visible
 // errors — the same applies to silently missing route steps).
 
+import type { RibSignals } from './rib-inserts';
+import type { SideActionSignals } from '../side-action-signals';
 import {
   IM_OPERATION_REGISTRY, IMOperationId, IMProcessTree, IMRoutedOperation,
   MoldingSubtype,
@@ -42,11 +44,19 @@ export interface InjectionMoldingSignals {
   /** Recognised side-action bundles only a slide can serve, and bundles a lifter or a slide could serve (see side-action-signals.ts). Absent: not recognised. */
   slideBundleCount?: number | null;
   slideOrLifterBundleCount?: number | null;
+  /** The recognised slide and lifter bundles by size class (side-action-signals.ts); null when the features were not recognised. */
+  sideActionBlocks?: SideActionSignals['blocks'] | null;
+  /** The longest slide bundle stroke (mm), side-action-signals.ts. */
+  maxSlideStrokeMm?: number | null;
+  /** The ribs the CAD engine measured (rib-inserts.ts); null when the graph has no plastic features. */
+  ribs?: RibSignals | null;
   insertCount: number | null;
   textFeatureCount: number | null;  // molded-in text/logos → pad print/laser mark NOT needed
   assemblyFeatureCount: number | null; // snap fits / weld ribs → welding or assembly
   gateType: 'edge' | 'fan' | 'sub' | 'hot_tip' | null; // null = unknown (no gate prediction yet)
   partingComplexity: number | null; // 0–1; flash risk proxy
+  /** The measured parting line length (mm, CAD PartingLine feature): what deflashing trims; null when not measured. */
+  partingLineLengthMm?: number | null;
   // Phase 5+ signals — set manually via BOM annotation until CAD detection exists.
   unscrewingCoreCount: number | null; // helical blind holes requiring in-cycle core rotation
   overmoldSubstrate: string | null;   // substrate material grade (triggers overmold path)

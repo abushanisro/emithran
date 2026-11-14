@@ -402,7 +402,6 @@ export default function QualityControlPage() {
                     {inspection.bomName && (
                       <div className="text-sm">
                         <span className="font-medium">BOM:</span> {inspection.bomName}
-                        {inspection.bomVersion && <span className="text-muted-foreground"> (v{inspection.bomVersion})</span>}
                       </div>
                     )}
 

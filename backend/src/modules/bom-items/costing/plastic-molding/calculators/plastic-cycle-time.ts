@@ -14,7 +14,8 @@ import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
 import { cadEvidenceKey } from '../../shared/cad-evidence';
-import { injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, COMPRESSION_CALCULATOR, RIM_CALCULATOR } from './plastic-cycle-time-seeds';
+import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, visualInspectionSeeds, weightCheckSeeds, materialDryingSeeds, MATERIAL_DRYING_CALCULATOR, type MaterialDryingInput, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR, VISUAL_INSPECTION_CALCULATOR, WEIGHT_CHECK_CALCULATOR } from './plastic-cycle-time-seeds';
+import type { WeightCheckReference } from '../reference/im-reference';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
 export function calculatorFingerprint(def: ReferenceCalculatorDef): string {
@@ -44,7 +45,7 @@ export function withRegistryFormulas(trace: readonly CalculationTraceStep[], cal
 }
 
 /** The migrations that create and update the plastic-molding calculators: what to apply to a database that lacks them or holds an older version. */
-export const PLASTIC_CALCULATOR_MIGRATIONS = '975 and 976';
+export const PLASTIC_CALCULATOR_MIGRATIONS = '975, 976, 977, 1007, 1008, 1010, 1012, 1013 and 1014';
 
 /**
  * The stored calculator of a name, when it is in the database AND is the version this engine was written for; otherwise why not. A calculator that is not there means the
@@ -107,6 +108,37 @@ function runPress(name: string, seeded: ReturnType<typeof pressCycleTimeSeeds>, 
 /** The cycle of a compression press (press open/close time plus cure time), by the stored calculator. */
 export function runCompressionCycleTime(input: { pressCycleTimeS: number | null; cureTimeMin: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(COMPRESSION_CALCULATOR, pressCycleTimeSeeds(input), calculators);
+}
+
+/** The time to trim the flash off the parting line by hand (length / rate), by the stored calculator. */
+export function runDeflashingTime(input: { partingLineLengthMm: number | null; rateMmPerS: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(DEFLASH_CALCULATOR, deflashingSeeds(input), calculators);
+}
+
+/** The time the hydraulic slides add to each part (F-32), by the stored slide movement calculator, or what is missing. */
+export function runSlideMovementTime(input: { slideStrokeMm: number | null; rateMmPerS: number | null; cavities: number }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(SLIDE_MOVEMENT_CALCULATOR, slideMovementSeeds(input), calculators);
+}
+
+/** The visual inspection time per part (F-34), by the stored visual inspection calculator, or what is missing. */
+export function runVisualInspectionTime(input: { surfaceAreaMm2: number | null; minPerM2: number | null; percent: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(VISUAL_INSPECTION_CALCULATOR, visualInspectionSeeds(input), calculators);
+}
+
+/** The material drying (F-36): the press time per part and the dryer's hourly cost, by the stored material drying calculator, or what is missing. */
+export function runMaterialDrying(input: MaterialDryingInput, calculators: ReferenceCalculators | null | undefined): PressCycle & { dryerHourlyUsd?: number } {
+  const run = runPress(MATERIAL_DRYING_CALCULATOR, materialDryingSeeds(input), calculators);
+  if (!run.derivable) return run;
+  const rate = run.trace.find((t) => t.fieldName === 'Dryer Hourly Cost')?.value;
+  return typeof rate === 'number' ? { ...run, dryerHourlyUsd: rate } : { derivable: false, missing: ['the dryer hourly cost (Dryer Hourly Cost)'] };
+}
+
+/** The weight check time per part and the scale's hourly rate (F-35), by the stored weight check calculator, or what is missing. */
+export function runWeightCheck(ref: WeightCheckReference, calculators: ReferenceCalculators | null | undefined): PressCycle & { scaleRateUsdPerHr?: number } {
+  const run = runPress(WEIGHT_CHECK_CALCULATOR, weightCheckSeeds(ref), calculators);
+  if (!run.derivable) return run;
+  const rate = run.trace.find((t) => t.fieldName === 'Scale Rate')?.value;
+  return typeof rate === 'number' ? { ...run, scaleRateUsdPerHr: rate } : { derivable: false, missing: ['the scale rate (Scale Rate)'] };
 }
 
 /** The cycle of a reaction injection molding (dry cycle + fill + cure time), by the stored calculator. */

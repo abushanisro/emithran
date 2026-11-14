@@ -16,6 +16,7 @@
   "src/modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service.ts": 37,
   "src/modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service.ts": 1,
   "src/modules/bom-items/costing/sheet-metal/operation/catalog-operations.service.ts": 1,
+  "src/modules/bom-items/services/calculator-field-overrides.service.ts": 1,
   "src/modules/bom-items/services/file-storage.service.ts": 1,
   "src/modules/bom-items/services/nre.service.ts": 2,
   "src/modules/bom-items/services/plastic-pull-direction.service.ts": 1,

@@ -155,7 +155,8 @@
           "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
       ],
-      "migration": 977
+      "migration": 1008,
+      "version": 3
     },
     {
       "key": "injection_lsr",
@@ -410,7 +411,8 @@
           "formula": "floor(({Fill Time} + {Pack Time} + {Cooling Time} + {Press Dry Cycle Time}) * {Cycle Time Adjustment Factor} * 100 + 0.5) / 100"
         }
       ],
-      "migration": 977
+      "migration": 1008,
+      "version": 3
     },
     {
       "key": "compression",
@@ -512,6 +514,1114 @@
       ],
       "version": 2,
       "migration": 976
+    },
+    {
+      "key": "injection_deflash",
+      "name": "Injection Molding - Deflashing",
+      "description": "Deflashing time = the parting line length / the manual flash trimming rate (formula registry F-24, ASSUMED). The parting line length is the CAD measurement of the PartingLine feature. The rate is the reference variable cmManualFlashTrimmingRate (75), staged for compression molding (Compression Molding:Manual Flash Trimming//PartingLine) and borrowed for injection molding, which has no staged rate. The reference types the rate only as Length/Time; it is read as mm/s, the unit that fits the reference's other Length/Time rates (grindSpeed 381, defaultAviInspectionSpeed 110, cmAirHoseCleaningRateLinear 100) and a manual trim (mm/min would put a 785 mm parting line at over 10 minutes). Routed when the parting line is complex (routing engine); internal cutouts and flash thickness are not modelled. A missing length or rate makes the line a named gap, never a default.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Parting Line Length",
+          "unit": "mm",
+          "source": {
+            "cad": "PartingLine feature length_mm (cad-engine parting_line_reading_v1)"
+          }
+        },
+        {
+          "name": "Manual Flash Trimming Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "cmManualFlashTrimmingRate (Length/Time, read as mm/s)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "floor({Parting Line Length} / {Manual Flash Trimming Rate} * 100 + 0.5) / 100"
+        }
+      ],
+      "migration": 1010
+    },
+    {
+      "key": "injection_slide_movement",
+      "name": "Injection Molding - Slide Movement",
+      "description": "The time the hydraulic slides add to each shot, per part (formula registry F-32, ASSUMED: the reference gives the slide speed, slideCycleRate, not the motion): the slides move out and back once per shot, all together, so the longest slide stroke (the CAD SlideBundle stroke) twice over slideCycleRate (Velocity, read as mm/s), shared by the cavities. Lifters ride on the ejector stroke and add no time. A helper: the injection engine runs it for the routed side action and charges it at the press rate.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Slide Stroke",
+          "unit": "mm",
+          "source": {
+            "cad": "the longest SlideBundle stroke_mm (cad-engine side_actions.py)"
+          }
+        },
+        {
+          "name": "Slide Cycle Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "slideCycleRate (Velocity, read as mm/s)"
+          }
+        },
+        {
+          "name": "Cavities per Mold",
+          "unit": "",
+          "source": {
+            "engine": "the costed cavity count"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "floor(2 * {Slide Stroke} / {Slide Cycle Rate} / {Cavities per Mold} * 100 + 0.5) / 100"
+        }
+      ],
+      "migration": 1021
+    },
+    {
+      "key": "injection_visual_inspection",
+      "name": "Injection Molding - Visual Inspection",
+      "description": "The visual inspection of a molded part, per part (formula registry F-34): the part surface area at memory/Secondary process visualInspectTimeStandard (min per square metre), for the share of parts inspected (defaultPercentToBeTested). A helper: the injection engine runs it for the routed visual inspection and charges it at the bench rate.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Part Surface Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "CAD part surface area"
+          }
+        },
+        {
+          "name": "Visual Inspection Rate",
+          "unit": "min/m²",
+          "source": {
+            "variable": "memory/Secondary process: visualInspectTimeStandard"
+          }
+        },
+        {
+          "name": "Percent Inspected",
+          "unit": "%",
+          "source": {
+            "variable": "memory/Secondary process: defaultPercentToBeTested"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "floor({Part Surface Area} / 1000000 * {Visual Inspection Rate} * 60 * {Percent Inspected} / 100 * 100 + 0.5) / 100"
+        }
+      ],
+      "migration": 1023
+    },
+    {
+      "key": "injection_weight_check",
+      "name": "Injection Molding - Weight Check",
+      "description": "The periodic weight check of molded parts, per part (formula registry F-35): one check of Time Per Check every Sampling Interval parts, by the press operator on a bench scale (reference/quality-inspection-reference.csv: the costing engineer's defaults, engineering estimates). The scale's hourly rate is the machine-hour rate pattern of migration 580: (price x (1 - salvage) / life + price x maintenance + price x installation / life) / (scheduled hours x uptime x utilization), with the press economics of memory/Plastic Modeling (reference/equipment-economics-reference.csv). A helper: the injection engine charges the time at the operator rate plus the scale rate.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Time Per Check",
+          "unit": "s",
+          "source": {
+            "lookup": "reference/quality-inspection-reference.csv: weight_check time_per_check"
+          }
+        },
+        {
+          "name": "Sampling Interval",
+          "unit": "parts per check",
+          "source": {
+            "lookup": "reference/quality-inspection-reference.csv: weight_check sampling_interval"
+          }
+        },
+        {
+          "name": "Scale Price",
+          "unit": "USD",
+          "source": {
+            "lookup": "reference/quality-inspection-reference.csv: weight_check scale_price"
+          }
+        },
+        {
+          "name": "Equipment Life",
+          "unit": "yr",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: life"
+          }
+        },
+        {
+          "name": "Salvage Factor",
+          "unit": "%",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: salvage_factor"
+          }
+        },
+        {
+          "name": "Maintenance Factor",
+          "unit": "%/yr",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: annual_maintenance_factor"
+          }
+        },
+        {
+          "name": "Installation Factor",
+          "unit": "%",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: installation_factor"
+          }
+        },
+        {
+          "name": "Scheduled Hours",
+          "unit": "h/yr",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: scheduled_hours"
+          }
+        },
+        {
+          "name": "Uptime",
+          "unit": "%",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: uptime"
+          }
+        },
+        {
+          "name": "Utilization",
+          "unit": "",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: utilization"
+          }
+        },
+        {
+          "name": "Scale Rate",
+          "unit": "USD/h",
+          "formula": "({Scale Price} * (1 - {Salvage Factor} / 100) / {Equipment Life} + {Scale Price} * {Maintenance Factor} / 100 + {Scale Price} * {Installation Factor} / 100 / {Equipment Life}) / ({Scheduled Hours} * {Uptime} / 100 * {Utilization})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time Per Check} / {Sampling Interval}"
+        }
+      ],
+      "migration": 1023
+    },
+    {
+      "key": "injection_material_drying",
+      "name": "Injection Molding - Material Drying",
+      "description": "Drying a hygroscopic resin in a machine-mounted desiccant dryer, per part (formula registry F-36, ASSUMED): the dryer runs with the press, so its hour is charged with the press time per part (the costing engineer throughput model: dryer hourly cost / effective throughput x the resin per part). Its hourly cost is the machine-hour rate pattern of migration 580 on the dryer price plus its rated power at the location electricity price. The dryer is the smallest reference model whose nylon throughput covers the press resin demand. A helper: the injection engine charges it for the routed material drying.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Drying Temperature",
+          "unit": "degC",
+          "source": {
+            "lookup": "reference/material-drying-reference.csv: the resin drying temperature (context)"
+          }
+        },
+        {
+          "name": "Drying Time",
+          "unit": "h",
+          "source": {
+            "lookup": "reference/material-drying-reference.csv: the resin drying time (context)"
+          }
+        },
+        {
+          "name": "Resin Per Part",
+          "unit": "kg",
+          "source": {
+            "engine": "the shot weight per part, runner included"
+          }
+        },
+        {
+          "name": "Press Time Per Part",
+          "unit": "s",
+          "source": {
+            "engine": "the press cycle per part"
+          }
+        },
+        {
+          "name": "Dryer Throughput",
+          "unit": "kg/h",
+          "source": {
+            "lookup": "reference/dryer-models-reference.csv: the chosen model nylon throughput"
+          }
+        },
+        {
+          "name": "Dryer Power",
+          "unit": "kW",
+          "source": {
+            "lookup": "reference/dryer-models-reference.csv: the chosen model rated power"
+          }
+        },
+        {
+          "name": "Dryer Price",
+          "unit": "USD",
+          "source": {
+            "lookup": "reference/dryer-models-reference.csv: the priced dryer of the class"
+          }
+        },
+        {
+          "name": "Electricity Price",
+          "unit": "USD/kWh",
+          "source": {
+            "lookup": "location_electricity_prices (migration 1004)"
+          }
+        },
+        {
+          "name": "Equipment Life",
+          "unit": "yr",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: life"
+          }
+        },
+        {
+          "name": "Salvage Factor",
+          "unit": "%",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: salvage_factor"
+          }
+        },
+        {
+          "name": "Maintenance Factor",
+          "unit": "%/yr",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: annual_maintenance_factor"
+          }
+        },
+        {
+          "name": "Installation Factor",
+          "unit": "%",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: installation_factor"
+          }
+        },
+        {
+          "name": "Scheduled Hours",
+          "unit": "h/yr",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: scheduled_hours"
+          }
+        },
+        {
+          "name": "Uptime",
+          "unit": "%",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: uptime"
+          }
+        },
+        {
+          "name": "Utilization",
+          "unit": "",
+          "source": {
+            "lookup": "reference/equipment-economics-reference.csv: utilization"
+          }
+        },
+        {
+          "name": "Resin Demand",
+          "unit": "kg/h",
+          "formula": "{Resin Per Part} * 3600 / {Press Time Per Part}"
+        },
+        {
+          "name": "Dryer Rate",
+          "unit": "USD/h",
+          "formula": "({Dryer Price} * (1 - {Salvage Factor} / 100) / {Equipment Life} + {Dryer Price} * {Maintenance Factor} / 100 + {Dryer Price} * {Installation Factor} / 100 / {Equipment Life}) / ({Scheduled Hours} * {Uptime} / 100 * {Utilization})"
+        },
+        {
+          "name": "Dryer Energy Rate",
+          "unit": "USD/h",
+          "formula": "{Dryer Power} * {Electricity Price}"
+        },
+        {
+          "name": "Dryer Hourly Cost",
+          "unit": "USD/h",
+          "formula": "{Dryer Rate} + {Dryer Energy Rate}"
+        },
+        {
+          "name": "Drying Cost Per Kg",
+          "unit": "USD/kg",
+          "formula": "{Dryer Hourly Cost} / {Resin Demand}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Press Time Per Part}"
+        }
+      ],
+      "migration": 1024
+    },
+    {
+      "key": "injection_mold_tooling",
+      "name": "Injection Mold - Tooling",
+      "description": "Injection mold tooling cost (formula registry F-16, F-17, F-18). Mold Cost = the mold base plate steel + the purchased standard components (cmStandardToolingComponents, the side-action hardware only when a slide is needed) + toolroom labour: design hours (cmMoldBaseDesignHours by mold-base area) x the design rate, machining hours (the cavity and core plates at the cmToolMachiningRates plate rate, plus the cmToolMachiningSetups setup hours) x the machining rate, and assembly hours (cmToolAssemblyTimes per component x its quantity) x the assembly rate; the rates are the toolroom rates of digital_factory_settings_usa (memory/ holds USA only). The molds the job wears out are the lifetime shots per cavity over the shots one tool lasts (tblToolLife by material type, else the defaultToolLife variable), at least one; the investment is spread over the parts of the production life. Mold base steel (formula registry F-25, ASSUMED: the reference holds the sizes, borders, plate thicknesses and the steel, not the formula): the smallest standard base (tblStandardMoldBaseSizes) that holds the cavity layout (layoutNumCav, betweenPartsMoldBorder) and the edge borders (tblEdgeMoldBorderX/Y by the press force); the A plate holds aPlateFlatCavityRatio of the part height plus the cavity-plate depth border, at least aPlateMinThickness, the B plate the rest plus the core-plate depth border, at least bPlateMinThickness; with the top clamp, support and bottom clamp plates, the stack is priced as the default tool steel (AISI P20) by mass x its price x its moldBaseCostFactor. The ejector plates and rails have no injection-molding thickness on file and are not included. Cavity and core (formula registry F-26, ASSUMED): machined at tblHrsPerSqInch{Simple,Average,Complex} hours per square inch of part surface, the complexity from the CAD face count against cmMoldSurfaceCountThreshold{Simple,Average} (staged for compression molding and borrowed: the injection process states no rule), times the cavities, at the machining rate; polished to the default cavity finish (defaultCavityFinishIM, SPIFinishes hours per square meter) at the assembly (bench) rate, as no polishing rate is on file. Mold assembly extras (formula registry F-27): the ejector pins, one per areaCoveredPerEjectorPin of the molded area, at the cmStandardToolingComponents Ejector Pin cost plus their cmToolAssemblyTimes hours at the assembly rate; one sprue bushing and one locating ring (sprueBushingCost, locatingRingsCost); the try-out, timePerTryoutBase hours per try-out (twice that on a press over 500 t, as its note states) x defaultNumTryOuts at the tryout rate. Slides and lifters (formula registry F-28, ASSUMED: the reference holds the block volumes and the CMM hours, not the formula): each recognised bundle is a block of its size class ({small,medium,large}{Slide,Lifter}Volume; a bundle a lifter could serve is costed as a lifter), priced as the default tool steel by mass x its price; machined over the surface of a cube of its volume at the cavity hours per square inch and the machining rate; inspected for cmmInspectionMultiplier x the side actions + cmmInspectionAdder CMM hours at the machining rate. Heat treatment (formula registry F-29 version 2): charged only as the tool steel grade needs it (reference/mold-steel-treatment-reference.csv, the costing engineer's research): the steel that forms the part (cavity and core plates, slide and lifter blocks) hardened at heatTreatRateUsdPerKg, the rest of the mold base stress relieved at stressReliefRateUsdPerKg; AISI P20, supplied pre-hardened, is neither. Hot drops (formula registry F-33): on a hot runner, one drop per gate (the cavities x defaultNumberOfGatesPerCavity) at the defaultHotDropType price. Cooling lines (formula registry F-30, ASSUMED: the reference holds the line diameter, the hardware prices and a line drilling rate, not how many lines a mold needs): lines across the cavity plate at 3 x defaultWaterLineDiameter pitch along the mold base length, each the mold base width long, drilled at the cmToolMachiningRates Heater Line Drilling rate and the machining rate, with 2 hoses and 2 fittings per line and one manifold per side. Rib inserts and their EDM (formula registry F-31, ASSUMED: the reference holds the insert sizes, electrodes, burns and hours, not which class a rib is): a rib the CAD engine measured taller than machinedRibThreshold is an insert of the smallest class whose area ({small,medium,large}InsertArea) holds its footprint (length x thickness); its steel is the class area x the core plate height (the variables' notes) as the default tool steel, its pocket machined at the Insert Pocket Machining rate plus the Insert Pocket setup; its electrodes, one graphite electrode of the class size per burn (num*InsertsBurns), at edmMaterialCostCarbonUsdPerIn3, burnt for edmElectrodeVolumeBurn of their volume at the EDM Electrode Burn rate and edmRateUsdPerHr; with the class design hours, the cutter path and spotting hours per insert and the Rib Insert assembly time. Not modelled yet: water baffles (no count on file), and, where they apply, the hot-runner manifold, hot drops (hot runner), cavity inserts (SPI classes tblSpiType builds with inserts) and texture (a cavityTexture other than None) (registry G-03 to G-08).",
+      "operations": [],
+      "helper": true,
+      "output": "Tooling Cost Per Part",
+      "results": [
+        "Machining Hours",
+        "Toolroom Labour Cost",
+        "Mold Cost",
+        "Molds Required",
+        "Tooling Investment",
+        "Mold Base Steel Mass",
+        "Mold Base Steel Cost",
+        "Mold Stack Height",
+        "Cavity Machining Hours",
+        "Cavity Machining Cost",
+        "Polish Hours",
+        "Polish Cost",
+        "Ejector Pins",
+        "Ejector System Cost",
+        "Sprue and Locating Ring Cost",
+        "Tryout Hours",
+        "Tryout Cost",
+        "Side Action Steel Mass",
+        "Side Action Steel Cost",
+        "Side Action Machining Hours",
+        "Side Action Machining Cost",
+        "Side Action CMM Hours",
+        "Side Action CMM Cost",
+        "Side Action Cost",
+        "Cavity Core Plate Mass",
+        "Hardened Steel Mass",
+        "Stress Relieved Steel Mass",
+        "Heat Treatment Cost",
+        "Water Lines",
+        "Water Line Drilling Hours",
+        "Cooling Cost",
+        "Rib Insert Steel Cost",
+        "EDM Burn Hours",
+        "EDM Cost",
+        "Rib Insert Pocket Hours",
+        "Rib Insert Labour Cost",
+        "Rib Insert Cost",
+        "Hot Drop Cost"
+      ],
+      "version": 9,
+      "fields": [
+        {
+          "name": "Purchased Components Cost",
+          "unit": "USD",
+          "source": {
+            "lookup": "cmStandardToolingComponents: unit cost x quantity of each standard component the mold needs"
+          }
+        },
+        {
+          "name": "Mold Base Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "CAD projected area x cavities per mold (the required mold window)"
+          }
+        },
+        {
+          "name": "Design Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmMoldBaseDesignHours: the first row whose mold-base area covers the mold"
+          }
+        },
+        {
+          "name": "Plate Machining Rate",
+          "unit": "m²/h",
+          "source": {
+            "lookup": "cmToolMachiningRates: Cavity Core Plate General Machining"
+          }
+        },
+        {
+          "name": "Plate Setup Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolMachiningSetups: cavity and core plate general machining, setups x hours"
+          }
+        },
+        {
+          "name": "Assembly Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolAssemblyTimes: hours per component x its quantity"
+          }
+        },
+        {
+          "name": "Design Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: designRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Machining Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: machiningRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Assembly Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: assemblyRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Annual Volume",
+          "unit": "parts/yr",
+          "source": {
+            "scenario": "annual volume"
+          }
+        },
+        {
+          "name": "Production Life",
+          "unit": "yr",
+          "source": {
+            "scenario": "production life"
+          }
+        },
+        {
+          "name": "Cavities per Mold",
+          "unit": null,
+          "source": {
+            "engine": "the costed cavity count"
+          }
+        },
+        {
+          "name": "Tool Life Shots",
+          "unit": "shots",
+          "source": {
+            "lookup": "tblToolLife: shots per tool for the material type, else the defaultToolLife variable"
+          }
+        },
+        {
+          "name": "Mold Base Width",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblStandardMoldBaseSizes: the smallest standard base (useMetricOrImperialValues) that holds the cavity layout and the edge borders"
+          }
+        },
+        {
+          "name": "Mold Base Length",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblStandardMoldBaseSizes: the same base"
+          }
+        },
+        {
+          "name": "Part Height",
+          "unit": "mm",
+          "source": {
+            "cad": "bounding box, the smallest side (along the pull direction)"
+          }
+        },
+        {
+          "name": "A Plate Cavity Ratio",
+          "unit": null,
+          "source": {
+            "variable": "aPlateFlatCavityRatio"
+          }
+        },
+        {
+          "name": "Cavity Plate Depth Border",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblCavityPlateDepthBorder (in): by the press force"
+          }
+        },
+        {
+          "name": "Core Plate Depth Border",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblCorePlateDepthBorder (in): by the press force"
+          }
+        },
+        {
+          "name": "A Plate Min Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "aPlateMinThickness"
+          }
+        },
+        {
+          "name": "B Plate Min Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "bPlateMinThickness"
+          }
+        },
+        {
+          "name": "Top Clamp Plate Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "topClampPlateThickness"
+          }
+        },
+        {
+          "name": "Support Plate Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "supportPlateThickness"
+          }
+        },
+        {
+          "name": "Bottom Clamp Plate Thickness",
+          "unit": "mm",
+          "source": {
+            "variable": "bottomClampPlateThickness"
+          }
+        },
+        {
+          "name": "Tool Steel Density",
+          "unit": "kg/m³",
+          "source": {
+            "lookup": "digital_factory_tool_materials_usa: densityKgPerM3 of the default tool material (digital_factory_settings_usa defaultToolMaterialName)"
+          }
+        },
+        {
+          "name": "Tool Steel Price",
+          "unit": "USD/kg",
+          "source": {
+            "lookup": "digital_factory_tool_materials_usa: materialCostUsdPerKg of the default tool material"
+          }
+        },
+        {
+          "name": "Mold Base Cost Factor",
+          "unit": null,
+          "source": {
+            "lookup": "digital_factory_tool_materials_usa: moldBaseCostFactor of the default tool material"
+          }
+        },
+        {
+          "name": "Part Surface Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "the part's surface area"
+          }
+        },
+        {
+          "name": "Cavity Machining Hours Per Sq In",
+          "unit": "h/in²",
+          "source": {
+            "lookup": "tblHrsPerSqInch{Simple,Average,Complex}: the mold complexity (CAD face count against cmMoldSurfaceCountThreshold{Simple,Average}) and the first row covering the part surface area"
+          }
+        },
+        {
+          "name": "Polish Hours Per Sq Meter",
+          "unit": "h/m²",
+          "source": {
+            "lookup": "SPIFinishes: the default cavity finish (defaultCavityFinishIM)"
+          }
+        },
+        {
+          "name": "Area Per Ejector Pin",
+          "unit": "mm²",
+          "source": {
+            "variable": "areaCoveredPerEjectorPin"
+          }
+        },
+        {
+          "name": "Ejector Pin Cost",
+          "unit": "USD",
+          "source": {
+            "lookup": "cmStandardToolingComponents: Ejector Pin unit cost (its quantity \"is calculated in the cost model\")"
+          }
+        },
+        {
+          "name": "Ejector Pin Assembly Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolAssemblyTimes: Ejector Pin"
+          }
+        },
+        {
+          "name": "Sprue Bushing Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "sprueBushingCost"
+          }
+        },
+        {
+          "name": "Locating Ring Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "locatingRingsCost"
+          }
+        },
+        {
+          "name": "Tryout Base Hours",
+          "unit": "h",
+          "source": {
+            "variable": "timePerTryoutBase"
+          }
+        },
+        {
+          "name": "Tryout Press Multiplier",
+          "unit": "",
+          "source": {
+            "engine": "timePerTryoutBase note: the hours are for a press under 500 t, twice that for a bigger one"
+          }
+        },
+        {
+          "name": "Number of Tryouts",
+          "unit": "",
+          "source": {
+            "variable": "defaultNumTryOuts"
+          }
+        },
+        {
+          "name": "Tryout Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: tryoutRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Slide Block Volume",
+          "unit": "in³",
+          "source": {
+            "engine": "the recognised slide bundles by size class x {small,medium,large}SlideVolume"
+          }
+        },
+        {
+          "name": "Lifter Block Volume",
+          "unit": "in³",
+          "source": {
+            "engine": "the recognised lifter bundles by size class x {small,medium,large}LifterVolume"
+          }
+        },
+        {
+          "name": "Side Action Block Surface",
+          "unit": "in²",
+          "source": {
+            "engine": "each block as a cube of its volume: 6 x V^(2/3), summed"
+          }
+        },
+        {
+          "name": "Side Actions",
+          "unit": "",
+          "source": {
+            "engine": "the recognised slide and lifter bundles with a size class"
+          }
+        },
+        {
+          "name": "CMM Hours Per Side Action",
+          "unit": "h",
+          "source": {
+            "variable": "cmmInspectionMultiplier"
+          }
+        },
+        {
+          "name": "CMM Base Hours",
+          "unit": "h",
+          "source": {
+            "variable": "cmmInspectionAdder"
+          }
+        },
+        {
+          "name": "Heat Treat Rate",
+          "unit": "USD/kg",
+          "source": {
+            "variable": "digital_factory_settings_usa: heatTreatRateUsdPerKg"
+          }
+        },
+        {
+          "name": "Stress Relief Rate",
+          "unit": "USD/kg",
+          "source": {
+            "variable": "digital_factory_settings_usa: stressReliefRateUsdPerKg"
+          }
+        },
+        {
+          "name": "Water Line Diameter",
+          "unit": "mm",
+          "source": {
+            "variable": "defaultWaterLineDiameter"
+          }
+        },
+        {
+          "name": "Water Line Pitch Factor",
+          "unit": "",
+          "source": {
+            "engine": "approved rule: lines at 3 line diameters apart (no pitch is on file)"
+          }
+        },
+        {
+          "name": "Line Drilling Rate",
+          "unit": "mm/min",
+          "source": {
+            "lookup": "cmToolMachiningRates: Heater Line Drilling"
+          }
+        },
+        {
+          "name": "Water Hose Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "waterHosesCost"
+          }
+        },
+        {
+          "name": "Water Fitting Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "waterManifoldFittingsCost"
+          }
+        },
+        {
+          "name": "Water Manifold Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "waterManifoldsCost"
+          }
+        },
+        {
+          "name": "Rib Inserts",
+          "unit": "",
+          "source": {
+            "engine": "CAD ribs taller than machinedRibThreshold, by insert class"
+          }
+        },
+        {
+          "name": "Rib Insert Area",
+          "unit": "in²",
+          "source": {
+            "engine": "the inserts by class x {small,medium,large}InsertArea"
+          }
+        },
+        {
+          "name": "Rib Insert Electrode Volume",
+          "unit": "in³",
+          "source": {
+            "engine": "the inserts by class x {small,medium,large}CalcRibInsertElectrodeSize x num{Small,Medium,Large}InsertsBurns"
+          }
+        },
+        {
+          "name": "Rib Insert Burned Volume",
+          "unit": "in³",
+          "source": {
+            "engine": "the electrode volume x edmElectrodeVolumeBurn"
+          }
+        },
+        {
+          "name": "Rib Insert Design Hours",
+          "unit": "h",
+          "source": {
+            "engine": "the inserts by class x cmDesignHrsRibInsert{Small,Medium,Large}"
+          }
+        },
+        {
+          "name": "Cutter Path Hours Per Insert",
+          "unit": "h",
+          "source": {
+            "variable": "cutterPathHrsPerInsert"
+          }
+        },
+        {
+          "name": "Spotting Hours Per Insert",
+          "unit": "h",
+          "source": {
+            "variable": "spottingHrsPerInsert"
+          }
+        },
+        {
+          "name": "Rib Insert Assembly Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolAssemblyTimes: Rib Insert"
+          }
+        },
+        {
+          "name": "Electrode Material Cost",
+          "unit": "USD/in³",
+          "source": {
+            "variable": "digital_factory_settings_usa: edmMaterialCostCarbonUsdPerIn3 (graphite)"
+          }
+        },
+        {
+          "name": "EDM Burn Rate",
+          "unit": "mm³/min",
+          "source": {
+            "lookup": "cmToolMachiningRates: EDM Electrode Burn"
+          }
+        },
+        {
+          "name": "EDM Rate",
+          "unit": "USD/h",
+          "source": {
+            "variable": "digital_factory_settings_usa: edmRateUsdPerHr"
+          }
+        },
+        {
+          "name": "Insert Pocket Rate",
+          "unit": "mm³/min",
+          "source": {
+            "lookup": "cmToolMachiningRates: Insert Pocket Machining"
+          }
+        },
+        {
+          "name": "Insert Pocket Setup Hours",
+          "unit": "h",
+          "source": {
+            "lookup": "cmToolMachiningSetups: Insert Pocket"
+          }
+        },
+        {
+          "name": "Hardening Applies",
+          "unit": "",
+          "source": {
+            "lookup": "reference/mold-steel-treatment-reference.csv: heat_treatment_required of the tool steel grade (1 = charged, 0 = not)"
+          }
+        },
+        {
+          "name": "Stress Relief Applies",
+          "unit": "",
+          "source": {
+            "lookup": "reference/mold-steel-treatment-reference.csv: stress_relief_required of the tool steel grade (1 = charged, 0 = not)"
+          }
+        },
+        {
+          "name": "Hot Drops",
+          "unit": "",
+          "source": {
+            "engine": "hot runner: the cavities x defaultNumberOfGatesPerCavity (one drop per gate); cold runner: 0"
+          }
+        },
+        {
+          "name": "Hot Drop Unit Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "costPerStandardHotDrop or costPerSVGHotDrop, by defaultHotDropType"
+          }
+        },
+        {
+          "name": "Machining Hours",
+          "unit": "h",
+          "formula": "{Mold Base Area} / 1000000 / {Plate Machining Rate} * 2 + {Plate Setup Hours}"
+        },
+        {
+          "name": "Design Cost",
+          "unit": "USD",
+          "formula": "{Design Hours} * {Design Rate}"
+        },
+        {
+          "name": "Machining Cost",
+          "unit": "USD",
+          "formula": "{Machining Hours} * {Machining Rate}"
+        },
+        {
+          "name": "Assembly Cost",
+          "unit": "USD",
+          "formula": "{Assembly Hours} * {Assembly Rate}"
+        },
+        {
+          "name": "Toolroom Labour Cost",
+          "unit": "USD",
+          "formula": "{Design Cost} + {Machining Cost} + {Assembly Cost}"
+        },
+        {
+          "name": "A Plate Thickness",
+          "unit": "mm",
+          "formula": "max({A Plate Min Thickness}, {A Plate Cavity Ratio} * {Part Height} + {Cavity Plate Depth Border})"
+        },
+        {
+          "name": "B Plate Thickness",
+          "unit": "mm",
+          "formula": "max({B Plate Min Thickness}, (1 - {A Plate Cavity Ratio}) * {Part Height} + {Core Plate Depth Border})"
+        },
+        {
+          "name": "Mold Stack Height",
+          "unit": "mm",
+          "formula": "{Top Clamp Plate Thickness} + {A Plate Thickness} + {B Plate Thickness} + {Support Plate Thickness} + {Bottom Clamp Plate Thickness}"
+        },
+        {
+          "name": "Mold Base Steel Mass",
+          "unit": "kg",
+          "formula": "{Mold Base Width} * {Mold Base Length} * {Mold Stack Height} / 1000000000 * {Tool Steel Density}"
+        },
+        {
+          "name": "Mold Base Steel Cost",
+          "unit": "USD",
+          "formula": "{Mold Base Steel Mass} * {Tool Steel Price} * {Mold Base Cost Factor}"
+        },
+        {
+          "name": "Cavity Machining Hours",
+          "unit": "h",
+          "formula": "{Part Surface Area} / 645.16 * {Cavity Machining Hours Per Sq In} * {Cavities per Mold}"
+        },
+        {
+          "name": "Cavity Machining Cost",
+          "unit": "USD",
+          "formula": "{Cavity Machining Hours} * {Machining Rate}"
+        },
+        {
+          "name": "Polish Hours",
+          "unit": "h",
+          "formula": "{Part Surface Area} / 1000000 * {Polish Hours Per Sq Meter} * {Cavities per Mold}"
+        },
+        {
+          "name": "Polish Cost",
+          "unit": "USD",
+          "formula": "{Polish Hours} * {Assembly Rate}"
+        },
+        {
+          "name": "Ejector Pins",
+          "unit": "",
+          "formula": "CEIL({Mold Base Area} / {Area Per Ejector Pin})"
+        },
+        {
+          "name": "Ejector System Cost",
+          "unit": "USD",
+          "formula": "{Ejector Pins} * ({Ejector Pin Cost} + {Ejector Pin Assembly Hours} * {Assembly Rate})"
+        },
+        {
+          "name": "Sprue and Locating Ring Cost",
+          "unit": "USD",
+          "formula": "{Sprue Bushing Cost} + {Locating Ring Cost}"
+        },
+        {
+          "name": "Tryout Hours",
+          "unit": "h",
+          "formula": "{Tryout Base Hours} * {Tryout Press Multiplier} * {Number of Tryouts}"
+        },
+        {
+          "name": "Tryout Cost",
+          "unit": "USD",
+          "formula": "{Tryout Hours} * {Tryout Rate}"
+        },
+        {
+          "name": "Side Action Steel Mass",
+          "unit": "kg",
+          "formula": "({Slide Block Volume} + {Lifter Block Volume}) * 16387.064 / 1000000000 * {Tool Steel Density}"
+        },
+        {
+          "name": "Side Action Steel Cost",
+          "unit": "USD",
+          "formula": "{Side Action Steel Mass} * {Tool Steel Price}"
+        },
+        {
+          "name": "Side Action Machining Hours",
+          "unit": "h",
+          "formula": "{Side Action Block Surface} * {Cavity Machining Hours Per Sq In}"
+        },
+        {
+          "name": "Side Action Machining Cost",
+          "unit": "USD",
+          "formula": "{Side Action Machining Hours} * {Machining Rate}"
+        },
+        {
+          "name": "Side Action CMM Hours",
+          "unit": "h",
+          "formula": "IF({Side Actions} > 0, {CMM Hours Per Side Action} * {Side Actions} + {CMM Base Hours}, 0)"
+        },
+        {
+          "name": "Side Action CMM Cost",
+          "unit": "USD",
+          "formula": "{Side Action CMM Hours} * {Machining Rate}"
+        },
+        {
+          "name": "Side Action Cost",
+          "unit": "USD",
+          "formula": "{Side Action Steel Cost} + {Side Action Machining Cost} + {Side Action CMM Cost}"
+        },
+        {
+          "name": "Cavity Core Plate Mass",
+          "unit": "kg",
+          "formula": "{Mold Base Width} * {Mold Base Length} * ({A Plate Thickness} + {B Plate Thickness}) / 1000000000 * {Tool Steel Density}"
+        },
+        {
+          "name": "Hardened Steel Mass",
+          "unit": "kg",
+          "formula": "{Cavity Core Plate Mass} + {Side Action Steel Mass}"
+        },
+        {
+          "name": "Stress Relieved Steel Mass",
+          "unit": "kg",
+          "formula": "{Mold Base Steel Mass} - {Cavity Core Plate Mass}"
+        },
+        {
+          "name": "Heat Treatment Cost",
+          "unit": "USD",
+          "formula": "{Hardened Steel Mass} * {Heat Treat Rate} * {Hardening Applies} + {Stress Relieved Steel Mass} * {Stress Relief Rate} * {Stress Relief Applies}"
+        },
+        {
+          "name": "Water Lines",
+          "unit": "",
+          "formula": "max(1, floor({Mold Base Length} / ({Water Line Pitch Factor} * {Water Line Diameter})))"
+        },
+        {
+          "name": "Water Line Drilling Hours",
+          "unit": "h",
+          "formula": "{Water Lines} * {Mold Base Width} / {Line Drilling Rate} / 60"
+        },
+        {
+          "name": "Cooling Cost",
+          "unit": "USD",
+          "formula": "{Water Line Drilling Hours} * {Machining Rate} + {Water Lines} * 2 * ({Water Hose Cost} + {Water Fitting Cost}) + 2 * {Water Manifold Cost}"
+        },
+        {
+          "name": "Rib Insert Steel Volume",
+          "unit": "mm³",
+          "formula": "{Rib Insert Area} * 645.16 * {B Plate Thickness}"
+        },
+        {
+          "name": "Rib Insert Steel Cost",
+          "unit": "USD",
+          "formula": "{Rib Insert Steel Volume} / 1000000000 * {Tool Steel Density} * {Tool Steel Price}"
+        },
+        {
+          "name": "EDM Burn Hours",
+          "unit": "h",
+          "formula": "{Rib Insert Burned Volume} * 16387.064 / {EDM Burn Rate} / 60"
+        },
+        {
+          "name": "EDM Cost",
+          "unit": "USD",
+          "formula": "{EDM Burn Hours} * {EDM Rate} + {Rib Insert Electrode Volume} * {Electrode Material Cost}"
+        },
+        {
+          "name": "Rib Insert Pocket Hours",
+          "unit": "h",
+          "formula": "IF({Rib Inserts} > 0, {Rib Insert Steel Volume} / {Insert Pocket Rate} / 60 + {Insert Pocket Setup Hours}, 0)"
+        },
+        {
+          "name": "Rib Insert Labour Cost",
+          "unit": "USD",
+          "formula": "{Rib Insert Design Hours} * {Design Rate} + ({Rib Inserts} * {Cutter Path Hours Per Insert} + {Rib Insert Pocket Hours}) * {Machining Rate} + {Rib Inserts} * ({Spotting Hours Per Insert} + {Rib Insert Assembly Hours}) * {Assembly Rate}"
+        },
+        {
+          "name": "Rib Insert Cost",
+          "unit": "USD",
+          "formula": "{Rib Insert Steel Cost} + {EDM Cost} + {Rib Insert Labour Cost}"
+        },
+        {
+          "name": "Hot Drop Cost",
+          "unit": "USD",
+          "formula": "{Hot Drops} * {Hot Drop Unit Cost}"
+        },
+        {
+          "name": "Mold Cost",
+          "unit": "USD",
+          "formula": "{Purchased Components Cost} + {Toolroom Labour Cost} + {Mold Base Steel Cost} + {Cavity Machining Cost} + {Polish Cost} + {Ejector System Cost} + {Sprue and Locating Ring Cost} + {Tryout Cost} + {Side Action Cost} + {Heat Treatment Cost} + {Cooling Cost} + {Rib Insert Cost} + {Hot Drop Cost}"
+        },
+        {
+          "name": "Lifetime Shots",
+          "unit": "shots",
+          "formula": "{Annual Volume} / {Cavities per Mold} * {Production Life}"
+        },
+        {
+          "name": "Molds Required",
+          "unit": null,
+          "formula": "max(1, CEIL({Lifetime Shots} / {Tool Life Shots}))"
+        },
+        {
+          "name": "Tooling Investment",
+          "unit": "USD",
+          "formula": "floor({Mold Cost} * {Molds Required} * 100 + 0.5) / 100"
+        },
+        {
+          "name": "Tooling Cost Per Part",
+          "unit": "USD",
+          "formula": "floor({Tooling Investment} / ({Annual Volume} * {Production Life}) * 10000 + 0.5) / 10000"
+        }
+      ],
+      "migration": 1022
     }
   ]
 }

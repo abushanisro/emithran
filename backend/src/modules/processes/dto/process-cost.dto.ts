@@ -578,6 +578,15 @@ export class QueryProcessCostsDto {
 /**
  * DTO for process cost calculation response
  */
+/** One phase of an operation's cycle (process_cost_records.cycle_phases). */
+export class CyclePhaseDto {
+  @ApiProperty({ example: 'Cooling Time' })
+  name: string;
+
+  @ApiProperty({ example: 2.9 })
+  seconds: number;
+}
+
 export class ProcessCostResponseDto {
   @ApiProperty({ description: 'Record ID' })
   id: string;
@@ -650,6 +659,12 @@ export class ProcessCostResponseDto {
 
   @ApiProperty({ description: "'time': costed from setup and cycle time x rates; 'per_part': a per-part charge with no machine time (totalCostPerPart is the cost)", example: 'time' })
   chargeBasis: 'time' | 'per_part';
+
+  @ApiProperty({ description: 'What the operation charges beyond machine and crew time (energy, a consumable), USD per part; included in totalCostPerPart. Null when nothing beyond time.', example: 0.0029, nullable: true, type: Number })
+  otherCostPerPart: number | null;
+
+  @ApiProperty({ description: 'The phases of the operation cycle as its stored calculator gave them, in the order of the cycle-time formula (migration 1009). Null when the line has no calculator cycle.', type: () => [CyclePhaseDto], nullable: true })
+  cyclePhases: CyclePhaseDto[] | null;
 
   @ApiProperty({ description: 'Parts per cycle', example: 1 })
   partsPerCycle: number;
@@ -767,6 +782,8 @@ export class ProcessCostResponseDto {
       partsPerCycle: parseFloat(row.parts_per_cycle) || 1,
       scrap: parseFloat(row.scrap) || 0,
       totalCostPerPart: parseFloat(row.total_cost_per_part) || 0,
+      otherCostPerPart: row.other_cost_per_part != null ? parseFloat(row.other_cost_per_part) : null,
+      cyclePhases: Array.isArray(row.cycle_phases) ? row.cycle_phases : null,
       setupCostPerPart: parseFloat(row.setup_cost_per_part) || 0,
       totalCycleCostPerPart: parseFloat(row.total_cycle_cost_per_part) || 0,
       totalCostBeforeScrap: parseFloat(row.total_cost_before_scrap) || 0,

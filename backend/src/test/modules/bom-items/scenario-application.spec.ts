@@ -27,10 +27,15 @@ function build(over: {
       from: () => chain,
     }),
   };
-  const analysisRuns = { ensureCurrent: jest.fn().mockImplementation(() => { calls.push('analysis'); return Promise.resolve({ ran: ['cad_features'], status: over.analysis ?? READY }); }) };
   const materials = { ensure: jest.fn().mockImplementation(() => { calls.push('material'); return Promise.resolve({ action: 'replaced', recordId: 'r1', usage: null }); }) };
   const toolingCosts = { ensure: jest.fn().mockImplementation(() => { calls.push('tooling'); return Promise.resolve({ action: 'replaced', items: ['Injection mold'] }); }) };
+  const status = (over.analysis ?? READY) as { ready: boolean; missing: string[] };
   const routes = {
+    // The one rule (RouteApplicationService.requireAnalysis): the status is read, never made current here.
+    requireAnalysis: jest.fn().mockImplementation(() => {
+      calls.push('analysis');
+      return status.ready ? Promise.resolve() : Promise.reject(new ConflictException({ code: 'analysis_not_ready', missing: status.missing }));
+    }),
     applyRoute: jest.fn().mockImplementation(() => {
       calls.push('route');
       return over.routeError ? Promise.reject(over.routeError) : Promise.resolve({ created: 5, operations: ['a'], routeLabel: 'Auto', routeId: 'im-standard-200t' });
@@ -38,24 +43,23 @@ function build(over: {
     applyCustomRoute: jest.fn().mockImplementation(() => { calls.push('custom-route'); return Promise.resolve({ created: 2, operations: ['x'], routeLabel: 'Custom', needsManualCycleTime: [] }); }),
   };
   const audit = { recordBestEffort: jest.fn().mockResolvedValue(undefined) };
-  const svc = new ScenarioApplicationService(bomItems as never, database as never, analysisRuns as never, materials as never, toolingCosts as never, routes as never, audit as never);
-  return { svc, calls, patches, bomItems, materials, toolingCosts, routes, audit, analysisRuns };
+  const svc = new ScenarioApplicationService(bomItems as never, database as never, materials as never, toolingCosts as never, routes as never, audit as never);
+  return { svc, calls, patches, bomItems, materials, toolingCosts, routes, audit };
 }
 const input = (request: object) => ({ bomItemId: 'i1', userId: 'u', organizationId: 'o', token: 't', request: { location: 'USA', route: { mode: 'auto' }, ...request } as never });
 const stateWritten = (patches: Array<Record<string, unknown>>) => patches.map((p) => p['appliedScenario']).filter(Boolean) as Array<Record<string, unknown>>;
 
 describe('ScenarioApplicationService.apply', () => {
-  it('runs the steps in order: analysis, begin, fields, material, route, tooling, then the applied state', async () => {
+  it('runs the steps in order: the analysis check, begin, fields, material, route, tooling, then the applied state', async () => {
     const { svc, calls } = build();
     await svc.apply(input({ materialGrade: 'ABS', annualVolume: 5000 }));
     expect(calls).toEqual(['analysis', 'begin', 'item.update', 'overrides', 'cost-summary', 'material', 'route', 'cost-summary', 'tooling', 'overrides']);
   });
 
-  it('returns the canonical result: revision + 1, what ran, the material and the route', async () => {
+  it('returns the canonical result: revision + 1, the material and the route', async () => {
     const { svc } = build();
     const r = await svc.apply(input({ materialGrade: 'ABS' }));
     expect(r.scenario).toMatchObject({ revision: 4, status: 'applied' });
-    expect(r.analysis.ran).toEqual(['cad_features']);
     expect(r.material).toEqual({ grade: 'ABS', action: 'replaced', recordId: 'r1' });
     expect(r.route).toMatchObject({ mode: 'auto', routeId: 'im-standard-200t', created: 5 });
     expect(r.tooling).toEqual({ action: 'replaced', items: ['Injection mold'] });
@@ -82,7 +86,7 @@ describe('ScenarioApplicationService.apply', () => {
     expect(b.patches[0]).not.toHaveProperty('batchSize');
   });
 
-  it('does not touch the part when the analysis cannot be made ready: nothing is written and no state moves', async () => {
+  it('refuses a part that is not analysed, without running the analysis: nothing is written and no state moves (Refresh analysis runs it)', async () => {
     const { svc, calls, patches } = build({ analysis: { ...READY, cad: 'none', ready: false, missing: ['cad_features'] } });
     await expect(svc.apply(input({}))).rejects.toMatchObject({ response: { code: 'analysis_not_ready' } });
     expect(calls).toEqual(['analysis']);
@@ -123,12 +127,21 @@ describe('ScenarioApplicationService.apply', () => {
 
     const keep = build({ notes: [{ notes: 'x' }, { notes: 'auto_fill_from_route:im-large-500t' }] });
     await keep.svc.apply(input({ route: { mode: 'keep' } }));
-    expect(keep.routes.applyRoute).toHaveBeenCalledWith('i1', { routeId: 'im-large-500t', location: 'USA' }, expect.anything(), 't');
+    // Kept, unless it is no longer a route for the part (its process changed): then the recommendation, said in a warning.
+    expect(keep.routes.applyRoute).toHaveBeenCalledWith('i1', { routeId: 'im-large-500t', location: 'USA' }, expect.anything(), 't', { fallbackToRecommended: true });
 
     const none = build();
     const k = await none.svc.apply(input({ route: { mode: 'keep' } }));
     expect(none.routes.applyRoute).toHaveBeenCalledWith('i1', { routeId: 'auto', location: 'USA' }, expect.anything(), 't');
     expect(k.warnings.join(' ')).toMatch(/No route was applied yet/);
+  });
+
+  it('says so when the kept route was replaced because the part has changed process', async () => {
+    const moved = build({ notes: [{ notes: 'auto_fill_from_route:sm-laser' }] });
+    moved.routes.applyRoute.mockResolvedValueOnce({ created: 14, operations: ['Melting'], routeLabel: 'Sand casting', routeId: 'sand-casting', replacedRouteId: 'sm-laser' });
+    const r = await moved.svc.apply(input({ route: { mode: 'keep' } }));
+    expect(r.route).toMatchObject({ routeId: 'sand-casting', created: 14 });
+    expect(r.warnings.join(' ')).toMatch(/sm-laser is not a route for this part any more.*Sand casting/);
   });
 
   it('a machine that cannot be saved is reported and does not undo the route', async () => {

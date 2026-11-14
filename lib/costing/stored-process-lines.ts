@@ -79,6 +79,10 @@ export interface StoredProcessRow {
    */
   chargeBasis?: 'time' | 'per_part' | null;
   totalCostPerPart?: number | null;
+  /** What the operation charges beyond machine and crew time (energy, a consumable), USD per part (migration 1005); null when nothing. */
+  otherCostPerPart?: number | null;
+  /** The phases of the operation cycle as its calculator gave them when applied (migration 1009); null when it has no calculator cycle. */
+  cyclePhases?: { name: string; seconds: number }[] | null;
   heads?: number | null;
   partsPerCycle?: number | null;
   scrap?: number | null;
@@ -99,6 +103,8 @@ export interface EngineLineLite {
   /** This line's own process label (ProcessLineCost.process) — see matchedEngineLine. */
   process?: string | null;
   cycleTimeMin: number;
+  /** What the line charges beyond machine and crew time, USD per part (ProcessLineCost.otherCostPerPartUsd). */
+  otherCostPerPartUsd?: number;
   machineSelection?: {
     overridden?: boolean;
     balanced?: { candidate?: { hourlyRate: number; machineName?: string | null } | null } | null;
@@ -151,7 +157,9 @@ export interface ResolvedStoredLine<
 
   setupPerPart: number;
   cyclePerPart: number;
-  /** setup + cycle, with scrap applied — the row's contribution per part. */
+  /** What the line charges beyond machine and crew time (energy, consumables): the live engine line's, else the saved row's. */
+  otherPerPart: number;
+  /** setup + cycle + other, with scrap applied — the row's contribution per part. */
   totalPerPart: number;
 
   /** Which of this snapshot's own costing inputs no longer match the scenario. */
@@ -255,6 +263,8 @@ export function resolveStoredProcessLines<
       ? num(row.totalCostPerPart)
       : ((cycleSec / 3600) * (machineRate + laborRate * heads)) / partsPerCycle;
 
+    const otherPerPart = perPartCharge ? 0 : (matchedEngineLine ? num(matchedEngineLine.otherCostPerPartUsd) : num(row.otherCostPerPart));
+
     const persistedBatchSize = Number.isFinite(Number(row.batchSize)) && Number(row.batchSize) >= 1
       ? Math.floor(Number(row.batchSize))
       : null;
@@ -270,7 +280,8 @@ export function resolveStoredProcessLines<
       persistedBatchSize,
       setupPerPart,
       cyclePerPart,
-      totalPerPart: (setupPerPart + cyclePerPart) * (1 + scrap / 100),
+      otherPerPart,
+      totalPerPart: (setupPerPart + cyclePerPart + otherPerPart) * (1 + scrap / 100),
       staleInputKeys: findStaleInputKeys(
         { batchSize: row.batchSize ?? null, location: row.location ?? null },
         { batchSize, location: effective.location },

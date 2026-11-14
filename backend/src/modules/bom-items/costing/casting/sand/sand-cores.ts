@@ -11,7 +11,7 @@ import type { ReferenceCalcRun } from '../../shared/calculators/reference-calcul
 import { machineValue, type SandMachine } from './sand-machines';
 import { handlingTime } from './sand-handling';
 import { valuesProvider } from './sand-seeds';
-import { runStep, selectAndCost, type CostedStep, type SandRouteContext, type StepOutcome } from './sand-steps';
+import { energyBasisOf, runStep, selectAndCost, type CostedStep, type SandRouteContext, type StepOutcome } from './sand-steps';
 import type { CostContext } from '../casting-finishing';
 import { variableProvider } from './sand-seeds';
 
@@ -39,21 +39,35 @@ export const CORE_PROCESSES = [
 export type CoreProcess = (typeof CORE_PROCESSES)[number];
 
 /**
- * What the hot box physics needs from the plant, or what is missing and why it cannot work: the box must be hotter than the binder's cure temperature
- * and that hotter than the sand it is blown at (otherwise the sand never gets there), and the cured depth must be a depth.
+ * The hot box settings: the Cost Guide's, else the published values of US 5,365,995 (Ford, "Method of curing hot box sand cores"): "the 120° F. critical
+ * cure temperature", "normal pattern operating temperatures (450 to 550° F.)", massive cores cured "to a shallower skin depth, 1/4 to 1/2 inch". The box is
+ * taken at the range's lower bound and the skin at its upper bound: both the slower cure. The cured depth is capped at half the core's section (calculator).
+ */
+const HOT_BOX_PUBLISHED = {
+  coreboxTempC: { value: 232.2, source: 'US 5,365,995: pattern 450-550 °F, the lower bound 450 °F (the slower cure)' },
+  cureTempC: { value: 48.9, source: 'US 5,365,995: "the 120° F. critical cure temperature"' },
+  curedDepthMm: { value: 12.7, source: 'US 5,365,995: massive cores cured to a skin of 1/4 to 1/2 inch, the upper bound 1/2 inch (the slower cure)' },
+} as const;
+const HOT_BOX_SET_IN = { coreboxTempC: 'core box temperature', cureTempC: "binder's cure temperature", curedDepthMm: 'cured depth before stripping' } as const;
+
+function hotBoxValues(ctx: SandRouteContext): Record<keyof typeof HOT_BOX_PUBLISHED, { value: number; source: string }> {
+  const of = (k: keyof typeof HOT_BOX_PUBLISHED) => {
+    const set = ctx.hotBox[k];
+    return set != null ? { value: set, source: `${HOT_BOX_SET_IN[k]} set in the Cost Guide` } : HOT_BOX_PUBLISHED[k];
+  };
+  return { coreboxTempC: of('coreboxTempC'), cureTempC: of('cureTempC'), curedDepthMm: of('curedDepthMm') };
+}
+
+/**
+ * Why the hot box physics cannot work, or nothing: the box must be hotter than the binder's cure temperature and that hotter than the sand it is blown at
+ * (otherwise the sand never gets there).
  */
 export function hotBoxSettingsProblems(ctx: SandRouteContext): string[] {
-  const { coreboxTempC: box, cureTempC: cure, curedDepthMm: depth } = ctx.hotBox;
+  const { coreboxTempC: box, cureTempC: cure } = hotBoxValues(ctx);
   const start = ctx.ref.number('sandMoldTemp');
-  const missing = [
-    box == null ? 'the core box temperature (Cost Guide: hot box core box temperature)' : null,
-    cure == null ? "the binder's cure temperature (Cost Guide: hot box cure temperature)" : null,
-    depth == null ? 'the depth of core cured before stripping (Cost Guide: hot box cured depth)' : null,
-  ].filter((m): m is string => m !== null);
-  if (missing.length) return [`hot box: set ${missing.join(', ')}`];
   if (start == null) return ['sand variable sandMoldTemp'];
-  if (!(box! > cure! && cure! > start)) {
-    return [`hot box: the core box (${box} °C) must be hotter than the binder's cure temperature (${cure} °C), which must be above the sand's starting temperature (${start} °C)`];
+  if (!(box.value > cure.value && cure.value > start)) {
+    return [`hot box: the core box (${box.value} °C) must be hotter than the binder's cure temperature (${cure.value} °C), which must be above the sand's starting temperature (${start} °C)`];
   }
   return [];
 }
@@ -120,7 +134,7 @@ export function makeCoreStep(ctx: SandRouteContext, machine: SandMachine, core: 
   // The strip and handling time: the handling table's band that takes this core (its equipment is part of the source shown in the trace).
   const band = isHotBox ? handlingTime(ctx.ref, core.kg) : null;
   if (isHotBox && !band) return { ok: false, reasons: [`tblHandlingTimes has no band that takes a ${core.kg.toFixed(1)} kg core`] };
-  const hot = ctx.hotBox;
+  const hot = hotBoxValues(ctx);
   const priced = ctx.energyPricePerKwh != null;
   const r = runStep(
     ctx, isHotBox ? HOT_BOX : COREMAKING, machine,
@@ -132,11 +146,11 @@ export function makeCoreStep(ctx: SandRouteContext, machine: SandMachine, core: 
     isHotBox
       ? {
           scenario: valuesProvider({
-            hot_box_corebox_temp_c: { value: hot.coreboxTempC ?? NaN, source: 'core box temperature set in the Cost Guide (°C)' },
-            hot_box_cure_temp_c: { value: hot.cureTempC ?? NaN, source: "binder cure temperature set in the Cost Guide (°C)" },
-            hot_box_cured_depth_mm: { value: hot.curedDepthMm ?? NaN, source: 'cured depth before stripping set in the Cost Guide (mm)' },
+            hot_box_corebox_temp_c: hot.coreboxTempC,
+            hot_box_cure_temp_c: hot.cureTempC,
+            hot_box_cured_depth_mm: hot.curedDepthMm,
             // As for melting: an energy price the user has not set is not assumed; the energy is then not charged, and the line says so.
-            energy_price: { value: priced ? ctx.energyPricePerKwh! : 0, source: priced ? 'energy price set in the Cost Guide (USD/kWh)' : 'energy price not set: energy not charged' },
+            energy_price: { value: priced ? ctx.energyPricePerKwh! : 0, source: priced ? ctx.energyPriceSource ?? 'energy price (USD/kWh)' : 'no energy price: none set in the Cost Guide and none for the location' },
           }),
           lookup: valuesProvider({ 'tblHandlingTimes.Handling Time (s)': { value: band!.seconds, source: `tblHandlingTimes: ${band!.equipment} up to ${band!.maxKg} kg` } }),
         }
@@ -146,9 +160,9 @@ export function makeCoreStep(ctx: SandRouteContext, machine: SandMachine, core: 
   // The sand's sensible heat to the cure temperature (a lower bound: holding the box hot between shots costs more), priced with the energy price.
   const energyKwh = r.run.outputs['Energy'];
   const notes = isHotBox && !priced && energyKwh != null
-    ? [`Hot box heating energy is not charged: the energy price is not set (the sand's heat alone is ${energyKwh.toFixed(3)} kWh per core, a lower bound).`]
+    ? [`Hot box heating energy is not charged: no energy price for the location or in the Cost Guide (the sand's heat alone is ${energyKwh.toFixed(3)} kWh per core, a lower bound).`]
     : [];
-  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: isHotBox ? r.run.outputs['Energy Cost'] ?? 0 : 0, notes };
+  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: isHotBox ? r.run.outputs['Energy Cost'] ?? 0 : 0, notes, ...(isHotBox && priced ? { energyBasis: energyBasisOf(ctx) } : {}) };
 }
 
 export interface CoreLine {

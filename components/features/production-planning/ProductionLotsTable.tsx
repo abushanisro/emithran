@@ -150,10 +150,7 @@ export function ProductionLotsTable({ lots, isLoading }: ProductionLotsTableProp
               </TableCell>
               
               <TableCell>
-                <div className="flex flex-col">
-                  <span className="font-medium">{lot.bom?.name || 'N/A'}</span>
-                  <span className="text-xs text-muted-foreground">v{lot.bom?.version || '1.0'}</span>
-                </div>
+                <span className="font-medium">{lot.bom?.name || 'N/A'}</span>
               </TableCell>
               
               <TableCell>

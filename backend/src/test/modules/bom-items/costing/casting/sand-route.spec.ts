@@ -12,7 +12,7 @@ const input: SandRouteInput = {
   ref, spec: loadSandCastingCalculatorSpec(), calculators: sandCastingCalculatorsByName(), material: iron,
   part: {
     volumeMm3: (8 / iron.columns['density_kg_m3']!) * 1e9, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12,
-    partingLineMm: 900, abovePartingMm: 50, cores: [{ volumeMm3: 1.2e6, areaMm2: null, sizeMm: [200, 100, 60] }],
+    partingLineMm: 900, abovePartingMm: 50, cores: [{ volumeMm3: 1.2e6, areaMm2: 64000, sizeMm: [200, 100, 60] }],
   },
   machinesByClass: machines,
   scenario: { batchSize: 250, cavities: null, mouldingClass: null, chosenCoreProcess: null, energyPricePerKwh: 0.1, hotBox: HOT_BOX, lifetimeVolume: 10000 },
@@ -31,20 +31,15 @@ describe('buildSandRoute on a gray iron casting with one core (real sand data)',
     expect(route!.totalUsd).toBeGreaterThan(0);
   });
 
-  it('compares every moulding machine tried: the chosen one first and the only one chosen, the rest dearer, the unusable last with their reason', () => {
-    const alts = route!.alternatives;
-    expect(alts.length).toBeGreaterThan(1);
-    expect(alts[0]).toMatchObject({ chosen: true, mouldingMachine: route!.mouldingMachine, totalUsd: route!.totalUsd });
-    expect(alts.filter((a) => a.chosen)).toHaveLength(1);
-    const costed = alts.filter((a) => !a.chosen && a.complete);
-    expect(costed.length).toBeGreaterThan(0);
-    for (const a of costed) expect(a.totalUsd!).toBeGreaterThanOrEqual(route!.totalUsd!);
-    expect(costed.map((a) => a.totalUsd!)).toEqual([...costed.map((a) => a.totalUsd!)].sort((x, y) => x - y));
-    const unusable = alts.filter((a) => a.cavities == null);
-    for (const a of unusable) expect(a.reason).toEqual(expect.any(String));
-    // unusable machines come after every machine that made a route
-    const firstUnusable = alts.findIndex((a) => a.cavities == null);
-    if (firstUnusable >= 0) expect(alts.slice(firstUnusable).every((a) => a.cavities == null)).toBe(true);
+  it('the moulding line compares the moulding machines by their whole route: the chosen one first, then the cheapest that hold the part, at most 3', () => {
+    const choice = route!.lines.find((l) => l.process === route!.mouldingProcess)!.machineChoice!;
+    expect(choice.candidates[0]).toMatchObject({ name: route!.mouldingMachine, status: 'chosen', perPartCost: route!.totalUsd });
+    expect(choice.candidates.length).toBeGreaterThan(1);
+    expect(choice.candidates.length).toBeLessThanOrEqual(3);
+    const others = choice.candidates.slice(1).map((c) => c.perPartCost!);
+    for (const t of others) expect(t).toBeGreaterThanOrEqual(route!.totalUsd!);
+    expect(others).toEqual([...others].sort((x, y) => x - y));
+    expect(choice.checkedCount).toBeGreaterThan(choice.capableCount); // machines whose flask cannot hold the part are checked, not listed
   });
 
   it('sets the designed yield beside the plant baseline for the alloy', () => {
@@ -55,9 +50,9 @@ describe('buildSandRoute on a gray iron casting with one core (real sand data)',
     expect(tookMs).toBeLessThan(8000);
   });
 
-  it('runs the steps in order: melt, the core, moulding, pour, cooling, shakeout, degating, cleaning, finishing, inspection', () => {
+  it('runs the steps in order: melt, the core, its coating and drying (the plant\'s default), moulding, pour, cooling, shakeout, degating, cleaning, finishing, inspection', () => {
     const names = route!.lines.map((l) => l.process);
-    expect(names).toEqual(['Melting', expect.stringMatching(/coremaking$/), route!.mouldingProcess, 'Pour', 'Cooling', 'Shakeout', 'Degating', 'Cleaning', 'Finishing', 'Visual Inspection']);
+    expect(names).toEqual(['Melting', expect.stringMatching(/coremaking$/), 'Core Refractory Coat', expect.stringMatching(/^Refractory Coat (Oven|Air) Dry \(cores\)$/), route!.mouldingProcess, 'Pour', 'Cooling', 'Shakeout', 'Degating', 'Cleaning', 'Finishing', 'Visual Inspection']);
     expect(route!.lines.every((l) => l.physicsGap == null && l.totalCost > 0)).toBe(true);
     expect(route!.coresMade).toBe(1);
   });
@@ -156,5 +151,18 @@ describe('what the user can choose, and what the data cannot do', () => {
 
   it('says what is not costed: patterns, core coating, sand', () => {
     expect(route!.warnings.join(' ')).toMatch(/Patterns, core coating and core gluing are not costed/);
+  });
+});
+
+// A small casting's melt costs a fraction of a cent: per good casting (divided by the route's good-part yield) it keeps its value and its
+// energy, so the saved record's total is not 0 (it was rounded to the cent).
+describe('a line below a cent, per good casting', () => {
+  const small = buildSandRoute({ ...input, part: { ...input.part, volumeMm3: (0.05 / iron.columns['density_kg_m3']!) * 1e9, dimsMm: [42, 42, 20], surfaceAreaMm2: 7500, partingLineMm: 170, wallNominalMm: 4, cores: [] } }).route!;
+  const melt = small.lines.find((l) => l.process === 'Melting')!;
+
+  it('keeps the melt\'s total and its energy, the energy inside the total', () => {
+    expect(melt.otherCostPerPartUsd).toBeGreaterThan(0);
+    expect(melt.totalCost).toBeGreaterThan(0);
+    expect(melt.totalCost).toBeGreaterThanOrEqual(melt.otherCostPerPartUsd!);
   });
 });

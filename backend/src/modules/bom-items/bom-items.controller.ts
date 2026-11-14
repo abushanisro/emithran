@@ -52,6 +52,7 @@ import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/ex
 import { deriveImplications } from './intelligence/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PmiReviewService, type PmiReviewRequest } from './services/pmi-review.service';
+import { MachiningAllowanceService, type AllowanceDecisionRequest } from './costing/casting/machining-allowance.service';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
@@ -136,6 +137,7 @@ export class BOMItemsController {
     private readonly routeApplications: RouteApplicationService,
     private readonly scenarioApplications: ScenarioApplicationService,
     private readonly costTables: CostTableService,
+    private readonly machiningAllowance: MachiningAllowanceService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -469,6 +471,14 @@ export class BOMItemsController {
   @ApiOperation({ summary: 'Approve or reject one decoded PMI record or a frame datum references (organization owners only; stale or ineligible records are refused)' })
   async reviewPmiRecord(@Param('id') id: string, @Body() body: PmiReviewRequest, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.pmiReviewService.review(id, user.id, token, body);
+  }
+
+  // ── Machining allowance decisions on a cast part (migration 1002; shown on the cost summary, never costed) ──
+  @Post(':id/machining-allowances')
+  @ApiOperation({ summary: 'Record whether one feature is machined and its allowance with its source and reason (members; append-only, bound to the current file)' })
+  async decideMachiningAllowance(@Param('id') id: string, @Body() body: AllowanceDecisionRequest, @AccessToken() token: string) {
+    await this.machiningAllowance.decide(id, token, body);
+    return { ok: true };
   }
 
 

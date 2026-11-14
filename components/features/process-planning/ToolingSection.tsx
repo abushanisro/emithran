@@ -11,61 +11,54 @@ import {
   useUpdateToolingCost,
   useDeleteToolingCost,
 } from '@/lib/api/hooks/useToolingCosts';
+import { useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
+import { catalogSourceLabel, processLabel } from '@/lib/costing/tooling-catalog';
 
 interface ToolingSectionProps {
   bomItemId?: string;
   bomItem?: any;
+  /** The part's process group (the Cost Guide's Process Group): a new tooling item opens on its tooling catalog. */
+  partProcessGroup?: string | null;
   compact?: boolean;
   currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
   conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
 }
 
-// Manufacturing Process Hierarchy (simplified version). 'machining' has no
-// static subProcesses list — ToolingCostDialog now saves a real
-// process_calculator_mappings operation name (e.g. "Gun Drilling") as
-// item.subProcess for Machining tooling, already human-readable, so display
-// below skips the snake_case->Title Case transform for it rather than
-// hardcoding a duplicate sub-process list here just to label it.
-const MANUFACTURING_PROCESSES = {
-  machining: {
-    label: 'Machining',
-    subProcesses: [] as string[],
-  },
-  injection_molding: {
-    label: 'Plastic Molding',
-    subProcesses: ['mold_making', 'injection', 'cooling', 'ejection']
-  },
-  sheet_metal: {
-    label: 'Sheet Metal',
-    subProcesses: ['cutting', 'bending', 'punching', 'stamping', 'welding', 'forming']
-  },
-  casting: {
-    label: 'Casting',
-    subProcesses: ['sand_casting', 'investment_casting', 'die_casting', 'permanent_mold', 'pattern_making']
-  },
-  forging: {
-    label: 'Forging',
-    subProcesses: ['hot_forging', 'cold_forging', 'upset_forging', 'drop_forging', 'press_forging']
-  },
-  assembly: {
-    label: 'Assembly',
-    subProcesses: ['mechanical_assembly', 'welded_assembly', 'fastened_assembly', 'bonded_assembly']
-  },
-  finishing: {
-    label: 'Finishing',
-    subProcesses: ['surface_treatment', 'painting', 'plating', 'heat_treatment']
-  },
-  inspection: {
-    label: 'Quality Control & Inspection',
-    subProcesses: ['dimensional_inspection', 'functional_testing', 'visual_inspection', 'material_testing']
-  }
-};
+/** The fields of a saved tooling record the compact row reads. */
+interface ToolingRowView {
+  manufacturingProcess?: string | null;
+  subProcess?: string | null;
+  description?: string | null;
+  toolingType?: string | null;
+  amortizationParts?: number | string | null;
+  usagePercentage?: number | string | null;
+  isCustom?: boolean | null;
+  catalogSource?: string | null;
+}
+const row = (item: unknown): ToolingRowView => item as ToolingRowView;
+/** A tool's name: its description, else its record type, else "Tooling" (an empty text is no name). */
+const toolName = (r: ToolingRowView): string => [r.description, r.toolingType?.replace(/_/g, ' ')].find((t) => t != null && t.trim() !== '') ?? 'Tooling';
 
-export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '$', conversionRate = 1 }: ToolingSectionProps) {
+export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, compact, currencySymbol = '$', conversionRate = 1 }: ToolingSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTooling, setEditTooling] = useState<any | null>(null);
   const [selectedProcess, setSelectedProcess] = useState<string | null>(null);
   const [selectedSubProcess, setSelectedSubProcess] = useState<string | null>(null);
+
+
+  // Fetch tooling costs from database
+  const { data, isLoading, error } = useToolingCosts({
+    bomItemId: bomItemId ?? '',
+    enabled: !!bomItemId,
+  });
+
+  // Mutations
+  const createMutation = useCreateToolingCost();
+  const updateMutation = useUpdateToolingCost();
+  const deleteMutation = useDeleteToolingCost();
+
+  const tooling = data?.records || [];
+  const { data: catalogDomains = [] } = useToolingCatalogDomains();
 
   if (!bomItemId) {
     return (
@@ -79,19 +72,6 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
       </div>
     );
   }
-
-  // Fetch tooling costs from database
-  const { data, isLoading, error } = useToolingCosts({
-    bomItemId,
-    enabled: !!bomItemId,
-  });
-
-  // Mutations
-  const createMutation = useCreateToolingCost();
-  const updateMutation = useUpdateToolingCost();
-  const deleteMutation = useDeleteToolingCost();
-
-  const tooling = data?.records || [];
 
 
   const handleAddTooling = (processKey?: string, subProcessKey?: string) => {
@@ -115,6 +95,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
       const submitData = {
         manufacturingProcess: data.manufacturingProcess,
         subProcess: data.subProcess,
+        catalogSource: (data as { catalogSource?: string | null }).catalogSource ?? null,
         toolingType: data.toolingType,
         description: data.description,
         specifications: data.specifications,
@@ -196,18 +177,19 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
           ) : (
             <>
               {tooling.map((item: any) => {
-                const processData = item.manufacturingProcess
-                  ? MANUFACTURING_PROCESSES[item.manufacturingProcess as keyof typeof MANUFACTURING_PROCESSES]
-                  : null;
+                const process = processLabel(row(item).manufacturingProcess, catalogDomains);
                 return (
                   <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{item.toolingType?.replace(/_/g, ' ') || 'Tooling'}</p>
+                      {/* The tool by what it is (its description: "Injection mold (SPI Class104)"), not its record type ("die"). */}
+                      <p className="text-xs font-medium truncate">{toolName(row(item))}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {[
-                          processData?.label,
-                          item.amortizationParts ? `${item.amortizationParts.toLocaleString()} pcs` : null,
-                          `${item.usagePercentage ?? 100}% usage`,
+                          process,
+                          catalogSourceLabel(row(item)),
+                          row(item).amortizationParts ? `spread over ${Number(row(item).amortizationParts).toLocaleString()} parts` : null,
+                          // A tool shared with other parts is charged in part; a tool this part uses alone needs no note.
+                          row(item).usagePercentage != null && Number(row(item).usagePercentage) !== 100 ? `${Number(row(item).usagePercentage)}% of the tool charged to this part` : null,
                         ].filter(Boolean).join(' · ')}
                       </p>
                     </div>
@@ -244,6 +226,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
           bomItem={bomItem}
           selectedProcess={selectedProcess}
           selectedSubProcess={selectedSubProcess}
+          partProcessGroup={partProcessGroup}
         />
       </div>
     );
@@ -317,12 +300,8 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                       ) : (
                         <>
                           {tooling.map((item: any) => {
-                            const processData = item.manufacturingProcess ? MANUFACTURING_PROCESSES[item.manufacturingProcess as keyof typeof MANUFACTURING_PROCESSES] : null;
-                            const subProcessLabel = item.subProcess ? item.subProcess.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : '';
-                            
-                            // Check if this tool is recommended for the sub-process
-                            const isRecommended = processData?.subProcesses?.some((sp: string) => sp === item.subProcess) && 
-                              processData?.subProcesses?.includes(item.subProcess);
+                            const process = processLabel(row(item).manufacturingProcess, catalogDomains);
+                            const subProcessLabel = processLabel(row(item).subProcess, []);
                             
                             return (
                               <tr key={item.id} className="hover:bg-secondary/50">
@@ -333,11 +312,6 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                                       {item.isCustom && (
                                         <Badge variant="secondary" className="text-xs">Custom</Badge>
                                       )}
-                                      {isRecommended && (
-                                        <Badge variant="outline" className="text-xs text-green-600 border-green-600">
-                                          Recommended
-                                        </Badge>
-                                      )}
                                     </div>
                                     <p className="text-xs text-muted-foreground">{item.description}</p>
                                     {item.specifications && (
@@ -347,9 +321,9 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                                 </td>
                                 <td className="p-3 border-r border-border text-xs">
                                   <div>
-                                    {processData ? (
+                                    {process ? (
                                       <div>
-                                        <div className="font-medium text-xs">{processData.label}</div>
+                                        <div className="font-medium text-xs">{process}</div>
                                         {subProcessLabel && (
                                           <div className="text-xs text-muted-foreground">{subProcessLabel}</div>
                                         )}
@@ -453,6 +427,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
         bomItem={bomItem}
         selectedProcess={selectedProcess}
         selectedSubProcess={selectedSubProcess}
+        partProcessGroup={partProcessGroup}
       />
     </div>
   );

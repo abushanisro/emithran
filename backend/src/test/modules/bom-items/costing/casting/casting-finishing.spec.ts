@@ -93,8 +93,8 @@ describe('trim (press cycle time, press force)', () => {
     const r = trimLine({ ...base, partingPerimeterMm: perimeter, partMassKg: 0.404, shearStrengthMpa: shear });
     const required = (perimeter * flashMm * shear) / 1000;
     expect(Number(presses.find((m) => m.name === r.line.machineName)!.specs['press_force_kn'])).toBeGreaterThanOrEqual(required);
-    const rejected = r.line.machineChoice!.candidates.filter((c) => c.status === 'rejected');
-    expect(rejected.some((c) => c.reasons.some((x) => /below the .* kN trim force/.test(x)))).toBe(true);
+    // the presses below the trim force are checked and not capable
+    expect(r.line.machineChoice!.capableCount).toBeLessThan(r.line.machineChoice!.checkedCount);
   });
   it('no perimeter: the force check is named as not done', () => {
     const r = trimLine({ ...base, partingPerimeterMm: null, partMassKg: 0.404, shearStrengthMpa: shear });

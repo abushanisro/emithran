@@ -15,6 +15,10 @@ for _ in $(seq 1 60); do docker exec "$ID-src" pg_isready -h 127.0.0.1 -U postgr
 # The source looks like the real one just before the baseline: the shared stubs + migration 917 (everything up to the baseline number), plus tenant data.
 docker exec -i "$ID-src" psql -U postgres -v ON_ERROR_STOP=1 -q <<'SQL' >/dev/null
 \i /sqltest/00_stubs.sql
+-- the session table (migration 901, part of the baseline) as the real database has it; 901 references Supabase's auth.sessions,
+-- which the real source has and the baseline load leaves out. Migration 1000 (logout ends the session) adds a column to it.
+CREATE TABLE auth.sessions (id uuid PRIMARY KEY);
+\i /migrations/901_user_session_activity.sql
 \i /migrations/917_cad_uploads.sql
 ALTER TABLE auth.users ADD COLUMN email text UNIQUE, ADD COLUMN raw_user_meta_data jsonb NOT NULL DEFAULT '{}', ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
 INSERT INTO auth.users (id, email) VALUES ('11111111-1111-4111-8111-111111111111','alice@example.com'),('22222222-2222-4222-8222-222222222222','bob@example.com');
@@ -68,7 +72,7 @@ ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN
 INSERT INTO public.mhr_records (machine_class, location, usd_labor_rate_per_hr, usd_lhr_total) VALUES
   ('surface_black_oxide', 'USA', NULL, NULL), ('surface_oven_cure', 'USA', 29.95, 29.95), ('surface_shot_blast', 'USA', 29.95, 29.95);
 -- the process cost table as the real database has it (migration 034 on): migration 970 adds columns to it and redefines the function that fills it
-CREATE TABLE public.process_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid, is_active boolean DEFAULT true);
+CREATE TABLE public.process_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid, is_active boolean DEFAULT true, cycle_time numeric(12,2));
 INSERT INTO public.projects (user_id, name) VALUES ('11111111-1111-4111-8111-111111111111','Alice project');
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own ON public.projects FOR SELECT TO authenticated USING (user_id = auth.uid());

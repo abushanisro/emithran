@@ -150,6 +150,7 @@ describe('die-cast part through the Cost Summary (real calculators, memory data)
     it('metal: part 0.348 kg charged at 5.515 USD/kg; the overflow and runner (0.5424 - 0.348 kg) are remelted, not charged', () => {
       expect(r.net).toBeCloseTo(0.348, 9);
       expect(s.materialCost).toBeCloseTo(0.348 * 5.515, 2);
+      expect(s.castingMetal).toEqual({ partKg: s.dieCasting!.metal.partKg, chargedKg: s.dieCasting!.metal.chargedKg });
       expect(s.dieCasting!.metal.partKg).toBeCloseTo(0.348, 3);
       expect(s.dieCasting!.metal.meltedKg!).toBeCloseTo(0.54235, 3);
       expect(s.dieCasting!.metal.returnedKg!).toBeCloseTo(0.19435, 3);

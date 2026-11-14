@@ -3,6 +3,7 @@
 import { type DraftSummary, undercutCountFromDraftSummary } from './draft-signals';
 import type { InjectionMoldingCostInput } from './process/cost-injection-molding-engine';
 import { sideActionSignals } from './side-action-signals';
+import { ribSignals } from './process/rib-inserts';
 import type { PlasticFeatureGraph } from './operation/plastic-catalog-operations.service';
 
 /** The part's three bounding-box sides, longest first. A side CAD did not measure is 0. */
@@ -26,6 +27,12 @@ export type MoldingSummary = DraftSummary & {
 
 const positive = (n: number | null | undefined): number | null => (n != null && n > 0 ? n : null);
 
+/** The measured length of the part's parting line (the PartingLine feature of the plastic feature graph); null when the graph has none. */
+function partingLineLengthMm(graph: MoldingSummary['plasticFeatureGraph']): number | null {
+  const line = graph?.items.find((f) => f.feature_type === 'PartingLine');
+  return positive(Number(line?.attributes?.length_mm));
+}
+
 /** Routing signals from the CAD analysis. A signal the analysis did not produce is null: the router then records a warning instead of assuming one. */
 export function moldingSignals(summary: MoldingSummary, bbox: readonly [number, number, number]): NonNullable<InjectionMoldingCostInput['signals']> {
   const sideActions = sideActionSignals(summary.plasticFeatureGraph);
@@ -42,7 +49,11 @@ export function moldingSignals(summary: MoldingSummary, bbox: readonly [number, 
     undercutCount: sideActions?.undercutFeatures ?? undercutCountFromDraftSummary(summary),
     slideBundleCount: sideActions?.slideBundles ?? null,
     slideOrLifterBundleCount: sideActions?.slideOrLifterBundles ?? null,
+    sideActionBlocks: sideActions?.blocks ?? null,
+    maxSlideStrokeMm: sideActions?.maxSlideStrokeMm ?? null,
+    ribs: ribSignals(summary.plasticFeatureGraph),
     partingComplexity: summary.partingComplexity ?? null,
+    partingLineLengthMm: partingLineLengthMm(summary.plasticFeatureGraph),
     insertCount: positive(summary.insertCandidateCount),
   };
 }
@@ -69,6 +80,18 @@ export interface MoldingCommonFacts {
   cavityCountOverride: number | null;
   /** The stored cycle-time calculators by name (calculators/plastic-molding-calculators.json), loaded from the database; the cycle time is computed by them. */
   calculators: InjectionMoldingCostInput['calculators'];
+  /** The part's own calculator field values (calculator_field_overrides, migration 1011). */
+  calculatorOverrides?: InjectionMoldingCostInput['calculatorOverrides'];
+  /** The CAD face count (cadFaceCount below): decides the mold complexity. */
+  cadFaceCount?: number | null;
+  /** The location's electricity price in USD (shared/location-electricity.ts); null when it has none. */
+  electricity?: { usdPerKwh: number; source: string } | null;
+}
+
+/** The CAD face count of an analysed part (feature_graph.face_graph.face_attributes); null when the analysis holds none. */
+export function cadFaceCount(featureGraph: unknown): number | null {
+  const faces = (featureGraph as { face_graph?: { face_attributes?: unknown } } | null | undefined)?.face_graph?.face_attributes;
+  return Array.isArray(faces) && faces.length > 0 ? faces.length : null;
 }
 
 export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInput {
@@ -90,11 +113,15 @@ export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInp
     inspectionRate: f.inspectionRate,
     cavityCountOverride: f.cavityCountOverride,
     calculators: f.calculators,
+    calculatorOverrides: f.calculatorOverrides ?? null,
+    cadFaceCount: f.cadFaceCount ?? null,
+    electricity: f.electricity ?? null,
     // Tooling amortisation: both come from the canonical costing-input resolver, never re-read from the item.
     annualVolume: f.annualVolume ?? undefined,
     productionLifeYears: f.productionLifeYears,
     bboxMaxMm: bbox[0],
     bboxMidMm: bbox[1],
+    bboxMinMm: bbox[2],
     signals: moldingSignals(f.summary, bbox),
   };
 }

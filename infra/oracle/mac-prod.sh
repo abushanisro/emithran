@@ -12,6 +12,13 @@
 set -Eeuo pipefail
 trap 'echo "mac-prod.sh failed at line $LINENO" >&2' ERR
 ref="${1:?usage: mac-prod.sh <git-ref>}"
+# Once production has moved to the Oracle servers this script must not run: it would start a second tunnel connector for the same hostname, and Cloudflare
+# would split visitors between this Mac's copy of the data and the servers' copy. The marker is written at the cutover; delete it only to move back.
+marker="${PROD_MOVED_MARKER:-$HOME/emithran-prod-run/MOVED_TO_ORACLE}"
+if [ -f "$marker" ]; then
+  echo "production no longer runs on this Mac ($(head -1 "$marker")). Deploy with infra/oracle/micro-deploy.sh. To move back, stop the servers' tunnel connector first, then delete $marker. Nothing was changed." >&2
+  exit 3
+fi
 repo="$(git rev-parse --show-toplevel)"; cd "$repo"
 sha="$(git rev-parse --verify --quiet "$ref^{commit}")" || { echo "unknown git ref: $ref" >&2; exit 2; }
 # The release must carry everything this script runs from it. An older release (one that predates the deploy tooling) is refused BEFORE anything is changed.

@@ -1,17 +1,39 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
-import { useAuth } from '@/lib/providers/auth'
-import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
 import { KeyRound, Loader2 } from 'lucide-react'
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+
+import { Button, type ButtonProps } from '@/components/ui/button'
+import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
+import { SIGN_IN_PATH, ssoSignInPath } from '@/lib/auth/sign-in'
+import { useAuth } from '@/lib/providers/auth'
+
+/**
+ * A sign-in button is a plain link to Auth0 (it works without JavaScript). Each one shows its own spinner while the browser leaves,
+ * and clears it when the browser restores this page from its back/forward cache (the Back button on Auth0's page).
+ */
+function SignInLink({ href, variant, className, children }: { href: string; variant?: ButtonProps['variant']; className: string; children: React.ReactNode }) {
+  const [leaving, setLeaving] = useState(false)
+  useEffect(() => {
+    const reset = (e: PageTransitionEvent) => { if (e.persisted) setLeaving(false) }
+    window.addEventListener('pageshow', reset)
+    return () => { window.removeEventListener('pageshow', reset) }
+  }, [])
+  return (
+    <Button asChild variant={variant} className={className}>
+      <a href={href} onClick={() => { setLeaving(true) }} aria-busy={leaving}>
+        {leaving ? <Loader2 className="h-5 w-5 animate-spin" aria-label="Signing in" /> : children}
+      </a>
+    </Button>
+  )
+}
 
 export default function AuthPage() {
-  const [loading, setLoading] = useState(false)
-  const { signIn, signInWithSso, ssoAvailable, signOut, accessDenied } = useAuth()
+  const { signOut, accessDenied } = useAuth()
+  const ssoPath = ssoSignInPath()
 
   useEffect(() => {
     if (consumeInactivitySignOutNotice()) {
@@ -29,18 +51,6 @@ export default function AuthPage() {
       window.history.replaceState(null, '', window.location.pathname)
     }
   }, [])
-
-  // The page keeps its look; credentials are typed on Auth0's own (branded) page, so both buttons simply leave for it.
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    await signIn()
-  }
-
-  const handleSsoSignIn = async () => {
-    setLoading(true)
-    await signInWithSso()
-  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -128,7 +138,7 @@ export default function AuthPage() {
               <h2 className="text-3xl font-bold text-foreground mb-2">Sign in your account</h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-6">
               {accessDenied && (
                 <div role="alert" className="rounded-xl border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
                   Your account has not been invited to eMithran. Ask your administrator for access, or{' '}
@@ -137,19 +147,14 @@ export default function AuthPage() {
               )}
 
 
-              <Button
-                type="submit"
+              <SignInLink
+                href={SIGN_IN_PATH}
                 className="w-full h-14 bg-card hover:bg-card/80 text-foreground font-semibold rounded-2xl transition-all duration-200 border border-border/50"
-                disabled={loading}
               >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
+                Sign In
+              </SignInLink>
 
-              {ssoAvailable && (
+              {ssoPath && (
                 <>
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
@@ -160,19 +165,17 @@ export default function AuthPage() {
                     </div>
                   </div>
 
-                  <Button
-                    type="button"
+                  <SignInLink
+                    href={ssoPath}
                     variant="outline"
-                    onClick={handleSsoSignIn}
                     className="w-full h-14 border-border bg-secondary/30 hover:bg-secondary/50 hover:text-foreground hover:border-primary/50 rounded-2xl font-semibold transition-all duration-200"
-                    disabled={loading}
                   >
                     <KeyRound className="w-5 h-5 mr-2" aria-hidden="true" />
                     Sign in with SSO
-                  </Button>
+                  </SignInLink>
                 </>
               )}
-            </form>
+            </div>
 
             <div className="text-center pt-4">
               <p className="text-sm text-muted-foreground">

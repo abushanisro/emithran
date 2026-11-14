@@ -378,7 +378,6 @@ export default function BOMDetailPage() {
     id: bomId,
     name: 'Loading...',
     description: '',
-    version: '1.0',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -1053,10 +1052,6 @@ export default function BOMDetailPage() {
               <p className="text-xs text-muted-foreground">Assembly BOM</p>
             </div>
             <div className="hidden md:block h-8 w-px bg-border" />
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Version</p>
-              <p className="text-sm font-medium">{bom.version}</p>
-            </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Project</p>
               <p className="text-sm font-medium">{project?.name ?? 'Loading…'}</p>

@@ -67,7 +67,9 @@ services:
     tmpfs:
       - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/ || exit 1"]
+      # The S3 gateway's own health endpoint: unauthenticated, 200 when the gateway serves. The S3 root (/) needs the access key once one is set,
+      # so probing it answered 403 and marked a working store unhealthy.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 6

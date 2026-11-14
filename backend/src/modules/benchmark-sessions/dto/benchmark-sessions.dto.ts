@@ -41,11 +41,6 @@ class SelectedBomDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  version?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
   status?: string;
 }
 

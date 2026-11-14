@@ -78,7 +78,7 @@ export const correlationIdInterceptor = (config: RequestConfig): RequestConfig =
  * Add custom headers
  */
 const customHeadersInterceptor = (config: RequestConfig): RequestConfig => {
-  config.headers['X-Client-Version'] = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
+  config.headers['X-Client-Version'] = process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0';
   config.headers['X-Client-Platform'] = 'web';
 
   return config;

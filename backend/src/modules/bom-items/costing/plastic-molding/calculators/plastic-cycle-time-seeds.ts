@@ -7,6 +7,7 @@
  * What the engine decides stays here, not in a formula: whether an input exists, and whether the Menges equation has a solution (the eject temperature must lie
  * between the mold wall and the melt). Both come back as named missing inputs, never a default.
  */
+import type { DryerModel, DryingCondition, ReferenceValue, WeightCheckReference } from '../reference/im-reference';
 import type { CalcSeed } from '../../shared/calculators/reference-calculator';
 import { bracketFactor, hasMengesSolution, resinThermalProps, type CycleTimeInput } from '../process/cycle-time';
 
@@ -17,6 +18,119 @@ export const STRUCTURAL_FOAM_CALCULATOR = 'Structural Foam Molding - Cycle Time'
 export const LSR_CALCULATOR = 'Injection Molding - LSR Cycle Time';
 export const COMPRESSION_CALCULATOR = 'Compression Molding - Cycle Time';
 export const RIM_CALCULATOR = 'Reaction Injection Molding - Cycle Time';
+export const DEFLASH_CALCULATOR = 'Injection Molding - Deflashing';
+
+/** Seeds for the deflashing calculator: the CAD parting line length and the reference trimming rate, or the ones that are missing. */
+export function deflashingSeeds(input: { partingLineLengthMm: number | null; rateMmPerS: number | null }): SeedResult {
+  const missing: string[] = [];
+  if (!positive(input.partingLineLengthMm)) missing.push('parting line length (CAD PartingLine feature)');
+  if (!positive(input.rateMmPerS)) missing.push('manual flash trimming rate (cmManualFlashTrimmingRate)');
+  if (missing.length > 0) return { missing };
+  return { seeds: {
+    'Parting Line Length': { value: input.partingLineLengthMm!, source: 'CAD PartingLine feature: measured parting line length' },
+    'Manual Flash Trimming Rate': { value: input.rateMmPerS!, source: `${REF}/variables: cmManualFlashTrimmingRate (compression molding, borrowed for injection; read as mm/s)` },
+  } };
+}
+
+export const SLIDE_MOVEMENT_CALCULATOR = 'Injection Molding - Slide Movement';
+
+/** Seeds for the slide movement calculator (F-32): the longest CAD slide stroke, the reference slide speed and the cavities, or what is missing. */
+export function slideMovementSeeds(input: { slideStrokeMm: number | null; rateMmPerS: number | null; cavities: number }): SeedResult {
+  const missing: string[] = [];
+  if (!positive(input.slideStrokeMm)) missing.push('the slide stroke (CAD SlideBundle stroke)');
+  if (!positive(input.rateMmPerS)) missing.push('the slide speed (slideCycleRate)');
+  if (missing.length > 0) return { missing };
+  return { seeds: {
+    'Slide Stroke': { value: input.slideStrokeMm!, source: 'CAD SlideBundle: the longest stroke (the slides move out and back together each shot)' },
+    'Slide Cycle Rate': { value: input.rateMmPerS!, source: `${REF}/variables: slideCycleRate (Velocity, read as mm/s)` },
+    'Cavities per Mold': { value: input.cavities, source: 'The costed cavity count' },
+  } };
+}
+
+// Formula registry (plastic-molding/formula-registry.ts): F-34 is the visual inspection calculator's formula.
+export const VISUAL_INSPECTION_CALCULATOR = 'Injection Molding - Visual Inspection';
+
+/** Seeds for the visual inspection calculator (F-34): the CAD surface area and the secondary-process inspection rate and share, or what is missing. */
+export function visualInspectionSeeds(input: { surfaceAreaMm2: number | null; minPerM2: number | null; percent: number | null }): SeedResult {
+  const missing: string[] = [];
+  if (!positive(input.surfaceAreaMm2)) missing.push('the part surface area (CAD)');
+  if (!positive(input.minPerM2)) missing.push('the visual inspection rate (memory/Secondary process visualInspectTimeStandard)');
+  if (!positive(input.percent)) missing.push('the share of parts inspected (memory/Secondary process defaultPercentToBeTested)');
+  if (missing.length > 0) return { missing };
+  return { seeds: {
+    'Part Surface Area': { value: input.surfaceAreaMm2!, source: 'CAD part surface area' },
+    'Visual Inspection Rate': { value: input.minPerM2!, source: 'memory/Secondary process/variables_inherited: visualInspectTimeStandard (average time per surface area to visually inspect a part)' },
+    'Percent Inspected': { value: input.percent!, source: 'memory/Secondary process/variables_inherited: defaultPercentToBeTested' },
+  } };
+}
+
+// Formula registry (plastic-molding/formula-registry.ts): F-35 is the weight check calculator's formula.
+export const WEIGHT_CHECK_CALCULATOR = 'Injection Molding - Weight Check';
+
+/** Seeds for the weight check calculator (F-35) from the reference package, or what is missing. Each input says its confidence and source. */
+export function weightCheckSeeds(ref: WeightCheckReference): SeedResult {
+  const fields: Array<[string, keyof WeightCheckReference]> = [
+    ['Time Per Check', 'timePerCheckS'], ['Sampling Interval', 'samplingInterval'], ['Scale Price', 'scalePriceUsd'], ['Equipment Life', 'lifeYr'],
+    ['Salvage Factor', 'salvagePct'], ['Maintenance Factor', 'maintenancePct'], ['Installation Factor', 'installationPct'], ['Scheduled Hours', 'scheduledHours'],
+    ['Uptime', 'uptimePct'], ['Utilization', 'utilization'],
+  ];
+  const missing = fields.filter(([, k]) => ref[k] == null).map(([name]) => `${name} (reference package)`);
+  if (missing.length > 0) return { missing };
+  return { seeds: Object.fromEntries(fields.map(([name, k]) => {
+    const v = ref[k]!;
+    return [name, { value: v.value, source: `${v.source} (${v.confidence})`, lookup: true }];
+  })) };
+}
+
+// Formula registry (plastic-molding/formula-registry.ts): F-36 is the material drying calculator's formula.
+export const MATERIAL_DRYING_CALCULATOR = 'Injection Molding - Material Drying';
+
+export interface MaterialDryingInput {
+  grade: string | null;
+  condition: DryingCondition | null;
+  resinPerPartKg: number | null;
+  pressTimePerPartSec: number | null;
+  dryers: readonly DryerModel[];
+  electricity: { usdPerKwh: number; source: string } | null;
+  economics: Record<'lifeYr' | 'maintenancePct' | 'installationPct' | 'salvagePct' | 'uptimePct' | 'utilization' | 'scheduledHours', ReferenceValue | null>;
+}
+
+/**
+ * Seeds for the material drying calculator (F-36), or what is missing. The dryer is the smallest model whose nylon throughput covers the press's resin
+ * demand; its price is the priced model of a throughput at least as large (the only published price, used); a demand no priced model covers is a gap.
+ */
+export function materialDryingSeeds(input: MaterialDryingInput): SeedResult {
+  const missing: string[] = [];
+  if (!input.condition) missing.push(`the drying conditions of ${input.grade ?? 'the resin'} (reference/material-drying-reference.csv has no row for it)`);
+  if (!positive(input.resinPerPartKg)) missing.push('the resin per part (shot weight)');
+  if (!positive(input.pressTimePerPartSec)) missing.push('the press time per part (cycle time)');
+  if (!input.electricity) missing.push('the location electricity price (location_electricity_prices)');
+  const econ = Object.entries(input.economics).filter(([, v]) => v == null).map(([k]) => `equipment economics: ${k}`);
+  missing.push(...econ);
+  const demand = positive(input.resinPerPartKg) && positive(input.pressTimePerPartSec) ? (input.resinPerPartKg! * 3600) / input.pressTimePerPartSec! : null;
+  const sized = [...input.dryers].filter((d) => d.ratedKw != null).sort((a, b) => a.throughputKgH - b.throughputKgH);
+  const priced = [...input.dryers].filter((d) => d.priceUsd != null).sort((a, b) => a.throughputKgH - b.throughputKgH);
+  const dryer = demand != null ? sized.find((d) => d.throughputKgH >= demand) ?? null : null;
+  const price = dryer ? priced.find((d) => d.throughputKgH >= dryer.throughputKgH) ?? null : null;
+  if (demand != null && !dryer) missing.push(`a dryer for ${demand.toFixed(1)} kg/h (the largest reference model dries ${sized[sized.length - 1]?.throughputKgH ?? 0} kg/h)`);
+  if (dryer && !price) missing.push(`a dryer price for the ${dryer.throughputKgH} kg/h class (reference/dryer-models-reference.csv holds none)`);
+  if (missing.length > 0) return { missing };
+  const c = input.condition!;
+  const e = input.economics;
+  const econSeed = (v: ReferenceValue) => ({ value: v.value, source: `${v.source} (${v.confidence})`, lookup: true });
+  return { seeds: {
+    'Drying Temperature': { value: Number(c.tempC.split('-').pop()), source: `${c.source}: ${c.material} (${c.grade}) ${c.tempC} degC (${c.confidence})`, lookup: true },
+    'Drying Time': { value: Number(c.timeH.split('-').pop()), source: `${c.source}: ${c.material} (${c.grade}) ${c.timeH} h (${c.confidence}); the dryer's nylon throughput is rated at a 5-6 h residence`, lookup: true },
+    'Resin Per Part': { value: input.resinPerPartKg!, source: 'The shot weight per part, runner included' },
+    'Press Time Per Part': { value: input.pressTimePerPartSec!, source: 'The press cycle per good part (the dryer runs with the press)' },
+    'Dryer Throughput': { value: dryer!.throughputKgH, source: `${dryer!.source}: ${dryer!.model}, the smallest covering ${demand!.toFixed(1)} kg/h (${dryer!.confidence})`, lookup: true },
+    'Dryer Power': { value: dryer!.ratedKw!, source: `${dryer!.source}: ${dryer!.model} rated power (heaters cycle: an upper bound) (${dryer!.confidence})`, lookup: true },
+    'Dryer Price': { value: price!.priceUsd!, source: `${price!.source}: ${price!.model}, ${price!.priceBasis} (${price!.confidence}: replace with a quotation)`, lookup: true },
+    'Electricity Price': { value: input.electricity!.usdPerKwh, source: input.electricity!.source, lookup: true },
+    'Equipment Life': econSeed(e.lifeYr!), 'Salvage Factor': econSeed(e.salvagePct!), 'Maintenance Factor': econSeed(e.maintenancePct!),
+    'Installation Factor': econSeed(e.installationPct!), 'Scheduled Hours': econSeed(e.scheduledHours!), 'Uptime': econSeed(e.uptimePct!), 'Utilization': econSeed(e.utilization!),
+  } };
+}
 
 export type SeedResult = { seeds: Record<string, CalcSeed> } | { missing: string[] };
 

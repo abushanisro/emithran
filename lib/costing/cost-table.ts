@@ -16,7 +16,8 @@ export interface CostColumn {
   basic: boolean;
 }
 
-export type CostRowKind = "part" | "material" | "group" | "process" | "logistics" | "procured" | "tooling";
+/** "phase": a part of an operation's cycle, as its calculator gave it: a time, never money. */
+export type CostRowKind = "part" | "material" | "group" | "process" | "phase" | "logistics" | "procured" | "tooling";
 
 export interface CostRow {
   id: string;
@@ -25,6 +26,8 @@ export interface CostRow {
   name: string;
   status: "ok" | "attention";
   statusNote?: string;
+  /** Where the row's cost came from, when on file (a tooling item's catalog row). */
+  note?: string;
   values: Record<string, number | string | null | undefined>;
 }
 

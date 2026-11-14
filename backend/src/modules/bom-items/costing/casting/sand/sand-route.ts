@@ -5,14 +5,15 @@
 // For every moulding machine that can hold the part a whole route is built; the cheapest complete one is the route (the moulding process
 // follows from it, unless the user chose one). Nothing is substituted: what the data or the measurements lack is named, and a step no machine
 // can do is a named gap line, which makes the route incomplete.
-import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import type { MachineChoiceDto, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import { machineChoice, roundPerPart } from '../machine-choice';
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import type { ReferenceCalcRun, ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
-import type { CostContext } from '../casting-finishing';
+import { roundLineCost, type CostContext } from '../casting-finishing';
 import { coreboxTooling, coreLine, sandCores, type CoreboxTooling, type CoreRegion } from './sand-cores';
 import { cleanStep, degateStep, finishStep, inspectStep, shakeoutStep, type SandFinishContext } from './sand-finishing-steps';
 import { referenceYieldNote } from './sand-yield';
-import { coreRefractoryLines, mouldRefractoryLines, NO_REFRACTORY, type RefractorySettings } from './sand-refractory';
+import { coreRefractoryLines, mouldRefractoryLines, PLANT_REFRACTORY, type RefractorySettings } from './sand-refractory';
 import { designGating, type GatingSystem, type SandFlask } from './sand-gating';
 import { ingateVelocityNote, RISER_EFFICIENCY_NOTE } from './sand-velocity';
 import { machineValue, type SandMachine } from './sand-machines';
@@ -57,11 +58,13 @@ export interface SandScenario {
   mouldingClass: string | null;
   /** A coremaking process the user chose. */
   chosenCoreProcess: string | null;
-  /** USD per kWh for melting: the user's, no default. */
+  /** USD per kWh: the Cost Guide's, else the location's sourced electricity price; null when neither exists (energy not charged). */
   energyPricePerKwh: number | null;
+  /** Where the energy price comes from, for the trace. */
+  energyPriceSource?: string | null;
   /** The plant's hot box settings; each null until the user sets it (no default is assumed). */
   hotBox: HotBoxSettings;
-  /** The refractory coating the user chose and how it is dried; absent: nothing is coated. */
+  /** The Cost Guide's coating settings; absent: the plant's defaults (sand-refractory.ts PLANT_REFRACTORY). */
   refractory?: RefractorySettings;
   /** Parts made over the tooling's life: core boxes are shared by these. Null: the tooling is not costed (and said so), never spread over an assumed volume. */
   lifetimeVolume: number | null;
@@ -90,7 +93,8 @@ export interface SandRoute {
   flask: SandFlask;
   coresMade: number;
   coresLeftSolid: number;
-  material: { netKg: number; pouredKg: number; yieldPct: number; costUsd: number | null; runs: ReferenceCalcRun[] };
+  /** boughtKg: net + melt loss + the gates and risers not remelted (the material-cost calculator); null when the metal is not costed. */
+  material: { netKg: number; pouredKg: number; yieldPct: number; boughtKg: number | null; costUsd: number | null; runs: ReferenceCalcRun[] };
   tooling: { perPartUsd: number; items: CoreboxTooling[] };
   /** The core sand calculator run of each core (the sand of the core and its prints), for the trace. */
   coreSandRuns: ReferenceCalcRun[];
@@ -98,26 +102,10 @@ export interface SandRoute {
   totalUsd: number | null;
   complete: boolean;
   warnings: string[];
-  /** Every moulding machine the route was tried on: the chosen one first, then the others by cost, then those that could not do it. */
-  alternatives: SandAlternative[];
-}
-
-/** One moulding machine's whole route, compared with the chosen one. */
-export interface SandAlternative {
-  mouldingProcess: string;
-  mouldingMachine: string;
-  chosen: boolean;
-  /** Null when the machine could not make a route at all (see `reason`). */
-  cavities: number | null;
-  totalUsd: number | null;
-  /** True when every step has a machine and the total is whole. */
-  complete: boolean;
-  /** Steps no machine could do, or why the machine could not be used. */
-  reason: string | null;
 }
 
 /** A route before it is compared with the others. */
-type BuiltRoute = Omit<SandRoute, 'alternatives'>;
+type BuiltRoute = SandRoute;
 
 interface Attempt {
   route: BuiltRoute | null;
@@ -169,7 +157,7 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   const base: SandRouteContext = {
     ref, spec: input.spec, calculators: input.calculators, material: input.material,
     part: { netKg, modulusMm: modulus, dimsMm: part.dimsMm, wallNominalMm: thickness },
-    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh, hotBox: scenario.hotBox, batchSize: scenario.batchSize,
+    cavities, coresPerCasting: 0, poured: { perCastingKg: netKg, perMouldKg: netKg * cavities }, energyPricePerKwh: scenario.energyPricePerKwh, energyPriceSource: scenario.energyPriceSource ?? null, hotBox: scenario.hotBox, batchSize: scenario.batchSize,
   };
   const { system: gating, missing: gatingMissing } = designGating({
     netKg, volumeMm3: part.volumeMm3, modulusMm: modulus, densityKgM3: density, materialName: input.material.name,
@@ -223,7 +211,7 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
     before.push(coreLine({ ctx, core, machinesByClass: input.machinesByClass, batchSize: scenario.batchSize, costContext: input.costContext, chosenProcess: scenario.chosenCoreProcess }).step);
   }
   // The cores coated and dried, and glued into an assembly (only what the user chose to coat; the gluing needs two cores or more).
-  before.push(...coreRefractoryLines(ctx, scenario.refractory ?? NO_REFRACTORY, cored.cores.map((c) => c.region), { machinesByClass: input.machinesByClass, ...common }));
+  before.push(...coreRefractoryLines(ctx, scenario.refractory ?? PLANT_REFRACTORY, cored.cores.map((c) => c.region), { machinesByClass: input.machinesByClass, ...common }));
   const after: CostedStep[] = [
     step('Pour', 'sand_casting_pour', (m) => pourStep(ctx, m), ['The ladle holds one mould', 'A pouring coefficient for the material']),
     step('Cooling', 'sand_casting_cooling', (m) => coolStep(ctx, m, mould.machineClass === PIT_CLASS), ["Chvorinov's rule on the casting's modulus"]),
@@ -260,13 +248,17 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
   });
   // The mould's cavity coated and the mould dried: after the mould is made, before the metal is poured (the flask is this machine's own).
   const flask = flaskOf(mould);
-  const mouldCoating = mouldRefractoryLines(ctx, scenario.refractory ?? NO_REFRACTORY, flask.lengthMm * flask.widthMm * flask.heightMm, { machinesByClass: input.machinesByClass, batchSize: scenario.batchSize, costContext: input.costContext, ref });
+  const mouldCoating = mouldRefractoryLines(ctx, scenario.refractory ?? PLANT_REFRACTORY, flask.lengthMm * flask.widthMm * flask.heightMm, { machinesByClass: input.machinesByClass, batchSize: scenario.batchSize, costContext: input.costContext, ref });
   const steps: CostedStep[] = [...before, mouldStepResult, ...mouldCoating, ...after];
   const lines = steps.map((s) => s.line);
   const gaps = lines.filter(isGap);
   // Scrapped parts are paid for by the good ones: the lines are divided by the product of the machines' good-part yields.
   const finalYield = steps.reduce((y, s) => y * (s.machine ? machineValue(s.machine, 'good_part_yield') ?? 1 : 1), 1) || 1;
-  const perGood = (l: ProcessLineCost): ProcessLineCost => (isGap(l) ? l : { ...l, setupCost: r2(l.setupCost / finalYield), runCost: r2(l.runCost / finalYield), totalCost: r2(l.totalCost / finalYield) });
+  // Per good casting: every cost of the line over the good-part yield, kept below a cent (roundLineCost), its other cost (energy, material) too.
+  const perGood = (l: ProcessLineCost): ProcessLineCost => (isGap(l) ? l : {
+    ...l, setupCost: roundLineCost(l.setupCost / finalYield), runCost: roundLineCost(l.runCost / finalYield), totalCost: roundLineCost(l.totalCost / finalYield),
+    ...(l.otherCostPerPartUsd != null ? { otherCostPerPartUsd: roundPerPart(l.otherCostPerPartUsd / finalYield) } : {}),
+  });
   const scaled = lines.map(perGood);
   const warnings = [...notes, ...steps.flatMap((s) => s.warnings)];
   if (cored.thin > 0) warnings.push(`${cored.thin} core${cored.thin > 1 ? 's' : ''} thinner than minSandCastableHoleDia: left solid and machined later.`);
@@ -278,6 +270,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
 
   // Metal bought: melt loss in the chosen furnace, gates and risers back to the furnace (remelt allowance), scrap paid by the good parts.
   let materialCost: number | null = null;
+  let boughtKg: number | null = null;
   const runs: ReferenceCalcRun[] = [metalRun];
   const furnace = before[0]!.machine; // melting is the first step
   if (furnace) {
@@ -295,6 +288,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
       );
       if ('run' in m) {
         materialCost = m.run.value!;
+        boughtKg = m.run.outputs['Bought Weight'] ?? null;
         runs.push(m.run);
       } else warnings.push(...m.reasons);
     }
@@ -322,7 +316,7 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
     route: {
       mouldingProcess, mouldingMachine: mould.name, cavities, lines: scaled, gating, flask: flaskOf(mould),
       coresMade: cored.cores.length, coresLeftSolid: cored.thin,
-      material: { netKg: r4(netKg), pouredKg: r4(pouredKg), yieldPct: r2((100 * netKg) / pouredKg), costUsd: materialCost != null ? r2(materialCost) : null, runs },
+      material: { netKg: r4(netKg), pouredKg: r4(pouredKg), yieldPct: r2((100 * netKg) / pouredKg), boughtKg, costUsd: materialCost != null ? r2(materialCost) : null, runs },
       tooling: { perPartUsd: r4(toolingPerPart), items },
       coreSandRuns: cored.cores.map((c) => c.run),
       totalUsd, complete, warnings,
@@ -336,39 +330,39 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
  */
 export function buildSandRoute(input: SandRouteInput): { route: SandRoute | null; missing: string[] } {
   const classes = MOULDING_PROCESSES.filter((p) => !input.scenario.mouldingClass || p.machineClass === input.scenario.mouldingClass);
-  const attempts: Attempt[] = [];
+  const attempts: Array<Attempt & { machine: string }> = [];
   const cache = new Map<string, ReturnType<typeof sharedFor>>();
-  const tried: Array<{ process: string; machine: string; attempt: Attempt }> = [];
   for (const p of classes) {
     for (const mould of input.machinesByClass[p.machineClass] ?? []) {
-      const attempt = routeOn(input, mould, p.process, cache);
-      attempts.push(attempt);
-      tried.push({ process: p.process, machine: mould.name, attempt });
+      attempts.push({ ...routeOn(input, mould, p.process, cache), machine: mould.name });
     }
   }
   const routes = attempts.flatMap((a) => (a.route ? [a.route] : []));
   const complete = routes.filter((r) => r.complete).sort((a, b) => a.totalUsd! - b.totalUsd! || a.mouldingMachine.localeCompare(b.mouldingMachine));
   const fewest = [...routes].sort((a, b) => a.lines.filter(isGap).length - b.lines.filter(isGap).length)[0];
   const best = complete[0] ?? fewest;
-  if (best) return { route: { ...best, alternatives: alternativesOf(tried, best) }, missing: [] };
+  if (best) {
+    const choice = mouldingChoice(attempts, best);
+    return { route: { ...best, lines: best.lines.map((l) => (l.process === best.mouldingProcess ? { ...l, machineChoice: choice } : l)) }, missing: [] };
+  }
   const reasons = [...new Set(attempts.flatMap((a) => a.missing))];
   return { route: null, missing: reasons.length ? reasons.slice(0, 8) : ['no moulding machines of the sand process classes'] };
 }
 
 
-/** Every machine tried, the chosen one first, then the others by total (complete before incomplete), then the machines that could not make a route. */
-function alternativesOf(tried: ReadonlyArray<{ process: string; machine: string; attempt: Attempt }>, chosen: BuiltRoute): SandAlternative[] {
-  const rows = tried.map(({ process, machine, attempt }): SandAlternative => {
-    const r = attempt.route;
-    if (!r) return { mouldingProcess: process, mouldingMachine: machine, chosen: false, cavities: null, totalUsd: null, complete: false, reason: attempt.missing[0] ?? 'could not make a route' };
-    const gaps = r.lines.filter(isGap).map((l) => l.process);
-    return {
-      mouldingProcess: r.mouldingProcess, mouldingMachine: r.mouldingMachine, chosen: r.mouldingMachine === chosen.mouldingMachine && r.mouldingProcess === chosen.mouldingProcess,
-      cavities: r.cavities, totalUsd: r.totalUsd, complete: r.complete, reason: gaps.length ? `no machine for: ${gaps.join(', ')}` : null,
-    };
+/**
+ * Why the moulding line runs on its machine: every moulding machine is tried with the whole route, so they are compared by the route's cost per
+ * part. A machine whose flask cannot hold the part, or whose route has a step no machine can do, is checked and not capable.
+ */
+function mouldingChoice(attempts: ReadonlyArray<Attempt & { machine: string }>, chosen: BuiltRoute): MachineChoiceDto {
+  return machineChoice({
+    rule: 'Cheapest whole route per part (every moulding machine is tried with the whole route: cavities, cores, metal and every step)',
+    criteria: ['The flask holds the part with its sand borders', 'Every step of the route has a machine'],
+    evals: attempts.map((a) => (a.route?.complete
+      ? { name: a.route.mouldingMachine, reasons: [], cost: a.route.totalUsd }
+      : { name: a.machine, reasons: a.route ? ['a step of the route has no machine'] : a.missing.slice(0, 1) })),
+    chosen: chosen.mouldingMachine,
   });
-  const rank = (a: SandAlternative) => (a.chosen ? 0 : a.cavities == null ? 3 : a.complete ? 1 : 2);
-  return rows.sort((a, b) => rank(a) - rank(b) || (a.totalUsd ?? Infinity) - (b.totalUsd ?? Infinity) || a.mouldingMachine.localeCompare(b.mouldingMachine));
 }
 
 /** The flask of a moulding machine; every machine that reached a route has one (cavitiesPerMould refuses a machine without flask length, width and height). */

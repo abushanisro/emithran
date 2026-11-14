@@ -29,7 +29,7 @@
 
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
-import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
+import { type ReferenceCalculators, withFieldOverrides, type CalculatorFieldOverrides } from '../../shared/calculators/reference-calculator';
 import { runRimCycleTime } from '../calculators/plastic-cycle-time';
 
 interface ReactionInjectionMoldingCostInput {
@@ -47,6 +47,8 @@ interface ReactionInjectionMoldingCostInput {
   injectionRateMm3PerS?: number | null;
   /** The stored cycle-time calculators by name (migrations 975, 976): the dry cycle plus fill plus cure time is computed by "Reaction Injection Molding - Cycle Time". Absent = a named gap, no cycle. */
   calculators?: ReferenceCalculators | null;
+  /** The part's own values for calculator fields (calculator_field_overrides, migration 1011), laid over the calculators for this calculation. */
+  calculatorOverrides?: CalculatorFieldOverrides | null;
   dlrPerHr?: number;
   qairPerHr?: number;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
@@ -63,7 +65,7 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
   const cycle = runRimCycleTime({
     machineCycleTimeS: input.rate.pressCycleTimeS ?? null, partVolumeMm3: input.partVolumeMm3 ?? null,
     injectionRateMm3PerS: input.injectionRateMm3PerS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null,
-  }, input.calculators ?? null);
+  }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
   const effectiveRate: MHRRateInput = { ...input.rate, pressCycleTimeS: cycle.derivable ? cycle.cycleSec : null };
 
   const result = computePressStrokeCost('Reaction Injection Molding', 'reaction_injection_molding', {
@@ -86,6 +88,7 @@ export function computeReactionInjectionMoldingCost(input: ReactionInjectionMold
       line.calculationTrace = cycle.trace;
       if (Object.keys(cycle.lookups).length > 0) line.lookupMatches = cycle.lookups;
       if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
+      line.calculatorName = cycle.calculator.name;
       if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
     }
   } else if (input.rate.pressCycleTimeS != null) {

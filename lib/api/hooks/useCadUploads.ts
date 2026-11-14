@@ -9,6 +9,7 @@ import { isInFlight } from '@/lib/cad-uploads/upload-view';
 
 import { cadUploadsApi, type CadUpload } from '../cad-uploads';
 import { ApiError } from '../client';
+import { pollDelay } from '../poll-backoff';
 
 const cadUploadKeys = {
   all: ['cad-uploads'] as const,
@@ -30,9 +31,10 @@ export function useCadUpload(uploadId: string | null) {
     enabled: !!uploadId,
     refetchInterval: (query) => {
       const data: CadUpload | undefined = query.state.data;
-      if (data) return isInFlight(data.status) ? POLL_MS : false;
+      const wait = pollDelay(POLL_MS, query.state.status === 'error', query.state.errorUpdateCount); // slows down while the API is failing
+      if (data) return isInFlight(data.status) ? wait : false;
       const error = query.state.error;
-      return error instanceof ApiError && error.status === 404 ? false : POLL_MS; // a network blip must not end polling
+      return error instanceof ApiError && error.status === 404 ? false : wait; // a network blip must not end polling
     },
     retry: false,
     refetchOnWindowFocus: false,

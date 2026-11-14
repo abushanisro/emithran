@@ -5,7 +5,12 @@
   "compilerOptions": {
     "tsConfigPath": "tsconfig.build.json",
     "deleteOutDir": true,
-    "assets": [],
+    "assets": [
+      {
+        "include": "modules/bom-items/costing/plastic-molding/reference/*.csv",
+        "watchAssets": false
+      }
+    ],
     "watchAssets": false
   }
 }

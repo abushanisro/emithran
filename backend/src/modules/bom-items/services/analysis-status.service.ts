@@ -1,3 +1,5 @@
+import { castingWorkerAvailable } from '../../sand-casting/casting-config';
+import { castingSourcePath } from '../../sand-casting/casting-source';
 import { Injectable } from '@nestjs/common';
 
 import { SandCastingService } from '../../sand-casting/sand-casting.service';
@@ -19,9 +21,10 @@ export class AnalysisStatusService {
   ) {}
 
   async forItem(item: BOMItemResponseDto, token: string): Promise<AnalysisStatus> {
-    const statuses = item.file3dPath ? await this.sandCasting.currentStatuses(item.id, item.file3dPath, token) : [];
+    const sourcePath = castingSourcePath({ file_3d_path: item.file3dPath, file_step_path: item.fileStepPath });
+    const statuses = sourcePath ? await this.sandCasting.currentStatuses(item.id, sourcePath, token) : [];
     const group = (item.scenarioOverrides as Record<string, unknown> | null | undefined)?.['processGroup'];
     const chosenFamilyHint = this.autoFill.familyHintForProcessGroup(typeof group === 'string' ? group : undefined) ?? null;
-    return deriveAnalysisStatus({ ...item, chosenFamilyHint }, castingStatusOf(statuses), currentFeatureGraphVersion());
+    return deriveAnalysisStatus({ ...item, chosenFamilyHint }, castingStatusOf(statuses), currentFeatureGraphVersion(), castingWorkerAvailable());
   }
 }

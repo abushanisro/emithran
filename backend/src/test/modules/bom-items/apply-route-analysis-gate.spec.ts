@@ -33,7 +33,7 @@ describe('applying a route requires the part to be analysed', () => {
     expect((error as ConflictException).getResponse()).toMatchObject({
       code: 'analysis_not_ready',
       missing: ['cad_features'],
-      message: expect.stringContaining('Apply Scenario does this'),
+      message: expect.stringContaining('Refresh analysis does this'),
     });
     expect(getRouteComparison).not.toHaveBeenCalled();
   });
@@ -77,5 +77,39 @@ describe('applying "auto" when every route is incompatible', () => {
     const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [] });
     const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;
     expect(error.message).toContain('No route is both feasible and fully costed');
+  });
+});
+
+/**
+ * Apply Scenario's "keep" re-applies the route the active records came from. When the part's process changed (sheet metal -> sand casting), that
+ * route is no longer one of the part's routes: keep falls back to the engine's recommendation, from the same comparison, and says which route it
+ * replaced. A route the caller chose by id is never swapped: it stays an error.
+ */
+describe('a kept route that is no longer a route for the part', () => {
+  const ready = { cad: 'ready', drawing: 'not_required', casting: 'not_required', ready: true, missing: [] };
+  const comparison = {
+    resolvedInputs: { batchSize: 100 }, recommendedRouteId: 'sand-casting',
+    routes: [{ routeId: 'sand-casting', routeLabel: 'Sand casting', isFeasible: true, processLines: [] }],
+  };
+  function service() {
+    const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
+    Object.assign(c, {
+      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }), getRouteComparison: jest.fn().mockResolvedValue(comparison) },
+      analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
+      audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
+    });
+    return c;
+  }
+  const user = { id: 'u' } as never;
+
+  it('falls back to the recommended route when asked (keep): it goes on with sand-casting, not the old sheet-metal route', async () => {
+    // The fixture's sand route has no lines, so the apply stops right after choosing it: the message names the route it chose.
+    await expect(service().applyRoute('i', { routeId: 'sm-laser', location: 'USA' } as never, user, 't', { fallbackToRecommended: true }))
+      .rejects.toThrow("Route 'sand-casting' returned no process lines");
+  });
+
+  it('refuses a route chosen by id that the part does not have', async () => {
+    await expect(service().applyRoute('i', { routeId: 'sm-laser', location: 'USA' } as never, user, 't'))
+      .rejects.toThrow("Route 'sm-laser' not available for this part. Available: sand-casting");
   });
 });

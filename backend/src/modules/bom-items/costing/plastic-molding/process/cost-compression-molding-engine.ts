@@ -40,7 +40,7 @@
 
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
-import type { ReferenceCalculators } from '../../shared/calculators/reference-calculator';
+import { type ReferenceCalculators, withFieldOverrides, type CalculatorFieldOverrides } from '../../shared/calculators/reference-calculator';
 import { runCompressionCycleTime } from '../calculators/plastic-cycle-time';
 
 interface CompressionMoldingCostInput {
@@ -58,6 +58,8 @@ interface CompressionMoldingCostInput {
   cureTimeMinFromMaterial?: number | null;
   /** The stored cycle-time calculators by name (migration 975): the press cycle plus cure time is computed by "Compression Molding - Cycle Time". Absent = a named gap, no cycle. */
   calculators?: ReferenceCalculators | null;
+  /** The part's own values for calculator fields (calculator_field_overrides, migration 1011), laid over the calculators for this calculation. */
+  calculatorOverrides?: CalculatorFieldOverrides | null;
   dlrPerHr?: number;
   qairPerHr?: number;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
@@ -74,7 +76,7 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
   // computePressStrokeCost's own existing $0 + "no real press_cycle_time_s
   // on file" warning path is unaffected.
   // The press cycle plus cure time is the stored calculator's (calculators/plastic-cycle-time.ts): the engine seeds its inputs and passes its result on.
-  const cycle = runCompressionCycleTime({ pressCycleTimeS: input.rate.pressCycleTimeS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null }, input.calculators ?? null);
+  const cycle = runCompressionCycleTime({ pressCycleTimeS: input.rate.pressCycleTimeS ?? null, cureTimeMin: input.cureTimeMinFromMaterial ?? null }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
   const effectiveRate: MHRRateInput = { ...input.rate, pressCycleTimeS: cycle.derivable ? cycle.cycleSec : null };
 
   const result = computePressStrokeCost('Compression Molding', 'compression_molding', {
@@ -103,6 +105,7 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
       line.calculationTrace = cycle.trace;
       if (Object.keys(cycle.lookups).length > 0) line.lookupMatches = cycle.lookups;
       if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
+      line.calculatorName = cycle.calculator.name;
       if (cycle.calculator.version != null) line.calculatorVersion = cycle.calculator.version;
     }
   } else if (input.rate.pressCycleTimeS != null) {

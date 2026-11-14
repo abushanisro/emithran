@@ -111,6 +111,8 @@ export interface CalculationTraceStep {
   formulaId?: string;
   formulaVersion?: number;
   state?: 'VALIDATED' | 'ASSUMED' | 'UNSUPPORTED';
+  /** The part's own value replaced this step (calculator_field_overrides, migration 1011): what the calculator would have used, and why it was changed. */
+  override?: { original: number | null; reason: string };
 }
 
 // Every lookup table declares exactly one policy (lookup_table_policy,
@@ -349,6 +351,11 @@ export interface ProcessLineCost {
   /** The cycle's cost split into machine time and operator labour, for engines that charge both. With `setupCost` (machine and labour together) they add up to `totalCost` (before rounding). */
   machineCostPerPart?: number;
   laborCostPerPart?: number;
+  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in `runCost` and `totalCost`. In USD on purpose: never
+   *  converted with the line's money, it is stored as process_cost_records.other_cost_per_part (USD, like total_cost_per_part) and added by the Cost tab. */
+  otherCostPerPartUsd?: number;
+  /** What `otherCostPerPartUsd` is, e.g. "energy 0.0029 USD per casting". */
+  otherCostDetail?: string;
   // local currency/hr — the MACHINE hour rate, and only that.
   //
   // This said "fully burdened MHR (machine + labour)", which is not what any
@@ -435,6 +442,8 @@ export interface ProcessLineCost {
   // line's cycle time, when resolved via resolvePhysicsQuantity. Absent for
   // processes not yet migrated onto that pipeline.
   calculatorId?: string;
+  /** The stored calculator's name: what a part's own field values are keyed by (calculator_field_overrides, migration 1011). Set where the engine applies them. */
+  calculatorName?: string;
   calculatorVersion?: number;
   // Present instead of a fabricated fallback number when resolvePhysicsQuantity
   // couldn't resolve this line's cycle time — the line still appears (never
@@ -600,6 +609,8 @@ export interface CostSummaryDto {
   // High pressure die casting: cavities per die and the clamp / shot they set.
   // Present only when a die-cast part reached the HPDC engine's cavity step.
   dieCasting?: DieCastingBreakdown;
+  /** A casting's metal per part: the part itself and what it is charged with (die casting: x the yield loss factor; sand: the metal bought). The material record is written from it. */
+  castingMetal?: { partKg: number; chargedKg: number };
   /** Sand casting: how the route was chosen, for the Cost Guide (the user's choices stay unset until made). */
   sandCasting?: SandCastingBreakdown;
 
@@ -696,22 +707,6 @@ export interface SandCastingBreakdown {
   gating: SandGatingLayout;
   /** The moulding machine's flask (mm), to draw the mould (cope above the parting plane, drag below) around the part. */
   flask: { lengthMm: number; widthMm: number; heightMm: number };
-  /** Every moulding machine the route was tried on, compared with the chosen one (costs in the location's currency). */
-  alternatives: SandRouteAlternative[];
-}
-
-/** One moulding machine's whole route, compared with the chosen one. */
-export interface SandRouteAlternative {
-  mouldingProcess: string;
-  mouldingMachine: string;
-  chosen: boolean;
-  /** Null when the machine could not make a route at all (see `reason`). */
-  cavities: number | null;
-  totalCost: number | null;
-  /** True when every step has a machine and the total is whole. */
-  complete: boolean;
-  /** Steps no machine could do, or why the machine could not be used. */
-  reason: string | null;
 }
 
 export interface MachineChoiceDto {
@@ -721,7 +716,9 @@ export interface MachineChoiceDto {
   criteria: string[];
   chosen: string | null;
   capableCount: number;
-  /** Chosen first, then capable by the rule's value, then rejected with the failed criteria. */
+  /** Every machine of the class that was checked against the criteria. */
+  checkedCount: number;
+  /** The chosen machine first, then the next cheapest capable ones: at most 3. When none is capable, up to 3 rejected with the criteria they failed. */
   candidates: Array<{ name: string; status: 'chosen' | 'capable' | 'rejected'; perPartCost: number | null; reasons: string[] }>;
 }
 
@@ -893,6 +890,29 @@ export interface ToolingCostDto {
   moldToolLifeShots?: number;
   /** Molds the job wears out: ceil(lifetime shots / moldToolLifeShots). moldCostUsd covers all of them. */
   moldsRequired?: number;
+  /** The mold base plate steel in one mold, USD (formula registry F-25). */
+  moldBaseSteelUsd?: number;
+  /** The cavity and core machining and their polish in one mold, USD (formula registry F-26). */
+  moldCavityMachiningUsd?: number;
+  moldPolishUsd?: number;
+  /** The mold assembly extras in one mold, USD (formula registry F-27): the ejector pins (with their assembly), the sprue bushing and locating ring, the try-out. */
+  moldEjectorSystemUsd?: number;
+  moldSprueAndLocatingRingUsd?: number;
+  moldTryoutUsd?: number;
+  /** The slide and lifter blocks in one mold, USD (formula registry F-28): steel, machining and CMM inspection. */
+  moldSideActionUsd?: number;
+  /** The heat treatment of one mold's steel, USD (formula registry F-29): hardening the cavity, core and side-action steel, stress relief of the rest. */
+  moldHeatTreatmentUsd?: number;
+  /** The cooling lines of one mold, USD (formula registry F-30): drilling, hoses, fittings, manifolds. */
+  moldCoolingUsd?: number;
+  /** The rib inserts of one mold and their EDM, USD (formula registry F-31). */
+  moldRibInsertUsd?: number;
+  /** The hot drops of a hot-runner mold, USD (formula registry F-33): one per gate. */
+  moldHotDropUsd?: number;
+  /** The tooling calculator's run (migration 1012): every input with its source and every formula with its value. */
+  calculationTrace?: CalculationTraceStep[];
+  /** The tooling calculator's name: a part's own field values are set by it (calculator_field_overrides). */
+  calculatorName?: string;
 }
 
 /**

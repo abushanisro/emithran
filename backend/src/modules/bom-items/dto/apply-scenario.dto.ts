@@ -132,7 +132,6 @@ export interface AppliedScenarioState {
 
 export interface ScenarioApplicationResult {
   scenario: AppliedScenarioState;
-  analysis: { ran: string[] };
   material: { grade: string; action: 'kept' | 'replaced'; recordId: string | null } | null;
   /** The mold (and die) the engine priced, written as tooling items. */
   tooling: { action: 'kept' | 'replaced' | 'none'; items: string[] };

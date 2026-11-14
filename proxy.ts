@@ -25,8 +25,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Auth0's handler serves /auth/login, /auth/callback, /auth/logout and /auth/profile, and keeps the session cookie rolling on every
-  // other request. Our headers are then added to whatever it returns.
+  // Logging out with no session: there is nothing to log out of here, and Auth0's standard logout would then ask "Are you sure you
+  // want to log out?" naming nobody (a second tab, an already-ended session). Straight to the sign-in page instead; both sign-in
+  // buttons make Auth0 ask again anyway (prompt=login). With a session, Auth0's logout carries the sign-in proof and never asks.
+  if (pathname === '/auth/logout' && !(await getAuth0().getSession(request))) {
+    return NextResponse.redirect(new URL('/auth', process.env.APP_BASE_URL ?? request.url))
+  }
+
+  // Auth0's handler serves /auth/login, /auth/callback, /auth/logout and /auth/profile, and lets every other request through (the
+  // session is not rolled: lib/auth0.ts). Our headers are then added to whatever it returns.
   const authResponse = await getAuth0().middleware(request)
   if (pathname.startsWith('/auth/') && !pathname.startsWith('/auth/callback/')) return authResponse
 
@@ -92,11 +99,11 @@ function contentSecurityPolicy(nonce: string): string {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' ${fileStore} https://vercel.live https://*.railway.app https://backend.emithran.com https://cad.emithran.com https://router.project-osrm.org https://maps.googleapis.com https://*.googleapis.com`,
+      `connect-src 'self' ${fileStore} https://vercel.live https://router.project-osrm.org https://maps.googleapis.com https://*.googleapis.com`,
       // 'self' covers /api/file-proxy; blob: covers Chrome PDF plugin internals
       "object-src 'self' blob: data:",
       // frame-src: only 'self' needed — PDF iframe src is now always localhost/api/file-proxy
-      "frame-src 'self' blob: data: https://vercel.live https://*.vercel.live https://*.railway.app",
+      "frame-src 'self' blob: data: https://vercel.live https://*.vercel.live",
       "media-src 'self' data: blob: https:",
       // child-src is the fallback for frame-src/worker-src in older Chrome
       "child-src 'self' blob: data:",
@@ -108,7 +115,7 @@ function contentSecurityPolicy(nonce: string): string {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' ws://localhost:* http://localhost:* http://localhost:4000 http://localhost:5055 ${fileStore} https://*.railway.app https://backend.emithran.com https://cad.emithran.com https://router.project-osrm.org`,
+      `connect-src 'self' ws://localhost:* http://localhost:* http://localhost:4000 http://localhost:5055 ${fileStore} https://router.project-osrm.org`,
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com",
       // 'self' covers /api/file-proxy; blob: covers Chrome PDF plugin internals
       "object-src 'self' blob: data:",

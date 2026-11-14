@@ -6,6 +6,7 @@ org:member      DELETE /api/v1/balloon-diagrams/:id  ProjectReportsController.de
 org:member      DELETE /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.remove
 org:member      DELETE /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.deleteSpecifications
 org:member      DELETE /api/v1/bom-items/:id  BOMItemsController.remove
+org:member      DELETE /api/v1/bom-items/:id/calculator-field-overrides  CalculatorFieldOverridesController.clear
 org:member      DELETE /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.clear
 org:admin       DELETE /api/v1/bom-items/:id/force  BOMItemsController.forceRemove
 org:member      DELETE /api/v1/bom-items/:id/pull-direction  BomItemPullDirectionController.clear
@@ -78,6 +79,7 @@ org:viewer      GET /api/v1/bom-items/:id  BOMItemsController.findOne
 org:viewer      GET /api/v1/bom-items/:id/analysis-status  BOMItemsController.getAnalysisStatus
 org:viewer      GET /api/v1/bom-items/:id/cad-analysis  BOMItemsController.getBOMItemCADAnalysis
 org:viewer      GET /api/v1/bom-items/:id/cad-analysis/history  BOMItemsController.getBOMItemAnalysisHistory
+org:viewer      GET /api/v1/bom-items/:id/calculator-field-overrides  CalculatorFieldOverridesController.list
 org:viewer      GET /api/v1/bom-items/:id/candidate-routes  BOMItemsController.getCandidateRoutes
 org:viewer      GET /api/v1/bom-items/:id/cost-summary  BOMItemsController.getCostSummary
 org:viewer      GET /api/v1/bom-items/:id/cost-table  BOMItemsController.getCostTable
@@ -264,6 +266,8 @@ org:viewer      GET /api/v1/supplier-nominations/:nominationId/vendor-ratings/:v
 org:viewer      GET /api/v1/supplier-nominations/approved-vendors/bom-part/:bomPartId  SupplierNominationsController.getApprovedVendorsByBomPart
 org:viewer      GET /api/v1/supplier-nominations/evaluations/:evaluationId/scores  SupplierNominationsController.getEvaluationScores
 org:viewer      GET /api/v1/supplier-nominations/project/:projectId  SupplierNominationsController.findByProject
+org:viewer      GET /api/v1/tooling-catalogs  ToolingCatalogController.list
+org:viewer      GET /api/v1/tooling-catalogs/:domain  ToolingCatalogController.findOne
 org:viewer      GET /api/v1/tooling-costs  ToolingCostController.findAll
 org:viewer      GET /api/v1/tooling-costs/:id  ToolingCostController.findOne
 org:viewer      GET /api/v1/vave-projects  VaveController.listProjects
@@ -290,6 +294,7 @@ org:member      PATCH /api/v1/rfqs/:id/close  RfqController.closeRfq
 org:member      PATCH /api/v1/rfqs/:id/send  RfqController.sendRfq
 org:member      PATCH /api/v1/supplier-evaluation-groups/:id  SupplierEvaluationGroupsController.update
 authenticated   POST /api/v1/auth/session/activity  SessionController.activity
+authenticated   POST /api/v1/auth/session/end  SessionController.end
 org:member      POST /api/v1/balloon-diagrams  ProjectReportsController.createBalloonDiagram
 org:member      POST /api/v1/balloon-diagrams/:id/annotations  ProjectReportsController.addAnnotation
 org:member      POST /api/v1/benchmark-sessions  BenchmarkSessionsController.create
@@ -302,6 +307,7 @@ org:member      POST /api/v1/bom-items/:id/custom-route-applications  BOMItemsCo
 org:member      POST /api/v1/bom-items/:id/drawing-analyses  BOMItemsController.analyzeDrawing
 org:member      POST /api/v1/bom-items/:id/files  BOMItemsController.uploadFiles
 org:member      POST /api/v1/bom-items/:id/machine-override  BOMItemsController.setMachineOverride
+org:member      POST /api/v1/bom-items/:id/machining-allowances  BOMItemsController.decideMachiningAllowance
 org:member      POST /api/v1/bom-items/:id/machining-calculator-inputs  BOMItemsController.resolveMachiningCalculatorInputs
 org:member      POST /api/v1/bom-items/:id/pmi-records/review  BOMItemsController.reviewPmiRecord
 org:member      POST /api/v1/bom-items/:id/reanalyze  BOMItemsController.reanalyze
@@ -422,6 +428,7 @@ org:member      PUT /api/v1/balloon-diagrams/:id  ProjectReportsController.updat
 org:member      PUT /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.update
 org:member      PUT /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.updateSpecifications
 org:member      PUT /api/v1/bom-items/:id  BOMItemsController.update
+org:member      PUT /api/v1/bom-items/:id/calculator-field-overrides  CalculatorFieldOverridesController.set
 org:member      PUT /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.set
 org:member      PUT /api/v1/bom-items/:id/feature-tolerances/:featureKey  BOMItemsController.setFeatureTolerances
 org:member      PUT /api/v1/bom-items/:id/pull-direction  BomItemPullDirectionController.set

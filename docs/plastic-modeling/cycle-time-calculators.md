@@ -222,14 +222,12 @@ RIM cycle = machine dry cycle + fill + cure. Dry cycle = the machine's mold open
 
 | Id | Item | Staged in memory/ | State |
 |---|---|---|---|
-| G-01 | Mold base selection and plate-by-plate steel | tblStandardMoldBaseSizes; tool material price and density (AISI P20 1.86 USD/kg, 7850 kg/m3); plate thickness variables; tblCavity/CorePlateDepthBorder; tblEdgeMoldBorderX/Y | UNSUPPORTED |
-| G-02 | Core and cavity blocks | plate depth tables; cmToolMachiningRates; EDM rates; tblHrsPerSqInch* | UNSUPPORTED |
-| G-03 | Slides and lifters | tblSlideSizes; slide* and lifter* variables; costPerHydraulicEjector; slideCycleRate | UNSUPPORTED |
-| G-04 | EDM and heat treatment | edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg | UNSUPPORTED |
+| G-03 | Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle | tblSlideSizes; slideCycleRate; costPerHydraulicEjector | UNSUPPORTED |
+| G-04 | Rib inserts of CAD ribs not measured, or too large for an insert class (the others are F-31; heat treatment is F-29) | machinedRibThreshold; *InsertArea | UNSUPPORTED |
 | G-05 | Mold texture | cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime | UNSUPPORTED |
-| G-06 | Cooling and water lines | tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables | UNSUPPORTED |
-| G-07 | Inserts and unscrewing mechanisms | insertInstallRate; cmInsertManualLoadingTime; defaultInsertCost; costPerUnscrewingMechanism; tblSpiType.Use Insert | UNSUPPORTED |
-| G-08 | Tool assembly extras: ejector system, sprue, locating ring, hot drops, try-out | ejector*, sprueBushingCost, locatingRingsCost, costPerStandardHotDrop, tryoutRateUsdPerHr | UNSUPPORTED |
+| G-06 | Water baffles (no count on file; the cooling lines are F-30) | waterBafflesCost | UNSUPPORTED |
+| G-07 | Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them) | tblSpiType.Use Insert; costPerUnscrewingMechanism | UNSUPPORTED |
+| G-08 | Hot-runner manifold and controller (no price on file; the hot drops are F-33) | manifoldPlateThickness; defaultHotDropLayout | UNSUPPORTED |
 | G-09 | Handling, setup scrap and plasticizing in the cycle | partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS | UNSUPPORTED |
 | G-10 | Period costs: indirect overhead, SG&A, margin | sGandARate; markUpRate; machine indirect overhead | UNSUPPORTED |
-| G-11 | Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing | nothing staged | UNSUPPORTED |
+| G-11 | Ultrasonic welding, cure oven, LSR dosing (nothing staged); material drying when its inputs are incomplete (F-36: a resin with no drying row, no electricity price, or a dryer class with no price) | nothing staged | UNSUPPORTED |

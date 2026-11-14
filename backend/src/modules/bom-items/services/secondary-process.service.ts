@@ -250,9 +250,9 @@ export class SecondaryProcessService {
     const fg = item.featureGraph ?? {};
     const family: string = fg?.classification?.family ?? 'unknown';
     const grade = item.materialGrade ?? item.material ?? null;
-    const { cutCode, materialType } = grade
+    const { cutCode, materialType, materialClass } = grade
       ? await this.materials.resolveCutCode(accessToken, grade, family)
-      : { cutCode: null, materialType: null };
+      : { cutCode: null, materialType: null, materialClass: null };
     const dims = [item.maxLength, item.maxWidth, item.maxHeight].map((v) => num(v));
     const wall = num(fg?.summary?.wallThicknessNominalMm) ?? (family === 'sheet_metal' ? num(item.sheetThicknessMm ?? fg?.summary?.sheetThicknessMm) : null);
 
@@ -265,6 +265,7 @@ export class SecondaryProcessService {
       // The reference tables (aging time, hold temperature, conversion coating, laser engraving) are keyed by the material TYPE (Steel, Aluminum, Nylon); the material group
       // (Ferrous & Non-Ferrous, Plastic & Rubber) matches none of their rows, so every lookup by it was a gap.
       materialTypeName: materialType,
+      materialClass,
       isMachined: family === 'unknown' ? null : isMachiningFamily(family),
       surfaceCallout: surfaceCalloutOf(item),
       features: partFeatures(fg, family),

@@ -27,11 +27,11 @@ function run(name: string, seeds: Record<string, import('../../../../../modules/
 describe('plastic molding calculator spec', () => {
   const spec = loadPlasticMoldingCalculatorSpec();
 
-  it('has one cycle-time calculator for each of the four molding processes, and an LSR helper no catalog operation maps to', () => {
+  it('has one cycle-time calculator for each of the four molding processes, and the LSR, deflashing, slide movement, visual inspection, weight check, material drying and mold tooling helpers no catalog operation maps to', () => {
     expect(spec.processGroup).toBe('Plastic Molding');
     expect(spec.calculators.filter((c) => !c.helper).map((c) => c.operations[0]).sort()).toEqual(
       ['Compression Molding', 'Injection Molding', 'Reaction Injection Molding', 'Structural foam molding']);
-    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR]);
+    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR, 'Injection Molding - Deflashing', 'Injection Molding - Slide Movement', 'Injection Molding - Visual Inspection', 'Injection Molding - Weight Check', 'Injection Molding - Material Drying', 'Injection Mold - Tooling']);
   });
 
   it('every operation it computes is a process of the reference catalog (digital_factory_operations.csv)', () => {
@@ -42,7 +42,7 @@ describe('plastic molding calculator spec', () => {
   it('every input says where its value comes from, and every calculated field is a formula over earlier fields', () => {
     for (const c of spec.calculators) {
       for (const f of c.fields) expect(Boolean(f.formula) !== Boolean(f.source)).toBe(true);
-      expect(c.fields[c.fields.length - 1]!.name).toBe('Cycle Time');
+      expect(c.fields[c.fields.length - 1]!.name).toBe(c.output ?? 'Cycle Time');
     }
   });
 
@@ -53,27 +53,26 @@ describe('plastic molding calculator spec', () => {
     expect(sfm.description).toContain('NOT modelled');
   });
 
-  it('the committed migration 976 is exactly what the generator writes from the spec, for the calculators above version 1 (975 is history and is not edited)', () => {
-    const committed = readFileSync(join(__dirname, '../../../../../../migrations/976_plastic_rim_fill_time_calculator.sql'), 'utf8');
-    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql(976));
-    // only the reaction injection calculator changed, and its version is raised
-    expect(spec.calculators.filter((c) => (c.version ?? 1) > 1).map((c) => c.name)).toEqual([RIM_CALCULATOR]);
-    expect(committed).toContain('version = 2');
+  it('the committed migrations 976 and 1008 are exactly what the generator writes from the spec (975, 977 and 1007 are history and are not edited)', () => {
+    const committed = (file: string) => readFileSync(join(__dirname, '../../../../../../migrations', file), 'utf8');
+    expect(committed('976_plastic_rim_fill_time_calculator.sql')).toBe(buildPlasticMoldingCalculatorsMigrationSql(976));
+    expect(committed('1008_plastic_injection_cycle_restore_v1.sql')).toBe(buildPlasticMoldingCalculatorsMigrationSql(1008));
     // the plain injection calculator's name is a part of the RIM one's, so the name as it is quoted in the SQL is what is looked for
     const quoted = (name: string) => '$q$' + name + '$q$';
-    expect(committed).not.toContain(quoted(INJECTION_CALCULATOR));
-    expect(readFileSync(join(__dirname, '../../../../../../migrations/975_plastic_molding_calculators.sql'), 'utf8')).toContain(quoted(INJECTION_CALCULATOR));
-  });
-
-  it('the committed migration 977 is what the generator writes: the fill-factor inputs of injection, structural foam and LSR name their reference table, and nothing else changes', () => {
-    const committed = readFileSync(join(__dirname, '../../../../../../migrations/977_plastic_fill_factor_lookup_tables.sql'), 'utf8');
-    expect(committed).toBe(buildPlasticMoldingCalculatorsMigrationSql(977));
-    const written = spec.calculators.filter((c) => c.migration === 977).map((c) => c.name).sort();
-    expect(written).toEqual([INJECTION_CALCULATOR, LSR_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR].sort());
-    // no calculator is in two migrations, and none of these three has a new version: their formulas did not change
-    expect(spec.calculators.filter((c) => c.migration === 977 && (c.version ?? 1) !== 1)).toEqual([]);
-    for (const name of written) expect(committed).toContain(`$q$${name}$q$`);
-    expect(committed).not.toContain(`$q$${RIM_CALCULATOR}$q$`);
+    // RIM is at version 2 (976); injection and structural foam at version 3 (1008, after 1007's version 2 was reverted); the rest at version 1
+    expect(spec.calculators.filter((c) => (c.version ?? 1) > 1).map((c) => [c.name, c.version, c.migration]))
+      .toEqual([[INJECTION_CALCULATOR, 3, 1008], [STRUCTURAL_FOAM_CALCULATOR, 3, 1008], [RIM_CALCULATOR, 2, 976], ['Injection Mold - Tooling', 9, 1022]]);
+    // 1008 writes the version-1 cycle again: fill + pack + cooling + mold open/close, no plasticizing or ejection field
+    const m1008 = committed('1008_plastic_injection_cycle_restore_v1.sql');
+    expect(m1008).toContain('version = 3');
+    expect(m1008).toContain('$q$Pack Time$q$');
+    expect(m1008).not.toContain('Plasticizing Time');
+    expect(m1008).not.toContain('Ejection Time');
+    for (const name of [LSR_CALCULATOR, COMPRESSION_CALCULATOR, RIM_CALCULATOR]) expect(m1008).not.toContain(quoted(name));
+    // the history files keep what they wrote
+    expect(committed('975_plastic_molding_calculators.sql')).toContain(quoted(INJECTION_CALCULATOR));
+    for (const name of [INJECTION_CALCULATOR, LSR_CALCULATOR, STRUCTURAL_FOAM_CALCULATOR]) expect(committed('977_plastic_fill_factor_lookup_tables.sql')).toContain(quoted(name));
+    expect(committed('1007_plastic_injection_cycle_plasticizing_ejection.sql')).toContain('Plasticizing Time');
     // exactly the two fill factors of each carry a table, and it is the staged one
     const tabled = spec.calculators.flatMap((c) => c.fields.filter((f) => f.sourceTable).map((f) => `${c.key}:${f.name}:${f.dataSource}:${f.sourceTable}.${f.sourceField}`));
     expect(tabled.sort()).toEqual(['injection', 'injection_lsr', 'structural_foam'].flatMap((k) => ['Fill Factor for Cavities', 'Fill Factor for Gates'].map((n) => `${k}:${n}:machining_lookup:injectionTimeAdjustmentFactors.adjustment_factor`)).sort());

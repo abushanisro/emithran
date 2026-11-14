@@ -1,3 +1,4 @@
+import { CASTING_SOURCE_COLUMNS, castingSourcePath } from "./casting-source";
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 
 import { AuditService } from "../../common/audit/audit.service";
@@ -97,9 +98,9 @@ export class CastingRetention implements OnModuleInit, OnModuleDestroy {
     if (rows.length === 0) return { rows: 0, files: 0 };
 
     const itemIds = [...new Set(rows.map((r) => r.bom_item_id))];
-    const items = await admin.from("bom_items").select("id, file_3d_path").in("id", itemIds);
+    const items = await admin.from("bom_items").select(`id, ${CASTING_SOURCE_COLUMNS}`).in("id", itemIds);
     if (items.error) throw new Error(`could not read the BOM items: ${items.error.message}`);
-    const currentFile = new Map(((items.data ?? []) as Array<{ id: string; file_3d_path: string | null }>).map((i) => [i.id, i.file_3d_path]));
+    const currentFile = new Map(((items.data ?? []) as Array<{ id: string; file_3d_path: string | null; file_step_path: string | null }>).map((i) => [i.id, castingSourcePath(i)]));
 
     const ids = prunable(rows, currentFile, cutoff, CASTING_WORKER_VERSION);
     if (ids.length === 0) return { rows: 0, files: 0 };

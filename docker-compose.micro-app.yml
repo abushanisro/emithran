@@ -1,0 +1,54 @@
+# Overlay for the web tier on a small Always Free x86 server (VM.Standard.E2.1.Micro: 1 GB RAM, 1/8 core with bursts).
+#   docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml -f docker-compose.micro-app.yml --env-file env/prd.env up -d --no-build \
+#     postgres postgrest backend frontend cloudflared
+# Runs: Postgres, PostgREST, the backend, the frontend and the tunnel connector. The CAD and electronics engines run on the OTHER small server
+# (docker-compose.micro-engines.yml) and are reached through an SSH tunnel that listens on the Docker bridge (infra/oracle/micro-deploy.sh installs it),
+# so no new port is opened anywhere: the cloud firewall keeps allowing only SSH.
+#
+# What changes against the full-size stack, and why: the limits (the full-size ones add up to several GB, this host has 1 GB plus swap), Postgres
+# memory, the Node heap, one heavy job at a time, and where the engines are. Nothing about security is relaxed (read-only filesystems, dropped
+# capabilities and the private networks stay as in docker-compose.prod.yml).
+services:
+  postgres:
+    command: ["postgres", "-c", "max_connections=40", "-c", "shared_buffers=64MB", "-c", "effective_cache_size=256MB", "-c", "work_mem=4MB", "-c", "maintenance_work_mem=32MB"]
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 300M, pids: 256 }
+
+  postgrest:
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 96M, pids: 128 }
+
+  backend:
+    # The engines are not in this project: clear the dependency on them, keep the one on the data API.
+    depends_on: !override
+      postgrest:
+        condition: service_healthy
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      NODE_OPTIONS: --max-old-space-size=288
+      CAD_ENGINE_URL: http://host.docker.internal:5055
+      ECAD_ENGINE_URL: http://host.docker.internal:5100
+      HEAVY_WORK_MAX_CONCURRENT: "1"
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 420M, pids: 512 }
+
+  frontend:
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      CAD_ENGINE_URL: http://host.docker.internal:5055
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 200M, pids: 512 }
+
+  cloudflared:
+    environment:
+      # Measured on this server: under load the connector used up to 124 % of a CPU thread, because its default transport (QUIC over UDP) encrypts every
+      # packet in application code. HTTP/2 over TCP uses the kernel's TCP and the CPU's AES, and two connections are enough for one small origin.
+      TUNNEL_TRANSPORT_PROTOCOL: http2
+      TUNNEL_HA_CONNECTIONS: "2"
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 64M, pids: 256 }

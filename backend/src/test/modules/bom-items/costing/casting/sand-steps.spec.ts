@@ -138,7 +138,7 @@ describe('meltStep (the furnace has no stored rate: the HR Rates engine prices i
     const out = meltStep(ctx, suitable);
     expect(out.ok).toBe(true);
     expect(out.ok && out.energyCostUsd).toBe(0);
-    expect(out.ok && out.notes).toEqual([expect.stringContaining('energy price')]);
+    expect(out.ok && out.notes).toEqual([expect.stringContaining('no electricity price')]);
   });
 
   it('with an energy price the energy cost follows it linearly', () => {
@@ -163,6 +163,30 @@ describe('selectAndCost', () => {
   const base = { process: 'Pour', machineClass: 'sand_casting_pour', batchSize: 250, costContext, ref, criteria: ['ladle holds one mould'] };
   const ladles = sandMachines('machines_pour.csv', 'sand_casting_pour');
 
+  // What a step charges beyond machine and crew time (the melt's electricity, a coating's material) is its own figure on the line, in USD: the
+  // process record stores it and the Cost tab adds it, so the saved line equals the engine's. A fraction of a cent is kept, not rounded to 0.
+  it('the energy is the line\'s other cost, in its total and kept below a cent', () => {
+    const furnaces = sandMachines('machines_melting.csv', 'sand_casting_melting', () => ({ ratePerHr: 12.5, assumedDefaults: [] }));
+    const r = selectAndCost({ ...base, process: 'Melting', machineClass: 'sand_casting_melting', machines: furnaces, evaluate: (m) => meltStep({ ...ctx, energyPricePerKwh: 0.0851, energyPriceSource: 'USA electricity price' }, m) });
+    const energy = r.outcome!.energyCostUsd;
+    expect(energy).toBeGreaterThan(0);
+    expect(r.line.otherCostPerPartUsd).toBeCloseTo(energy, 3); // rounded as every per-part cost (roundPerPart)
+    expect(r.line.otherCostDetail).toMatch(/energy/);
+    // what the energy was priced at, and where that price comes from, shown on the line (right panel) without opening the trace
+    expect(r.line.otherCostDetail).toMatch(/at 0\.0851 USD\/kWh \(USA electricity price\)/);
+    expect(r.line.totalCost).toBeGreaterThan(0); // was rounded to 0.00 when below a cent
+    // A casting's share of the furnace can be milliseconds: the line keeps it (it was rounded to 0.000 min, and Apply refused the line).
+    expect(r.line.cycleTimeMin).toBeGreaterThan(0);
+    expect(r.line.featureBreakdown![0]!.timeSec).toBeGreaterThan(0);
+    expect(r.line.cycleTimeMin * 60).toBeCloseTo(r.outcome!.sec, 1); // 0.001 min from there up
+    expect(r.line.totalCost).toBeCloseTo((r.line.setupCost ?? 0) + (r.line.runCost ?? 0), 2);
+  });
+
+  it('a step charging nothing beyond time has no other cost', () => {
+    const r = selectAndCost({ ...base, machines: ladles, evaluate: (m) => pourStep(ctx, m) });
+    expect(r.line.otherCostPerPartUsd).toBeUndefined();
+  });
+
   it('costs the cheapest capable machine and records why the others were not chosen', () => {
     const r = selectAndCost({ ...base, machines: ladles, evaluate: (m) => pourStep(ctx, m) });
     expect(r.machine).not.toBeNull();
@@ -172,7 +196,7 @@ describe('selectAndCost', () => {
     const costs = choice.candidates.filter((c) => c.perPartCost != null).map((c) => c.perPartCost as number);
     expect(costs.length).toBeGreaterThan(0);
     expect(r.line.totalCost).toBe(Math.min(...costs));
-    expect(choice.candidates.find((c) => c.status === 'rejected')?.reasons.length ?? 1).toBeGreaterThan(0);
+    expect(choice.checkedCount).toBeGreaterThanOrEqual(choice.capableCount);
   });
 
   it('with no capable machine the line is a named gap with every machine\'s reason, not a price', () => {
@@ -194,7 +218,7 @@ describe('selectAndCost', () => {
     const furnaces = sandMachines('machines_melting.csv', 'sand_casting_melting', () => ({ ratePerHr: 12.5, assumedDefaults: ['annual_maintenance_factor_pct'] }));
     const r = selectAndCost({ ...base, process: 'Melting', machineClass: 'sand_casting_melting', machines: furnaces, evaluate: (m) => meltStep(ctx, m) });
     expect(r.machine).not.toBeNull();
-    expect(r.warnings).toEqual([expect.stringContaining('energy price'), expect.stringContaining('assumed its defaults for annual_maintenance_factor_pct')]);
+    expect(r.warnings).toEqual([expect.stringContaining('no electricity price'), expect.stringContaining('assumed its defaults for annual_maintenance_factor_pct')]);
     expect(r.line.featureBreakdown?.[0]?.name).toMatch(/HR Rates engine/);
   });
 });

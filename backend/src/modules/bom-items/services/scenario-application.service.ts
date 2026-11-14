@@ -6,7 +6,6 @@ import { currentFeatureGraphVersion, MISSING_ANALYSIS_TEXT } from '../analysis-s
 import { BOMItemsService } from '../bom-items.service';
 import { AUTO_ROUTE_ID } from '../dto/apply-route.dto';
 import type { AppliedScenarioState, ApplyScenarioDto, ScenarioApplicationResult } from '../dto/apply-scenario.dto';
-import { AnalysisRunService } from './analysis-run.service';
 import { MaterialCostSnapshotService } from './material-cost-snapshot.service';
 import { ToolingCostSnapshotService } from './tooling-cost-snapshot.service';
 import { RouteApplicationService } from './route-application.service';
@@ -27,7 +26,8 @@ const ERROR_MAX = 500;
 /**
  * Apply Scenario as ONE backend operation, and the only owner of the applied scenario's state.
  *
- *   1. the analysis is made current (AnalysisRunService); an apply never runs on a part that is not analysed, and nothing is written if it cannot be;
+ *   1. the part must already be analysed (RouteApplicationService.requireAnalysis): an apply never starts an analysis (Refresh analysis does) and
+ *      writes nothing on a part that is not analysed;
  *   2. begin_scenario_application (migration 969): one apply at a time per item, against the revision the caller saw; the state becomes 'applying';
  *   3. the scenario fields: annual volume and material grade on the item, every scenario key in one atomic merge;
  *   4. the material cost record, a snapshot of the engine's own cost summary at this scenario (MaterialCostSnapshotService);
@@ -47,7 +47,6 @@ export class ScenarioApplicationService {
   constructor(
     private readonly bomItems: BOMItemsService,
     private readonly database: DatabaseService,
-    private readonly analysisRuns: AnalysisRunService,
     private readonly materials: MaterialCostSnapshotService,
     private readonly toolingCosts: ToolingCostSnapshotService,
     private readonly routes: RouteApplicationService,
@@ -63,15 +62,8 @@ export class ScenarioApplicationService {
     if (!organizationId) throw new BadRequestException('No organization context: the apply cannot write records for the part.');
     const user = { id: userId };
 
-    // 1. The analysis first; nothing is written, and the state is untouched, if it cannot be made ready.
-    const run = await this.analysisRuns.ensureCurrent({ bomItemId: id, userId, organizationId, token });
-    if (!run.status.ready) {
-      throw new ConflictException({
-        code: 'analysis_not_ready',
-        message: `This part is not analysed yet: ${run.status.missing.map((m) => MISSING_ANALYSIS_TEXT[m]).join(', then ')}.`,
-        missing: run.status.missing,
-      });
-    }
+    // 1. The part must be analysed; nothing is written, and the state is untouched, when it is not.
+    await this.routes.requireAnalysis(id, user, token);
 
     // 2. One apply at a time, against the revision the caller saw.
     const revision = await this.begin(id, request.expectedRevision, token);
@@ -142,7 +134,7 @@ export class ScenarioApplicationService {
         organizationId,
         meta: { revision: scenario.revision, route: route.routeId ?? route.mode, material: grade ?? null },
       });
-      return { scenario, analysis: { ran: run.ran }, material, tooling, route, machineOverrides, warnings };
+      return { scenario, material, tooling, route, machineOverrides, warnings };
     } catch (e: unknown) {
       await this.fail(id, revision, startedAt, e, token);
       throw e;
@@ -171,7 +163,13 @@ export class ScenarioApplicationService {
       return { mode, routeId: null, routeLabel: applied.routeLabel, created: applied.created, operations: applied.operations };
     }
     const wanted = mode === 'auto' ? AUTO_ROUTE_ID : (routeId ?? route.routeId!);
-    const applied = await this.routes.applyRoute(id, { routeId: wanted, location, ...(batchSize ? { batchSize } : {}) }, user as never, token);
+    // A kept route can belong to the part's earlier process (sheet metal before it became a sand casting): then the recommendation is applied.
+    const applied = await this.routes.applyRoute(
+      id, { routeId: wanted, location, ...(batchSize ? { batchSize } : {}) }, user as never, token, ...(mode === 'keep' ? [{ fallbackToRecommended: true }] : []),
+    );
+    if (applied.replacedRouteId) {
+      warnings.push(`The applied route ${applied.replacedRouteId} is not a route for this part any more (its process changed): the recommended ${applied.routeLabel} was applied.`);
+    }
     return { mode, routeId: applied.routeId, routeLabel: applied.routeLabel, created: applied.created, operations: applied.operations };
   }
 

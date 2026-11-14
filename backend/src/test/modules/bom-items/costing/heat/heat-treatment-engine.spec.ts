@@ -86,6 +86,21 @@ describe('heat treatment on the reference data', () => {
     expect(r.materialUsdPerPart).toBeGreaterThan(0);
   });
 
+  it('none applies to a plastic: every heat treatment is not applicable, with the material class as the reason, and nothing is priced', () => {
+    const nylon: HeatTreatmentFacts = { ...steelPart, materialCutCode: 41.11, materialTypeName: 'Nylon', materialClass: 'Plastic & Rubber' };
+    const results = [...run(nylon).values()];
+    expect(results.length).toBeGreaterThan(5);
+    for (const r of results) {
+      expect(r.status).toBe('not_applicable');
+      expect(r.reason).toMatch(/heat treatment is for metals.*Plastic & Rubber/i);
+      expect(r.materialUsdPerPart ?? 0).toBe(0);
+    }
+  });
+
+  it('a metal, or a material whose class is not on file, is assessed as before', () => {
+    for (const materialClass of ['Ferrous', null]) expect(run({ ...steelPart, materialClass }).get('Carburize')!.status).toBe('costed');
+  });
+
   it('carburize is not applicable to a cut code the reference does not list', () => {
     expect(run({ ...steelPart, materialCutCode: 30.11 }).get('Carburize')!.status).toBe('not_applicable');
   });

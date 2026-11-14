@@ -25,6 +25,8 @@ CREATE TABLE public.bom_items (
   file_3d_path text, file_2d_path text, file_dxf_path text
 );
 
+-- The tooling cost record columns migration 1015 builds on (035, 547).
+CREATE TABLE public.tooling_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), is_custom boolean DEFAULT false);
 CREATE TABLE public.api_request_logs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz DEFAULT now());
 CREATE TABLE public.fx_rate_snapshots (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), provider text NOT NULL, base_currency text NOT NULL, quote_currency text NOT NULL,

@@ -1,3 +1,5 @@
+import { loadLocationElectricity } from '../../shared/location-electricity';
+import { sandFeaturesFromCastingResult, type SandFeature } from './sand-catalog-operations';
 import { Injectable } from '@nestjs/common';
 import type { DbClient } from '../../../../../common/db/postgrest-client';
 import { escapeLikePattern, quoteFilterValue } from '../../../../../common/db/postgrest-filter';
@@ -7,7 +9,7 @@ import { loadSandCastingCalculatorSpec } from './calculators/sand-casting-calcul
 import { measurementsFromCastingResult } from '../../../../sand-casting/casting-measurements';
 import { evaluateSandDfm, type DfmResult } from '../../../../sand-casting/sand-dfm';
 import { SandCastingService } from '../../../../sand-casting/sand-casting.service';
-import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal, sandScenario, type SandMeasurements } from './sand-cost';
+import { SAND_MATERIAL_COLUMNS, sandMaterialFromRow, sandPart, sandRouteToLocal, sandScenario, type LocationElectricity, type SandMeasurements } from './sand-cost';
 import { SandMachineService } from './sand-machine.service';
 import { SandReferenceService } from './sand-reference.service';
 import { SAND_CASTING_SOURCE_VERSION } from './sand-reference';
@@ -51,6 +53,8 @@ export interface SandCostRequest {
   productionLifeYears: number | null;
   /** USD -> the location's currency. */
   usdToLocal: number;
+  /** An amount in a currency -> USD with the app's exchange rates; null when there is no rate (prices the location's electricity). */
+  toUsd: (value: number, currency: string) => number | null;
   costContext: CostContext;
 }
 
@@ -61,6 +65,8 @@ export interface SandCostResult {
   route: SandRoute | null;
   missing: string[];
   warnings: string[];
+  /** The casting analysis's features with the core that forms each, when it measured the part; else absent (the cad-engine's features carry no core links). */
+  analysisFeatures?: SandFeature[];
 }
 
 /**
@@ -75,6 +81,11 @@ export class SandCostService {
     private readonly catalog: CalculatorCatalogService,
     private readonly analyses: SandCastingService,
   ) {}
+
+  /** The location's sourced electricity price (location_electricity_prices, migration 1004); null when it has none or it cannot be read. */
+  async electricityOf(client: DbClient, location: string): Promise<LocationElectricity | null> {
+    return loadLocationElectricity(client, location);
+  }
 
   /** The sand material whose name or grade equals the BOM item's material grade, case-insensitively; null when the grade is not a sand material. */
   async getMaterial(client: DbClient, grade: string | null): Promise<SandMaterial | null> {
@@ -113,7 +124,8 @@ export class SandCostService {
   async price(req: SandCostRequest): Promise<SandCostResult> {
     const warnings: string[] = [];
     let measuredBy: SandCostResult['measuredBy'] = 'cad-engine';
-    const none = (...missing: string[]): SandCostResult => ({ measuredBy, route: null, missing, warnings });
+    let analysisFeatures: SandFeature[] | undefined;
+    const none = (...missing: string[]): SandCostResult => ({ measuredBy, route: null, missing, warnings, ...(analysisFeatures ? { analysisFeatures } : {}) });
     // The casting analysis (the C++ worker, on the exact solid) measures the part when there is one for the current file; otherwise the cad-engine does.
     let measurements = req.measurements;
     const analysis = await this.analyses.latestResult(req.bomItemId, req.sourcePath, req.accessToken);
@@ -122,6 +134,7 @@ export class SandCostService {
       if (fromAnalysis.measurements) {
         measurements = fromAnalysis.measurements;
         measuredBy = 'casting analysis';
+        analysisFeatures = sandFeaturesFromCastingResult(analysis.result) ?? undefined;
         warnings.push(`Measured by the casting analysis (worker ${analysis.workerVersion}) on the exact solid.`);
       } else {
         warnings.push(`The casting analysis could not be used (${fromAnalysis.missing.join('; ')}): the cad-engine's measurements are used.`);
@@ -148,10 +161,13 @@ export class SandCostService {
     const spec = loadSandCastingCalculatorSpec();
     const absent = spec.calculators.filter((c) => !calculators[c.name]).map((c) => c.name);
     if (absent.length) return none(`the sand calculators are not in the database (run migration 956): ${absent.slice(0, 3).join(', ')}${absent.length > 3 ? ', ...' : ''}`);
-    const { scenario, warnings: scenarioWarnings } = sandScenario({ overrides: req.overrides, batchSize: req.batchSize, annualVolume: req.annualVolume, productionLifeYears: req.productionLifeYears });
+    const { scenario, warnings: scenarioWarnings } = sandScenario({
+      overrides: req.overrides, batchSize: req.batchSize, annualVolume: req.annualVolume, productionLifeYears: req.productionLifeYears,
+      location: req.location, locationElectricity: await this.electricityOf(req.client, req.location), toUsd: req.toUsd,
+    });
     warnings.push(...scenarioWarnings);
     const { route, missing } = buildSandRoute({ ref, spec, calculators, material, part, machinesByClass: machines, scenario, costContext: req.costContext });
     if (!route) return none(...missing);
-    return { measuredBy, route: sandRouteToLocal(route, req.usdToLocal), missing: [], warnings: [...warnings, ...route.warnings] };
+    return { measuredBy, route: sandRouteToLocal(route, req.usdToLocal), missing: [], warnings: [...warnings, ...route.warnings], ...(analysisFeatures ? { analysisFeatures } : {}) };
   }
 }

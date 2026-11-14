@@ -307,9 +307,9 @@ export function formatNearestRowsDisclosure(rows: readonly LookupTableRow[] | un
 /**
  * The persistable floor for process_cost_records.cycle_time.
  *
- * 0.01 s — the smallest non-zero value the column can hold, since it is
- * NUMERIC(_,2). Verified empirically against the live table: inserts of 0.36,
- * 0.6 and 0.01 are all ACCEPTED and stored exactly.
+ * 0.0001 s — the smallest non-zero value the column can hold, since it is
+ * NUMERIC(_,4) (migration 1006; it was NUMERIC(_,2), whose 0.01 s floor read a
+ * casting's few-millisecond share of a large furnace's melt as "no cycle time").
  *
  * This was 1, documented as "from process_cost_records.cycle_time
  * (migration 034)". Migration 034 does declare CHECK (cycle_time >= 1), but it
@@ -330,7 +330,12 @@ export function formatNearestRowsDisclosure(rows: readonly LookupTableRow[] | un
  * A cycle of 0 is still a gap: it means nothing resolved a cycle time, not that
  * the operation is instantaneous.
  */
-const MIN_PERSISTABLE_CYCLE_SEC = 0.01;
+const MIN_PERSISTABLE_CYCLE_SEC = 0.0001;
+
+/** A line's cycle time in seconds at the column's scale (process_cost_records.cycle_time, NUMERIC(_,4), migration 1006): what is stored and what the floor is checked on. */
+export function persistableCycleSec(cycleTimeMin: number): number {
+  return Math.round(cycleTimeMin * 60 * 10000) / 10000;
+}
 
 /**
  * A line charged per part with no machine time: a consumable or conversion
@@ -351,7 +356,7 @@ export function isPerPartCharge(line: { rateSource?: string | null }): boolean {
 export function findRouteDataGaps(lines: readonly RouteDataGapLine[]): RouteDataGap[] {
   const gaps: RouteDataGap[] = [];
   for (const line of lines) {
-    const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
+    const cycleTimeSec = persistableCycleSec(line.cycleTimeMin);
     let reason: string | null = null;
     let nearestRows: LookupTableRow[] | undefined;
 
@@ -367,7 +372,7 @@ export function findRouteDataGaps(lines: readonly RouteDataGapLine[]): RouteData
         reason = 'no per-part charge was resolved for this line, so it cannot be costed or persisted';
       }
     } else if (cycleTimeSec < MIN_PERSISTABLE_CYCLE_SEC) {
-      // Says what is actually wrong. A cycle that rounds to 0.00 s at the
+      // Says what is actually wrong. A cycle that rounds to 0.0000 s at the
       // column scale means no cycle time was resolved at all -- which is what
       // happens when no capable machine was selected -- not that the operation
       // is too fast to store.

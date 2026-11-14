@@ -25,6 +25,23 @@ describe('sideActionSignals', () => {
     expect(s).toMatchObject({ slideBundles: 1, slideOrLifterBundles: 2 });
   });
 
+  it('counts the slide and lifter blocks by the size class the CAD engine gave each bundle (a bundle with none is unsized, never guessed)', () => {
+    const s = sideActionSignals(graph([
+      item('SlideBundle', { size_class: 'large' }), item('LifterBundle', { size_class: 'small' }), item('LifterBundle', { size_class: 'small' }),
+      item('LifterBundle', { size_class: 'medium' }), item('LifterBundle'),
+    ]));
+    expect(s?.blocks).toEqual({ slide: { small: 0, medium: 0, large: 1 }, lifter: { small: 2, medium: 1, large: 0 }, unsized: 1 });
+  });
+
+  it('keeps the longest slide stroke (what a slide moves each shot); lifters ride on the ejection and do not count', () => {
+    const s = sideActionSignals(graph([
+      item('SlideBundle', { size_class: 'small', stroke_mm: 12 }), item('SlideBundle', { size_class: 'small', stroke_mm: 30 }),
+      item('LifterBundle', { size_class: 'small', stroke_mm: 80 }),
+    ]));
+    expect(s?.maxSlideStrokeMm).toBe(30);
+    expect(sideActionSignals(graph([item('LifterBundle', { stroke_mm: 9 })]))?.maxSlideStrokeMm).toBeNull();
+  });
+
   it('says nothing when the graph cannot give the count (no graph, other schema, or an engine that did not look for voids)', () => {
     expect(sideActionSignals(null)).toBeNull();
     expect(sideActionSignals({ ...graph([]), schema: 'other' } as PlasticFeatureGraph)).toBeNull();
@@ -32,12 +49,15 @@ describe('sideActionSignals', () => {
   });
 
   it('a part with no side features is a real zero, not unknown', () => {
-    expect(sideActionSignals(graph([item('PlanarFace', { faces: 6 })]))).toEqual({ undercutFeatures: 0, slideBundles: 0, slideOrLifterBundles: 0 });
+    expect(sideActionSignals(graph([item('PlanarFace', { faces: 6 })]))).toEqual({
+      undercutFeatures: 0, slideBundles: 0, slideOrLifterBundles: 0,
+      blocks: { slide: { small: 0, medium: 0, large: 0 }, lifter: { small: 0, medium: 0, large: 0 }, unsized: 0 }, maxSlideStrokeMm: null,
+    });
   });
 });
 
 describe('slide hardware in the mold tooling', () => {
-  const base = { moldBaseAreaMm2: 50_000, cavityCount: 1, tables: REF.tooling, toolroomRates: null, location: 'India' };
+  const base = { moldBaseAreaMm2: 50_000, cavityCount: 1, tables: REF.tooling, toolroomRates: null, location: 'India', scope: { runner: 'cold' as const, classUsesInserts: false, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true } };
   const has = (r: ReturnType<typeof computeMoldToolingCost>, name: string) => r.items.some((i) => i.componentName === name);
 
   it('is priced when a slide bundle was recognised, at the staged one-set quantity, and says so', () => {

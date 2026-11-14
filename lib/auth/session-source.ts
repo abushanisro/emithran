@@ -10,6 +10,7 @@ export interface SessionSource {
 }
 
 const PROFILE_WAIT_MS = 5_000
+const END_SESSION_WAIT_MS = 3_000
 
 /** The session id from the profile, which lib/auth0.ts keeps there for the idle timer; null when signed out. */
 async function profileSessionId(): Promise<string | null> {
@@ -25,6 +26,9 @@ async function profileSessionId(): Promise<string | null> {
 
 export const sessionSource: SessionSource = {
   async signOutThisDevice() {
+    // End the session on the server first, so a copied session cookie is refused from now on (backend session/end). Logging out
+    // never waits on it for long or depends on it: the cookie and the Auth0 session go either way.
+    await fetch('/api/v1/auth/session/end', { method: 'POST', signal: AbortSignal.timeout(END_SESSION_WAIT_MS) }).catch(() => undefined)
     // Leaving through Auth0's logout ends the session everywhere on this browser, which is the expected meaning of "sign out".
     window.location.assign('/auth/logout')
     await new Promise(() => undefined)

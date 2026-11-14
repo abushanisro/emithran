@@ -1,3 +1,5 @@
+import { electricityUsd, loadLocationElectricity } from './costing/shared/location-electricity';
+import { castingSourcePath } from '../sand-casting/casting-source';
 import type { DbClient } from '../../common/db/postgrest-client';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
@@ -45,7 +47,7 @@ import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
 import { PlasticRouteComparisonService, assignMoldingRouteBadges } from './costing/plastic-molding/plastic-route-comparison.service';
 import { routeCompatibility, noCompatibleProcess, NO_COMPATIBLE_PROCESS_MESSAGE } from './costing/plastic-molding/operation/route-compatibility';
-import { buildMoldingCommonInput } from './costing/plastic-molding/molding-input';
+import { buildMoldingCommonInput, cadFaceCount } from './costing/plastic-molding/molding-input';
 import { injectionMoldabilityGap } from '../raw-materials/material-moldability';
 import { processCompatibilityGap, type MoldingProcess } from './costing/plastic-molding/process-compatibility';
 import { SecondaryProcessService } from './services/secondary-process.service';
@@ -111,6 +113,7 @@ import {
   largestPunchHitPerimeterMm, punchingRequirement, waterjetRequirement, shearRequirement, plasmaCutRequirement, laserPunchRequirement,
   pressFormingRequirement, rollBendingRequirement, deburrSecPerMm,
 } from './costing/shared/capability/machine-selection/physics';
+import { sandCastingRoute } from './costing/casting/sand/sand-route-comparison';
 import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
   drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
@@ -130,6 +133,10 @@ import { MaterialResolutionService } from './services/material-resolution.servic
 import { MachineDiscoveryService } from './services/machine-discovery.service';
 import { billetFallback } from './costing/sheet-metal/machine/blank-stock-candidates';
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
+import { SandCatalogOperationsService } from './costing/casting/sand/sand-catalog-operations.service';
+import { MachiningAllowanceService } from './costing/casting/machining-allowance.service';
+import { CalculatorFieldOverridesService, overridesByCalculator } from './services/calculator-field-overrides.service';
+import { mouldingMethodOf, type MachiningAllowanceResult } from './costing/casting/machining-allowance';
 import { SandCostService, type SandCostResult } from './costing/casting/sand/sand-cost.service';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
@@ -287,6 +294,10 @@ export class BOMItemsService {
     private readonly smCatalogOperations: SheetMetalCatalogOperationsService,
     private readonly plasticCatalogOperations: PlasticCatalogOperationsService,
     private readonly hydroformingReference: HydroformingReferenceService,
+    /** The sand-casting report on the route's lines (display only); optional so the hand-built services in tests need not pass it. */
+    private readonly sandCatalogOperations?: SandCatalogOperationsService,
+    /** The machining allowance of a sand casting (display only); optional for the same reason. */
+    private readonly machiningAllowance?: MachiningAllowanceService,
   ) { }
 
   /**
@@ -3088,7 +3099,7 @@ export class BOMItemsService {
     const item = await this.findOne(id, userId, accessToken);
     const grade = ((item as any).materialGrade ?? (item as any).material ?? null) as string | null;
     return this.sandCostService.dfm({
-      bomItemId: id, sourcePath: ((item as any).file3dPath ?? (item as any).file_3d_path ?? null) as string | null, grade,
+      bomItemId: id, sourcePath: castingSourcePath({ file_3d_path: (item as any).file3dPath ?? (item as any).file_3d_path, file_step_path: (item as any).fileStepPath ?? (item as any).file_step_path }), grade,
       client: this.databaseService.getUserClient(accessToken), accessToken,
     });
   }
@@ -3982,6 +3993,8 @@ export class BOMItemsService {
       let processChoice: DieCastingProcessChoiceDto | null = null;
       // Sand casting: the route (sand-cost.service.ts), or what keeps it from being built.
       let sandResult: SandCostResult | null = null;
+      // Sand casting: the stock left on each machined feature (machining-allowance.ts), shown and never costed.
+      let machiningAllowance: MachiningAllowanceResult | null = null;
       // Die casting: what the metal calculators of the summary need.
       let metal: {
         calculators: ReferenceCalculators; alloy: { name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
@@ -4227,7 +4240,7 @@ export class BOMItemsService {
         const bbox = [(item as any).maxLength, (item as any).maxWidth, (item as any).maxHeight].map((v) => Number(v ?? 0));
         sandResult = await this.sandCostService.price({
           client, accessToken, location, grade,
-          bomItemId: id, sourcePath: ((item as any).file3dPath ?? (item as any).file_3d_path ?? null) as string | null,
+          bomItemId: id, sourcePath: castingSourcePath({ file_3d_path: (item as any).file3dPath ?? (item as any).file_3d_path, file_step_path: (item as any).fileStepPath ?? (item as any).file_step_path }),
           measurements: {
             volumeMm3: ((item.volume ?? 0) as number) || null,
             surfaceAreaMm2: Number((item as any).surfaceArea ?? (item as any).surface_area ?? 0) || null,
@@ -4240,8 +4253,21 @@ export class BOMItemsService {
           },
           overrides: item.scenarioOverrides, batchSize, annualVolume: annualVolume ?? null, productionLifeYears: productionLifeYears ?? null,
           usdToLocal, costContext: zeroCtx,
+          toUsd: (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } },
         });
         route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...sandResult.warnings] };
+        if (this.machiningAllowance) {
+          const rmag = item.scenarioOverrides?.['machiningAllowanceRmag'];
+          const allowance = await this.machiningAllowance.resolve({
+            bomItemId: id, accessToken, need: m.need,
+            largestDimensionMm: Math.max(...bbox) || null,
+            materialFamily: (await this.sandCostService.getMaterial(client, grade))?.materialType ?? null,
+            mouldingMethod: mouldingMethodOf(sandResult.route?.mouldingProcess),
+            rmag: typeof rmag === 'string' && /^[A-K]$/.test(rmag) ? rmag : null,
+          });
+          machiningAllowance = allowance.result;
+          route.warnings.push(...allowance.warnings);
+        }
       } else {
         // Investment casting: no casting engine yet (a named, uncosted
         // line); machining after casting is still assessed for the process.
@@ -4272,10 +4298,24 @@ export class BOMItemsService {
         }),
         ...currencyMeta,
         drawingCadConsistency,
+        ...(machiningAllowance ? { machiningAllowance } : {}),
       };
       // No appendRateWarnings: it reads any uncosted line as "no machine in HR
       // Rates", but a casting line can be uncosted for its material or geometry;
       // the casting engines name the actual gap, machines included.
+      // The sand-casting report: each feature under the catalog operation that makes it (sand-catalog-operations.ts). The casting analysis's
+      // features carry their cores; the cad-engine's do not, so without an analysis a hole is undecided between mould and core.
+      if (sandResult && this.sandCatalogOperations) {
+        const v2 = ((fg?.feature_graph_v2?.features ?? []) as Array<{ id?: string; feature_type?: string; diameter_mm?: number | null }>)
+          .filter((x) => typeof x.id === 'string' && typeof x.feature_type === 'string')
+          .map((x) => ({ id: x.id!, type: x.feature_type!, core: null, diameterMm: x.diameter_mm ?? null }));
+        castingResult.warnings.push(...await this.sandCatalogOperations.attach({
+          lines: castingResult.processLines,
+          features: sandResult.analysisFeatures ?? v2,
+          coresLinked: !!sandResult.analysisFeatures,
+          accessToken,
+        }));
+      }
       this.applyCostOverrides(castingResult, costOverrides);
       if (costOverrides.size > 0) castingResult.costOverrides = Object.fromEntries(costOverrides);
       if (localLinesOut) {
@@ -4300,9 +4340,12 @@ export class BOMItemsService {
       const imInput: InjectionMoldingCostInput = {
         ...buildMoldingCommonInput({
           calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
-          item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
+          calculatorOverrides: overridesByCalculator(await CalculatorFieldOverridesService.rows(this.databaseService.getClient(accessToken), id)),
+          item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
           material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
           plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
+          electricity: electricityUsd(await loadLocationElectricity(this.databaseService.getClient(accessToken), location), location,
+            (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),
           currencySymbol: locInfo.symbol,
           usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
           deburrRate: mhrRates.deburring,
@@ -5622,6 +5665,38 @@ export class BOMItemsService {
     };
   }
 
+  /** A sand-cast part's route comparison: its one route, the cost summary as quoted; the local-currency lines are what Apply saves. */
+  private async sandCastingRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const local: { lines?: ProcessLineCost[]; localCurrency?: string } = {};
+    const summary = await this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, local);
+    const route = sandCastingRoute(summary);
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = [{ ...route, processLines: local.lines ?? [] }];
+      localCurrencyOut.localCurrency = local.localCurrency;
+    }
+    return {
+      bomItemId: id,
+      batchSize: summary.batchSize,
+      recommendedRouteId: route.isFeasible ? route.routeId : null,
+      materialCost: summary.materialCost,
+      materialGrade: summary.materialGrade,
+      grossWeightKg: summary.grossWeightKg,
+      materialCostPerKg: summary.materialCostPerKg,
+      materialSource: summary.materialSource,
+      routes: [route],
+      comparisonWarnings: route.isFeasible ? [] : ['The sand-casting route could not be fully costed for this part.'],
+      currency: summary.currency ?? 'USD',
+      currencySymbol: summary.currencySymbol ?? '$',
+      ...(summary.toUsdRate != null ? { toUsdRate: summary.toUsdRate } : {}),
+      ...(summary.usdToDisplayRate != null ? { usdToDisplayRate: summary.usdToDisplayRate } : {}),
+      resolvedInputs: summary.resolvedInputs,
+    };
+  }
+
   /**
    * Route comparison: every candidate route (computeRouteComparison), each
    * with the same selected shared secondary operations appended, so a route's
@@ -5761,6 +5836,10 @@ export class BOMItemsService {
     // path as the quote, so the comparison can never disagree with it).
     if (castingProcessOfFamily(family) === 'die_casting') {
       return this.dieCastingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Sand casting: one route, the cost summary as quoted (sand-route-comparison.ts).
+    if (castingProcessOfFamily(family) === 'sand_casting') {
+      return this.sandCastingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
 
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;

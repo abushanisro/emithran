@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { SandGatingLayout } from '@/lib/casting/gating-layout';
 import type { CalculatorRun } from '@/lib/costing/sand-calculations';
-import type { SandRouteAlternative } from '@/lib/costing/sand-alternatives';
 import { apiClient, ApiError } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
 import { runProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import type { FeatureGraph, DFMScoresResponse, OccurrenceScore } from '@/lib/types/manufacturing';
+import type { MachiningAllowanceSummary } from './useMachiningAllowance';
 
 export type { OccurrenceScore };
 
@@ -716,6 +716,8 @@ export interface CalculationTraceStep {
   /** 'lookup' when this step's value came from a real sm_lookup_* DB row;
    *  'physics' when it's a deterministic formula over already-known values. */
   stepType?: 'physics' | 'lookup';
+  /** The part's own value replaced this step: what the calculator would have used, and why it was changed. */
+  override?: { original: number | null; reason: string };
 }
 
 export type LookupPolicyType = 'EXACT_MATCH' | 'INTERPOLATE' | 'RANGE' | 'FORMULA';
@@ -774,6 +776,10 @@ export type ConfidenceLevel = 'verified' | 'derived' | 'unsupported';
 
 export interface ProcessLineCost {
   process: string;
+  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in its runCost and totalCost (backend ProcessLineCost). */
+  otherCostPerPartUsd?: number;
+  /** What otherCostPerPartUsd is, e.g. "energy 0.0029 USD per casting". */
+  otherCostDetail?: string;
   /** Real process_calculator_mappings identity for this line, resolved server-side
    *  from the DB (never hardcoded) — absent on paths not yet wired to resolve it,
    *  in which case callers must derive a process group from machineClass rather
@@ -841,6 +847,8 @@ export interface ProcessLineCost {
    *  Calculator pipeline. Absent for processes not yet migrated onto it. */
   calculatorId?: string;
   calculatorVersion?: number;
+  /** The stored calculator's name: a part's own field values are set by it (calculator_field_overrides). Present where the engine applies them. */
+  calculatorName?: string;
   /** Present instead of a fabricated fallback number when the calculator
    *  couldn't resolve this line's cycle time — the line still appears (never
    *  silently omitted), but cycleTimeMin/totalCost reflect the gap (0/null). */
@@ -937,6 +945,19 @@ export interface DriverImpact {
   lines: Array<{ line: string; deltaPerPart: number }>;
 }
 
+/** An injection mold's tooling, as the tooling calculator costs it. */
+export interface InjectionMoldToolingDto {
+  moldClass: string;
+  moldCostUsd: number;
+  moldCostPerPartUsd: number;
+  moldsRequired?: number;
+  moldToolLifeShots?: number;
+  annualVolume?: number;
+  productionLifeYears?: number;
+  calculationTrace?: CalculationTraceStep[];
+  calculatorName?: string;
+}
+
 export interface CostSummaryDto {
   /** Molded parts: what each CAD cost driver is worth (the engine run again with only that driver moved one step), per part, in this summary's currency. */
   driverImpacts?: DriverImpact[];
@@ -999,9 +1020,13 @@ export interface CostSummaryDto {
   /** Present when a die-cast part reached the HPDC cavity step — see DieCastingBreakdown. */
   dieCasting?: DieCastingBreakdown;
   /** Sand casting: what the route decided (mirrors the backend's SandCastingBreakdown). */
-  sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine'; gating: SandGatingLayout; flask: { lengthMm: number; widthMm: number; heightMm: number }; alternatives?: SandRouteAlternative[] };
+  sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine'; gating: SandGatingLayout; flask: { lengthMm: number; widthMm: number; heightMm: number } };
+  /** Sand casting: the machining allowance of each machined feature (display only, never costed). */
+  machiningAllowance?: MachiningAllowanceSummary;
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */
   dieTooling?: DieToolingDto;
+  /** Injection molding: the mold, by its tooling calculator (backend ToolingCostDto, migration 1012); kept out of the piece cost. USD. */
+  tooling?: InjectionMoldToolingDto;
   /** Heat / surface / other secondary operations, shared by every family. See SecondaryOperationsDto. */
   secondaryOperations?: SecondaryOperationsDto;
   /** Coreboxes for gravity die casting sand cores (USD, separate from the piece cost). */
@@ -1018,6 +1043,9 @@ export interface MachineChoiceDto {
   criteria: string[];
   chosen: string | null;
   capableCount: number;
+  /** Every machine of the class checked against the criteria. */
+  checkedCount: number;
+  /** The chosen machine first, then the next cheapest capable ones (at most 3); when none is capable, up to 3 rejected with the criteria they failed. */
   candidates: Array<{ name: string; status: 'chosen' | 'capable' | 'rejected'; perPartCost: number | null; reasons: string[] }>;
 }
 

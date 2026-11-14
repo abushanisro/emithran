@@ -141,7 +141,7 @@ interface ManufacturingFeature {
       if (selectedFile2d) formData.append('file2d', selectedFile2d);
       if (selectedFile3d) formData.append('file3d', selectedFile3d);
 
-      await apiClient.uploadFiles<BOMItem>(`/bom-items/${item.id}/upload-files`, formData);
+      await apiClient.uploadFiles<BOMItem>(`/bom-items/${item.id}/files`, formData);
 
       const names = [selectedFile2d?.name, selectedFile3d?.name].filter(Boolean).join(' and ');
       toast.success(`${names} uploaded successfully.`);

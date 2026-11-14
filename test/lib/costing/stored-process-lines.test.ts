@@ -98,6 +98,27 @@ describe('resolveStoredProcessLines — arithmetic preserved from the Cost Guide
   });
 });
 
+// What a line charges beyond machine and crew time (a furnace's electricity, a coating) is not machine rate x time: it comes with the line (USD), the
+// live engine line's when one matches, else the saved row's, and is part of the row's cost, so the row equals the engine (migration 1005).
+describe('resolveStoredProcessLines — the line\'s other cost (energy, consumables)', () => {
+  const only = (rows: StoredProcessRow[], lines: EngineLineLite[]) => {
+    const [line] = resolveStoredProcessLines(rows, lines, EFFECTIVE);
+    if (!line) throw new Error('one row in, one line out');
+    return line;
+  };
+
+  it('adds the live engine line\'s other cost to the row, before scrap', () => {
+    const line = only([row({ scrap: 10, otherCostPerPart: 0.5 })], [{ machineClass: 'press_brake', cycleTimeMin: 10 / 60, otherCostPerPartUsd: 0.0029 }]);
+    expect(line.otherPerPart).toBe(0.0029); // live wins over the saved figure
+    expect(line.totalPerPart).toBeCloseTo((line.setupPerPart + line.cyclePerPart + 0.0029) * 1.1, 12);
+  });
+
+  it('takes the saved row\'s other cost when no engine line matches, and none when neither has one', () => {
+    expect(only([row({ otherCostPerPart: 0.0029 })], []).otherPerPart).toBe(0.0029);
+    expect(only([row()], ENGINE_LINES).otherPerPart).toBe(0);
+  });
+});
+
 describe('resolveStoredProcessLines — the setup denominator follows the effective batch', () => {
   it('is unchanged when the saved row matches the current batch', () => {
     const [line] = resolveStoredProcessLines([row()], [], EFFECTIVE);

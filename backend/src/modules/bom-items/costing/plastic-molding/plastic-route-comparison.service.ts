@@ -1,5 +1,7 @@
+import { electricityUsd, loadLocationElectricity } from '../shared/location-electricity';
 import { Injectable } from '@nestjs/common';
 
+import { CalculatorFieldOverridesService, overridesByCalculator } from '../../services/calculator-field-overrides.service';
 import { DatabaseService } from '../../../../common/database/database.service';
 import type { RateSnapshot } from '../../../../common/exchange-rate/exchange-rate.service';
 import type { BOMItemResponseDto } from '../../dto/bom-item-response.dto';
@@ -9,7 +11,7 @@ import type { MaterialResolutionService } from '../../services/material-resoluti
 import { CalculatorCatalogService } from '../../services/calculator-catalog.service';
 import { PlasticReferenceService } from './lookup/plastic-reference.service';
 import { injectionMoldabilityGap } from '../../../raw-materials/material-moldability';
-import { buildMoldingCommonInput, partBboxLongestFirst, type MoldingSummary } from './molding-input';
+import { buildMoldingCommonInput, cadFaceCount, partBboxLongestFirst, type MoldingSummary } from './molding-input';
 import { estimatedToolHeightMm } from '../shared/capability/machine-selection/press-checks';
 import { mhrRateFromCandidate } from '../shared/capability/machine-selection/rate-from-candidate';
 import { fetchMachinePool } from '../shared/capability/machine-selection/selector';
@@ -99,6 +101,8 @@ export class PlasticRouteComparisonService {
     const family = 'plastic_molded';
     // The stored cycle-time calculators (migration 975): every molding route's cycle time is computed by its own process's calculator.
     const calculators = await this.calculatorCatalog.loadPlasticMoldingCalculators(accessToken);
+    // The part's own calculator field values, laid over the calculators by each engine (migration 1011).
+    const calculatorOverrides = overridesByCalculator(await CalculatorFieldOverridesService.rows(this.database.getClient(accessToken), item.id));
     // The real per-grade thermal inputs, from the same resolved material row as the cost per kg and density.
     const rcRealResinInputs = {
       meltingTempC: input.material.meltingTempC, moldTempC: input.material.moldTempC, ejectionTempC: input.material.ejectionTempC,
@@ -153,13 +157,15 @@ export class PlasticRouteComparisonService {
     );
     const rcUsdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
     const imCommon = buildMoldingCommonInput({
-      item, summary, grade, family, location, batchSize, annualVolume, productionLifeYears,
+      item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
       material: {
         materialCostPerKg, materialDensityKgM3, materialSource, materialType: rcMaterialType, materialStockForm: rcStockForm,
         materialMatlState: rcMatlState, materialClamp: rcClampProperties, realResinInputs: rcRealResinInputs,
       },
       plasticReference: { plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing },
-      calculators,
+      electricity: electricityUsd(await loadLocationElectricity(client, location), location,
+        (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),
+      calculators, calculatorOverrides,
       currencySymbol: locInfo.symbol, usdToLocal: rcUsdToLocal,
       deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
       cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
@@ -288,7 +294,7 @@ export class PlasticRouteComparisonService {
       // Real per-grade cure_time_min — same resolved material row as
       // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
-      calculators,
+      calculators, calculatorOverrides,
     });
     // A route is a real alternative only on a material the dataset flags for that process, and only where a real machine rate resolved.
     const processCompat = await this.plasticReference.getProcessCompatibility(client, grade);
@@ -334,7 +340,7 @@ export class PlasticRouteComparisonService {
       // The fill time is the CAD part volume (mm3) over the selected machine's staged injection rate (mm3/s): formula registry F-19.
       partVolumeMm3: partVolumeMm3 > 0 ? partVolumeMm3 : null,
       injectionRateMm3PerS: rimCandidate?.machineId ? pressRecordsRC.get(rimCandidate.machineId)?.injectionRateMm3PerS ?? null : null,
-      calculators,
+      calculators, calculatorOverrides,
     });
     const rimGap = compatGap('reaction_injection');
     const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database' && rimGap == null;

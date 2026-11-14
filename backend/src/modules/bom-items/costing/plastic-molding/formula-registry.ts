@@ -235,7 +235,7 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
       'Mold window area is the projected area times cavities with no allowance.',
       'One purchased-component set for any cavity count (investigation I-1).',
     ],
-    state: 'ASSUMED', implementedIn: 'process/mold-tooling-engine.ts', note: 'Excludes mold-base steel, EDM, texture, cooling, etc. (G-01..G-08).',
+    state: 'ASSUMED', implementedIn: 'process/mold-tooling-engine.ts', note: 'The plate steel is F-25, the cavity and core F-26, the assembly extras F-27; slides and lifters, EDM, heat treatment, cooling and, where they apply, inserts, texture and hot drops are not modelled (G-03..G-08).',
   },
   {
     id: 'F-17', version: 1, name: 'Molds required',
@@ -274,19 +274,268 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     note: 'Calculator "Reaction Injection Molding - Cycle Time" (F-19 is its Fill Time). A missing or invalid volume or rate makes the cycle a named gap, never a default.',
   },
 
+  {
+    id: 'F-24', version: 1, name: 'Deflashing time (manual flash trimming)',
+    expression: 't = L_parting / r_trim  [s]',
+    outputUnit: 's',
+    inputs: [
+      { name: 'L_parting parting line length', unit: 'mm', source: 'CAD PartingLine feature (cad-engine parting_line_reading_v1)' },
+      { name: 'r_trim manual flash trimming rate', unit: 'mm/s', source: `${MEM}/variables: cmManualFlashTrimmingRate` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/variables/cmManualFlashTrimmingRate (Compression Molding:Manual Flash Trimming//PartingLine)`,
+    assumptions: [
+      'The rate is staged for compression molding and borrowed for injection molding, which has no staged rate.',
+      'The reference types the rate only as Length/Time; it is read as mm/s, the unit that fits the reference\'s other Length/Time rates and a manual trim.',
+      'The whole parting line is trimmed; internal cutouts and the flash thickness are not modelled.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-molding-calculators.json',
+  },
+
+  {
+    id: 'F-25', version: 1, name: 'Mold base and plate steel',
+    expression: 'base = smallest tblStandardMoldBaseSizes holding (layout + borders); A = max(min_A, r x h + border_cav); B = max(min_B, (1 - r) x h + border_core); m = W x L x (clamp_top + A + B + support + clamp_bottom) x rho; cost = m x price x moldBaseCostFactor',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'layout, between-parts border, edge borders', unit: 'count, mm', source: `${MEM}/lookup: layoutNumCav, tblEdgeMoldBorderX/Y; variables: betweenPartsMoldBorder` },
+      { name: 'W x L standard base', unit: 'mm', source: `${MEM}/lookup/tblStandardMoldBaseSizes` },
+      { name: 'h part height', unit: 'mm', source: 'CAD bounding box, the smallest side' },
+      { name: 'r, min_A, min_B, plate thicknesses', unit: 'ratio, mm', source: `${MEM}/variables: aPlateFlatCavityRatio, a/bPlateMinThickness, top/bottomClampPlateThickness, supportPlateThickness` },
+      { name: 'border_cav, border_core', unit: 'mm', source: `${MEM}/lookup: tblCavity/CorePlateDepthBorder (inches)` },
+      { name: 'rho, price, moldBaseCostFactor', unit: 'kg/m3, USD/kg, ratio', source: `${MEM}/process/digital_factory_tool_materials_usa: the default tool material (AISI P20)` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/lookup + variables + process/digital_factory_tool_materials_usa`,
+    assumptions: [
+      'The reference holds the sizes, borders, plate thicknesses and the steel, not the formula: the stack is priced as tool steel by mass.',
+      'The runner region coefficient widens the cavity region; the base may be turned to fit; a base larger than every standard one is not modelled (a named gap).',
+      'The ejector plates and rails have no injection-molding thickness on file and are not included.',
+    ],
+    state: 'ASSUMED', implementedIn: 'process/mold-base.ts',
+  },
+
+  {
+    id: 'F-26', version: 1, name: 'Cavity and core machining and polish',
+    expression: 'complexity = faces <= simple ? Simple : faces <= average ? Average : Complex;  machining = A_in2 x h_per_in2(complexity, A) x cavities x machining rate;  polish = A_m2 x h_per_m2(finish) x cavities x assembly rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'A part surface area', unit: 'mm2', source: 'CAD' },
+      { name: 'faces', unit: 'count', source: 'CAD face count (face_graph.face_attributes)' },
+      { name: 'simple, average', unit: 'count', source: `${MEM}/variables: cmMoldSurfaceCountThreshold{Simple,Average} (compression molding, borrowed)` },
+      { name: 'h_per_in2', unit: 'h/in2', source: `${MEM}/lookup: tblHrsPerSqInch{Simple,Average,Complex}` },
+      { name: 'h_per_m2', unit: 'h/m2', source: `${MEM}/lookup/SPIFinishes: defaultCavityFinishIM` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/lookup + variables`,
+    assumptions: [
+      'The face-count complexity thresholds are staged for compression molding and borrowed: the injection process states no rule.',
+      'The machining hours cover the whole part surface (cavity and core halves) for each cavity; the polish is charged at the assembly (bench) rate, as no polishing rate is on file.',
+    ],
+    state: 'ASSUMED', implementedIn: 'process/mold-cavity.ts',
+  },
+
+  {
+    id: 'F-27', version: 1, name: 'Mold assembly extras: ejector pins, sprue bushing, locating ring, try-out',
+    expression: 'pins = ceil(A_window / area_per_pin);  ejector = pins x (pin cost + pin assembly h x assembly rate);  sprue + ring;  try-out = base h x (2 if press > 500 t else 1) x try-outs x try-out rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'A_window', unit: 'mm2', source: 'CAD projected area x cavities (the required mold window)' },
+      { name: 'area_per_pin', unit: 'mm2', source: `${MEM}/variables: areaCoveredPerEjectorPin` },
+      { name: 'pin cost, pin assembly h', unit: 'USD, h', source: `${MEM}/lookup: cmStandardToolingComponents / cmToolAssemblyTimes Ejector Pin` },
+      { name: 'sprue, ring', unit: 'USD', source: `${MEM}/variables: sprueBushingCost, locatingRingsCost` },
+      { name: 'base h, try-outs', unit: 'h, count', source: `${MEM}/variables: timePerTryoutBase, defaultNumTryOuts` },
+      { name: 'try-out rate', unit: 'USD/h', source: `${MEM}/process/digital_factory_settings_usa: tryoutRateUsdPerHr` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/lookup + variables + process`,
+    assumptions: [
+      'One sprue bushing and one locating ring per mold (the variables give a unit cost, no quantity).',
+      'The 500 t threshold and the doubling are read from the timePerTryoutBase note ("<500T (x2 for bigger)"), as metric tonnes of press force.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
+  {
+    id: 'F-28', version: 1, name: 'Slide and lifter blocks: steel, machining, CMM inspection',
+    expression: 'V = sum of block volumes by size class;  steel = V x density x price;  machining = sum(6 x V_block^(2/3)) x h_per_in2 x machining rate;  CMM = (multiplier x n + adder) x machining rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'blocks', unit: 'count by size class', source: 'CAD SlideBundle / LifterBundle size_class (cad-engine side_actions.py, by the staged bundle width thresholds)' },
+      { name: 'V_block', unit: 'in3', source: `${MEM}/variables: {small,medium,large}{Slide,Lifter}Volume` },
+      { name: 'density, price', unit: 'kg/m3, USD/kg', source: `${MEM}/process/digital_factory_tool_materials_usa: the default tool steel` },
+      { name: 'h_per_in2', unit: 'h/in2', source: `${MEM}/lookup: tblHrsPerSqInch{Simple,Average,Complex} (the cavity's, F-26)` },
+      { name: 'multiplier, adder', unit: 'h', source: `${MEM}/variables: cmmInspectionMultiplier, cmmInspectionAdder` },
+    ],
+    dependsOn: ['F-26'],
+    referenceSource: `${MEM}/variables + lookup + process`,
+    assumptions: [
+      'A LifterBundle (a lifter could serve it, and so could a slide) is costed as a lifter, the smaller block.',
+      'Each block is machined over the surface of a cube of its volume at the cavity hours per square inch (no slide or lifter machining hours are on file).',
+      'The CMM hours are cmmInspectionMultiplier x the side actions + cmmInspectionAdder, at the machining rate (the variables name the hours, not the form or the rate).',
+      'The block steel is priced at the steel price without the moldBaseCostFactor, which is for the mold base.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
+  {
+    id: 'F-29', version: 2, name: 'Heat treatment of the mold steel, as its grade needs it',
+    expression: 'hardened = W x L x (A + B) x density + side-action steel;  relieved = mold base steel - W x L x (A + B) x density;  cost = hardened x heat treat rate x hardening(grade) + relieved x stress relief rate x stress relief(grade)',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'W, L, A, B', unit: 'mm', source: 'the standard mold base and its A (cavity) and B (core) plates (F-25)' },
+      { name: 'side-action steel', unit: 'kg', source: 'the slide and lifter blocks (F-28)' },
+      { name: 'heat treat rate, stress relief rate', unit: 'USD/kg', source: `${MEM}/process/digital_factory_settings_usa: heatTreatRateUsdPerKg, stressReliefRateUsdPerKg` },
+      { name: 'hardening(grade), stress relief(grade)', unit: '0 or 1', source: 'reference/mold-steel-treatment-reference.csv (costing engineer research): heat_treatment_required, stress_relief_required' },
+    ],
+    dependsOn: ['F-25', 'F-28'],
+    referenceSource: `${MEM}/process`,
+    assumptions: [
+      'Version 2 (costing engineer research): treatment is charged only where the tool steel grade needs it by default. AISI P20 is supplied pre-hardened (28-34 HRC), so neither hardening nor stress relief is charged; a grade treated "when specified" is not charged until a hardness is specified.',
+      'Where charged, the steel that forms the part (cavity and core plates, slide and lifter blocks) is hardened and the rest of the mold base stress relieved.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
+  {
+    id: 'F-30', version: 1, name: 'Cooling lines',
+    expression: 'lines = max(1, floor(L / (3 x d)));  drilling h = lines x W / drill rate / 60;  cost = drilling h x machining rate + lines x 2 x (hose + fitting) + 2 x manifold',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'W, L', unit: 'mm', source: 'the standard mold base (F-25)' },
+      { name: 'd', unit: 'mm', source: `${MEM}/variables: defaultWaterLineDiameter` },
+      { name: 'drill rate', unit: 'mm/min', source: `${MEM}/lookup/cmToolMachiningRates: Heater Line Drilling` },
+      { name: 'hose, fitting, manifold', unit: 'USD', source: `${MEM}/variables: waterHosesCost, waterManifoldFittingsCost, waterManifoldsCost` },
+    ],
+    dependsOn: ['F-25'],
+    referenceSource: `${MEM}/variables + lookup`,
+    assumptions: [
+      'Approved rule (no line count is on file): water lines across the cavity plate, 3 line diameters apart along the mold base length, each the mold base width long.',
+      'Two hoses and two fittings per line and one manifold per side of the mold.',
+      'The lines are drilled at the Heater Line Drilling rate, the only line drilling rate on file.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
+  {
+    id: 'F-36', version: 1, name: 'Material drying',
+    expression: 'demand = resin per part x 3600 / press time per part;  dryer = smallest model with nylon throughput >= demand;  dryer hourly = (P (1 - salvage) / life + P x maintenance + P x installation / life) / (6240 x uptime x utilization) + rated kW x electricity;  cost per part = dryer hourly x press time per part / 3600',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'drying conditions', unit: 'degC, h', source: 'reference/material-drying-reference.csv (manufacturer datasheets: BASF, Covestro, Celanese, Lotte, Arkema)' },
+      { name: 'throughput, rated kW', unit: 'kg/h, kW', source: 'reference/dryer-models-reference.csv: Bry-Air BRY DRY specification' },
+      { name: 'P', unit: 'USD', source: 'reference/dryer-models-reference.csv: Conair dX50, used-equipment listing (provisional)' },
+      { name: 'electricity', unit: 'USD/kWh', source: 'location_electricity_prices (migration 1004)' },
+      { name: 'economics', unit: '-', source: 'reference/equipment-economics-reference.csv (memory/ press economics, migration 580)' },
+    ],
+    dependsOn: [],
+    referenceSource: 'reference/*.csv + location_electricity_prices',
+    assumptions: [
+      'The costing engineer\'s throughput model: a machine-mounted desiccant dryer runs with the press, so its hour is charged with the press time per part.',
+      'The dryer price is a used-equipment listing (no new price is published): provisional until a quotation.',
+      'The rated power is an upper bound on the energy: the heaters cycle.',
+      'No operator time: the hopper is fed with the press material handling; no handling time is on file for a machine-mounted dryer.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
+    id: 'F-35', version: 1, name: 'Weight check',
+    expression: 't = time per check / sampling interval (s per part);  scale rate = (P (1 - salvage) / life + P x maintenance + P x installation / life) / (6240 x uptime x utilization);  cost = t / 3600 x (operator rate + scale rate)',
+    outputUnit: 's',
+    inputs: [
+      { name: 'time per check, sampling interval', unit: 's, parts', source: 'reference/quality-inspection-reference.csv (costing engineer defaults)' },
+      { name: 'P', unit: 'USD', source: 'reference/quality-inspection-reference.csv: OHAUS Defender 3000 bench scale, Zoro US listing' },
+      { name: 'life, salvage, maintenance, installation, uptime, utilization, scheduled hours', unit: '-', source: 'reference/equipment-economics-reference.csv (memory/ press economics, migration 580)' },
+    ],
+    dependsOn: [],
+    referenceSource: 'reference/quality-inspection-reference.csv + equipment-economics-reference.csv',
+    assumptions: [
+      'The costing engineer\'s defaults: 10 s per check, 1 check per 1,000 parts, by the press operator (engineering estimates).',
+      'The scale is depreciated with the press economics of memory/ (10 years, 20 % installation, 5 % maintenance, 80 % uptime, 0.95 utilization).',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
+    id: 'F-34', version: 1, name: 'Visual inspection',
+    expression: 't = A_m2 x visualInspectTimeStandard (min/m2) x 60 x defaultPercentToBeTested / 100 (s per part)',
+    outputUnit: 's',
+    inputs: [
+      { name: 'A_m2', unit: 'm2', source: 'CAD part surface area' },
+      { name: 'visualInspectTimeStandard', unit: 'min/m2', source: 'memory/Secondary process/variables_inherited' },
+      { name: 'defaultPercentToBeTested', unit: '%', source: 'memory/Secondary process/variables_inherited' },
+    ],
+    dependsOn: [],
+    referenceSource: 'memory/Secondary process/variables_inherited',
+    assumptions: ['The secondary-process inspection rate applies to a molded part; charged at the bench rate, like deflashing.'],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
+    id: 'F-33', version: 1, name: 'Hot drops of a hot runner',
+    expression: 'drops = cavities x gates per cavity (hot runner; 0 on a cold runner);  cost = drops x hot drop price(defaultHotDropType)',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'gates per cavity', unit: 'count', source: `${MEM}/variables: defaultNumberOfGatesPerCavity` },
+      { name: 'hot drop price', unit: 'USD', source: `${MEM}/variables: costPerStandardHotDrop / costPerSVGHotDrop by defaultHotDropType` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/variables`,
+    assumptions: ['One hot drop per hot-runner gate (costing engineer research: drops = actual hot-runner gates, not cavities).'],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
+  {
+    id: 'F-32', version: 1, name: 'Slide movement in the cycle',
+    expression: 't = 2 x max slide stroke / slideCycleRate / cavities (s per part)',
+    outputUnit: 's',
+    inputs: [
+      { name: 'max slide stroke', unit: 'mm', source: 'CAD SlideBundle stroke_mm (cad-engine side_actions.py)' },
+      { name: 'slideCycleRate', unit: 'mm/s', source: `${MEM}/variables: slideCycleRate (Velocity, read as mm/s)` },
+    ],
+    dependsOn: [],
+    referenceSource: `${MEM}/variables`,
+    assumptions: [
+      'The slides move out and back once per shot, all together, so the longest stroke sets the time.',
+      'Lifters ride on the ejector stroke and add no time; a LifterBundle is costed as a lifter (F-28).',
+      'Charged at the press rate as its own line (the press waits for the slides), not folded into the injection cycle calculator.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
+    id: 'F-31', version: 1, name: 'Rib inserts and their EDM',
+    expression: 'insert if rib height > threshold, class = smallest with area >= length x thickness;  steel = area x core plate height x density x price;  pocket = steel volume / pocket rate + setup;  EDM = electrode x burns x burn fraction / burn rate x EDM rate + electrode x burns x graphite price;  labour = design h(class) + cutter path + spotting + assembly',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'rib height, length, thickness', unit: 'mm', source: 'CAD (cad-engine _detect_ribs: measured along the pull; length = wall area / height)' },
+      { name: 'threshold', unit: 'mm', source: `${MEM}/variables: machinedRibThreshold` },
+      { name: 'area, electrode, burns, design h by class', unit: 'in2, in3, count, h', source: `${MEM}/variables: *InsertArea, *CalcRibInsertElectrodeSize, num*InsertsBurns, cmDesignHrsRibInsert*` },
+      { name: 'burn fraction, cutter path h, spotting h', unit: '-, h, h', source: `${MEM}/variables: edmElectrodeVolumeBurn, cutterPathHrsPerInsert, spottingHrsPerInsert` },
+      { name: 'burn rate, pocket rate, pocket setup, assembly h', unit: 'mm3/min, mm3/min, h, h', source: `${MEM}/lookup: cmToolMachiningRates EDM Electrode Burn / Insert Pocket Machining, cmToolMachiningSetups Insert Pocket, cmToolAssemblyTimes Rib Insert` },
+      { name: 'EDM rate, graphite price', unit: 'USD/h, USD/in3', source: `${MEM}/process/digital_factory_settings_usa: edmRateUsdPerHr, edmMaterialCostCarbonUsdPerIn3` },
+    ],
+    dependsOn: ['F-25'],
+    referenceSource: `${MEM}/variables + lookup + process`,
+    assumptions: [
+      'Approved rule (no class rule is on file): a rib is the smallest insert class whose area holds its footprint, length x thickness; a rib no class holds is a gap.',
+      'Graphite electrodes (approved; no default electrode material is on file), one electrode of the class size per burn.',
+      'The insert steel is the class area x the core (B) plate height, as the *InsertArea notes state, priced as the default tool steel.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
   // What the model cannot compute yet: data is staged, no authoritative formula exists (README section 8).
   ...([
-    ['G-01', 'Mold base selection and plate-by-plate steel', 'tblStandardMoldBaseSizes; tool material price and density (AISI P20 1.86 USD/kg, 7850 kg/m3); plate thickness variables; tblCavity/CorePlateDepthBorder; tblEdgeMoldBorderX/Y'],
-    ['G-02', 'Core and cavity blocks', 'plate depth tables; cmToolMachiningRates; EDM rates; tblHrsPerSqInch*'],
-    ['G-03', 'Slides and lifters', 'tblSlideSizes; slide* and lifter* variables; costPerHydraulicEjector; slideCycleRate'],
-    ['G-04', 'EDM and heat treatment', 'edmRateUsdPerHr; EDM material per in3; heatTreatRateUsdPerKg; stressReliefRateUsdPerKg'],
+    ['G-03', 'Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle', 'tblSlideSizes; slideCycleRate; costPerHydraulicEjector'],
+    ['G-04', 'Rib inserts of CAD ribs not measured, or too large for an insert class (the others are F-31; heat treatment is F-29)', 'machinedRibThreshold; *InsertArea'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
-    ['G-06', 'Cooling and water lines', 'tblStandardWaterLineSizes; defaultWaterLineDiameter; water* cost variables'],
-    ['G-07', 'Inserts and unscrewing mechanisms', 'insertInstallRate; cmInsertManualLoadingTime; defaultInsertCost; costPerUnscrewingMechanism; tblSpiType.Use Insert'],
-    ['G-08', 'Tool assembly extras: ejector system, sprue, locating ring, hot drops, try-out', 'ejector*, sprueBushingCost, locatingRingsCost, costPerStandardHotDrop, tryoutRateUsdPerHr'],
+    ['G-06', 'Water baffles (no count on file; the cooling lines are F-30)', 'waterBafflesCost'],
+    ['G-07', 'Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them)', 'tblSpiType.Use Insert; costPerUnscrewingMechanism'],
+    ['G-08', 'Hot-runner manifold and controller (no price on file; the hot drops are F-33)', 'manifoldPlateThickness; defaultHotDropLayout'],
     ['G-09', 'Handling, setup scrap and plasticizing in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS'],
     ['G-10', 'Period costs: indirect overhead, SG&A, margin', 'sGandARate; markUpRate; machine indirect overhead'],
-    ['G-11', 'Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing', 'nothing staged'],
+    ['G-11', 'Ultrasonic welding, cure oven, LSR dosing (nothing staged); material drying when its inputs are incomplete (F-36: a resin with no drying row, no electricity price, or a dryer class with no price)', 'nothing staged'],
   ] as const).map(([id, name, stagedData]): FormulaEntry => ({
     id, version: 1, name, expression: '', outputUnit: 'USD', inputs: [], dependsOn: [], referenceSource: '',
     assumptions: [], state: 'UNSUPPORTED', implementedIn: null, stagedData,

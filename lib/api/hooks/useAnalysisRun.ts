@@ -7,7 +7,7 @@ import { analysisStatusKey } from './useAnalysisStatus';
 
 /**
  * Makes the part's analysis current: the backend runs what its analysis status says is missing (CAD features, the drawing, the casting analysis)
- * and nothing else, so with everything current it does no work. It is the first step of Apply Scenario; nobody starts an analysis by hand.
+ * and nothing else, so with everything current it does no work. Started by Refresh analysis (top bar); Apply refuses an unanalysed part.
  * The caller reads `status` of the result: that is the backend's answer, not something worked out here.
  */
 export function useAnalysisRun(bomItemId: string | undefined) {

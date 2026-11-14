@@ -6,6 +6,7 @@ import {
   resolvePlasticReference,
   type PlasticReference,
   type PlasticReferenceRows,
+  SECONDARY_VARIABLE_KEYS,
 } from '../../../../../modules/bom-items/costing/plastic-molding/plastic-reference';
 import type { MaterialClampProperties } from '../../../../../modules/bom-items/costing/plastic-molding/clamp-force';
 import type { RealResinInputs } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
@@ -38,10 +39,14 @@ const read = (rel: string) => parseCsv(readFileSync(join(DIR, rel), 'utf-8').rep
 
 /** The staged rows the plastic reference resolves from, read from memory/Plastic Modeling the way migration 823 stages them. */
 export function realReferenceRows(): PlasticReferenceRows {
-  const variables = read('variables/digital_factory_variables.csv').map((r) => ({ key: r['variableName']!, value: r['stringValue'] ?? null }));
+  // memory/Secondary process (2026-Secondary): the variables the plastic model reads from it (SECONDARY_VARIABLE_KEYS), loaded next to its own.
+  const secondary = parseCsv(readFileSync(join(DIR, '../Secondary process/variables_inherited.csv'), 'utf-8').replace(/^\uFEFF/, ''))
+    .filter((r) => (SECONDARY_VARIABLE_KEYS as readonly string[]).includes(r['Variable Name']!))
+    .map((r) => ({ key: r['Variable Name']!, value: r['String Value'] ?? null }));
+  const variables = [...read('variables/digital_factory_variables.csv').map((r) => ({ key: r['variableName']!, value: r['stringValue'] ?? null })), ...secondary];
   // Same file for each key that migration 823 stages under it (split tables in
   // lookup/ as X__records.csv, the settings export in process/).
-  const fileOf = (k: string) => (k === 'digital_factory_settings_usa' ? `process/${k}.csv` : `lookup/${k}__records.csv`);
+  const fileOf = (k: string) => (k.startsWith('digital_factory_') ? `process/${k}.csv` : `lookup/${k}__records.csv`);
   const lookups = Object.fromEntries(PLASTIC_LOOKUP_KEYS.map((k) => [k, read(fileOf(k))]));
   const gps = read('materials_final.csv').find((r) => r['name'] === GPPS_REFERENCE_MATERIAL);
   const gppsMaterial = gps ? Object.fromEntries(Object.entries(gps).map(([k, v]) => [k, v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : v])) : undefined;

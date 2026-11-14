@@ -14,7 +14,6 @@ export interface BenchmarkSession {
     name: string;
     projectId: string;
     projectName: string;
-    version?: string;
     status?: string;
   }[];
   bomCount: number;

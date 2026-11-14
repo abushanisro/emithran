@@ -11,4 +11,10 @@ export const REGISTRY_FORMULA_OF_FIELD: Readonly<Record<string, Readonly<Record<
   structural_foam: INJECTION,
   injection_lsr: { 'Cure Time': 'F-09', 'Fill Time': 'F-05', 'Press Dry Cycle Time': 'F-07', 'Cycle Time': 'F-08' },
   rim: { 'Fill Time': 'F-19' },
+  injection_deflash: { 'Cycle Time': 'F-24' },
+  injection_slide_movement: { 'Cycle Time': 'F-32' },
+  injection_visual_inspection: { 'Cycle Time': 'F-34' },
+  injection_weight_check: { 'Cycle Time': 'F-35', 'Scale Rate': 'F-35' },
+  injection_material_drying: { 'Dryer Hourly Cost': 'F-36', 'Drying Cost Per Kg': 'F-36' },
+  injection_mold_tooling: { 'Mold Base Steel Cost': 'F-25', 'Cavity Machining Cost': 'F-26', 'Polish Cost': 'F-26', 'Ejector System Cost': 'F-27', 'Sprue and Locating Ring Cost': 'F-27', 'Tryout Cost': 'F-27', 'Side Action Cost': 'F-28', 'Side Action Steel Cost': 'F-28', 'Side Action Machining Cost': 'F-28', 'Side Action CMM Cost': 'F-28', 'Heat Treatment Cost': 'F-29', 'Cooling Cost': 'F-30', 'Rib Insert Cost': 'F-31', 'Hot Drop Cost': 'F-33', 'EDM Cost': 'F-31', 'Mold Cost': 'F-16', 'Molds Required': 'F-17', 'Tooling Cost Per Part': 'F-18' },
 };
