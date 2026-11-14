@@ -318,6 +318,9 @@ export interface ProcessLineCost {
   // part's own CAD features ("Punching // SimpleHole ×14"), from
   // catalog-operation-resolver.ts. Display and trace only — costing is unchanged.
   catalogOperations?: CatalogOperation[];
+  // The step acts on the whole part (a sand casting's melting, pouring, cooling, shakeout, cleaning, finishing and inspection): the process
+  // tree shows the part as the step's feature and highlights all of it. Display only.
+  actsOnWholePart?: boolean;
   // The real GD&T callouts this line (Inspection) covers — see gdt-callouts.ts.
   // Only the STEP-model source can carry a real faceIds link (drawing-sourced
   // callouts are always faceIds: []) — highlight only when faceIds is non-empty.
