@@ -183,7 +183,11 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   const pouredKg = metal.run.value!;
   const yieldNote = referenceYieldNote(ref, input.material.materialType, (100 * netKg) / pouredKg);
   if (yieldNote) notes.push(yieldNote);
-  const poured = { perCastingKg: pouredKg, perMouldKg: pouredKg * cavities };
+  // Poured Weight's eye in the dialog opens this calculation: its own inputs (the part volume's faces, the gating and the risers) and result.
+  const poured = {
+    perCastingKg: pouredKg, perMouldKg: pouredKg * cavities,
+    ref: { kind: 'calculation' as const, name: METAL_PER_CASTING, evidence: 'part_volume' as const, steps: metal.run.trace },
+  };
 
   const cored = sandCores({ ...base, poured }, part.cores);
   if (cored.missing.length) return fail(...cored.missing);

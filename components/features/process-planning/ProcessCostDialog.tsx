@@ -52,6 +52,7 @@ import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
 import { isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
+import { calculationPanel, evidenceOfRef, lookupPanel, opensTable, recordPanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
 import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
@@ -2225,6 +2226,12 @@ export function ProcessCostDialog({
   const handleViewLookup = useCallback((field: CalculatorField) => { void viewLookupRef.current(field); }, []);
   const onShowEvidenceRef = useRef(onShowEvidence);
   onShowEvidenceRef.current = onShowEvidence;
+  /** Where the engine read an input of the open calculator (SourceRef on its trace step); undefined for a value it did not read from a record. */
+  const sourceRefFor = (fieldName: string): SourceRef | undefined => {
+    const seed = engineSeedRef.current?.calculatorId === selectedCalculatorId ? engineSeedRef.current : engineSeedsRef.current[selectedCalculatorId] ?? null;
+    return seed?.refs[fieldName];
+  };
+
   const handleToggleEvidence = useCallback((field: CalculatorField, highlight: FieldHighlight | null, turnOn: boolean) => {
     if (!turnOn) { onShowEvidenceRef.current?.(null); return; }
     // one panel slot: the reference table yields to the evidence, and showing this input
@@ -2246,6 +2253,30 @@ export function ProcessCostDialog({
 
     try {
       const { processesApi } = await import('@/lib/api/processes');
+
+      // The engine said where the value was read (SourceRef): open that record or table with its row outlined, or the calculation behind
+      // it step by step with the faces it rests on lit. Every engine that records refs is shown this one way, not per field name.
+      const ref = sourceRefFor(field.fieldName);
+      if (ref && opensTable(ref)) {
+        const current = calculatorInputs[field.fieldName];
+        let panel: SourcePanel;
+        if (ref.kind === 'variable') panel = variablePanel(ref, (await processesApi.getDomainVariables(ref.domain)).variables);
+        else if (ref.kind === 'lookup') panel = lookupPanel(ref, await processesApi.getReferenceLookup(ref.domain, ref.table), current);
+        else if (ref.kind === 'machine') panel = recordPanel(await processesApi.getRecordSourceTable('machine', ref.machineId, ref.column));
+        else if (ref.kind === 'material') panel = recordPanel(await processesApi.getRecordSourceTable('material', ref.materialId, ref.column));
+        else if (ref.kind === 'calculation') panel = calculationPanel(ref);
+        else return;
+        setLookupTableData({ fieldName: field.fieldName, fieldLabel: field.displayLabel || field.fieldName, tableId: null, ...panel });
+        setShowLookupTable(true);
+        // A calculation over CAD measurements: its faces too, beside the steps (the one case both panels show at once).
+        const evidence = evidenceOfRef(ref);
+        if (evidence) {
+          const highlight = resolveFieldHighlight(evidence, bomItemData?.featureGraph?.feature_graph_v2);
+          // Not checked against the input: the faces carry the calculation's measurement (a volume), not the input's quantity (a weight).
+          onShowEvidence?.({ highlight, fieldLabel: field.displayLabel || field.fieldName });
+        }
+        return;
+      }
 
       // Case M: a machining calculator field backed by a machining reference
       // table (machining_reference_data). The row the engine used is outlined
@@ -3591,6 +3622,8 @@ export function ProcessCostDialog({
                       .map((field: CalculatorField) => {
                         // An eye opens the reference table for inputs read from one.
                         const hasLookupEye =
+                          // The engine recorded where the value was read: a record, table or calculation to open.
+                          opensTable(sourceRefFor(field.fieldName)) ||
                           (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
                           !!field.sourceField?.startsWith('from_') ||
                           // Real sm_lookup_* cost-engine tables, DB-marked or resolved in application code.
@@ -3865,6 +3898,7 @@ export function ProcessCostDialog({
           <div className="shrink-0 px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex flex-wrap items-center gap-x-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
             Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
+            {lookupTableData.note && <span className="text-foreground ml-1">{lookupTableData.note}</span>}
             {lookupTableData.matchedRowKeys && (
               <span className="text-primary font-medium ml-1">
                 {Array.isArray(lookupTableData.matchedRowKeys)

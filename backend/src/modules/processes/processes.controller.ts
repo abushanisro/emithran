@@ -230,6 +230,22 @@ export class ProcessesController {
   }
 
   @OrgRole('viewer')
+  @Get('source-tables/machine/:id')
+  @ApiOperation({ summary: 'The machine a calculator input was read from, among the machines of its class and location, shaped as a lookup table' })
+  async getMachineSourceTable(@Param('id') id: string, @Query('column') column: string, @AccessToken() token: string) {
+    if (!column) throw new BadRequestException('column is required');
+    return this.processesService.getMachineSourceTable(id, column, token);
+  }
+
+  @OrgRole('viewer')
+  @Get('source-tables/material/:id')
+  @ApiOperation({ summary: 'The material a calculator input was read from, among the materials of its group, shaped as a lookup table' })
+  async getMaterialSourceTable(@Param('id') id: string, @Query('column') column: string, @AccessToken() token: string) {
+    if (!column) throw new BadRequestException('column is required');
+    return this.processesService.getMaterialSourceTable(id, column, token);
+  }
+
+  @OrgRole('viewer')
   @Get('waterjet-machines-table')
   @ApiOperation({ summary: 'Nozzle delay (pierce time) and jet data of every waterjet machine, shaped as a lookup table' })
   @ApiResponse({ status: 200, description: 'Table retrieved successfully' })

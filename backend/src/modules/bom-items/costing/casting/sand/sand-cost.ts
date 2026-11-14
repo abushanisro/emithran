@@ -150,6 +150,7 @@ export const SAND_MATERIAL_COLUMNS = [
 
 export function sandMaterialFromRow(row: Record<string, any>): SandMaterial {
   return {
+    id: String(row.id ?? ''),
     name: String(row.name ?? row.grade ?? ''), // migration 865: name was material_grade, grade was material
     materialType: row.material_type ? String(row.material_type) : null,
     columns: Object.fromEntries(SAND_MATERIAL_COLUMNS.map((k) => [k, num(row[k])])),

@@ -13,6 +13,7 @@ import * as ExcelJS from 'exceljs';
 import { readWorkbook } from '../../common/heavy-work/heavy-work';
 import { REFERENCE_DOMAINS, REFERENCE_GROUP_DOMAIN, type ReferenceDomain } from './reference-domains';
 import { strokeRateFactorTable, turretMachinesTable, waterjetMachinesTable, type ReferenceTablePayload } from '../bom-items/costing/sheet-metal/lookup/turret-reference-tables';
+import { machineSourceTable, materialSourceTable, type SourceTable } from './source-tables';
 import { Logger } from '../../common/logger/logger.service';
 import { DatabaseService } from '../../common/database/database.service';
 import {
@@ -276,6 +277,37 @@ export class ProcessesService {
     ]);
     if (machines.error || library.error) throw new InternalServerErrorException('Failed to read the Turret Press machine library');
     return turretMachinesTable(machines.data ?? [], library.data ?? []);
+  }
+
+  /**
+   * The machine record a calculator input was read from, among the machines of its class at its location (source-tables.ts), with the
+   * column the value is in last. The caller's own access: HR Rates rows are the organization's.
+   */
+  async getMachineSourceTable(machineId: string, column: string, accessToken: string): Promise<SourceTable> {
+    const db = this.databaseService.getClient(accessToken);
+    const { data: own, error } = await db.from('mhr_records').select('id, machine_class, location').eq('id', machineId).maybeSingle();
+    if (error) throw new InternalServerErrorException(`Failed to read the machine (${error.message})`);
+    if (!own) throw new NotFoundException(`Machine ${machineId} not found`);
+    let q = db.from('mhr_records')
+      .select('id, machine_name, machine_class, location, machine_power_kw, operators, setup_time_hr, mhr_usd_per_hour, usd_labor_rate_per_hr, specs')
+      .eq('machine_class', own.machine_class);
+    q = own.location == null ? q.is('location', null) : q.eq('location', own.location);
+    const { data: rows, error: rowsError } = await q.limit(500);
+    if (rowsError) throw new InternalServerErrorException(`Failed to read the machines (${rowsError.message})`);
+    return machineSourceTable(rows ?? [], { id: String(own.id), machineClass: String(own.machine_class), location: own.location ?? null }, column);
+  }
+
+  /** The material record a calculator input was read from, among the materials of its group (source-tables.ts), the value's column last. */
+  async getMaterialSourceTable(materialId: string, column: string, accessToken: string): Promise<SourceTable> {
+    const db = this.databaseService.getClient(accessToken);
+    const { data: own, error } = await db.from('raw_materials').select('id, material_group').eq('id', materialId).maybeSingle();
+    if (error) throw new InternalServerErrorException(`Failed to read the material (${error.message})`);
+    if (!own) throw new NotFoundException(`Material ${materialId} not found`);
+    let q = db.from('raw_materials').select('*');
+    q = own.material_group == null ? q.eq('id', own.id) : q.eq('material_group', own.material_group);
+    const { data: rows, error: rowsError } = await q.limit(500);
+    if (rowsError) throw new InternalServerErrorException(`Failed to read the materials (${rowsError.message})`);
+    return materialSourceTable(rows ?? [], { id: String(own.id), group: own.material_group ?? null }, column);
   }
 
   /** Every waterjet machine with its nozzle delay (the waterjet calculator pierce time) and jet data. */

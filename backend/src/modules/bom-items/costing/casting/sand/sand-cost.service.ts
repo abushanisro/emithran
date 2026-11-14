@@ -93,7 +93,7 @@ export class SandCostService {
     if (!g) return null;
     const { data, error } = await client
       .from('raw_materials')
-      .select(['name', 'grade', 'material_type', ...SAND_MATERIAL_COLUMNS].join(', '))
+      .select(['id', 'name', 'grade', 'material_type', ...SAND_MATERIAL_COLUMNS].join(', '))
       .eq('material_group', SAND_MATERIAL_GROUP)
       .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`)
       .limit(2);

@@ -3,7 +3,7 @@ import {
   normalizeFieldName,
   type CalculatorFieldRow,
 } from '../../../../calculators/calculator-formula-evaluator';
-import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
+import type { CalculationTraceStep, SourceRef } from '../../../dto/cost-breakdown.dto';
 
 /**
  * Reference-data calculators (Machining, Die Casting, ...) are computed BY the
@@ -71,12 +71,21 @@ export interface CalcSeed {
   lookup?: boolean;
   /** Which lookup-table row(s) the value came from: every column/value in `row` identifies them. */
   match?: LookupMatch;
+  /** Where the value was read, structured, so the calculator dialog can open and highlight it (SourceRef). */
+  ref?: SourceRef;
 }
 
 /** The lookup-table row(s) an input came from, for highlighting in the table viewer. */
 export interface LookupMatch {
   table: string;
   row: Record<string, string | number>;
+}
+
+/** The CAD faces a source rests on: a CAD measurement, or a calculation over one (Poured Weight over the part volume). */
+function evidenceOf(ref: SourceRef): CalculationTraceStep['evidence'] | null {
+  if (ref.kind === 'cad') return ref.evidence;
+  if (ref.kind === 'calculation') return ref.evidence;
+  return null;
 }
 
 export interface CalcRun {
@@ -135,6 +144,8 @@ export function runReferenceCalculator(
         fieldName: f.field_name, displayLabel: f.display_label ?? f.field_name, kind: 'input',
         value: round(seed.value), unit: f.unit ?? null, source: seed.source,
         ...(seed.lookup ? { stepType: 'lookup' as const } : {}),
+        // A value the part's own override replaced was not read from the seed's source: no ref then.
+        ...(seed.ref && !own ? { ref: seed.ref, ...(evidenceOf(seed.ref) ? { evidence: evidenceOf(seed.ref)! } : {}) } : {}),
         ...(own ? { override: { original: seeded && Number.isFinite(seeded.value) ? round(seeded.value) : null, reason: own.reason } } : {}),
       });
     } else if (hasValue(f.default_value) && Number.isFinite(Number(f.default_value))) {

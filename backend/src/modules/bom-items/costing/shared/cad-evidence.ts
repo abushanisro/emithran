@@ -14,6 +14,8 @@ export const CAD_EVIDENCE_KEYS = [
   // Plastic molding: the nominal wall (the antiparallel face pairs that voted for it) and the solid's volume (the whole body).
   'wall_thickness',
   'part_volume',
+  // The part's whole surface (a casting's area for coating and blasting): every face.
+  'part_surface',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];

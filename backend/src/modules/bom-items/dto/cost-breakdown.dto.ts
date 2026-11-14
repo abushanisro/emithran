@@ -85,6 +85,25 @@ export interface FeatureOp {
   occurrenceRefs?: Array<{ featureId: string; occurrenceIndex: number }>;
 }
 
+/**
+ * Where a calculator input's value was read, so the UI can open that source and highlight it: the reference-table row (and the column the
+ * value is in), the machine or material record and its column, the CAD faces it was measured on, or the calculation that produced it with
+ * its own steps. Set by the engine that seeds the input; an input without one has nothing to open.
+ */
+export type SourceRef =
+  /** A named variable of a reference-data domain (memory/<domain>/..._variables.csv, staged). */
+  | { kind: 'variable'; domain: string; name: string }
+  /** A staged reference lookup table: its row when the engine knows which one, and the column the value is in. */
+  | { kind: 'lookup'; domain: string; table: string; column: string; row: Record<string, string | number> | null }
+  /** A machine's HR Rates record (mhr_records): the column (or spec key) the value is in. */
+  | { kind: 'machine'; machineId: string; machineName: string; machineClass: string; location: string | null; column: string }
+  /** A material's Raw Materials record: the column the value is in. */
+  | { kind: 'material'; materialId: string; materialName: string; column: string }
+  /** Measured on the part's CAD faces (costing/shared/cad-evidence.ts). */
+  | { kind: 'cad'; evidence: CadEvidenceKey }
+  /** Computed by another calculator: its steps (each with its own source), and the CAD faces it rests on when there are any. */
+  | { kind: 'calculation'; name: string; evidence: CadEvidenceKey | null; steps: CalculationTraceStep[] };
+
 export interface CalculationTraceStep {
   fieldName: string;         // real calculator_fields.field_name, e.g. "Cutting Speed"
   displayLabel: string;      // real calculator_fields.display_label, e.g. "Cutting Speed (m/min)"
@@ -107,6 +126,8 @@ export interface CalculationTraceStep {
   // 'input' steps whose value was measured on CAD faces: which measurement
   // (see costing/shared/cad-evidence.ts), so the UI can show those faces.
   evidence?: CadEvidenceKey;
+  /** 'input' steps: where the value was read, structured (see SourceRef), for the input's eye in the calculator dialog. */
+  ref?: SourceRef;
   /** Plastic molding: the registered formula (costing/plastic-molding/formula-registry.ts) that produced a calculated step, its version and validation state. */
   formulaId?: string;
   formulaVersion?: number;
