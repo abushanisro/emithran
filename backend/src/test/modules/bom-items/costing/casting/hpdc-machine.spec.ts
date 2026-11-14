@@ -348,7 +348,7 @@ describe('casting Cost Summary', () => {
   const base = {
     materialGrade: al380.material.name, materialCostPerKg: 5, materialDensityKgM3: al380.material.densityKgM3!,
     materialSource: 'db' as const, partVolumeMm3: 30_000, batchSize: 1000, warnings: [], ratesSource: 'test',
-    calculators, alloy: { name: al380.material.name, densityKgM3: al380.material.densityKgM3, yieldLossFactor: al380.material.yieldLossFactor },
+    calculators, alloy: { id: al380.material.id, name: al380.material.name, densityKgM3: al380.material.densityKgM3, yieldLossFactor: al380.material.yieldLossFactor },
   };
   /** Melted metal per part, the shot shared across cavities (what the Melting calculator gives). */
   const melted = (h: { shotVolumeMm3: number | null; cavities: { count: number } | null }) => (h.shotVolumeMm3! / h.cavities!.count / 1e9) * al380.material.densityKgM3!;

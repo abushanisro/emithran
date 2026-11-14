@@ -33,4 +33,31 @@ describe('materialSourceTable', () => {
     expect(t.columnDefinitions.map((c) => c.name)).toEqual(['name', 'grade', 'specific_heat_rt_j_kg_k']);
     expect(t.matchedRowKeys).toEqual({ id: 'm2' });
   });
+
+  describe('with the materials\' properties (raw_material_properties)', () => {
+    const t = materialSourceTable([
+      { id: 'a2', name: 'Aluminum, AA 380.0', grade: '380.0', density_kg_m3: 2760 },
+      { id: 'a1', name: 'Aluminum, AA 360.0', grade: '360.0', density_kg_m3: 2630 },
+    ], { id: 'a2', group: 'Die Casting' }, 'mold_temp', [
+      { raw_material_id: 'a2', property_key: 'mold_temp', value_num: '240' },
+      { raw_material_id: 'a2', property_key: 'shear_strength', value_num: 190 },
+      { raw_material_id: 'a1', property_key: 'mold_temp', value_num: 230 },
+      { raw_material_id: 'a1', property_key: 'density_kg_m3', value_num: 1 },
+      { raw_material_id: 'a1', property_key: 'cooling_factor', value_num: null },
+    ]);
+
+    it('adds each property as a column of its material\'s row, named by property_key, the value\'s column last', () => {
+      const al380 = t.rows.find((r) => r['id'] === 'a2')!;
+      expect(al380['mold_temp']).toBe(240);
+      expect(al380['shear_strength']).toBe(190);
+      expect(t.rows.find((r) => r['id'] === 'a1')!['mold_temp']).toBe(230);
+      expect(t.columnDefinitions.at(-1)).toEqual({ name: 'mold_temp', label: 'Mold Temp' });
+      expect(t.matchedRowKeys).toEqual({ id: 'a2' });
+    });
+
+    it('never replaces a column of the record with a property of the same name, and shows no empty property', () => {
+      expect(t.rows.find((r) => r['id'] === 'a1')!['density_kg_m3']).toBe(2630);
+      expect(t.columnDefinitions.map((c) => c.name)).not.toContain('cooling_factor');
+    });
+  });
 });
