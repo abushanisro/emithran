@@ -14,13 +14,25 @@ const ROOT = join(__dirname, '../../../../../../..');
 describe('machining calculator spec ↔ migration ↔ engine', () => {
   it('the committed migration is exactly what the spec generates', () => {
     const committed = readFileSync(join(ROOT, 'migrations/804_machining_calculators.sql'), 'utf-8');
-    expect(committed).toBe(buildMachiningCalculatorsMigrationSql(spec));
+    // 804 is built from the whole spec, superseded entries included: an applied migration never changes.
+    expect(committed).toBe(buildMachiningCalculatorsMigrationSql());
+  });
+
+  it('a calculator replaced later keeps its 804 entry, and the replacement ships in its own migration (Inspection, 1029)', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1029_machining_inspection_from_reference.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1029, spec));
+    expect(committed).toContain('tblInspection');
+    // The engine sees only the current entry.
+    expect(spec.calculators.filter((c) => c.name === 'Machining - Inspection').map((c) => c.fields.map((f) => f.name))).toEqual([
+      ['Time Per Analysis', 'Inspection Sample Ratio', 'Final Inspection Time', 'Cycle Time'],
+    ]);
+    expect(buildMachiningCalculatorsMigrationSql()).toContain('Positioning Time');
   });
 
   it('a calculator added later ships in its own migration, and 804 does not change for it', () => {
     const committed = readFileSync(join(ROOT, 'migrations/1027_machining_milling_calculator.sql'), 'utf-8');
     expect(committed).toBe(buildMachiningCalculatorMigrationSql(1027, spec));
-    expect(buildMachiningCalculatorsMigrationSql(spec)).not.toContain('Machining - Milling');
+    expect(buildMachiningCalculatorsMigrationSql()).not.toContain('Machining - Milling');
   });
 
   it('the calculators added to the spec after 804 was applied ship again in 1028, so a database that ran the earlier 804 gets them', () => {

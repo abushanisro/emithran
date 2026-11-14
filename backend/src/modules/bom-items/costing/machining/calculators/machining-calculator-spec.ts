@@ -32,6 +32,11 @@ interface SpecCalculator {
   migration?: number;
   /** A later migration that ships this calculator again: it was added to the spec after migration 804 had been applied, so databases that ran the earlier 804 never received it. */
   reissue?: number;
+  /**
+   * A later migration replaces this calculator with the spec's next entry of the same name. The entry stays, unchanged, because an applied
+   * migration (804) is generated from it and must never change; everything else reads only the current entry.
+   */
+  supersededBy?: number;
   description: string;
   machineClasses: string[];
   fields: SpecField[];
@@ -43,11 +48,16 @@ export interface MachiningCalculatorSpec {
   retire: string[];
 }
 
-export function loadMachiningCalculatorSpec(): MachiningCalculatorSpec {
+/**
+ * The spec's calculators. By default only the current entry of each calculator: one a later migration replaced (supersededBy) is left
+ * out. `includeSuperseded` keeps it, for generating the migration that shipped it (804), which must stay byte-identical once applied.
+ */
+export function loadMachiningCalculatorSpec(opts: { includeSuperseded?: boolean } = {}): MachiningCalculatorSpec {
   const raw = spec as any;
   const groups: Record<string, string[]> = { lathes: raw.lathes, mills: raw.mills };
-  const byName = new Map<string, any>(raw.calculators.map((c: any) => [c.name, c]));
-  const calculators: SpecCalculator[] = raw.calculators.map((c: any) => {
+  const entries = (raw.calculators as any[]).filter((c) => opts.includeSuperseded || !c.supersededBy);
+  const byName = new Map<string, any>(entries.map((c: any) => [c.name, c]));
+  const calculators: SpecCalculator[] = entries.map((c: any) => {
     const classes: string[] = Array.isArray(c.machineClasses)
       ? c.machineClasses
       : String(c.machineClasses).split('+').flatMap((g: string) => groups[g] ?? []);
@@ -56,7 +66,7 @@ export function loadMachiningCalculatorSpec(): MachiningCalculatorSpec {
     for (const cls of classes) {
       if (!raw.stations[cls]) throw new Error(`machining calculator "${c.name}": no catalog station for machine class "${cls}"`);
     }
-    return { name: c.name, operation: c.operation, description: c.description, machineClasses: classes, fields, ...(c.migration ? { migration: c.migration } : {}), ...(c.reissue ? { reissue: c.reissue } : {}) };
+    return { name: c.name, operation: c.operation, description: c.description, machineClasses: classes, fields, ...(c.migration ? { migration: c.migration } : {}), ...(c.reissue ? { reissue: c.reissue } : {}), ...(c.supersededBy ? { supersededBy: c.supersededBy } : {}) };
   });
   return { stations: raw.stations, calculators, retire: raw.retire };
 }

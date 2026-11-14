@@ -1,8 +1,7 @@
-import { RATES_SOURCE_LABEL, INSPECTION_SAMPLING_DEFAULT, isoCoarsePitchMm, HOLE_OP_UNLOAD_SEC, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, type SurfaceTreatmentDbRate, type InspectionStagePolicy } from '../../shared/core/default-rates.constants';
+import { RATES_SOURCE_LABEL, isoCoarsePitchMm, HOLE_OP_UNLOAD_SEC, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, type SurfaceTreatmentDbRate } from '../../shared/core/default-rates.constants';
 import { resolveSetupMinutes, type SetupTimeResolution } from '../../shared/core/engine-kernel';
 import type { DeepHoleCandidate } from '../operation/deep-hole-routing';
 import { isRealHeatTreatmentCallout } from '../operation/wire-edm-routing';
-import { deriveGdtSeverity } from '../../shared/physics/gdt-severity';
 import {
   checkMachineCapability,
   type PartGeometryForCapability,
@@ -13,6 +12,8 @@ import { computeSustainability } from '../../shared/core/cost-engine';
 import type { CalculationTraceStep, CostSummaryDto, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { DrillingTable } from '../lookup/drilling-table';
 import type { MachiningCapabilityRules } from '../capability-rules';
+import { INSPECTION_TABLE, INSPECTION_TIME_COLUMN, type InspectionReference } from '../inspection-reference';
+import { lookupSeed, variableSeed } from '../calculators/machining-source-refs';
 import { prefixTrace, traceCalc, traceHasAssumption, traceInput } from './machining-trace';
 import type { GearRoute } from '../operation/gear-routing';
 import { runMachiningCalculator, type CalcRun, type CalcSeed, type MachiningCalculators } from '../calculators/machining-calculator';
@@ -101,15 +102,6 @@ export interface MachiningCostInput {
   // Surface treatment callout from the drawing / coating field ("Type III Hardcoat
   // Black Anodize"); null when the part has none.
   surfaceTreatment: string | null;
-  // Resolved quality plan (DB quality_plans row or code default). When unset,
-  // INSPECTION_SAMPLING_DEFAULT applies.
-  samplingPolicy?: InspectionStagePolicy;
-  // Legacy per-item in-process override (1 = full measurement on every part);
-  // wins over samplingPolicy.inProcessPerN. FAI and final stages still apply.
-  samplingPerN?: number;
-  // GD&T callouts for per-feature inspection time. timeMin is pre-resolved from
-  // the inspection_rules table when available; the code matrix is the fallback.
-  gdtFeatures?: Array<{ symbol: string; tolerance: number; timeMin?: number }>;
   // Digital Factory location — localizes fixture/tooling cost. Defaults to the
   // shared costing default so a missing value never silently prices in the wrong country.
   location?: string;
@@ -257,6 +249,10 @@ export interface MachiningCostInput {
   // = not staged: no grinding / jig line is added and capabilityRulesMissing
   // names what is absent.
   capabilityRules?: MachiningCapabilityRules | null;
+  /** The memory/Machining inspection reference (inspection-reference.ts); null/absent = the inspection line is a named gap. */
+  inspectionReference?: InspectionReference | null;
+  /** The occurrences the reference inspects (inspectedFeatures over the part's feature_graph_v2): listed and lit on the inspection line. */
+  inspectedFeatures?: Array<{ featureId: string; occurrenceIndex: number }>;
   capabilityRulesMissing?: string[];
   // Jig Grind (new) -- shares Jig Boring's real tolerance ceiling, routed
   // by a real, disclosed heat-treat-callout classifier instead (see
@@ -1217,65 +1213,30 @@ function tapThreadGroups(
   return { min: totalSec / 60, trace, missing, calculatorId, calculatorVersion, lookups };
 }
 
-/**
- * GD&T inspection minutes (up to 5 callouts): the inspection_rules time per
- * callout when resolved, else the coded severity matrix — with the source that
- * applied. gdtFeatures and the part's GD&T count come from the same resolver
- * (resolveGdtCallouts), so there is no count without callouts to time.
- */
-function gdtInspectionTime(
-  gdtFeatures?: Array<{ symbol: string; tolerance: number; timeMin?: number }>,
-): CalcSeed {
-  if (gdtFeatures && gdtFeatures.length > 0) {
-    const used = gdtFeatures.slice(0, 5);
-    const fromRules = used.every((g) => g.timeMin != null);
-    return {
-      value: used.reduce((sum, g) => sum + (g.timeMin ?? deriveGdtSeverity(g.symbol, g.tolerance).inspectionTimeMin), 0),
-      source: fromRules
-        ? `inspection_rules: ${used.map((g) => `${g.symbol} ${g.tolerance}`).join(', ')}`
-        : 'Assumption: coded GD&T severity matrix for callouts without an inspection_rules row',
-    };
-  }
-  return { value: 0, source: 'No GD&T callouts (STEP model PMI or drawing)' };
-}
 
-// ── Inspection line (three-stage sampling, CMM-amortized) ────────────────────
-// Cost per part = (setup + FAI + in-process samples + final checks) / batchSize.
-//   FAI:        first article, full per-piece measurement, once per batch
-//   in-process: 1 of every N parts (samplingPerN override), full measurement
-//   final:      1 of every finalPerN parts, short visual/gauge check
-// The rate carries CMM equipment amortization when an MHR record exists — the
-// MHR engine already prices depreciation/interest/maintenance per effective hour.
+// ── Inspection line (memory/Machining reference: inspection-reference.ts) ───────
+// Per part: one analysis of the default inspection type (tblInspection) on the share of parts inspected, plus every part's final quality
+// inspection. Every input is read from the reference and opens there (SourceRef); the holes inspected are listed on the line for the
+// Process tree and lit on the model. Without the reference the line is a named gap, never a coded allowance.
 function computeInspectionLine(
-  holes: number,
-  threadCount: number,
-  tightestToleranceMm: number | null,
-  gdtFeatureCount: number,
-  gdtFeatures: Array<{ symbol: string; tolerance: number; timeMin?: number }> | undefined,
+  reference: InspectionReference | null | undefined,
+  inspected: ReadonlyArray<{ featureId: string; occurrenceIndex: number }>,
   inspectionRate: MHRRateInput,
   batchSize: number,
-  samplingPerN: number | undefined,
-  samplingPolicy: InspectionStagePolicy | undefined,
   calculators: MachiningCalculators | null | undefined,
   warnings: string[],
   processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
 ): ProcessLineCost {
-  const policy = samplingPolicy ?? INSPECTION_SAMPLING_DEFAULT;
-  const policySource = samplingPolicy ? 'Sampling policy: inspection_rules' : 'Assumption: default sampling policy (coded)';
   const batch = Math.max(batchSize, 1);
-  const run = runMachiningCalculator(calculators, 'Inspection', {
-    'Holes': { value: holes, source: 'CAD: drilled holes' },
-    'Threads': { value: threadCount, source: 'Drawing/CAD: threads' },
-    'Tightest Tolerance': tightestToleranceMm != null && tightestToleranceMm > 0
-      ? { value: tightestToleranceMm, source: 'Drawing: tightest tolerance' }
-      : { value: 0, source: 'Drawing: no tolerance callout' },
-    'GDT Time': gdtInspectionTime(gdtFeatures),
-    'Batch Size': { value: batch, source: 'BOM: batch size' },
-    'First Article Pieces': { value: policy.fai ? 1 : 0, source: policySource },
-    'In-process 1 in N': { value: Math.max(samplingPerN ?? policy.inProcessPerN, 1), source: samplingPerN != null ? 'Scenario: sampling override' : policySource },
-    'Final Check 1 in N': { value: Math.max(policy.finalPerN, 1), source: policySource },
-    'Final Check Time': { value: policy.finalCheckMin, source: policySource },
-  });
+  const run = runMachiningCalculator(calculators, 'Inspection', reference ? {
+    'Time Per Analysis': lookupSeed(
+      reference.timePerAnalysisS, `${INSPECTION_TABLE}: ${reference.inspectionType} (variables defaultInspectionType)`,
+      { table: INSPECTION_TABLE, row: { Name: reference.inspectionType } }, INSPECTION_TIME_COLUMN,
+    ),
+    'Inspection Sample Ratio': variableSeed(reference.sampleRatio, 'defaultInspectionSampleRatio'),
+    'Final Inspection Time': variableSeed(reference.finalInspectionMin, 'defaultFinalInspectionTime'),
+  } : {});
+  if (!reference) warnings.push('Inspection not priced: the memory/Machining inspection reference (tblInspection and its variables) is not staged.');
   const cycleMin = (run.sec ?? 0) / 60;
   // Real per-CMM mhr_records.setup_time_hr first, then the cited class
   // constant — see resolveSetupMinutes().
@@ -1287,9 +1248,21 @@ function computeInspectionLine(
   if (setupResolution.warning) warnings.push(setupResolution.warning);
   const setupCost = r2((setupResolution.setupMin / 60) * inspectionRate.rate / batch);
   const runCost = r2((cycleMin / 60) * inspectionRate.rate);
-  return withRun(makeLine('Inspection', setupCost, runCost, cycleMin, inspectionRate, processIdentityByMachineClass, {
+  const line = withRun(makeLine('Inspection', setupCost, runCost, cycleMin, inspectionRate, processIdentityByMachineClass, {
     setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
   }), run, setupTraceSteps(setupResolution, inspectionRate.machineName, batchSize));
+  // The holes the reference inspects (Special Inspection: Feature Inspection), for the Process tree: one analysis covers them all.
+  if (inspected.length > 0 && reference) {
+    line.featureBreakdown = [{
+      name: `Feature Inspection ×${inspected.length}`,
+      timeSec: reference.timePerAnalysisS * reference.sampleRatio,
+      featureType: 'inspection',
+      count: inspected.length,
+      featureIds: [...new Set(inspected.map((o) => o.featureId))],
+      occurrenceRefs: [...inspected],
+    }];
+  }
+  return line;
 }
 
 // Surface treatment is now in its own module to avoid circular dep with cost-engine.ts.
@@ -1660,8 +1633,8 @@ export function computeMillingCostSummary(
 
   // ── Inspection (batch-sampled; CMM amortization rides on the MHR rate) ───
   processLines.push(computeInspectionLine(
-    holeCount, threadCount, tightestToleranceMm, gdtFeatureCount, input.gdtFeatures, inspectionRate, batchSize,
-    input.samplingPerN, input.samplingPolicy, input.machiningCalculators, warnings, input.processIdentityByMachineClass,
+    input.inspectionReference, input.inspectedFeatures ?? [], inspectionRate, batchSize,
+    input.machiningCalculators, warnings, input.processIdentityByMachineClass,
   ));
 
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
@@ -2170,8 +2143,8 @@ export function computeTurningCostSummary(
   // drilledHoleCount, not raw holeCount — the raw count includes OD steps/grooves
   // and would inflate the hole-sampling time for turned parts.
   processLines.push(computeInspectionLine(
-    drilledHoleCount, threadCount, tightestToleranceMm, gdtFeatureCount, input.gdtFeatures, inspectionRate, batchSize,
-    input.samplingPerN, input.samplingPolicy, input.machiningCalculators, warnings, input.processIdentityByMachineClass,
+    input.inspectionReference, input.inspectedFeatures ?? [], inspectionRate, batchSize,
+    input.machiningCalculators, warnings, input.processIdentityByMachineClass,
   ));
 
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));

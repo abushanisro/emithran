@@ -106,9 +106,8 @@ describe('machining calculator inputs carry where they were read (SourceRef)', (
     });
   });
 
-  it('gives no ref to a CAD measurement with no face set behind it, nor to the batch size: there is nothing to open', () => {
+  it('gives no ref to a CAD measurement with no face set behind it: there is nothing to open', () => {
     for (const field of ['Hole Diameter', 'Hole Depth', 'Holes']) expect(inputStep(drill.trace, field)!.ref).toBeUndefined();
-    expect(inputStep(traceOf('Inspection'), 'Batch Size')!.ref).toBeUndefined();
   });
 
   it('Index Transfer: the multi-spindle times open the selected machine\'s HR Rates record at the column read', () => {

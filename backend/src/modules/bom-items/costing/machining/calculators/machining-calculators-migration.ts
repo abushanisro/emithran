@@ -50,7 +50,7 @@ $calc$;
 `;
 }
 
-export function buildMachiningCalculatorsMigrationSql(fullSpec: MachiningCalculatorSpec = loadMachiningCalculatorSpec()): string {
+export function buildMachiningCalculatorsMigrationSql(fullSpec: MachiningCalculatorSpec = loadMachiningCalculatorSpec({ includeSuperseded: true })): string {
   // Migration 804 holds the calculators with no migration of their own; later ones ship separately
   // (buildMachiningCalculatorMigrationSql) so this file never changes once applied.
   const spec = { ...fullSpec, calculators: fullSpec.calculators.filter((c) => !c.migration) };

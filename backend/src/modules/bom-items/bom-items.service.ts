@@ -1,3 +1,4 @@
+import { inspectedOccurrences, type InspectionReference } from './costing/machining/inspection-reference';
 import { electricityUsd, loadLocationElectricity } from './costing/shared/location-electricity';
 import { castingSourcePath } from '../sand-casting/casting-source';
 import type { DbClient } from '../../common/db/postgrest-client';
@@ -104,8 +105,7 @@ import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candi
 import type { RouteComparisonDto, RouteComparisonResponseDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
 import { VALID_ROUTE_IDS } from './dto/apply-route.dto';
 import { resolveInspectionRule, SEVERITY_RANK } from './costing/shared/physics/gdt-severity';
-import type { GdtSeverity, InspectionMethod, InspectionRuleRow } from './costing/shared/physics/gdt-severity';
-import type { InspectionStagePolicy } from './costing/shared/core/default-rates.constants';
+import type { GdtSeverity, InspectionMethod } from './costing/shared/physics/gdt-severity';
 import { InspectionKnowledgeService } from '../manufacturing-knowledge/services/inspection-knowledge.service';
 import type { GdtAnalysisDto, GdtFeatureDto } from './dto/gdt-analysis.dto';
 import {
@@ -3488,8 +3488,6 @@ export class BOMItemsService {
     void this.writeSelectionSnapshots(id, accessToken, mhrRates, location);
 
     if (isMachiningFamily(family)) {
-      const inspectionRules = await this.inspectionKnowledge.getInspectionRules(accessToken);
-      const samplingPolicy = await this.resolveSamplingPolicy(item, accessToken);
 
       // Fix 2: Blank optimizer — select near-net stock (round bar / rectangular bar)
       // instead of bbox billet. Runs async but non-blocking: failure → billet fallback.
@@ -3615,9 +3613,8 @@ export class BOMItemsService {
         inspectionRate: preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
         surfaceTreatment: null,
         surfaceTreatmentDbRate,
-        samplingPerN: this.resolveSamplingPerN(item),
-        samplingPolicy,
-        gdtFeatures: this.extractGdtFeatures(item, fg, inspectionRules),
+        // memory/Machining inspection (inspection-reference.ts): the reference values and the holes it inspects.
+        inspectionReference: (await this.machiningLookup.getInspectionReference()).reference, inspectedFeatures: inspectedOccurrences(fg?.feature_graph_v2?.features as any),
         location,
         blankResult,
         machinabilityRating: machinabilityRating ?? undefined,
@@ -6494,11 +6491,6 @@ export class BOMItemsService {
     const waterjetAbrasivePricePerKg = await this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, locInfo.code, rates);
 
     if (isMachiningFamily(family)) {
-      // Same rules + sampling policy as getCostSummary — totals must match line for line
-      const inspection = {
-        rules: await this.inspectionKnowledge.getInspectionRules(accessToken),
-        policy: await this.resolveSamplingPolicy(item, accessToken),
-      };
       // Same real Deburr/Ream data getCostSummary resolves — route
       // comparison must price these identically, not diverge from the
       // primary quote (see this file's own "Single source of truth" rule
@@ -6519,7 +6511,7 @@ export class BOMItemsService {
         return attachToRoutes(await this.buildMilledRoutes(
           id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
           materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
-          inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
+          cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
           routeJigBoreTable, routeCylindricalGrindingParams, routeInternalGrindingParams, routeKeywayBroach, routeWireEdmParams,
           accessToken,
         ));
@@ -6527,7 +6519,7 @@ export class BOMItemsService {
       return attachToRoutes(await this.buildTurnedRoutes(
         id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
         materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
-        inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
+        cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
         routeCylindricalGrindingParams, routeInternalGrindingParams, routeJigBoreTable, routeKeywayBroach, routeWireEdmParams,
         routeTurningParams,
         accessToken,
@@ -7707,6 +7699,7 @@ export class BOMItemsService {
         holeCount: (summary.holeCount ?? item.holeCount ?? 0) as number,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, mhrRates, location,
         stockAllowancePerSideMm: milledAllowance.allowancePerSideMm,
+        inspectionReference: (await this.machiningLookup.getInspectionReference()).reference,
       });
       if (milledAlt) candidates.push(milledAlt);
     }
@@ -7812,10 +7805,12 @@ export class BOMItemsService {
     location: string;
     /** Reference per-side stock allowance (BlankOptimizerService.stockAllowanceFor); null = rule not staged. */
     stockAllowancePerSideMm: number | null;
+    /** The memory/Machining inspection reference (MachiningLookupService.getInspectionReference); null = inspection is a named gap. */
+    inspectionReference: InspectionReference | null;
   }): CandidateRouteDto | null {
     const { volume, surfaceArea, maxLength, maxWidth, maxHeight, finishedWeightKg,
             holeCount, materialCostPerKg, materialDensityKgM3, materialSource,
-            batchSize, mhrRates, location, stockAllowancePerSideMm } = args;
+            batchSize, mhrRates, location, stockAllowancePerSideMm, inspectionReference } = args;
 
     // The ONE bounding-box billet definition (blank-stock-candidates.ts),
     // with the reference stock-allowance rule — not a copy of its formula.
@@ -7832,8 +7827,8 @@ export class BOMItemsService {
       batchSize, family: 'milled', finishedWeightKg,
       deburrRate: preferRealRate(mhrRates.manualDeburr, mhrRates.deburring), inspectionRate: preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment: null, surfaceTreatmentDbRate: null,
-      samplingPerN: undefined, samplingPolicy: undefined,
-      gdtFeatures: [], location, blankResult,
+      inspectionReference, inspectedFeatures: [],
+      location, blankResult,
       machinabilityRating: undefined, featureOps: undefined,
       mhrRate: mhrRates.cnc3ax, tappingRate: mhrRates.tapping,
     };
@@ -8556,44 +8551,6 @@ export class BOMItemsService {
     }));
   }
 
-  // GD&T callouts from drawing intelligence → per-feature inspection-time input.
-  // When inspection_rules rows are supplied, per-callout time comes from the DB
-  // rule bands; the code matrix in gdt-severity.ts remains the fallback.
-  private extractGdtFeatures(
-    item: any,
-    fg: unknown,
-    rules: InspectionRuleRow[] = [],
-  ): Array<{ symbol: string; tolerance: number; timeMin?: number }> {
-    return resolveGdtCallouts(fg, item?.drawingIntelligence)
-      .map((c) => {
-        const symbol = c.type;
-        const tolerance = c.toleranceMm;
-        return {
-          symbol,
-          tolerance,
-          timeMin: rules.length > 0
-            ? resolveInspectionRule(rules, symbol, tolerance).inspectionTimeMin
-            : undefined,
-        };
-      });
-  }
-
-  // Per-item inspection sampling override: bom_items.validation_config.inspection.samplePerN
-  private resolveSamplingPerN(item: any): number | undefined {
-    const v = Number((item?.validationConfig as any)?.inspection?.samplePerN);
-    return Number.isFinite(v) && v >= 1 ? Math.floor(v) : undefined;
-  }
-
-  // Named quality plan (DB quality_plans row) selected per item via
-  // bom_items.validation_config.inspection.qualityPlan; null → code default.
-  private async resolveSamplingPolicy(
-    item: any,
-    accessToken: string,
-  ): Promise<InspectionStagePolicy | undefined> {
-    const planKey = (item?.validationConfig as any)?.inspection?.qualityPlan;
-    if (typeof planKey !== 'string' || !planKey.trim()) return undefined;
-    return (await this.inspectionKnowledge.getQualityPlan(accessToken, planKey.trim())) ?? undefined;
-  }
 
   // Same real drawing-extracted Ra field operation-sequencer.ts's
   // injectDrawingIntelligence already reads for the milled path
@@ -8638,7 +8595,6 @@ export class BOMItemsService {
     comparisonWarnings: string[],
     locInfo: (typeof LOCATION_INFO)[string],
     location: string,
-    inspection?: { rules: InspectionRuleRow[]; policy?: InspectionStagePolicy },
     surfaceTreatmentDbRate?: SurfaceTreatmentDbRate | null,
     deburrLinearSpeedMmPerSec?: number | null,
     reamTable?: any[] | null,
@@ -8715,9 +8671,8 @@ export class BOMItemsService {
       inspectionRate:       preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment:     null,
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
-      samplingPerN:         this.resolveSamplingPerN(item),
-      samplingPolicy:       inspection?.policy,
-      gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
+      inspectionReference:  (await this.machiningLookup.getInspectionReference()).reference,
+      inspectedFeatures:    inspectedOccurrences(fg?.feature_graph_v2?.features as any),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
       deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,
@@ -8938,7 +8893,6 @@ export class BOMItemsService {
     comparisonWarnings: string[],
     locInfo: (typeof LOCATION_INFO)[string],
     location: string,
-    inspection?: { rules: InspectionRuleRow[]; policy?: InspectionStagePolicy },
     surfaceTreatmentDbRate?: SurfaceTreatmentDbRate | null,
     deburrLinearSpeedMmPerSec?: number | null,
     reamTable?: any[] | null,
@@ -9004,9 +8958,8 @@ export class BOMItemsService {
       inspectionRate:       preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment:     null,
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
-      samplingPerN:         this.resolveSamplingPerN(item),
-      samplingPolicy:       inspection?.policy,
-      gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
+      inspectionReference:  (await this.machiningLookup.getInspectionReference()).reference,
+      inspectedFeatures:    inspectedOccurrences(fg?.feature_graph_v2?.features as any),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
       deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,

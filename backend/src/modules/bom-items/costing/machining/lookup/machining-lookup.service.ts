@@ -1,3 +1,4 @@
+import { INSPECTION_TABLE, INSPECTION_VARIABLE_KEYS, resolveInspectionReference, type InspectionReference } from '../inspection-reference';
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../../../common/database/database.service';
 import type { MaterialClass } from '../process/cost-machining-engine';
@@ -245,6 +246,25 @@ export class MachiningLookupService {
     }
     this.capabilityRules = resolveMachiningCapabilityRules(data ?? [], gtol);
     return this.capabilityRules;
+  }
+
+  /** The inspection reference (inspection-reference.ts): the three inspection variables and tblInspection. Cached once it resolves. */
+  private inspectionReference: { reference: InspectionReference | null; missing: string[] } | null = null;
+  async getInspectionReference(): Promise<{ reference: InspectionReference | null; missing: string[] }> {
+    if (this.inspectionReference?.reference) return this.inspectionReference;
+    const { data, error } = await this.database
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+      .from('machining_reference_data')
+      .select('key, value')
+      .eq('category', 'variable')
+      .eq('source_version', CAPABILITY_RULES_SOURCE_VERSION)
+      .in('key', [...INSPECTION_VARIABLE_KEYS]);
+    const table = await this.loadTable(INSPECTION_TABLE);
+    if (error || table == null) {
+      return { reference: null, missing: [error ? `variables (${error.message})` : `${INSPECTION_TABLE} (not staged)`] };
+    }
+    this.inspectionReference = resolveInspectionReference(data ?? [], table);
+    return this.inspectionReference;
   }
 
   /** Every reference catalog operation key, "<Process>:<Operation>//<Feature>" (memory/Machining/operations_full__operations.csv); null when not staged or unreadable. */

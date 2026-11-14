@@ -22,9 +22,10 @@ function expectGapLine(result: { processLines: any[]; warnings: string[] }, proc
   expect(line.physicsGap?.gapType).toBe('unsupported_operation');
   expect(result.warnings.some((w) => w.includes(process) && w.includes('not priced'))).toBe(true);
 }
-import { realCapabilityRules, realDrillingTable, realGrindingParams, realKeywayBroachReference, realSurfaceGrindingParams, realTappingTable } from '../real-reference-tables';
+import { realCapabilityRules, realDrillingTable, realGrindingParams, realKeywayBroachReference, realSurfaceGrindingParams, realTappingTable, realInspectionReference } from '../real-reference-tables';
 
 const TAPPING = realTappingTable();
+const INSPECTION = realInspectionReference();
 // Finishing-process rules from the real staged files (capability-rules.ts).
 const RULES = realCapabilityRules();
 
@@ -80,13 +81,8 @@ function milledInput(overrides: Partial<MachiningCostInput> = {}): MachiningCost
     materialSource: 'db',
     threads: [{ size: 'M4', count: 12 }],
     tightestToleranceMm: 0.05,
-    // Two real callouts, each timed by an inspection_rules row (3 min). The
-    // count always equals the callouts it came from (resolveGdtCallouts).
     gdtFeatureCount: 2,
-    gdtFeatures: [
-      { symbol: 'position', tolerance: 0.05, timeMin: 3 },
-      { symbol: 'flatness', tolerance: 0.4, timeMin: 3 },
-    ],
+    inspectionReference: INSPECTION,
     batchSize: 60,
     family: 'milled',
     finishedWeightKg: 0.27,
@@ -207,110 +203,54 @@ describe('computeMillingCostSummary — billet and chip loss', () => {
   });
 });
 
-describe('inspection line — batch sampling + CMM amortized rate', () => {
-  // milledInput per-piece inspection minutes:
-  // base 5 + holeSample min(ceil(107/5),15)×0.5 = 7.5 + threads min(12,6)×0.4 = 2.4
-  // + tolAdder 8 (0.05mm) + GD&T 2 callouts × 3 min (inspection_rules) = 6 → 28.9 min
-  const PER_PIECE_MIN = 28.9;
+describe('inspection line — memory/Machining reference (one analysis per inspected part + final inspection)', () => {
+  // Real reference: tblInspection diametrical 400 s per analysis, sample ratio 0.25, final inspection 5 min.
+  const CYCLE_S = INSPECTION.timePerAnalysisS * INSPECTION.sampleRatio + INSPECTION.finalInspectionMin * 60;
+  const inspOf = (r: ReturnType<typeof computeMillingCostSummary>) => r.processLines.find((l) => l.process === 'Inspection')!;
+  const step = (r: ReturnType<typeof computeMillingCostSummary>, field: string) => inspOf(r).calculationTrace!.find((s) => s.fieldName === field)!;
 
-  // Per-piece minutes as the Inspection calculator itself computed them
-  // ("Inspection per Piece" in the line's calculation trace).
-  const perPiece = (r: ReturnType<typeof computeMillingCostSummary>) =>
-    r.processLines.find((l) => l.process === 'Inspection')!.calculationTrace!.find((s) => s.fieldName === 'Inspection per Piece')!.value;
-  const noFeatures = { holeCount: 0, holeGroups: [], threads: [], tightestToleranceMm: null, gdtFeatureCount: 0, gdtFeatures: [] };
-
-  it('computes per-piece inspection minutes from holes/threads/tolerance/GD&T', () => {
-    expect(perPiece(computeMillingCostSummary(milledInput(), mc('3_axis_mill')))).toBeCloseTo(PER_PIECE_MIN, 5);
-  });
-
-  it('uses per-callout GD&T time from the severity rules when callouts are provided', () => {
-    // position 0.05 → CMM 8 min; flatness 0.4 → height gauge 4 min (vs flat 3+3)
-    const withCallouts = computeMillingCostSummary(milledInput({
-      ...noFeatures, gdtFeatureCount: 2,
-      gdtFeatures: [{ symbol: 'position', tolerance: 0.05 }, { symbol: 'flatness', tolerance: 0.4 }],
-    } as any), mc('3_axis_mill'));
-    expect(perPiece(withCallouts)).toBe(5 + 8 + 4);
-  });
-
-  it('batch 1 = FAI full measurement + one final check', () => {
-    const result = computeMillingCostSummary(milledInput({ batchSize: 1 }), mc('3_axis_mill'));
-    const insp = result.processLines.find((l) => l.process === 'Inspection')!;
-    // The default inspectionRate carries no real setup_time_hr: CMM setup not costed.
-    expect(insp.setupCost).toBe(0);
-    // FAI (28.9 min) + final visual check (2 min)
-    expect(insp.runCost).toBeCloseTo(((PER_PIECE_MIN + 2) / 60) * 450, 2);
+  it('is one analysis on the share of parts inspected plus every part\'s final inspection, all from the reference', () => {
+    expect(INSPECTION).toEqual({ inspectionType: 'diametrical', timePerAnalysisS: 400, sampleRatio: 0.25, finalInspectionMin: 5 });
+    const insp = inspOf(computeMillingCostSummary(milledInput(), mc('3_axis_mill')));
+    expect(insp.cycleTimeMin).toBeCloseTo(CYCLE_S / 60, 3);
+    expect(insp.runCost).toBeCloseTo((CYCLE_S / 3600) * 450, 2);
     expect(insp.hourlyRate).toBe(450);
-    expect(insp.machineClass).toBe('cmm');
   });
 
-  it('amortizes three-stage sampling over the batch (FAI + in-process 1/10 + final 1/25)', () => {
-    // batch 60 → FAI 1 + in-process floor(59/10)=5 full measurements + final ceil(60/25)=3 × 2min
-    const measuredMin = PER_PIECE_MIN * 6 + 2 * 3;
-    const result = computeMillingCostSummary(milledInput({ batchSize: 60 }), mc('3_axis_mill'));
-    const insp = result.processLines.find((l) => l.process === 'Inspection')!;
-    expect(insp.runCost).toBeCloseTo(((measuredMin / 60) * 450) / 60, 2);
-    expect(insp.setupCost).toBe(0); // no real CMM setup_time_hr on the default inspectionRate
-    expect(insp.cycleTimeMin).toBeCloseTo(measuredMin / 60, 2);
+  it('does not grow with the hole count: one analysis is one inspected part (holes only listed)', () => {
+    const few = inspOf(computeMillingCostSummary(milledInput({ holeCount: 2, holeGroups: [{ diameter_mm: 4, count: 2 }] }), mc('3_axis_mill')));
+    const many = inspOf(computeMillingCostSummary(milledInput(), mc('3_axis_mill')));
+    expect(few.cycleTimeMin).toBe(many.cycleTimeMin);
   });
 
-  it('honors a per-item samplingPerN override (1 = full measurement on every part)', () => {
-    const result = computeMillingCostSummary(
-      milledInput({ batchSize: 60, samplingPerN: 1 }),
-      mc('3_axis_mill'),
-    );
-    const insp = result.processLines.find((l) => l.process === 'Inspection')!;
-    // FAI 1 + in-process 59 = every part fully measured, + 3 final checks
-    const measuredMin = PER_PIECE_MIN * 60 + 2 * 3;
-    expect(insp.runCost).toBeCloseTo(((measuredMin / 60) * 450) / 60, 2);
+  it('every input opens where it was read: the tblInspection row and the two variables', () => {
+    const r = computeMillingCostSummary(milledInput(), mc('3_axis_mill'));
+    expect(step(r, 'Time Per Analysis').ref).toEqual({ kind: 'lookup', domain: 'machining', table: 'tblInspection', column: 'Time Per Analysis (s)', row: { Name: 'diametrical' } });
+    expect(step(r, 'Inspection Sample Ratio').ref).toEqual({ kind: 'variable', domain: 'machining', name: 'defaultInspectionSampleRatio' });
+    expect(step(r, 'Final Inspection Time').ref).toEqual({ kind: 'variable', domain: 'machining', name: 'defaultFinalInspectionTime' });
+  });
+
+  it('lists the inspected holes on the line, so the Process tree shows and lights them', () => {
+    const inspected = [{ featureId: 'hole_d4', occurrenceIndex: 0 }, { featureId: 'hole_d4', occurrenceIndex: 1 }, { featureId: 'step_1', occurrenceIndex: 0 }];
+    const insp = inspOf(computeMillingCostSummary(milledInput({ inspectedFeatures: inspected }), mc('3_axis_mill')));
+    expect(insp.featureBreakdown).toEqual([expect.objectContaining({
+      name: 'Feature Inspection ×3', count: 3, featureIds: ['hole_d4', 'step_1'], occurrenceRefs: inspected,
+    })]);
+  });
+
+  it('without the reference the line is a named gap, never a coded allowance', () => {
+    const r = computeMillingCostSummary(milledInput({ inspectionReference: null }), mc('3_axis_mill'));
+    expect(inspOf(r).cycleTimeMin).toBe(0);
+    expect(r.warnings.some((w) => w.includes('inspection reference'))).toBe(true);
   });
 
   it('emits the inspection line on turned parts too', () => {
-    const result = computeTurningCostSummary(
-      milledInput({ family: 'turned' }),
-      mc('2_axis_lathe'),
-    );
+    const result = computeTurningCostSummary(milledInput({ family: 'turned' }), mc('2_axis_lathe'));
     expect(result.processLines.some((l) => l.process === 'Inspection')).toBe(true);
   });
 
-  it('applies a named quality plan (full_cmm: every part measured)', () => {
-    const result = computeMillingCostSummary(
-      milledInput({
-        batchSize: 60,
-        samplingPolicy: { fai: true, inProcessPerN: 1, finalPerN: 1, finalCheckMin: 2 },
-      }),
-      mc('3_axis_mill'),
-    );
-    const insp = result.processLines.find((l) => l.process === 'Inspection')!;
-    // FAI 1 + in-process 59 = 60 full measurements + 60 final checks
-    const measuredMin = PER_PIECE_MIN * 60 + 2 * 60;
-    expect(insp.runCost).toBeCloseTo(((measuredMin / 60) * 450) / 60, 2);
-  });
-
-  it('applies an AS9100-style plan (5% in-process sampling) more cheaply than general', () => {
-    const general = computeMillingCostSummary(milledInput({ batchSize: 100 }), mc('3_axis_mill'));
-    const as9100 = computeMillingCostSummary(
-      milledInput({
-        batchSize: 100,
-        samplingPolicy: { fai: true, inProcessPerN: 20, finalPerN: 25, finalCheckMin: 3 },
-      }),
-      mc('3_axis_mill'),
-    );
-    const inspOf = (r: typeof general) => r.processLines.find((l) => l.process === 'Inspection')!;
-    expect(inspOf(as9100).runCost).toBeLessThan(inspOf(general).runCost);
-  });
-
-  it('uses DB-resolved per-callout time (timeMin) over the code matrix', () => {
-    // Rules say this callout takes 20 min (org-tuned CMM routine), matrix says 8
-    const withDbTime = computeMillingCostSummary(milledInput({
-      ...noFeatures, gdtFeatureCount: 1,
-      gdtFeatures: [{ symbol: 'position', tolerance: 0.05, timeMin: 20 }],
-    } as any), mc('3_axis_mill'));
-    expect(perPiece(withDbTime)).toBe(5 + 20);
-  });
-
   // Root-caused live (2026-09-18): a CMM class constant was used unconditionally,
-  // ignoring a real per-CMM mhr_records.setup_time_hr even when present —
-  // same fix pattern applied to the main Setup line below.
+  // ignoring a real per-CMM mhr_records.setup_time_hr even when present.
   it('uses a real per-CMM setup_time_hr when one is on file', () => {
     const result = computeMillingCostSummary(
       milledInput({
@@ -319,7 +259,7 @@ describe('inspection line — batch sampling + CMM amortized rate', () => {
       }),
       mc('3_axis_mill'),
     );
-    const insp = result.processLines.find((l) => l.process === 'Inspection')!;
+    const insp = inspOf(result);
     expect(insp.setupTimeMin).toBe(24);
     expect(insp.setupTimeSource).toBe('machine');
     expect(insp.setupCost).toBeCloseTo((24 / 60) * 450 / 48, 5);
@@ -327,7 +267,7 @@ describe('inspection line — batch sampling + CMM amortized rate', () => {
 
   it('does not cost CMM setup, and says so, when no real setup_time_hr exists', () => {
     const result = computeMillingCostSummary(milledInput({ batchSize: 48 }), mc('3_axis_mill'));
-    const insp = result.processLines.find((l) => l.process === 'Inspection')!;
+    const insp = inspOf(result);
     expect(insp.setupTimeMin).toBe(0);
     expect(insp.setupTimeSource).toBe('none');
     expect(insp.setupCost).toBe(0);
