@@ -68,6 +68,7 @@ import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
 import { generateCalculationReportPdf } from '@/lib/utils/calculation-report';
 import { RouteCompareList } from '@/components/features/workflow/RouteCompareList';
 import { RouteStepEditor } from '@/components/features/workflow/RouteStepEditor';
+import { treePathForFeature } from '@/lib/features/tree-feature-path';
 import { AddProcessOperationBar } from '@/components/features/workflow/AddProcessOperationBar';
 import type { AddOperationOption } from '@/components/features/workflow/AddOperationPicker';
 import { adaptRoutesToTree, RouteTreeValidationError, type RouteNode } from '@/lib/routing/route-tree';
@@ -3569,6 +3570,8 @@ function TreeRow({
   return (
     <>
       <tr
+        // A row selected from elsewhere (a Feature breakdown card) is brought into view; one clicked here already is.
+        ref={isSelected ? (el) => { el?.scrollIntoView({ block: 'nearest' }); } : undefined}
         onClick={() => { onSelect(node); }}
         className={`border-b border-border/30 cursor-pointer transition-colors text-xs ${isSelected ? 'bg-primary/10' : 'hover:bg-primary/5'}`}
       >
@@ -10066,7 +10069,11 @@ export default function ManufacturingIntelligencePage() {
   // Geometry section) — one selection state, so highlighting from either panel
   // behaves identically.
   const onSelectHighlight = (node: FeatureNodeV2 | null) => {
-    setSelectedNodeId(null);
+    // The feature's own row in the Manufacturing Process tree is selected and revealed with it, so the tree and the
+    // Selected panel show what the 3D model shows. A feature with no row in the tree selects none.
+    const path = treePathForFeature(tree, node?.id);
+    setSelectedNodeId(path?.at(-1) ?? null);
+    if (path) setExpandedNodes((prev) => new Set([...prev, ...path.slice(0, -1)]));
     setSelectedDirectV2Feature(node);
     setSelectedOccurrenceIndex(null);
   };
