@@ -65,3 +65,9 @@ export function resolveGdtCallouts(featureGraph: unknown, drawingIntelligence: u
     ? drawing.map((c) => toCallout(c, 'drawing')).filter((c): c is GdtCallout => c !== null)
     : [];
 }
+
+/** The drawing's own callouts, whatever the model carries: for comparing the two sources (resolveGdtCallouts returns one of them, never both). */
+export function drawingGdtCallouts(drawingIntelligence: unknown): GdtCallout[] {
+  const drawing = (drawingIntelligence as { gdt_callouts?: RawCallout[] } | null)?.gdt_callouts;
+  return Array.isArray(drawing) ? drawing.map((c) => toCallout(c, 'drawing')).filter((c): c is GdtCallout => c !== null) : [];
+}

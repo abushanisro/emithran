@@ -58,6 +58,17 @@ export interface PmiReviewRow {
   supersededAt: string | null;
 }
 
+/** A pmi_record_reviews row as the modules read it. */
+export function pmiReviewRowOf(r: any): PmiReviewRow {
+  return {
+    recordKey: r.record_key, scope: r.scope, decision: r.decision, recordFingerprint: r.record_fingerprint,
+    fileSha256: r.file_sha256, reviewerId: r.reviewer_id, reviewerEmail: r.reviewer_email ?? null, reviewedAt: r.reviewed_at,
+    approvedValues: r.approved_values ?? {}, decodedStatus: r.decoded_status, basis: r.basis, notes: r.notes ?? null,
+    supersededAt: r.superseded_at ?? null,
+  };
+}
+
+
 /** Who may approve or reject: an active owner of the item organization (the only elevated role that exists). */
 export function canReviewPmi(role: string | null | undefined): boolean {
   return role === 'owner';
@@ -76,6 +87,8 @@ export interface PmiRecord {
   limits: PmiLimits | null;
   basic: boolean;
   zoneMm: number | null;
+  /** Material-condition and other modifiers on a frame's zone, as the engine read them (empty when none or not a frame). */
+  modifiers: string[];
   datumRefs: string[] | null;
   datumRefsSource: string | null;
   datumLetter: string | null;
@@ -164,6 +177,7 @@ function toRecord(raw: any, rows: readonly PmiReviewRow[], fileSha256: string | 
     limits: limits(raw.tolerance),
     basic: raw.basic === true,
     zoneMm: num(raw.zone?.value),
+    modifiers: Array.isArray(raw.modifiers) ? raw.modifiers.filter((m: unknown): m is string => typeof m === 'string' && !!m) : [],
     datumRefs: Array.isArray(raw.datum_refs) ? raw.datum_refs.filter((d: unknown): d is string => typeof d === 'string') : null,
     datumRefsSource: str(raw.datum_refs_source),
     datumLetter: str(raw.letter),

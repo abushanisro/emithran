@@ -2,7 +2,9 @@ import { BadRequestException, Injectable, InternalServerErrorException, NotFound
 import { DatabaseService } from '../../../common/database/database.service';
 import { isMachiningFamily } from '../../../domain/part-family';
 import { machiningRouteFamilyOf, resolveCanonicalOperation } from '../costing/machining/process/canonical-operation';
-import { resolveGdtCallouts } from '../costing/shared/physics/gdt-callouts';
+import { drawingGdtCallouts, resolveGdtCallouts } from '../costing/shared/physics/gdt-callouts';
+import { detectTolerances } from '../costing/shared/tolerance/auto-detect';
+import { pmiReviewRowOf, resolvePmiRecords, type PmiReviewRow } from '../costing/shared/tolerance/pmi-records';
 import { CastingReferenceService, type CastabilityProcess } from '../costing/casting/casting-reference.service';
 import { holeCastability, holeProximityCastability, type HoleCastability } from '../costing/casting/casting-reference';
 import { castingProcessLabel, castingProcessOfFamily } from '../costing/casting/casting-cost-summary';
@@ -10,6 +12,7 @@ import { resolveScenarioDieCastingProcess } from '../costing/casting/die-casting
 import { HPDC_PROCESS } from '../costing/casting/hpdc-engine';
 import { GDC_PROCESS } from '../costing/casting/gdc-engine';
 import { evaluateMachiningNeed, type MachiningNeedResult } from '../costing/shared/tolerance/machining-need';
+import { evaluateToleranceDecisions, toleranceProfileOf, type ToleranceDecision, type ToleranceProcessProfile } from '../costing/shared/tolerance/process-profile';
 import { ToleranceReferenceService } from '../costing/shared/tolerance/tolerance-reference.service';
 import { GTOL_CATEGORIES, type GtolCategory } from '../costing/shared/tolerance/process-capability';
 import {
@@ -63,6 +66,15 @@ export class FeatureToleranceService {
     return featureInstances(fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2 ?? null);
   }
 
+  /** The current engineer decisions on the part's PMI records (pmi_record_reviews); none is read when the analysis carries no records. */
+  private async pmiReviews(id: string, featureGraph: any, accessToken: string): Promise<PmiReviewRow[]> {
+    if (!Array.isArray(featureGraph?.pmi?.records) || featureGraph.pmi.records.length === 0) return [];
+    const { data, error } = await this.database.getUserClient(accessToken)
+      .from('pmi_record_reviews').select('*').eq('bom_item_id', id).is('superseded_at', null);
+    if (error) throw new InternalServerErrorException(`Failed to read PMI reviews: ${error.message}`);
+    return (data ?? []).map(pmiReviewRowOf);
+  }
+
   async get(id: string, accessToken: string): Promise<FeatureTolerancesView> {
     const item = await this.loadItem(id, accessToken);
     const { data: rows, error } = await this.database.getUserClient(accessToken)
@@ -75,13 +87,17 @@ export class FeatureToleranceService {
       .map((r: any) => ({ featureKey: r.feature_key, category: r.category, value: Number(r.value) }));
     const parsed = parseTolerancePolicy(item.scenario_overrides?.['tolerancePolicy']);
     const policy = parsed.policy ?? parseTolerancePolicy(null).policy!;
+    const instances = this.instancesOf(item);
+    const callouts = resolveGdtCallouts(item.feature_graph, item.drawing_intelligence);
+    const detection = detectTolerances({
+      instances,
+      records: resolvePmiRecords(item.feature_graph, await this.pmiReviews(id, item.feature_graph, accessToken)),
+      callouts,
+      drawingCallouts: drawingGdtCallouts(item.drawing_intelligence),
+      generalTolerances: (item.drawing_intelligence as { general_tolerances?: string | null } | null)?.general_tolerances ?? null,
+    });
     return {
-      ...resolveFeatureRequirements({
-        instances: this.instancesOf(item),
-        manual,
-        policy,
-        callouts: resolveGdtCallouts(item.feature_graph, item.drawing_intelligence),
-      }),
+      ...resolveFeatureRequirements({ instances, manual, policy, callouts, detection }),
       policy,
       policyErrors: parsed.errors,
     };
@@ -152,6 +168,19 @@ export class FeatureToleranceService {
     const item = await this.loadItem(id, accessToken);
     const tolerances = await this.get(id, accessToken);
     const family = item.feature_graph?.classification?.family ?? item.family_classification ?? 'unknown';
+    const assessed = await this.assessNeed(item, tolerances, family, accessToken, primaryProcessOverride);
+    // The process's own reading of each feature (process-profile.ts): held, an operation added, or left for review. Never a cost by itself.
+    const profile = toleranceProfileOf(family);
+    return {
+      ...assessed, profile,
+      decisions: evaluateToleranceDecisions({ profile, features: tolerances.instances, need: assessed.result, notAssessedReason: profile.capability === 'not_validated' ? null : assessed.reason }),
+    };
+  }
+
+  private async assessNeed(
+    item: Awaited<ReturnType<FeatureToleranceService['loadItem']>>, tolerances: FeatureTolerancesView, family: string, accessToken: string, primaryProcessOverride?: string,
+  ): Promise<Omit<MachiningNeedView, 'profile' | 'decisions'>> {
+    const id = item.id;
     const casting = castingProcessOfFamily(family);
     if (isMachiningFamily(family)) {
       // A machined part has no forming process to fall short: each feature is made by its own operation, and a tolerance finer than that operation holds calls for
@@ -258,4 +287,7 @@ export interface MachiningNeedView {
   result: MachiningNeedResult | null;
   /** The feature instances assessed (sizes, depths, extents, viewer refs). */
   instances: FeatureInstance[];
+  /** How the part's process treats tolerances (process-profile.ts), and its decision on every feature. */
+  profile: ToleranceProcessProfile;
+  decisions: ToleranceDecision[];
 }

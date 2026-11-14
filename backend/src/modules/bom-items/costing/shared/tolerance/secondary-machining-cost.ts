@@ -98,6 +98,23 @@ function seedsFor(calculator: string, inst: FeatureInstance, ctx: MachiningLooku
   return { seeds, missing };
 }
 
+const SOURCE_LABEL: Record<string, string> = {
+  manual: 'entered on the feature', policy_uniform: 'tolerance policy (uniform values)', cad_model: 'model PMI (CAD policy)',
+  cad_model_replaced: 'model PMI, replaced by the policy value', auto_detected: 'model PMI (detected)',
+};
+
+/** The requirement, its source and the reason a feature is machined after the primary process, for its cost entry. */
+export function machiningBasis(f: MachiningNeedResult['features'][number]): NonNullable<FeatureOp['basis']> {
+  if (f.requirements.length === 0) {
+    return { requirement: 'none', source: `${f.forming ? 'formability' : 'assessment'} of the primary process`, reason: f.reasons.join('; ') };
+  }
+  return {
+    requirement: f.requirements.map((r) => `${r.category} ${r.value}${r.origin ? ` (${r.origin.stated}, ${r.origin.annotationRef})` : ''}`).join('; '),
+    source: [...new Set(f.requirements.map((r) => `${SOURCE_LABEL[r.source] ?? r.source}${r.origin ? `, ${r.origin.basis === 'native_pmi' ? 'native' : 'engineer approved'}` : ''}`))].join('; '),
+    reason: f.reasons.join('; '),
+  };
+}
+
 export function priceSecondaryMachining(input: {
   need: MachiningNeedResult;
   instances: readonly FeatureInstance[];
@@ -197,6 +214,8 @@ export function priceSecondaryMachining(input: {
       groups.set(k, g);
     }
   }
+  // Why each feature is machined: its requirements with where each was read, and the assessment's own reasons.
+  const basisOf = new Map(input.need.features.filter((x) => x.verdict === 'needs_machining').map((x) => [x.label, machiningBasis(x)]));
   const lines: ProcessLineCost[] = [];
   const setupCharged = new Set<string>();
   const lineFor = (machine: MHRRateInput, operation: string, sec: number, breakdown: FeatureOp[], referenceSetupTimeHr?: number | null): ProcessLineCost => {
@@ -252,7 +271,7 @@ export function priceSecondaryMachining(input: {
   for (const { machine, operation, picks } of groups.values()) {
     const sec = picks.reduce((t, p) => t + p.op.sec, 0);
     lines.push(lineFor(machine, operation, sec, picks.map(({ f, op, inst }) => ({
-      name: f.label, featureType: f.featureType, timeSec: r2(op.sec), count: 1, ...occRef(inst),
+      name: f.label, featureType: f.featureType, timeSec: r2(op.sec), count: 1, ...occRef(inst), basis: basisOf.get(f.label),
     }))));
   }
 

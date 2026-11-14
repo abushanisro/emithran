@@ -29,9 +29,12 @@ import {
   useMachiningNeed,
   useSetFeatureTolerances,
   useSetTolerancePolicy,
+  type DetectedTolerance,
   type FeatureInstance,
   type FeatureMachiningNeed,
+  type FeatureTolerancesView,
   type GtolCategory,
+  type MachiningNeedView,
   type ResolvedRequirement,
   type TolerancePolicy,
 } from '@/lib/api/hooks/useFeatureTolerances';
@@ -43,12 +46,14 @@ const SOURCE_LABEL: Record<ResolvedRequirement['source'], string> = {
   policy_uniform: 'Policy',
   cad_model: 'CAD model',
   cad_model_replaced: 'CAD model (replaced)',
+  auto_detected: 'Detected',
 };
 
 const POLICY_LABEL: Record<TolerancePolicy['mode'], string> = {
   assume_achieved: 'Assume achieved by the selected operation',
   uniform: 'Use the following values',
   cad: 'Use CAD model values',
+  auto_detect: 'Detect from CAD, flag the rest',
 };
 
 export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
@@ -195,6 +200,16 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
         </div>
       )}
 
+      {view && (
+        <DetectedTolerances
+          view={view} need={need}
+          onShow={(label) => {
+            const inst = instances.find((i) => i.instance.label === label)?.instance;
+            if (inst) { setSelected(label); highlight(inst); }
+          }}
+        />
+      )}
+
       <DrawingCallouts itemId={itemId} />
 
       {editing && view && (
@@ -208,6 +223,69 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
       )}
       {policyOpen && view && <TolerancePolicyDialog itemId={itemId} policy={view.policy} onClose={() => { setPolicyOpen(false); }} />}
     </div>
+  );
+}
+
+/**
+ * What the part's files state about tolerances (model PMI, drawing callouts, the general-tolerance note) and how each reads: a requirement on a feature, or left
+ * for review with the reason. Shown under every policy; only the Detect policy applies the requirements. Below it, the toleranced features the part's process
+ * leaves for review (no cost is added for them).
+ */
+function DetectedTolerances({ view, need, onShow }: { view: FeatureTolerancesView; need: MachiningNeedView | undefined; onShow: (label: string) => void }) {
+  const { detected, general, conflicts } = view.detection;
+  const applies = view.policy.mode === 'auto_detect';
+  const readable = detected.filter((d) => d.status === 'interpretable');
+  const review = detected.filter((d) => d.status === 'review');
+  const undecided = (need?.decisions ?? []).filter((d) => d.decision === 'needs_review' && d.requirements.length > 0);
+  if (detected.length === 0 && !general && undecided.length === 0) return null;
+  const labels = (d: DetectedTolerance) => d.labels.map((l, i) => (
+    <span key={l}>{i ? ', ' : ''}<button type="button" className="hover:text-brand-500 hover:underline" onClick={() => { onShow(l); }}>{l}</button></span>
+  ));
+  return (
+    <section aria-label="Detected tolerances" className="border-t border-border/50 pt-1.5 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">Detected in the part&apos;s files</span>
+        <span className="text-[10px] text-muted-foreground">{applies ? 'Applied by the policy' : 'Not applied (policy)'}</span>
+      </div>
+      {need?.profile && (
+        <p className="text-[10px] text-muted-foreground leading-tight">
+          Judged as {need.profile.process}{need.profile.capability === 'not_validated' ? ' (no validated tolerance capability)' : ''}: {need.profile.note}
+        </p>
+      )}
+      {readable.length > 0 && (
+        <div>
+          <div className="text-[10px] font-semibold text-muted-foreground">{applies ? 'Applied as requirements' : 'Would apply under the Detect policy'} [{readable.length}]</div>
+          {readable.map((d) => (
+            <div key={d.recordId} className="pl-2 text-[11px]">
+              <span>{d.stated}</span> <span className="text-muted-foreground">on {labels(d)} · {d.basis === 'engineer_approved' ? 'engineer approved' : 'model PMI'} · {d.annotationRef}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {(review.length > 0 || conflicts.length > 0) && (
+        <div>
+          <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Needs review, not applied [{review.length}]</div>
+          {conflicts.map((c) => <div key={`${c.characteristic}-${c.drawingMm}`} className="pl-2 text-[11px] text-amber-600 dark:text-amber-400">{c.detail}</div>)}
+          {review.map((d) => (
+            <div key={d.recordId} className="pl-2 text-[11px]">
+              <span>{d.stated}</span> <span className="text-muted-foreground">({d.origin === 'drawing' ? 'drawing' : d.annotationRef}) — {d.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {undecided.length > 0 && (
+        <div>
+          <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Toleranced features left for review, no cost added [{undecided.length}]</div>
+          {undecided.map((d) => (
+            <div key={d.label} className="pl-2 text-[11px]">
+              <button type="button" className="font-medium hover:text-brand-500" onClick={() => { onShow(d.label); }}>{d.label}</button>
+              <span className="text-muted-foreground"> — {d.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {general && <p className="text-[10px] text-muted-foreground leading-tight">General tolerance &ldquo;{general.text}&rdquo;: {general.reason}</p>}
+    </section>
   );
 }
 
@@ -365,7 +443,7 @@ function TolerancePolicyDialog({ itemId, policy, onClose }: { itemId: string; po
   const [error, setError] = useState<string | null>(null);
 
   const build = (): TolerancePolicy | string => {
-    if (mode === 'assume_achieved') return { mode };
+    if (mode === 'assume_achieved' || mode === 'auto_detect') return { mode };
     if (mode === 'uniform') {
       const out: Partial<Record<GtolCategory, number>> = {};
       for (const [k, v] of Object.entries(values)) {
@@ -444,6 +522,16 @@ function TolerancePolicyDialog({ itemId, policy, onClose }: { itemId: string; po
                 </div>
               )}
             </div>
+            <label className="flex items-start gap-2">
+              <input type="radio" checked={mode === 'auto_detect'} onChange={() => { setMode('auto_detect'); }} className="mt-0.5 accent-brand-600" />
+              <span>
+                <b>Detect from CAD: apply what reads reliably, flag the rest</b>
+                <span className="block text-muted-foreground">
+                  Model tolerances that are native or engineer-approved, tied to a feature and of a kind with a validated reading become that feature&apos;s
+                  requirements. Everything else is listed for review and adds no cost. A requirement adds an operation only when the part&apos;s process cannot hold it.
+                </span>
+              </span>
+            </label>
           </div>
           <ToleranceLegend />
         </div>
