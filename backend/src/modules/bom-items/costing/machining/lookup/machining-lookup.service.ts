@@ -126,12 +126,11 @@ export function edgeDeburrRow(rows: any[], toolType: string | null | undefined, 
 export class MachiningLookupService {
   constructor(private readonly database: DatabaseService) {}
 
-  // In-process cache: these 4 tables are large (up to ~380KB) whole-file
-  // JSONB blobs staged once per table, not per-row — never change within a
-  // running process, so fetched at most once per table per process
-  // lifetime, matching loadCalculatorCatalog's own cachedRead discipline
-  // elsewhere in this module (just a plain Map here since there's no
-  // per-request invalidation need for static reference data).
+  // In-process cache: these tables are large (up to ~380KB) whole-file
+  // JSONB blobs staged once per table, not per-row. A staged table does not
+  // change within a running process, so it is fetched once. A table that is
+  // not staged is NOT remembered: a migration can stage it while the process
+  // runs, and the next request must see it without a restart.
   /** The machining reference data is global and shared (no user rows): every read of it goes through this one privileged client. */
   private get referenceDb() {
     return this.database.getPrivilegedClient('reference-data: machining lookup tables, global shared');
@@ -149,16 +148,11 @@ export class MachiningLookupService {
       .eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
       .eq('key', key)
       .maybeSingle();
-    // A read error (network, timeout) is not cached: the next request reads
-    // again. Only a genuinely absent row is remembered as null.
-    if (error) return null;
-    if (!data?.raw) {
-      this.tableCache.set(key, null);
-      return null;
-    }
+    // Neither a read error nor an absent row is cached: the next request reads again.
+    if (error || !data?.raw) return null;
     const raw = data.raw as any;
     const rows: any[] | null = Array.isArray(raw) ? raw : Array.isArray(raw.rows) ? raw.rows : null;
-    this.tableCache.set(key, rows);
+    if (rows) this.tableCache.set(key, rows);
     return rows;
   }
 
@@ -180,7 +174,7 @@ export class MachiningLookupService {
       .maybeSingle();
     if (error) return null; // transient read failure: not cached, retried next request
     const raw = data?.raw && typeof data.raw === 'object' && !Array.isArray(data.raw) ? data.raw : null;
-    this.tableCache.set(key, raw);
+    if (raw) this.tableCache.set(key, raw); // an absent table is read again next request
     return raw;
   }
 
