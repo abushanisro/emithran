@@ -67,6 +67,12 @@ describe('machining calculator spec ↔ migration ↔ engine', () => {
     }
   });
 
+  it('countersinking has its own machining calculator, shipped in 1035', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1035_machining_countersinking_calculator.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1035, spec));
+    expect(calcs['Countersinking']?.name).toBe('Machining - Countersinking');
+  });
+
   it('the milling calculator prices the line of every mill station, and of the live-tool turning machines', () => {
     expect(['3 Axis Mill', '4 Axis Mill', '5 Axis Mill', 'MillTurn', '3 Axis Lathe'].map((station) => calcs[station]?.name)).toEqual(Array(5).fill('Machining - Milling'));
   });
