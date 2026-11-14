@@ -103,6 +103,7 @@ interface FeatureNodeV2HL {
   bbox_centered?: { x_min: number; x_max: number; y_min: number; y_max: number };
   diameter_mm?: number;
   radius_mm?: number;
+  centroidFromFaces?: boolean;
 }
 
 interface ModelViewerProps {

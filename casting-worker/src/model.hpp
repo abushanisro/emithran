@@ -134,6 +134,8 @@ struct Feature {
   std::string type;  // a feature type of the operations catalogue (PlanarFace, SharpEdge, ...)
   std::vector<int> faces;
   std::vector<std::vector<Xyz>> edges;
+  // Edge features only: the faces meeting at its edges (two per edge, each once), so the edge can be shown by its faces.
+  std::vector<int> edge_faces;
   std::vector<std::pair<std::string, double>> parameters;
   std::string parent;  // the feature it belongs to; empty at the top
 };
@@ -164,6 +166,10 @@ struct PartProperties {
   std::optional<CastingProperties> casting;  // only for a valid part with a volume
   // The face shown by each primitive of the part's GLB, in order (faces without a mesh have none).
   std::vector<int> glb_faces;
+  // Each face's geometric key, numbered as the features number faces: "<surface>|<area>|<cx>|<cy>|<cz>" (mm, 3
+  // decimals), the fingerprint the cad-engine hashes for its stable face ids (cad-engine/shared/stable_face_id.py),
+  // so a feature's faces can be found on the cad-engine's mesh without assuming both number faces alike.
+  std::vector<std::string> face_keys;
   std::vector<Feature> features;  // only for a valid part with a volume (D132)
 
   // Stable codes: empty_shape, no_solid, invalid_geometry, failed:<measurement> (an OCCT exception).
@@ -183,6 +189,8 @@ PartProperties measure(const TDF_Label& part);
 
 // The face of every GLB primitive of a meshed part, in the writer's order (features.cpp).
 std::vector<int> glb_faces(const TDF_Label& part);
+// The geometric key of every face, in TopExp::MapShapes order (features.cpp); see PartProperties::face_keys.
+std::vector<std::string> face_keys(const TDF_Label& part);
 // The features of a meshed, valid part (features.cpp); throws Standard_Failure on an OCCT error.
 // With the casting measurements, faces hidden from both mould halves form voids, linked to their cores (F3).
 std::vector<Feature> recognise_features(const TDF_Label& part, const std::optional<CastingProperties>& casting);

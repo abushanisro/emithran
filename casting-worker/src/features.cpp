@@ -48,6 +48,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <map>
 #include <numeric>
@@ -308,6 +309,39 @@ std::vector<int> glb_faces(const TDF_Label& part) {
     TopLoc_Location location;
     const occ::handle<Poly_Triangulation> t = BRep_Tool::Triangulation(TopoDS::Face(it.Current()), location);
     if (!t.IsNull() && t->NbTriangles() > 0) out.push_back(faces.FindIndex(it.Current()) - 1);
+  }
+  return out;
+}
+
+std::vector<std::string> face_keys(const TDF_Label& part) {
+  const TopoDS_Shape shape = XCAFDoc_ShapeTool::GetShape(part);
+  FaceMap faces;
+  TopExp::MapShapes(shape, TopAbs_FACE, faces);
+  std::vector<std::string> out;
+  for (int i = 1; i <= faces.Extent(); ++i) {
+    const TopoDS_Face face = TopoDS::Face(faces(i));
+    // The cad-engine's names (stable_face_id.py _SURFACE_TYPE_NAMES); any other type is "other_<GeomAbs value>" there too.
+    const GeomAbs_SurfaceType type = BRepAdaptor_Surface(face).GetType();
+    std::string surface;
+    switch (type) {
+      case GeomAbs_Plane: surface = "plane"; break;
+      case GeomAbs_Cylinder: surface = "cylinder"; break;
+      case GeomAbs_Cone: surface = "cone"; break;
+      case GeomAbs_Sphere: surface = "sphere"; break;
+      case GeomAbs_Torus: surface = "torus"; break;
+      case GeomAbs_BSplineSurface: surface = "bspline"; break;
+      case GeomAbs_BezierSurface: surface = "bezier"; break;
+      case GeomAbs_SurfaceOfRevolution: surface = "revolution"; break;
+      case GeomAbs_SurfaceOfExtrusion: surface = "extrusion"; break;
+      case GeomAbs_OffsetSurface: surface = "offset"; break;
+      default: surface = "other_" + std::to_string(static_cast<int>(type));
+    }
+    GProp_GProps props;
+    BRepGProp::SurfaceProperties(face, props);
+    const gp_Pnt c = props.CentreOfMass();
+    char key[256];
+    std::snprintf(key, sizeof key, "%s|%.3f|%.3f|%.3f|%.3f", surface.c_str(), props.Mass(), c.X(), c.Y(), c.Z());
+    out.emplace_back(key);
   }
   return out;
 }
@@ -688,6 +722,8 @@ std::vector<Feature> recognise_features(const TDF_Label& part, const std::option
     for (const std::size_t m : members) {
       length += sharp[m].length;
       f.edges.push_back(sharp[m].points);
+      for (const int face : {sharp[m].f1, sharp[m].f2})
+        if (std::find(f.edge_faces.begin(), f.edge_faces.end(), face) == f.edge_faces.end()) f.edge_faces.push_back(face);
     }
     f.parameters = {{"length_mm", length},
                     {"convex", sharp[members.front()].convex ? 1.0 : 0.0},

@@ -1,6 +1,6 @@
 'use client';
 
-import { highlightLabel, uniqueOccurrenceTriangles } from '@/lib/features/highlight-display';
+import { highlightLabel, uniqueOccurrenceTriangles, withFaceCentroids } from '@/lib/features/highlight-display';
 import { faceIdForTriangle } from '@/lib/features/machining-feature-tree';
 import React, { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
@@ -95,6 +95,8 @@ interface FeatureNodeV2HL {
   diameter_mm?: number;
   radius_mm?: number;
   normal?: [number, number, number];
+  /** The source knows the faces, not where they are: take each occurrence's centroid (and the box) from its triangles on the mesh. */
+  centroidFromFaces?: boolean;
 }
 
 interface EDrawingsViewerProps {
@@ -3237,6 +3239,13 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     return new Map(faceMap.map((e) => [e.face_id, e]));
   }, [faceMap]);
 
+  // Where the highlighted faces are, for the zoom: from the mesh itself when the source did not say (withFaceCentroids).
+  const placedHighlight = useMemo(() => {
+    const position = currentGeometry?.getAttribute('position');
+    if (!highlightOccurrences?.centroidFromFaces || !position || !faceMapIndex.size) return highlightOccurrences;
+    return withFaceCentroids(highlightOccurrences, position.array as ArrayLike<number>, currentGeometry?.index?.array ?? null, faceMapIndex);
+  }, [highlightOccurrences, currentGeometry, faceMapIndex]);
+
   // ─── Heatmap Engine ───────────────────────────────────────────────────────────
   const heatmapActive = !!heatmapSources?.length;
   const heatmapRiskValuesRef = useRef<Float32Array | null>(null);
@@ -4121,7 +4130,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               projectedFaceIndices={projectedFaceIndices}
               projectedHighlightColor={VIEW_COLORS[currentView] ?? '#06b6d4'}
               showProjectedHighlight={showProjectedAreaHighlight}
-              highlightOccurrences={highlightOccurrences}
+              highlightOccurrences={placedHighlight}
               selectedOccurrenceIndex={selectedOccurrenceIndex}
               occurrenceFaceIndices={occurrenceFaceIndices}
               groupFaceIndices={groupFaceIndices}

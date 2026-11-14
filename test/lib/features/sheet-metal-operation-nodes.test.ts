@@ -39,4 +39,24 @@ describe('sheetMetalOperationNodes', () => {
     expect(s!.attrs.find((a) => a.name === 'Operation')?.value).toBe('No operation');
     expect(s!.attrs.find((a) => a.name === 'Why')?.value).toMatch(/smallest punchable/);
   });
+
+  it('highlights a sand casting\'s analysis features by their faces on the model, one occurrence each, a child step by its own faces', () => {
+    const sand: CatalogOperation = {
+      operations: ['Sand Casting'], featureType: 'SimpleHole', variant: '', diameterMm: null, count: 3,
+      featureIds: ['SimpleHole:1', 'SimpleHole:2', 'SimpleHole:3'], status: 'resolved',
+      // SimpleHole:3's faces were not found on the model: it is left out, not shown in another's place.
+      featureFaceIds: [[4, 5], [9], []],
+      children: [{ operation: 'As Cast', featureType: 'Edge', featureFaceIds: [[5], [], []] }],
+    };
+    const [n] = sheetMetalOperationNodes('catop_1', [sand]);
+    expect(n!.faceOccurrences).toEqual([[4, 5], [9]]);
+    expect(n!.v2FeatureIds).toBeUndefined();
+    expect(n!.children![0]!.faceOccurrences).toEqual([[5]]);
+  });
+
+  it('highlights nothing rather than guess when none of the faces were found', () => {
+    const [n] = sheetMetalOperationNodes('catop_2', [{ ...punched, featureFaceIds: [[]], children: [] }]);
+    expect(n!.faceOccurrences).toBeUndefined();
+    expect(n!.v2FeatureIds).toBeUndefined();
+  });
 });

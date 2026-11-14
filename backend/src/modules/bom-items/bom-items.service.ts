@@ -4241,6 +4241,7 @@ export class BOMItemsService {
         sandResult = await this.sandCostService.price({
           client, accessToken, location, grade,
           bomItemId: id, sourcePath: castingSourcePath({ file_3d_path: (item as any).file3dPath ?? (item as any).file_3d_path, file_step_path: (item as any).fileStepPath ?? (item as any).file_step_path }),
+          stableFaceIds: (fg?.feature_graph_v2?.metadata?.stable_face_ids as Record<string, string> | undefined) ?? null,
           measurements: {
             volumeMm3: ((item.volume ?? 0) as number) || null,
             surfaceAreaMm2: Number((item as any).surfaceArea ?? (item as any).surface_area ?? 0) || null,
