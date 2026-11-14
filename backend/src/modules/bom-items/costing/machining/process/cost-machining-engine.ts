@@ -136,9 +136,11 @@ export interface MachiningCostInput {
   // machinability_rating from raw_materials DB (75 = mild steel baseline).
   // Scales MRR: Al 6061 ≈ 150 → 2× faster; SS316 ≈ 35 → 0.47× slower.
   machinabilityRating?: number;
+  /** The material's milling removal rate (tblMillingRemovalRate, mm^3/min); null or unset = not on file. */
+  millingRemovalRateMm3PerMin?: number | null;
   // Feature volumes from feature_graph_v2 — enables per-feature cycle time instead
   // of (billetVol − partVol) / MRR. When absent, falls back to the bbox formula.
-  featureOps?: Array<{ name: string; timeSec: number; source: string; /** feature_graph_v2 ids of the features the operation is performed on. */ featureIds?: string[]; /** The steps of the calculator that timed the operation. */ trace?: CalculationTraceStep[] }>;
+  featureOps?: Array<{ name: string; timeSec: number; source: string; /** feature_graph_v2 ids of the features the operation is performed on. */ featureIds?: string[]; /** The steps of the calculator that timed the operation. */ trace?: CalculationTraceStep[]; /** The inputs the operation could not be priced without (its time is then 0). */ missing?: string }>;
   // The drawing callout costed by the reference surface-treatment engine
   // (BomItemsService.resolveSurfaceTreatmentDbRate). Null = the callout names no
   // reference process: no line, a warning.
@@ -353,22 +355,6 @@ export function detectMaterialClass(grade: string | null): MaterialClass {
   if (/DELRIN|POM|ACETAL|\bPA6\b|\bPA66\b|\bPA\d|\bNYLON\b|\bABS\b|\bPEEK\b|\bPTFE\b|\bULTEM\b|POLYCARBONATE|\bPC\b|\bPP\b|\bPE\b|\bHDPE\b|\bLDPE\b|PLASTIC/.test(g)) return 'plastic';
   return 'mild_steel';
 }
-
-// ── MRR tables (mm³/min, carbide tooling) ────────────────────────────────────
-
-// Exported so operation-sequencer.ts's feature-driven path shares this exact
-// table instead of keeping its own separately hand-maintained copy (that
-// duplicate — MRR_MM3_PER_MIN — used to require a comment begging both
-// tables be kept in sync by hand; single source of truth now).
-export const MILLING_MRR: Record<MaterialClass, number> = {
-  aluminum:     60_000,
-  mild_steel:   12_000,
-  stainless:     5_000,
-  titanium:      3_000,
-  copper_alloy: 40_000,
-  tool_steel:    3_000,
-  plastic:      150_000,  // Engineering plastics (POM/Delrin) cut ~2.5× faster than aluminum
-};
 
 // Real ops that buildOperationSequence() emits into the milling bucket's own
 // featureOps array but that are billed as their OWN dedicated process line at
@@ -1505,7 +1491,6 @@ export function computeMillingCostSummary(
   //
   // machinabilityRating scales MRR: Al 6061 ≈ 150 (2× mild steel baseline of 75).
   const machinabilityFactor = (input.machinabilityRating ?? 75) / 75;
-  const mrr = MILLING_MRR[matClass] * machinabilityFactor;
 
   let cncMillingMin = 0;
   let millRun: CalcRun | null = null;
@@ -1527,8 +1512,19 @@ export function computeMillingCostSummary(
     cncMillingMin = (millRun.sec ?? 0) / 60;
   } else {
     // Bbox-subtraction fallback (used when CAD engine did not return feature_graph_v2)
+    // No feature graph: the whole stock-to-part volume is one Bulk Milling operation, timed by its calculator.
     const materialRemovalMm3 = Math.max(0, billetVolMm3 - volume);
-    const roughingMin = materialRemovalMm3 > 0 ? (materialRemovalMm3 / mrr) * 1.3 : 0;
+    const rate = input.millingRemovalRateMm3PerMin;
+    const bulk = runMachiningCalculator(input.machiningCalculators, 'Bulk Milling', {
+      'Removed Volume': { value: materialRemovalMm3, source: 'Stock volume less the CAD part volume' },
+      ...(rate != null && rate > 0 ? { 'Material Removal Rate': {
+        value: rate * machinabilityFactor, lookup: true,
+        source: `tblMillingRemovalRate: ${matClass} ${rate} mm^3/min x machinability factor ${machinabilityFactor}`,
+        match: { table: 'tblMillingRemovalRate', row: { MaterialClass: matClass } },
+      } } : {}),
+    });
+    if (materialRemovalMm3 > 0 && bulk.missing.length > 0) warnings.push(`Bulk Milling not priced — missing real input: ${bulk.missing.join('; ')}.`);
+    const roughingMin = materialRemovalMm3 > 0 ? (bulk.sec ?? 0) / 60 : 0;
 
     const drilling = drillHoleGroups(holeGroups, holeCount, materialGrade, input.drillingTable, input.machiningCalculators);
     const drillingMin = drilling.min;
@@ -1557,7 +1553,12 @@ export function computeMillingCostSummary(
     const operationSteps = (input.featureOps ?? [])
       .filter((o) => !MILLING_DOUBLE_BILLED_ELSEWHERE.has(o.name))
       .flatMap((o) => prefixTrace(`${o.name} ·`, o.trace ?? []));
-    processLines.push(millRun ? withRun(millLine, millRun, operationSteps) : millLine);
+    // An operation the sequencer could not price leaves the line short of its time: the line is a named gap, so the
+    // route is not fully costed and cannot be applied at a total that silently leaves the operation out.
+    const unpricedOperations = [...new Set((input.featureOps ?? [])
+      .filter((o) => o.missing && !MILLING_DOUBLE_BILLED_ELSEWHERE.has(o.name))
+      .map((o) => o.missing!))];
+    processLines.push(millRun ? withRun(millLine, millRun, operationSteps, unpricedOperations) : millLine);
   }
   if (cncMillingMin <= 0) {
     warnings.push('Volume data unavailable — milling time estimated at 0');

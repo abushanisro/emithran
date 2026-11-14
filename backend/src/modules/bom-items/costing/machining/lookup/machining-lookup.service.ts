@@ -281,6 +281,13 @@ export class MachiningLookupService {
     return this.operationCatalog;
   }
 
+  /** The material class's milling removal rate (tblMillingRemovalRate, mm^3/min), or null when the table or the row is not staged. */
+  async getMillingRemovalRate(materialClass: MaterialClass): Promise<number | null> {
+    const row = ((await this.loadTable('tblMillingRemovalRate')) ?? []).find((r) => r.MaterialClass === materialClass);
+    const rate = Number(row?.RemovalRateMm3PerMin);
+    return Number.isFinite(rate) && rate > 0 ? rate : null;
+  }
+
   /** A staged lookup table by name, for a calculator whose spec names the table (specLookupSeeds). */
   async getTable(name: string): Promise<any[] | null> {
     return this.loadTable(name);

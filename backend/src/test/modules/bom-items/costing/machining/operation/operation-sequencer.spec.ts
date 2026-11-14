@@ -16,11 +16,17 @@ import {
 import { specAsCalculators } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculator-spec';
 import { realDrillingTable, realTappingTable } from '../real-reference-tables';
 
+const REMOVAL_RATE: Record<string, number> = {
+  aluminum: 60000, mild_steel: 12000, stainless: 5000, titanium: 3000, copper_alloy: 40000, tool_steel: 3000, plastic: 150000,
+};
+
 // Every operation is timed by its stored calculator, so the sequencer is always given them (as production does):
 // the calculators of the spec unless a test passes its own.
 const buildOperationSequence = (...args: Parameters<typeof buildWith>): OperationLine[] => {
   const a = [...args] as Parameters<typeof buildWith>;
   if (a[8] === undefined) a[8] = specAsCalculators();
+  // The removal rate of the material class, as tblMillingRemovalRate stages it (migration 1036).
+  if (a[10] === undefined) a[10] = REMOVAL_RATE[a[1]] ?? null;
   return buildWith(...a);
 };
 
@@ -603,9 +609,31 @@ describe('every milling operation is timed by its stored calculator', () => {
   });
 
   it('with no calculators an operation is a named gap, never a number', () => {
-    const ops = buildWith(pocket, 'mild_steel', 1.0, null, null, null, null, null, {});
+    const ops = buildWith(pocket, 'mild_steel', 1.0, null, null, null, null, null, {}, null, 12000);
     const rough = ops.find((o) => o.name === 'Rough Milling')!;
     expect(rough.timeSec).toBe(0);
     expect(rough.missing).toContain('none mapped');
+  });
+});
+
+describe('the removal rate is data (tblMillingRemovalRate), not a table in the code', () => {
+  const pocket = [{ feature_type: 'PocketV2', variant: 'default', diameter_mm: 0, occurrences: [{ material_removed_mm3: 12000 }] }];
+
+  it('a volume operation with no rate on file is a named gap', () => {
+    const rough = buildWith(pocket, 'mild_steel', 1.0, null, null, null, null, null, specAsCalculators(), null, null).find((o) => o.name === 'Rough Milling')!;
+    expect(rough.timeSec).toBe(0);
+    expect(rough.missing).toContain('Material Removal Rate');
+  });
+
+  it('the rate it is given is the one it uses, and the trace names the table', () => {
+    const rough = buildWith(pocket, 'mild_steel', 1.0, null, null, null, null, null, specAsCalculators(), null, 24000).find((o) => o.name === 'Rough Milling')!;
+    expect(rough.timeSec).toBeCloseTo((12000 * 0.8 / 24000 + 12000 * 0.2 / (24000 * 0.4)) * 60, 6);
+    expect(rough.trace!.find((st) => st.fieldName === 'Material Removal Rate')!.source).toContain('tblMillingRemovalRate');
+  });
+
+  it('countersinking reads its time per hole from its calculator (6 s)', () => {
+    const csk = [{ feature_type: 'Edge', variant: 'countersink', diameter_mm: 8, occurrences: [{ depth_mm: 4 }, { depth_mm: 4 }] }];
+    const op = buildOperationSequence(csk, 'mild_steel', 1.0, 'AISI 1018', null, null, null, realDrillingTable()).find((o) => o.name === 'Countersinking')!;
+    expect(op.timeSec).toBe(12);
   });
 });

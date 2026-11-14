@@ -2883,6 +2883,31 @@
           "formula": "{Passes} * {Pass Time}"
         }
       ]
+    },
+    {
+      "name": "Machining - Countersinking",
+      "operation": "Countersinking",
+      "machineClasses": "lathes+mills",
+      "migration": 1035,
+      "description": "Countersinking each hole after it is drilled.",
+      "fields": [
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Time per Hole",
+          "unit": "s",
+          "source": "default",
+          "default": 6
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Holes} * {Time per Hole}"
+        }
+      ]
     }
   ],
   "retire": [

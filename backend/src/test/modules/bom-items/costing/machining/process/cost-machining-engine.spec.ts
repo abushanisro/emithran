@@ -1,6 +1,7 @@
 import type { CalculationTraceStep } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
 import { calculatorInputSteps } from '../../../../../../modules/bom-items/costing/machining/process/machining-trace';
 import {
+  detectMaterialClass,
   computeMillingCostSummary,
   computeTurningCostSummary,
   computeSurfaceTreatmentLine,
@@ -14,6 +15,9 @@ import { matchSurfaceTreatmentCallout } from '../../../../../../modules/bom-item
 import { specAsCalculators } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculator-spec';
 
 const CALCS = specAsCalculators();
+const REMOVAL_RATE: Record<string, number> = {
+  aluminum: 60000, mild_steel: 12000, stainless: 5000, titanium: 3000, copper_alloy: 40000, tool_steel: 3000, plastic: 150000,
+};
 
 // A line whose real inputs are missing stays visible with a gap — never
 // omitted, never estimated.
@@ -68,7 +72,7 @@ function rate(value: number, overrides: Partial<MHRRateInput> = {}): MHRRateInpu
 
 // RMP-00028-A boom clamp analog: 83×62×32 mm aluminium, 107 holes, M4 taps
 function milledInput(overrides: Partial<MachiningCostInput> = {}): MachiningCostInput {
-  return {
+  const input: MachiningCostInput = {
     volume: 100_000,
     surfaceArea: 40_000,
     maxLength: 83,
@@ -100,6 +104,9 @@ function milledInput(overrides: Partial<MachiningCostInput> = {}): MachiningCost
     location: 'India',
     ...overrides,
   };
+  // The removal rate of the part's material class, as tblMillingRemovalRate stages it (migration 1036), unless the test sets one.
+  if (!('millingRemovalRateMm3PerMin' in overrides)) input.millingRemovalRateMm3PerMin = REMOVAL_RATE[detectMaterialClass(input.materialGrade)];
+  return input;
 }
 
 describe('computeMillingCostSummary — billet and chip loss', () => {
@@ -924,8 +931,8 @@ describe('Fix 4 — machinabilityRating: scales MRR in both engines', () => {
       { feature_type: 'PocketV2', variant: 'default', diameter_mm: 0,
         occurrences: [{ depth_mm: 12, material_removed_mm3: 15_000 }] },
     ];
-    const alOps = buildOperationSequence(fgv2, 'aluminum', 2.0, null, null, null, null, null, CALCS);
-    const steelOps = buildOperationSequence(fgv2, 'mild_steel', 1.0, null, null, null, null, null, CALCS);
+    const alOps = buildOperationSequence(fgv2, 'aluminum', 2.0, null, null, null, null, null, CALCS, null, 60000);
+    const steelOps = buildOperationSequence(fgv2, 'mild_steel', 1.0, null, null, null, null, null, CALCS, null, 12000);
     const alTime = alOps.find((o) => o.name === 'Rough Milling')!.timeSec;
     const steelTime = steelOps.find((o) => o.name === 'Rough Milling')!.timeSec;
     expect(alTime).toBeLessThan(steelTime);
@@ -2400,6 +2407,12 @@ describe('the mill line is the Machining - Milling calculator over the part\'s s
 
   it('adds the rapids and tool-change allowance stored on the calculator (15 %)', () => {
     expect(line.cycleTimeMin).toBeCloseTo((535 * 1.15) / 60, 4);
+  });
+
+  it('an operation the sequencer could not price makes the line a named gap: the route is not fully costed', () => {
+    const ops = featureOps.map((o) => (o.name === 'Rough Milling' ? { ...o, timeSec: 0, missing: 'Rough Milling: Material Removal Rate' } : o));
+    const l = computeMillingCostSummary(milledInput({ featureOps: ops }), mc('3_axis_mill')).processLines.find((x) => x.process === '3 Axis Mill')!;
+    expect((l.physicsGap as { reason?: string } | undefined)?.reason).toContain('Rough Milling: Material Removal Rate');
   });
 
   it('is a named gap, not a number, when the station has no calculator', () => {

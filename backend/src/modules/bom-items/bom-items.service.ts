@@ -136,7 +136,7 @@ import { CADAnalysisService } from './services/cad-analysis.service';
 import { RateResolutionService } from './services/rate-resolution.service';
 import { CalculatorCatalogService } from './services/calculator-catalog.service';
 import { MaterialResolutionService } from './services/material-resolution.service';
-import { MachineDiscoveryService } from './services/machine-discovery.service';
+import { MachineDiscoveryService, type MachiningRouteRole } from './services/machine-discovery.service';
 import { billetFallback } from './costing/sheet-metal/machine/blank-stock-candidates';
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
 import { SandCatalogOperationsService } from './costing/casting/sand/sand-catalog-operations.service';
@@ -2413,6 +2413,7 @@ export class BOMItemsService {
       drillingTable,
       machiningCalculators,
       tappingTable,
+      await this.machiningLookup.getMillingRemovalRate(matClass),
     );
     // Ops the sequencer could not price from real inputs (missing CAD
     // measurement or lookup row) — reported, never estimated.
@@ -3624,6 +3625,7 @@ export class BOMItemsService {
         location,
         blankResult,
         machinabilityRating: machinabilityRating ?? undefined,
+        millingRemovalRateMm3PerMin: await this.machiningLookup.getMillingRemovalRate(detectMaterialClass(grade)),
         featureOps: featureOps,
         processIdentityByMachineClass: cncProcessIdentities,
         deburrLinearSpeedMmPerSec: deburrParams.dataFound ? deburrParams.linearSpeedMmPerSec : null,
@@ -6522,14 +6524,31 @@ export class BOMItemsService {
           accessToken,
         ));
       }
-      return attachToRoutes(await this.buildTurnedRoutes(
+      const turned = await this.buildTurnedRoutes(
         id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
         materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
         cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
         routeCylindricalGrindingParams, routeInternalGrindingParams, routeJigBoreTable, routeKeywayBroach, routeWireEdmParams,
         routeTurningParams,
         accessToken,
-      ));
+      );
+      // A mill the operation catalog says can make every feature of this turned part is priced as its milled route,
+      // beside the lathes. (The mills it rules out are already listed by buildTurnedRoutes.)
+      const millable = new Set((await this.machiningVerdicts('primary_milling', fg, location, accessToken))
+        .filter((m) => m.verdict?.status === 'compatible').map((m) => m.cls));
+      if (millable.size > 0) {
+        const milled = await this.buildMilledRoutes(
+          id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
+          materialSource, mhrRates, batchSize, [], locInfo, location,
+          cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
+          routeJigBoreTable, routeCylindricalGrindingParams, routeInternalGrindingParams, routeKeywayBroach, routeWireEdmParams,
+          accessToken,
+        );
+        // Badges are awarded among the lathes; a mill route joins the ranking by its cost alone.
+        turned.routes.push(...milled.routes.filter((r) => millable.has(r.routeId))
+          .map((r) => ({ ...r, badges: { lowestCost: false, fastest: false, bestQuality: false } })));
+      }
+      return attachToRoutes(turned);
     }
     if (family === 'unknown') {
       return {
@@ -7706,6 +7725,9 @@ export class BOMItemsService {
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, mhrRates, location,
         stockAllowancePerSideMm: milledAllowance.allowancePerSideMm,
         inspectionReference: (await this.machiningLookup.getInspectionReference()).reference,
+        machiningCalculators: await this.resolveMachiningCalculators(accessToken),
+        // The alternative is costed with no grade: the engine's default material class.
+        millingRemovalRateMm3PerMin: await this.machiningLookup.getMillingRemovalRate(detectMaterialClass(null)),
       });
       if (milledAlt) candidates.push(milledAlt);
     }
@@ -7809,6 +7831,8 @@ export class BOMItemsService {
     materialSource: 'db' | 'default'; batchSize: number;
     mhrRates: Awaited<ReturnType<typeof this.resolveMHRRates>>;
     location: string;
+    machiningCalculators: MachiningCalculators;
+    millingRemovalRateMm3PerMin: number | null;
     /** Reference per-side stock allowance (BlankOptimizerService.stockAllowanceFor); null = rule not staged. */
     stockAllowancePerSideMm: number | null;
     /** The memory/Machining inspection reference (MachiningLookupService.getInspectionReference); null = inspection is a named gap. */
@@ -7836,6 +7860,8 @@ export class BOMItemsService {
       inspectionReference, inspectedFeatures: [],
       location, blankResult,
       machinabilityRating: undefined, featureOps: undefined,
+      // No feature graph on this path: the stock-to-part volume is one Bulk Milling operation, timed by its calculator.
+      machiningCalculators: args.machiningCalculators, millingRemovalRateMm3PerMin: args.millingRemovalRateMm3PerMin,
       mhrRate: mhrRates.cnc3ax, tappingRate: mhrRates.tapping,
     };
 
@@ -8065,10 +8091,15 @@ export class BOMItemsService {
     // maps). Older Machining rows on another class — e.g. the Tapping rows on
     // class 'tapping' bound to the Sheet Metal tapping calculator (migration
     // 702) — are not machining calculators and must not take an operation.
-    const stations = loadMachiningCalculatorSpec().stations;
+    const spec = loadMachiningCalculatorSpec();
+    const stations = spec.stations;
+    const machiningCalculatorNames = new Set(spec.calculators.map((c) => c.name));
     for (const m of catalog.mappings as any[]) {
       if (m.process_group !== 'Machining' || !m.calculator_id || out[m.operation] || !(m.machine_class in stations)) continue;
       const calc = (catalog.calculators as any[]).find((c) => c.id === m.calculator_id);
+      // Only a calculator of the machining spec: a station class also carries older rows bound to another domain's
+      // calculator (the drill press's Sheet Metal - Counterboring / Countersinking), which must not take an operation.
+      if (calc && !machiningCalculatorNames.has(calc.name)) continue;
       const fields = (catalog.fields as any[]).filter((f) => f.calculator_id === m.calculator_id);
       if (!calc || fields.length === 0) continue;
       out[m.operation] = { calculatorId: calc.id, name: calc.name, version: calc.version ?? 1, fields };
@@ -8643,18 +8674,44 @@ export class BOMItemsService {
     };
   }
 
+  /** Why a router is listed but not priced: the reference has no feed data to time routering with. */
+  private static readonly ROUTER_NOT_PRICED = 'The reference holds no router feed table, so routering cannot be timed: enter the feed rate and depth per pass on the line to price it.';
+
+  /** A machine the catalog says can make the part but that cannot be priced from the reference: listed with the reason, not costed. */
+  private unpricedMachiningRoute(cls: string, compatibility: NonNullable<ReturnType<typeof machiningCatalogCompatibility>>, ratesSource: string, reason: string): RouteResultDto {
+    return {
+      ...this.listedMachiningRoute(cls, compatibility, ratesSource),
+      isFeasible: true, warnings: [reason], machineCapabilityWarnings: [reason],
+      dataGaps: [{ process: this.humanizeMachineClass(cls), machineClass: cls, reason }],
+      capability: { cuttingCapable: true, pressBrakeCapable: true, overallCapable: true, confidence: 'high', estimatedTonnage: null, reasonCodes: [], warnings: [reason] },
+    };
+  }
+
   /**
-   * The machines of a route role that the reference operation catalog rules out for this part (catalog-compatibility.ts),
-   * each as a listed route. A machine the catalog does not rule out is not listed here.
+   * What the reference operation catalog says of each machine of a route role for this part (catalog-compatibility.ts):
+   * 'compatible', 'incompatible' with the operations it lacks, or null when nothing is known (no catalog, no feature operation).
    */
-  private async machinesThatCannotMake(role: 'primary_milling' | 'primary_turning', fg: any, location: string, accessToken: string, ratesSource: string): Promise<RouteResultDto[]> {
+  private async machiningVerdicts(role: MachiningRouteRole, fg: any, location: string, accessToken: string) {
     const stations = loadMachiningCalculatorSpec().stations;
     const catalog = await this.machiningLookup.getOperationCatalog();
     const features = (fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2)?.features as unknown[] | undefined;
     const classes = await this.machineDiscoveryService.getEligibleClasses(role, location, accessToken);
-    return classes.flatMap((cls) => {
-      const verdict = machiningCatalogCompatibility(features, catalog, stations[cls] ?? cls);
-      return verdict?.status === 'incompatible' ? [this.listedMachiningRoute(cls, verdict, ratesSource)] : [];
+    return classes.map((cls) => ({ cls, verdict: machiningCatalogCompatibility(features, catalog, stations[cls] ?? this.humanizeMachineClass(cls)) }));
+  }
+
+  /** The machines of a role the catalog rules out for this part, each as a listed route. */
+  private async machinesThatCannotMake(role: MachiningRouteRole, fg: any, location: string, accessToken: string, ratesSource: string): Promise<RouteResultDto[]> {
+    return (await this.machiningVerdicts(role, fg, location, accessToken))
+      .flatMap(({ cls, verdict }) => (verdict?.status === 'incompatible' ? [this.listedMachiningRoute(cls, verdict, ratesSource)] : []));
+  }
+
+  /** The routers of the location for this part: listed with the operations they lack, or as able to make it but not priced. */
+  private async routerRoutes(fg: any, location: string, accessToken: string, ratesSource: string): Promise<RouteResultDto[]> {
+    return (await this.machiningVerdicts('primary_routing', fg, location, accessToken)).flatMap(({ cls, verdict }) => {
+      if (!verdict) return [];
+      return [verdict.status === 'incompatible'
+        ? this.listedMachiningRoute(cls, verdict, ratesSource)
+        : this.unpricedMachiningRoute(cls, verdict, ratesSource, BOMItemsService.ROUTER_NOT_PRICED)];
     });
   }
 
@@ -8715,6 +8772,7 @@ export class BOMItemsService {
     const baseInput: Omit<MachiningCostInput, 'mhrRate' | 'tappingRate'> = {
       blankResult,
       machinabilityRating:  featurePlan.machinabilityRating ?? undefined,
+        millingRemovalRateMm3PerMin: await this.machiningLookup.getMillingRemovalRate(detectMaterialClass(grade)),
       featureOps:           featurePlan.featureOps,
       gunDrillCandidates:   featurePlan.deepHoleSplit.gunDrillCandidates,
       deepBoreCandidates:   featurePlan.deepHoleSplit.deepBoreCandidates,
@@ -8904,6 +8962,7 @@ export class BOMItemsService {
     });
     // Listed, never costed: the machine cannot make the part, and the reason is each operation it lacks.
     for (const cls of cannotMake) routes.push(this.listedMachiningRoute(cls, compatibilityOf(cls)!, primaryRateByClass.get(cls)!.source));
+    routes.push(...await this.routerRoutes(fg, location, accessToken, routes[0]?.ratesSource ?? RATES_SOURCE_LABEL));
 
     // Badges — only among capable routes. The lowest-cost capable route here is
     // by construction the route getCostSummary quotes on (same pick function).
@@ -9149,6 +9208,7 @@ export class BOMItemsService {
     });
     // The mills of the location, when the catalog says they cannot make this turned part: listed with the operations they lack.
     routes.push(...await this.machinesThatCannotMake('primary_milling', fg, location, accessToken, routes[0]?.ratesSource ?? RATES_SOURCE_LABEL));
+    routes.push(...await this.routerRoutes(fg, location, accessToken, routes[0]?.ratesSource ?? RATES_SOURCE_LABEL));
 
     // Badges. Lowest cost is COMPUTED from route totals — a 2-axis lathe with a
     // per-part rechuck penalty is often costlier than live tooling, so the old

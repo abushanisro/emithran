@@ -58,7 +58,7 @@
  * section (unrelated to this routing engine) — not part of this backlog.
  */
 
-import { MILLING_MRR, computeDrillCycle, computeTapCycle, computeRotaryCycleSec, DRILL_DEPTH_TO_DIAMETER_RATIO, detectMaterialClass } from '../process/cost-machining-engine';
+import { computeDrillCycle, computeTapCycle, computeRotaryCycleSec, DRILL_DEPTH_TO_DIAMETER_RATIO, detectMaterialClass } from '../process/cost-machining-engine';
 import type { DrillingTable } from '../lookup/drilling-table';
 import { runMachiningCalculator, type CalcSeed, type MachiningCalculators } from '../calculators/machining-calculator';
 import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
@@ -246,19 +246,23 @@ export function buildOperationSequence(
   drillingTable: DrillingTable | null = null,
   calculators: MachiningCalculators | null = null,
   tappingTable: any[] | null = null,
+  // The material's milling removal rate (tblMillingRemovalRate). Null = not on file: every operation that divides a
+  // volume by it is a named gap.
+  removalRateMm3PerMin: number | null = null,
 ): OperationLine[] {
   if (!Array.isArray(fgv2Features) || fgv2Features.length === 0) return [];
-
-  const baseMrr = MILLING_MRR[matClass] ?? MILLING_MRR.mild_steel;
-  const mrr = baseMrr * machinabilityFactor;
 
   const ops: OperationLine[] = [];
 
   // Face mill is always first — part has to be squared before any features
   // The inputs every volume- or area-based milling calculator shares, and the per-operation calls.
-  const mrrSeed: Record<string, CalcSeed> = {
-    'Material Removal Rate': { value: mrr, source: `Milling removal rate of ${matClass} x machinability factor ${machinabilityFactor}` },
-  };
+  const mrrSeed: Record<string, CalcSeed> = removalRateMm3PerMin != null && removalRateMm3PerMin > 0 ? {
+    'Material Removal Rate': {
+      value: removalRateMm3PerMin * machinabilityFactor, lookup: true,
+      source: `tblMillingRemovalRate: ${matClass} ${removalRateMm3PerMin} mm^3/min x machinability factor ${machinabilityFactor}`,
+      match: { table: 'tblMillingRemovalRate', row: { MaterialClass: matClass } },
+    },
+  } : {};
   const volumeOp = (operation: string, removedMm3: number) => calcOp(calculators, operation, {
     'Removed Volume': { value: removedMm3, source: 'CAD: volume the features remove' }, ...mrrSeed,
   });
@@ -408,7 +412,7 @@ export function buildOperationSequence(
         if (diamMm > 0) {
           ops.push({ name: "Center Drilling", ...countOp('Center Drilling', 'Holes', count), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
           ops.push({ name: "Drilling", ...drillOp(diamMm * 0.6, depthMm, count, materialGrade, drillingTable, calculators), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
-          ops.push({ name: "Countersinking", timeSec: count * 6, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Countersinking", ...countOp('Countersinking', 'Holes', count), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
