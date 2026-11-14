@@ -31,7 +31,9 @@ async function main(): Promise<void> {
   });
   await check('migration 984 restored the counterbore, countersink, PEM and tapping catalog rows, each bound to its calculator', async () => {
     const rows = await (await api('/process_calculator_mappings?machine_class=in.(drill_press,pem_press,tapping)&select=operation,calculator_id', minter.forService())).json() as { operation: string; calculator_id: string | null }[];
-    const bound = rows.filter((r) => r.calculator_id !== null).map((r) => r.operation).sort();
+    // The five rows 984 restores. The class holds other calculator rows too (migration 1030 gives the Drill Press its own), so only these are counted.
+    const restored = new Set(['Counterboring', 'Countersinking', 'PEM Insertion', 'Tapping']);
+    const bound = rows.filter((r) => r.calculator_id !== null && restored.has(r.operation)).map((r) => r.operation).sort();
     must(JSON.stringify(bound) === JSON.stringify(['Counterboring', 'Countersinking', 'PEM Insertion', 'Tapping', 'Tapping']), `rows ${JSON.stringify(rows)}`);
   });
   await check('migration 981 gave the Black Oxide machine the labor rate its wage grade carries', async () => {

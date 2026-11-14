@@ -57,7 +57,10 @@ import { resolveGdtCallouts } from './costing/shared/physics/gdt-callouts';
 import { detectDrawingCadMismatches, type FactMismatch } from './costing/shared/physics/drawing-cad-consistency';
 import type { MachiningCalculators } from './costing/machining/calculators/machining-calculator';
 import { loadMachiningCalculatorSpec } from './costing/machining/calculators/machining-calculator-spec';
-import type { KeywayBroachReference } from './costing/machining/calculators/machining-lookup-seeds';
+import { specLookupSeeds, type KeywayBroachReference, type LookupSeeds } from './costing/machining/calculators/machining-lookup-seeds';
+
+/** Lookup tables read by the generic spec resolver (specLookupSeeds), not by a resolver of their own. */
+const SPEC_RESOLVED_TABLES: ReadonlySet<string> = new Set(['tblRotarySurfaceGrinding', 'tblStraightBevelGearCutting', 'tblSpiralBevelGearCutting', 'tblShaping']);
 import { chemicalMillingCallout, splitChemicallyMilledPockets } from './costing/chemical-milling/chemical-milling-engine';
 import { resolveGearRoute } from './costing/machining/operation/gear-routing';
 import { polygonCallout, resolvePolygons, splitPolygonPockets } from './costing/machining/operation/polygon-routing';
@@ -8207,7 +8210,7 @@ export class BOMItemsService {
     };
 
     // CAD key inputs of this part (the engineer's own keys take precedence).
-    const HOLE_OPS = new Set(['Drilling', 'Reaming', 'Jig Boring', 'Gun Drilling', 'Deep Bore Machine']);
+    const HOLE_OPS = new Set(['Drilling', 'Drill Press', 'Reaming', 'Jig Boring', 'Gun Drilling', 'Deep Bore Machine']);
     const BORE_GRIND_OPS = new Set(['Internal Grinding', 'Jig Grind']);
     const holeGroups = this.resolveMachiningHoleGroups(fg, fg?.summary ?? {});
     if ((HOLE_OPS.has(operation) || BORE_GRIND_OPS.has(operation)) && holeGroups.length > 0) {
@@ -8225,7 +8228,7 @@ export class BOMItemsService {
         set('Surfaces', g.count, `${note} — bores of this diameter`, holesRef);
       }
     }
-    if (['Rough Turning', 'Finish Turning', 'Cylindrical Grinding'].includes(operation)) {
+    if (['Rough Turning', 'Stock Prep Lathe', 'Finish Turning', 'Cylindrical Grinding'].includes(operation)) {
       const turned = this.resolveTurnedGeometry(fg, {
         length: Number((item as any).maxLength) || 0, width: Number((item as any).maxWidth) || 0, height: Number((item as any).maxHeight) || 0,
       });
@@ -8237,7 +8240,7 @@ export class BOMItemsService {
         if (operation === 'Cylindrical Grinding') set('Surfaces', 1, 'CAD: turned outer diameter');
       }
     }
-    if (operation === 'Hobbing' || operation === 'Shaving') {
+    if (['Hobbing', 'Shaving', 'Shaper', 'Straight BG Face Milling', 'Spiral BG Face Milling'].includes(operation)) {
       const t = this.resolveToothForms(fg)[0];
       const note = 'CAD: first recognised tooth form (AxiGroove)';
       set('Teeth', t?.tooth_count, `${note} — teeth`);
@@ -8252,6 +8255,12 @@ export class BOMItemsService {
       set('Grind Width', face?.widthMm, `${note} — area / longest extent`);
       set('Faces', face?.count, `${note} — faces of this size`);
     }
+    if (operation === 'Rotary Surface Grinder') {
+      const face = this.resolvePlanarFaces(fg).sort((a, b) => b.lengthMm * b.widthMm - a.lengthMm * a.widthMm)[0];
+      const note = 'CAD: largest planar-face group';
+      set('Path Diameter', face?.lengthMm, `${note} — longest extent, the diameter it sweeps on the table`);
+      set('Faces', face?.count, `${note} — faces of this size`);
+    }
     if (operation === 'Tapping') {
       const drawingThreads = ((item as any).drawingIntelligence?.threads ?? []) as Array<{ size: string; count: number; pitchMm?: number }>;
       const t = this.resolveThreads(drawingThreads, fg)[0];
@@ -8264,7 +8273,7 @@ export class BOMItemsService {
       set('Thread Depth', t?.depthMm, `${note} — depth`, tappedRef);
       set('Threads', t?.count, `${note} — threads of this size`, tappedRef);
     }
-    if (operation === 'Deburring') {
+    if (operation === 'Deburring' || operation === 'Automated Deburring') {
       const edgeFaces = fg?.machining_features?.edges?.sharp_edge_face_ids as number[] | undefined;
       set('Sharp Edge Length', Number(fg?.machining_features?.edges?.sharp_edge_length_mm),
         'CAD: total length of sharp B-Rep edges (seams and tangent edges excluded)',
@@ -8326,7 +8335,7 @@ export class BOMItemsService {
       this.machiningLookup.getWireEdmParams(matClass),
       this.machiningLookup.getDeburrParams(matClass),
     ]);
-    const lookup = machiningLookupSeeds(operation, {
+    const lookup = (await this.specLookups(def.name, matClass, inputs)) ?? machiningLookupSeeds(operation, {
       matClass, drillingTable, tappingTable, reamTable, finishBoringTable, gunDrillTable, deepBoreMaterials, partoffTable, workholderTable,
       turningParams, grindingParams, internalGrindingParams, surfaceGrindingParams, hobbing, shaving: gearReference.shaving, keywayBroach, wireEdmParams, deburrParams,
       capabilityRules: (await this.machiningLookup.getCapabilityRules()).rules,
@@ -8348,6 +8357,23 @@ export class BOMItemsService {
       if (!missing.some((m) => m.includes(f.field_name))) missing.push(`${f.field_name}: not on this part (${f.data_source ?? 'input'}) — enter it`);
     }
     return { calculatorId, operation, materialClass: matClass, inputs, provenance, lookupMatches, refs, missing };
+  }
+
+  /**
+   * The lookup inputs of a calculator whose spec fields name their table (or variable) and row rule: read by the
+   * one generic resolver (specLookupSeeds). Null for a calculator whose lookups are resolved by its own function.
+   */
+  private async specLookups(calculatorName: string, matClass: ReturnType<typeof detectMaterialClass>, inputs: Record<string, number>): Promise<LookupSeeds | null> {
+    const calc = loadMachiningCalculatorSpec().calculators.find((c) => c.name === calculatorName);
+    const fields = (calc?.fields ?? []).filter((f) => f.source === 'lookup' && (f.where || f.nearest || f.table === 'variables' || SPEC_RESOLVED_TABLES.has(f.table ?? '')));
+    if (!calc || fields.length === 0 || fields.length !== calc.fields.filter((f) => f.source === 'lookup').length) return null;
+    const tableNames = [...new Set(fields.map((f) => f.table!).filter((t) => t !== 'variables'))];
+    const [tables, variables, cutCode] = await Promise.all([
+      Promise.all(tableNames.map(async (t) => [t, await this.machiningLookup.getTable(t)] as const)),
+      this.machiningLookup.getVariables(fields.filter((f) => f.table === 'variables').map((f) => f.column!)),
+      this.machiningLookup.getMaterialCutCode(matClass),
+    ]);
+    return specLookupSeeds(calc.fields, { matClass, tables: Object.fromEntries(tables), variables, cutCode }, inputs);
   }
 
   /** Gear/spline teeth the cad-engine recognised (machining_features AxiGroove), with their measured geometry. */
