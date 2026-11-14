@@ -38,8 +38,10 @@ import type { RibInsertReference } from './process/rib-inserts';
 import MANIFEST from '../../../processes/memory-reference-domains.json';
 import { fingerprintRows } from './reference-fingerprint';
 
+/** The reference-data domain of memory/Plastic Modeling (processes/memory-reference-domains.json): the Process page and the calculator dialog open it by this key. */
+export const PLASTIC_REFERENCE_DOMAIN = 'injection_molding';
 export const PLASTIC_REFERENCE_SOURCE_VERSION: string =
-  MANIFEST.domains.find((d) => d.key === 'injection_molding')!.sourceVersion;
+  MANIFEST.domains.find((d) => d.key === PLASTIC_REFERENCE_DOMAIN)!.sourceVersion;
 
 export const PLASTIC_VARIABLE_KEYS = [
   'clampForceSafetyFactor', 'shotSizeSafetyFactor', 'defaultToolLife',
@@ -76,7 +78,8 @@ export const PLASTIC_VARIABLE_KEYS = [
  * Variables of memory/Secondary process (source_version 2026-Secondary) the plastic model reads: the visual inspection time per surface area and the
  * share of parts inspected (F-34). Loaded next to the plastic variables; no key repeats a plastic one.
  */
-export const SECONDARY_PROCESS_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === 'secondary_process')!.sourceVersion;
+export const SECONDARY_PROCESS_DOMAIN = 'secondary_process';
+export const SECONDARY_PROCESS_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === SECONDARY_PROCESS_DOMAIN)!.sourceVersion;
 export const SECONDARY_VARIABLE_KEYS = ['visualInspectTimeStandard', 'defaultPercentToBeTested'] as const;
 
 export const PLASTIC_LOOKUP_KEYS = [

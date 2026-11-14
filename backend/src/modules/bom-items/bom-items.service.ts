@@ -4343,7 +4343,7 @@ export class BOMItemsService {
           calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
           calculatorOverrides: overridesByCalculator(await CalculatorFieldOverridesService.rows(this.databaseService.getClient(accessToken), id)),
           item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
-          material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
+          material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs, materialRecord: resolvedMaterial.materialRecord },
           plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
           electricity: electricityUsd(await loadLocationElectricity(this.databaseService.getClient(accessToken), location), location,
             (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),

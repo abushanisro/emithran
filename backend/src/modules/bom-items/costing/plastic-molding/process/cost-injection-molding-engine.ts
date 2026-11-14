@@ -46,6 +46,7 @@ import { runDeflashingTime, runInjectionCycleTime, runMaterialDrying, runSlideMo
 import { runMoldTooling } from '../calculators/mold-tooling-calculator';
 import { selectMoldBase } from './mold-base';
 import { moldCavityLookup } from './mold-cavity';
+import type { MaterialRecord } from '../calculators/plastic-input-sources';
 import { type ReferenceCalculators, withFieldOverrides, type CalculatorFieldOverrides } from '../../shared/calculators/reference-calculator';
 import {
   type CycleTimeResult,
@@ -261,6 +262,8 @@ export interface InjectionMoldingCostInput {
   // 831). Every field is required for the cooling model; any missing leaves
   // the cycle not derivable (cycle-time.ts), never a resin-family default.
   realResinInputs?: RealResinInputs | null;
+  /** The raw_materials record the resin's values above were read from (resolveMaterialForFamily): a calculator input read from it opens it. */
+  materialRecord?: MaterialRecord | null;
   // Staged Plastic reference data (plastic-reference.ts): SPI classes and the
   // mold-tooling tables. Null = not staged: no tooling result is produced and
   // plasticReferenceMissing names what is absent.
@@ -472,6 +475,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         cavityCount,
         // No per-part gate-count signal: the reference defaultNumberOfGatesPerCavity.
         gatesPerCavity: plasticRef.defaultGatesPerCavity,
+        material: input.materialRecord ?? null,
       }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null, mhrRate.machineClass === 'structural_foam_molding' ? 'structural_foam' : 'injection')
     : { derivable: false, missing: [`Plastic reference data (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')})`] };
   const cycleGapReason = cycle.derivable ? null : cycle.calculatorProblem ? `Cycle time not derivable: ${cycle.calculatorProblem}.` : `Cycle time not derivable: missing ${cycle.missing.join('; ')}.`;
@@ -576,7 +580,10 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (routed.has('material_drying')) {
     const dry = runMaterialDrying({
       grade: materialGrade, condition: dryingConditionFor(materialGrade), resinPerPartKg: shotWeightKg > 0 ? shotWeightKg : null,
-      pressTimePerPartSec: inCycleMin > 0 ? inCycleMin * 60 : null, dryers: dryerModels(), electricity: input.electricity ?? null, economics: equipmentEconomics(),
+      pressTimePerPartSec: inCycleMin > 0 ? inCycleMin * 60 : null,
+      // The press time per part is the molding cycle over the cavities and the good-part yield: its eye opens that cycle calculation, step by step.
+      pressTimeRef: cycle.derivable ? { kind: 'calculation', name: cycle.calculator.name, evidence: null, steps: cycle.trace } : null,
+      dryers: dryerModels(), electricity: input.electricity ?? null, economics: equipmentEconomics(),
     }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
     if (dry.derivable && dry.dryerHourlyUsd != null) {
       const dryerRate: MHRRateInput = {
@@ -794,9 +801,9 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     // Every price, hour and amortization step is the tooling calculator's (migration 1012), shown on the line and changeable for the part.
     const tooling = runMoldTooling({
       components: moldTooling.items, componentsSubtotalUsd: moldTooling.bomSubtotalUsd, moldBaseAreaMm2,
-      designHours: moldTooling.estimatedDesignHrs, assemblyHours: moldTooling.estimatedAssemblyHrs, tables: plasticRef.tooling,
+      designHours: moldTooling.estimatedDesignHrs, designHoursRowAreaMm2: moldTooling.designHoursRowAreaMm2, assemblyHours: moldTooling.estimatedAssemblyHrs, tables: plasticRef.tooling,
       toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null, location: input.location ?? '(unknown location)',
-      annualVolume: annualVol, productionLifeYears: prodLife, cavityCount, toolLifeShots,
+      annualVolume: annualVol, productionLifeYears: prodLife, cavityCount, toolLifeShots, toolLifeMaterialType: lifeRow?.materialType ?? null,
       toolLifeSource: lifeRow ? `memory/Plastic Modeling/lookup/tblToolLife: ${input.materialType}` : `memory/Plastic Modeling/variables: defaultToolLife (no tblToolLife row for ${input.materialType ?? 'the material type'})`,
       moldBase: selectMoldBase({
         partLengthMm: input.bboxMaxMm ?? 0, partWidthMm: input.bboxMidMm ?? 0, cavities: cavityCount,

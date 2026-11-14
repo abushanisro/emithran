@@ -17,6 +17,7 @@
 
 import type { CycleModel } from '../plastic-reference';
 import type { CalculationTraceStep } from '../../../dto/cost-breakdown.dto';
+import type { MachineRecord, MaterialRecord } from '../calculators/plastic-input-sources';
 
 export type GateType = 'edge' | 'fan' | 'sub' | 'hot_tip';
 
@@ -41,6 +42,8 @@ export interface ResinThermalProps {
 export interface PressTiming {
   injectionRateMm3PerS: number | null;
   dryCycleTimeS: number | null;
+  /** The HR Rates record the timing was read from, so the calculator dialog can open it; absent when not read from one. */
+  record?: MachineRecord | null;
 }
 
 type ThermalResult = { props: ResinThermalProps } | { missing: string[] };
@@ -98,4 +101,6 @@ export interface CycleTimeInput {
   shotMeltVolumeMm3: number | null;
   cavityCount: number;
   gatesPerCavity: number;
+  /** The Raw Materials record the thermal properties were read from (the calculator dialog opens it); absent when not known. */
+  material?: MaterialRecord | null;
 }
