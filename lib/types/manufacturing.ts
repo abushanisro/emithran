@@ -341,6 +341,8 @@ export interface FeatureNodeV2 {
   catalog_operations?: string[];
   /** Machining features: geometric variant of feature_type (e.g. "threaded" on a SimpleHole). */
   variant?: string;
+  /** Built from faces alone (no occurrence centroids): the viewer measures where each occurrence is from its triangles. */
+  centroidFromFaces?: boolean;
 }
 
 export interface FeatureGraphV2 {

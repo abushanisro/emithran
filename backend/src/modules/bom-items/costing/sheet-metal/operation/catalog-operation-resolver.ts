@@ -47,8 +47,13 @@ export interface CatalogOperation {
   featureIds: string[];
   status: 'resolved' | 'undecided' | 'infeasible';
   /** Catalog child steps of the resolved operation, e.g. Punching // Edge under Punching // Blank. */
-  children: Array<{ operation: string; featureType: string }>;
+  children: Array<{ operation: string; featureType: string; featureFaceIds?: number[][] }>;
   reason?: string;
+  /**
+   * Sand casting with a casting analysis: the faces of each feature in featureIds (same order) on the cad-engine's mesh, by face_map
+   * face_id, for the 3D highlight. The analysis's features are not feature_graph_v2 entries, so featureIds alone cannot be highlighted.
+   */
+  featureFaceIds?: number[][];
 }
 
 interface Pair { operation: string; featureType: string }
