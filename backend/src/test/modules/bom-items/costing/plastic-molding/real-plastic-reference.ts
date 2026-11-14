@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import {
   GPPS_REFERENCE_MATERIAL,
@@ -13,7 +13,19 @@ import type { RealResinInputs } from '../../../../../modules/bom-items/costing/p
 
 // The Plastic reference, resolved by the production resolver from the same
 // memory/Plastic Modeling files migration 823 stages (not values typed here).
-const DIR = join(__dirname, '../../../../../../../memory/plastic modeling');
+const MEMORY = join(__dirname, '../../../../../../../memory');
+const DIR = join(MEMORY, 'plastic modeling');
+
+/**
+ * A memory/ folder by name, whatever its case. The reference data is checked out in CI from a repository whose folders are lower case
+ * ("secondary process"), while a local memory/ may capitalise them ("Secondary process"); Linux compares names exactly, a Mac does not, so a
+ * path written in one case passed here and failed in CI. The folder is found by its real directory entry, which works on both.
+ */
+function memoryFolder(name: string): string {
+  const entry = readdirSync(MEMORY).find((e) => e.toLowerCase() === name.toLowerCase());
+  if (!entry) throw new Error(`memory/ has no folder "${name}"`);
+  return join(MEMORY, entry);
+}
 
 function parseCsv(text: string): Array<Record<string, string>> {
   const rows: string[][] = [];
@@ -40,7 +52,7 @@ const read = (rel: string) => parseCsv(readFileSync(join(DIR, rel), 'utf-8').rep
 /** The staged rows the plastic reference resolves from, read from memory/Plastic Modeling the way migration 823 stages them. */
 export function realReferenceRows(): PlasticReferenceRows {
   // memory/Secondary process (2026-Secondary): the variables the plastic model reads from it (SECONDARY_VARIABLE_KEYS), loaded next to its own.
-  const secondary = parseCsv(readFileSync(join(DIR, '../Secondary process/variables_inherited.csv'), 'utf-8').replace(/^\uFEFF/, ''))
+  const secondary = parseCsv(readFileSync(join(memoryFolder('secondary process'), 'variables_inherited.csv'), 'utf-8').replace(/^\uFEFF/, ''))
     .filter((r) => (SECONDARY_VARIABLE_KEYS as readonly string[]).includes(r['Variable Name']!))
     .map((r) => ({ key: r['Variable Name']!, value: r['String Value'] ?? null }));
   const variables = [...read('variables/digital_factory_variables.csv').map((r) => ({ key: r['variableName']!, value: r['stringValue'] ?? null })), ...secondary];
