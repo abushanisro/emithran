@@ -46,7 +46,7 @@ import { PartDetailsSheet } from '@/components/features/manufacturing-intelligen
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
 import { routeMachineDrift } from '@/lib/costing/applied-route';
 import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
-import { formatCycleMin, formatCycleSec } from '@/lib/costing/format-cycle';
+import { formatCycleMin, formatCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
@@ -2260,10 +2260,9 @@ function CostSummaryTab({
                         // same real per-feature counts/times already shown in
                         // the Feature breakdown panel, not re-derived here.
                         setProcDialogPrefill({
-                          // process_cost_records.cycle_time is NUMERIC(12,2) —
-                          // round to 2dp, not to a whole integer (that silently
-                          // dropped real precision the schema already supports).
-                          ...(liveCycleSec != null ? { ...proc, cycleTime: Math.round(liveCycleSec * 100) / 100 } : proc),
+                          // At the precision process_cost_records.cycle_time stores (NUMERIC(12,4)):
+                          // two decimals turned a 0.0041 s melting share into 0.
+                          ...(liveCycleSec != null ? { ...proc, cycleTime: storableCycleSec(liveCycleSec) } : proc),
                           ...(matchedEngineLine?.featureBreakdown ? { featureBreakdown: matchedEngineLine.featureBreakdown } : {}),
                           // The labour rate the engine costed this line with, for a line that has no machine.
                           ...(laborRate > 0 ? { liveLabourRate: laborRate } : {}),
