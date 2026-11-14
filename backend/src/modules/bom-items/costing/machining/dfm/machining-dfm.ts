@@ -67,6 +67,19 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 const fmt = (v: number, digits = 2) => String(Number(v.toFixed(digits)));
 const SEVERITY_ORDER: DfmSeverity[] = ['critical', 'major', 'minor'];
 
+/** The feature types whose wall is judged. Blend faces (edge rounds, grooves) and free-form regions are left out: the wall behind a blend reads the blend, not a wall. */
+const WALL_TYPES: readonly string[] = ['SimpleHole', 'MultiStepHole', 'PocketV2', 'Slot', 'Keyway', 'Cutout', 'PlanarFace', 'CurvedWall'];
+
+/** The wall behind each feature instance that has one measured (mm): what the thin wall check judges, and what the Design Guidance reports as the part's walls. */
+export function measuredWalls(features: readonly unknown[] | null | undefined): Array<{ featureId: string; occurrenceIndex: number; faces: number[]; value: number }> {
+  return ((features ?? []) as Feature[])
+    .filter((f) => f.id && f.feature_type && WALL_TYPES.includes(f.feature_type) && f.variant !== 'groove')
+    .flatMap((f) => (f.occurrences ?? []).flatMap((o, i) => {
+      const value = num(o.min_wall_mm);
+      return value == null ? [] : [{ featureId: f.id!, occurrenceIndex: i, faces: Array.isArray(o.face_ids) ? (o.face_ids as number[]) : [], value }];
+    }));
+}
+
 /**
  * The instances reached along a direction that is neither the part's commonest tool line nor square to it: the ones
  * that make a setup oblique.
@@ -296,7 +309,7 @@ export function evaluateMachiningDfm(features: readonly unknown[] | null | undef
     source: 'tblMachiningMinWall (eMithran baseline: recommended and feasible minimum wall for the material)',
     what: 'features have a thin wall behind them', nothing: measured ? 'No feature has a measured wall.' : STALE,
     recommendation: 'Thicken the wall. A thin wall deflects and chatters under the cutter: it is cut in light passes and may not hold tolerance.',
-    judged: instances(['SimpleHole', 'MultiStepHole', 'PocketV2', 'Slot', 'Keyway', 'Cutout', 'PlanarFace', 'CurvedWall'], (f, o) => (notGroove(f) ? num(o.min_wall_mm) : null)),
+    judged: measuredWalls(all),
     levels: [
       { severity: 'critical', limit: ref.minWall?.feasibleMm ?? null, exceeds: below, says: 'below' },
       { severity: 'major', limit: ref.minWall?.recommendedMm ?? null, exceeds: below, says: 'below' },

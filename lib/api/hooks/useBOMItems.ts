@@ -505,6 +505,39 @@ export interface PartSummary {
   uncosted: string[];
 }
 
+export type DesignGuidanceSeverity = 'critical' | 'major' | 'minor';
+/** Something to look at on the model: the feature instances and faces it points at. */
+export interface DesignGuidanceItem {
+  label: string; detail: string | null; severity: DesignGuidanceSeverity | null;
+  occurrences: { featureId: string; occurrenceIndex: number }[]; faces: number[];
+}
+export interface DesignGuidanceRange { value: number | null; min: number | null; max: number | null }
+/** The part's design guidance (backend costing/shared/design-guidance.ts). A null is a value the analysis, the reference data and the applied cost do not hold, with its reason in notModelled; a null panel does not apply to the part's process. */
+export interface DesignGuidance {
+  family: string;
+  processGroup: string | null;
+  costDrivers: { count: number | null; items: DesignGuidanceItem[] };
+  material: { name: string | null; currency: string; costPerCm3: DesignGuidanceRange; massKg: DesignGuidanceRange; comparedWith: number; comparedGroups: string[] };
+  thickness: { recommendedMinMm: number | null; recommendedMaxMm: number | null; partMinMm: number | null; partMaxMm: number | null; maxMinRatio: number | null; source: string | null; items: DesignGuidanceItem[] };
+  moldTooling: { slides: number | null; lifters: number | null; cores: number | null; items: DesignGuidanceItem[] } | null;
+  machining: { routing: string | null; scrapPct: number | null; machinedFeatures: number | null; items: DesignGuidanceItem[] } | null;
+  tolerances: { withTolerances: number | null; drivingMachining: number | null; drivingFinishing: number | null; items: DesignGuidanceItem[]; machiningItems: DesignGuidanceItem[]; finishingItems: DesignGuidanceItem[] };
+  setups: { count: number | null; perpendicular: number | null; oblique: number | null; fewFeatureSetups: number | null; fewFeatureLimit: number; items: DesignGuidanceItem[] } | null;
+  holesAndFillets: { holeDiametersMm: number[]; filletRadiiMm: number[]; nonStandardTools: number | null; holeItems: DesignGuidanceItem[]; filletItems: DesignGuidanceItem[]; nonStandardItems: DesignGuidanceItem[] } | null;
+  notModelled: Partial<Record<string, string>>;
+}
+
+/** The Design Guidance tab's data. Refetched on each visit (staleTime 0): the limits are read from the reference data and the routing from the applied cost, and both can change. */
+export function useDesignGuidance(bomItemId: string | undefined) {
+  return useQuery({
+    queryKey: ['bom-items', bomItemId, 'design-guidance'],
+    queryFn: async () => apiClient.get<DesignGuidance>(`/bom-items/${bomItemId}/design-guidance`),
+    enabled: useAuthEnabledWith(!!bomItemId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
 /** The Part Summary tab's data. Refetched on each visit (staleTime 0): what Apply wrote is what it shows. */
 export function usePartSummary(bomItemId: string | undefined) {
   return useQuery({

@@ -82,6 +82,8 @@ import type { CostTable } from './costing/shared/cost-table';
 import { ApplyScenarioDto, type ScenarioApplicationResult } from './dto/apply-scenario.dto';
 import { PartSummaryService } from './services/part-summary.service';
 import type { PartSummary } from './costing/shared/part-summary';
+import { DesignGuidanceService } from './services/design-guidance.service';
+import type { DesignGuidance } from './costing/shared/design-guidance';
 import { PlasticDfmService, MOLDING_PROCESS_NAMES } from './costing/plastic-molding/dfm/plastic-dfm.service';
 import { MachiningDfmService } from './costing/machining/dfm/machining-dfm.service';
 import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
@@ -128,6 +130,7 @@ export class BOMItemsController {
     private readonly plasticDfm: PlasticDfmService,
     private readonly machiningDfm: MachiningDfmService,
     private readonly partSummaries: PartSummaryService,
+    private readonly designGuidance: DesignGuidanceService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     private readonly databaseService: DatabaseService,
     private readonly exchangeRateService: ExchangeRateService,
@@ -308,6 +311,14 @@ export class BOMItemsController {
   @ApiResponse({ status: 200, description: 'The part summary (USD)' })
   async getPartSummary(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<PartSummary> {
     return this.partSummaries.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/design-guidance')
+  @ApiOperation({ summary: "The part's design guidance: its cost drivers (the DFM findings of its process), its material among the materials the process draws from, its walls against the staged limits, the mold tooling, the machining, the tolerances, the setups, and the hole and fillet sizes. A projection of the analysis, the reference data and the applied cost; a value none of them holds is null with its reason" })
+  @ApiResponse({ status: 200, description: 'The design guidance' })
+  async getDesignGuidance(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<DesignGuidance> {
+    return this.designGuidance.forItem(await this.bomItemsService.findOne(id, user.id, token), token);
   }
 
   @OrgRole('viewer')
