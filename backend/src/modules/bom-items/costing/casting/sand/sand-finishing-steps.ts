@@ -128,7 +128,9 @@ export function finishStep(ctx: SandFinishContext, m: SandMachine): StepOutcome 
   const factorRow = ctx.ref.table('tblGrindingSpeedMaterialFactor').find((r) => Math.abs(Number(r['Material Cut Code']) - cutCode) < 1e-9);
   if (!factorRow) return fail(`tblGrindingSpeedMaterialFactor has no row for cut code ${cutCode}`);
   const row = `tblGrindingDimensions, parts up to ${dims['Max Weight (kg)']} kg`;
-  const v = (col: string) => ({ value: Number(dims[col]), source: row, lookup: true });
+  // The exact rows, so the dialog's eye highlights them: a weight band by its upper weight, the speed factor by the cut code.
+  const dimsRow = { table: 'tblGrindingDimensions', row: { 'Max Weight (kg)': Number(dims['Max Weight (kg)']) } };
+  const v = (col: string) => ({ value: Number(dims[col]), source: row, lookup: true, match: dimsRow });
   return done(runStep(
     ctx, FINISHING, m,
     { ...gateInputs(ctx), parting_line_mm: ctx.partingLine },
@@ -138,7 +140,10 @@ export function finishStep(ctx: SandFinishContext, m: SandMachine): StepOutcome 
         'tblGrindingDimensions.Riser Height (mm)': v('Riser Height (mm)'),
         'tblGrindingDimensions.Parting Line Thickness (mm)': v('Parting Line Thickness (mm)'),
         'tblGrindingDimensions.Parting Line Height (mm)': v('Parting Line Height (mm)'),
-        'tblGrindingSpeedMaterialFactor.Grinding Speed Material Factor': { value: Number(factorRow['Grinding Speed Material Factor']), source: `tblGrindingSpeedMaterialFactor, cut code ${cutCode}`, lookup: true },
+        'tblGrindingSpeedMaterialFactor.Grinding Speed Material Factor': {
+          value: Number(factorRow['Grinding Speed Material Factor']), source: `tblGrindingSpeedMaterialFactor, cut code ${cutCode}`, lookup: true,
+          match: { table: 'tblGrindingSpeedMaterialFactor', row: { 'Material Cut Code': cutCode } },
+        },
       }[key] ?? null),
       cad: valuesProvider({}),
     },
@@ -154,7 +159,10 @@ export function inspectStep(ctx: SandFinishContext, m: SandMachine): StepOutcome
     { cores: { value: ctx.coresCount, source: 'cores made of sand' } },
     {
       lookup: (key) => (key === 'tblVisualInspection.External Inspection Rate (min / m^2)'
-        ? { value: Number(band['External Inspection Rate (min / m^2)']), source: `tblVisualInspection, parts up to ${band['Max Weight (kg)']} kg`, lookup: true }
+        ? {
+          value: Number(band['External Inspection Rate (min / m^2)']), source: `tblVisualInspection, parts up to ${band['Max Weight (kg)']} kg`, lookup: true,
+          match: { table: 'tblVisualInspection', row: { 'Max Weight (kg)': Number(band['Max Weight (kg)']) } },
+        }
         : null),
       cad: valuesProvider({ area_mm2: { value: ctx.surfaceAreaMm2, source: 'part surface area (mm²)' } }),
     },

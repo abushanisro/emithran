@@ -186,6 +186,26 @@ export const processesApi = {
     return apiClient.get<ReferenceTable>('/processes/waterjet-machines-table');
   },
 
+  /** A reference-data domain's staged variables (memory/<domain>), for a calculator input read from one. */
+  getDomainVariables: async (domain: string) =>
+    apiClient.get<{ variables: { key: string; category: string | null; value: string | null; unitType: string | null; notes: string | null }[] }>(
+      `/processes/variables?${new URLSearchParams({ domain }).toString()}`,
+    ),
+
+  /** One staged lookup table of a reference-data domain. */
+  getReferenceLookup: async (domain: string, key: string) =>
+    apiClient.get<{ key: string; columns: string[]; rows: Record<string, unknown>[] }>(
+      `/processes/reference-lookup?${new URLSearchParams({ domain, key }).toString()}`,
+    ),
+
+  /** The machine (HR Rates) or material (Raw Materials) record a calculator input was read from, among its peers, the record's row matched. */
+  getRecordSourceTable: async (kind: 'machine' | 'material', id: string, column: string) =>
+    apiClient.get<{ tableName: string; columnDefinitions: { name: string; label: string; unit?: string }[]; rows: Record<string, unknown>[]; matchedRowKeys: Record<string, unknown> }>(
+      kind === 'machine'
+        ? `/processes/source-tables/machine/${encodeURIComponent(id)}?${new URLSearchParams({ column }).toString()}`
+        : `/processes/source-tables/material/${encodeURIComponent(id)}?${new URLSearchParams({ column }).toString()}`,
+    ),
+
   getStrokeRateFactorTable: async (): Promise<ReferenceTable> => {
     return apiClient.get<ReferenceTable>('/processes/stroke-rate-factor-table');
   },

@@ -185,6 +185,8 @@ org:viewer      GET /api/v1/processes/reference-lookup  ProcessesController.getR
 org:viewer      GET /api/v1/processes/reference-tables/:tableId  ProcessesController.getReferenceTable
 org:viewer      GET /api/v1/processes/sm-lookup-tables  ProcessesController.getSmLookupTables
 org:viewer      GET /api/v1/processes/sm-lookup-tables/by-name/:table  ProcessesController.getSmLookupTableByName
+org:viewer      GET /api/v1/processes/source-tables/machine/:id  ProcessesController.getMachineSourceTable
+org:viewer      GET /api/v1/processes/source-tables/material/:id  ProcessesController.getMaterialSourceTable
 org:viewer      GET /api/v1/processes/stroke-rate-factor-table  ProcessesController.getStrokeRateFactorTable
 org:viewer      GET /api/v1/processes/turret-machines-table  ProcessesController.getTurretMachinesTable
 org:viewer      GET /api/v1/processes/variables  ProcessesController.getDomainVariables

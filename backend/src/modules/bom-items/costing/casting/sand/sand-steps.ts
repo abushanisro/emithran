@@ -4,7 +4,7 @@
 // with the shared casting line builder. Ported from the retired petrus-demo prototype (its design records, D-numbers, are archived outside the repo) (D122, D128-D130).
 //
 // Nothing is substituted: a missing input, an unstaged table or a machine without a rate is named in the reasons.
-import type { MachineChoiceDto } from '../../../dto/cost-breakdown.dto';
+import type { MachineChoiceDto, SourceRef } from '../../../dto/cost-breakdown.dto';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
@@ -27,6 +27,8 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** The part's sand-casting material, as the raw_materials row (columns by name). */
 export interface SandMaterial {
+  /** raw_materials.id: the record the calculator dialog opens for a material input. */
+  id: string;
   name: string;
   materialType: string | null;
   /** raw_materials columns the calculators read (density_kg_m3, heat_of_fusion_j_kg, ...). */
@@ -60,8 +62,8 @@ export interface SandRouteContext {
   cavities: number;
   /** Cores in each casting; a mould has `cavities` times this many. */
   coresPerCasting: number;
-  /** Metal poured: the casting with its risers and gating (kg), per casting and per mould. */
-  poured: { perCastingKg: number; perMouldKg: number };
+  /** Metal poured: the casting with its risers and gating (kg), per casting and per mould, and the calculation behind it once it is run. */
+  poured: { perCastingKg: number; perMouldKg: number; ref?: SourceRef };
   /** USD per kWh: the Cost Guide's, else the location's sourced electricity price; null when neither exists (energy not charged). */
   energyPricePerKwh: number | null;
   /** Where the energy price comes from, for the trace. */
@@ -77,12 +79,21 @@ export type StepOutcome =
 
 const fail = (...reasons: string[]): StepOutcome => ({ ok: false, reasons });
 
+/** The metal poured, per casting or per mould, with the metal-per-casting calculation behind it (its ref) when it has been run. */
+function pouredSeed(ctx: SandRouteContext, per: 'casting' | 'mould'): CalcSeed {
+  return {
+    value: per === 'casting' ? ctx.poured.perCastingKg : ctx.poured.perMouldKg,
+    source: per === 'casting' ? 'metal per casting: net, risers and gating' : 'metal per casting x cavities',
+    ...(ctx.poured.ref ? { ref: ctx.poured.ref } : {}),
+  };
+}
+
 /** One calculator run: seed every input from its declared source, run it, or say what is missing. */
 export function runStep(
   ctx: SandRouteContext,
   calculator: string,
   machine: SandMachine | null,
-  engine: Record<string, { value: number; source: string }>,
+  engine: Record<string, CalcSeed>,
   extra: SeedProviders = {},
   output = 'Cycle Time',
 ): { run: ReferenceCalcRun } | { reasons: string[] } {
@@ -90,11 +101,17 @@ export function runStep(
   if (!calc) return { reasons: [`${calculator} is not in the calculator spec`] };
   const materialProvider: SeedProvider = (key) => {
     const value = ctx.material.columns[key];
-    return value == null ? null : { value, source: `${ctx.material.name}: ${key}` };
+    return value == null ? null : {
+      value, source: `${ctx.material.name}: ${key}`,
+      ref: { kind: 'material', materialId: ctx.material.id, materialName: ctx.material.name, column: key },
+    };
   };
   const machineProvider: SeedProvider = (key) => {
     const value = machine ? machineValue(machine, key) : null;
-    return value == null || !machine ? null : { value, source: `machine ${machine.name}: ${key}` };
+    return value == null || !machine ? null : {
+      value, source: `machine ${machine.name}: ${key}`,
+      ref: { kind: 'machine', machineId: machine.id, machineName: machine.name, machineClass: machine.machineClass, location: machine.location, column: key },
+    };
   };
   const { seeds, missing } = seedsFor(calc, {
     variable: variableProvider(ctx.ref),
@@ -161,7 +178,7 @@ export function mouldStep(ctx: SandRouteContext, mould: SandMachine): StepOutcom
   if (cureMin == null) return fail(`sand variable ${cure}`);
   const r = runStep(ctx, MOULDING_MANUAL, mould, {
     cavities: cavitiesSource(ctx),
-    poured_per_mould_kg: { value: ctx.poured.perMouldKg, source: 'metal per casting x cavities' },
+    poured_per_mould_kg: pouredSeed(ctx, 'mould'),
     sand_cure_min: { value: cureMin, source: `Sand casting variable ${cure}` },
   });
   return 'run' in r ? { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: 0, notes: [] } : fail(...r.reasons);
@@ -190,7 +207,7 @@ export function meltStep(ctx: SandRouteContext, furnace: SandMachine): StepOutco
   const priced = ctx.energyPricePerKwh != null;
   const r = runStep(
     ctx, MELTING, furnace,
-    { poured_kg: { value: ctx.poured.perCastingKg, source: 'metal per casting: net, risers and gating' } },
+    { poured_kg: pouredSeed(ctx, 'casting') },
     { scenario: valuesProvider({ energy_price: { value: priced ? ctx.energyPricePerKwh! : 0, source: priced ? ctx.energyPriceSource ?? 'energy price (USD/kWh)' : 'no energy price: none set in the Cost Guide and none for the location' } }) },
   );
   if (!('run' in r)) return fail(...r.reasons);
@@ -211,7 +228,7 @@ export function pourStep(ctx: SandRouteContext, ladle: SandMachine): StepOutcome
   if ('missing' in coefficient) return fail(coefficient.missing);
   const r = runStep(
     ctx, POUR, ladle,
-    { poured_per_mould_kg: { value: ctx.poured.perMouldKg, source: 'metal per casting x cavities' }, cavities: cavitiesSource(ctx) },
+    { poured_per_mould_kg: pouredSeed(ctx, 'mould'), cavities: cavitiesSource(ctx) },
     { lookup: (key) => (key === 'tblPouringCoefficients.Coefficient' ? { value: coefficient.value, source: coefficient.source, lookup: true } : null) },
   );
   return 'run' in r ? { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: 0, notes: [] } : fail(...r.reasons);

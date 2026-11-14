@@ -20,6 +20,8 @@ export interface SandMachine {
   preferred: boolean;
   powerKw: number | null;
   specs: Readonly<Record<string, unknown>>;
+  /** The HR Rates location the record is priced for (the dialog shows the class's machines there); null when the row has none. */
+  location: string | null;
 }
 
 const num = (v: unknown): number | null => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -46,6 +48,7 @@ export function sandMachineFromRow(
     preferred: specs['is_preferred'] === true || String(specs['is_preferred']).toLowerCase() === 'true',
     powerKw: num(row.machine_power_kw),
     specs,
+    location: row.location == null ? null : String(row.location),
   };
 }
 

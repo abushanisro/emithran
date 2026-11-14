@@ -172,3 +172,22 @@ describe('bend line length', () => {
     expect(resolveFieldHighlight('bend_line_length', { metadata: { face_map: [] }, features: [] })).toBeNull();
   });
 });
+
+describe('whole-part evidence (a casting\'s volume or surface on a graph without measurements)', () => {
+  const casting: FeatureGraphV2 = {
+    metadata: { face_map: [0, 1, 2].map((face_id) => ({ face_id, tri_start: face_id * 4, tri_count: 4 })) },
+    features: [],
+  };
+
+  it('the part volume lights every face of the part, says so, and is never compared with the input', () => {
+    const h = resolveFieldHighlight('part_volume', casting)!;
+    expect(faces(h.node)).toEqual([0, 1, 2]);
+    expect(h.measured).toBeNull();
+    expect(h.wholePart).toEqual({ faces: 3, label: 'part volume' });
+    expect(checkAgainstInput(h, 0.08)).toBe(h);
+  });
+
+  it('the part surface lights every face too', () => {
+    expect(faces(resolveFieldHighlight('part_surface', casting)!.node)).toEqual([0, 1, 2]);
+  });
+});

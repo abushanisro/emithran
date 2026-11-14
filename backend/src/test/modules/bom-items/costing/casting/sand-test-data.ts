@@ -55,7 +55,7 @@ export function sandMaterial(name: string): SandMaterial {
   const r = sandMaterials().find((m) => m['Name'] === name)!;
   const n = (h: string) => (r[h] == null || r[h] === '' ? null : Number(r[h]));
   return {
-    name, materialType: String(r['Material Type']),
+    id: `raw-materials:${name}`, name, materialType: String(r['Material Type']),
     columns: {
       density_kg_m3: n('Density (kg / m^3)'), heat_of_fusion_j_kg: n('Heat of Fusion (J / kg)'), specific_heat_rt_j_kg_k: n('Specific Heat RT (J / kg * K)'),
       specific_heat_solidus_j_kg_k: n('Specific Heat at Solidus Temperature (J / kg * K)'), injection_temp_c: n('Injection Temp (C)'),

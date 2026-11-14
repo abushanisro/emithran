@@ -1,3 +1,4 @@
+import type { SourceRef } from './input-source';
 // Per calculator, the inputs the cost engine gave it on this part: values,
 // their sources and the lookup rows used — read from process lines'
 // calculation traces. The first line WITH a trace wins for each calculator;
@@ -10,11 +11,13 @@ export interface EngineCalculatorSeed {
   /** Inputs measured on CAD faces -> which measurement (see backend cad-evidence.ts). */
   evidence: Record<string, string>;
   lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
+  /** Where each input was read (SourceRef), for the eye beside it. */
+  refs: Record<string, SourceRef>;
 }
 
 interface TracedLine {
   calculatorId?: string | null;
-  calculationTrace?: { kind: string; fieldName: string; value: unknown; source?: string | null; evidence?: string | null }[] | null;
+  calculationTrace?: { kind: string; fieldName: string; value: unknown; source?: string | null; evidence?: string | null; ref?: SourceRef | null }[] | null;
   lookupMatches?: EngineCalculatorSeed['lookupMatches'] | null;
 }
 
@@ -29,6 +32,7 @@ export function buildEngineCalculatorSeeds(lines: readonly TracedLine[]): Record
       provenance: Object.fromEntries(inputs.flatMap((st) => (st.source ? [[st.fieldName, st.source]] : []))),
       evidence: Object.fromEntries(inputs.flatMap((st) => (st.evidence ? [[st.fieldName, st.evidence]] : []))),
       lookupMatches: line.lookupMatches ?? {},
+      refs: Object.fromEntries(inputs.flatMap((st) => (st.ref ? [[st.fieldName, st.ref]] : []))),
     };
   }
   return out;

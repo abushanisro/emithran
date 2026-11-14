@@ -6,6 +6,7 @@ import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
 import { runProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import type { FeatureGraph, DFMScoresResponse, OccurrenceScore } from '@/lib/types/manufacturing';
+import type { SourceRef } from '@/lib/calculators/input-source';
 import type { MachiningAllowanceSummary } from './useMachiningAllowance';
 
 export type { OccurrenceScore };
@@ -718,6 +719,10 @@ export interface CalculationTraceStep {
   stepType?: 'physics' | 'lookup';
   /** The part's own value replaced this step: what the calculator would have used, and why it was changed. */
   override?: { original: number | null; reason: string };
+  /** 'input' steps measured on CAD faces: which measurement (backend cad-evidence.ts). */
+  evidence?: string;
+  /** 'input' steps: where the value was read, structured (lib/calculators/input-source.ts), for the eye beside the input. */
+  ref?: SourceRef;
 }
 
 export type LookupPolicyType = 'EXACT_MATCH' | 'INTERPOLATE' | 'RANGE' | 'FORMULA';

@@ -6,8 +6,13 @@ import { isBend, isPlainHole } from './feature-graph';
 export interface FieldHighlight {
   /** What the viewer highlights: only the faces this field counted. */
   node: FeatureNodeV2;
-  /** What the CAD engine measured on those faces, for the engineer to compare with the field. */
-  measured: { value: number; unit: string; label: string };
+  /**
+   * What the CAD engine measured on those faces, for the engineer to compare with the field. Null when the faces are the whole part and the
+   * graph records no number for them (a volume on a machining graph): `wholePart` then says what is shown, and nothing is compared.
+   */
+  measured: { value: number; unit: string; label: string } | null;
+  /** The faces are every face of the part (a volume or a surface is measured over all of them). */
+  wholePart?: { faces: number; label: string };
   /** False when the faces do not account for the number (engine-side) or for the input's current value. */
   reconciles: boolean;
   /** Why it does not reconcile, for the engineer. */
@@ -21,7 +26,8 @@ type Source =
   | { kind: 'measurement'; key: MeasurementKey; label: string }
   | { kind: 'bends' }
   | { kind: 'longest_bend' }
-  | { kind: 'tool_changes' };
+  | { kind: 'tool_changes' }
+  | { kind: 'whole_part'; label: string };
 
 // Evidence key (declared by the backend on the input's trace step, see
 // backend costing/shared/cad-evidence.ts) -> how to read its faces from the part.
@@ -34,7 +40,23 @@ const SOURCE_BY_EVIDENCE: Record<string, Source> = {
   flat_pattern_area: { kind: 'measurement', key: 'flat_pattern_area', label: 'flat pattern area' },
   wall_thickness: { kind: 'measurement', key: 'wall_thickness', label: 'wall thickness' },
   part_volume: { kind: 'measurement', key: 'part_volume', label: 'part volume' },
+  // A surface area is measured over every face of the part.
+  part_surface: { kind: 'whole_part', label: 'part surface' },
 };
+
+/** Every face of the part, from the face map: what a volume or a surface is measured over. Null without a face map (nothing to draw). */
+function wholePartHighlight(graph: FeatureGraphV2, label: string): FieldHighlight | null {
+  // A graph stored before face_map existed has none (the type says it always does).
+  const faceMap = (graph.metadata as Partial<FeatureGraphV2['metadata']> | undefined)?.face_map ?? [];
+  const faceIds = faceMap.map((e) => e.face_id);
+  if (faceIds.length === 0) return null;
+  return {
+    node: { id: `whole_part_${label}`, feature_type: 'Blank', occurrences: [{ centroid: [0, 0, 0], face_ids: faceIds }] },
+    measured: null,
+    wholePart: { faces: faceIds.length, label },
+    reconciles: true,
+  };
+}
 
 /**
  * The faces behind a CAD-derived calculator input, or null when this part's
@@ -122,8 +144,12 @@ function computeFieldHighlight(evidenceKey: string, graph: FeatureGraphV2): Fiel
     };
   }
 
+  if (source.kind === 'whole_part') return wholePartHighlight(graph, source.label);
+
   const m = graph.measurements?.[source.key];
   const occurrences = m?.occurrences.filter((o) => o.face_ids.length > 0) ?? [];
+  // A volume is measured over the whole closed solid: a graph without the measurement (a machining or casting part) still has its faces.
+  if ((!m || occurrences.length === 0) && source.key === 'part_volume') return wholePartHighlight(graph, source.label);
   if (!m || occurrences.length === 0) return null;
   return {
     node: {
@@ -142,7 +168,7 @@ function computeFieldHighlight(evidenceKey: string, graph: FeatureGraphV2): Fiel
  */
 export function checkAgainstInput(highlight: FieldHighlight, inputValue: unknown): FieldHighlight {
   const value = typeof inputValue === 'number' ? inputValue : Number(inputValue);
-  if (!Number.isFinite(value) || inputValue === '' || inputValue === null) return highlight;
+  if (!Number.isFinite(value) || inputValue === '' || inputValue === null || !highlight.measured) return highlight;
   const { value: measured, unit } = highlight.measured;
   const tolerance = unit === 'count' ? 0 : Math.max(0.5, Math.abs(value) * 0.002);
   if (Math.abs(measured - value) <= tolerance) return highlight;
