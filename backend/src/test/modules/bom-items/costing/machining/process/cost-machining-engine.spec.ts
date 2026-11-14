@@ -2421,3 +2421,50 @@ describe('the mill line is the Machining - Milling calculator over the part\'s s
     expect(r.warnings.join(' ')).toContain('3 Axis Mill not priced');
   });
 });
+
+// componentLoadTime, the rows for a part handled by hand (memory/Machining/lookup): weight kg, longest side mm, seconds.
+const LOAD_TABLE = [
+  { equipment: 'None', weight_kg: 5, part_max_dimension_mm: 915, load_time_s: 10, unload_time_s: 10, reorientation_time_s: 10 },
+  { equipment: 'None', weight_kg: 20, part_max_dimension_mm: 915, load_time_s: 15, unload_time_s: 15, reorientation_time_s: 15 },
+  { equipment: 'Lifting Aid 1', weight_kg: 25, part_max_dimension_mm: 915, load_time_s: 20, unload_time_s: 20, reorientation_time_s: 20 },
+];
+const partSetup = (setups: number | null, loadTable: any[] | null = LOAD_TABLE) => ({ loadTable, setups, adjustmentFactor: 1, repetitions: 1 });
+
+describe('Part Setup: loading, unloading and reorienting each part is part of the machining time', () => {
+  const line = (over: Partial<MachiningCostInput>) =>
+    computeMillingCostSummary(milledInput(over), mc('3_axis_mill')).processLines.find((l) => l.process === 'Part Setup');
+
+  it('a small part handled by hand: load 10 s + unload 10 s, on the mill at its rate, with no second setup', () => {
+    const l = line({ partSetup: partSetup(null) })!;
+    expect(l.cycleTimeMin).toBeCloseTo(20 / 60, 4);
+    expect(l.setupCost).toBe(0);
+    expect(l.runCost).toBeCloseTo((20 / 3600) * 900, 2);
+    expect(l.calculatorId).toBe('Machining - Part Setup');
+  });
+
+  it('each setup after the first adds a reorientation (three setups: 20 s + 2 x 10 s)', () => {
+    expect(line({ partSetup: partSetup(3) })!.cycleTimeMin).toBeCloseTo(40 / 60, 4);
+  });
+
+  it('with no tool axes the line is costed as one setup and says so', () => {
+    const steps = line({ partSetup: partSetup(null) })!.calculationTrace!;
+    expect(steps.find((st) => st.fieldName === 'Setups')!.source).toContain('one setup');
+  });
+
+  it('a heavier stock takes the row that holds it, lifting aid included', () => {
+    // 300 x 300 x 100 mm of aluminium = 24.3 kg: the first row that holds it is the lifting aid's.
+    const l = line({ maxLength: 300, maxWidth: 300, maxHeight: 100, volume: 5_000_000, finishedWeightKg: 13.5, partSetup: partSetup(null) })!;
+    expect(l.cycleTimeMin).toBeCloseTo(40 / 60, 4);
+    expect(JSON.stringify(l.calculationTrace)).toContain('Lifting Aid 1');
+  });
+
+  it('a part the table has no row for is a named gap, not a time', () => {
+    const l = line({ partSetup: partSetup(null, []) })!;
+    expect(l.cycleTimeMin).toBe(0);
+    expect((l.physicsGap as { reason?: string } | undefined)?.reason).toContain('componentLoadTime row');
+  });
+
+  it('a caller that does not price it gets no line', () => {
+    expect(line({})).toBeUndefined();
+  });
+});

@@ -2908,6 +2908,60 @@
           "formula": "{Holes} * {Time per Hole}"
         }
       ]
+    },
+    {
+      "name": "Machining - Part Setup",
+      "operation": "Part Setup",
+      "machineClasses": "lathes+mills",
+      "migration": 1037,
+      "description": "Loading and unloading each part on the machine, and turning it over between setups: the reference times for a part of this weight and size (componentLoadTime, variables partSetupTimeMethod weightAndSizeBased), adjusted by the reference factor and repetitions.",
+      "fields": [
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "source": "lookup",
+          "table": "componentLoadTime",
+          "column": "load_time_s"
+        },
+        {
+          "name": "Unload Time",
+          "unit": "s",
+          "source": "lookup",
+          "table": "componentLoadTime",
+          "column": "unload_time_s"
+        },
+        {
+          "name": "Reorientation Time",
+          "unit": "s",
+          "source": "lookup",
+          "table": "componentLoadTime",
+          "column": "reorientation_time_s"
+        },
+        {
+          "name": "Setups",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Adjustment Factor",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "partSetupTimeAdjustmentFactor"
+        },
+        {
+          "name": "Repetitions",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "repetitionsOfIndividualPartSetup"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Load Time} + {Unload Time} + ({Setups} - 1) * {Reorientation Time}) * {Adjustment Factor} * {Repetitions}"
+        }
+      ]
     }
   ],
   "retire": [

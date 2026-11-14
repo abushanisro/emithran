@@ -136,6 +136,12 @@ export interface MachiningCostInput {
   // machinability_rating from raw_materials DB (75 = mild steel baseline).
   // Scales MRR: Al 6061 ≈ 150 → 2× faster; SS316 ≈ 35 → 0.47× slower.
   machinabilityRating?: number;
+  /**
+   * Loading, unloading and reorienting each part (the reference's individual part setup): the componentLoadTime rows,
+   * the reference adjustment factor and repetitions, and the number of setups the part's tool axes need (null = not
+   * derived, costed as one setup). Unset = the caller does not price it (no line).
+   */
+  partSetup?: { loadTable: any[] | null; adjustmentFactor: number | null; repetitions: number | null; setups: number | null } | null;
   /** The material's milling removal rate (tblMillingRemovalRate, mm^3/min); null or unset = not on file. */
   millingRemovalRateMm3PerMin?: number | null;
   // Feature volumes from feature_graph_v2 — enables per-feature cycle time instead
@@ -989,6 +995,45 @@ export function resolveOperationName(
  * travelled at the real tblDeburring edge speed for this material. Either
  * missing → the line reports the gap; nothing is estimated in its place.
  */
+/** The componentLoadTime row for a part: the lightest, then smallest, row that holds its weight and its longest dimension. */
+export function componentLoadRow(rows: any[] | null | undefined, weightKg: number, maxDimMm: number): any | null {
+  return [...(rows ?? [])]
+    .filter((r) => Number(r.weight_kg) >= weightKg && Number(r.part_max_dimension_mm) >= maxDimMm)
+    .sort((a, b) => Number(a.weight_kg) - Number(b.weight_kg) || Number(a.part_max_dimension_mm) - Number(b.part_max_dimension_mm))[0] ?? null;
+}
+
+/**
+ * The time the operator spends on each part at the machine besides cutting: loading the stock, unloading the part,
+ * and turning it over between setups (the "Part Setup" calculator). Billed at the machine's rate, in its setup.
+ * The row is chosen by the stock weight, the heavier of what is loaded and unloaded.
+ */
+function computePartSetupLine(
+  input: MachiningCostInput, rate: MHRRateInput, stockWeightKg: number, warnings: string[],
+): ProcessLineCost | null {
+  const ps = input.partSetup;
+  if (!ps) return null;
+  const maxDim = Math.max(input.maxLength, input.maxWidth, input.maxHeight);
+  const row = stockWeightKg > 0 && maxDim > 0 ? componentLoadRow(ps.loadTable, stockWeightKg, maxDim) : null;
+  const seeds: Record<string, CalcSeed> = {
+    'Setups': ps.setups != null && ps.setups > 0
+      ? { value: ps.setups, source: 'CAD: setups the feature tool axes need' }
+      : { value: 1, source: 'Assumption: one setup (the CAD analysis carries no feature tool axes)' },
+  };
+  if (row) {
+    const src = `componentLoadTime: ${row.equipment === 'None' ? 'by hand' : row.equipment}, up to ${row.weight_kg} kg and ${row.part_max_dimension_mm} mm (stock ${r3(stockWeightKg)} kg, ${r2(maxDim)} mm)`;
+    const match = { table: 'componentLoadTime', row: { equipment: row.equipment, weight_kg: row.weight_kg, part_max_dimension_mm: row.part_max_dimension_mm } };
+    seeds['Load Time'] = { value: Number(row.load_time_s), source: src, lookup: true, match };
+    seeds['Unload Time'] = { value: Number(row.unload_time_s), source: src, lookup: true, match };
+    seeds['Reorientation Time'] = { value: Number(row.reorientation_time_s), source: src, lookup: true, match };
+  }
+  if (ps.adjustmentFactor != null) seeds['Adjustment Factor'] = { value: ps.adjustmentFactor, source: 'variables: partSetupTimeAdjustmentFactor', lookup: true };
+  if (ps.repetitions != null) seeds['Repetitions'] = { value: ps.repetitions, source: 'variables: repetitionsOfIndividualPartSetup', lookup: true };
+  const run = runMachiningCalculator(input.machiningCalculators, 'Part Setup', seeds);
+  const extraMissing = row ? [] : [`a componentLoadTime row for a ${r3(stockWeightKg)} kg, ${r2(maxDim)} mm part`];
+  // On the part's own machine: no second setup, and the line is named for the operation, not the station.
+  return secondaryLine('Part Setup', run, { ...rate, hostMachineClass: rate.hostMachineClass ?? rate.machineClass }, input.batchSize, warnings, input.processIdentityByMachineClass, extraMissing, false);
+}
+
 function computeDeburringLine(
   input: MachiningCostInput,
   deburrRate: MHRRateInput,
@@ -1563,6 +1608,10 @@ export function computeMillingCostSummary(
   if (cncMillingMin <= 0) {
     warnings.push('Volume data unavailable — milling time estimated at 0');
   }
+
+  // ── Part Setup (load, unload, reorient: on the machine, in its setup) ─────
+  const partSetupLine = computePartSetupLine(input, mhrRate, billetWeightKg, warnings);
+  if (partSetupLine) processLines.push(partSetupLine);
 
   // ── Tapping ───────────────────────────────────────────────────────────────
   const threadCount = threads.reduce((s, t) => s + t.count, 0);
