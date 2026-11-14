@@ -20,6 +20,12 @@ const REMOVAL_RATE: Record<string, number> = {
   aluminum: 60000, mild_steel: 12000, stainless: 5000, titanium: 3000, copper_alloy: 40000, tool_steel: 3000, plastic: 150000,
 };
 
+const cutter = (teeth: number, cuttingSpeedMPerMin: number, feedPerToothPerDiameter: number) => ({ toolDiameterMm: 10, teeth, cuttingSpeedMPerMin, feedPerToothPerDiameter });
+const FINISHING: Record<string, ReturnType<typeof cutter>> = {
+  aluminum: cutter(3, 183, 0.008), copper_alloy: cutter(3, 91, 0.008), plastic: cutter(2, 183, 0.012), mild_steel: cutter(4, 76, 0.008),
+  stainless: cutter(4, 61, 0.004), titanium: cutter(4, 46, 0.004), tool_steel: cutter(4, 46, 0.004),
+};
+
 // Every operation is timed by its stored calculator, so the sequencer is always given them (as production does):
 // the calculators of the spec unless a test passes its own.
 const buildOperationSequence = (...args: Parameters<typeof buildWith>): OperationLine[] => {
@@ -27,6 +33,8 @@ const buildOperationSequence = (...args: Parameters<typeof buildWith>): Operatio
   if (a[8] === undefined) a[8] = specAsCalculators();
   // The removal rate of the material class, as tblMillingRemovalRate stages it (migration 1036).
   if (a[10] === undefined) a[10] = REMOVAL_RATE[a[1]] ?? null;
+  // The finishing cutter of the material class, as tblMillingFinishing stages it (migration 1039).
+  if (a[11] === undefined) a[11] = FINISHING[a[1]] ?? null;
   return buildWith(...a);
 };
 
@@ -595,10 +603,11 @@ describe('every milling operation is timed by its stored calculator', () => {
     expect(rough.trace!.map((st) => st.fieldName)).toEqual(expect.arrayContaining(['Removed Volume', 'Material Removal Rate', 'Roughing Share', 'Cycle Time']));
   });
 
-  it('pocket finishing is one operation at the calculator\'s time per pocket (55 s)', () => {
+  it('a pocket with no CAD size has no finishing time: the gap is named, never a flat time per pocket', () => {
     const finish = buildOperationSequence(pocket, 'mild_steel').filter((o) => o.name === 'Fine Finish Milling');
     expect(finish).toHaveLength(1);
-    expect(finish[0]!.timeSec).toBeCloseTo(110, 6);
+    expect(finish[0]!.timeSec).toBe(0);
+    expect(finish[0]!.missing).toContain('length and width');
   });
 
   it('facing and centre drilling read their times from the calculator, not from this file', () => {
@@ -635,5 +644,48 @@ describe('the removal rate is data (tblMillingRemovalRate), not a table in the c
     const csk = [{ feature_type: 'Edge', variant: 'countersink', diameter_mm: 8, occurrences: [{ depth_mm: 4 }, { depth_mm: 4 }] }];
     const op = buildOperationSequence(csk, 'mild_steel', 1.0, 'AISI 1018', null, null, null, realDrillingTable()).find((o) => o.name === 'Countersinking')!;
     expect(op.timeSec).toBe(12);
+  });
+});
+
+describe('finishing is a tool path at the cutter feed (tblMillingFinishing), not a share of the removal rate', () => {
+  // Mild steel: 76 m/min on a 10 mm cutter = 2419 rpm; x 4 teeth x (0.008 x 10 mm) = 774.1 mm/min.
+  const feed = (76 * 1000 / (Math.PI * 10)) * 4 * 0.008 * 10;
+  const pocketOf = (lengthMm: number, widthMm: number, depthMm: number) => ({ extents_mm: [lengthMm, widthMm, 0], material_removed_mm3: lengthMm * widthMm * depthMm });
+  const pockets = (...occurrences: object[]) => [{ feature_type: 'PocketV2', variant: 'default', occurrences }];
+  const finishOf = (features: object[]) => buildOperationSequence(features, 'mild_steel').filter((o) => o.name === 'Fine Finish Milling');
+
+  it('a pocket wider than the cutter: floor at half-diameter stepover, walls one diameter per step-down, a lead-in and lead-out', () => {
+    const [finish] = finishOf(pockets(pocketOf(60, 40, 12)));
+    const path = (60 * 40) / (10 * 0.5) + (2 * (60 + 40) * 12) / (10 * 1) + 1 * 2 * 10;
+    expect(finish!.timeSec).toBeCloseTo(path / feed * 60, 6);
+    expect(finish!.trace!.map((st) => st.fieldName)).toEqual(expect.arrayContaining(['Floor Area', 'Wall Area', 'Tool Diameter', 'Spindle Speed', 'Feed Rate', 'Path Length']));
+  });
+
+  it('a pocket narrower than the cutter is finished by a cutter of its width, walls included, on its own line', () => {
+    const finish = finishOf(pockets(pocketOf(60, 40, 12), pocketOf(30, 4, 5), pocketOf(20, 4, 5)));
+    expect(finish.map((o) => o.count)).toEqual([1, 2]);
+    // Ø4: 76 m/min is 6048 rpm, feed 4 x 0.008 x 4 mm per rev; floor only (the cutter fills the width).
+    const narrowFeed = (76 * 1000 / (Math.PI * 4)) * 4 * 0.008 * 4;
+    expect(finish[1]!.timeSec).toBeCloseTo(((30 * 4 + 20 * 4) / (4 * 0.5) + 2 * 2 * 4) / narrowFeed * 60, 6);
+  });
+
+  it('a small cutter is held to the spindle speed limit, so it feeds slower', () => {
+    const [finish] = finishOf(pockets(pocketOf(20, 1, 1)));
+    // Ø1 would need 24192 rpm; the calculator's limit is 10000.
+    expect(finish!.timeSec).toBeCloseTo(((20 * 1) / (1 * 0.5) + 2 * 1) / (10000 * 4 * 0.008 * 1) * 60, 6);
+  });
+
+  it('a free-form surface is stepped over at the scallop height, a wall by the cutter side: the surface takes longer per area', () => {
+    const region = (type: string) => [{ feature_type: type, variant: 'default', occurrences: [{ area_mm2: 500 }] }];
+    const timeOf = (type: string) => buildOperationSequence(region(type), 'mild_steel').find((o) => o.name === 'Contouring')!.timeSec;
+    expect(timeOf('CurvedSurface')).toBeCloseTo((500 / Math.sqrt(4 * 10 * 0.01) + 2 * 10) / feed * 60, 6);
+    expect(timeOf('CurvedWall')).toBeCloseTo((500 / 10 + 2 * 10) / feed * 60, 6);
+  });
+
+  it('with no finishing row the pass is a named gap', () => {
+    const ops = buildWith(pockets(pocketOf(60, 40, 12)), 'mild_steel', 1.0, null, null, null, null, null, specAsCalculators(), null, 12000, null);
+    const finish = ops.find((o) => o.name === 'Fine Finish Milling')!;
+    expect(finish.timeSec).toBe(0);
+    expect(finish.missing).toContain('Cutting Speed');
   });
 });

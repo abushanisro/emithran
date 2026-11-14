@@ -2434,6 +2434,7 @@ export class BOMItemsService {
       machiningCalculators,
       tappingTable,
       await this.machiningLookup.getMillingRemovalRate(matClass),
+      await this.machiningLookup.getMillingFinishing(matClass),
     );
     // Ops the sequencer could not price from real inputs (missing CAD
     // measurement or lookup row) — reported, never estimated.

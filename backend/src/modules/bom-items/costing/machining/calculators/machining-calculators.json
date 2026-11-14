@@ -2321,6 +2321,89 @@
           "unit": "s",
           "formula": "{Area Time} + {Pockets} * {Finish Time per Pocket}"
         }
+      ],
+      "supersededBy": 1038
+    },
+    {
+      "name": "Machining - Fine Finish Milling",
+      "operation": "Fine Finish Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1038,
+      "description": "Finishing milled surfaces: the tool path over the CAD floor and wall area (area over the stepover) at the feed rate the finishing cutter runs in the material, plus a lead-in and lead-out per face.",
+      "fields": [
+        {
+          "name": "Floor Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Wall Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Faces",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Tool Diameter",
+          "unit": "mm",
+          "source": "engine"
+        },
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "engine"
+        },
+        {
+          "name": "Feed per Tooth per Diameter",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Max Spindle Speed",
+          "unit": "rpm",
+          "source": "default",
+          "default": 10000
+        },
+        {
+          "name": "Floor Stepover Ratio",
+          "unit": null,
+          "source": "default",
+          "default": 0.5
+        },
+        {
+          "name": "Wall Step-down Ratio",
+          "unit": null,
+          "source": "default",
+          "default": 1
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "min({Max Spindle Speed}, {Cutting Speed} * 1000 / (pi * {Tool Diameter}))"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Teeth} * {Feed per Tooth per Diameter} * {Tool Diameter}"
+        },
+        {
+          "name": "Path Length",
+          "unit": "mm",
+          "formula": "{Floor Area} / ({Tool Diameter} * {Floor Stepover Ratio}) + {Wall Area} / ({Tool Diameter} * {Wall Step-down Ratio}) + {Faces} * 2 * {Tool Diameter}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Path Length} / {Feed Rate} * 60"
+        }
       ]
     },
     {
@@ -2368,6 +2451,94 @@
           "unit": "s",
           "formula": "({Finish Volume} * {Roughing Share} / {Material Removal Rate} + {Finish Volume} * (1 - {Roughing Share}) / ({Material Removal Rate} * {Finishing Rate Factor})) * 60"
         }
+      ],
+      "supersededBy": 1038
+    },
+    {
+      "name": "Machining - Contouring",
+      "operation": "Contouring",
+      "machineClasses": "lathes+mills",
+      "migration": 1038,
+      "description": "Contouring curved walls and surfaces: a wall is followed with the side of the cutter one step-down at a time, a free-form surface with a ball cutter stepped over to the scallop height, both at the finishing feed rate of the material.",
+      "fields": [
+        {
+          "name": "Wall Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Surface Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Faces",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Tool Diameter",
+          "unit": "mm",
+          "source": "engine"
+        },
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "engine"
+        },
+        {
+          "name": "Feed per Tooth per Diameter",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Max Spindle Speed",
+          "unit": "rpm",
+          "source": "default",
+          "default": 10000
+        },
+        {
+          "name": "Wall Step-down Ratio",
+          "unit": null,
+          "source": "default",
+          "default": 1
+        },
+        {
+          "name": "Scallop Height",
+          "unit": "mm",
+          "source": "default",
+          "default": 0.01
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "min({Max Spindle Speed}, {Cutting Speed} * 1000 / (pi * {Tool Diameter}))"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Teeth} * {Feed per Tooth per Diameter} * {Tool Diameter}"
+        },
+        {
+          "name": "Surface Stepover",
+          "unit": "mm",
+          "formula": "sqrt(4 * {Tool Diameter} * {Scallop Height})"
+        },
+        {
+          "name": "Path Length",
+          "unit": "mm",
+          "formula": "{Wall Area} / ({Tool Diameter} * {Wall Step-down Ratio}) + {Surface Area} / {Surface Stepover} + {Faces} * 2 * {Tool Diameter}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Path Length} / {Feed Rate} * 60"
+        }
       ]
     },
     {
@@ -2375,6 +2546,15 @@
       "operation": "Perimeter Milling",
       "machineClasses": "lathes+mills",
       "migration": 1031,
+      "description": "Milling the wall of a through cutout: its CAD wall area, by the contouring model.",
+      "sameFieldsAs": "Machining - Contouring",
+      "supersededBy": 1038
+    },
+    {
+      "name": "Machining - Perimeter Milling",
+      "operation": "Perimeter Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1038,
       "description": "Milling the wall of a through cutout: its CAD wall area, by the contouring model.",
       "sameFieldsAs": "Machining - Contouring"
     },
