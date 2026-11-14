@@ -102,6 +102,11 @@ async function main(): Promise<void> {
         await client.query(sql);
         await client.query('INSERT INTO public.schema_migrations (name, checksum) VALUES ($1, $2)', [m.name, m.checksum]);
         if (transactional) await client.query('COMMIT');
+        // The API (PostgREST) answers from a cached copy of the schema. A column a migration adds is unknown
+        // to it until it reloads, and every write naming that column is refused. Reloading here, after each
+        // migration that landed, means no migration has to remember to ask, and a later failure cannot leave
+        // an earlier migration's schema unseen.
+        await client.query("NOTIFY pgrst, 'reload schema'");
         console.log(`  applied ${m.name}`);
       } catch (error) {
         if (transactional) await client.query('ROLLBACK');
