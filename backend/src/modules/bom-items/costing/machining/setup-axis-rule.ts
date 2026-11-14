@@ -64,7 +64,15 @@ export function resolveSetupAxisRule(
 type Vec = [number, number, number];
 
 interface AxisFeatureLike {
+  id?: string;
   occurrences?: ReadonlyArray<{ tool_axis?: readonly number[] | null; tool_axis_bidirectional?: boolean | null }>;
+}
+
+/** One setup: the direction the part is approached from, whether it is one of the part's perpendicular directions, and the feature instances reached in it. */
+export interface PartSetup {
+  axis: [number, number, number];
+  principal: boolean;
+  members: Array<{ featureId: string | null; occurrenceIndex: number }>;
 }
 
 
@@ -107,6 +115,41 @@ const ENGINE_AXIS_ROUNDING = 1e-4;
 const ENGINE_ROUNDING_NOISE_DEG = (Math.sqrt(3) * ENGINE_AXIS_ROUNDING * 180) / Math.PI;
 
 /**
+ * The setups the features need, each with the feature instances reached in it. One-sided features open a setup along
+ * their approach; a two-sided feature joins any setup at +axis or -axis and opens its own only when neither exists.
+ * Features with no tool axis (surface regions, edges) belong to no setup and are not listed.
+ *
+ * Axes are collapsed with the rule's own angular tolerance, plus the angle the engine's own rounding can introduce:
+ * it rounds each component to 1e-4, so two roundings of one direction differ by at most sqrt(3) x 1e-4 rad. Without
+ * that an exact-match rule (0 deg) would split one direction in two.
+ */
+export function partSetups(features: ReadonlyArray<AxisFeatureLike> | null | undefined, rule: SetupAxisRule): PartSetup[] {
+  type Ref = { v: Vec; featureId: string | null; occurrenceIndex: number };
+  const one: Ref[] = [];
+  const both: Ref[] = [];
+  for (const f of features ?? []) {
+    (f.occurrences ?? []).forEach((o, occurrenceIndex) => {
+      const v = o.tool_axis ? unit(o.tool_axis) : null;
+      if (v) (o.tool_axis_bidirectional ? both : one).push({ v, featureId: f.id ?? null, occurrenceIndex });
+    });
+  }
+  const tol = rule.allowedAngleDeviationDeg + ENGINE_ROUNDING_NOISE_DEG;
+  const same = (a: Vec, b: Vec) => angleDeg(a, b) <= tol;
+  const setups: Array<{ axis: Vec; members: PartSetup['members'] }> = [];
+  const join = (r: Ref, fits: (axis: Vec) => boolean) => {
+    const setup = setups.find((s) => fits(s.axis));
+    const member = { featureId: r.featureId, occurrenceIndex: r.occurrenceIndex };
+    if (setup) setup.members.push(member); else setups.push({ axis: r.v, members: [member] });
+  };
+  for (const r of one) join(r, (axis) => same(axis, r.v));
+  for (const r of both) join(r, (axis) => same(axis, r.v) || same(axis, neg(r.v)));
+
+  const principal = principalDirections([...one, ...both].map((r) => r.v), tol);
+  // With one principal line only, a setup square to it is perpendicular too (it would have defined the second line).
+  return setups.map((s) => ({ axis: s.axis, principal: principal.some((p) => same(s.axis, p)), members: s.members }));
+}
+
+/**
  * Distinct setup directions the features need, then the least machine class
  * that can take them: any oblique setup beyond maxOblique4AMSetups needs a
  * 5 axis mill; more principal (perpendicular) setups than
@@ -124,30 +167,11 @@ export function requiredMilledClassFromToolAxes(
   const none = (reason: string): RequiredMilledClass => ({ required: null, reason, principalSetups: 0, obliqueSetups: 0 });
   if (!rule) return none('Machine axis requirement not derived: the reference setup-axis variables are not staged.');
 
-  const one: Vec[] = [];
-  const both: Vec[] = [];
-  for (const f of features ?? []) {
-    for (const o of f.occurrences ?? []) {
-      const v = o.tool_axis ? unit(o.tool_axis) : null;
-      if (!v) continue;
-      (o.tool_axis_bidirectional ? both : one).push(v);
-    }
-  }
-  if (one.length === 0 && both.length === 0) {
+  const setups = partSetups(features, rule);
+  if (setups.length === 0) {
     return none('Machine axis requirement not derived: the CAD analysis carries no feature tool axes, so no mill class is excluded.');
   }
-
-  const tol = rule.allowedAngleDeviationDeg + ENGINE_ROUNDING_NOISE_DEG;
-  const same = (a: Vec, b: Vec) => angleDeg(a, b) <= tol;
-  const setups: Vec[] = [];
-  for (const v of one) if (!setups.some((s) => same(s, v))) setups.push(v);
-  // A two-sided feature shares any setup at +axis or -axis; only when neither
-  // exists does it need a setup of its own.
-  for (const v of both) if (!setups.some((s) => same(s, v) || same(s, neg(v)))) setups.push(v);
-
-  const principal = principalDirections([...one, ...both], tol);
-  // With one principal line only, a setup square to it is perpendicular too (it would have defined the second line).
-  const principalSetups = setups.filter((s) => principal.some((p) => same(s, p))).length;
+  const principalSetups = setups.filter((s) => s.principal).length;
   const obliqueSetups = setups.length - principalSetups;
 
   if (obliqueSetups > rule.maxOblique4AMSetups) {

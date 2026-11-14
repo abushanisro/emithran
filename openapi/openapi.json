@@ -13857,6 +13857,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/design-guidance": {
+      "get": {
+        "operationId": "BOMItemsController_getDesignGuidance_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The design guidance"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's design guidance: its cost drivers (the DFM findings of its process), its material among the materials the process draws from, its walls against the staged limits, the mold tooling, the machining, the tolerances, the setups, and the hole and fillet sizes. A projection of the analysis, the reference data and the applied cost; a value none of them holds is null with its reason",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/dfm-scores": {
       "get": {
         "operationId": "BOMItemsController_getDFMScores_v1",

@@ -41,6 +41,11 @@ export interface PlasticDfmResult {
   notEvaluated: Array<{ rule: string; reason: string }>;
   /** What limits the result: measurements left out of it, and why. */
   notes: string[];
+  /**
+   * The wall this process and material are advised to stay within (mm): the first limit of the thin and of the thick section rule a wall would cross (the least severe
+   * level each rule grades). Null where the rule data has no measured limit for them.
+   */
+  sectionLimits: { minMm: number | null; maxMm: number | null };
 }
 
 export interface PlasticDfmReference {
@@ -102,6 +107,15 @@ function limitsFor(rows: readonly Row[], process: string, materialType: string |
     if (v != null) limits[s] = v;
   }
   return { comparison: type, limits, unit: text(r['Units']) || null, title: text(r['Threshold Name']), note: text(r['Notes']) || null };
+}
+
+/** The first limit of a rule a value would cross: the largest of a "below" rule's limits, the smallest of an "above" rule's. Null when the rule has no measured limit. */
+function firstLimit(rows: readonly Row[], process: string, materialType: string | null): number | null {
+  const l = limitsFor(rows, process, materialType);
+  if (l == null || 'missing' in l) return null;
+  const values = SEVERITIES.flatMap((s) => (l.limits[s] != null ? [l.limits[s]!] : []));
+  if (values.length === 0) return null;
+  return l.comparison === '<' ? Math.max(...values) : Math.min(...values);
 }
 
 /** The most severe level whose limit the value crosses. */
@@ -168,7 +182,11 @@ export function evaluatePlasticDfm(part: PlasticDfmPart, process: MoldingProcess
   // mention is on: reading "not listed" as "off" would switch off the draft rule on a table that never mentions it.
   const disabled = new Set(ref.adviceRules.filter((r) => text(r['enabled']).toLowerCase() === 'false').map((r) => text(r['advice_rule_name'])));
   const rules = [...new Set(ref.severity.map((r) => text(r['Rule Name'])).filter(Boolean))].sort();
-  const out: PlasticDfmResult = { rulesetVersion: ref.version, process, materialType, findings: [], passed: [], notEvaluated: [], notes: [] };
+  const rowsOf = (rule: string) => ref.severity.filter((r) => text(r['Rule Name']) === rule);
+  const out: PlasticDfmResult = {
+    rulesetVersion: ref.version, process, materialType, findings: [], passed: [], notEvaluated: [], notes: [],
+    sectionLimits: { minMm: firstLimit(rowsOf('ThinSection'), process, materialType), maxMm: firstLimit(rowsOf('ThickSection'), process, materialType) },
+  };
   const unresolved = part.wallFaces && part.wallResolutionMm != null ? part.wallFaces.filter((w) => w.mm < part.wallResolutionMm!).length : 0;
   if (unresolved > 0) out.notes.push(`${unresolved} face${unresolved === 1 ? '' : 's'} read thinner than the ${fmt(part.wallResolutionMm!)} mm the wall was measured at (slivers and edges of the mesh): they are not judged for thin or thick section.`);
 

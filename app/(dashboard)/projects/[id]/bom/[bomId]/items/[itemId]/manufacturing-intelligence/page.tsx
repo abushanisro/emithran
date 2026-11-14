@@ -87,6 +87,7 @@ import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
 import { moldingRouteSelectability } from '@/lib/routing/molding-route-selectability';
 import { PartSummaryTab } from '@/components/features/manufacturing-intelligence/PartSummaryTab';
+import { DesignGuidanceTab as PartDesignGuidance } from '@/components/features/manufacturing-intelligence/DesignGuidanceTab';
 import { PlasticDfmFindings } from '@/components/features/manufacturing-intelligence/PlasticDfmFindings';
 import { isSupersededPlasticCheck, isSupersededPlasticWarning, plasticDfmReadiness } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
@@ -322,6 +323,7 @@ const RIGHT_TABS = [
   { key: 'cost',          label: 'Cost'         },
   { key: 'validation',    label: 'Validation'   },
   { key: 'part_summary',  label: 'Part Summary' },
+  { key: 'design_guidance', label: 'Design Guidance' },
   { key: 'sustainability', label: 'Sustain'     },
   { key: 'detail',        label: 'Detail'       },
   { key: 'investment',    label: 'Invest'       },
@@ -8051,6 +8053,15 @@ function AnalysisTabsPanel({
       <div className="flex-1 overflow-y-auto min-h-0">
         {tab === 'part_summary' && (
           <PartSummaryTab itemId={item.id} uncostedWarnings={(summaryForPartTab?.warnings ?? []).filter((w) => /not costed/i.test(w))} />
+        )}
+
+        {tab === 'design_guidance' && (
+          <PartDesignGuidance
+            itemId={item.id}
+            features={fg?.feature_graph_v2?.features ?? []}
+            operations={operationCosts(summaryForPartTab?.processLines ?? []).map((o) => ({ operation: o.operation, process: o.process, timeSec: o.timeSec, count: o.count }))}
+            onSelectHighlight={onSelectHighlight}
+          />
         )}
 
         {tab === 'cost' && (
