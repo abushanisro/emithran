@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { dryingConditionFor } from '../../../../../modules/bom-items/costing/plastic-molding/reference/im-reference';
 
 // The injection-molding reference package (plastic-molding/reference/*.csv): the costing engineer's open-source research, kept as cited data
 // before the cost model reads any of it. Every row says how far it can be trusted (source_backed / engineering_estimate / provisional /
@@ -97,5 +98,14 @@ describe('injection-molding reference package', () => {
     const { rows } = load('unresolved-costing-gaps.csv');
     expect(rows.map((r) => r.item)).toEqual(['dryer_hourly_rate', 'cooling_circuits_per_mold', 'baffle_count', 'texture_price_per_m2', 'rib_insert_threshold', 'slide_motion_overlap', 'hot_runner_manifold_price']);
     for (const r of rows) expect(r.needs).not.toBe('');
+  });
+
+  it('matches a resin grade to its drying row: Back cover\'s nylon 11 with glass is PA11 GF (Arkema); PA66 borrows nothing; an unknown resin has none', () => {
+    expect(dryingConditionFor('Generic Nylon, Type 11 40% Glass')).toMatchObject({ material: 'PA11 GF', tempC: '80-90', timeH: '4-6' });
+    expect(dryingConditionFor('Generic Nylon, Type 6')).toMatchObject({ material: 'PA6' });
+    expect(dryingConditionFor('Nylon 66 30% Glass')).toBeNull();
+    expect(dryingConditionFor('Generic Polycarbonate')).toMatchObject({ material: 'PC', tempC: '120' });
+    expect(dryingConditionFor('Generic ABS')).toMatchObject({ material: 'ABS' });
+    expect(dryingConditionFor('Polypropylene')).toBeNull();
   });
 });

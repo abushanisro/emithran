@@ -417,6 +417,28 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
+    id: 'F-36', version: 1, name: 'Material drying',
+    expression: 'demand = resin per part x 3600 / press time per part;  dryer = smallest model with nylon throughput >= demand;  dryer hourly = (P (1 - salvage) / life + P x maintenance + P x installation / life) / (6240 x uptime x utilization) + rated kW x electricity;  cost per part = dryer hourly x press time per part / 3600',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'drying conditions', unit: 'degC, h', source: 'reference/material-drying-reference.csv (manufacturer datasheets: BASF, Covestro, Celanese, Lotte, Arkema)' },
+      { name: 'throughput, rated kW', unit: 'kg/h, kW', source: 'reference/dryer-models-reference.csv: Bry-Air BRY DRY specification' },
+      { name: 'P', unit: 'USD', source: 'reference/dryer-models-reference.csv: Conair dX50, used-equipment listing (provisional)' },
+      { name: 'electricity', unit: 'USD/kWh', source: 'location_electricity_prices (migration 1004)' },
+      { name: 'economics', unit: '-', source: 'reference/equipment-economics-reference.csv (memory/ press economics, migration 580)' },
+    ],
+    dependsOn: [],
+    referenceSource: 'reference/*.csv + location_electricity_prices',
+    assumptions: [
+      'The costing engineer\'s throughput model: a machine-mounted desiccant dryer runs with the press, so its hour is charged with the press time per part.',
+      'The dryer price is a used-equipment listing (no new price is published): provisional until a quotation.',
+      'The rated power is an upper bound on the energy: the heaters cycle.',
+      'No operator time: the hopper is fed with the press material handling; no handling time is on file for a machine-mounted dryer.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
     id: 'F-35', version: 1, name: 'Weight check',
     expression: 't = time per check / sampling interval (s per part);  scale rate = (P (1 - salvage) / life + P x maintenance + P x installation / life) / (6240 x uptime x utilization);  cost = t / 3600 x (operator rate + scale rate)',
     outputUnit: 's',
@@ -513,7 +535,7 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     ['G-08', 'Hot-runner manifold and controller (no price on file; the hot drops are F-33)', 'manifoldPlateThickness; defaultHotDropLayout'],
     ['G-09', 'Handling, setup scrap and plasticizing in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS'],
     ['G-10', 'Period costs: indirect overhead, SG&A, margin', 'sGandARate; markUpRate; machine indirect overhead'],
-    ['G-11', 'Material drying, visual inspection, ultrasonic welding, cure oven, LSR dosing', 'nothing staged'],
+    ['G-11', 'Ultrasonic welding, cure oven, LSR dosing (nothing staged); material drying when its inputs are incomplete (F-36: a resin with no drying row, no electricity price, or a dryer class with no price)', 'nothing staged'],
   ] as const).map(([id, name, stagedData]): FormulaEntry => ({
     id, version: 1, name, expression: '', outputUnit: 'USD', inputs: [], dependsOn: [], referenceSource: '',
     assumptions: [], state: 'UNSUPPORTED', implementedIn: null, stagedData,

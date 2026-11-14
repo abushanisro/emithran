@@ -444,6 +444,30 @@ describe('the slide movement in each shot (F-32)', () => {
   });
 });
 
+describe('material drying (F-36)', () => {
+  const USA = { usdPerKwh: 0.0851, source: 'USA electricity price: 0.0851 USD/kWh (EIA)' };
+
+  it('charges the dryer hour with the press time per part: ABS 9.77 kg/h -> Bry-Air DRY-30 (12 kg/h, 2.43 kW), the used dX50 price, USA electricity', () => {
+    const r = computeInjectionMoldedCostSummary(absPart({ electricity: USA }));
+    const line = r.processLines.find((l) => l.process === 'Material Drying');
+    // demand 0.05616 kg x 3600 / 20.69 s = 9.77 kg/h; ownership (11,900 / 10 + 11,900 x 5 % + 11,900 x 20 % / 10) / (6,240 x 0.8 x 0.95)
+    const ownership = (11900 / 10 + 11900 * 0.05 + 11900 * 0.2 / 10) / (6240 * 0.8 * 0.95);
+    const hourly = ownership + 2.43 * 0.0851;
+    expect(line?.calculationTrace?.find((t) => t.fieldName === 'Dryer Throughput')?.value).toBe(12);
+    expect(line?.calculationTrace?.find((t) => t.fieldName === 'Dryer Hourly Cost')?.value).toBeCloseTo(hourly, 4); // the trace shows 4 decimals
+    expect(line?.totalCost).toBeCloseTo((hourly * 20.69) / 3600, 6);
+    expect(line?.laborCostPerPart).toBe(0);
+    expect(line?.calculationTrace?.find((t) => t.fieldName === 'Drying Temperature')?.source).toMatch(/ABS \(Lotte Chemical/);
+    expect(r.validation?.unsupported.map((u) => u.id)).not.toContain('G-11');
+  });
+
+  it('with no electricity price, or a resin with no drying row, drying stays a named gap (G-11)', () => {
+    const noPower = computeInjectionMoldedCostSummary(absPart());
+    expect(noPower.warnings.join(' ')).toMatch(/Material Drying not costed: missing the location electricity price/);
+    expect(noPower.validation?.unsupported.map((u) => u.id)).toContain('G-11');
+  });
+});
+
 describe('operations the model does not cost', () => {
   const warn = (signals: object, grade = 'Generic ABS') => computeInjectionMoldedCostSummary({ ...absPart(), materialGrade: grade, signals: { ...absPart().signals, ...signals } }).warnings.join('\n');
 

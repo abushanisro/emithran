@@ -1,3 +1,4 @@
+import { electricityUsd, loadLocationElectricity } from './costing/shared/location-electricity';
 import { castingSourcePath } from '../sand-casting/casting-source';
 import type { DbClient } from '../../common/db/postgrest-client';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
@@ -4343,6 +4344,8 @@ export class BOMItemsService {
           item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
           material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
           plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
+          electricity: electricityUsd(await loadLocationElectricity(this.databaseService.getClient(accessToken), location), location,
+            (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),
           currencySymbol: locInfo.symbol,
           usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
           deburrRate: mhrRates.deburring,

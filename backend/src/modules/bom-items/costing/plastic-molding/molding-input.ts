@@ -84,6 +84,8 @@ export interface MoldingCommonFacts {
   calculatorOverrides?: InjectionMoldingCostInput['calculatorOverrides'];
   /** The CAD face count (cadFaceCount below): decides the mold complexity. */
   cadFaceCount?: number | null;
+  /** The location's electricity price in USD (shared/location-electricity.ts); null when it has none. */
+  electricity?: { usdPerKwh: number; source: string } | null;
 }
 
 /** The CAD face count of an analysed part (feature_graph.face_graph.face_attributes); null when the analysis holds none. */
@@ -113,6 +115,7 @@ export function buildMoldingCommonInput(f: MoldingCommonFacts): MoldingCommonInp
     calculators: f.calculators,
     calculatorOverrides: f.calculatorOverrides ?? null,
     cadFaceCount: f.cadFaceCount ?? null,
+    electricity: f.electricity ?? null,
     // Tooling amortisation: both come from the canonical costing-input resolver, never re-read from the item.
     annualVolume: f.annualVolume ?? undefined,
     productionLifeYears: f.productionLifeYears,

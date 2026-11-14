@@ -22,14 +22,24 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1021 the injection molding slide movement calculator: the hydraulic slides' movement in each shot
  *   1022 the injection mold tooling calculator, version 9: heat treatment by steel grade, and the hot drops
  *   1023 the injection molding visual inspection and weight check calculators
+ *   1024 the injection molding material drying calculator
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1022, 1023] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1022, 1023, 1024] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
+  1024: {
+    title: 'Injection molding material drying calculator -- a machine-mounted desiccant dryer running with the press.',
+    rootCause: [
+      'Material drying is routed for a hygroscopic resin but was reported as having no sourced data. The reference package now holds manufacturer drying',
+      'conditions (BASF, Covestro, Celanese, Lotte, Arkema), Bry-Air dryer throughput and rated power, a published (used) dryer price, and the press',
+      'economics of memory/. This calculator charges the dryer\'s hour, ownership by the machine-hour rate pattern of migration 580 plus rated power at',
+      'the location\'s electricity price, with the press time per part (the costing engineer\'s throughput model; formula registry F-36, ASSUMED).',
+    ].join('\n'),
+  },
   1023: {
     title: 'Injection molding visual inspection and weight check calculators.',
     rootCause: [
@@ -105,4 +115,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   1021: '1021_plastic_slide_movement_calculator.sql',
   1022: '1022_plastic_mold_steel_treatment_hot_drops.sql',
   1023: '1023_plastic_inspection_calculators.sql',
+  1024: '1024_plastic_material_drying_calculator.sql',
 };

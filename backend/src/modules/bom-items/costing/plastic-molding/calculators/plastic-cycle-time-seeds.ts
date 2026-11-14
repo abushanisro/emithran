@@ -7,7 +7,7 @@
  * What the engine decides stays here, not in a formula: whether an input exists, and whether the Menges equation has a solution (the eject temperature must lie
  * between the mold wall and the melt). Both come back as named missing inputs, never a default.
  */
-import type { WeightCheckReference } from '../reference/im-reference';
+import type { DryerModel, DryingCondition, ReferenceValue, WeightCheckReference } from '../reference/im-reference';
 import type { CalcSeed } from '../../shared/calculators/reference-calculator';
 import { bracketFactor, hasMengesSolution, resinThermalProps, type CycleTimeInput } from '../process/cycle-time';
 
@@ -80,6 +80,56 @@ export function weightCheckSeeds(ref: WeightCheckReference): SeedResult {
     const v = ref[k]!;
     return [name, { value: v.value, source: `${v.source} (${v.confidence})`, lookup: true }];
   })) };
+}
+
+// Formula registry (plastic-molding/formula-registry.ts): F-36 is the material drying calculator's formula.
+export const MATERIAL_DRYING_CALCULATOR = 'Injection Molding - Material Drying';
+
+export interface MaterialDryingInput {
+  grade: string | null;
+  condition: DryingCondition | null;
+  resinPerPartKg: number | null;
+  pressTimePerPartSec: number | null;
+  dryers: readonly DryerModel[];
+  electricity: { usdPerKwh: number; source: string } | null;
+  economics: Record<'lifeYr' | 'maintenancePct' | 'installationPct' | 'salvagePct' | 'uptimePct' | 'utilization' | 'scheduledHours', ReferenceValue | null>;
+}
+
+/**
+ * Seeds for the material drying calculator (F-36), or what is missing. The dryer is the smallest model whose nylon throughput covers the press's resin
+ * demand; its price is the priced model of a throughput at least as large (the only published price, used); a demand no priced model covers is a gap.
+ */
+export function materialDryingSeeds(input: MaterialDryingInput): SeedResult {
+  const missing: string[] = [];
+  if (!input.condition) missing.push(`the drying conditions of ${input.grade ?? 'the resin'} (reference/material-drying-reference.csv has no row for it)`);
+  if (!positive(input.resinPerPartKg)) missing.push('the resin per part (shot weight)');
+  if (!positive(input.pressTimePerPartSec)) missing.push('the press time per part (cycle time)');
+  if (!input.electricity) missing.push('the location electricity price (location_electricity_prices)');
+  const econ = Object.entries(input.economics).filter(([, v]) => v == null).map(([k]) => `equipment economics: ${k}`);
+  missing.push(...econ);
+  const demand = positive(input.resinPerPartKg) && positive(input.pressTimePerPartSec) ? (input.resinPerPartKg! * 3600) / input.pressTimePerPartSec! : null;
+  const sized = [...input.dryers].filter((d) => d.ratedKw != null).sort((a, b) => a.throughputKgH - b.throughputKgH);
+  const priced = [...input.dryers].filter((d) => d.priceUsd != null).sort((a, b) => a.throughputKgH - b.throughputKgH);
+  const dryer = demand != null ? sized.find((d) => d.throughputKgH >= demand) ?? null : null;
+  const price = dryer ? priced.find((d) => d.throughputKgH >= dryer.throughputKgH) ?? null : null;
+  if (demand != null && !dryer) missing.push(`a dryer for ${demand.toFixed(1)} kg/h (the largest reference model dries ${sized[sized.length - 1]?.throughputKgH ?? 0} kg/h)`);
+  if (dryer && !price) missing.push(`a dryer price for the ${dryer.throughputKgH} kg/h class (reference/dryer-models-reference.csv holds none)`);
+  if (missing.length > 0) return { missing };
+  const c = input.condition!;
+  const e = input.economics;
+  const econSeed = (v: ReferenceValue) => ({ value: v.value, source: `${v.source} (${v.confidence})`, lookup: true });
+  return { seeds: {
+    'Drying Temperature': { value: Number(c.tempC.split('-').pop()), source: `${c.source}: ${c.material} (${c.grade}) ${c.tempC} degC (${c.confidence})`, lookup: true },
+    'Drying Time': { value: Number(c.timeH.split('-').pop()), source: `${c.source}: ${c.material} (${c.grade}) ${c.timeH} h (${c.confidence}); the dryer's nylon throughput is rated at a 5-6 h residence`, lookup: true },
+    'Resin Per Part': { value: input.resinPerPartKg!, source: 'The shot weight per part, runner included' },
+    'Press Time Per Part': { value: input.pressTimePerPartSec!, source: 'The press cycle per good part (the dryer runs with the press)' },
+    'Dryer Throughput': { value: dryer!.throughputKgH, source: `${dryer!.source}: ${dryer!.model}, the smallest covering ${demand!.toFixed(1)} kg/h (${dryer!.confidence})`, lookup: true },
+    'Dryer Power': { value: dryer!.ratedKw!, source: `${dryer!.source}: ${dryer!.model} rated power (heaters cycle: an upper bound) (${dryer!.confidence})`, lookup: true },
+    'Dryer Price': { value: price!.priceUsd!, source: `${price!.source}: ${price!.model}, ${price!.priceBasis} (${price!.confidence}: replace with a quotation)`, lookup: true },
+    'Electricity Price': { value: input.electricity!.usdPerKwh, source: input.electricity!.source, lookup: true },
+    'Equipment Life': econSeed(e.lifeYr!), 'Salvage Factor': econSeed(e.salvagePct!), 'Maintenance Factor': econSeed(e.maintenancePct!),
+    'Installation Factor': econSeed(e.installationPct!), 'Scheduled Hours': econSeed(e.scheduledHours!), 'Uptime': econSeed(e.uptimePct!), 'Utilization': econSeed(e.utilization!),
+  } };
 }
 
 export type SeedResult = { seeds: Record<string, CalcSeed> } | { missing: string[] };
