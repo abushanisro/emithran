@@ -61,3 +61,17 @@ describe('materialSourceTable', () => {
     });
   });
 });
+
+describe('machineSourceTable shows whatever column an engine reads', () => {
+  it('passes through every value column of the record (a press dry cycle, a transfer index time), not a fixed list', () => {
+    const t = machineSourceTable([
+      { id: 'p1', machine_name: 'Engel 200T', machine_class: 'injection_molding', location: 'USA', press_cycle_time_s: 4.2, created_at: '2026-01-01', organization_id: 'o', specs: { injection_rate_mm3_per_s: 90000 } },
+      { id: 't1', machine_name: 'Hydromat', machine_class: 'injection_molding', location: 'USA', drum_index_time_s: 1.1, specs: {} },
+    ], { id: 'p1', machineClass: 'injection_molding', location: 'USA' }, 'press_cycle_time_s');
+    const names = t.columnDefinitions.map((c) => c.name);
+    expect(names.at(-1)).toBe('press_cycle_time_s');
+    expect(names).toEqual(expect.arrayContaining(['drum_index_time_s', 'injection_rate_mm3_per_s']));
+    for (const skipped of ['id', 'created_at', 'organization_id', 'machine_class', 'location', 'specs']) expect(names).not.toContain(skipped);
+    expect(t.rows.find((r) => r['id'] === 'p1')!['press_cycle_time_s']).toBe(4.2);
+  });
+});
