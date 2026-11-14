@@ -120,3 +120,14 @@ describe('smTablePanel', () => {
     expect(isSheetMetalLibraryTable('sm_lookup_laser_cut')).toBe(false);
   });
 });
+
+describe('lookupPanel on camelCased rows', () => {
+  it('finds the row holding the value when the API camelCased its keys (cutting_speed arrives as cuttingSpeed)', () => {
+    const p = lookupPanel(
+      { kind: 'lookup', domain: 'machining', table: 'tblDrilling', column: 'cutting_speed', row: null },
+      { key: 'tblDrilling', columns: ['material_cut_code', 'cutting_speed'], rows: [{ materialCutCode: 1, cuttingSpeed: 30 }, { materialCutCode: 2, cuttingSpeed: 45 }] },
+      45,
+    );
+    expect(p.matchedRowKeys).toEqual({ cutting_speed: 45 });
+  });
+});

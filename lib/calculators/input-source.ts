@@ -72,10 +72,11 @@ export function lookupPanel(
 ): SourcePanel {
   const base = { tableName: table.key.replace(/^lookupTables_Component_/, ''), column_definitions: valueColumnLast(table.columns, ref.column), rows: table.rows };
   if (ref.row) return { ...base, matchedRowKeys: ref.row };
-  const holding = table.rows.filter((r) => close(r[ref.column], value));
+  // The API camelCases row keys (cutting_speed -> cuttingSpeed): read the column by either spelling.
+  const holding = table.rows.filter((r) => close(columnValue(r, ref.column), value));
   const [only] = holding;
   if (holding.length === 1 && only) {
-    return { ...base, matchedRowKeys: { [ref.column]: only[ref.column] }, note: `The row whose ${ref.column} is the value in use.` };
+    return { ...base, matchedRowKeys: { [ref.column]: columnValue(only, ref.column) }, note: `The row whose ${ref.column} is the value in use.` };
   }
   return {
     ...base, matchedRowKeys: null,
