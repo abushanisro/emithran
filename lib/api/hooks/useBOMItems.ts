@@ -730,6 +730,9 @@ export interface CalculationTraceStep {
   evidence?: string;
   /** 'input' steps: where the value was read, structured (lib/calculators/input-source.ts), for the eye beside the input. */
   ref?: SourceRef;
+  /** A line that ran one calculator per group: the group ("M2") and the calculator's own field name (fieldName carries the prefix). */
+  group?: string;
+  groupField?: string;
 }
 
 export type LookupPolicyType = 'EXACT_MATCH' | 'INTERPOLATE' | 'RANGE' | 'FORMULA';

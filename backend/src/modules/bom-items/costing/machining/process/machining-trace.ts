@@ -49,9 +49,28 @@ export function traceHasAssumption(trace: CalculationTraceStep[]): boolean {
 
 /** Prefixes every label of a sub-trace so several occurrences can share one line's trace. */
 export function prefixTrace(prefix: string, trace: CalculationTraceStep[]): CalculationTraceStep[] {
-  return trace.map((s) => ({ ...s, fieldName: `${prefix} ${s.fieldName}`, displayLabel: `${prefix} ${s.displayLabel}` }));
+  // The group and the calculator's own field name stay on each step, so a calculator can be refilled from one group (calculator-input-group.ts).
+  const group = prefix.replace(/\s*·\s*$/, '').trim();
+  return trace.map((s) => ({
+    ...s, fieldName: `${prefix} ${s.fieldName}`, displayLabel: `${prefix} ${s.displayLabel}`, group, groupField: s.groupField ?? s.fieldName,
+  }));
 }
 
 function round(v: number): number {
   return Math.abs(v) >= 100 ? Math.round(v * 100) / 100 : Math.round(v * 10000) / 10000;
+}
+
+/**
+ * The input steps a calculator is filled from, under its own field names: a line that ran it once per group (prefixTrace) fills it from its
+ * first group, and each source says which group of how many. Same rule as the dialog's (lib/calculators/engine-calculator-seeds.ts).
+ */
+export function calculatorInputSteps(trace: readonly CalculationTraceStep[]): CalculationTraceStep[] {
+  const inputs = trace.filter((st) => st.kind === 'input');
+  const groups = [...new Set(inputs.map((st) => st.group).filter((g): g is string => !!g))];
+  if (groups.length === 0) return inputs;
+  const first = groups[0]!;
+  const note = groups.length > 1 ? ` — ${first}, the first of ${groups.length} groups (${groups.join(', ')})` : ` — ${first}`;
+  return inputs
+    .filter((st) => !st.group || st.group === first)
+    .map((st) => (st.group ? { ...st, fieldName: st.groupField ?? st.fieldName, ...(st.source ? { source: `${st.source}${note}` } : {}) } : st));
 }

@@ -16,8 +16,10 @@ export function resolveLineIdentity(input: {
   selectedMachineClass: string;
   selectedOperation: string;          // picked from the CAD-detected operation list ('' if none)
   classCatalog: CatalogIdentity | null | undefined; // the single catalog row for selectedMachineClass
+  /** The selected machine is the one the line was saved on (see keepsSavedOperation). */
+  sameMachine?: boolean;
 }): LineIdentity {
-  if (keepsSavedOperation(input.savedMachineClass, input.selectedMachineClass) && input.savedProcessRoute) {
+  if (keepsSavedOperation(input.savedMachineClass, input.selectedMachineClass, input.sameMachine) && input.savedProcessRoute) {
     return {
       ok: true,
       processRoute: input.savedProcessRoute,
@@ -41,9 +43,13 @@ export function resolveLineIdentity(input: {
   };
 }
 
-/** Whether a line's saved operation still applies: only while its machine class is unchanged. */
-export function keepsSavedOperation(savedMachineClass: string | null | undefined, selectedMachineClass: string): boolean {
-  return !!savedMachineClass && savedMachineClass === selectedMachineClass;
+/**
+ * Whether a line's saved operation still applies: while its machine class is unchanged, or while it is still on the very machine it was saved
+ * on. An operation hosted on another class's machine (Tapping, saved as class "tapping", run on the 3 Axis Mill that taps it) is opened on
+ * that machine: its class differs from the saved one, but nothing about the line changed.
+ */
+export function keepsSavedOperation(savedMachineClass: string | null | undefined, selectedMachineClass: string, sameMachine = false): boolean {
+  return (!!savedMachineClass && savedMachineClass === selectedMachineClass) || sameMachine;
 }
 
 /**

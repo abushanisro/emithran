@@ -1,3 +1,4 @@
+import { calculatorInputSteps } from './costing/machining/process/machining-trace';
 import { inspectedOccurrences, type InspectionReference } from './costing/machining/inspection-reference';
 import { featuresRef, occurrenceByFace, occurrencesOfFaces, type FeatureOccurrenceRef } from './costing/machining/feature-occurrences';
 import { electricityUsd, loadLocationElectricity } from './costing/shared/location-electricity';
@@ -8290,7 +8291,8 @@ export class BOMItemsService {
         const lines = (summary as any).processLines as ProcessLineCost[] ?? [];
         const own = lines.find((l) => l.calculatorId === calculatorId && l.calculationTrace?.length);
         const SHARED = new Set(['Bar Diameter', 'Batch Size']);
-        const stepsOf = (l: ProcessLineCost) => (l.calculationTrace ?? []).filter((st) => st.kind === 'input' && typeof st.value === 'number');
+        // Under the calculator's own field names: a line run once per group (thread sizes, hole diameters) gives its first group.
+        const stepsOf = (l: ProcessLineCost) => calculatorInputSteps(l.calculationTrace ?? []).filter((st) => typeof st.value === 'number');
         for (const st of own ? stepsOf(own) : []) {
           if (!inputFields.has(st.fieldName)) continue;
           inputs[st.fieldName] = st.value as number;

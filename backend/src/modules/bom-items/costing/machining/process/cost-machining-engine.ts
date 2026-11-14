@@ -1040,9 +1040,12 @@ function computeDeburringLine(
       { setupTimeMin: setup.setupMin, setupTimeSource: setup.source }),
     { ...run, missing }, setup.setupMin > 0 ? setupTraceSteps(setup, deburrRate.machineName, input.batchSize) : [],
   );
-  // The sharp edges deburred, for the Process tree: one row lighting the faces they lie between.
-  return edgeFaces && run.sec != null
-    ? withFeatureGroups(line, [{ name: `Sharp edges (${Math.round(input.sharpEdgeLengthMm!)} mm)`, timeSec: run.sec, featureType: 'deburring', count: 1, faceIds: edgeFaces }])
+  // The sharp edges deburred, for the Process tree: a row that lights the faces they lie between when the analysis recorded them
+  // (edges.sharp_edge_face_ids); an analysis before that still lists the row, without a highlight, until it is refreshed.
+  return run.sec != null && input.sharpEdgeLengthMm != null && input.sharpEdgeLengthMm > 0
+    ? withFeatureGroups(line, [{
+      name: `Sharp edges (${Math.round(input.sharpEdgeLengthMm)} mm)`, timeSec: run.sec, featureType: 'deburring', count: 1, ...(edgeFaces ? { faceIds: edgeFaces } : {}),
+    }])
     : line;
 }
 
