@@ -25,7 +25,7 @@
 import { REFERENCE_FEATURE_OPERATIONS } from '../reference-features.generated';
 import { resolveCanonicalOperation } from '../../machining/process/canonical-operation';
 import type { InstanceRequirements, ResolvedRequirement } from './feature-tolerances';
-import { processHolds, type CapabilityRow, type IsoToleranceRow } from './process-capability';
+import { processAchieves, processHolds, type Achieved, type CapabilityRow, type GtolCategory, type IsoToleranceRow } from './process-capability';
 
 export interface OperationLink { operation: string; capabilityProcess: string }
 
@@ -50,6 +50,10 @@ interface FeatureMachiningNeed {
   featureId: string | null;
   occurrenceIndex: number;
   verdict: FeatureVerdict;
+  /** The process the feature is judged as made by: the part's primary process, or on a machined part the feature's own operation. Null when no operation is on file for it. */
+  primaryProcess: string | null;
+  /** What that process holds on this feature (its size, form and finish), from the capability table. Empty when it has no row. */
+  achieved: Achieved[];
   /** Why: each requirement against the primary process, and formability. */
   reasons: string[];
   requirements: ResolvedRequirement[];
@@ -71,6 +75,14 @@ export interface MachiningNeedResult {
 const machiningOperationsFor = (featureType: string): readonly string[] =>
   (REFERENCE_FEATURE_OPERATIONS.machining as Readonly<Record<string, readonly string[]>>)[featureType] ?? [];
 
+const HOLE_TYPES = new Set(['SimpleHole', 'MultiStepHole']);
+
+/** The categories a feature's capability is reported in: a hole by its diameter and position, any other feature by its size; a flat face by its flatness too; all by finish. */
+function achievedCategories(featureType: string): GtolCategory[] {
+  if (HOLE_TYPES.has(featureType)) return ['diamTolerance', 'positionTolerance', 'roughness'];
+  return featureType === 'PlanarFace' ? ['tolerance', 'flatness', 'roughness'] : ['tolerance', 'roughness'];
+}
+
 export function evaluateMachiningNeed(input: {
   primaryProcess: string;
   features: readonly InstanceRequirements[];
@@ -79,6 +91,11 @@ export function evaluateMachiningNeed(input: {
   links: readonly OperationLink[];
   /** Whether the primary process can form this feature at all (holes). Absent = not assessed. */
   formability?: (f: InstanceRequirements) => Formability | null;
+  /**
+   * On a machined part every feature is made by its own operation, and that operation's capability is what its tolerances are judged against: the capability process
+   * of each feature (null when it has no operation on file). Absent = every feature is made by `primaryProcess`.
+   */
+  primaryProcessOf?: (f: InstanceRequirements) => string | null;
 }): MachiningNeedResult {
   const linkOf = new Map(input.links.map((l) => [l.operation, l.capabilityProcess]));
   const features = input.features.map(({ instance, requirements }) => {
@@ -86,14 +103,20 @@ export function evaluateMachiningNeed(input: {
     let short = false;
     let undecided = false;
 
+    const primary = input.primaryProcessOf ? input.primaryProcessOf({ instance, requirements }) : input.primaryProcess;
     const form = input.formability?.({ instance, requirements }) ?? null;
     if (form) {
       reasons.push(form.detail);
       if (form.formable === false) short = true;
       if (form.formable === null) undecided = true;
     }
+    if (primary == null && requirements.length > 0) {
+      reasons.push(`no operation with a capability on file makes a ${instance.featureType}${instance.variant ? ` (${instance.variant})` : ''}: its tolerances are not judged`);
+      undecided = true;
+    }
     for (const req of requirements) {
-      const h = processHolds(input.primaryProcess, req, instance.sizeMm, input.capability, input.iso);
+      if (primary == null) break;
+      const h = processHolds(primary, req, instance.sizeMm, input.capability, input.iso);
       reasons.push(`${h.detail} [${req.source}]`);
       if (h.held === false) short = true;
       if (h.held === null) undecided = true;
@@ -115,12 +138,14 @@ export function evaluateMachiningNeed(input: {
         }
       }
       // Finishing: requirements the last operation does not hold.
-      const after = forming?.capabilityProcess ?? input.primaryProcess;
-      const unmet = requirements.filter((r) => processHolds(after, r, instance.sizeMm, input.capability, input.iso).held !== true);
+      const after = forming?.capabilityProcess ?? primary;
+      const unmet = after == null ? [] : requirements.filter((r) => processHolds(after, r, instance.sizeMm, input.capability, input.iso).held !== true);
       if (unmet.length > 0) {
         for (const operation of machiningOperationsFor(instance.featureType)) {
           if (operation === forming?.operation) continue;
           const cap = linkOf.get(operation);
+          // The operation that already makes the feature is not a finishing step for it.
+          if (input.primaryProcessOf && cap && cap === after) continue;
           if (!cap) { rejected.push({ operation, reason: 'no capability process linked (operation_capability_process)' }); continue; }
           const checks = requirements.map((r) => processHolds(cap, r, instance.sizeMm, input.capability, input.iso));
           const fail = checks.find((c) => c.held !== true);
@@ -135,7 +160,12 @@ export function evaluateMachiningNeed(input: {
     return {
       featureKey: instance.key, label: instance.label, featureType: instance.featureType, faceIds: instance.faceIds,
       featureId: instance.featureId, occurrenceIndex: instance.occurrenceIndex,
-      verdict, reasons, requirements, forming, candidates, rejected,
+      verdict, primaryProcess: primary,
+      achieved: primary == null ? [] : achievedCategories(instance.featureType).flatMap((c) => {
+        const a = processAchieves(primary, c, instance.sizeMm, input.capability, input.iso);
+        return a ? [a] : [];
+      }),
+      reasons, requirements, forming, candidates, rejected,
     };
   });
   return { primaryProcess: input.primaryProcess, features, machiningRequired: features.some((f) => f.verdict === 'needs_machining') };

@@ -118,3 +118,37 @@ export function processHolds(
     ? { held: true, detail: `${req.category} ${req.value} mm at ${sizeMm} mm = IT${grade}; ${process} holds IT${row.best}` }
     : { held: false, detail: `${req.category} ${req.value} mm at ${sizeMm} mm = IT${grade}; ${process} best is IT${row.best}` };
 }
+
+/** What a process holds in one category on a feature of a given size: its finest and its coarsest, in the category's own unit. */
+export interface Achieved {
+  category: GtolCategory;
+  /** The finest and the coarsest value the process holds: +/- mm for a size tolerance, the zone width in mm for a geometric one, um for roughness, degrees for a bend angle. */
+  best: number;
+  worst: number;
+  unit: 'mm' | 'um' | 'deg';
+  /** The ISO 286 grades behind the values, when the capability is a grade; null for a literal one. */
+  grade: { best: number; worst: number } | null;
+}
+
+const unitOf = (category: GtolCategory): Achieved['unit'] =>
+  category === 'roughness' || category === 'roughnessRz' ? 'um' : category === 'bendAngleTolerance' ? 'deg' : 'mm';
+
+/**
+ * What `process` holds in `category` on a feature of nominal size sizeMm, from its capability row: a literal row as it is written, an IT row through ISO 286 at that
+ * size. null when the data cannot say (no row, no size to grade by, a size or a grade outside ISO 286).
+ */
+export function processAchieves(
+  process: string, category: GtolCategory, sizeMm: number | null, capability: readonly CapabilityRow[], iso: readonly IsoToleranceRow[],
+): Achieved | null {
+  const row = capability.find((c) => c.process === process && c.category === category);
+  if (!row) return null;
+  if (row.system === 'literal') return { category, best: row.best, worst: row.worst, unit: unitOf(category), grade: null };
+  if (sizeMm == null) return null;
+  const sizes = iso.find((r) => sizeMm > r.aboveMm && sizeMm <= r.upToMm) ?? (sizeMm === 0 ? iso[0] : undefined);
+  const bestUm = sizes?.umByGrade.get(Math.round(row.best));
+  const worstUm = sizes?.umByGrade.get(Math.round(row.worst));
+  if (bestUm == null || worstUm == null) return null;
+  // A size tolerance is written +/- half its band; a geometric tolerance is the zone width itself.
+  const value = (um: number) => (SYMMETRIC.has(category) ? um / 2000 : um / 1000);
+  return { category, best: value(bestUm), worst: value(worstUm), unit: 'mm', grade: { best: row.best, worst: row.worst } };
+}

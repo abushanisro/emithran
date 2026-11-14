@@ -65,3 +65,22 @@ describe('process capability (tblGtolProcessCapabilities)', () => {
     expect(r2.detail).toMatch(/size/);
   });
 });
+
+describe('what a process holds on a feature (processAchieves)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { processAchieves } = require('../../../../../modules/bom-items/costing/shared/tolerance/process-capability');
+  it('grades a drilled 4 mm hole by ISO 286: IT11 to IT15 at 3-6 mm is 75 to 480 um, written +/- half the band', () => {
+    expect(row('Drilling', 'diamTolerance')).toMatchObject({ 'Capability System': 'IT', 'Best Achievable': 11, 'Worst Achievable': 15 });
+    expect(processAchieves('Drilling', 'diamTolerance', 4, capability, iso)).toEqual({ category: 'diamTolerance', best: 0.0375, worst: 0.24, unit: 'mm', grade: { best: 11, worst: 15 } });
+  });
+  it('a geometric tolerance is the zone width, not half of it', () => {
+    expect(processAchieves('Drilling', 'positionTolerance', 4, capability, iso)).toMatchObject({ best: 0.075, worst: 0.48, unit: 'mm' });
+  });
+  it('a literal capability is given as written, in the category unit', () => {
+    expect(processAchieves('Drilling', 'roughness', null, capability, iso)).toEqual({ category: 'roughness', best: 1.6, worst: 6.3, unit: 'um', grade: null });
+  });
+  it('says nothing without a row, or without a size to grade by', () => {
+    expect(processAchieves('No Such Process', 'diamTolerance', 4, capability, iso)).toBeNull();
+    expect(processAchieves('Drilling', 'diamTolerance', null, capability, iso)).toBeNull();
+  });
+});

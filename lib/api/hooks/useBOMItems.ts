@@ -521,7 +521,7 @@ export interface DesignGuidance {
   thickness: { recommendedMinMm: number | null; recommendedMaxMm: number | null; partMinMm: number | null; partMaxMm: number | null; maxMinRatio: number | null; source: string | null; items: DesignGuidanceItem[] };
   moldTooling: { slides: number | null; lifters: number | null; cores: number | null; items: DesignGuidanceItem[] } | null;
   machining: { routing: string | null; scrapPct: number | null; machinedFeatures: number | null; items: DesignGuidanceItem[] } | null;
-  tolerances: { withTolerances: number | null; drivingMachining: number | null; drivingFinishing: number | null; items: DesignGuidanceItem[]; machiningItems: DesignGuidanceItem[]; finishingItems: DesignGuidanceItem[] };
+  tolerances: { withTolerances: number | null; drivingMachining: number | null; drivingFinishing: number | null; items: DesignGuidanceItem[]; machiningItems: DesignGuidanceItem[]; finishingItems: DesignGuidanceItem[]; heldByOperations: number | null; heldItems: DesignGuidanceItem[] };
   setups: { count: number | null; perpendicular: number | null; oblique: number | null; fewFeatureSetups: number | null; fewFeatureLimit: number; items: DesignGuidanceItem[] } | null;
   holesAndFillets: { holeDiametersMm: number[]; filletRadiiMm: number[]; nonStandardTools: number | null; holeItems: DesignGuidanceItem[]; filletItems: DesignGuidanceItem[]; nonStandardItems: DesignGuidanceItem[] } | null;
   notModelled: Partial<Record<string, string>>;

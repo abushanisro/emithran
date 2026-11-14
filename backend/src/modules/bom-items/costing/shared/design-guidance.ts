@@ -65,6 +65,9 @@ export interface DesignGuidance {
   tolerances: {
     withTolerances: number | null; drivingMachining: number | null; drivingFinishing: number | null;
     items: ReviewItem[]; machiningItems: ReviewItem[]; finishingItems: ReviewItem[];
+    /** The features whose operation has a capability on file, each with what that operation holds on it (size, form, finish). Null when that was not assessed. */
+    heldByOperations: number | null;
+    heldItems: ReviewItem[];
   };
   /** Null when the part has no machined features. */
   setups: { count: number | null; perpendicular: number | null; oblique: number | null; fewFeatureSetups: number | null; fewFeatureLimit: number; items: ReviewItem[] } | null;
@@ -122,8 +125,11 @@ export interface DesignGuidanceInput {
   routing: string[] | null;
   /** The applied material utilization (%); null when no cost is applied. */
   utilizationPct: number | null;
-  /** On a part whose primary process is not machining: the features that need machining after it; null when that was not assessed (why in the reason). */
-  secondaryMachining: { items: ReviewItem[]; finishingItems: ReviewItem[] } | null;
+  /**
+   * The features whose tolerances their process cannot hold: on a cast or molded part the ones machined after it, on a machined part the ones that need a finer
+   * operation than the one that makes them. Null when that was not assessed (why in the reason).
+   */
+  secondaryMachining: { items: ReviewItem[]; finishingItems: ReviewItem[]; heldItems: ReviewItem[] } | null;
   secondaryMachiningReason: string | null;
   /** The features carrying a tolerance requirement; null when they could not be read. */
   toleranced: ReviewItem[] | null;
@@ -232,11 +238,9 @@ export function buildDesignGuidance(input: DesignGuidanceInput): DesignGuidance 
   // ── Tolerances ─────────────────────────────────────────────────────────────────────────────────────────────────
   if (input.toleranced == null) notModelled.tolerances = 'The tolerance requirements of the features could not be read.';
   if (input.secondaryMachining == null) {
-    const why = input.machined
-      ? 'Every feature of a machined part is machined: a tolerance changes how it is finished, which the Validation checks under these panels report, not whether it is machined.'
-      : input.secondaryMachiningReason ?? 'Which tolerances the primary process cannot hold was not assessed.';
+    const why = input.secondaryMachiningReason ?? 'Which tolerances the operations cannot hold was not assessed.';
     notModelled.drivingMachining = why;
-    notModelled.drivingFinishing = input.machined ? 'Which tolerances need grinding or honing beyond the cutting operations is not modelled for machined parts.' : why;
+    notModelled.drivingFinishing = why;
   }
 
   // ── Machining setups: the directions the features are reached from, with the features in each ──────────────────
@@ -328,6 +332,8 @@ export function buildDesignGuidance(input: DesignGuidanceInput): DesignGuidance 
       drivingMachining: input.secondaryMachining ? input.secondaryMachining.items.length : null,
       drivingFinishing: input.secondaryMachining ? input.secondaryMachining.finishingItems.length : null,
       items: input.toleranced ?? [], machiningItems: input.secondaryMachining?.items ?? [], finishingItems: input.secondaryMachining?.finishingItems ?? [],
+      heldByOperations: input.secondaryMachining ? input.secondaryMachining.heldItems.length : null,
+      heldItems: input.secondaryMachining?.heldItems ?? [],
     },
     setups,
     holesAndFillets,

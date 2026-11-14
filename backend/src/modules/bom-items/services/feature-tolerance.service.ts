@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
+import { isMachiningFamily } from '../../../domain/part-family';
+import { machiningRouteFamilyOf, resolveCanonicalOperation } from '../costing/machining/process/canonical-operation';
 import { resolveGdtCallouts } from '../costing/shared/physics/gdt-callouts';
 import { CastingReferenceService, type CastabilityProcess } from '../costing/casting/casting-reference.service';
 import { holeCastability, holeProximityCastability, type HoleCastability } from '../costing/casting/casting-reference';
@@ -151,6 +153,24 @@ export class FeatureToleranceService {
     const tolerances = await this.get(id, accessToken);
     const family = item.feature_graph?.classification?.family ?? item.family_classification ?? 'unknown';
     const casting = castingProcessOfFamily(family);
+    if (isMachiningFamily(family)) {
+      // A machined part has no forming process to fall short: each feature is made by its own operation, and a tolerance finer than that operation holds calls for
+      // a finer one (reaming, boring, fine milling) or an abrasive one (grinding, honing).
+      const { reference, missing } = await this.toleranceReference.get();
+      if (!reference) return { assessed: false, reason: 'Tolerance reference data not staged.', missing, result: null, instances: [] };
+      const capabilityOf = new Map(reference.links.map((l) => [l.operation, l.capabilityProcess]));
+      const routeFamily = machiningRouteFamilyOf(family);
+      const result = evaluateMachiningNeed({
+        primaryProcess: 'Machining',
+        features: tolerances.instances,
+        ...reference,
+        primaryProcessOf: ({ instance }) => {
+          const operation = resolveCanonicalOperation(instance.featureType, instance.variant, routeFamily)?.split(' // ')[0];
+          return (operation && capabilityOf.get(operation)) || null;
+        },
+      });
+      return { assessed: true, reason: null, missing: [], result, instances: tolerances.instances.map((i) => i.instance) };
+    }
     if (!casting) {
       return { assessed: false, reason: `No primary-process capability assessment for family ${family} yet.`, missing: [], result: null, instances: [] };
     }
