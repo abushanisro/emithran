@@ -83,6 +83,13 @@ describe('machiningCostDrivers', () => {
     expect(value('Planar faces to finish')).toBe('1 face, 120 mm²');
   });
 
+  it('an open step does not set the narrowest pocket or the reach: its width does not limit the cutter', () => {
+    const step = feat('s', 'PocketV2', 'default', [{ extents_mm: [45, 0.8, 0], depth_mm: 20, width_confined: false }]);
+    const withStep = machiningCostDrivers([pocket, step]);
+    expect(withStep.find((d) => d.name === 'Narrowest pocket')?.value).toBe('2 mm');
+    expect(withStep.find((d) => d.name === 'Deepest pocket')?.value).toBe('20 mm');
+  });
+
   it('leaves out a driver the part does not have, and every driver says why it matters', () => {
     expect(value('Free-form surface')).toBeUndefined();
     expect(value('Rounded edges')).toBeUndefined();

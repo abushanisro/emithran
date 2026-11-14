@@ -196,20 +196,22 @@ export function evaluateMachiningDfm(features: readonly unknown[] | null | undef
   });
 
   // ── Pockets, slots and keyways ─────────────────────────────────────────────
-  // A pocket's floor is its two largest extents; its depth the removed volume over that floor. A slot or keyway reports its own.
+  // A pocket's floor is its two largest extents; its depth the measured depth_mm (an analysis from before that measurement:
+  // the removed volume over the floor). Its width limits the cutter only where walls stand on both sides of it
+  // (width_confined): an open step, or a rib top that runs into a wall, is cut with any cutter and is not judged here.
   const size = (o: Record<string, unknown>) => {
     const [lengthMm, widthMm] = (Array.isArray(o.extents_mm) ? (o.extents_mm as unknown[]).map(num) : []).filter((v): v is number => v != null).sort((a, b) => b - a);
     const width = num(o.width_mm) ?? widthMm ?? null;
     const removed = num(o.material_removed_mm3);
     const depth = num(o.depth_mm) ?? (removed && lengthMm && widthMm ? removed / (lengthMm * widthMm) : null);
-    return { width, depth };
+    return o.width_confined === false ? { width: null, depth: null } : { width, depth };
   };
   const MILLED = ['PocketV2', 'Slot', 'Keyway'];
   const notGroove = (f: Feature) => f.variant !== 'groove';
   check({
     rule: 'ToolReach', name: 'Pocket and slot depth to width (cutter reach)', unit: ' : 1', worst: 'highest',
     source: 'variables: easyL2DRatio, maxMillingLToDRatio, difficultL2DRatio',
-    what: 'pockets or slots are deep for their width', nothing: 'The part has no pocket or slot with a measured width and depth.',
+    what: 'pockets or slots are deep for their width', nothing: 'The part has no pocket or slot walled on both sides with a measured width and depth.',
     recommendation: 'Widen the feature or make it shallower. The cutter can be no wider than the feature, so its reach over its diameter is at least this ratio; a long thin cutter deflects and is run slowly.',
     judged: instances(MILLED, (f, o) => { const s = size(o); return notGroove(f) && s.width && s.depth ? s.depth / s.width : null; }),
     levels: [
@@ -221,7 +223,7 @@ export function evaluateMachiningDfm(features: readonly unknown[] | null | undef
   check({
     rule: 'NarrowMilledFeature', name: 'Pocket and slot width (smallest cutter)', unit: ' mm', worst: 'lowest',
     source: 'variables: imposedLowerToolDiameterLimitForMilling; tblOperationSizeRanges: Groove Milling, keyseat mill width',
-    what: 'pockets or slots are narrower than the smallest standard cutter', nothing: 'The part has no pocket or slot with a measured width.',
+    what: 'pockets or slots are narrower than the smallest standard cutter', nothing: 'The part has no pocket or slot walled on both sides with a measured width.',
     recommendation: 'Widen the feature. A cutter this small is fragile, slow, and a special tool.',
     judged: instances(MILLED, (f, o) => (notGroove(f) ? size(o).width : null)),
     levels: [

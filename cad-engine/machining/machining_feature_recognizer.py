@@ -558,7 +558,8 @@ class MachiningFeatureRecognizer:
         # represented as 4 quarter-circle patches would inflate hole counts 4×.
         cylinders = _deduplicate_cylinders(raw_cylinders)
         cones = self._collect_cones(shape)
-        prismatic = self._collect_prismatic_pockets(shape, datum_axis, bbox)
+        hole_bottoms: set = set()
+        prismatic = self._collect_prismatic_pockets(shape, datum_axis, bbox, hole_bottoms)
         # Reuse the same toroid detector the turned path already uses (Phase 0
         # coverage fix) — fillets/grooves are real, common features on milled
         # parts too (edge blends, corner radii); this detector is orientation-
@@ -791,6 +792,8 @@ class MachiningFeatureRecognizer:
         claimed_face_ids: set = set()
         for f in features:
             claimed_face_ids.update(f.face_ids)
+        # The flat bottom of a hole is made by the drill or counterbore that makes the hole: not a face to finish.
+        claimed_face_ids.update(hole_bottoms)
 
         # ── Cutout rings (Phase 5) — non-circular through-openings (11 real
         # catalog rows). Runs BEFORE general face classification so a real
@@ -1031,10 +1034,14 @@ class MachiningFeatureRecognizer:
         shape,
         main_axis: Tuple[float, float, float],
         bbox: Optional[Dict] = None,
+        hole_bottoms: Optional[set] = None,
     ) -> List[Dict]:
         """
-        Detects enclosed planar-walled recesses for slot / keyway / pocket classification.
-        Phase 1: uses face-count heuristics. Phase 2 will use full wire topology.
+        The floors of the part's recesses, for slot / keyway / pocket classification: planar faces that
+        face along main_axis and have a wall rising from them (recessed_floor.py). The flat top of a rib or
+        a boss is not a floor, and the flat bottom of a hole belongs to the hole. Each floor carries
+        dims = [depth, width, length]: the height of its tallest wall and the two sides of the floor itself.
+        The face ordinals of hole bottoms are added to `hole_bottoms` when the caller passes a set.
 
         Structural-face exclusion (fixed 2026-09-19, real confirmed bug): a face
         whose normal is parallel to main_axis (dot > 0.85) is kept as a pocket-
@@ -1057,8 +1064,13 @@ class MachiningFeatureRecognizer:
         from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
         from OCC.Core.Bnd import Bnd_Box  # type: ignore
 
+        from OCC.Core.TopoDS import topods  # type: ignore
+        from shared.feature_extent import faces_extents_mm
+        from .recessed_floor import RecessedFloors
+
         ax, ay, az = main_axis
         axis_lo, axis_hi = _axis_range(bbox, (ax, ay, az)) if bbox is not None else (None, None)
+        floors = RecessedFloors(shape)
         pockets = []
         face_idx = 0
         exp = TopExp_Explorer(shape, TopAbs_FACE)
@@ -1077,8 +1089,6 @@ class MachiningFeatureRecognizer:
                     fbox = Bnd_Box()
                     brepbndlib.Add(face, fbox)
                     xmin, ymin, zmin, xmax, ymax, zmax = fbox.Get()
-                    dx, dy, dz = xmax - xmin, ymax - ymin, zmax - zmin
-                    dims = sorted([dx, dy, dz])
                     cx = (xmin + xmax) / 2
                     cy = (ymin + ymax) / 2
                     cz = (zmin + zmax) / 2
@@ -1091,12 +1101,20 @@ class MachiningFeatureRecognizer:
                             face_idx += 1
                             exp.Next()
                             continue
-                    pockets.append({
-                        "normal": (nx, ny, nz),
-                        "dims": dims,
-                        "centroid": (cx, cy, cz),
-                        "face_indices": [face_idx],  # OCC face ordinal — matches face_map in memory_optimizer
-                    })
+                    floor = floors.measure(topods.Face(face))
+                    if floor and floor["hole_bottom"] and hole_bottoms is not None:
+                        hole_bottoms.add(face_idx)
+                    sides = faces_extents_mm([topods.Face(face)]) if floor and floor["recessed"] and not floor["hole_bottom"] else None
+                    if sides:
+                        pockets.append({
+                            "normal": (nx, ny, nz),
+                            "dims": [floor["depth_mm"], sides[1], sides[0]],
+                            "area_mm2": floor["area_mm2"],
+                            "walled_fraction": floor["walled_fraction"],
+                            "width_confined": floor["width_confined"],
+                            "centroid": (cx, cy, cz),
+                            "face_indices": [face_idx],  # OCC face ordinal — matches face_map in memory_optimizer
+                        })
             face_idx += 1  # increment for EVERY face, not just planes
             exp.Next()
         return pockets
@@ -1294,15 +1312,18 @@ def _deduplicate_cylinders(raw: List[Dict]) -> List[Dict]:
 
 def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> Tuple[MachiningFeatureType, str, Dict]:
     """
-    Classify a planar floor face into (type, variant, params):
+    Classify a recess floor into (type, variant, params); dims are [depth, width, length].
 
-    Keyway        : elongated, floor normal parallel to the datum axis
-    Slot/straight : elongated otherwise
-    PocketV2      : default -- enclosed planar recess
+    Keyway        : elongated channel (walls on both sides of its width), floor normal parallel to the datum axis
+    Slot/straight : elongated channel otherwise
+    PocketV2      : default -- a pocket, or an open step (a floor with a wall on one side, whatever its proportions)
     """
     dims = pocket["dims"]
     short, mid, long = dims[0], dims[1], dims[2]
-    aspect = long / max(mid, 0.1)
+    # A floor measured from the shape says whether walls stand on both sides of it; an open step is not a channel.
+    aspect = long / max(mid, 0.1) if pocket.get("width_confined", True) else 0.0
+    measured = {k: (round(v, 3) if isinstance(v, float) else v) for k in ("area_mm2", "walled_fraction", "width_confined")
+                if (v := pocket.get(k)) is not None}
 
     nx, ny, nz = pocket["normal"]
     ax, ay, az = main_axis
@@ -1324,6 +1345,7 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
             "centroid": centroid,
+            **measured,
         }
 
     if aspect > 2.5:
@@ -1332,6 +1354,7 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
             "centroid": centroid,
+            **measured,
         }
 
     return "PocketV2", "default", {
@@ -1339,6 +1362,7 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
         "width_mm": round(mid, 3),
         "depth_mm": round(short, 3),
         "centroid": centroid,
+        **measured,
     }
 
 
@@ -1641,6 +1665,11 @@ def build_machining_feature_graph_v2(
             area = p.get("area_mm2")  # an obround slot states its own area; a rectangle is length x width
             removed = (area * dims[0]) if area else dims[2] * dims[1] * dims[0]
             entry = {**base, "material_removed_mm3": round(removed, 2)}
+            if p.get("walled_fraction") is not None:
+                # Measured from the shape: the recess's depth, and how far its floor is walled in.
+                entry["depth_mm"] = dims[0]
+                entry["walled_fraction"] = p["walled_fraction"]
+                entry["width_confined"] = p.get("width_confined")
             if ftype == "Keyway":
                 for fld in _KEYWAY_DIM_FIELDS:
                     entry[fld] = p.get(fld)
@@ -1726,6 +1755,10 @@ def build_machining_feature_graph_v2(
                 occ_entry["area_mm2"] = occ["area_mm2"]
                 if ftype == "Cutout":
                     occ_entry["side_count"] = occ["side_count"]
+            if shape == _VOLUMETRIC and occ.get("walled_fraction") is not None:
+                occ_entry["depth_mm"] = round(depth, 3)
+                occ_entry["walled_fraction"] = occ["walled_fraction"]
+                occ_entry["width_confined"] = occ["width_confined"]
             if ftype == "Keyway":
                 for fld in _KEYWAY_DIM_FIELDS:
                     val = occ.get(fld)

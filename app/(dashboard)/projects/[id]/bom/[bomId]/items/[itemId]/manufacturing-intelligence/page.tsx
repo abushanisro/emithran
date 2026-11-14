@@ -91,7 +91,7 @@ import { PlasticDfmFindings } from '@/components/features/manufacturing-intellig
 import { isSupersededPlasticCheck, isSupersededPlasticWarning, plasticDfmReadiness } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, type PlasticDfmView, usePlasticDfm } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, type PlasticDfmView, usePlasticDfm, useMachiningDfm } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -7070,6 +7070,9 @@ function ValidationTab({
   const v2FeaturesForDcc = fg?.feature_graph_v2?.features ?? [];
   // A machined part's design-for-machining checks are listed with the DFM checks below.
   const machinedFeatures = isMachiningTreeFamily(item.familyClassification ?? fg?.classification.family ?? '') ? v2FeaturesForDcc : [];
+  // The same request MachiningDfmCheckRows makes (deduped): its checks are counted in the section heading.
+  const { data: machiningDfm } = useMachiningDfm(item.id, machinedFeatures.length > 0);
+  const machiningCheckCount = machiningDfm?.result?.checks.length ?? 0;
   const resolveDccHighlight = (ids: string[] | undefined): FeatureNodeV2 | null => {
     if (!ids?.length) return null;
     const idSet = new Set(ids);
@@ -7351,7 +7354,7 @@ function ValidationTab({
           <div className="flex items-center gap-1.5 mb-1.5">
             <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              DFM Checks ({checks.length})
+              DFM Checks ({checks.length + machiningCheckCount})
             </span>
           </div>
           {machinedFeatures.length > 0 ? (

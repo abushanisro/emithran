@@ -74,10 +74,11 @@ describe('detectDrawingCadMismatches', () => {
     expect(onlyCad.status).toBe('cad_only');
   });
 
-  it('reports match (not a fabricated mismatch) when a fact is absent from both sources', () => {
-    const r = find(detectDrawingCadMismatches(bothEmpty, cadEmpty), 'bendCount');
-    expect(r.status).toBe('match');
-    expect(r.severity).toBe('info');
+  it('a fact absent from both sources has no row: neither a fabricated mismatch nor an agreement on nothing', () => {
+    expect(detectDrawingCadMismatches(bothEmpty, cadEmpty)).toEqual([]);
+    // A machined part: bends and sheet thickness are in neither source, threads only in the model.
+    const facts = detectDrawingCadMismatches(bothEmpty, { ...cadEmpty, threadCount: 8 }).map((r) => r.fact);
+    expect(facts).toEqual(['threadCount']);
   });
 
   it('sheet metal has no CAD thread count (synthesized from the drawing itself, comparing it would be circular) — drawing_only, never a fabricated check', () => {

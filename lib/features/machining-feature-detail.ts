@@ -32,6 +32,8 @@ export interface FeatureInstance {
   cornerRadiusMm?: number;
   /** The thinnest material behind the instance's faces. */
   minWallMm?: number;
+  /** False where walls do not stand on both sides of the floor's width (an open step): its width does not limit the cutter. */
+  widthConfined?: boolean;
   /** The direction the tool approaches from; "either way" appended when both ends are open. */
   toolAxis?: string;
   thread?: string;
@@ -71,6 +73,7 @@ export function featureInstances(features: readonly FeatureNodeV2[]): FeatureIns
         removedMm3,
         cornerRadiusMm: typeof o.corner_radius_mm === 'number' && o.corner_radius_mm >= 0 ? o.corner_radius_mm : undefined,
         minWallMm: positive(o.min_wall_mm),
+        widthConfined: typeof o.width_confined === 'boolean' ? o.width_confined : undefined,
         toolAxis: Array.isArray(o.tool_axis) && o.tool_axis.length === 3
           ? `${(o.tool_axis as number[]).map((c) => Number(c.toFixed(2))).join(', ')}${o.tool_axis_bidirectional === true ? ' (either way)' : ''}`
           : undefined,
@@ -137,9 +140,11 @@ export function machiningCostDrivers(features: readonly FeatureNodeV2[]): CostDr
   add('Material removal', 'Pockets', pockets.length ? `${pockets.length}` : undefined, 'Each is roughed, then its floor and walls are finished.');
   const deepest = max(pockets, (r) => r.depthMm);
   add('Material removal', 'Deepest pocket', deepest ? `${round(deepest)} mm` : undefined, 'Depth sets the wall area to finish and the reach of the cutter.');
-  const narrowest = min(pockets, (r) => r.widthMm);
+  // Width limits the cutter only where walls stand on both sides of the floor (an analysis from before that measurement: every pocket).
+  const confined = pockets.filter((r) => r.widthConfined !== false);
+  const narrowest = min(confined, (r) => r.widthMm);
   add('Material removal', 'Narrowest pocket', narrowest ? `${round(narrowest, 2)} mm` : undefined, 'The cutter can be no wider than this; a small cutter feeds slowly.');
-  const reach = max(pockets, (r) => (r.depthMm && r.widthMm ? r.depthMm / r.widthMm : undefined));
+  const reach = max(confined, (r) => (r.depthMm && r.widthMm ? r.depthMm / r.widthMm : undefined));
   add('Material removal', 'Highest pocket depth to width', reach ? `${round(reach)} : 1` : undefined, 'Above about 4 : 1 a pocket needs long-reach tooling or another process.');
 
   const holes = [...of('SimpleHole'), ...of('MultiStepHole')];

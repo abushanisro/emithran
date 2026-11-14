@@ -53,12 +53,11 @@ function buildNumeric(args: {
   drawing: number | null; cad: number | null;
   compare: (drawing: number, cad: number) => boolean;
   unit: string; v2FeatureIds?: string[];
-}): FactMismatch {
+}): FactMismatch | null {
   const { fact, label, severity, drawing, cad, compare, unit, v2FeatureIds } = args;
   const fmt = (v: number) => `${v} ${unit}`;
-  if (drawing == null && cad == null) {
-    return { fact, label, drawingValue: '—', cadValue: '—', status: 'match', severity: 'info', message: `${label}: not present in either source.` };
-  }
+  // A fact neither source carries (bends on a machined part) is not an agreement: there is nothing to compare, so no row.
+  if (drawing == null && cad == null) return null;
   if (drawing == null) {
     return { fact, label, drawingValue: '—', cadValue: fmt(cad!), status: 'cad_only', severity: 'info', message: `${label}: only the 3D model has this (${fmt(cad!)}) — the drawing carries no value.` };
   }
@@ -95,7 +94,7 @@ export interface CadFacts {
 }
 
 export function detectDrawingCadMismatches(drawing: DrawingFacts, cad: CadFacts): FactMismatch[] {
-  const results: FactMismatch[] = [];
+  const results: (FactMismatch | null)[] = [];
 
   results.push(buildNumeric({
     fact: 'bendCount', label: 'Bend count', severity: 'critical',
@@ -128,7 +127,7 @@ export function detectDrawingCadMismatches(drawing: DrawingFacts, cad: CadFacts)
   // axis labeling, not a real difference in the part.
   const dLabel = 'Overall dimensions';
   if (drawing.dimensionsMm == null && cad.dimensionsMm == null) {
-    results.push({ fact: 'dimensionsMm', label: dLabel, drawingValue: '—', cadValue: '—', status: 'match', severity: 'info', message: `${dLabel}: not present in either source.` });
+    // Nothing to compare: no row.
   } else if (drawing.dimensionsMm == null) {
     const c = [...cad.dimensionsMm!].sort((a, b) => a - b);
     results.push({ fact: 'dimensionsMm', label: dLabel, drawingValue: '—', cadValue: c.join(' × '), status: 'cad_only', severity: 'info', message: `${dLabel}: only the 3D model has this (${c.join(' × ')} mm).` });
@@ -150,5 +149,5 @@ export function detectDrawingCadMismatches(drawing: DrawingFacts, cad: CadFacts)
     });
   }
 
-  return results;
+  return results.filter((r): r is FactMismatch => r !== null);
 }

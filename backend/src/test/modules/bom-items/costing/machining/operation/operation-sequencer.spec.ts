@@ -669,6 +669,15 @@ describe('finishing is a tool path at the cutter feed (tblMillingFinishing), not
     expect(finish[1]!.timeSec).toBeCloseTo(((30 * 4 + 20 * 4) / (4 * 0.5) + 2 * 2 * 4) / narrowFeed * 60, 6);
   });
 
+  it('an open step narrower than the cutter is finished with the standard cutter: its floor, and its one wall at the measured depth', () => {
+    // 45 x 6 step, 4 deep, walled along one long side (45 of its 102 boundary): nothing confines the cutter to 6 mm.
+    const step = { extents_mm: [45, 6, 0], material_removed_mm3: 1, depth_mm: 4, walled_fraction: 45 / 102, width_confined: false };
+    const finish = finishOf(pockets(step));
+    expect(finish).toHaveLength(1);
+    const path = (45 * 6) / (10 * 0.5) + (45 * 4) / (10 * 1) + 1 * 2 * 10;
+    expect(finish[0]!.timeSec).toBeCloseTo(path / feed * 60, 6);
+  });
+
   it('a small cutter is held to the spindle speed limit, so it feeds slower', () => {
     const [finish] = finishOf(pockets(pocketOf(20, 1, 1)));
     // Ø1 would need 24192 rpm; the calculator's limit is 10000.
