@@ -1,0 +1,7 @@
+operation,parameter,value,unit,applicability,confidence,source_name,source_url,source_checked,review_required,retrieved,notes
+weight_check,time_per_check,10,s,manual weighing,engineering_estimate,Costing engineer recommendation,,false,true,2026-11-14,"Validate against the production control plan."
+weight_check,sampling_interval,1000,parts per check,periodic sampling,engineering_estimate,Costing engineer recommendation,,false,true,2026-11-14,"First-piece and 100 % weighing are separate configurations."
+weight_check,operator,press operator,,routine process check,engineering_estimate,Costing engineer recommendation,,false,true,2026-11-14,"Independent QC inspection is a separate operation."
+weight_check,scale_hourly_rate,,USD/h,,unresolved,,,false,true,2026-11-14,"Example equipment: OHAUS Defender 30 kg platform scale, public listing INR 1,17,999 (verify quote). The rate needs the service life and annual utilisation."
+visual_inspection,time_per_area,5,min/m2,part surface,source_backed,memory/Secondary process/variables_inherited.csv: visualInspectTimeStandard,,true,false,2026-11-14,"Staged reference data (2026-Secondary)."
+visual_inspection,percent_tested,100,%,,source_backed,memory/Secondary process/variables_inherited.csv: defaultPercentToBeTested,,true,false,2026-11-14,
