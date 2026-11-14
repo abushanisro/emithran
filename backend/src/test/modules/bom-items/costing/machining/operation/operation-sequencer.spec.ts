@@ -8,13 +8,21 @@
  */
 
 import {
-  buildOperationSequence,
+  buildOperationSequence as buildWith,
   totalCycleTimeSec,
   injectDrawingIntelligence,
   type OperationLine,
 } from '../../../../../../modules/bom-items/costing/machining/operation/operation-sequencer';
 import { specAsCalculators } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculator-spec';
 import { realDrillingTable, realTappingTable } from '../real-reference-tables';
+
+// Every operation is timed by its stored calculator, so the sequencer is always given them (as production does):
+// the calculators of the spec unless a test passes its own.
+const buildOperationSequence = (...args: Parameters<typeof buildWith>): OperationLine[] => {
+  const a = [...args] as Parameters<typeof buildWith>;
+  if (a[8] === undefined) a[8] = specAsCalculators();
+  return buildWith(...a);
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -163,8 +171,9 @@ describe('buildOperationSequence', () => {
   });
 
   it('generates real, distinct Filleting/Groove Milling ops for fillet and groove features (Phase 0 coverage fix; Phase 4b real-name split)', () => {
-    const filletOps = buildOperationSequence([toroidFeature('fillet', 2, 30)], 'aluminum');
-    const grooveOps = buildOperationSequence([toroidFeature('groove', 1, 18)], 'aluminum');
+    // 13.7 mm/s: an edge speed, as tblCornerRoundingMill gives one for the material.
+    const filletOps = buildOperationSequence([toroidFeature('fillet', 2, 30)], 'aluminum', 1.0, null, null, null, 13.7);
+    const grooveOps = buildOperationSequence([toroidFeature('groove', 1, 18)], 'aluminum', 1.0, null, null, null, 13.7);
 
     // fillet and groove used to share one invented "Corner Round" name;
     // the real catalog treats them as two different real operations
@@ -432,10 +441,18 @@ describe('Counterbore — real tblCounterboring physics vs the previous flat fal
 const CHAMFER_LINEAR_SPEED = 10.7; // real tblChamfering value, material_cut_code "1.0"
 
 describe('Chamfer — real tblChamfering physics vs the previous flat fallback', () => {
-  it('falls back to the flat constant when no real linear speed is provided', () => {
+  it('a sized chamfer with no edge speed for the material is a named gap, not a flat time', () => {
     const ops = buildOperationSequence([{ feature_type: 'Edge', variant: 'chamfer', diameter_mm: 10, occurrences: [{}] }], 'aluminum');
     const chamfer = ops.find((o) => o.name === 'Chamfering')!;
-    expect(chamfer.timeSec).toBeCloseTo(5, 3); // count(1) * 5
+    expect(chamfer.timeSec).toBe(0);
+    expect(chamfer.missing).toContain('Edge Speed');
+  });
+
+  it('a chamfer with no CAD size takes the calculator\'s time per unsized edge (5 s), and needs no edge speed', () => {
+    const ops = buildOperationSequence([{ feature_type: 'Edge', variant: 'chamfer', diameter_mm: 0, occurrences: [{}, {}] }], 'aluminum');
+    const chamfer = ops.find((o) => o.name === 'Chamfering')!;
+    expect(chamfer.timeSec).toBeCloseTo(10, 3);
+    expect(chamfer.missing).toBeUndefined();
   });
 
   it('uses real diameter-derived edge length / real linear speed when provided', () => {
@@ -463,10 +480,11 @@ describe('Chamfer — real tblChamfering physics vs the previous flat fallback',
 const ROUNDING_LINEAR_SPEED = 5.4; // real tblCornerRoundingMill value, material_cut_code "1.0"
 
 describe('Corner Rounding (Filleting/Groove Milling) — real tblCornerRoundingMill physics vs the previous flat fallback (Phase 1, 2026-09-19)', () => {
-  it('falls back to the flat constant when no real linear speed is provided', () => {
+  it('a sized fillet with no edge speed for the material is a named gap, not a flat time', () => {
     const ops = buildOperationSequence([toroidFeature('fillet', 1, 30)], 'aluminum');
     const fillet = ops.find((o) => o.name === 'Filleting')!;
-    expect(fillet.timeSec).toBeCloseTo(8, 3); // count(1) * 8
+    expect(fillet.timeSec).toBe(0);
+    expect(fillet.missing).toContain('Edge Speed');
   });
 
   it('uses real diameter-derived edge length / real linear speed when provided', () => {
@@ -559,5 +577,35 @@ describe('OperationLine.featureIds', () => {
   it('leaves fixed ops (not tied to one feature) without feature ids', () => {
     const ops = buildOperationSequence([{ ...tappedHoleFeature(1), id: 'x' }], 'mild_steel');
     expect(ops.find((o) => o.source === 'fixed')?.featureIds).toBeUndefined();
+  });
+});
+
+describe('every milling operation is timed by its stored calculator', () => {
+  const pocket = [{ feature_type: 'PocketV2', variant: 'default', diameter_mm: 0, occurrences: [{ material_removed_mm3: 6000 }, { material_removed_mm3: 6000 }] }];
+
+  it('rough milling: the removed volume at the removal rate, 80 % roughed and 20 % at 0.4 of the rate', () => {
+    const rough = buildOperationSequence(pocket, 'mild_steel').find((o) => o.name === 'Rough Milling')!;
+    expect(rough.timeSec).toBeCloseTo((12000 * 0.8 / 12000 + 12000 * 0.2 / (12000 * 0.4)) * 60, 6);
+    expect(rough.trace!.map((st) => st.fieldName)).toEqual(expect.arrayContaining(['Removed Volume', 'Material Removal Rate', 'Roughing Share', 'Cycle Time']));
+  });
+
+  it('pocket finishing is one operation at the calculator\'s time per pocket (55 s)', () => {
+    const finish = buildOperationSequence(pocket, 'mild_steel').filter((o) => o.name === 'Fine Finish Milling');
+    expect(finish).toHaveLength(1);
+    expect(finish[0]!.timeSec).toBeCloseTo(110, 6);
+  });
+
+  it('facing and centre drilling read their times from the calculator, not from this file', () => {
+    const hole = [{ feature_type: 'SimpleHole', variant: 'through', diameter_mm: 6, occurrences: [{ depth_mm: 10 }, { depth_mm: 10 }] }];
+    const ops = buildOperationSequence(hole, 'mild_steel', 1.0, 'AISI 1018', null, null, null, realDrillingTable());
+    expect(ops.find((o) => o.name === 'Facing')!.timeSec).toBe(45);
+    expect(ops.find((o) => o.name === 'Center Drilling')!.timeSec).toBe(10);
+  });
+
+  it('with no calculators an operation is a named gap, never a number', () => {
+    const ops = buildWith(pocket, 'mild_steel', 1.0, null, null, null, null, null, {});
+    const rough = ops.find((o) => o.name === 'Rough Milling')!;
+    expect(rough.timeSec).toBe(0);
+    expect(rough.missing).toContain('none mapped');
   });
 });

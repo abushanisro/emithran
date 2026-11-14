@@ -138,7 +138,7 @@ export interface MachiningCostInput {
   machinabilityRating?: number;
   // Feature volumes from feature_graph_v2 — enables per-feature cycle time instead
   // of (billetVol − partVol) / MRR. When absent, falls back to the bbox formula.
-  featureOps?: Array<{ name: string; timeSec: number; source: string; /** feature_graph_v2 ids of the features the operation is performed on. */ featureIds?: string[] }>;
+  featureOps?: Array<{ name: string; timeSec: number; source: string; /** feature_graph_v2 ids of the features the operation is performed on. */ featureIds?: string[]; /** The steps of the calculator that timed the operation. */ trace?: CalculationTraceStep[] }>;
   // The drawing callout costed by the reference surface-treatment engine
   // (BomItemsService.resolveSurfaceTreatmentDbRate). Null = the callout names no
   // reference process: no line, a warning.
@@ -1553,7 +1553,11 @@ export function computeMillingCostSummary(
       input.processIdentityByMachineClass, setupDisclosure,
     );
     if (millRun?.missing.length) warnings.push(`${millLine.process} not priced — missing real input: ${millRun.missing.join('; ')}.`);
-    processLines.push(millRun ? withRun(millLine, millRun) : millLine);
+    // The line's own steps (the operation groups), then each sequenced operation's calculator steps under its name.
+    const operationSteps = (input.featureOps ?? [])
+      .filter((o) => !MILLING_DOUBLE_BILLED_ELSEWHERE.has(o.name))
+      .flatMap((o) => prefixTrace(`${o.name} ·`, o.trace ?? []));
+    processLines.push(millRun ? withRun(millLine, millRun, operationSteps) : millLine);
   }
   if (cncMillingMin <= 0) {
     warnings.push('Volume data unavailable — milling time estimated at 0');

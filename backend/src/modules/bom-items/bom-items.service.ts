@@ -61,7 +61,7 @@ import { loadMachiningCalculatorSpec } from './costing/machining/calculators/mac
 import { specLookupSeeds, type KeywayBroachReference, type LookupSeeds } from './costing/machining/calculators/machining-lookup-seeds';
 
 /** Lookup tables read by the generic spec resolver (specLookupSeeds), not by a resolver of their own. */
-const SPEC_RESOLVED_TABLES: ReadonlySet<string> = new Set(['tblRotarySurfaceGrinding', 'tblStraightBevelGearCutting', 'tblSpiralBevelGearCutting', 'tblShaping']);
+const SPEC_RESOLVED_TABLES: ReadonlySet<string> = new Set(['tblRotarySurfaceGrinding', 'tblStraightBevelGearCutting', 'tblSpiralBevelGearCutting', 'tblShaping', 'tblChamfering', 'tblCornerRoundingMill']);
 import { chemicalMillingCallout, splitChemicallyMilledPockets } from './costing/chemical-milling/chemical-milling-engine';
 import { resolveGearRoute } from './costing/machining/operation/gear-routing';
 import { polygonCallout, resolvePolygons, splitPolygonPockets } from './costing/machining/operation/polygon-routing';

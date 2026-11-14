@@ -924,8 +924,8 @@ describe('Fix 4 — machinabilityRating: scales MRR in both engines', () => {
       { feature_type: 'PocketV2', variant: 'default', diameter_mm: 0,
         occurrences: [{ depth_mm: 12, material_removed_mm3: 15_000 }] },
     ];
-    const alOps = buildOperationSequence(fgv2, 'aluminum', 2.0);
-    const steelOps = buildOperationSequence(fgv2, 'mild_steel', 1.0);
+    const alOps = buildOperationSequence(fgv2, 'aluminum', 2.0, null, null, null, null, null, CALCS);
+    const steelOps = buildOperationSequence(fgv2, 'mild_steel', 1.0, null, null, null, null, null, CALCS);
     const alTime = alOps.find((o) => o.name === 'Rough Milling')!.timeSec;
     const steelTime = steelOps.find((o) => o.name === 'Rough Milling')!.timeSec;
     expect(alTime).toBeLessThan(steelTime);

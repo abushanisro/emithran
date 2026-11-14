@@ -2188,6 +2188,320 @@
           "formula": "{Cut Length} * {Passes} / {Feed Rate} * 60"
         }
       ]
+    },
+    {
+      "name": "Machining - Facing",
+      "operation": "Facing",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Facing the stock square before any feature is cut: one facing pass per part.",
+      "fields": [
+        {
+          "name": "Facing Time",
+          "unit": "s",
+          "source": "default",
+          "default": 45
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Facing Time}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Rough Milling",
+      "operation": "Rough Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Milling a feature's volume out (a pocket, a slot, a milled keyway): the CAD removed volume at the material removal rate of the material, most of it roughed and the rest taken at the slower finishing rate.",
+      "fields": [
+        {
+          "name": "Removed Volume",
+          "unit": "mm^3",
+          "source": "cad"
+        },
+        {
+          "name": "Material Removal Rate",
+          "unit": "mm^3/min",
+          "source": "engine"
+        },
+        {
+          "name": "Roughing Share",
+          "unit": null,
+          "source": "default",
+          "default": 0.8
+        },
+        {
+          "name": "Finishing Rate Factor",
+          "unit": null,
+          "source": "default",
+          "default": 0.4
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Removed Volume} * {Roughing Share} / {Material Removal Rate} + {Removed Volume} * (1 - {Roughing Share}) / ({Material Removal Rate} * {Finishing Rate Factor})) * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Bulk Milling",
+      "operation": "Bulk Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Milling away the volume of a feature that has no operation of its own: the same removal model as rough milling.",
+      "sameFieldsAs": "Machining - Rough Milling"
+    },
+    {
+      "name": "Machining - Fine Finish Milling",
+      "operation": "Fine Finish Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Finishing milled surfaces: a planar face's CAD area taken to the finish depth at the material removal rate, and each pocket's floor and wall finishing passes.",
+      "fields": [
+        {
+          "name": "Finish Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Finish Depth",
+          "unit": "mm",
+          "source": "default",
+          "default": 0.5
+        },
+        {
+          "name": "Pockets",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Finish Time per Pocket",
+          "unit": "s",
+          "source": "default",
+          "default": 55
+        },
+        {
+          "name": "Material Removal Rate",
+          "unit": "mm^3/min",
+          "source": "engine"
+        },
+        {
+          "name": "Roughing Share",
+          "unit": null,
+          "source": "default",
+          "default": 0.8
+        },
+        {
+          "name": "Finishing Rate Factor",
+          "unit": null,
+          "source": "default",
+          "default": 0.4
+        },
+        {
+          "name": "Finish Volume",
+          "unit": "mm^3",
+          "formula": "{Finish Area} * {Finish Depth}"
+        },
+        {
+          "name": "Area Time",
+          "unit": "s",
+          "formula": "({Finish Volume} * {Roughing Share} / {Material Removal Rate} + {Finish Volume} * (1 - {Roughing Share}) / ({Material Removal Rate} * {Finishing Rate Factor})) * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Area Time} + {Pockets} * {Finish Time per Pocket}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Contouring",
+      "operation": "Contouring",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Contouring curved walls and surfaces: their CAD area taken to the finish depth at the material removal rate.",
+      "fields": [
+        {
+          "name": "Contour Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Finish Depth",
+          "unit": "mm",
+          "source": "default",
+          "default": 0.5
+        },
+        {
+          "name": "Material Removal Rate",
+          "unit": "mm^3/min",
+          "source": "engine"
+        },
+        {
+          "name": "Roughing Share",
+          "unit": null,
+          "source": "default",
+          "default": 0.8
+        },
+        {
+          "name": "Finishing Rate Factor",
+          "unit": null,
+          "source": "default",
+          "default": 0.4
+        },
+        {
+          "name": "Finish Volume",
+          "unit": "mm^3",
+          "formula": "{Contour Area} * {Finish Depth}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Finish Volume} * {Roughing Share} / {Material Removal Rate} + {Finish Volume} * (1 - {Roughing Share}) / ({Material Removal Rate} * {Finishing Rate Factor})) * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Perimeter Milling",
+      "operation": "Perimeter Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Milling the wall of a through cutout: its CAD wall area, by the contouring model.",
+      "sameFieldsAs": "Machining - Contouring"
+    },
+    {
+      "name": "Machining - Slot Milling",
+      "operation": "Slot Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "The finishing pass of each slot after it is roughed.",
+      "fields": [
+        {
+          "name": "Slots",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Time per Slot",
+          "unit": "s",
+          "source": "default",
+          "default": 20
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Slots} * {Time per Slot}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Center Drilling",
+      "operation": "Center Drilling",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Spotting each hole before it is drilled.",
+      "fields": [
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Time per Hole",
+          "unit": "s",
+          "source": "default",
+          "default": 5
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Holes} * {Time per Hole}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Chamfering",
+      "operation": "Chamfering",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Chamfering edges: the edge length at the tblChamfering edge speed for the material; an edge with no CAD size takes a set time.",
+      "fields": [
+        {
+          "name": "Edge Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Edge Speed",
+          "unit": "mm/s",
+          "source": "lookup",
+          "table": "tblChamfering",
+          "column": "linear_speed_mm_s"
+        },
+        {
+          "name": "Unsized Edges",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Time per Unsized Edge",
+          "unit": "s",
+          "source": "default",
+          "default": 5
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Edge Length} / {Edge Speed} + {Unsized Edges} * {Time per Unsized Edge}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Filleting",
+      "operation": "Filleting",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Rounding edges: the edge length at the tblCornerRoundingMill edge speed for the material; an edge with no CAD size takes a set time.",
+      "fields": [
+        {
+          "name": "Edge Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Edge Speed",
+          "unit": "mm/s",
+          "source": "lookup",
+          "table": "tblCornerRoundingMill",
+          "column": "LinearSpeedMmPerS"
+        },
+        {
+          "name": "Unsized Edges",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Time per Unsized Edge",
+          "unit": "s",
+          "source": "default",
+          "default": 8
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Edge Length} / {Edge Speed} + {Unsized Edges} * {Time per Unsized Edge}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Groove Milling",
+      "operation": "Groove Milling",
+      "machineClasses": "lathes+mills",
+      "migration": 1031,
+      "description": "Milling grooves: the groove length at the tblCornerRoundingMill edge speed for the material, by the filleting model.",
+      "sameFieldsAs": "Machining - Filleting"
     }
   ],
   "retire": [
