@@ -233,7 +233,7 @@ export function buildDesignGuidance(input: DesignGuidanceInput): DesignGuidance 
   if (input.toleranced == null) notModelled.tolerances = 'The tolerance requirements of the features could not be read.';
   if (input.secondaryMachining == null) {
     const why = input.machined
-      ? 'Every feature of a machined part is machined: a tolerance changes how it is finished, which the Validation checks report, not whether it is machined.'
+      ? 'Every feature of a machined part is machined: a tolerance changes how it is finished, which the Validation checks under these panels report, not whether it is machined.'
       : input.secondaryMachiningReason ?? 'Which tolerances the primary process cannot hold was not assessed.';
     notModelled.drivingMachining = why;
     notModelled.drivingFinishing = input.machined ? 'Which tolerances need grinding or honing beyond the cutting operations is not modelled for machined parts.' : why;

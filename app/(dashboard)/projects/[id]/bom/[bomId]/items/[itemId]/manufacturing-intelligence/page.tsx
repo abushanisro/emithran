@@ -321,7 +321,6 @@ const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
 const RIGHT_TABS = [
   { key: 'copilot',       label: '✦ Copilot'   },
   { key: 'cost',          label: 'Cost'         },
-  { key: 'validation',    label: 'Validation'   },
   { key: 'part_summary',  label: 'Part Summary' },
   { key: 'design_guidance', label: 'Design Guidance' },
   { key: 'sustainability', label: 'Sustain'     },
@@ -8063,14 +8062,17 @@ function AnalysisTabsPanel({
             onSelectHighlight={onSelectHighlight}
           />
         )}
+        {/* The validation checks (cost, DFM, drawing against CAD) are part of the design guidance: one tab, the guidance panels first and the checks under them. */}
+        {tab === 'design_guidance' && (
+          <section aria-label="Validation" className="border-t border-border">
+            <h2 className="px-3 pt-3 text-xs font-semibold tracking-wide">Validation</h2>
+            <ValidationTab fg={fg} item={item} file3dUrl={file3dUrl ?? null} onFile3dUrlExpired={onFile3dUrlExpired}
+              batchSize={batchSize} factory={factory} onSelectHighlight={onSelectHighlight} />
+          </section>
+        )}
 
         {tab === 'cost' && (
           <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} onShowEvidence={onShowEvidence} activeEvidenceLabel={activeEvidenceLabel} addProcessRequest={addProcessRequest} />
-        )}
-
-        {tab === 'validation' && item && (
-          <ValidationTab fg={fg} item={item} file3dUrl={file3dUrl ?? null} onFile3dUrlExpired={onFile3dUrlExpired}
-            batchSize={batchSize} factory={factory} onSelectHighlight={onSelectHighlight} />
         )}
 
 
