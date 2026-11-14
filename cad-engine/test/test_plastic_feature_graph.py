@@ -84,10 +84,11 @@ class TestFeatureGraph:
 
     def test_every_type_not_yet_recognized_is_listed_so_none_found_is_never_assumed(self):
         g = self.graph(box(100, 60, 20))
-        # a plain box has walls along the pull, so its parting line is not shown by the geometry; SharpEdge has no staged rule
-        assert g["not_yet_recognized"] == ["PartingLine", "SharpEdge"]
-        assert set(g["not_assessed_reasons"]) == {"PartingLine", "SharpEdge"}
-        assert set(g["not_yet_recognized"]) | RECOGNIZED == set(feature_types("plastic_molding"))
+        # a plain box has walls along the pull, so its parting line is not shown by the geometry; its sharp edges are measured (12 outside corners)
+        assert g["not_yet_recognized"] == ["PartingLine"]
+        assert set(g["not_assessed_reasons"]) == {"PartingLine"}
+        assert set(g["not_yet_recognized"]) | RECOGNIZED | {"SharpEdge"} == set(feature_types("plastic_molding"))
+        assert next(i for i in g["items"] if i["feature_type"] == "SharpEdge")["attributes"]["count"] == 12
 
     def test_the_vocabulary_gate_refuses_a_type_the_catalog_does_not_have(self):
         holes = {"holes": [{"id": "hole-1", "feature_type": "SimpleHoles", "variant": "through", "diameter_mm": 5.0, "depth_mm": 10.0, "depth_to_diameter": 2.0,

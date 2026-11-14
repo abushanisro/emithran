@@ -4,6 +4,8 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Optional, Sequence
 
+from shared.edge_length import sharp_edge_length
+
 from .census import surface_census
 from .draft import analyze_draft
 from .face_features import classify_faces
@@ -71,6 +73,7 @@ def recognize_core(
     if parting["status"] == "found":
         parting["internal_cutouts"] = sum(1 for h in holes["holes"] if h["variant"] == "through")
     centroid_of = _centroid_lookup(meshes)
+    sharp = sharp_edge_length(shape, detail=True, concavity=True)
     return {
         "version": VERSION,
         "surface_census": surface_census(meshes),
@@ -93,6 +96,6 @@ def recognize_core(
         "parting_line": parting,
         "feature_graph": build_feature_graph(
             holes, faces, legacy_rib_groups, legacy_rib_confidence, lambda t: require_feature_type("plastic_molding", t), sorted(feature_types("plastic_molding")),
-            side_actions=side, parting=parting, centroid_of=centroid_of,
+            side_actions=side, parting=parting, centroid_of=centroid_of, sharp_edges=sharp["edges"],
         ),
     }

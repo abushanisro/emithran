@@ -18,8 +18,12 @@ RECOGNIZED = frozenset({
 })
 # Why a type is still not assessed: said in the result, so absence is never read as "none found".
 NOT_ASSESSED_REASONS = {
-    "SharpEdge": "no staged rule defines a sharp edge (no angle or radius threshold), and its only catalog operation is As Molded, which adds no cost",
+    "SharpEdge": "the sharp edges were not measured for this part (an analysis made before they were)",
 }
+SHARP_EDGE_READING = (
+    "sharp_edge_reading_v1: an edge where two faces meet in a crease (no fillet, radius 0), as an outside (external, convex) or inside "
+    "(internal, concave) corner; below the minimum radius of manufacturabilitySeverity SharpExternalEdge / SharpInternalEdge"
+)
 
 
 def build_feature_graph(
@@ -32,6 +36,7 @@ def build_feature_graph(
     side_actions: Dict[str, Any] | None = None,
     parting: Dict[str, Any] | None = None,
     centroid_of: Callable[[Sequence[int]], List[float]] | None = None,
+    sharp_edges: Sequence[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     """`vocabulary(t)` returns t when it is a catalog feature type and raises when it is not (shared.feature_vocabulary.require_feature_type)."""
     items: List[Dict[str, Any]] = []
@@ -95,8 +100,21 @@ def build_feature_graph(
             "attributes": {"length_mm": parting["length_mm"], "height_spread_mm": parting["height_spread_mm"], "internal_cutouts": parting.get("internal_cutouts", 0), "reading": parting["reading"]},
             "occurrences": [],
         })
+    # Sharp edges (shared/edge_length.py with concavity): one item per kind of corner, its edges' faces as the occurrence.
+    if sharp_edges is not None:
+        for kind in ("external", "internal"):
+            edges = [e for e in sharp_edges if e.get("concavity") == kind]
+            if not edges:
+                continue
+            faces = sorted({f for e in edges for f in e["face_ids"]})
+            items.append({
+                "id": f"sharp-edge-{kind}", "feature_type": vocabulary("SharpEdge"), "variant": kind, "diameter_mm": None, "depth_mm": None,
+                "attributes": {"count": len(edges), "length_mm": round(sum(e["length_mm"] for e in edges), 3), "radius_mm": 0.0, "reading": SHARP_EDGE_READING},
+                "occurrences": [occ(faces)],
+            })
+    recognized = RECOGNIZED | ({"SharpEdge"} if sharp_edges is not None else frozenset())
     unclassified = face_features.get("unclassified", {}).get("faces", 0)
-    not_assessed = sorted(set(all_types) - RECOGNIZED)
+    not_assessed = sorted(set(all_types) - recognized)
     reasons = {t: NOT_ASSESSED_REASONS.get(t, "not recognised yet") for t in not_assessed}
     if parting and parting.get("status") == "indeterminate":
         not_assessed = sorted(set(not_assessed) | {"PartingLine"})
