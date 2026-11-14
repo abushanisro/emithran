@@ -3,6 +3,8 @@
 import { Loader2, Calculator as CalculatorIcon, Play } from 'lucide-react';
 import { longestBendLineMm } from '@/lib/features/bend-line-length';
 import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
+import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
+import { formatFieldValue } from '@/lib/costing/cycle-fields';
 import { checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
 import { strokeFactorColumnOf, withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
@@ -549,7 +551,8 @@ export function ProcessCostDialog({
     const totalTimeSec = value;
     const totalTimeMin = totalTimeSec / 60;
     const currentCycleTimeSec = parseFloat(cycleTime as string) || 0;
-    const matchesCurrent = currentCycleTimeSec > 0 && Math.abs(totalTimeSec - currentCycleTimeSec) < 0.05;
+    // The same at the precision the cycle is stored at (an absolute 0.05 s made any time under 0.05 s "match").
+    const matchesCurrent = currentCycleTimeSec > 0 && storableCycleSec(totalTimeSec) === storableCycleSec(currentCycleTimeSec);
 
     return {
       totalTimeSec,
@@ -1133,7 +1136,7 @@ export function ProcessCostDialog({
     if (calculatorTarget === 'setupManning') setSetupManning(round2(Number(value)));
     else if (calculatorTarget === 'setupTime') setSetupTime(round2(Number(value)));
     else if (calculatorTarget === 'batchSize') setBatchSize(round2(Number(value)));
-    else if (calculatorTarget === 'cycleTime') setCycleTime(round2(Number(value)));
+    else if (calculatorTarget === 'cycleTime') setCycleTime(storableCycleSec(Number(value)));
     else if (calculatorTarget === 'partsPerCycle') setPartsPerCycle(round2(Number(value)));
     else if (calculatorTarget === 'heads') setHeads(round2(Number(value)));
     else if (calculatorTarget === 'scrap') setScrap(round2(Number(value)));
@@ -3047,7 +3050,7 @@ export function ProcessCostDialog({
                           <SelectContent>
                             {operationOptionsWithSaved.map((op) => (
                               <SelectItem key={op.value} value={op.value}>
-                                {op.cycleTimeMin > 0 ? `${op.label} · ${op.cycleTimeMin.toFixed(2)} min` : op.notOnPart ? `${op.label} · not on this part` : op.label}
+                                {op.cycleTimeMin > 0 ? `${op.label} · ${formatCycleMin(op.cycleTimeMin)}` : op.notOnPart ? `${op.label} · not on this part` : op.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -3324,7 +3327,7 @@ export function ProcessCostDialog({
                       <div className="flex gap-2">
                         <Input
                           type="number"
-                          step="0.01"
+                          step="any"
                           value={cycleTime}
                           onChange={(e) => {
                             setCycleTime(e.target.value);
@@ -3753,7 +3756,7 @@ export function ProcessCostDialog({
                               <div className="flex items-center gap-2">
                                 {!hasError && (
                                   <div className="text-lg font-bold text-primary">
-                                    {typeof value === 'number' ? value.toFixed(2) : value || 'N/A'}
+                                    {typeof value === 'number' ? formatFieldValue(value) : value || 'N/A'}
                                   </div>
                                 )}
                                 <Button
@@ -3785,10 +3788,10 @@ export function ProcessCostDialog({
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-2xl font-bold text-primary">
-                            {computedCycleTime.totalTimeMin.toFixed(2)} min
+                            {formatCycleMin(computedCycleTime.totalTimeMin)}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {computedCycleTime.totalTimeSec.toFixed(1)} sec — from this calculator's "Total Time" result
+                            {formatStoredCycleSec(computedCycleTime.totalTimeSec)} — from this calculator's "Total Time" result
                           </div>
                         </div>
                         <Button
@@ -3808,11 +3811,11 @@ export function ProcessCostDialog({
                       <div className="text-xs">
                         {computedCycleTime.matchesCurrent ? (
                           <span className="text-green-600 dark:text-green-500 font-medium">
-                            ✓ Matches the Cycle Time currently set on this process ({computedCycleTime.currentCycleTimeSec.toFixed(1)} sec) — this is the value Direct Process Costs will use.
+                            ✓ Matches the Cycle Time currently set on this process ({formatStoredCycleSec(computedCycleTime.currentCycleTimeSec)}) — this is the value Direct Process Costs will use.
                           </span>
                         ) : (
                           <span className="text-amber-600 dark:text-amber-500 font-medium">
-                            This process's saved Cycle Time is currently {computedCycleTime.currentCycleTimeSec.toFixed(1)} sec — click "Use as Cycle Time" so Direct Process Costs matches this calculator.
+                            This process's saved Cycle Time is currently {formatStoredCycleSec(computedCycleTime.currentCycleTimeSec)} — click "Use as Cycle Time" so Direct Process Costs matches this calculator.
                           </span>
                         )}
                       </div>
