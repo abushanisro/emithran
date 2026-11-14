@@ -2,6 +2,7 @@
 // decision needs it. The CSVs are the one source; nest-cli.json ships them with the build. Each row keeps its confidence and source, so a
 // cost that uses one says how far it can be trusted.
 import { readFileSync } from 'fs';
+import { Logger } from '@nestjs/common';
 import { join } from 'path';
 
 /** RFC 4180: quoted fields, "" for a quote inside one. */
@@ -25,8 +26,26 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+const logger = new Logger('InjectionMoldingReference');
+const reportedMissing = new Set<string>();
+
+/**
+ * A reference file's rows. A file that is not there (a build that did not copy the CSVs) gives no rows, so every value read from it is a named gap
+ * on the quote, and the error is logged once with the file: a missing data file never fails the whole cost summary.
+ */
 export function readReferenceCsv(file: string): Array<Record<string, string>> {
-  const [header, ...body] = parseCsv(readFileSync(join(__dirname, file), 'utf8'));
+  let text: string;
+  try {
+    text = readFileSync(join(__dirname, file), 'utf8');
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    if (!reportedMissing.has(file)) {
+      reportedMissing.add(file);
+      logger.error(`Reference file ${file} is not in the build (${join(__dirname, file)}): its values are gaps. Check nest-cli.json assets.`);
+    }
+    return [];
+  }
+  const [header, ...body] = parseCsv(text);
   return body.filter((r) => r.some((c) => c !== '')).map((r) => Object.fromEntries(header!.map((h, i) => [h, r[i] ?? ''])));
 }
 
