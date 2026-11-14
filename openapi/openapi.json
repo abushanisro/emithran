@@ -14399,6 +14399,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/machining-dfm": {
+      "get": {
+        "operationId": "BOMItemsController_getMachiningDfm_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The findings, and every check with its limit, source and status (passed, failed, or not evaluated with why)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Design-for-machining checks of a part against the machining reference limits; findings carry the features and faces to highlight",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/machining-need": {
       "get": {
         "operationId": "BOMItemsController_getMachiningNeed_v1",
