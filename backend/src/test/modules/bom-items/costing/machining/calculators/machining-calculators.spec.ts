@@ -59,6 +59,14 @@ describe('machining calculator spec ↔ migration ↔ engine', () => {
     }
   });
 
+  it('the third batch ships in 1032: every reference process with a machine now has a calculator', () => {
+    const committed = readFileSync(join(ROOT, 'migrations/1032_machining_calculators_batch_3.sql'), 'utf-8');
+    expect(committed).toBe(buildMachiningCalculatorMigrationSql(1032, spec));
+    for (const station of ['Mask Cure', 'Scribe', 'Etch Cell', 'DeMask', 'Spline Roller', 'Profile Gear Grinder', 'Threaded Wheel Gear Grinder']) {
+      expect(calcs[station]?.name).toMatch(/^Machining - /);
+    }
+  });
+
   it('the milling calculator prices the line of every mill station, and of the live-tool turning machines', () => {
     expect(['3 Axis Mill', '4 Axis Mill', '5 Axis Mill', 'MillTurn', '3 Axis Lathe'].map((station) => calcs[station]?.name)).toEqual(Array(5).fill('Machining - Milling'));
   });

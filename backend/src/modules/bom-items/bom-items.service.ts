@@ -61,7 +61,7 @@ import { loadMachiningCalculatorSpec } from './costing/machining/calculators/mac
 import { specLookupSeeds, type KeywayBroachReference, type LookupSeeds } from './costing/machining/calculators/machining-lookup-seeds';
 
 /** Lookup tables read by the generic spec resolver (specLookupSeeds), not by a resolver of their own. */
-const SPEC_RESOLVED_TABLES: ReadonlySet<string> = new Set(['tblRotarySurfaceGrinding', 'tblStraightBevelGearCutting', 'tblSpiralBevelGearCutting', 'tblShaping', 'tblChamfering', 'tblCornerRoundingMill']);
+const SPEC_RESOLVED_TABLES: ReadonlySet<string> = new Set(['tblRotarySurfaceGrinding', 'tblStraightBevelGearCutting', 'tblSpiralBevelGearCutting', 'tblShaping', 'tblChamfering', 'tblCornerRoundingMill', 'tblChemicalMilling', 'tblChemicalMillingEtchingRates']);
 import { chemicalMillingCallout, splitChemicallyMilledPockets } from './costing/chemical-milling/chemical-milling-engine';
 import { resolveGearRoute } from './costing/machining/operation/gear-routing';
 import { polygonCallout, resolvePolygons, splitPolygonPockets } from './costing/machining/operation/polygon-routing';
@@ -8241,7 +8241,7 @@ export class BOMItemsService {
         if (operation === 'Cylindrical Grinding') set('Surfaces', 1, 'CAD: turned outer diameter');
       }
     }
-    if (['Hobbing', 'Shaving', 'Shaper', 'Straight BG Face Milling', 'Spiral BG Face Milling'].includes(operation)) {
+    if (['Hobbing', 'Shaving', 'Shaper', 'Straight BG Face Milling', 'Spiral BG Face Milling', 'Profile Gear Grinder', 'Threaded Wheel Gear Grinder'].includes(operation)) {
       const t = this.resolveToothForms(fg)[0];
       const note = 'CAD: first recognised tooth form (AxiGroove)';
       set('Teeth', t?.tooth_count, `${note} — teeth`);
@@ -8255,6 +8255,9 @@ export class BOMItemsService {
       set('Grind Length', face?.lengthMm, `${note} — longest extent`);
       set('Grind Width', face?.widthMm, `${note} — area / longest extent`);
       set('Faces', face?.count, `${note} — faces of this size`);
+    }
+    if (operation === 'Etch Cell' || operation === 'DeMask') {
+      set('Part Surface Area', Number((item as any).surfaceArea), 'CAD: part surface area');
     }
     if (operation === 'Rotary Surface Grinder') {
       const face = this.resolvePlanarFaces(fg).sort((a, b) => b.lengthMm * b.widthMm - a.lengthMm * a.widthMm)[0];
@@ -8367,7 +8370,7 @@ export class BOMItemsService {
    */
   private async specLookups(calculatorName: string, matClass: ReturnType<typeof detectMaterialClass>, inputs: Record<string, number>): Promise<LookupSeeds | null> {
     const calc = loadMachiningCalculatorSpec().calculators.find((c) => c.name === calculatorName);
-    const fields = (calc?.fields ?? []).filter((f) => f.source === 'lookup' && (f.where || f.nearest || f.table === 'variables' || SPEC_RESOLVED_TABLES.has(f.table ?? '')));
+    const fields = (calc?.fields ?? []).filter((f) => f.source === 'lookup' && (f.where || f.nearest || f.materialType || f.band || f.table === 'variables' || SPEC_RESOLVED_TABLES.has(f.table ?? '')));
     if (!calc || fields.length === 0 || fields.length !== calc.fields.filter((f) => f.source === 'lookup').length) return null;
     const tableNames = [...new Set(fields.map((f) => f.table!).filter((t) => t !== 'variables'))];
     const [tables, variables, cutCode] = await Promise.all([
@@ -8626,6 +8629,35 @@ export class BOMItemsService {
       .join(' ');
   }
 
+  /** A machine that cannot make the part: listed in the route comparison with each operation it lacks, never costed. */
+  private listedMachiningRoute(cls: string, compatibility: NonNullable<ReturnType<typeof machiningCatalogCompatibility>>, ratesSource: string): RouteResultDto {
+    const reasons = compatibility.incompatibilities.map((i) => `${i.count} x ${i.featureType}: ${i.reason}`);
+    return {
+      routeId: cls as unknown as RouteId, routeLabel: this.humanizeMachineClass(cls), processFamily: 'cutting', toolingVolumeNote: null,
+      autoRoutable: false, processLines: [], materialCost: 0, abrasiveCost: 0, totalProcessCost: 0, totalCost: null,
+      isFeasible: false, dataComplete: false, dataGaps: [],
+      cycleTimes: { cuttingMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: 0 },
+      badges: { lowestCost: false, fastest: false, bestQuality: false },
+      capability: { cuttingCapable: false, pressBrakeCapable: true, overallCapable: false, confidence: 'high', estimatedTonnage: null, reasonCodes: [], warnings: reasons },
+      warnings: reasons, ratesSource, machineCapabilityWarnings: reasons, compatibility,
+    };
+  }
+
+  /**
+   * The machines of a route role that the reference operation catalog rules out for this part (catalog-compatibility.ts),
+   * each as a listed route. A machine the catalog does not rule out is not listed here.
+   */
+  private async machinesThatCannotMake(role: 'primary_milling' | 'primary_turning', fg: any, location: string, accessToken: string, ratesSource: string): Promise<RouteResultDto[]> {
+    const stations = loadMachiningCalculatorSpec().stations;
+    const catalog = await this.machiningLookup.getOperationCatalog();
+    const features = (fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2)?.features as unknown[] | undefined;
+    const classes = await this.machineDiscoveryService.getEligibleClasses(role, location, accessToken);
+    return classes.flatMap((cls) => {
+      const verdict = machiningCatalogCompatibility(features, catalog, stations[cls] ?? cls);
+      return verdict?.status === 'incompatible' ? [this.listedMachiningRoute(cls, verdict, ratesSource)] : [];
+    });
+  }
+
   private async buildMilledRoutes(
     id: string,
     item: any,
@@ -8871,19 +8903,7 @@ export class BOMItemsService {
       };
     });
     // Listed, never costed: the machine cannot make the part, and the reason is each operation it lacks.
-    for (const cls of cannotMake) {
-      const compatibility = compatibilityOf(cls)!;
-      const reasons = compatibility.incompatibilities.map((i) => `${i.count} x ${i.featureType}: ${i.reason}`);
-      routes.push({
-        routeId: cls as unknown as RouteId, routeLabel: this.humanizeMachineClass(cls), processFamily: 'cutting', toolingVolumeNote: null,
-        autoRoutable: false, processLines: [], materialCost: 0, abrasiveCost: 0, totalProcessCost: 0, totalCost: null,
-        isFeasible: false, dataComplete: false, dataGaps: [],
-        cycleTimes: { cuttingMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: 0 },
-        badges: { lowestCost: false, fastest: false, bestQuality: false },
-        capability: { cuttingCapable: false, pressBrakeCapable: true, overallCapable: false, confidence: 'high', estimatedTonnage: null, reasonCodes: [], warnings: reasons },
-        warnings: reasons, ratesSource: primaryRateByClass.get(cls)!.source, machineCapabilityWarnings: reasons, compatibility,
-      });
-    }
+    for (const cls of cannotMake) routes.push(this.listedMachiningRoute(cls, compatibilityOf(cls)!, primaryRateByClass.get(cls)!.source));
 
     // Badges — only among capable routes. The lowest-cost capable route here is
     // by construction the route getCostSummary quotes on (same pick function).
@@ -9048,6 +9068,7 @@ export class BOMItemsService {
       ['2_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed2ax],
       ['3_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed3ax],
       ['machining_millturn', mhrRates.machiningMillturn],
+      ['simultaneous_turning', mhrRates.simultaneousTurning],
     ]);
     const discoveredTurnedClasses = await this.machineDiscoveryService.getEligibleClasses(
       'primary_turning', location, accessToken,
@@ -9126,6 +9147,8 @@ export class BOMItemsService {
         ),
       };
     });
+    // The mills of the location, when the catalog says they cannot make this turned part: listed with the operations they lack.
+    routes.push(...await this.machinesThatCannotMake('primary_milling', fg, location, accessToken, routes[0]?.ratesSource ?? RATES_SOURCE_LABEL));
 
     // Badges. Lowest cost is COMPUTED from route totals — a 2-axis lathe with a
     // per-part rechuck penalty is often costlier than live tooling, so the old

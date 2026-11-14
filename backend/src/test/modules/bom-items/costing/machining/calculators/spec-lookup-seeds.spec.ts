@@ -50,3 +50,34 @@ describe('specLookupSeeds: lookups read as the calculator spec describes them', 
     expect(specLookupSeeds(fieldsOf('Machining - Rotary Surface Grinding'), data('aluminum', 99.9), {}).missing.join(' ')).toContain('has no row for aluminum');
   });
 });
+
+describe('specLookupSeeds: rows keyed by material type or by a size band (chemical milling)', () => {
+  const chem = (matClass: SpecLookupData['matClass']): SpecLookupData => ({
+    matClass, cutCode: null,
+    tables: {
+      tblChemicalMillingEtchingRates: [{ material_type: 'Aluminum', etch_rate_mm_min: 0.0381 }, { material_type: 'Steel', etch_rate_mm_min: 0.025 }],
+      tblChemicalMilling: [{ component_area_mm2: 1000000, peel_rate_mm2_s: 4166 }, { component_area_mm2: 5000000, peel_rate_mm2_s: 4000 }],
+    },
+    variables: { defaultChemMillRinsingTime: 25, defaultChemMillDesmutTime: 10, defaultChemMillDesmutRinseTime: 10, defaultChemMillDryingTime: 25, demaskPeelTimeUpperCap: 60, defaultEdgeDressingRate: 10 },
+  });
+
+  it('the etch rate is the row of the material type; the peel rate is the first area band that holds the part', () => {
+    const { seeds, missing } = specLookupSeeds(fieldsOf('Machining - Etch Cell'), chem('aluminum'), { 'Part Surface Area': 2_000_000 });
+    expect(missing).toEqual([]);
+    expect(seeds['Etch Rate']).toMatchObject({ value: 0.0381, source: 'tblChemicalMillingEtchingRates: material_type Aluminum' });
+    expect(seeds['Peel Rate']).toMatchObject({ value: 4000, source: 'tblChemicalMilling: component_area_mm2 up to 5000000' });
+    expect(seeds['Drying Time']!.value).toBe(25);
+  });
+
+  it('names a material with no etch rate and a part larger than every band', () => {
+    const { missing } = specLookupSeeds(fieldsOf('Machining - Etch Cell'), chem('plastic'), { 'Part Surface Area': 9_000_000 });
+    expect(missing).toEqual(expect.arrayContaining([
+      'Etch Rate: tblChemicalMillingEtchingRates has no row for material_type plastic',
+      'Peel Rate: tblChemicalMilling has no row for component_area_mm2 for 9000000',
+    ]));
+  });
+
+  it('asks for the part area when the band cannot be chosen without it', () => {
+    expect(specLookupSeeds(fieldsOf('Machining - DeMask'), chem('aluminum'), {}).missing.join(' ')).toContain('Part Surface Area');
+  });
+});

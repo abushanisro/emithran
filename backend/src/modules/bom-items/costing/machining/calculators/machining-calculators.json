@@ -46,7 +46,14 @@
     "manual_bench_cell": "Bench Operation",
     "3_axis_router": "3 Axis Router",
     "5_axis_router": "5 Axis Router",
-    "shaper": "Shaper"
+    "shaper": "Shaper",
+    "mask_cure": "Mask Cure",
+    "scribe": "Scribe",
+    "etch_cell": "Etch Cell",
+    "demask": "DeMask",
+    "spline_roller": "Spline Roller",
+    "profile_gear_grinder": "Profile Gear Grinder",
+    "threaded_wheel_gear_grinder": "Threaded Wheel Gear Grinder"
   },
   "calculators": [
     {
@@ -2502,6 +2509,380 @@
       "migration": 1031,
       "description": "Milling grooves: the groove length at the tblCornerRoundingMill edge speed for the material, by the filleting model.",
       "sameFieldsAs": "Machining - Filleting"
+    },
+    {
+      "name": "Machining - Mask Cure",
+      "operation": "{station}",
+      "machineClasses": [
+        "mask_cure"
+      ],
+      "migration": 1032,
+      "description": "Curing the maskant before chemical milling: the cure time of the maskant in this oven (tblMaskingMaterials gives 8 h unheated and 1 h heated), shared by the parts one oven load holds.",
+      "fields": [
+        {
+          "name": "Cure Time",
+          "unit": "hr",
+          "source": "machine"
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "source": "machine"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cure Time} * 3600 / {Parts per Load}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Scribe",
+      "operation": "{station}",
+      "machineClasses": [
+        "scribe"
+      ],
+      "migration": 1032,
+      "description": "Scribing the maskant around each pocket to be etched: the outline of the pockets at the scribe's feed rate.",
+      "fields": [
+        {
+          "name": "Pocket Outline",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "source": "machine"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Pocket Outline} / {Feed Rate} * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Etch Cell",
+      "operation": "{station}",
+      "machineClasses": [
+        "etch_cell"
+      ],
+      "migration": 1032,
+      "description": "Chemical milling in the etch tank: the pocket depth at the tblChemicalMillingEtchingRates rate for the material, then rinsing, desmut, desmut rinse and drying at their reference times, shared by the parts one load holds; then peeling the pocket maskant at the tblChemicalMilling rate.",
+      "fields": [
+        {
+          "name": "Etch Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Pocket Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Part Surface Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "source": "machine"
+        },
+        {
+          "name": "Etch Rate",
+          "unit": "mm/min",
+          "source": "lookup",
+          "table": "tblChemicalMillingEtchingRates",
+          "column": "etch_rate_mm_min",
+          "materialType": "material_type"
+        },
+        {
+          "name": "Peel Rate",
+          "unit": "mm^2/s",
+          "source": "lookup",
+          "table": "tblChemicalMilling",
+          "column": "peel_rate_mm2_s",
+          "band": {
+            "column": "component_area_mm2",
+            "input": "Part Surface Area"
+          }
+        },
+        {
+          "name": "Rinsing Time",
+          "unit": "min",
+          "source": "lookup",
+          "table": "variables",
+          "column": "defaultChemMillRinsingTime"
+        },
+        {
+          "name": "Desmut Time",
+          "unit": "min",
+          "source": "lookup",
+          "table": "variables",
+          "column": "defaultChemMillDesmutTime"
+        },
+        {
+          "name": "Desmut Rinse Time",
+          "unit": "min",
+          "source": "lookup",
+          "table": "variables",
+          "column": "defaultChemMillDesmutRinseTime"
+        },
+        {
+          "name": "Drying Time",
+          "unit": "min",
+          "source": "lookup",
+          "table": "variables",
+          "column": "defaultChemMillDryingTime"
+        },
+        {
+          "name": "Etching Time",
+          "unit": "min",
+          "formula": "{Etch Depth} / {Etch Rate}"
+        },
+        {
+          "name": "Tank Time",
+          "unit": "min",
+          "formula": "{Etching Time} + {Rinsing Time} + {Desmut Time} + {Desmut Rinse Time} + {Drying Time}"
+        },
+        {
+          "name": "Pocket Peeling Time",
+          "unit": "s",
+          "formula": "{Pocket Area} / {Peel Rate}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Tank Time} * 60 / {Parts per Load} + {Pocket Peeling Time}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - DeMask",
+      "operation": "{station}",
+      "machineClasses": [
+        "demask"
+      ],
+      "migration": 1032,
+      "description": "Removing the maskant after etching: peeling the whole part at the tblChemicalMilling rate, capped at the reference time (variables demaskPeelTimeUpperCap), then dressing the pocket edges by hand (variables defaultEdgeDressingRate).",
+      "fields": [
+        {
+          "name": "Part Surface Area",
+          "unit": "mm^2",
+          "source": "cad"
+        },
+        {
+          "name": "Pocket Outline",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Peel Rate",
+          "unit": "mm^2/s",
+          "source": "lookup",
+          "table": "tblChemicalMilling",
+          "column": "peel_rate_mm2_s",
+          "band": {
+            "column": "component_area_mm2",
+            "input": "Part Surface Area"
+          }
+        },
+        {
+          "name": "Peel Time Cap",
+          "unit": "min",
+          "source": "lookup",
+          "table": "variables",
+          "column": "demaskPeelTimeUpperCap"
+        },
+        {
+          "name": "Edge Dressing Rate",
+          "unit": "mm/s",
+          "source": "lookup",
+          "table": "variables",
+          "column": "defaultEdgeDressingRate"
+        },
+        {
+          "name": "Peeling Time",
+          "unit": "s",
+          "formula": "min({Part Surface Area} / {Peel Rate}, {Peel Time Cap} * 60)"
+        },
+        {
+          "name": "Edge Dressing Time",
+          "unit": "s",
+          "formula": "{Pocket Outline} / {Edge Dressing Rate}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Peeling Time} + {Edge Dressing Time}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Spline Rolling",
+      "operation": "{station}",
+      "machineClasses": [
+        "spline_roller"
+      ],
+      "migration": 1032,
+      "description": "Cold rolling a spline between racks: one rolling stroke per spline. The reference states which materials can be rolled (tblSplineRolling) and up to what module (variables splineRollingMaxModule) but holds no rolling time, so the stroke time of the machine is entered.",
+      "fields": [
+        {
+          "name": "Splines",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Rolling Time per Spline",
+          "unit": "s",
+          "source": "machine"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Splines} * {Rolling Time per Spline}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Profile Gear Grinding",
+      "operation": "{station}",
+      "machineClasses": [
+        "profile_gear_grinder"
+      ],
+      "migration": 1032,
+      "description": "Profile (form) grinding a gear one tooth gap at a time: the radial stock taken in strokes of the infeed, plus the finishing strokes, each stroke across the face width and its overtravel at the axial feed. The reference holds no gear-grinding table, so the grinding data of the wheel and machine are entered.",
+      "fields": [
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Face Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Radial Stock",
+          "unit": "mm",
+          "source": "machine"
+        },
+        {
+          "name": "Infeed per Stroke",
+          "unit": "mm",
+          "source": "machine"
+        },
+        {
+          "name": "Finish Strokes",
+          "unit": null,
+          "source": "machine"
+        },
+        {
+          "name": "Stroke Overtravel",
+          "unit": "mm",
+          "source": "machine"
+        },
+        {
+          "name": "Axial Feed",
+          "unit": "mm/min",
+          "source": "machine"
+        },
+        {
+          "name": "Rough Strokes",
+          "unit": null,
+          "formula": "CEIL({Radial Stock} / {Infeed per Stroke})"
+        },
+        {
+          "name": "Stroke Time",
+          "unit": "s",
+          "formula": "({Face Width} + {Stroke Overtravel}) / {Axial Feed} * 60"
+        },
+        {
+          "name": "Time per Tooth",
+          "unit": "s",
+          "formula": "({Rough Strokes} + {Finish Strokes}) * {Stroke Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Teeth} * {Time per Tooth}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Threaded Wheel Gear Grinding",
+      "operation": "{station}",
+      "machineClasses": [
+        "threaded_wheel_gear_grinder"
+      ],
+      "migration": 1032,
+      "description": "Continuous generating grinding with a threaded wheel: the gear turns one tooth per wheel start per wheel revolution while the wheel feeds across the face width, as a hob does. The reference holds no gear-grinding table, so the wheel and feed data are entered.",
+      "fields": [
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Face Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Wheel Speed",
+          "unit": "m/s",
+          "source": "machine"
+        },
+        {
+          "name": "Wheel Diameter",
+          "unit": "mm",
+          "source": "machine"
+        },
+        {
+          "name": "Wheel Starts",
+          "unit": null,
+          "source": "machine"
+        },
+        {
+          "name": "Axial Feed",
+          "unit": "mm/rev",
+          "source": "machine"
+        },
+        {
+          "name": "Stroke Overtravel",
+          "unit": "mm",
+          "source": "machine"
+        },
+        {
+          "name": "Passes",
+          "unit": null,
+          "source": "machine"
+        },
+        {
+          "name": "Wheel Rotation",
+          "unit": "rpm",
+          "formula": "{Wheel Speed} * 60000 / (pi * {Wheel Diameter})"
+        },
+        {
+          "name": "Workpiece Rotation",
+          "unit": "rpm",
+          "formula": "{Wheel Rotation} * {Wheel Starts} / {Teeth}"
+        },
+        {
+          "name": "Pass Time",
+          "unit": "s",
+          "formula": "({Face Width} + {Stroke Overtravel}) / ({Axial Feed} * {Workpiece Rotation}) * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Passes} * {Pass Time}"
+        }
+      ]
     }
   ],
   "retire": [
