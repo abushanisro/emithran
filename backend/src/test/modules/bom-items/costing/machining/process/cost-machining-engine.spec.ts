@@ -2350,8 +2350,8 @@ describe('Cannula Holder bottom (aluminum 6061, milled): every operation is pric
       holeCount: 5, holeGroups: [{ diameter_mm: 4, count: 4, depth_mm: 5.208 }, { diameter_mm: 18.4, count: 1, depth_mm: 21.73 }],
       threads: [{ size: 'M2', count: 4, pitchMm: 0.4, depthMm: 5.1 }, { size: 'M3', count: 4, pitchMm: 0.5, depthMm: 5.04 }],
       tappingTable: TAPPING, drillingTable: realDrillingTable(), keywayBroach: realKeywayBroachReference(), keywayCandidates: [],
-      // CAD sharp-edge length; tblDeburring Virtual Debuiring Knife speed for cut code 30.11.
-      sharpEdgeLengthMm: 1442.715, deburrLinearSpeedMmPerSec: 13.4, deburrMaterialCutCode: '30.11',
+      // CAD sharp-edge length; tblDeburring Wire Wheel Brush (the reference default edge tool) speed for cut code 30.11.
+      sharpEdgeLengthMm: 1442.715, deburrLinearSpeedMmPerSec: 27.4, deburrMaterialCutCode: '30.11',
     } as any),
     mc('3_axis_mill'),
   );

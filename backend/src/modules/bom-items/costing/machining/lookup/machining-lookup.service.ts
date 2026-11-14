@@ -113,6 +113,13 @@ interface TurningParams {
   materialCutCode?: string;
 }
 
+/** The tblDeburring row of the given deburring tool type for a material, or null (no tool type, no such tool, or no row of the material). */
+export function edgeDeburrRow(rows: any[], toolType: string | null | undefined, materialClass: MaterialClass): any | null {
+  if (!toolType) return null;
+  const row = nearestByHardness(rows.filter((r) => r.tool_type === toolType), MACHINING_MATERIAL[materialClass]);
+  return row && typeof row.linear_speed_mm_s === 'number' ? row : null;
+}
+
 @Injectable()
 export class MachiningLookupService {
   constructor(private readonly database: DatabaseService) {}
@@ -431,13 +438,21 @@ export class MachiningLookupService {
   }
 
   // ── Deburring (tblDeburring_lookup_table.json, 1182 real rows) ──────────
+  // A material code has one row per deburring tool (13 tool types). The tool is the reference's default
+  // edge-deburring tool (variables defaultExternalEdgeDeburrToolType, "Wire Wheel Brush"); the internal-edge
+  // default (Wire Tube Brush) has the same speed on every material code. Taking the table's first row read the
+  // "Deburring Brush", which the table itself marks deburr_type "Unused".
   async getDeburrParams(materialClass: MaterialClass): Promise<EdgeToolParams> {
     const noData: EdgeToolParams = { linearSpeedMmPerSec: 0, dataFound: false };
     const rows = await this.loadTable('tblDeburring');
     if (!rows?.length) return noData;
-    const row = nearestByHardness(rows, MACHINING_MATERIAL[materialClass]);
-    if (!row || typeof row.linear_speed_mm_s !== 'number') return noData;
-    // A material code has one row per deburring tool: the code, deburr type and tool series identify the one read.
+    const { data } = await this.database
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+      .from('machining_reference_data').select('value')
+      .eq('category', 'variable').eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
+      .eq('key', 'defaultExternalEdgeDeburrToolType').maybeSingle();
+    const row = edgeDeburrRow(rows, (data as { value?: string } | null)?.value, materialClass);
+    if (!row) return noData;
     const match = { table: 'tblDeburring', row: rowKeys(row, ['material_cut_code_name', 'deburr_type', 'tool_series']) };
     return { linearSpeedMmPerSec: row.linear_speed_mm_s, dataFound: true, materialCutCode: row.material_cut_code_name, match };
   }
