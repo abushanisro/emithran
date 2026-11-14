@@ -143,7 +143,7 @@ export interface MachiningCostInput {
   machinabilityRating?: number;
   // Feature volumes from feature_graph_v2 — enables per-feature cycle time instead
   // of (billetVol − partVol) / MRR. When absent, falls back to the bbox formula.
-  featureOps?: Array<{ name: string; timeSec: number; source: string }>;
+  featureOps?: Array<{ name: string; timeSec: number; source: string; /** feature_graph_v2 ids of the features the operation is performed on. */ featureIds?: string[] }>;
   // The drawing callout costed by the reference surface-treatment engine
   // (BomItemsService.resolveSurfaceTreatmentDbRate). Null = the callout names no
   // reference process: no line, a warning.
@@ -410,18 +410,21 @@ const MILLING_TIME_INPUT: Record<string, string> = {
 
 /** The milling calculator's inputs: the part's sequenced operation times by group, with the operations behind each. */
 function millingSeeds(featureOps: NonNullable<MachiningCostInput['featureOps']>): Record<string, CalcSeed> {
-  const groups = new Map<string, { sec: number; ops: Set<string> }>(
-    [...new Set(Object.values(MILLING_TIME_INPUT)), 'Other Operations Time'].map((g) => [g, { sec: 0, ops: new Set<string>() }]),
+  const groups = new Map<string, { sec: number; ops: Set<string>; featureIds: Set<string> }>(
+    [...new Set(Object.values(MILLING_TIME_INPUT)), 'Other Operations Time'].map((g) => [g, { sec: 0, ops: new Set<string>(), featureIds: new Set<string>() }]),
   );
   for (const o of featureOps) {
     if (MILLING_DOUBLE_BILLED_ELSEWHERE.has(o.name)) continue;
     const g = groups.get(MILLING_TIME_INPUT[o.name] ?? 'Other Operations Time')!;
     g.sec += o.timeSec;
     g.ops.add(o.name);
+    for (const id of o.featureIds ?? []) g.featureIds.add(id);
   }
   return Object.fromEntries([...groups].map(([field, g]) => [field, {
     value: g.sec,
     source: g.ops.size > 0 ? `CAD features: ${[...g.ops].join(', ')} (operation sequence)` : 'CAD features: none of this group on the part',
+    // The features the time was computed on: the calculator input shows them on the model.
+    ...(g.featureIds.size > 0 ? { ref: { kind: 'features' as const, label: field, features: [...g.featureIds].map((featureId) => ({ featureId })) } } : {}),
   }]));
 }
 
