@@ -37,6 +37,19 @@ describe('ProcessCostCalculationEngine', () => {
       expect(slow.totalCycleCostPerPart).toBeGreaterThan(fast.totalCycleCostPerPart);
     });
 
+    // The cycle was costed from its hours rounded to 4 places (0.36 s steps): a sand-casting melt of 0.0041 s cost exactly $0, and every
+    // cycle was off by up to 0.18 s. The cost is the rate times the time as given; rounding is for the time shown, never the time costed.
+    it('costs a cycle far below the display precision (0.0041 s melt) at rate x time, not zero', () => {
+      const r = engine.calculate({ ...baseInput, directRate: 48.05, machineRate: 5.73, setupTime: 0, batchSize: 2500, cycleTime: 0.0041 });
+      expect(r.totalCostPerPart).toBeCloseTo(((48.05 + 5.73) / 3600) * 0.0041, 6);
+      expect(r.totalCostPerPart).toBeGreaterThan(0);
+    });
+
+    it('costs the exact time, not the time rounded to 0.36 s steps', () => {
+      const r = engine.calculate({ ...baseInput, setupTime: 0, cycleTime: 1.5 });
+      expect(r.totalCycleCostPerPart).toBeCloseTo(((46.67 + 23) / 3600) * 1.5, 6);
+    });
+
     it('still refuses a zero or negative cycle time, which is not a quantity', () => {
       expect(() => engine.calculate({ ...baseInput, cycleTime: 0 })).toThrow(/Cycle Time must be greater than/);
       expect(() => engine.calculate({ ...baseInput, cycleTime: -1 })).toThrow(/Cycle Time must be greater than/);

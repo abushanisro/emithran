@@ -267,6 +267,8 @@ export class ProcessCostCalculationEngine {
       setupTimeHours: this.round(setupTimeHours, this.precision.TIME),
       cycleTimePerPartHours: this.round(cycleTimePerPartHours, this.precision.TIME),
       cycleTimePerPartSeconds: this.round(cycleTimePerPartSeconds, this.precision.TIME),
+      // The time costed: exact. The rounded values above are for display; costing them priced time in 0.36 s steps (a 0.0041 s melt at $0).
+      cycleTimeMinPerPartExact: cycleTimePerPartHours * this.time.MINUTES_PER_HOUR,
     };
   }
 
@@ -287,7 +289,7 @@ export class ProcessCostCalculationEngine {
     const LHR = normalized.directRate + normalized.indirectRate + normalized.fringeRate;
 
     const setupTimeMinPerPart = normalized.setupTime / Math.max(normalized.batchSize, 1);
-    const cycleTimeMinPerPart = timeCalcs.cycleTimePerPartHours * this.time.MINUTES_PER_HOUR;
+    const cycleTimeMinPerPart = timeCalcs.cycleTimeMinPerPartExact;
 
     const terms = eMithranTerms({
       mhrPerHr: MHR,
