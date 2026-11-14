@@ -48,6 +48,9 @@ export interface InjectionMoldingSignals {
   sideActionBlocks?: SideActionSignals['blocks'] | null;
   /** The longest slide bundle stroke (mm), side-action-signals.ts. */
   maxSlideStrokeMm?: number | null;
+  /** The bundle that stroke is, and the sized bundles by kind (plastic feature graph ids): what their calculator inputs light. */
+  maxSlideStrokeBundleId?: string | null;
+  sideActionBundleIds?: { slide: string[]; lifter: string[] } | null;
   /** The ribs the CAD engine measured (rib-inserts.ts); null when the graph has no plastic features. */
   ribs?: RibSignals | null;
   insertCount: number | null;

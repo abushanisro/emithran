@@ -42,13 +42,17 @@ export function deflashingSeeds(input: { partingLineLengthMm: number | null; rat
 export const SLIDE_MOVEMENT_CALCULATOR = 'Injection Molding - Slide Movement';
 
 /** Seeds for the slide movement calculator (F-32): the longest CAD slide stroke, the reference slide speed and the cavities, or what is missing. */
-export function slideMovementSeeds(input: { slideStrokeMm: number | null; rateMmPerS: number | null; cavities: number }): SeedResult {
+export function slideMovementSeeds(input: { slideStrokeMm: number | null; slideStrokeBundleId?: string | null; rateMmPerS: number | null; cavities: number }): SeedResult {
   const missing: string[] = [];
   if (!positive(input.slideStrokeMm)) missing.push('the slide stroke (CAD SlideBundle stroke)');
   if (!positive(input.rateMmPerS)) missing.push('the slide speed (slideCycleRate)');
   if (missing.length > 0) return { missing };
   return { seeds: {
-    'Slide Stroke': { value: input.slideStrokeMm!, source: 'CAD SlideBundle: the longest stroke (the slides move out and back together each shot)' },
+    'Slide Stroke': {
+      value: input.slideStrokeMm!, source: 'CAD SlideBundle: the longest stroke (the slides move out and back together each shot)',
+      // The bundle it was measured on (plastic feature graph id): its eye lights that slide.
+      ...(input.slideStrokeBundleId ? { ref: { kind: 'features' as const, label: 'slide bundle', features: [{ featureId: input.slideStrokeBundleId }] } } : {}),
+    },
     'Slide Cycle Rate': { value: input.rateMmPerS!, source: `${REF}/variables: slideCycleRate (Velocity, read as mm/s)`, ref: plasticVariable('slideCycleRate') },
     'Cavities per Mold': { value: input.cavities, source: 'The costed cavity count' },
   } };

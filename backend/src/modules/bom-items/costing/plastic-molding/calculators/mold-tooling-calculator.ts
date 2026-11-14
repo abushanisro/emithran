@@ -60,6 +60,8 @@ export interface MoldToolingFacts {
   pressClampTonnes: number | null;
   /** The recognised slide and lifter bundles by size class (side-action-signals.ts); null when the CAD features were not recognised. */
   sideActionBlocks: SideActionSignals['blocks'] | null;
+  /** The sized bundles behind those blocks (plastic feature graph ids), by kind: what the block volumes light. Absent with an older signal. */
+  sideActionBundleIds?: { slide: string[]; lifter: string[] } | null;
   /** The ribs the CAD engine measured (rib-inserts.ts); null when the graph has none to read. */
   ribs: RibSignals | null;
   /** How the default tool steel grade is treated (reference/mold-steel-treatment-reference.csv); null when the grade has no row. */
@@ -70,6 +72,11 @@ export interface MoldToolingFacts {
 }
 
 const SIZE_ORDER: readonly BlockSize[] = ['small', 'medium', 'large'];
+
+/** The bundles a block volume was counted from, as the ref its eye lights; nothing when none is named. */
+function bundlesRef(label: string, ids: readonly string[] | null | undefined) {
+  return ids && ids.length > 0 ? { ref: { kind: 'features' as const, label, features: ids.map((featureId) => ({ featureId })) } } : {};
+}
 
 /**
  * The slide and lifter blocks the mold needs (F-28): their volume by size class, and their surface as cubes of that volume (6 x V^(2/3)). Unsized
@@ -219,8 +226,8 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       },
       'Number of Tryouts': { value: x.tryouts, source: `${vars}: defaultNumTryOuts`, ref: v('defaultNumTryOuts') },
       'Tryout Rate': { value: f.toolroomRates.tryoutUsdPerHr, source: `${settings} tryoutRateUsdPerHr`, ref: settingsRef('tryoutRateUsdPerHr') },
-      'Slide Block Volume': { value: sa.slideVolumeIn3, source: `CAD slide bundles: ${sa.slideSource}`, lookup: true },
-      'Lifter Block Volume': { value: sa.lifterVolumeIn3, source: `CAD lifter bundles (a bundle a slide could also serve is costed as a lifter): ${sa.lifterSource}`, lookup: true },
+      'Slide Block Volume': { value: sa.slideVolumeIn3, source: `CAD slide bundles: ${sa.slideSource}`, lookup: true, ...bundlesRef('slide bundles', f.sideActionBundleIds?.slide) },
+      'Lifter Block Volume': { value: sa.lifterVolumeIn3, source: `CAD lifter bundles (a bundle a slide could also serve is costed as a lifter): ${sa.lifterSource}`, lookup: true, ...bundlesRef('lifter bundles', f.sideActionBundleIds?.lifter) },
       'Side Action Block Surface': { value: sa.surfaceIn2, source: `each of the ${sa.count} block${sa.count === 1 ? '' : 's'} as a cube of its volume, 6 x V^(2/3) in², summed` },
       'Side Actions': { value: sa.count, source: f.sideActionBlocks ? 'CAD: the recognised slide and lifter bundles with a size class' : 'CAD features not recognised: no bundles to price' },
       'CMM Hours Per Side Action': { value: x.cmmHoursPerSideAction, source: `${vars}: cmmInspectionMultiplier`, ref: v('cmmInspectionMultiplier') },
