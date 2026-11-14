@@ -116,7 +116,7 @@ export function runDeflashingTime(input: { partingLineLengthMm: number | null; r
 }
 
 /** The time the hydraulic slides add to each part (F-32), by the stored slide movement calculator, or what is missing. */
-export function runSlideMovementTime(input: { slideStrokeMm: number | null; rateMmPerS: number | null; cavities: number }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+export function runSlideMovementTime(input: { slideStrokeMm: number | null; slideStrokeBundleId?: string | null; rateMmPerS: number | null; cavities: number }, calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(SLIDE_MOVEMENT_CALCULATOR, slideMovementSeeds(input), calculators);
 }
 

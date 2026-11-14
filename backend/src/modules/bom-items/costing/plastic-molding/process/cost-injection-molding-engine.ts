@@ -498,6 +498,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     slideOrLifterBundleCount: input.signals?.slideOrLifterBundleCount ?? null,
     sideActionBlocks: input.signals?.sideActionBlocks ?? null,
     maxSlideStrokeMm: input.signals?.maxSlideStrokeMm ?? null,
+    maxSlideStrokeBundleId: input.signals?.maxSlideStrokeBundleId ?? null,
+    sideActionBundleIds: input.signals?.sideActionBundleIds ?? null,
     ribs: input.signals?.ribs ?? null,
     insertCount: input.signals?.insertCount ?? null,
     textFeatureCount: input.signals?.textFeatureCount ?? null,
@@ -623,6 +625,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     if ((signals.slideBundleCount ?? 0) > 0) {
       const move = runSlideMovementTime({
         slideStrokeMm: signals.maxSlideStrokeMm ?? null,
+        slideStrokeBundleId: signals.maxSlideStrokeBundleId ?? null,
         rateMmPerS: plasticRef?.featureRules.slideCycleRateMmPerS ?? null,
         cavities: cavityCount,
       }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
@@ -816,6 +819,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       extras: plasticRef.moldExtras,
       pressClampTonnes: input.machineClampTonnes != null && input.machineClampTonnes > 0 ? input.machineClampTonnes : null,
       sideActionBlocks: signals.sideActionBlocks ?? null,
+      sideActionBundleIds: signals.sideActionBundleIds ?? null,
       ribs: signals.ribs ?? null,
       steelTreatment: treatment,
       runner: runnerSystemType,

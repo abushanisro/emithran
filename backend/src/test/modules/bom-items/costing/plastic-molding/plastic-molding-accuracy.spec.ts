@@ -431,6 +431,12 @@ describe('the slide movement in each shot (F-32)', () => {
     expect(r.warnings.join(' ')).not.toMatch(/Side Action \(Slide\/Lifter\) required/);
   });
 
+  it('the slide stroke opens the slide bundle it was measured on', () => {
+    const r = run({ slideBundleCount: 1, slideOrLifterBundleCount: 0, maxSlideStrokeMm: 30, maxSlideStrokeBundleId: 'bundle-7', sideActionBlocks: { slide: { ...NONE, small: 1 }, lifter: NONE, unsized: 0 } });
+    const line = r.processLines.find((l) => l.calculatorName === 'Injection Molding - Slide Movement');
+    expect(line?.calculationTrace?.find((t) => t.fieldName === 'Slide Stroke')?.ref).toEqual({ kind: 'features', label: 'slide bundle', features: [{ featureId: 'bundle-7' }] });
+  });
+
   it('adds no time for lifters, and says so instead of calling the operation uncosted', () => {
     const r = run({ slideBundleCount: 0, slideOrLifterBundleCount: 4, sideActionBlocks: { slide: NONE, lifter: { ...NONE, small: 4 }, unsized: 0 } });
     expect(r.processLines.some((l) => l.calculatorName === 'Injection Molding - Slide Movement')).toBe(false);

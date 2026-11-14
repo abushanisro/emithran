@@ -52,7 +52,19 @@ describe('sideActionSignals', () => {
     expect(sideActionSignals(graph([item('PlanarFace', { faces: 6 })]))).toEqual({
       undercutFeatures: 0, slideBundles: 0, slideOrLifterBundles: 0,
       blocks: { slide: { small: 0, medium: 0, large: 0 }, lifter: { small: 0, medium: 0, large: 0 }, unsized: 0 }, maxSlideStrokeMm: null,
+      maxSlideStrokeBundleId: null, blockBundleIds: { slide: [], lifter: [] },
     });
+  });
+
+  it('names the bundles behind each value: the slide with the longest stroke, and the sized bundles the blocks count (unsized ones are not named)', () => {
+    const s = sideActionSignals(graph([
+      { ...item('SlideBundle', { size_class: 'small', stroke_mm: 12 }), id: 'slide-a' },
+      { ...item('SlideBundle', { size_class: 'large', stroke_mm: 30 }), id: 'slide-b' },
+      { ...item('LifterBundle', { size_class: 'small' }), id: 'lifter-a' },
+      { ...item('LifterBundle'), id: 'lifter-unsized' },
+    ]));
+    expect(s?.maxSlideStrokeBundleId).toBe('slide-b');
+    expect(s?.blockBundleIds).toEqual({ slide: ['slide-a', 'slide-b'], lifter: ['lifter-a'] });
   });
 });
 

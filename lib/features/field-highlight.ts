@@ -231,3 +231,34 @@ export function cachedFeaturesHighlight(ref: FeaturesRef, graph: FeatureGraphV2 
   byRef.set(ref, h);
   return h;
 }
+
+const highlightGraphCache = new WeakMap<object, FeatureGraphV2 | null>();
+
+/**
+ * The features a calculator input can name, as one graph: feature_graph_v2 plus a plastic part's recognised features
+ * (summary.plasticFeatureGraph items, e.g. the slide and lifter bundles), which carry their own faces. Cached per stored feature graph,
+ * so the memoized dialog rows get the same object between renders.
+ */
+export function highlightableGraph(featureGraph: { feature_graph_v2?: FeatureGraphV2 | null; summary?: unknown } | null | undefined): FeatureGraphV2 | null {
+  if (!featureGraph) return null;
+  if (highlightGraphCache.has(featureGraph)) return highlightGraphCache.get(featureGraph) ?? null;
+  const v2 = featureGraph.feature_graph_v2 ?? null;
+  const plastic = (featureGraph.summary as { plasticFeatureGraph?: { items?: unknown } } | undefined)?.plasticFeatureGraph?.items;
+  const items = Array.isArray(plastic)
+    ? (plastic as { id?: unknown; feature_type?: unknown; occurrences?: unknown }[])
+      .filter((i) => typeof i.id === 'string' && Array.isArray(i.occurrences))
+      .map((i) => ({
+        id: i.id as string,
+        feature_type: String(i.feature_type ?? 'Feature'),
+        occurrences: (i.occurrences as { centroid?: unknown; face_ids?: unknown }[]).map((o) => ({
+          centroid: (Array.isArray(o.centroid) ? o.centroid : [0, 0, 0]) as [number, number, number],
+          face_ids: Array.isArray(o.face_ids) ? (o.face_ids as number[]) : [],
+        })),
+      })) as unknown as FeatureNodeV2[]
+    : [];
+  const out = v2 || items.length > 0
+    ? { ...(v2 ?? { metadata: { face_map: [] } }), features: [...(v2?.features ?? []), ...items] } as FeatureGraphV2
+    : null;
+  highlightGraphCache.set(featureGraph, out);
+  return out;
+}

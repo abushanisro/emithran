@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cachedFeaturesHighlight, checkAgainstInput, featuresHighlight, resolveFieldHighlight } from '@/lib/features/field-highlight';
+import { cachedFeaturesHighlight, checkAgainstInput, featuresHighlight, highlightableGraph, resolveFieldHighlight } from '@/lib/features/field-highlight';
 import type { FeatureGraphV2 } from '@/lib/types/manufacturing';
 
 const graph: FeatureGraphV2 = {
@@ -237,5 +237,21 @@ describe('featuresHighlight for named faces (a SourceRef of kind faces)', () => 
 
   it('is null for an empty face list', () => {
     expect(featuresHighlight({ label: 'none', faceIds: [] }, g)).toBeNull();
+  });
+});
+
+describe('highlightableGraph (feature_graph_v2 plus a plastic part\'s recognised features)', () => {
+  it('a features ref can name a plastic bundle: its faces light like a feature_graph_v2 entry\'s', () => {
+    const stored = {
+      feature_graph_v2: { metadata: { face_map: [] }, features: [] } as FeatureGraphV2,
+      summary: { plasticFeatureGraph: { items: [{ id: 'bundle-2', feature_type: 'LifterBundle', occurrences: [{ centroid: [1, 2, 3], face_ids: [40, 41] }] }] } },
+    };
+    const g = highlightableGraph(stored)!;
+    expect(faces(featuresHighlight({ label: 'lifter bundles', features: [{ featureId: 'bundle-2' }] }, g)!.node)).toEqual([40, 41]);
+    expect(highlightableGraph(stored)).toBe(g);
+  });
+
+  it('is null with no stored graph', () => {
+    expect(highlightableGraph(null)).toBeNull();
   });
 });

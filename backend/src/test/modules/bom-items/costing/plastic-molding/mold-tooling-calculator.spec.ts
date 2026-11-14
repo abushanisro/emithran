@@ -98,6 +98,15 @@ describe('the mold tooling calculator', () => {
     expect(r.outputs['Side Action Cost']).toBeCloseTo(r.outputs['Side Action Steel Cost']! + surface * 0.18 * 100.55 + (1.52 * 3 + 5) * 100.55, 6);
     expect(r.trace.find((t) => t.fieldName === 'Lifter Block Volume')?.source).toMatch(/2 small x 75 in³ \(smallLifterVolume\)/);
     expect(r.trace.find((t) => t.fieldName === 'Slide Block Volume')?.source).toMatch(/1 medium x 1100 in³ \(mediumSlideVolume\)/);
+    // Without the bundles' ids (an older signal) the volumes name no features.
+    expect(r.trace.find((t) => t.fieldName === 'Slide Block Volume')?.ref).toBeUndefined();
+    const named = runMoldTooling(facts({
+      sideActionBlocks: { slide: { ...NONE, medium: 1 }, lifter: { ...NONE, small: 2 }, unsized: 0 },
+      sideActionBundleIds: { slide: ['bundle-1'], lifter: ['bundle-2', 'bundle-3'] },
+    }), CALCS);
+    if (!named.derivable) throw new Error(named.missing.join());
+    expect(named.trace.find((t) => t.fieldName === 'Slide Block Volume')?.ref).toEqual({ kind: 'features', label: 'slide bundles', features: [{ featureId: 'bundle-1' }] });
+    expect(named.trace.find((t) => t.fieldName === 'Lifter Block Volume')?.ref).toEqual({ kind: 'features', label: 'lifter bundles', features: [{ featureId: 'bundle-2' }, { featureId: 'bundle-3' }] });
     // and it is in the mold cost
     const without = runMoldTooling(facts(), CALCS);
     if (!without.derivable) throw new Error(without.missing.join());

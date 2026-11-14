@@ -5,7 +5,7 @@ import { longestBendLineMm } from '@/lib/features/bend-line-length';
 import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
 import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
 import { formatFieldValue } from '@/lib/costing/cycle-fields';
-import { cachedFeaturesHighlight, checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
+import { cachedFeaturesHighlight, checkAgainstInput, highlightableGraph, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
 import { ReferenceTable } from './ReferenceTable';
 import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
@@ -3722,7 +3722,7 @@ export function ProcessCostDialog({
                             hasLookupEye={hasLookupEye}
                             cadEvidenceKey={cadEvidenceKey}
                             cadHighlight={featureRef && (featureRef.kind === 'features' || featureRef.kind === 'faces')
-                              ? cachedFeaturesHighlight(featureRef, bomItemData?.featureGraph?.feature_graph_v2)
+                              ? cachedFeaturesHighlight(featureRef, highlightableGraph(bomItemData?.featureGraph))
                               : resolveFieldHighlight(cadEvidenceKey, bomItemData?.featureGraph?.feature_graph_v2)}
                             evidenceOn={activeEvidenceLabel === label}
                             tonnageCheck={field.fieldName === 'Selected Tonnage' ? tonnageCheckOf(calculatorResults, calculatorInputs) : null}
