@@ -709,6 +709,8 @@ export interface FeatureOp {
   featureIds?: string[];
   /** Exact occurrences this entry machines (feature_graph_v2 entry id + occurrence index). */
   occurrenceRefs?: Array<{ featureId: string; occurrenceIndex: number }>;
+  /** CAD faces (face_map ids) the entry acts on when no feature lists them (the faces meeting at the sharp edges deburred). */
+  faceIds?: number[];
 }
 
 export interface CalculationTraceStep {

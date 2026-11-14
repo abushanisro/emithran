@@ -223,3 +223,19 @@ describe('featuresHighlight (a SourceRef naming particular features)', () => {
     expect(cachedFeaturesHighlight(ref, part)).toBe(cachedFeaturesHighlight(ref, part));
   });
 });
+
+describe('featuresHighlight for named faces (a SourceRef of kind faces)', () => {
+  const g: FeatureGraphV2 = { metadata: { face_map: [] }, features: [] };
+
+  it('lights exactly those faces, says how many, and is not compared with the input (a length is not a face count)', () => {
+    const h = featuresHighlight({ label: 'sharp edges', faceIds: [3, 5, 8] }, g)!;
+    expect(faces(h.node)).toEqual([3, 5, 8]);
+    expect(h.measured).toBeNull();
+    expect(h.faceSet).toEqual({ faces: 3, label: 'sharp edges' });
+    expect(checkAgainstInput(h, 1442.7)).toBe(h);
+  });
+
+  it('is null for an empty face list', () => {
+    expect(featuresHighlight({ label: 'none', faceIds: [] }, g)).toBeNull();
+  });
+});

@@ -9,11 +9,12 @@ import {
 import type { MachineCapability } from '../../shared/capability/machine-selection/seed-registry';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import { computeSustainability } from '../../shared/core/cost-engine';
-import type { CalculationTraceStep, CostSummaryDto, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import type { CalculationTraceStep, CostSummaryDto, FeatureOp, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { DrillingTable } from '../lookup/drilling-table';
 import type { MachiningCapabilityRules } from '../capability-rules';
 import { INSPECTION_TABLE, INSPECTION_TIME_COLUMN, type InspectionReference } from '../inspection-reference';
 import { lookupSeed, variableSeed } from '../calculators/machining-source-refs';
+import { featuresRef, type FeatureOccurrenceRef } from '../feature-occurrences';
 import { prefixTrace, traceCalc, traceHasAssumption, traceInput } from './machining-trace';
 import type { GearRoute } from '../operation/gear-routing';
 import { runMachiningCalculator, type CalcRun, type CalcSeed, type MachiningCalculators } from '../calculators/machining-calculator';
@@ -79,7 +80,8 @@ export interface MachiningCostInput {
   // depth_mm: the group's real CAD hole depth (the deepest occurrence), when
   // the part's machining features carry one; absent for parts analysed
   // without it, where drilling discloses its depth assumption instead.
-  holeGroups: Array<{ diameter_mm: number; count: number; depth_mm?: number }>;
+  /** Drilled holes by diameter; `occurrences` = the feature_graph_v2 occurrences counted (feature-occurrences.ts), what their inputs light. */
+  holeGroups: Array<{ diameter_mm: number; count: number; depth_mm?: number; occurrences?: FeatureOccurrenceRef[] }>;
   pocketCount: number;
   materialGrade: string | null;
   materialCostPerKg: number;
@@ -89,7 +91,8 @@ export interface MachiningCostInput {
   // (CAD-detected tapped_hole.depth_mm, or a drawing-OCR'd pitch) that
   // bom-items.service.ts's resolveThreads() already resolves and passes
   // here. See tapThreadGroups below.
-  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean }>;
+  /** Threads by size; `occurrences` = the tapped holes' feature_graph_v2 occurrences when they come from the CAD (not from a drawing). */
+  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }>;
   tightestToleranceMm: number | null;
   gdtFeatureCount: number;
   batchSize: number;
@@ -188,8 +191,10 @@ export interface MachiningCostInput {
   rotaryBroach?: RotaryBroachReference | null;
   // Real sharp-edge length of the part, measured by the cad-engine from the
   // B-Rep (machining_features.edges.sharp_edge_length_mm, shared/edge_length.py).
+  // sharpEdgeFaceIds: the faces meeting at those edges (edges.sharp_edge_face_ids), lit for the deburring line; absent for older analyses.
   // Absent for parts analysed before that measurement existed.
   sharpEdgeLengthMm?: number | null;
+  sharpEdgeFaceIds?: number[] | null;
   // The machining calculators (calculators / calculator_fields, mapped per
   // operation in process_calculator_mappings), keyed by operation name. Every
   // machining cycle time is evaluated from these stored formulas; the engine
@@ -487,10 +492,11 @@ export function computeDrillCycle(
   drillingTable: DrillingTable | null | undefined,
   calculators: MachiningCalculators | null | undefined,
   holes = 1,
+  occurrences?: readonly FeatureOccurrenceRef[],
 ): DrillCycle {
   const matClass = detectMaterialClass(materialGrade ?? null);
   const lookup = drillingLookupSeeds({ matClass, drillingTable }, { 'Hole Diameter': diameterMm });
-  const run = runMachiningCalculator(calculators, 'Drilling', { ...holeSeeds(diameterMm, depthMm, holes), ...lookup.seeds });
+  const run = runMachiningCalculator(calculators, 'Drilling', { ...holeSeeds(diameterMm, depthMm, holes, occurrences), ...lookup.seeds });
   const missing = run.missing.length > 0 ? [...lookup.missing, ...run.missing] : run.missing;
   return { sec: run.sec, trace: run.trace, missing, calculatorId: run.calculatorId, calculatorVersion: run.calculatorVersion, lookups: run.lookups };
 }
@@ -500,7 +506,7 @@ export function computeDrillCycle(
  * hole-diameter group. Groups without real inputs are left unpriced and named.
  */
 function drillHoleGroups(
-  holeGroups: Array<{ diameter_mm: number; count: number; depth_mm?: number }>,
+  holeGroups: Array<{ diameter_mm: number; count: number; depth_mm?: number; occurrences?: FeatureOccurrenceRef[] }>,
   holeCount: number,
   materialGrade: string | null | undefined,
   drillingTable: DrillingTable | null | undefined,
@@ -518,7 +524,7 @@ function drillHoleGroups(
   }
   const multi = holeGroups.length > 1;
   for (const g of holeGroups) {
-    const cycle = computeDrillCycle(g.diameter_mm, materialGrade, g.depth_mm, drillingTable, calculators, g.count);
+    const cycle = computeDrillCycle(g.diameter_mm, materialGrade, g.depth_mm, drillingTable, calculators, g.count, g.occurrences);
     calculatorId = cycle.calculatorId ?? calculatorId;
     calculatorVersion = cycle.calculatorVersion ?? calculatorVersion;
     Object.assign(lookups, cycle.lookups);
@@ -538,7 +544,7 @@ function drillHoleGroups(
 export { DRILL_DEPTH_TO_DIAMETER_RATIO };
 
 type Identity = Record<string, { processGroup: string; processRoute: string; operation: string }> | undefined;
-type HoleGroup = { diameter_mm: number; count: number; depth_mm?: number };
+type HoleGroup = { diameter_mm: number; count: number; depth_mm?: number; occurrences?: FeatureOccurrenceRef[] };
 type GrindingParams = { workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number; roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean; materialCutCode?: string; match?: { table: string; row: Record<string, string | number> } };
 
 const smallestGroup = (groups: HoleGroup[]): HoleGroup =>
@@ -625,7 +631,7 @@ function computeReamingLine(
   identity: Identity,
 ): ProcessLineCost {
   const g = smallestGroup(holeGroups);
-  const seeds = { ...holeSeeds(g.diameter_mm, g.depth_mm, g.count), ...reamingLookupSeeds({ matClass, reamTable }, { 'Hole Diameter': g.diameter_mm }).seeds };
+  const seeds = { ...holeSeeds(g.diameter_mm, g.depth_mm, g.count, g.occurrences), ...reamingLookupSeeds({ matClass, reamTable }, { 'Hole Diameter': g.diameter_mm }).seeds };
   const run = runMachiningCalculator(calculators, 'Reaming', seeds);
   const gap = run.missing;
   if (gap.length > 0) warnings.push(`Reaming not priced — missing real input: ${gap.join('; ')}.`);
@@ -664,7 +670,7 @@ function computeJigBoreLine(
   if (tightestToleranceMm == null || tightestToleranceMm <= 0 || tightestToleranceMm > rules.jigBorePositionToleranceMm) return null;
   if (holeGroups.length === 0 || !rate) return null;
   const g = smallestGroup(holeGroups);
-  const seeds = { ...holeSeeds(g.diameter_mm, g.depth_mm, g.count), ...jigBoringLookupSeeds({ matClass, finishBoringTable, capabilityRules: rules }, { 'Hole Diameter': g.diameter_mm }).seeds };
+  const seeds = { ...holeSeeds(g.diameter_mm, g.depth_mm, g.count, g.occurrences), ...jigBoringLookupSeeds({ matClass, finishBoringTable, capabilityRules: rules }, { 'Hole Diameter': g.diameter_mm }).seeds };
   return secondaryLine('Jig Boring', runMachiningCalculator(calculators, 'Jig Boring', seeds), rate, batchSize, warnings, identity);
 }
 
@@ -1001,8 +1007,13 @@ function computeDeburringLine(
   warnings: string[],
 ): ProcessLineCost | null {
   const seeds: Record<string, CalcSeed> = {};
+  // The faces meeting at those edges (cad-engine edge_length.sharp_edge_faces): what the edge length lights on the model.
+  const edgeFaces = input.sharpEdgeFaceIds?.length ? [...input.sharpEdgeFaceIds] : null;
   if (input.sharpEdgeLengthMm != null && input.sharpEdgeLengthMm > 0) {
-    seeds['Sharp Edge Length'] = { value: input.sharpEdgeLengthMm, source: 'CAD: total length of sharp B-Rep edges (seams and tangent edges excluded)' };
+    seeds['Sharp Edge Length'] = {
+      value: input.sharpEdgeLengthMm, source: 'CAD: total length of sharp B-Rep edges (seams and tangent edges excluded)',
+      ...(edgeFaces ? { ref: { kind: 'faces' as const, label: 'sharp edges', faceIds: edgeFaces } } : {}),
+    };
   }
   Object.assign(seeds, deburringLookupSeeds({
     matClass,
@@ -1021,11 +1032,15 @@ function computeDeburringLine(
   const setup = resolveSetupMinutes({ process: 'Deburring', machineSetupTimeHr: deburrRate.setupTimeHr, machineName: deburrRate.machineName });
   if (setup.warning) warnings.push(setup.warning);
   const setupCost = r2((setup.setupMin / 60) * deburrRate.rate / Math.max(input.batchSize, 1));
-  return withRun(
+  const line = withRun(
     makeLine('Deburring', setupCost, r2((min / 60) * deburrRate.rate), min, deburrRate, input.processIdentityByMachineClass,
       { setupTimeMin: setup.setupMin, setupTimeSource: setup.source }),
     { ...run, missing }, setup.setupMin > 0 ? setupTraceSteps(setup, deburrRate.machineName, input.batchSize) : [],
   );
+  // The sharp edges deburred, for the Process tree: one row lighting the faces they lie between.
+  return edgeFaces && run.sec != null
+    ? withFeatureGroups(line, [{ name: `Sharp edges (${Math.round(input.sharpEdgeLengthMm!)} mm)`, timeSec: run.sec, featureType: 'deburring', count: 1, faceIds: edgeFaces }])
+    : line;
 }
 
 const EMPTY_RUN: CalcRun = { sec: null, trace: [], missing: [], calculatorId: null, calculatorVersion: null, lookups: {} };
@@ -1051,13 +1066,23 @@ function machineRecordId(rate: MHRRateInput): string | null {
   return rate.selection?.balanced?.candidate?.machineId ?? rate.mhrRecordId ?? null;
 }
 
-/** CAD hole diameter / depth / count as calculator seeds (depth omitted when CAD has none). */
-function holeSeeds(diameterMm: number, depthMm: number | null | undefined, count: number): Record<string, CalcSeed> {
+/** A line with the features it acts on (FeatureOp rows the Process tree lists and lights); unchanged when there are none. */
+function withFeatureGroups(line: ProcessLineCost, groups: readonly FeatureOp[]): ProcessLineCost {
+  return groups.length > 0 ? { ...line, featureBreakdown: [...(line.featureBreakdown ?? []), ...groups] } : line;
+}
+
+/**
+ * CAD hole diameter / depth / count as calculator seeds (depth omitted when CAD has none). With the holes' feature_graph_v2 occurrences,
+ * each input opens exactly those holes on the model (a 'features' ref); without them the inputs carry no ref.
+ */
+function holeSeeds(diameterMm: number, depthMm: number | null | undefined, count: number, occurrences?: readonly FeatureOccurrenceRef[]): Record<string, CalcSeed> {
+  const ref = featuresRef(`Ø${diameterMm} holes`, occurrences);
+  const withRef = (seed: CalcSeed): CalcSeed => (ref ? { ...seed, ref } : seed);
   const seeds: Record<string, CalcSeed> = {
-    'Hole Diameter': { value: diameterMm, source: 'CAD: hole diameter' },
-    'Holes': { value: count, source: 'CAD: holes of this diameter' },
+    'Hole Diameter': withRef({ value: diameterMm, source: 'CAD: hole diameter' }),
+    'Holes': withRef({ value: count, source: 'CAD: holes of this diameter' }),
   };
-  if (depthMm != null && depthMm > 0) seeds['Hole Depth'] = { value: depthMm, source: 'CAD: hole depth' };
+  if (depthMm != null && depthMm > 0) seeds['Hole Depth'] = withRef({ value: depthMm, source: 'CAD: hole depth' });
   return seeds;
 }
 
@@ -1157,7 +1182,7 @@ function makeLine(
  * with no depth is left unpriced and named — never an assumed value.
  */
 export function computeTapCycle(
-  thread: { size: string; count: number; pitchMm?: number; depthMm?: number },
+  thread: { size: string; count: number; pitchMm?: number; depthMm?: number; occurrences?: readonly FeatureOccurrenceRef[] },
   matClass: MaterialClass,
   tappingTable: any[] | null | undefined,
   calculators: MachiningCalculators | null | undefined,
@@ -1167,16 +1192,18 @@ export function computeTapCycle(
   if (!m) return none([`a metric thread size (got "${thread.size}")`]);
   const diameterMm = Number(m[1]);
   const pitchMm = thread.pitchMm != null && thread.pitchMm > 0 ? thread.pitchMm : isoCoarsePitchMm(diameterMm);
+  // The tapped holes on the model, when the threads came from the CAD: their inputs light exactly those holes.
+  const holesRef = featuresRef(`${thread.size} tapped holes`, thread.occurrences);
   const seeds: Record<string, CalcSeed> = {
-    'Thread Diameter': { value: diameterMm, source: `Thread size ${thread.size}` },
-    'Threads': { value: thread.count, source: 'CAD/drawing: threads of this size' },
+    'Thread Diameter': { value: diameterMm, source: `Thread size ${thread.size}`, ...(holesRef ? { ref: holesRef } : {}) },
+    'Threads': { value: thread.count, source: 'CAD/drawing: threads of this size', ...(holesRef ? { ref: holesRef } : {}) },
   };
   if (pitchMm != null) {
     seeds['Thread Pitch'] = thread.pitchMm != null && thread.pitchMm > 0
       ? { value: pitchMm, source: 'CAD/drawing: thread pitch' }
       : { value: pitchMm, source: `ISO 261 coarse pitch of M${diameterMm}` };
   }
-  if (thread.depthMm != null && thread.depthMm > 0) seeds['Thread Depth'] = { value: thread.depthMm, source: 'CAD: tapped hole depth' };
+  if (thread.depthMm != null && thread.depthMm > 0) seeds['Thread Depth'] = { value: thread.depthMm, source: 'CAD: tapped hole depth', ...(holesRef ? { ref: holesRef } : {}) };
   const lookup = pitchMm != null ? tappingLookupSeeds({ matClass, tappingTable }, { 'Thread Pitch': pitchMm }) : { seeds: {}, missing: [`a thread pitch (M${diameterMm} is off the ISO 261 coarse series and none was given)`] };
   const run = runMachiningCalculator(calculators, 'Tapping', { ...seeds, ...lookup.seeds });
   const missing = run.missing.length > 0 ? [...lookup.missing, ...run.missing] : run.missing;
@@ -1185,14 +1212,15 @@ export function computeTapCycle(
 
 /** Tapping time for every thread on the part: one calculator run per thread-size group. */
 function tapThreadGroups(
-  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number }>,
+  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; occurrences?: FeatureOccurrenceRef[] }>,
   matClass: MaterialClass,
   tappingTable: any[] | null | undefined,
   calculators: MachiningCalculators | null | undefined,
-): { min: number; trace: CalculationTraceStep[]; missing: string[]; calculatorId: string | null; calculatorVersion: number | null; lookups: CalcRun['lookups'] } {
+): { min: number; trace: CalculationTraceStep[]; missing: string[]; calculatorId: string | null; calculatorVersion: number | null; lookups: CalcRun['lookups']; groups: FeatureOp[] } {
   const trace: CalculationTraceStep[] = [];
   const missing: string[] = [];
   const lookups: CalcRun['lookups'] = {};
+  const groups: FeatureOp[] = [];
   let totalSec = 0;
   let calculatorId: string | null = null;
   let calculatorVersion: number | null = null;
@@ -1208,9 +1236,16 @@ function tapThreadGroups(
     }
     totalSec += cycle.sec;
     trace.push(...(multi ? prefixTrace(`${t.size} ·`, cycle.trace) : cycle.trace));
+    // The tapped holes of this size, for the Process tree (only when the threads came from the CAD, so they name real holes).
+    if (t.occurrences?.length) {
+      groups.push({
+        name: `${t.size} tapped ×${t.count}`, timeSec: cycle.sec, featureType: 'tapping', count: t.count,
+        featureIds: [...new Set(t.occurrences.map((o) => o.featureId))], occurrenceRefs: t.occurrences.map((o) => ({ ...o })),
+      });
+    }
   }
   if (multi && trace.length > 0) trace.push(traceCalc('Tapping cycle time', totalSec, 's', 'Sum of every thread-size group Cycle Time'));
-  return { min: totalSec / 60, trace, missing, calculatorId, calculatorVersion, lookups };
+  return { min: totalSec / 60, trace, missing, calculatorId, calculatorVersion, lookups, groups };
 }
 
 
@@ -1534,11 +1569,11 @@ export function computeMillingCostSummary(
     const tapSetupMin = tapSetupResolution?.setupMin ?? 0;
     const tapSetup = r2((tapSetupMin / 60) * tappingRate.rate / Math.max(batchSize, 1));
     const tapRun = r2((tappingMin / 60) * tappingRate.rate);
-    processLines.push(withRun(makeLine(
+    processLines.push(withFeatureGroups(withRun(makeLine(
       resolveOperationName(tappingRate.hostMachineClass ?? tappingRate.machineClass, 'Tapping', input.realOperationCategories, warnings),
       tapSetup, tapRun, tappingMin, tappingRate, input.processIdentityByMachineClass,
       tapSetupResolution ? { setupTimeMin: tapSetupMin, setupTimeSource: tapSetupResolution.source } : undefined,
-    ), tapping));
+    ), tapping), tapping.groups));
   }
 
   // ── Deburring ────────────────────────────────────────────────────────────
@@ -1929,11 +1964,11 @@ export function computeTurningCostSummary(
     const tapSetupMin = tapSetupResolution?.setupMin ?? 0;
     const tapSetup = r2((tapSetupMin / 60) * tappingRate.rate / Math.max(batchSize, 1));
     const tapRun = r2((tappingMin / 60) * tappingRate.rate);
-    processLines.push(withRun(makeLine(
+    processLines.push(withFeatureGroups(withRun(makeLine(
       resolveOperationName(tappingRate.hostMachineClass ?? tappingRate.machineClass, 'Tapping', input.realOperationCategories, warnings),
       tapSetup, tapRun, tappingMin, tappingRate, input.processIdentityByMachineClass,
       tapSetupResolution ? { setupTimeMin: tapSetupMin, setupTimeSource: tapSetupResolution.source } : undefined,
-    ), tapping));
+    ), tapping), tapping.groups));
   }
 
   // ── Secondary setup / rechucking (2-axis lathe only) ─────────────────────

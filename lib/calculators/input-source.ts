@@ -15,6 +15,7 @@ export type SourceRef =
   | { kind: 'material'; materialId: string; materialName: string; column: string }
   | { kind: 'cad'; evidence: string }
   | { kind: 'features'; label: string; features: { featureId: string; occurrenceIndex?: number }[] }
+  | { kind: 'faces'; label: string; faceIds: number[] }
   | { kind: 'calculation'; name: string; evidence: string | null; steps: CalculationTraceStep[] }
   /** A sheet-metal reference table served by name (backend SheetMetalSourceTable): an sm_lookup_* table, inspection_operation_defaults, or a machine-library table. */
   | { kind: 'smTable'; table: string; column: string; row: Record<string, string | number> | null };
@@ -40,12 +41,12 @@ export interface SourcePanel {
 
 /** An input opens a record or table (the eye beside it) when its ref names one; a CAD ref opens the faces instead. */
 export function opensTable(ref: SourceRef | undefined): boolean {
-  return !!ref && ref.kind !== 'cad' && ref.kind !== 'features';
+  return !!ref && ref.kind !== 'cad' && ref.kind !== 'features' && ref.kind !== 'faces';
 }
 
-/** The ref names particular features of the part: its eye lights exactly their faces (featuresHighlight). */
-export function showsFeatures(ref: SourceRef | undefined): ref is Extract<SourceRef, { kind: 'features' }> {
-  return ref?.kind === 'features';
+/** The ref names particular features or faces of the part: its eye lights exactly those (featuresHighlight). */
+export function showsFeatures(ref: SourceRef | undefined): ref is Extract<SourceRef, { kind: 'features' | 'faces' }> {
+  return ref?.kind === 'features' || ref?.kind === 'faces';
 }
 
 /** The CAD faces the eye lights for this ref: a measurement's own, or the ones a calculation rests on. */

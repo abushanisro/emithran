@@ -13,6 +13,8 @@ export interface FieldHighlight {
   measured: { value: number; unit: string; label: string } | null;
   /** The faces are every face of the part (a volume or a surface is measured over all of them). */
   wholePart?: { faces: number; label: string };
+  /** A named set of faces (no feature lists them): what the value was measured along. */
+  faceSet?: { faces: number; label: string };
   /** False when the faces do not account for the number (engine-side) or for the input's current value. */
   reconciles: boolean;
   /** Why it does not reconcile, for the engineer. */
@@ -185,11 +187,22 @@ export function checkAgainstInput(highlight: FieldHighlight, inputValue: unknown
  * occurrence. The measured value is the number of instances lit, so an input that counts them (Holes 5) is checked against it. Null when the
  * graph has none of them (re-analysed since, or analysed before face ids): the eye then says so instead of lighting a guess.
  */
-export function featuresHighlight(
-  ref: { label: string; features: readonly { featureId: string; occurrenceIndex?: number }[] },
-  graph: FeatureGraphV2 | null | undefined,
-): FieldHighlight | null {
+type FeaturesRef =
+  | { label: string; features: readonly { featureId: string; occurrenceIndex?: number }[] }
+  | { label: string; faceIds: readonly number[] };
+
+export function featuresHighlight(ref: FeaturesRef, graph: FeatureGraphV2 | null | undefined): FieldHighlight | null {
   if (!graph) return null;
+  // Faces named directly (no feature lists them, e.g. the faces meeting at sharp edges): lit as one set, not counted against the input.
+  if ('faceIds' in ref) {
+    if (ref.faceIds.length === 0) return null;
+    return {
+      node: { id: `faces_${ref.label}`, feature_type: 'Blank', occurrences: [{ centroid: [0, 0, 0], face_ids: [...ref.faceIds] }] },
+      measured: null,
+      faceSet: { faces: ref.faceIds.length, label: ref.label },
+      reconciles: true,
+    };
+  }
   const byId = new Map(graph.features.map((f) => [f.id, f]));
   const occurrences: FeatureOccurrence[] = [];
   for (const r of ref.features) {
@@ -209,10 +222,7 @@ export function featuresHighlight(
 const featuresCache = new WeakMap<FeatureGraphV2, WeakMap<object, FieldHighlight | null>>();
 
 /** featuresHighlight, computed once per (graph, ref): the dialog's rows are memoized and need the same object between renders. */
-export function cachedFeaturesHighlight(
-  ref: { label: string; features: readonly { featureId: string; occurrenceIndex?: number }[] },
-  graph: FeatureGraphV2 | null | undefined,
-): FieldHighlight | null {
+export function cachedFeaturesHighlight(ref: FeaturesRef, graph: FeatureGraphV2 | null | undefined): FieldHighlight | null {
   if (!graph) return null;
   let byRef = featuresCache.get(graph);
   if (!byRef) featuresCache.set(graph, byRef = new WeakMap());

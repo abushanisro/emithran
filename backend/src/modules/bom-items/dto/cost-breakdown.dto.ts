@@ -83,6 +83,8 @@ export interface FeatureOp {
   // entry machines, when it is one or some occurrences of an entry rather
   // than all of them (machining a cast part's toleranced features).
   occurrenceRefs?: Array<{ featureId: string; occurrenceIndex: number }>;
+  /** CAD faces (face_map ids) the entry acts on when no feature lists them (the faces meeting at the sharp edges deburred). */
+  faceIds?: number[];
 }
 
 /**
@@ -106,6 +108,8 @@ export type SourceRef =
    * exactly those features, e.g. the holes a hole count counted or the tapped holes a thread count counted.
    */
   | { kind: 'features'; label: string; features: Array<{ featureId: string; occurrenceIndex?: number }> }
+  /** Particular CAD faces (face_map ids) a value was measured along, when no feature lists them: the faces meeting at the sharp edges deburred. */
+  | { kind: 'faces'; label: string; faceIds: number[] }
   /** Computed by another calculator: its steps (each with its own source), and the CAD faces it rests on when there are any. */
   | { kind: 'calculation'; name: string; evidence: CadEvidenceKey | null; steps: CalculationTraceStep[] }
   /** A sheet-metal reference table served by name (SheetMetalSourceTable): the row the value came from, and the column it is in. */

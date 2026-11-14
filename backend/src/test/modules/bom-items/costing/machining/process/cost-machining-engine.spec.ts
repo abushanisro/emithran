@@ -1,3 +1,4 @@
+import type { CalculationTraceStep } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
 import {
   computeMillingCostSummary,
   computeTurningCostSummary,
@@ -272,6 +273,43 @@ describe('inspection line — memory/Machining reference (one analysis per inspe
     expect(insp.setupTimeSource).toBe('none');
     expect(insp.setupCost).toBe(0);
     expect(result.warnings.some((w) => w.includes('setup not costed') && w.includes('setup_time_hr'))).toBe(true);
+  });
+});
+
+describe('machining inputs light exactly the features they counted', () => {
+  const holes = [{ featureId: 'SimpleHole-blind_d4.0_c4', occurrenceIndex: 0 }, { featureId: 'SimpleHole-blind_d4.0_c4', occurrenceIndex: 1 }];
+  const step = (trace: CalculationTraceStep[] | undefined, field: string) => trace?.find((s) => s.kind === 'input' && s.fieldName === field);
+
+  it('a drilled-hole group\'s diameter, depth and count open those holes', () => {
+    const r = computeTurningCostSummary(milledInput({
+      family: 'turned', holeGroups: [{ diameter_mm: 4, count: 2, depth_mm: 10, occurrences: holes }], holeCount: 2, drillingTable: realDrillingTable(),
+    }), mc('2_axis_lathe'));
+    const drill = r.processLines.find((l) => (l.calculationTrace ?? []).some((s) => s.fieldName === 'Holes'))!;
+    for (const f of ['Holes', 'Hole Diameter', 'Hole Depth']) {
+      expect(step(drill.calculationTrace, f)!.ref).toEqual({ kind: 'features', label: 'Ø4 holes', features: holes });
+    }
+  });
+
+  it('CAD threads open their tapped holes, and the Tapping line lists them for the Process tree', () => {
+    const tapped = [{ featureId: 'SimpleHole-threaded_d1.6_c4', occurrenceIndex: 2 }];
+    const r = computeMillingCostSummary(milledInput({ threads: [{ size: 'M4', count: 1, depthMm: 8, occurrences: tapped }], tappingTable: TAPPING, materialGrade: 'AISI 1018' }), mc('3_axis_mill'));
+    const tap = r.processLines.find((l) => l.process === 'Tapping')!;
+    expect(step(tap.calculationTrace, 'Threads')!.ref).toEqual({ kind: 'features', label: 'M4 tapped holes', features: tapped });
+    expect(tap.featureBreakdown).toEqual([expect.objectContaining({ name: 'M4 tapped ×1', occurrenceRefs: tapped })]);
+  });
+
+  it('drawing threads name no holes: no ref, no rows', () => {
+    const r = computeMillingCostSummary(milledInput({ threads: [{ size: 'M4', count: 3, depthMm: 8 }], tappingTable: TAPPING, materialGrade: 'AISI 1018' }), mc('3_axis_mill'));
+    const tap = r.processLines.find((l) => l.process === 'Tapping')!;
+    expect(step(tap.calculationTrace, 'Threads')!.ref).toBeUndefined();
+    expect(tap.featureBreakdown).toBeUndefined();
+  });
+
+  it('the sharp-edge length opens the faces meeting at those edges, and the Deburring line lists them', () => {
+    const r = computeMillingCostSummary(milledInput({ sharpEdgeLengthMm: 1442.7, sharpEdgeFaceIds: [3, 5, 8], deburrLinearSpeedMmPerSec: 20 }), mc('3_axis_mill'));
+    const deburr = r.processLines.find((l) => l.process === 'Deburring')!;
+    expect(step(deburr.calculationTrace, 'Sharp Edge Length')!.ref).toEqual({ kind: 'faces', label: 'sharp edges', faceIds: [3, 5, 8] });
+    expect(deburr.featureBreakdown).toEqual([expect.objectContaining({ name: 'Sharp edges (1443 mm)', faceIds: [3, 5, 8] })]);
   });
 });
 

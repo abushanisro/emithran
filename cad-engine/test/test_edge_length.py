@@ -46,3 +46,11 @@ def test_fillet_removes_the_rounded_edge_and_adds_no_tangent_edges():
     assert sharp_rounded["sharp_edge_length_mm"] < sharp_box["sharp_edge_length_mm"]
     tangent_edges_excluded = sharp_rounded["total_edge_length_mm"] - sharp_rounded["sharp_edge_length_mm"]
     assert tangent_edges_excluded > 0
+
+
+def test_sharp_edge_faces_lists_each_face_meeting_a_sharp_edge_once():
+    from shared.edge_length import sharp_edge_faces, sharp_edge_length
+    box = BRepPrimAPI_MakeBox(10, 20, 30).Shape()
+    # Every edge of a box is sharp, and each of its 6 faces meets one.
+    assert sharp_edge_faces(sharp_edge_length(box, detail=True)) == [0, 1, 2, 3, 4, 5]
+    assert sharp_edge_faces({"edges": []}) == []
