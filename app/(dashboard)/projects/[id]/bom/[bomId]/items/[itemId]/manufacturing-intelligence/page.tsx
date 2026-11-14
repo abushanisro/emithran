@@ -9264,6 +9264,19 @@ export default function ManufacturingIntelligencePage() {
     return resolveFeatureSelection(selectedMachiningFeatureKey, fg.feature_graph_v2?.features ?? [], unclaimed);
   }, [selectedMachiningFeatureKey, fg]);
 
+  // A feature picked in the Features tab's tree or on the 3D model is selected in the Manufacturing Process tree too: its row is selected,
+  // its ancestors expanded and the Selected panel shows it (the same lookup as a card's highlight, onSelectHighlight). A pick no row stands
+  // for leaves the tree's selection as it is.
+  useEffect(() => {
+    if (!selectedMachiningV2Feature) return;
+    const path = treePathForFeature(tree, featuresOfHighlight(selectedMachiningV2Feature, fg?.feature_graph_v2?.features));
+    if (!path) return;
+    setSelectedNodeId(path.at(-1) ?? null);
+    setExpandedNodes((prev) => new Set([...prev, ...path.slice(0, -1)]));
+    // Only a new pick moves the tree: the tree itself changing (a recalculation) must not take back a row the engineer selected since.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMachiningV2Feature]);
+
   // Set by the Analysis panel's cost-tab "Feature breakdown" rows (Bend R1mm x2,
   // Pierces x19, Cut path...) to highlight that exact feature in the 3D viewer.
   const [selectedDirectV2Feature, setSelectedDirectV2Feature] = useState<FeatureNodeV2 | null>(null);
