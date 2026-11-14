@@ -113,7 +113,7 @@ export function MachiningDfmFindings(props: Props) {
   );
 }
 
-/** The same checks as rows of the Validation tab's DFM Checks list; a failed check highlights its instances when clicked. */
+/** The same checks as rows of the Validation section's DFM Checks list (under the Design Guidance tab); a failed check highlights its instances when clicked. */
 export function MachiningDfmCheckRows(props: Props) {
   const { data, isLoading, selected, keyOf, select } = useFindings(props);
   if (isLoading) return <div className="px-2 py-1.5 text-muted-foreground">Checking the part against the machining reference…</div>;

@@ -1,7 +1,7 @@
 import type { FactMismatch } from '@/lib/api/hooks/useBOMItems';
 
 /**
- * Validation tab rows for the part's 2D-drawing-vs-3D-CAD fact agreement
+ * Validation rows (under the Design Guidance tab) for the part's 2D-drawing-vs-3D-CAD fact agreement
  * (backend costing/shared/physics/drawing-cad-consistency.ts):
  *
  *   ✗ Bend count: drawing says 3 bends, the 3D model measures 2 bends   (critical — clickable, highlights the CAD bends)
