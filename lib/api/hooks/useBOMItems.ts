@@ -891,8 +891,8 @@ export interface ProcessLineCost {
   gdtCallouts?: GdtCallout[];
   /** Full end-to-end audit trail (real inputs + provenance, then calculated
    *  fields + real DB formula string, in evaluation order) — present only for
-   *  processes wired to a real DB calculator (Laser Cutting, Press Brake).
-   *  Powers the "Download calculation" export. */
+   *  processes wired to a real DB calculator. Shown in the Cost tab's
+   *  calculation trace and the calculator dialog. */
   calculationTrace?: CalculationTraceStep[];
   // Machining calculators: per input field, the lookup table + row(s) its value came from.
   lookupMatches?: Record<string, { table: string; row: Record<string, string | number> }>;

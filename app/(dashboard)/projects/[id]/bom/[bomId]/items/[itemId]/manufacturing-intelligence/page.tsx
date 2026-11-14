@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
   AlertCircle, GripVertical, GripHorizontal,
-  Calculator, ShieldCheck, Flame, Loader2, Edit, X, Download,
+  Calculator, ShieldCheck, Flame, Loader2, Edit, X,
   FileSpreadsheet, Search, Database,
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -67,7 +67,6 @@ import {
 import type { IMHeatmapFeatures, IMHeatmapSignals } from '@/lib/heatmap/types';
 import { cn } from '@/lib/utils';
 import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
-import { generateCalculationReportPdf } from '@/lib/utils/calculation-report';
 import { RouteCompareList } from '@/components/features/workflow/RouteCompareList';
 import { RouteStepEditor } from '@/components/features/workflow/RouteStepEditor';
 import { featuresOfHighlight, treePathForFeature } from '@/lib/features/tree-feature-path';
@@ -2214,29 +2213,6 @@ function CostSummaryTab({
                 <FeatureBreakdown items={matchedEngineLine?.featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
                 {matchedEngineLine?.machineChoice && (
                   <MachineChoicePanel choice={matchedEngineLine.machineChoice} currencySymbol={sym} />
-                )}
-                {/* Full end-to-end calculation export — only offered when the live engine
-                    actually has a real DB-calculator audit trail for this process (Laser
-                    Cutting, Press Brake so far); no placeholder button for processes that
-                    don't have one yet. */}
-                {!!matchedEngineLine?.calculationTrace?.length && (
-                  <button
-                    type="button"
-                    onClick={() => { generateCalculationReportPdf({
-                      partNumber: item.partNumber ?? item.id,
-                      location: factory,
-                      currencySymbol: sym,
-                      batchSize: batch,
-                      line: matchedEngineLine,
-                      cycleTimeSec: cycleSec,
-                      laborRate: laborRate || null,
-                    }); }}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/40 rounded px-2 py-1 transition-colors"
-                    title="Download the full calculation (formulas + real values) as a PDF for engineering review"
-                  >
-                    <Download className="h-3 w-3" />
-                    Download calculation (PDF)
-                  </button>
                 )}
                 {/* Machine — the same ⭐ recommended/alternatives/"Why" picker as the live
                     engine rows, persisting picks to THIS saved row (via onApply) instead
