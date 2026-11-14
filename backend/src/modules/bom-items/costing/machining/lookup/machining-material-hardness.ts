@@ -126,6 +126,14 @@ export function nearestByDiameterKey(
   byDiameter: Record<string, number> | undefined | null,
   diameterMm: number,
 ): number | null {
+  return nearestDiameterEntry(byDiameter, diameterMm)?.value ?? null;
+}
+
+/** The breakpoint nearestByDiameterKey reads: its diameter (the flattened table's diameter_mm) and value. */
+export function nearestDiameterEntry(
+  byDiameter: Record<string, number> | undefined | null,
+  diameterMm: number,
+): { diameterMm: number; value: number } | null {
   if (!byDiameter) return null;
   // Keep each key's ORIGINAL string alongside its numeric value -- real
   // keys are formatted like "12.0", and reconstructing via String(Number(k))
@@ -140,5 +148,5 @@ export function nearestByDiameterKey(
     entries[0]!,
   );
   const v = byDiameter[nearest.key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return typeof v === 'number' && Number.isFinite(v) ? { diameterMm: nearest.num, value: v } : null;
 }

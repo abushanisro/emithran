@@ -163,7 +163,7 @@ import {
 import { matchSurfaceTreatmentCallout } from './costing/surface/surface-treatment-engine';
 import { surfaceCalloutOf } from './costing/surface/surface-callout';
 import type { CalculatorRunDto, SecondaryOperationsDto, SecondaryOptionDto } from './dto/cost-breakdown.dto';
-import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto } from './dto/cost-breakdown.dto';
+import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto, SourceRef } from './dto/cost-breakdown.dto';
 import { cadEvidenceKey } from './costing/shared/cad-evidence';
 import { realBendLengthsMm } from './costing/shared/bend-lengths';
 import { cachedRead } from './costing/shared/core/request-cache';
@@ -3588,7 +3588,7 @@ export class BOMItemsService {
         featureOps: featureOps,
         processIdentityByMachineClass: cncProcessIdentities,
         deburrLinearSpeedMmPerSec: deburrParams.dataFound ? deburrParams.linearSpeedMmPerSec : null,
-        deburrMaterialCutCode: deburrParams.dataFound ? deburrParams.materialCutCode ?? null : null,
+        deburrMatch: deburrParams.dataFound ? deburrParams.match ?? null : null,
         reamTable,
         drillingTable,
         tappingTable,
@@ -8122,10 +8122,14 @@ export class BOMItemsService {
     const fg = (item as any).featureGraph ?? {};
     const inputs: Record<string, number> = {};
     const provenance: Record<string, string> = {};
-    const set = (field: string, value: number | null | undefined, source: string) => {
+    // Where each value was read (the engine's own trace refs, the lookup resolvers' refs); a value set without one has none.
+    const refs: Record<string, SourceRef> = {};
+    const set = (field: string, value: number | null | undefined, source: string, ref?: SourceRef) => {
       if (!inputFields.has(field) || value == null || !Number.isFinite(value) || value <= 0) return;
       inputs[field] = value;
       provenance[field] = source;
+      if (ref) refs[field] = ref;
+      else delete refs[field];
     };
 
     // CAD key inputs of this part (the engineer's own keys take precedence).
@@ -8202,11 +8206,13 @@ export class BOMItemsService {
           if (!inputFields.has(st.fieldName)) continue;
           inputs[st.fieldName] = st.value as number;
           provenance[st.fieldName] = st.source ?? 'Cost engine';
+          if (st.ref) refs[st.fieldName] = st.ref;
+          else delete refs[st.fieldName];
         }
         if (own?.lookupMatches) Object.assign(engineMatches, own.lookupMatches);
         for (const l of lines) {
           for (const st of stepsOf(l)) {
-            if (SHARED.has(st.fieldName) && !(st.fieldName in inputs)) set(st.fieldName, st.value as number, st.source ?? 'Cost engine');
+            if (SHARED.has(st.fieldName) && !(st.fieldName in inputs)) set(st.fieldName, st.value as number, st.source ?? 'Cost engine', st.ref);
           }
         }
         const resolvedBatch = (summary as any).resolvedInputs?.batchSize;
@@ -8216,7 +8222,7 @@ export class BOMItemsService {
       }
     }
     for (const [field, value] of Object.entries(keys)) {
-      if (inputFields.has(field) && Number.isFinite(value)) { inputs[field] = value; provenance[field] = 'Entered in the calculator'; }
+      if (inputFields.has(field) && Number.isFinite(value)) { inputs[field] = value; provenance[field] = 'Entered in the calculator'; delete refs[field]; }
     }
 
     // Lookup-table inputs, keyed by the inputs above.
@@ -8251,6 +8257,8 @@ export class BOMItemsService {
       inputs[field] = seed.value;
       provenance[field] = seed.source;
       if (seed.match) lookupMatches[field] = seed.match;
+      if (seed.ref) refs[field] = seed.ref;
+      else delete refs[field];
     }
 
     const missing = [...unresolved, ...(lookup?.missing ?? []).filter((m) => !Object.keys(inputs).some((f) => m.startsWith(`${f}`)))];
@@ -8259,7 +8267,7 @@ export class BOMItemsService {
       if (f.default_value != null && f.default_value !== '') continue;
       if (!missing.some((m) => m.includes(f.field_name))) missing.push(`${f.field_name}: not on this part (${f.data_source ?? 'input'}) — enter it`);
     }
-    return { calculatorId, operation, materialClass: matClass, inputs, provenance, lookupMatches, missing };
+    return { calculatorId, operation, materialClass: matClass, inputs, provenance, lookupMatches, refs, missing };
   }
 
   /** Gear/spline teeth the cad-engine recognised (machining_features AxiGroove), with their measured geometry. */
@@ -8613,7 +8621,7 @@ export class BOMItemsService {
       gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
-      deburrMaterialCutCode: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).materialCutCode ?? null,
+      deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,
       reamTable: reamTable ?? null,
       drillingTable: await this.machiningLookup.getDrillingTable(),
       tappingTable: await this.machiningLookup.getTappingTable(),
@@ -8868,7 +8876,7 @@ export class BOMItemsService {
       gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
-      deburrMaterialCutCode: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).materialCutCode ?? null,
+      deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,
       reamTable: reamTable ?? null,
       drillingTable: await this.machiningLookup.getDrillingTable(),
       tappingTable: await this.machiningLookup.getTappingTable(),
