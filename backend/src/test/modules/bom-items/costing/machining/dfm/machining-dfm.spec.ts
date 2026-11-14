@@ -11,8 +11,10 @@ const REF: MachiningDfmReference = {
   ],
   variables: { easyL2DRatio: 3, maxMillingLToDRatio: 6, difficultL2DRatio: 12, imposedLowerToolDiameterLimitForMilling: 2, delicatePartRatio: 8, aspectRatioLimitRatio: 10, pickWeight: 15.87 },
   drillSizesMm: [2.5, 4, 6, 18.5],
+  setupRule: { perpendicularCountFor3AM: 4, maxOblique4AMSetups: 0, allowedAngleDeviationDeg: 0 },
+  minWall: { recommendedMm: 0.8, feasibleMm: 0.5 },
 };
-const PART: MachiningDfmPart = { dimensionsMm: [60, 50, 40], weightKg: 0.5 };
+const PART: MachiningDfmPart = { dimensionsMm: [60, 50, 40], weightKg: 0.5, accessMeasured: true };
 
 const hole = (id: string, diameter: number, depths: number[], variant = 'blind') =>
   ({ id, feature_type: 'SimpleHole', variant, diameter_mm: diameter, occurrences: depths.map((d, i) => ({ depth_mm: d, face_ids: [100 + i] })) });
@@ -65,24 +67,60 @@ describe('evaluateMachiningDfm', () => {
   });
 
   it('a thin, long or heavy part is flagged against the reference ratios and the lifting weight', () => {
-    const r = run([hole('h', 4, [8])], { dimensionsMm: [900, 60, 5], weightKg: 20 });
+    const r = run([hole('h', 4, [8])], { dimensionsMm: [900, 60, 5], weightKg: 20, accessMeasured: true });
     expect(r.findings.map((f) => f.rule).sort()).toEqual(['DelicatePart', 'HeavyPart', 'HighAspectRatio']);
     expect(r.findings.find((f) => f.rule === 'HeavyPart')!.label).toBe('The part is too heavy to load by hand: highest 20 kg');
     expect(r.findings.every((f) => f.featureIds.length === 0)).toBe(true);
   });
 
   it('a limit that is not staged, or a measurement that is absent, is not evaluated: never passed', () => {
-    const r = run([hole('h', 4, [8])], { dimensionsMm: [60, 50, null], weightKg: null }, { sizeRanges: null, variables: {}, drillSizesMm: null });
+    const r = run([hole('h', 4, [8])], { dimensionsMm: [60, 50, null], weightKg: null, accessMeasured: true }, { sizeRanges: null, variables: {}, drillSizesMm: null, setupRule: null, minWall: null });
     expect(r.findings).toEqual([]);
-    expect(r.checks.every((c) => c.status === 'not_evaluated')).toBe(true);
+    // The sharp-corner check has no staged limit (a cutter cannot make a sharp inside corner): it alone is still judged.
+    expect(r.checks.filter((c) => c.rule !== 'SharpInternalCorner').every((c) => c.status === 'not_evaluated')).toBe(true);
     expect(checkOf(r, 'HoleDepthToDiameter').detail).toContain('not staged');
-    const measured = run([hole('h', 4, [8])], { dimensionsMm: [60, 50, null], weightKg: null });
+    const measured = run([hole('h', 4, [8])], { dimensionsMm: [60, 50, null], weightKg: null, accessMeasured: true });
     expect(checkOf(measured, 'DelicatePart').detail).toContain('no three bounding dimensions');
     expect(checkOf(measured, 'ToolReach').detail).toContain('no pocket or slot');
   });
 
-  it('what the CAD analysis does not measure is listed with the reason', () => {
-    const rules = run([hole('h', 4, [8])]).checks.filter((c) => c.status === 'not_evaluated').map((c) => c.rule);
-    expect(rules).toEqual(expect.arrayContaining(['InternalCornerRadius', 'ThinWall', 'ToolAccess']));
+  // ── Corners, walls and tool access: read from what the CAD analysis measured per occurrence ──
+  const cornered = (radius: number | undefined, depth: number, extra: object = {}) =>
+    ({ id: 'c', feature_type: 'PocketV2', variant: 'default', occurrences: [{ extents_mm: [40, 20, 0], material_removed_mm3: 40 * 20 * depth, face_ids: [300], ...(radius === undefined ? {} : { corner_radius_mm: radius }), ...extra }] });
+
+  it('a sharp inside corner is critical; a rounded one is graded by the pocket depth over the corner cutter', () => {
+    const sharp = run([cornered(0, 10)]);
+    expect(sharp.findings.find((f) => f.rule === 'SharpInternalCorner')).toMatchObject({ severity: 'critical', faces: [300] });
+    // R1 corner in a 16 deep pocket: the Ø2 cutter reaches 8 diameters.
+    const tight = run([cornered(1, 16)]);
+    expect(tight.findings.find((f) => f.rule === 'CornerCutterReach')).toMatchObject({ severity: 'major', label: '1 of 1 pockets have corners too tight for their depth: highest 8 : 1' });
+    expect(checkOf(tight, 'SharpInternalCorner').status).toBe('passed');
+    expect(run([cornered(4, 10)]).findings).toEqual([]);
+  });
+
+  it('a pocket with no inside corner passes when the analysis looked, and is not evaluated when it did not', () => {
+    expect(checkOf(run([cornered(undefined, 10)]), 'SharpInternalCorner')).toMatchObject({ status: 'passed', detail: 'No pocket has an inside corner between its walls.' });
+    const stale = run([cornered(undefined, 10)], { ...PART, accessMeasured: false });
+    for (const rule of ['SharpInternalCorner', 'CornerCutterReach', 'ThinWall', 'ToolAccess']) {
+      expect(checkOf(stale, rule)).toMatchObject({ status: 'not_evaluated', detail: expect.stringContaining('Refresh analysis') });
+    }
+  });
+
+  it('a thin wall behind a feature: below the recommended minimum major, below the feasible minimum critical', () => {
+    const walls = (...mm: number[]) => ({ id: 'w', feature_type: 'PlanarFace', variant: 'default', occurrences: mm.map((m, i) => ({ area_mm2: 10, min_wall_mm: m, face_ids: [400 + i] })) });
+    const r = run([walls(2, 0.7, 0.4)]);
+    expect(r.findings.filter((f) => f.rule === 'ThinWall').map((f) => [f.severity, f.faces])).toEqual([['critical', [402]], ['major', [401]]]);
+    expect(checkOf(run([walls(0.8, 3)]), 'ThinWall').status).toBe('passed');
+    // No limit staged for the material: not evaluated.
+    expect(checkOf(run([walls(0.4)], PART, { ...REF, minWall: null }), 'ThinWall').status).toBe('not_evaluated');
+  });
+
+  it('tool access: setups square to each other pass; a feature at an angle to the part\'s main direction needs a 5 axis mill and is the one highlighted', () => {
+    const along = (axis: number[], n: number, id: string, face: number) => ({ id, feature_type: 'SimpleHole', variant: 'blind', diameter_mm: 4, occurrences: Array.from({ length: n }, (_, i) => ({ depth_mm: 8, tool_axis: axis, face_ids: [face + i] })) });
+    const square = run([along([0, 0, 1], 3, 'top', 500), along([1, 0, 0], 1, 'side', 510)]);
+    expect(checkOf(square, 'ToolAccess')).toMatchObject({ status: 'passed', detail: '2 perpendicular, 0 oblique setups' });
+    const angled = run([along([0, 0, 1], 3, 'top', 500), along([0, 0.6428, 0.766], 1, 'angled', 520)]);
+    expect(angled.findings.find((f) => f.rule === 'ToolAccess')).toMatchObject({ severity: 'major', featureIds: ['angled'], faces: [520] });
+    expect(checkOf(angled, 'ToolAccess').status).toBe('failed');
   });
 });

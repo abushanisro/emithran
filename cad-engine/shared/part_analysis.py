@@ -182,6 +182,17 @@ def analyze_part(
                 # Nominal size for ISO 286 grading of tolerances on non-hole features.
                 from shared.feature_extent import annotate_occurrence_extents
                 annotate_occurrence_extents(shape, machining_features_result["feature_graph_v2"]["features"])
+                # How each feature is reached (tool axis), a pocket's tightest corner and the wall behind each feature:
+                # what the setup rule and the design-for-machining checks read.
+                try:
+                    from machining.feature_access import annotate_occurrence_access
+                    # The flag tells a reader the occurrences were measured: an absent corner_radius_mm then means "no inside corner", not "not looked for".
+                    machining_features_result["feature_graph_v2"]["metadata"]["feature_access"] = annotate_occurrence_access(
+                        shape, machining_features_result["feature_graph_v2"]["features"],
+                        (_bbox_raw["xmax"] - _bbox_raw["xmin"], _bbox_raw["ymax"] - _bbox_raw["ymin"], _bbox_raw["zmax"] - _bbox_raw["zmin"]),
+                    )
+                except Exception as _access_exc:
+                    logger.warning(f"[machining_fgv2] feature access failed: {_access_exc}")
                 logger.info(
                     f"[machining_fgv2] synthesised "
                     f"{len(machining_features_result['feature_graph_v2']['features'])} features"

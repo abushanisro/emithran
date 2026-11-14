@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MachiningLookupService } from '../lookup/machining-lookup.service';
+import { detectMaterialClass } from '../process/cost-machining-engine';
 import { evaluateMachiningDfm, type MachiningDfmPart, type MachiningDfmResult } from './machining-dfm';
 
 export interface MachiningDfmView {
@@ -20,14 +21,17 @@ const DFM_VARIABLES = ['easyL2DRatio', 'maxMillingLToDRatio', 'difficultL2DRatio
 export class MachiningDfmService {
   constructor(private readonly lookup: MachiningLookupService) {}
 
-  async evaluate(req: { featureGraph: unknown; part: MachiningDfmPart }): Promise<MachiningDfmView> {
-    const features = (req.featureGraph as { feature_graph_v2?: { features?: unknown } } | null)?.feature_graph_v2?.features;
+  async evaluate(req: { featureGraph: unknown; grade: string | null; part: Omit<MachiningDfmPart, 'accessMeasured'> }): Promise<MachiningDfmView> {
+    const graph = (req.featureGraph as { feature_graph_v2?: { features?: unknown; metadata?: { feature_access?: unknown } } } | null)?.feature_graph_v2;
+    const features = graph?.features;
     if (!Array.isArray(features) || features.length === 0) {
       return { status: 'no_analysis', result: null, reasons: ['The part has no machining features: run the CAD analysis first.'] };
     }
-    const [sizeRanges, variables, drillSizesMm] = await Promise.all([
+    const [sizeRanges, variables, drillSizesMm, setup, minWall] = await Promise.all([
       this.lookup.getOperationSizeRanges(), this.lookup.getVariables(DFM_VARIABLES), this.lookup.getDrillSizesMm(),
+      this.lookup.getSetupAxisRule(), this.lookup.getMachiningMinWall(detectMaterialClass(req.grade)),
     ]);
-    return { status: 'ok', result: evaluateMachiningDfm(features, req.part, { sizeRanges, variables, drillSizesMm }), reasons: [] };
+    const part = { ...req.part, accessMeasured: graph?.metadata?.feature_access === true };
+    return { status: 'ok', result: evaluateMachiningDfm(features, part, { sizeRanges, variables, drillSizesMm, setupRule: setup.rule, minWall }), reasons: [] };
   }
 }

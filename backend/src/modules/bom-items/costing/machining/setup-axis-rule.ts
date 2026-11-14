@@ -67,7 +67,6 @@ interface AxisFeatureLike {
   occurrences?: ReadonlyArray<{ tool_axis?: readonly number[] | null; tool_axis_bidirectional?: boolean | null }>;
 }
 
-const PRINCIPAL: Vec[] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 function unit(v: readonly number[]): Vec | null {
   if (v.length !== 3 || !v.every(Number.isFinite)) return null;
@@ -81,6 +80,27 @@ function angleDeg(a: Vec, b: Vec): number {
 }
 
 const neg = (v: Vec): Vec => [-v[0], -v[1], -v[2]];
+const cross = (a: Vec, b: Vec): Vec => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+/**
+ * The part's own principal directions, read from its tool axes: the line most features are reached along, the
+ * commonest line square to it, and the line square to both. "Perpendicular" setups are perpendicular to each other,
+ * not to the axes the part happens to be modelled in: a part drawn tilted in its CAD file needs no oblique setup.
+ */
+function principalDirections(axes: Vec[], tolDeg: number): Vec[] {
+  const sameLine = (a: Vec, b: Vec) => angleDeg(a, b) <= tolDeg || angleDeg(a, neg(b)) <= tolDeg;
+  const lines: Array<{ dir: Vec; count: number }> = [];
+  for (const v of axes) {
+    const line = lines.find((l) => sameLine(l.dir, v));
+    if (line) line.count += 1; else lines.push({ dir: v, count: 1 });
+  }
+  const byCount = [...lines].sort((a, b) => b.count - a.count);
+  const first = byCount[0]?.dir;
+  if (!first) return [];
+  const second = byCount.find((l) => Math.abs(angleDeg(l.dir, first) - 90) <= tolDeg)?.dir;
+  const frame = second ? [first, second, unit(cross(first, second))!] : [first];
+  return frame.flatMap((d) => [d, neg(d)]);
+}
 
 /** The engine rounds tool_axis components to this step (feature contract). */
 const ENGINE_AXIS_ROUNDING = 1e-4;
@@ -125,7 +145,9 @@ export function requiredMilledClassFromToolAxes(
   // exists does it need a setup of its own.
   for (const v of both) if (!setups.some((s) => same(s, v) || same(s, neg(v)))) setups.push(v);
 
-  const principalSetups = setups.filter((s) => PRINCIPAL.some((p) => same(s, p))).length;
+  const principal = principalDirections([...one, ...both], tol);
+  // With one principal line only, a setup square to it is perpendicular too (it would have defined the second line).
+  const principalSetups = setups.filter((s) => principal.some((p) => same(s, p))).length;
   const obliqueSetups = setups.length - principalSetups;
 
   if (obliqueSetups > rule.maxOblique4AMSetups) {

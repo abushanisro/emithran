@@ -65,6 +65,20 @@ describe('requiredMilledClassFromToolAxes', () => {
 
   it('equal directions after the engine 1e-4 rounding collapse to one setup', () => {
     const r = requiredMilledClassFromToolAxes([blind([0.5774, 0.5774, 0.5773], [0.5773, 0.5774, 0.5774])], rule);
-    expect(r.obliqueSetups).toBe(1);
+    expect(r.principalSetups + r.obliqueSetups).toBe(1);
+  });
+
+  it('a part modelled tilted in its CAD file needs no oblique setup: setups are perpendicular to each other, not to the model axes', () => {
+    // Every feature along one tilted line (both ways) and one line square to it.
+    const along: [number, number, number] = [0, 0.6428, 0.766];
+    const square: [number, number, number] = [0, 0.766, -0.6428];
+    const r = requiredMilledClassFromToolAxes([blind(along, along, [0, -0.6428, -0.766], square)], rule);
+    expect(r).toMatchObject({ required: '3_axis_mill', principalSetups: 3, obliqueSetups: 0 });
+  });
+
+  it('a hole at an angle to the part\'s own main direction is an oblique setup', () => {
+    const along: [number, number, number] = [0, 0.6428, 0.766];
+    const r = requiredMilledClassFromToolAxes([blind(along, along, along, [0, 0, 1])], rule);
+    expect(r).toMatchObject({ required: '5_axis_mill', principalSetups: 1, obliqueSetups: 1 });
   });
 });

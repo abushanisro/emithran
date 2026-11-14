@@ -523,7 +523,7 @@ export class BOMItemsController {
   async getMachiningDfm(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     const item = await this.bomItemsService.findOne(id, user.id, token);
     return this.machiningDfm.evaluate({
-      featureGraph: item.featureGraph,
+      featureGraph: item.featureGraph, grade: item.materialGrade ?? null,
       part: { dimensionsMm: [item.maxLength, item.maxWidth, item.maxHeight], weightKg: item.weight },
     });
   }
