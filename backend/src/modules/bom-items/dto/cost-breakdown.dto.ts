@@ -95,8 +95,8 @@ export type SourceRef =
   | { kind: 'variable'; domain: string; name: string }
   /** A staged reference lookup table: its row when the engine knows which one, and the column the value is in. */
   | { kind: 'lookup'; domain: string; table: string; column: string; row: Record<string, string | number> | null }
-  /** A machine's HR Rates record (mhr_records): the column (or spec key) the value is in. */
-  | { kind: 'machine'; machineId: string; machineName: string; machineClass: string; location: string | null; column: string }
+  /** A machine's HR Rates record (mhr_records): the column (or spec key) the value is in. Its class and location when the engine has them (the viewer needs only the id). */
+  | { kind: 'machine'; machineId: string; machineName: string; machineClass?: string; location?: string | null; column: string }
   /** A material's Raw Materials record: the column the value is in. */
   | { kind: 'material'; materialId: string; materialName: string; column: string }
   /** Measured on the part's CAD faces (costing/shared/cad-evidence.ts). */

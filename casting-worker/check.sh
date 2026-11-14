@@ -169,6 +169,21 @@ points_case() { # <sample stem> <allowed thicknesses, comma separated> <why>
 points_case box "20,50,100" "the rays of a 100 x 50 x 20 box"
 points_case tube "10,50" "the rays of the tube: 10 through the wall, 50 along the bore"
 
+echo "== face keys and edge faces (0.19.0): each face's geometry, for finding it on the cad-engine's mesh"
+# The 100 x 50 x 20 box from the origin, worked by hand: two 50 x 20 ends (1000 mm2) at x = 0 and 100, two 100 x 20 sides (2000 mm2) at
+# y = 0 and 50, the 100 x 50 bottom and top (5000 mm2) at z = 0 and 20, each centred on its face. Its twelve edges are all sharp and none
+# continues another, so twelve SharpEdge features, each shown by the two faces that meet at it.
+keys="$(node -e '
+    const p = JSON.parse(require("fs").readFileSync(process.argv[1])).parts[0];
+    const want = ["plane|1000.000|0.000|25.000|10.000", "plane|1000.000|100.000|25.000|10.000", "plane|2000.000|50.000|0.000|10.000",
+        "plane|2000.000|50.000|50.000|10.000", "plane|5000.000|50.000|25.000|0.000", "plane|5000.000|50.000|25.000|20.000"];
+    const got = [...p.face_keys].sort(), edges = p.features.filter((f) => f.type === "SharpEdge");
+    const pairs = edges.every((f) => f.edge_faces.length === 2 && f.edge_faces.every((n) => n >= 0 && n < 6));
+    const same = got.length === 6 && want.sort().every((k, i) => k === got[i]);
+    console.log(same && edges.length === 12 && pairs ? "ok" : "bad " + JSON.stringify(got) + " edges " + edges.length + " pairs " + pairs);
+' "$WORK/results/box/result.json")"
+[ "$keys" = "ok" ] && pass "face keys box: the six faces' surface, area and centroid; 12 sharp edges, 2 faces each" || fail "face keys box: $keys"
+
 echo "== limits"
 run_sample assembly --deadline-ms 1
 mv "$WORK/results/assembly.out" "$WORK/deadline.out"; mv "$WORK/results/assembly.exit" "$WORK/deadline.exit"

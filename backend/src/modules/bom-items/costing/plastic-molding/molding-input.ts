@@ -66,7 +66,7 @@ export interface MoldingCommonFacts {
   summary: MoldingSummary;
   grade: string | null;
   family: string;
-  material: Pick<InjectionMoldingCostInput, 'materialCostPerKg' | 'materialDensityKgM3' | 'materialSource' | 'materialType' | 'materialStockForm' | 'materialMatlState' | 'materialClamp' | 'realResinInputs'>;
+  material: Pick<InjectionMoldingCostInput, 'materialCostPerKg' | 'materialDensityKgM3' | 'materialSource' | 'materialType' | 'materialStockForm' | 'materialMatlState' | 'materialClamp' | 'realResinInputs' | 'materialRecord'>;
   plasticReference: Pick<InjectionMoldingCostInput, 'plasticReference' | 'plasticReferenceMissing'>;
   location: string;
   currencySymbol: string;

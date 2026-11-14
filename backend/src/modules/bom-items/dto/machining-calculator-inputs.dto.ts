@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsObject, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import type { SourceRef } from './cost-breakdown.dto';
 
 export class MachiningCalculatorInputsRequestDto {
   @ApiProperty({ description: 'The machining calculator (calculators.id) to resolve inputs for' })
@@ -45,6 +46,8 @@ export interface MachiningCalculatorInputsDto {
   provenance: Record<string, string>;
   /** Input field name → the lookup-table row(s) the value came from. */
   lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
+  /** Input field name → where the value was read (SourceRef), for the eye beside it; an entered value has none. */
+  refs: Record<string, SourceRef>;
   /** Inputs that could not be resolved, each with the reason. */
   missing: string[];
 }

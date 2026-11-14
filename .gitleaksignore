@@ -3,3 +3,8 @@
 0aefb527df344a80eaa43049f5afa9edc2186cfa:backend/src/common/audit/audit-row.spec.ts:generic-api-key:52
 # The same test, in this fix's first commit: the value was split but still read as a key. It is now low-entropy filler.
 6485b6a5fa22703608fd93d3a1a733df8b456faa:backend/src/common/audit/audit-row.spec.ts:generic-api-key:52
+# A material property name in the source-tables test (property_key: 'density_kg_m3'), read as a key by the generic rule.
+96cf9a467920f2158fd27c5981485e358dbf2a0f:backend/src/test/modules/processes/source-tables.spec.ts:generic-api-key:45
+# The machining setup-axis test's reference variable (key: 'perpendicularCountFor3AM'), already in the baseline, seen again through two merge commits.
+a136d9198c87926c84bfe6479a7b87d70e5a8d43:backend/src/test/modules/bom-items/costing/machining/setup-axis-rule.spec.ts:generic-api-key:12
+1527640df47bc22a3905768b3008b202be52b721:backend/src/test/modules/bom-items/costing/machining/setup-axis-rule.spec.ts:generic-api-key:12

@@ -163,9 +163,8 @@ import {
 import { matchSurfaceTreatmentCallout } from './costing/surface/surface-treatment-engine';
 import { surfaceCalloutOf } from './costing/surface/surface-callout';
 import type { CalculatorRunDto, SecondaryOperationsDto, SecondaryOptionDto } from './dto/cost-breakdown.dto';
-import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto } from './dto/cost-breakdown.dto';
+import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto, SourceRef } from './dto/cost-breakdown.dto';
 import { cadEvidenceKey } from './costing/shared/cad-evidence';
-import type { SourceRef } from './dto/cost-breakdown.dto';
 import { sourceRefOfSeed } from './costing/shared/seed-source-ref';
 import {
   deburrTimeRef, inspectionSeedRefs, laserCutSeedRefs, materialSeedRefs, pressBrakeSeedRefs, smVariableRef, turretSeedRefs, waterjetSeedRefs,
@@ -3594,7 +3593,7 @@ export class BOMItemsService {
         featureOps: featureOps,
         processIdentityByMachineClass: cncProcessIdentities,
         deburrLinearSpeedMmPerSec: deburrParams.dataFound ? deburrParams.linearSpeedMmPerSec : null,
-        deburrMaterialCutCode: deburrParams.dataFound ? deburrParams.materialCutCode ?? null : null,
+        deburrMatch: deburrParams.dataFound ? deburrParams.match ?? null : null,
         reamTable,
         drillingTable,
         tappingTable,
@@ -4003,7 +4002,7 @@ export class BOMItemsService {
       let machiningAllowance: MachiningAllowanceResult | null = null;
       // Die casting: what the metal calculators of the summary need.
       let metal: {
-        calculators: ReferenceCalculators; alloy: { name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
+        calculators: ReferenceCalculators; alloy: { id: string | null; name: string; densityKgM3: number | null; yieldLossFactor: number | null } | null;
         meltedKg: number | null; calculatorRuns: Record<string, CalculatorRunDto>;
       } | null = null;
 
@@ -4023,7 +4022,7 @@ export class BOMItemsService {
           readFinishingMachines(client, 'casting_pm_melting', location),
           this.calculatorCatalogService.loadDieCastingCalculators(accessToken),
         ]);
-        const alloyRef = castingAlloy ? { name: castingAlloy.name, densityKgM3: castingAlloy.densityKgM3, yieldLossFactor: castingAlloy.yieldLossFactor } : null;
+        const alloyRef = castingAlloy ? { id: castingAlloy.id, name: castingAlloy.name, densityKgM3: castingAlloy.densityKgM3, yieldLossFactor: castingAlloy.yieldLossFactor } : null;
 
         // Cleaning after casting and Visual Inspection at the end (memory/Die
         // Casting machines and tblVisualInspection), every die-cast part,
@@ -4037,14 +4036,14 @@ export class BOMItemsService {
         // The part weight every finishing line uses (calculator Net Material Usage).
         const netRun = castingAlloy && (item.volume ?? 0) > 0 && castingAlloy.densityKgM3 != null
           ? runReferenceCalculator(castingCalcs, 'Net Material Usage', {
-              'Part Volume': castingSeed.cad(item.volume as number, 'part volume (mm³)'),
-              Density: castingSeed.alloy(castingAlloy.name, 'Density (kg/m^3)', castingAlloy.densityKgM3),
+              'Part Volume': castingSeed.cad(item.volume as number, 'part volume (mm³)', 'part_volume'),
+              Density: castingSeed.alloy(castingAlloy, 'density_kg_m3', 'Density (kg/m^3)', castingAlloy.densityKgM3),
             }, 'Net Usage')
           : null;
         const partMassKg = netRun?.value ?? null;
         const c = cleaningLine({
           machines: local(cleaners), calculators: castingCalcs,
-          partWeight: partMassKg != null ? castingSeed.calculator(partMassKg, 'Net Material Usage') : null,
+          partWeight: netRun?.value != null ? castingSeed.calculator(netRun.value, 'Net Material Usage', netRun, 'part_volume') : null,
           partDimsMm: [((item as any).maxLength ?? 0) as number, ((item as any).maxWidth ?? 0) as number, ((item as any).maxHeight ?? 0) as number],
           batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_cleaning', costContext: zeroCtx,
         });
@@ -4054,7 +4053,7 @@ export class BOMItemsService {
           batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_visual_inspection', costContext: zeroCtx,
         });
         const t = trimLine({
-          machines: local(trimPresses), calculators: castingCalcs, alloyName: castingAlloy?.name ?? null, partsPerStroke: refSet.reference?.variables.defaultNumberOfTrimmedParts ?? null,
+          machines: local(trimPresses), calculators: castingCalcs, alloy: castingAlloy, partsPerStroke: refSet.reference?.variables.defaultNumberOfTrimmedParts ?? null,
           partingPerimeterMm: (summary.castingPartingPerimeterMm as number | null) ?? null, partMassKg,
           dimensions: refSet.reference?.grindingDimensions ?? [], shearStrengthMpa: castingAlloy?.shearStrengthMpa ?? null,
           batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_trim', costContext: zeroCtx,
@@ -4184,11 +4183,11 @@ export class BOMItemsService {
           const ductileUsd = ductileRaw != null && ductileRaw !== '' && Number.isFinite(Number(ductileRaw)) ? Number(ductileRaw) : null;
           const melt = meltingLine({
             furnaces: furnaces, calculators: castingCalcs,
-            ductileIron: ductile && ductileUsd != null ? { name: ductile.name, costPerKg: ductileUsd * usdToLocal } : null,
+            ductileIron: ductile && ductileUsd != null ? { id: ductile.id, name: ductile.name, costPerKg: ductileUsd * usdToLocal } : null,
             regionConvFactor: refSet.reference?.variables.regionConvFactor ?? NaN,
             furnaceCapacitySafetyFactor: refSet.reference?.variables.furnaceCapacitySafetyFactor ?? NaN,
-            shotVolumeMm3: line.shotVolumeMm3, cavities: line.cavities?.count ?? null,
-            alloyName: castingAlloy?.name ?? null, densityKgM3: castingAlloy?.densityKgM3 ?? null,
+            shotVolumeMm3: line.shotVolumeMm3, shotVolumeRun: line.shotVolumeRun, cavities: line.cavities?.count ?? null,
+            alloy: castingAlloy, densityKgM3: castingAlloy?.densityKgM3 ?? null,
             injectionTempC: castingAlloy?.injectionTempC ?? null,
             batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_melting',
           });
@@ -4247,6 +4246,7 @@ export class BOMItemsService {
         sandResult = await this.sandCostService.price({
           client, accessToken, location, grade,
           bomItemId: id, sourcePath: castingSourcePath({ file_3d_path: (item as any).file3dPath ?? (item as any).file_3d_path, file_step_path: (item as any).fileStepPath ?? (item as any).file_step_path }),
+          stableFaceIds: (fg?.feature_graph_v2?.metadata?.stable_face_ids as Record<string, string> | undefined) ?? null,
           measurements: {
             volumeMm3: ((item.volume ?? 0) as number) || null,
             surfaceAreaMm2: Number((item as any).surfaceArea ?? (item as any).surface_area ?? 0) || null,
@@ -4348,7 +4348,7 @@ export class BOMItemsService {
           calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
           calculatorOverrides: overridesByCalculator(await CalculatorFieldOverridesService.rows(this.databaseService.getClient(accessToken), id)),
           item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
-          material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs },
+          material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs, materialRecord: resolvedMaterial.materialRecord },
           plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
           electricity: electricityUsd(await loadLocationElectricity(this.databaseService.getClient(accessToken), location), location,
             (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),
@@ -8166,10 +8166,14 @@ export class BOMItemsService {
     const fg = (item as any).featureGraph ?? {};
     const inputs: Record<string, number> = {};
     const provenance: Record<string, string> = {};
-    const set = (field: string, value: number | null | undefined, source: string) => {
+    // Where each value was read (the engine's own trace refs, the lookup resolvers' refs); a value set without one has none.
+    const refs: Record<string, SourceRef> = {};
+    const set = (field: string, value: number | null | undefined, source: string, ref?: SourceRef) => {
       if (!inputFields.has(field) || value == null || !Number.isFinite(value) || value <= 0) return;
       inputs[field] = value;
       provenance[field] = source;
+      if (ref) refs[field] = ref;
+      else delete refs[field];
     };
 
     // CAD key inputs of this part (the engineer's own keys take precedence).
@@ -8246,11 +8250,13 @@ export class BOMItemsService {
           if (!inputFields.has(st.fieldName)) continue;
           inputs[st.fieldName] = st.value as number;
           provenance[st.fieldName] = st.source ?? 'Cost engine';
+          if (st.ref) refs[st.fieldName] = st.ref;
+          else delete refs[st.fieldName];
         }
         if (own?.lookupMatches) Object.assign(engineMatches, own.lookupMatches);
         for (const l of lines) {
           for (const st of stepsOf(l)) {
-            if (SHARED.has(st.fieldName) && !(st.fieldName in inputs)) set(st.fieldName, st.value as number, st.source ?? 'Cost engine');
+            if (SHARED.has(st.fieldName) && !(st.fieldName in inputs)) set(st.fieldName, st.value as number, st.source ?? 'Cost engine', st.ref);
           }
         }
         const resolvedBatch = (summary as any).resolvedInputs?.batchSize;
@@ -8260,7 +8266,7 @@ export class BOMItemsService {
       }
     }
     for (const [field, value] of Object.entries(keys)) {
-      if (inputFields.has(field) && Number.isFinite(value)) { inputs[field] = value; provenance[field] = 'Entered in the calculator'; }
+      if (inputFields.has(field) && Number.isFinite(value)) { inputs[field] = value; provenance[field] = 'Entered in the calculator'; delete refs[field]; }
     }
 
     // Lookup-table inputs, keyed by the inputs above.
@@ -8295,6 +8301,8 @@ export class BOMItemsService {
       inputs[field] = seed.value;
       provenance[field] = seed.source;
       if (seed.match) lookupMatches[field] = seed.match;
+      if (seed.ref) refs[field] = seed.ref;
+      else delete refs[field];
     }
 
     const missing = [...unresolved, ...(lookup?.missing ?? []).filter((m) => !Object.keys(inputs).some((f) => m.startsWith(`${f}`)))];
@@ -8303,7 +8311,7 @@ export class BOMItemsService {
       if (f.default_value != null && f.default_value !== '') continue;
       if (!missing.some((m) => m.includes(f.field_name))) missing.push(`${f.field_name}: not on this part (${f.data_source ?? 'input'}) — enter it`);
     }
-    return { calculatorId, operation, materialClass: matClass, inputs, provenance, lookupMatches, missing };
+    return { calculatorId, operation, materialClass: matClass, inputs, provenance, lookupMatches, refs, missing };
   }
 
   /** Gear/spline teeth the cad-engine recognised (machining_features AxiGroove), with their measured geometry. */
@@ -8657,7 +8665,7 @@ export class BOMItemsService {
       gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
-      deburrMaterialCutCode: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).materialCutCode ?? null,
+      deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,
       reamTable: reamTable ?? null,
       drillingTable: await this.machiningLookup.getDrillingTable(),
       tappingTable: await this.machiningLookup.getTappingTable(),
@@ -8912,7 +8920,7 @@ export class BOMItemsService {
       gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
-      deburrMaterialCutCode: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).materialCutCode ?? null,
+      deburrMatch: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).match ?? null,
       reamTable: reamTable ?? null,
       drillingTable: await this.machiningLookup.getDrillingTable(),
       tappingTable: await this.machiningLookup.getTappingTable(),

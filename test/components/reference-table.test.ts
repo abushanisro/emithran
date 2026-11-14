@@ -7,8 +7,8 @@ import { variablePanel } from '@/lib/calculators/input-source';
 
 // The sand-casting variables panel as the Process dialog opens it for Ambient Temperature: long notes on some rows.
 const panel = variablePanel({ kind: 'variable', domain: 'sand_casting', name: 'ambientTemp' } as never, [
-  { key: 'Melting', category: 'Process', value: '1', unitType: null, notes: 'A process flag with a long explanation that runs on and on. '.repeat(6) },
-  { key: 'ambientTemp', category: 'Temperature', value: '21', unitType: 'Temperature', notes: null },
+  { key: 'pouringTempMargin', category: 'variable', value: '1', unitType: null, notes: 'A process flag with a long explanation that runs on and on. '.repeat(6) },
+  { key: 'ambientTemp', category: 'variable', value: '21', unitType: 'Temperature', notes: null },
 ]);
 const html = renderToStaticMarkup(createElement(ReferenceTable, {
   columns: panel.column_definitions,

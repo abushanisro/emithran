@@ -106,7 +106,7 @@ function runPress(name: string, seeded: ReturnType<typeof pressCycleTimeSeeds>, 
 }
 
 /** The cycle of a compression press (press open/close time plus cure time), by the stored calculator. */
-export function runCompressionCycleTime(input: { pressCycleTimeS: number | null; cureTimeMin: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
+export function runCompressionCycleTime(input: Parameters<typeof pressCycleTimeSeeds>[0], calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(COMPRESSION_CALCULATOR, pressCycleTimeSeeds(input), calculators);
 }
 
@@ -143,7 +143,7 @@ export function runWeightCheck(ref: WeightCheckReference, calculators: Reference
 
 /** The cycle of a reaction injection molding (dry cycle + fill + cure time), by the stored calculator. */
 export function runRimCycleTime(
-  input: { machineCycleTimeS: number | null; partVolumeMm3: number | null; injectionRateMm3PerS: number | null; cureTimeMin: number | null },
+  input: Parameters<typeof rimCycleTimeSeeds>[0],
   calculators: ReferenceCalculators | null | undefined,
 ): PressCycle {
   return runPress(RIM_CALCULATOR, rimCycleTimeSeeds(input), calculators);

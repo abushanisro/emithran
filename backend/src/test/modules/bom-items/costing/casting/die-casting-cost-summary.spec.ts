@@ -87,13 +87,13 @@ function costPart(batchSize: number, process: 'hpdc' | 'gdc' = 'hpdc', annualVol
     ? computeHpdc({ reference: ref, referenceMissing: [], calculators, material: alloy, materialGrade: alloy.name, geometry, machines: hpdcMachines, batchSize, costContext: ctx })
     : computeGdc({ reference: ref, referenceMissing: [], calculators, material: alloy, materialGrade: alloy.name, geometry, machines: gdcMachines, batchSize, coreCount: 0, costContext: ctx });
   const net = runReferenceCalculator(calculators, 'Net Material Usage', {
-    'Part Volume': castingSeed.cad(part.volumeMm3, 'v'), Density: castingSeed.alloy(alloy.name, 'Density (kg/m^3)', alloy.densityKgM3!),
+    'Part Volume': castingSeed.cad(part.volumeMm3, 'v'), Density: castingSeed.alloy(alloy, 'density_kg_m3', 'Density (kg/m^3)', alloy.densityKgM3!),
   }, 'Net Usage').value!;
   const common = { processGroup: 'Die Casting', costContext: ctx, batchSize, calculators };
   const cleaning = cleaningLine({ ...common, machines: cleaners, partWeight: castingSeed.calculator(net, 'Net Material Usage'), partDimsMm: [160, 110, 40], machineClass: 'die_casting_cleaning' });
   const inspection = visualInspectionLine({ ...common, machines: inspectors, rows: ref.visualInspection, partMassKg: net, surfaceAreaMm2: part.surfaceAreaMm2, machineClass: 'die_casting_visual_inspection' });
   const trim = trimLine({
-    ...common, machines: trimPresses, alloyName: alloy.name, partsPerStroke: ref.variables.defaultNumberOfTrimmedParts, partingPerimeterMm: part.perimeterMm,
+    ...common, machines: trimPresses, alloy, partsPerStroke: ref.variables.defaultNumberOfTrimmedParts, partingPerimeterMm: part.perimeterMm,
     partMassKg: net, dimensions: ref.grindingDimensions, shearStrengthMpa: alloy.shearStrengthMpa, machineClass: 'die_casting_trim',
   });
   const grinding = partingLineGrindingLine({
@@ -103,9 +103,9 @@ function costPart(batchSize: number, process: 'hpdc' | 'gdc' = 'hpdc', annualVol
     variables: ref.variables, machineClass: 'die_casting_finishing',
   });
   const melting = meltingLine({
-    furnaces, calculators, ductileIron: { name: 'Induction - DI', costPerKg: diConversion }, regionConvFactor: ref.variables.regionConvFactor,
+    furnaces, calculators, ductileIron: { id: 'induction-di', name: 'Induction - DI', costPerKg: diConversion }, regionConvFactor: ref.variables.regionConvFactor,
     furnaceCapacitySafetyFactor: ref.variables.furnaceCapacitySafetyFactor, shotVolumeMm3: line.shotVolumeMm3, cavities: line.cavities?.count ?? null,
-    alloyName: alloy.name, densityKgM3: alloy.densityKgM3, injectionTempC: alloy.injectionTempC, batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_melting',
+    alloy, densityKgM3: alloy.densityKgM3, injectionTempC: alloy.injectionTempC, batchSize, processGroup: 'Die Casting', machineClass: 'die_casting_melting',
   });
   const borders = line.machine && process === 'hpdc' ? pressDieBorders(toolingRef, line.machine.clampingForceKn!) : null;
   const dieTooling = line.machine && borders && 'borders' in borders
@@ -119,7 +119,7 @@ function costPart(batchSize: number, process: 'hpdc' | 'gdc' = 'hpdc', annualVol
     family: 'die_cast', process: 'die_casting', hpdc: line, materialGrade: alloy.name, materialCostPerKg: Number(alloyRow['Unit Cost (USD/kg)']),
     materialDensityKgM3: alloy.densityKgM3!, materialSource: 'db', partVolumeMm3: part.volumeMm3, batchSize, warnings: [], ratesSource: 'test',
     finishing: { melting: melting.line, trim: trim.line, grinding: grinding.line, cleaning: cleaning.line, inspection: inspection.line, warnings: [] },
-    dieTooling, calculators, alloy: { name: alloy.name, densityKgM3: alloy.densityKgM3, yieldLossFactor: alloy.yieldLossFactor }, meltedKg: melting.meltedKg,
+    dieTooling, calculators, alloy: { id: alloy.id, name: alloy.name, densityKgM3: alloy.densityKgM3, yieldLossFactor: alloy.yieldLossFactor }, meltedKg: melting.meltedKg,
     calculatorRuns: trim.forceRun ? { 'Trim Force': trim.forceRun } : {},
   });
   return { summary, line, melting, dieTooling, net };

@@ -12,6 +12,8 @@ import type { BlockSize, SideActionSignals } from '../side-action-signals';
 import { planRibInserts, ribInsertQuantities, type RibSignals } from '../process/rib-inserts';
 import type { SteelTreatment } from '../reference/im-reference';
 import { calculatorFingerprint, requirePlasticCalculator, withRegistryFormulas } from './plastic-cycle-time';
+import { componentNameKey } from '../plastic-reference';
+import { plasticLookup, plasticVariable, withRef } from './plastic-input-sources';
 
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
 const OUTPUT = 'Tooling Cost Per Part';
@@ -29,6 +31,8 @@ export interface MoldToolingFacts {
   componentsSubtotalUsd: number;
   moldBaseAreaMm2: number;
   designHours: number;
+  /** The mold_base_area_mm2 of the cmMoldBaseDesignHours row the design hours were read from; absent when not known. */
+  designHoursRowAreaMm2?: number | null;
   assemblyHours: number;
   tables: MoldToolingTables;
   /** The quote location's toolroom rates; null when memory/ holds none for it (USA only). */
@@ -40,6 +44,8 @@ export interface MoldToolingFacts {
   toolLifeShots: number;
   /** Where the tool life came from: the tblToolLife row of the material type, or the reference default. */
   toolLifeSource: string;
+  /** The Material Type of the tblToolLife row the tool life was read from; null when it is the reference default (defaultToolLife). Absent: not known. */
+  toolLifeMaterialType?: string | null;
   /** The standard mold base chosen for the part (mold-base.ts), or what is missing to choose one. */
   moldBase: MoldBaseChoice | { missing: string[] };
   moldBaseRef: MoldBaseReference;
@@ -120,72 +126,119 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
   const steel = `${REF}/process/digital_factory_tool_materials_usa: ${mb.steel.name} (digital_factory_settings_usa defaultToolMaterialName)`;
   const listed = f.components.map((c) => `${c.componentName} ${c.qty} x ${c.unitCostUsd}`).join(', ');
   const settings = `${REF}/process/digital_factory_settings_usa: Default`;
+  // Where each value was read (plastic-input-sources.ts): the staged variable, or the lookup table's column and row. A value summed or multiplied over
+  // several rows or variables (the component subtotal, the assembly hours, the plate setups, the block volumes, the rib insert quantities), a CAD
+  // bounding-box size, the scenario and the approved rules have no one place to open, so they carry none.
+  const v = plasticVariable;
+  const settingsRef = (column: string) => plasticLookup('digital_factory_settings_usa', column, { name: 'Default' });
+  const steelRef = (column: string) => plasticLookup('digital_factory_tool_materials_usa', column, { name: mb.steel.name });
+  const machiningRate = (rowName: string) => plasticLookup('cmToolMachiningRates', 'rate', { name: rowName });
+  /** A component's staged row name (the tables spell components differently: componentNameKey), for its row. */
+  const stagedName = (rows: ReadonlyArray<{ name: string }>, wanted: string) => rows.find((r) => componentNameKey(r.name) === componentNameKey(wanted))?.name;
+  const rowNamed = (table: string, column: string, rows: ReadonlyArray<{ name: string }>, wanted: string) => {
+    const name = stagedName(rows, wanted);
+    return name ? plasticLookup(table, column, { name }) : undefined;
+  };
+  // A base name repeats in the table (two 11X12 sizes in inches): the row is the one with this name, unit and size, in the table's own unit.
+  const baseUnitMm = mb.system === 'Imperial' ? 25.4 : 1;
+  const baseRow = {
+    'Mold Base Name': b.base.name, 'Reference Uom': mb.system === 'Imperial' ? 'inches' : 'mm',
+    'Actual Width': b.base.widthMm / baseUnitMm, 'Actual Length': b.base.lengthMm / baseUnitMm,
+  };
+  const toolLifeRef = f.toolLifeMaterialType === undefined ? undefined
+    : f.toolLifeMaterialType === null ? v('defaultToolLife') : plasticLookup('tblToolLife', 'Num Shots Per Tool', { 'Material Type': f.toolLifeMaterialType });
+  const designRef = f.designHoursRowAreaMm2 != null ? plasticLookup('cmMoldBaseDesignHours', 'base_design_hrs_hr', { mold_base_area_mm2: f.designHoursRowAreaMm2 }) : undefined;
   return {
     seeds: {
       'Purchased Components Cost': { value: f.componentsSubtotalUsd, source: `${REF}/lookup/cmStandardToolingComponents: ${listed || 'none'}`, lookup: true },
       'Mold Base Area': { value: f.moldBaseAreaMm2, source: `CAD projected area x ${f.cavityCount} cavit${f.cavityCount === 1 ? 'y' : 'ies'} (the required mold window)` },
-      'Design Hours': { value: f.designHours, source: `${REF}/lookup/cmMoldBaseDesignHours: the first row covering ${Math.round(f.moldBaseAreaMm2)} mm²`, lookup: true },
-      'Plate Machining Rate': { value: f.tables.plateMachiningRateM2PerHr, source: `${REF}/lookup/cmToolMachiningRates: Cavity Core Plate General Machining`, lookup: true },
+      'Design Hours': withRef({ value: f.designHours, source: `${REF}/lookup/cmMoldBaseDesignHours: the first row covering ${Math.round(f.moldBaseAreaMm2)} mm²`, lookup: true }, designRef),
+      'Plate Machining Rate': {
+        value: f.tables.plateMachiningRateM2PerHr, source: `${REF}/lookup/cmToolMachiningRates: Cavity Core Plate General Machining`, lookup: true,
+        ref: machiningRate('Cavity Core Plate General Machining'),
+      },
       'Plate Setup Hours': { value: f.tables.cavityPlateSetupHr + f.tables.corePlateSetupHr, source: `${REF}/lookup/cmToolMachiningSetups: cavity ${f.tables.cavityPlateSetupHr} h + core ${f.tables.corePlateSetupHr} h`, lookup: true },
       'Assembly Hours': { value: f.assemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: hours per component x its quantity`, lookup: true },
-      'Design Rate': { value: f.toolroomRates.designUsdPerHr, source: `${settings} designRateUsdPerHr` },
-      'Machining Rate': { value: f.toolroomRates.machiningUsdPerHr, source: `${settings} machiningRateUsdPerHr` },
-      'Assembly Rate': { value: f.toolroomRates.assemblyUsdPerHr, source: `${settings} assemblyRateUsdPerHr` },
+      'Design Rate': { value: f.toolroomRates.designUsdPerHr, source: `${settings} designRateUsdPerHr`, ref: settingsRef('designRateUsdPerHr') },
+      'Machining Rate': { value: f.toolroomRates.machiningUsdPerHr, source: `${settings} machiningRateUsdPerHr`, ref: settingsRef('machiningRateUsdPerHr') },
+      'Assembly Rate': { value: f.toolroomRates.assemblyUsdPerHr, source: `${settings} assemblyRateUsdPerHr`, ref: settingsRef('assemblyRateUsdPerHr') },
       'Annual Volume': { value: f.annualVolume, source: 'Scenario: annual volume' },
       'Production Life': { value: f.productionLifeYears, source: 'Scenario: production life (years)' },
       'Cavities per Mold': { value: f.cavityCount, source: 'The costed cavity count' },
-      'Tool Life Shots': { value: f.toolLifeShots, source: f.toolLifeSource, lookup: true },
+      'Tool Life Shots': withRef({ value: f.toolLifeShots, source: f.toolLifeSource, lookup: true }, toolLifeRef),
       'Mold Base Width': {
-        value: b.base.widthMm, lookup: true,
+        value: b.base.widthMm, lookup: true, ref: plasticLookup('tblStandardMoldBaseSizes', 'Actual Width', baseRow),
         source: `${REF}/lookup/tblStandardMoldBaseSizes: ${b.base.name} (${mb.system}), the smallest holding ${Math.round(b.requiredWidthMm)} x ${Math.round(b.requiredLengthMm)} mm: `
           + `${b.layout.widthWise} x ${b.layout.lengthWise} cavities (layoutNumCav) with ${mb.betweenPartsMm} mm between parts, edge borders ${b.edgeBorderXMm} / ${b.edgeBorderYMm} mm (tblEdgeMoldBorderX/Y)`,
       },
-      'Mold Base Length': { value: b.base.lengthMm, source: `${REF}/lookup/tblStandardMoldBaseSizes: ${b.base.name}`, lookup: true },
+      'Mold Base Length': { value: b.base.lengthMm, source: `${REF}/lookup/tblStandardMoldBaseSizes: ${b.base.name}`, lookup: true, ref: plasticLookup('tblStandardMoldBaseSizes', 'Actual Length', baseRow) },
       'Part Height': { value: f.partHeightMm!, source: 'CAD bounding box: the smallest side, along the pull direction' },
-      'A Plate Cavity Ratio': { value: mb.aPlateCavityRatio, source: `${vars}: aPlateFlatCavityRatio` },
-      'Cavity Plate Depth Border': { value: b.cavityDepthBorderMm, source: `${REF}/lookup/tblCavityPlateDepthBorder: by the press force (inches, in mm)`, lookup: true },
-      'Core Plate Depth Border': { value: b.coreDepthBorderMm, source: `${REF}/lookup/tblCorePlateDepthBorder: by the press force (inches, in mm)`, lookup: true },
-      'A Plate Min Thickness': { value: mb.aPlateMinMm, source: `${vars}: aPlateMinThickness` },
-      'B Plate Min Thickness': { value: mb.bPlateMinMm, source: `${vars}: bPlateMinThickness` },
-      'Top Clamp Plate Thickness': { value: mb.topClampMm, source: `${vars}: topClampPlateThickness` },
-      'Support Plate Thickness': { value: mb.supportPlateMm, source: `${vars}: supportPlateThickness` },
-      'Bottom Clamp Plate Thickness': { value: mb.bottomClampMm, source: `${vars}: bottomClampPlateThickness` },
-      'Tool Steel Density': { value: mb.steel.densityKgM3, source: `${steel}: densityKgPerM3`, lookup: true },
-      'Tool Steel Price': { value: mb.steel.priceUsdPerKg, source: `${steel}: materialCostUsdPerKg`, lookup: true },
-      'Mold Base Cost Factor': { value: mb.steel.moldBaseCostFactor, source: `${steel}: moldBaseCostFactor`, lookup: true },
-      'Part Surface Area': { value: f.partSurfaceAreaMm2!, source: 'CAD part surface area' },
+      'A Plate Cavity Ratio': { value: mb.aPlateCavityRatio, source: `${vars}: aPlateFlatCavityRatio`, ref: v('aPlateFlatCavityRatio') },
+      'Cavity Plate Depth Border': {
+        value: b.cavityDepthBorderMm, source: `${REF}/lookup/tblCavityPlateDepthBorder: by the press force (inches, in mm)`, lookup: true,
+        ref: plasticLookup('tblCavityPlateDepthBorder', 'Cavity Plate Depth Border (in)', { 'Max Press Force (kN)': b.cavityDepthBorderRowKn }),
+      },
+      'Core Plate Depth Border': {
+        value: b.coreDepthBorderMm, source: `${REF}/lookup/tblCorePlateDepthBorder: by the press force (inches, in mm)`, lookup: true,
+        ref: plasticLookup('tblCorePlateDepthBorder', 'Core Plate Depth Border (in)', { 'Max Press Force (kN)': b.coreDepthBorderRowKn }),
+      },
+      'A Plate Min Thickness': { value: mb.aPlateMinMm, source: `${vars}: aPlateMinThickness`, ref: v('aPlateMinThickness') },
+      'B Plate Min Thickness': { value: mb.bPlateMinMm, source: `${vars}: bPlateMinThickness`, ref: v('bPlateMinThickness') },
+      'Top Clamp Plate Thickness': { value: mb.topClampMm, source: `${vars}: topClampPlateThickness`, ref: v('topClampPlateThickness') },
+      'Support Plate Thickness': { value: mb.supportPlateMm, source: `${vars}: supportPlateThickness`, ref: v('supportPlateThickness') },
+      'Bottom Clamp Plate Thickness': { value: mb.bottomClampMm, source: `${vars}: bottomClampPlateThickness`, ref: v('bottomClampPlateThickness') },
+      'Tool Steel Density': { value: mb.steel.densityKgM3, source: `${steel}: densityKgPerM3`, lookup: true, ref: steelRef('densityKgPerM3') },
+      'Tool Steel Price': { value: mb.steel.priceUsdPerKg, source: `${steel}: materialCostUsdPerKg`, lookup: true, ref: steelRef('materialCostUsdPerKg') },
+      'Mold Base Cost Factor': { value: mb.steel.moldBaseCostFactor, source: `${steel}: moldBaseCostFactor`, lookup: true, ref: steelRef('moldBaseCostFactor') },
+      'Part Surface Area': { value: f.partSurfaceAreaMm2!, source: 'CAD part surface area', ref: { kind: 'cad', evidence: 'part_surface' } },
       'Cavity Machining Hours Per Sq In': {
         value: cav.hoursPerSqIn, lookup: true,
+        ref: plasticLookup(`tblHrsPerSqInch${cav.complexity}`, `Hrs Per Sq Inch ${cav.complexity} (hr)`, { [`Surface Area ${cav.complexity} (in^2)`]: cav.rowUpToSqIn }),
         source: `${REF}/lookup/tblHrsPerSqInch${cav.complexity}: the row up to ${cav.rowUpToSqIn} in² (${cav.complexity}: ${cav.faceCount} CAD faces against `
           + `cmMoldSurfaceCountThreshold ${mb.complexityFaceThresholds.simple} / ${mb.complexityFaceThresholds.average}, borrowed from compression molding)`,
       },
-      'Polish Hours Per Sq Meter': { value: mb.finish.hoursPerSqM, source: `${REF}/lookup/SPIFinishes: ${mb.finish.name} (defaultCavityFinishIM)`, lookup: true },
-      'Area Per Ejector Pin': { value: x.areaPerEjectorPinMm2, source: `${vars}: areaCoveredPerEjectorPin` },
-      'Ejector Pin Cost': { value: x.ejectorPinUsd, source: `${REF}/lookup/cmStandardToolingComponents: Ejector Pin (its quantity "is calculated in the cost model")`, lookup: true },
-      'Ejector Pin Assembly Hours': { value: x.ejectorPinAssemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: Ejector Pin`, lookup: true },
-      'Sprue Bushing Cost': { value: x.sprueBushingUsd, source: `${vars}: sprueBushingCost (one per mold)` },
-      'Locating Ring Cost': { value: x.locatingRingUsd, source: `${vars}: locatingRingsCost (one per mold)` },
-      'Tryout Base Hours': { value: x.tryoutBaseHours, source: `${vars}: timePerTryoutBase` },
+      'Polish Hours Per Sq Meter': {
+        value: mb.finish.hoursPerSqM, source: `${REF}/lookup/SPIFinishes: ${mb.finish.name} (defaultCavityFinishIM)`, lookup: true,
+        ref: plasticLookup('SPIFinishes', 'Hrs Per Sq Meter (hr / m^2)', { 'Finish Name': mb.finish.name }),
+      },
+      'Area Per Ejector Pin': { value: x.areaPerEjectorPinMm2, source: `${vars}: areaCoveredPerEjectorPin`, ref: v('areaCoveredPerEjectorPin') },
+      'Ejector Pin Cost': withRef(
+        { value: x.ejectorPinUsd, source: `${REF}/lookup/cmStandardToolingComponents: Ejector Pin (its quantity "is calculated in the cost model")`, lookup: true },
+        rowNamed('cmStandardToolingComponents', 'unit_cost_usd', f.tables.components, 'Ejector Pin'),
+      ),
+      'Ejector Pin Assembly Hours': withRef(
+        { value: x.ejectorPinAssemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: Ejector Pin`, lookup: true },
+        rowNamed('cmToolAssemblyTimes', 'assembly_time_hr', f.tables.assemblyTimes, 'Ejector Pin'),
+      ),
+      'Sprue Bushing Cost': { value: x.sprueBushingUsd, source: `${vars}: sprueBushingCost (one per mold)`, ref: v('sprueBushingCost') },
+      'Locating Ring Cost': { value: x.locatingRingUsd, source: `${vars}: locatingRingsCost (one per mold)`, ref: v('locatingRingsCost') },
+      'Tryout Base Hours': { value: x.tryoutBaseHours, source: `${vars}: timePerTryoutBase`, ref: v('timePerTryoutBase') },
       'Tryout Press Multiplier': {
         value: f.pressClampTonnes! > TRYOUT_DOUBLE_ABOVE_TONNES ? 2 : 1,
         source: `${vars}: timePerTryoutBase note "<500T (x2 for bigger)": the press is ${Math.round(f.pressClampTonnes!)} t`,
       },
-      'Number of Tryouts': { value: x.tryouts, source: `${vars}: defaultNumTryOuts` },
-      'Tryout Rate': { value: f.toolroomRates.tryoutUsdPerHr, source: `${settings} tryoutRateUsdPerHr` },
+      'Number of Tryouts': { value: x.tryouts, source: `${vars}: defaultNumTryOuts`, ref: v('defaultNumTryOuts') },
+      'Tryout Rate': { value: f.toolroomRates.tryoutUsdPerHr, source: `${settings} tryoutRateUsdPerHr`, ref: settingsRef('tryoutRateUsdPerHr') },
       'Slide Block Volume': { value: sa.slideVolumeIn3, source: `CAD slide bundles: ${sa.slideSource}`, lookup: true },
       'Lifter Block Volume': { value: sa.lifterVolumeIn3, source: `CAD lifter bundles (a bundle a slide could also serve is costed as a lifter): ${sa.lifterSource}`, lookup: true },
       'Side Action Block Surface': { value: sa.surfaceIn2, source: `each of the ${sa.count} block${sa.count === 1 ? '' : 's'} as a cube of its volume, 6 x V^(2/3) in², summed` },
       'Side Actions': { value: sa.count, source: f.sideActionBlocks ? 'CAD: the recognised slide and lifter bundles with a size class' : 'CAD features not recognised: no bundles to price' },
-      'CMM Hours Per Side Action': { value: x.cmmHoursPerSideAction, source: `${vars}: cmmInspectionMultiplier` },
-      'CMM Base Hours': { value: x.cmmBaseHours, source: `${vars}: cmmInspectionAdder` },
-      'Heat Treat Rate': { value: f.toolroomRates.heatTreatUsdPerKg, source: `${settings} heatTreatRateUsdPerKg (the cavity and core plates and the slide and lifter blocks)` },
-      'Stress Relief Rate': { value: f.toolroomRates.stressReliefUsdPerKg, source: `${settings} stressReliefRateUsdPerKg (the clamp and support plates)` },
-      'Water Line Diameter': { value: x.waterLineDiameterMm, source: `${vars}: defaultWaterLineDiameter` },
+      'CMM Hours Per Side Action': { value: x.cmmHoursPerSideAction, source: `${vars}: cmmInspectionMultiplier`, ref: v('cmmInspectionMultiplier') },
+      'CMM Base Hours': { value: x.cmmBaseHours, source: `${vars}: cmmInspectionAdder`, ref: v('cmmInspectionAdder') },
+      'Heat Treat Rate': {
+        value: f.toolroomRates.heatTreatUsdPerKg, source: `${settings} heatTreatRateUsdPerKg (the cavity and core plates and the slide and lifter blocks)`,
+        ref: settingsRef('heatTreatRateUsdPerKg'),
+      },
+      'Stress Relief Rate': { value: f.toolroomRates.stressReliefUsdPerKg, source: `${settings} stressReliefRateUsdPerKg (the clamp and support plates)`, ref: settingsRef('stressReliefRateUsdPerKg') },
+      'Water Line Diameter': { value: x.waterLineDiameterMm, source: `${vars}: defaultWaterLineDiameter`, ref: v('defaultWaterLineDiameter') },
       'Water Line Pitch Factor': { value: WATER_LINE_PITCH_FACTOR, source: 'Approved rule: lines 3 line diameters apart across the cavity plate (no pitch is on file)' },
-      'Line Drilling Rate': { value: x.lineDrillingMmPerMin, source: `${REF}/lookup/cmToolMachiningRates: Heater Line Drilling (the only line drilling rate on file)`, lookup: true },
-      'Water Hose Cost': { value: x.waterHoseUsd, source: `${vars}: waterHosesCost (2 per line)` },
-      'Water Fitting Cost': { value: x.waterFittingUsd, source: `${vars}: waterManifoldFittingsCost (2 per line)` },
-      'Water Manifold Cost': { value: x.waterManifoldUsd, source: `${vars}: waterManifoldsCost (one per side)` },
+      'Line Drilling Rate': {
+        value: x.lineDrillingMmPerMin, source: `${REF}/lookup/cmToolMachiningRates: Heater Line Drilling (the only line drilling rate on file)`, lookup: true,
+        ref: machiningRate('Heater Line Drilling'),
+      },
+      'Water Hose Cost': { value: x.waterHoseUsd, source: `${vars}: waterHosesCost (2 per line)`, ref: v('waterHosesCost') },
+      'Water Fitting Cost': { value: x.waterFittingUsd, source: `${vars}: waterManifoldFittingsCost (2 per line)`, ref: v('waterManifoldFittingsCost') },
+      'Water Manifold Cost': { value: x.waterManifoldUsd, source: `${vars}: waterManifoldsCost (one per side)`, ref: v('waterManifoldsCost') },
       'Rib Inserts': { value: rq.inserts, source: ribSource, lookup: true },
       'Rib Insert Area': { value: rq.areaIn2, source: `${rq.breakdown} x {small,medium,large}InsertArea ${ri.areaIn2.small} / ${ri.areaIn2.medium} / ${ri.areaIn2.large} in²`, lookup: true },
       'Rib Insert Electrode Volume': {
@@ -194,13 +247,19 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       },
       'Rib Insert Burned Volume': { value: rq.burnedIn3, source: `the electrode volume x edmElectrodeVolumeBurn ${ri.electrodeBurnFraction}` },
       'Rib Insert Design Hours': { value: rq.designHours, source: `${rq.breakdown} x cmDesignHrsRibInsert{Small,Medium,Large} ${ri.designHours.small} / ${ri.designHours.medium} / ${ri.designHours.large} h`, lookup: true },
-      'Cutter Path Hours Per Insert': { value: ri.cutterPathHours, source: `${vars}: cutterPathHrsPerInsert` },
-      'Spotting Hours Per Insert': { value: ri.spottingHours, source: `${vars}: spottingHrsPerInsert` },
-      'Rib Insert Assembly Hours': { value: ri.assemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: Rib Insert`, lookup: true },
-      'Electrode Material Cost': { value: ri.electrodeUsdPerIn3, source: `${settings} edmMaterialCostCarbonUsdPerIn3 (graphite, the approved electrode material)` },
-      'EDM Burn Rate': { value: ri.burnRateMm3PerMin, source: `${REF}/lookup/cmToolMachiningRates: EDM Electrode Burn`, lookup: true },
-      'EDM Rate': { value: f.toolroomRates.edmUsdPerHr, source: `${settings} edmRateUsdPerHr` },
-      'Insert Pocket Rate': { value: ri.pocketRateMm3PerMin, source: `${REF}/lookup/cmToolMachiningRates: Insert Pocket Machining`, lookup: true },
+      'Cutter Path Hours Per Insert': { value: ri.cutterPathHours, source: `${vars}: cutterPathHrsPerInsert`, ref: v('cutterPathHrsPerInsert') },
+      'Spotting Hours Per Insert': { value: ri.spottingHours, source: `${vars}: spottingHrsPerInsert`, ref: v('spottingHrsPerInsert') },
+      'Rib Insert Assembly Hours': withRef(
+        { value: ri.assemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: Rib Insert`, lookup: true },
+        rowNamed('cmToolAssemblyTimes', 'assembly_time_hr', f.tables.assemblyTimes, 'Rib Insert'),
+      ),
+      'Electrode Material Cost': {
+        value: ri.electrodeUsdPerIn3, source: `${settings} edmMaterialCostCarbonUsdPerIn3 (graphite, the approved electrode material)`,
+        ref: settingsRef('edmMaterialCostCarbonUsdPerIn3'),
+      },
+      'EDM Burn Rate': { value: ri.burnRateMm3PerMin, source: `${REF}/lookup/cmToolMachiningRates: EDM Electrode Burn`, lookup: true, ref: machiningRate('EDM Electrode Burn') },
+      'EDM Rate': { value: f.toolroomRates.edmUsdPerHr, source: `${settings} edmRateUsdPerHr`, ref: settingsRef('edmRateUsdPerHr') },
+      'Insert Pocket Rate': { value: ri.pocketRateMm3PerMin, source: `${REF}/lookup/cmToolMachiningRates: Insert Pocket Machining`, lookup: true, ref: machiningRate('Insert Pocket Machining') },
       'Insert Pocket Setup Hours': { value: ri.pocketSetupHours, source: `${REF}/lookup/cmToolMachiningSetups: Insert Pocket (setups x hours)`, lookup: true },
       'Hardening Applies': { value: st?.hardening ? 1 : 0, source: treatmentSource('heat_treatment_required', st?.hardening), lookup: true },
       'Stress Relief Applies': { value: st?.stressRelief ? 1 : 0, source: treatmentSource('stress_relief_required', st?.stressRelief), lookup: true },
@@ -208,7 +267,10 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
         value: f.runner === 'hot' ? f.cavityCount * f.gatesPerCavity : 0,
         source: f.runner === 'hot' ? `hot runner: ${f.cavityCount} cavit${f.cavityCount === 1 ? 'y' : 'ies'} x ${f.gatesPerCavity} gate(s) per cavity (defaultNumberOfGatesPerCavity), one drop per gate` : 'cold runner: no hot drops',
       },
-      'Hot Drop Unit Cost': { value: x.hotDrop.usd, source: `${vars}: ${x.hotDrop.type === 'SVG' ? 'costPerSVGHotDrop' : 'costPerStandardHotDrop'} (defaultHotDropType ${x.hotDrop.type})` },
+      'Hot Drop Unit Cost': {
+        value: x.hotDrop.usd, source: `${vars}: ${x.hotDrop.type === 'SVG' ? 'costPerSVGHotDrop' : 'costPerStandardHotDrop'} (defaultHotDropType ${x.hotDrop.type})`,
+        ref: v(x.hotDrop.type === 'SVG' ? 'costPerSVGHotDrop' : 'costPerStandardHotDrop'),
+      },
     },
   };
 }

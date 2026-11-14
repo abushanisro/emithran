@@ -119,6 +119,8 @@ export const DIE_TOOLING_LOOKUP_KEYS = [
 export const TOOL_SHOP_LOOKUP_KEYS = ['digital_factory_settings_usa', 'digital_factory_tool_materials_usa'] as const;
 const TOOL_SHOP_NAME = 'Default';
 const DIE_STEEL = 'AISI H13';
+/** The tool shop tables (digital_factory_*_usa) are staged with memory/plastic modeling (2026-Plastic), the injection_molding reference domain. */
+const TOOL_SHOP_DOMAIN = 'injection_molding';
 
 export interface DieToolingReference {
   v: Record<(typeof DIE_TOOLING_VARIABLE_KEYS)[number], number>;
@@ -414,8 +416,8 @@ export function computeDieTooling(input: DieToolingInput): DieToolingResult {
   const pressure = input.pressForceKn != null;
   const vs = (k: keyof typeof v) => castingSeed.variable(k, v[k]);
   const build = run('Die Build', 'Die Casting - Die Build', 'Total Steel Weight', {
-    'Die Length': castingSeed.calculator(dieX, 'Die Size'),
-    'Die Steel Weight': castingSeed.calculator(size.value, 'Die Size'),
+    'Die Length': castingSeed.calculator(dieX, 'Die Size', size),
+    'Die Steel Weight': castingSeed.calculator(size.value, 'Die Size', size),
     'Base Design Time': castingSeed.lookup('tblMoldBaseDesignTime', ref.customBase ? 'Custom Base Design Time (hr)' : 'Standard Base Design Time (hr)',
       ref.customBase ? design.customHr : design.standardHr, designRow),
     'Per Slide Design Time': castingSeed.lookup('tblMoldBaseDesignTime', 'Per Slide Design Time (hr)', design.perSlideHr, designRow),
@@ -424,7 +426,7 @@ export function computeDieTooling(input: DieToolingInput): DieToolingResult {
     'Parting Line Design Time per Slide': vs('partingLineDesignTimePerSlide'),
     'Hours per Square Inch': castingSeed.lookup(COMPLEXITY_TABLE[complexity], `Hrs Per Sq Inch ${complexity} (hr / in^2)`, hrRow.hrPerIn2,
       { [`Surface Area ${complexity} (in^2)`]: hrRow.maxAreaIn2 }),
-    'Surface Area': castingSeed.cad(input.surfaceAreaMm2, 'part surface area (mm²)'),
+    'Surface Area': castingSeed.cad(input.surfaceAreaMm2, 'part surface area (mm²)', 'part_surface'),
     'Cavities': castingSeed.engine(n, `${n} cavit${n === 1 ? 'y' : 'ies'} per die`),
     'H13 Machinability': vs('machinabilityMultiplierH13ToolSteel'),
     'Projected Area': castingSeed.cad(input.projectedAreaMm2, 'projected area on the parting plane (mm²)'),
@@ -476,17 +478,17 @@ export function computeDieTooling(input: DieToolingInput): DieToolingResult {
   const shop = ref.toolShop;
   const shopRow = { name: TOOL_SHOP_NAME };
   const cost = run('Die Cost', 'Die Casting - Die Cost', 'Die Cost', {
-    'Total Steel Weight': castingSeed.calculator(build.value, 'Die Build'),
-    'Component Cost': castingSeed.calculator(o['Component Cost']!, 'Die Build'),
-    'Design Hours': castingSeed.calculator(o['Design Hours']!, 'Die Build'),
-    'Machining Hours': castingSeed.calculator(o['Machining Hours']!, 'Die Build'),
-    'Assembly Hours': castingSeed.calculator(o['Assembly Hours']!, 'Die Build'),
-    'H13 Price': castingSeed.lookup('digital_factory_tool_materials_usa', 'materialCostUsdPerKg', shop.h13UsdPerKg, { name: DIE_STEEL }),
+    'Total Steel Weight': castingSeed.calculator(build.value, 'Die Build', build),
+    'Component Cost': castingSeed.calculator(o['Component Cost']!, 'Die Build', build),
+    'Design Hours': castingSeed.calculator(o['Design Hours']!, 'Die Build', build),
+    'Machining Hours': castingSeed.calculator(o['Machining Hours']!, 'Die Build', build),
+    'Assembly Hours': castingSeed.calculator(o['Assembly Hours']!, 'Die Build', build),
+    'H13 Price': castingSeed.lookup('digital_factory_tool_materials_usa', 'materialCostUsdPerKg', shop.h13UsdPerKg, { name: DIE_STEEL }, TOOL_SHOP_DOMAIN),
     'Heat Treat Cost per kg': vs('stdHeatTreatCostPerMass'),
     'Heat Treat Calibration': { ...vs('compHeatTreatCost'), source: `variables compHeatTreatCost = ${v.compHeatTreatCost} (calibration dial, applied as a multiplier)` },
-    'Design Rate': castingSeed.lookup('digital_factory_settings_usa', 'designRateUsdPerHr', shop.designUsdPerHr, shopRow),
-    'Machining Rate': castingSeed.lookup('digital_factory_settings_usa', 'machiningRateUsdPerHr', shop.machiningUsdPerHr, shopRow),
-    'Assembly Rate': castingSeed.lookup('digital_factory_settings_usa', 'assemblyRateUsdPerHr', shop.assemblyUsdPerHr, shopRow),
+    'Design Rate': castingSeed.lookup('digital_factory_settings_usa', 'designRateUsdPerHr', shop.designUsdPerHr, shopRow, TOOL_SHOP_DOMAIN),
+    'Machining Rate': castingSeed.lookup('digital_factory_settings_usa', 'machiningRateUsdPerHr', shop.machiningUsdPerHr, shopRow, TOOL_SHOP_DOMAIN),
+    'Assembly Rate': castingSeed.lookup('digital_factory_settings_usa', 'assemblyRateUsdPerHr', shop.assemblyUsdPerHr, shopRow, TOOL_SHOP_DOMAIN),
     'Tuning': vs('percentTuning'),
     'SG and A': vs('percentSGandA'),
     'Profit': vs('percentProfit'),
@@ -513,8 +515,8 @@ export function computeDieTooling(input: DieToolingInput): DieToolingResult {
     return result;
   }
   const amort = run('Die Life', 'Die Casting - Die Life', 'Tooling per Part', life.with({
-    'Die Cost': castingSeed.calculator(cost.value, 'Die Cost'),
-    'Replacement Die Cost': castingSeed.calculator(cost.outputs['Replacement Die Cost']!, 'Die Cost'),
+    'Die Cost': castingSeed.calculator(cost.value, 'Die Cost', cost),
+    'Replacement Die Cost': castingSeed.calculator(cost.outputs['Replacement Die Cost']!, 'Die Cost', cost),
     'Shots per Die': shots,
     'Cavities': castingSeed.engine(n, `${n} cavit${n === 1 ? 'y' : 'ies'} per die`),
   }));

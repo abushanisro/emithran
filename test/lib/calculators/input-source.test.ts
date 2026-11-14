@@ -44,10 +44,12 @@ describe('lookupPanel', () => {
 });
 
 describe('variablePanel', () => {
-  it('lists the domain\'s variables (not its lookup tables) with the variable outlined and its value last', () => {
+  it('lists the domain\'s variables (not its lookup tables, operations or wage grades) with the variable outlined and its value last', () => {
     const p = variablePanel({ kind: 'variable', domain: 'sand_casting', name: 'ambientTemp' }, [
       { key: 'ambientTemp', category: 'variable', value: '21', unitType: 'Temperature', notes: null },
       { key: 'lookupTables_Component_tblX', category: 'lookup_table', value: null, unitType: null, notes: null },
+      { key: 'Core Making', category: 'operation', value: null, unitType: null, notes: null },
+      { key: 'Moulder', category: 'wage_grade', value: '18', unitType: null, notes: null },
     ]);
     expect(p.rows).toEqual([{ key: 'ambientTemp', unit_type: 'Temperature', notes: null, value: '21' }]);
     expect(p.matchedRowKeys).toEqual({ key: 'ambientTemp' });

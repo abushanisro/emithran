@@ -28,6 +28,8 @@ interface DrillingParams {
   depthMaxMm: number | null;
   /** How feedMmPerRev was obtained from the breakpoints, for the trace. */
   feedDerivation: string;
+  /** The breakpoint(s) the feed was read at: one, or the two it was interpolated between (diameter_mm of the flattened table). */
+  feedBreakpoints: Array<{ diameterMm: number; feedMmPerRev: number }>;
   toolSeries: string | null;
 }
 
@@ -83,17 +85,20 @@ export function resolveDrillingParams(
 
   let feed: number;
   let feedDerivation: string;
+  let feedBreakpoints: DrillingParams['feedBreakpoints'];
   const lo = [...band].reverse().find((b) => b.d <= diameterMm);
   const hi = band.find((b) => b.d >= diameterMm);
   if (lo && hi && lo.d !== hi.d) {
     feed = lo.v + ((diameterMm - lo.d) / (hi.d - lo.d)) * (hi.v - lo.v);
     feedDerivation = `linear between tblDrilling breakpoints Ø${lo.key} mm (${lo.v}) and Ø${hi.key} mm (${hi.v})`;
+    feedBreakpoints = [{ diameterMm: lo.d, feedMmPerRev: lo.v }, { diameterMm: hi.d, feedMmPerRev: hi.v }];
   } else {
     const exact = lo ?? hi!;
     feed = exact.v;
     feedDerivation = lo && hi
       ? `tblDrilling breakpoint Ø${exact.key} mm`
       : `clamped to tblDrilling breakpoint Ø${exact.key} mm (outside the ${construction} band)`;
+    feedBreakpoints = [{ diameterMm: exact.d, feedMmPerRev: exact.v }];
   }
 
   const depthPoints = breakpoints(table.depth_max_mm_by_diameter);
@@ -107,6 +112,7 @@ export function resolveDrillingParams(
     hardnessHb: row.hardness,
     depthMaxMm: depthMax?.v ?? null,
     feedDerivation,
+    feedBreakpoints,
     toolSeries: table.tool_series ?? null,
   };
 }

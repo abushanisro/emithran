@@ -16,6 +16,7 @@ import type { MachiningCapabilityRules } from '../capability-rules';
 import { prefixTrace, traceCalc, traceHasAssumption, traceInput } from './machining-trace';
 import type { GearRoute } from '../operation/gear-routing';
 import { runMachiningCalculator, type CalcRun, type CalcSeed, type MachiningCalculators } from '../calculators/machining-calculator';
+import { calculationRef, resultStep, seedStep } from '../calculators/machining-source-refs';
 import {
   keywayBroachingLookupSeeds, deburringLookupSeeds, deepBoreLookupSeeds, drillingLookupSeeds, finishTurningLookupSeeds, tappingLookupSeeds,
   grindingLookupSeeds, gunDrillingLookupSeeds, surfaceGrindingLookupSeeds, hobbingLookupSeeds, shavingLookupSeeds, rotaryBroachingLookupSeeds, jigBoringLookupSeeds, partingLookupSeeds, reamingLookupSeeds,
@@ -159,8 +160,8 @@ export interface MachiningCostInput {
   // previously uncited flat 0.5 constant when present; falls back to it,
   // disclosed as a fallback, when the real rate isn't available.
   deburrLinearSpeedMmPerSec?: number | null;
-  // Material cut code of the tblDeburring row that speed came from.
-  deburrMaterialCutCode?: string | null;
+  // The tblDeburring row that speed came from.
+  deburrMatch?: { table: string; row: Record<string, string | number> } | null;
   // Real tblReaming rows (MachiningLookupService.getReamTable()), fetched
   // once by the async caller — reaming is a genuinely new operation (had
   // ZERO implementation before), triggered when tightestToleranceMm is at
@@ -981,7 +982,7 @@ function computeDeburringLine(
   Object.assign(seeds, deburringLookupSeeds({
     matClass,
     deburrParams: input.deburrLinearSpeedMmPerSec != null
-      ? { linearSpeedMmPerSec: input.deburrLinearSpeedMmPerSec, dataFound: true, materialCutCode: input.deburrMaterialCutCode ?? undefined }
+      ? { linearSpeedMmPerSec: input.deburrLinearSpeedMmPerSec, dataFound: true, match: input.deburrMatch ?? undefined }
       : null,
   }).seeds);
   const run = runMachiningCalculator(input.machiningCalculators, 'Deburring', seeds);
@@ -1013,6 +1014,11 @@ function withRun(
   }
   if (run.lookups && Object.keys(run.lookups).length > 0) out.lookupMatches = run.lookups;
   return out;
+}
+
+/** The HR Rates record (mhr_records.id) a rate was read from: the machine the selector chose, else the record the rate names; null for none. */
+function machineRecordId(rate: MHRRateInput): string | null {
+  return rate.selection?.balanced?.candidate?.machineId ?? rate.mhrRecordId ?? null;
 }
 
 /** CAD hole diameter / depth / count as calculator seeds (depth omitted when CAD has none). */
@@ -1835,8 +1841,15 @@ export function computeTurningCostSummary(
   // Turning machine (mhrRate.numberSpindles set); every other class leaves
   // these null and this line is skipped entirely, not zeroed.
   if (mhrRate.numberSpindles != null) {
+    // Read from the selected machine's HR Rates record: the ref opens that record among its class's machines, at the column read.
+    const machineId = machineRecordId(mhrRate);
     const machineSeed = (value: number | null | undefined, field: string): CalcSeed | undefined =>
-      value != null ? { value, source: `Machine: ${mhrRate.machineName ?? 'selected machine'} ${field} (mhr_records)` } : undefined;
+      value != null ? {
+        value, source: `Machine: ${mhrRate.machineName ?? 'selected machine'} ${field} (mhr_records)`,
+        ...(machineId ? {
+          ref: { kind: 'machine' as const, machineId, machineName: mhrRate.machineName ?? '', machineClass: mhrRate.machineClass, location: input.location ?? null, column: field },
+        } : {}),
+      } : undefined;
     const indexSeeds = Object.fromEntries(Object.entries({
       'Drum Index Time': machineSeed(mhrRate.drumIndexTimeS, 'drum_index_time_s'),
       'Transfer Time': machineSeed(mhrRate.transferTimeS, 'transfer_time_s'),
@@ -1971,13 +1984,29 @@ export function computeTurningCostSummary(
   }
   const gearSeeds = (t: (typeof toothForms)[number]) => {
     const module = t.tip_diameter_mm / (t.tooth_count + 2);
+    const teeth: CalcSeed = { value: t.tooth_count, source: 'CAD: AxiGroove rotational symmetry order' };
+    const tip: CalcSeed = { value: t.tip_diameter_mm, source: 'CAD: tooth form tip diameter' };
+    // Module and tooth depth are computed from the CAD tooth form: their source is that calculation, step by step.
     const seeds: Record<string, CalcSeed> = {
-      'Teeth': { value: t.tooth_count, source: 'CAD: AxiGroove rotational symmetry order' },
+      'Teeth': teeth,
       'Face Width': { value: t.face_width_mm, source: 'CAD: tooth face length along the axis' },
-      'Module': { value: module, source: `CAD: tip diameter ${t.tip_diameter_mm} mm / (${t.tooth_count} teeth + 2)` },
+      'Module': {
+        value: module, source: `CAD: tip diameter ${t.tip_diameter_mm} mm / (${t.tooth_count} teeth + 2)`,
+        ref: calculationRef('Gear module (full-depth tooth)', [
+          seedStep('Tip Diameter', 'mm', tip), seedStep('Teeth', null, teeth), resultStep('Module', 'mm', module, '{Tip Diameter} / ({Teeth} + 2)'),
+        ]),
+      },
     };
     if (t.root_diameter_mm != null && t.root_diameter_mm < t.tip_diameter_mm) {
-      seeds['Tooth Depth'] = { value: (t.tip_diameter_mm - t.root_diameter_mm) / 2, source: `CAD: (tip ${t.tip_diameter_mm} - root ${t.root_diameter_mm}) / 2` };
+      const depth = (t.tip_diameter_mm - t.root_diameter_mm) / 2;
+      seeds['Tooth Depth'] = {
+        value: depth, source: `CAD: (tip ${t.tip_diameter_mm} - root ${t.root_diameter_mm}) / 2`,
+        ref: calculationRef('Gear tooth depth', [
+          seedStep('Tip Diameter', 'mm', tip),
+          seedStep('Root Diameter', 'mm', { value: t.root_diameter_mm, source: 'CAD: tooth form root diameter' }),
+          resultStep('Tooth Depth', 'mm', depth, '({Tip Diameter} - {Root Diameter}) / 2'),
+        ]),
+      };
     }
     return { module, seeds };
   };

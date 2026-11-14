@@ -11,7 +11,7 @@ import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-colum
 export type SourceRef =
   | { kind: 'variable'; domain: string; name: string }
   | { kind: 'lookup'; domain: string; table: string; column: string; row: Record<string, string | number> | null }
-  | { kind: 'machine'; machineId: string; machineName: string; machineClass: string; location: string | null; column: string }
+  | { kind: 'machine'; machineId: string; machineName: string; machineClass?: string; location?: string | null; column: string }
   | { kind: 'material'; materialId: string; materialName: string; column: string }
   | { kind: 'cad'; evidence: string }
   | { kind: 'calculation'; name: string; evidence: string | null; steps: CalculationTraceStep[] }
@@ -86,7 +86,7 @@ export function lookupPanel(
 
 /**
  * The domain's variables (GET /processes/variables) for a variable ref: the variable's row outlined, its value column last. The endpoint
- * also lists the domain's staged lookup tables; only the variables are rows here.
+ * also lists the domain's staged lookup tables, operations, processes and wage grades; only the variables are rows here.
  */
 export function variablePanel(
   ref: Extract<SourceRef, { kind: 'variable' }>,
@@ -95,7 +95,7 @@ export function variablePanel(
   return {
     tableName: `Variables (${ref.domain.replace(/_/g, ' ')})`,
     column_definitions: [{ name: 'key', label: 'Variable' }, { name: 'unit_type', label: 'Unit' }, { name: 'notes', label: 'Notes' }, { name: 'value', label: 'Value' }],
-    rows: variables.filter((v) => v.category !== 'lookup_table').map((v) => ({ key: v.key, unit_type: v.unitType ?? null, notes: v.notes ?? null, value: v.value })),
+    rows: variables.filter((v) => v.category == null || v.category === 'variable').map((v) => ({ key: v.key, unit_type: v.unitType ?? null, notes: v.notes ?? null, value: v.value })),
     matchedRowKeys: { key: ref.name },
   };
 }
