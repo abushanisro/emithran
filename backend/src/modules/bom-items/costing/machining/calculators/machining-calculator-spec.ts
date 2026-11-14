@@ -22,6 +22,10 @@ export interface SpecField {
   where?: Record<string, string | number>;
   /** A lookup row is the material's row whose `column` is nearest the product of these inputs (the bevel cutter diameter nearest Module x Teeth). */
   nearest?: { column: string; product: string[] };
+  /** A lookup row is the one whose `materialType` column names the material's type (tblChemicalMillingEtchingRates "material_type": Aluminum). */
+  materialType?: string;
+  /** A lookup row is the first, in ascending order of `column`, that reaches the input's value (the tblChemicalMilling row for a part of this area). */
+  band?: { column: string; input: string };
   default?: number;
   formula?: string;
 }

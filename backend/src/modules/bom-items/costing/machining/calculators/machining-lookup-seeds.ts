@@ -10,6 +10,7 @@ import {
 import type { MachiningCapabilityRules } from '../capability-rules';
 import type { CalcSeed } from './machining-calculator';
 import type { SpecField } from './machining-calculator-spec';
+import { ETCH_MATERIAL_TYPE } from '../../chemical-milling/chemical-milling-engine';
 import { calculationRef, lookupSeed, MACHINING_REFERENCE_DOMAIN, resultStep, rowKeys, seedStep, variableSeed } from './machining-source-refs';
 
 /**
@@ -688,6 +689,26 @@ export function specLookupSeeds(fields: readonly SpecField[], data: SpecLookupDa
     const all = data.tables[f.table];
     if (!all?.length) { out.missing.push(`${f.name}: ${f.table} (machining_reference_data) could not be read`); continue; }
     const rows = all.filter((r) => Object.entries(f.where ?? {}).every(([col, v]) => String(r[col]) === String(v)));
+    // Tables keyed by something other than the material cut code: the material's type name, or a size band.
+    if (f.materialType || f.band) {
+      let row: any;
+      let how: string;
+      if (f.materialType) {
+        const type = ETCH_MATERIAL_TYPE[data.matClass];
+        row = type ? rows.find((r) => r[f.materialType!] === type) : undefined;
+        how = `${f.materialType} ${type ?? data.matClass}`;
+      } else {
+        const size = keys[f.band!.input];
+        if (!Number.isFinite(size)) { out.missing.push(`${f.name}: ${f.band!.input} (the ${f.table} row is chosen by it)`); continue; }
+        row = [...rows].sort((a, b) => Number(a[f.band!.column]) - Number(b[f.band!.column])).find((r) => Number(r[f.band!.column]) >= size!);
+        how = row ? `${f.band!.column} up to ${row[f.band!.column]}` : `${f.band!.column} for ${size}`;
+      }
+      const v = Number(row?.[f.column]);
+      if (!Number.isFinite(v)) { out.missing.push(`${f.name}: ${f.table} has no row for ${how}`); continue; }
+      const keyCol = f.materialType ?? f.band!.column;
+      out.seeds[f.name] = { value: v, lookup: true, source: `${f.table}: ${how}`, match: { table: f.table, row: { [keyCol]: row[keyCol] } } };
+      continue;
+    }
     // The material's rows: by hardness inside its cut-code family, or by its cut code when the table has no hardness.
     const byHardness = nearestByHardness(rows, MACHINING_MATERIAL[data.matClass]);
     const code = byHardness ? cutCodeOf(byHardness) : data.cutCode;

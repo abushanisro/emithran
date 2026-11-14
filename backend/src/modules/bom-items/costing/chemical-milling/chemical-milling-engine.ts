@@ -61,7 +61,7 @@ export interface ChemMillPartFacts extends SecondaryPartFacts {
 
 // Material class -> tblChemicalMillingEtchingRates material type. Tool steel is
 // a steel; plastics are not chemically milled (no row).
-const ETCH_MATERIAL_TYPE: Partial<Record<MaterialClass, string>> = {
+export const ETCH_MATERIAL_TYPE: Partial<Record<MaterialClass, string>> = {
   aluminum: 'Aluminum', copper_alloy: 'Copper', stainless: 'Stainless Steel',
   mild_steel: 'Steel', tool_steel: 'Steel', titanium: 'Titanium',
 };
