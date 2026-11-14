@@ -480,7 +480,9 @@ describe('operations the model does not cost', () => {
   });
 
   it('an operation with nothing in the reference still says there is no sourced data', () => {
-    expect(warn({}, 'Generic ABS')).toMatch(/Material Drying required[^\n]*no sourced time\/rate data exists/);
+    expect(warn({}, 'Generic ABS')).toMatch(/Dimensional Inspection \(First Article\) required[^\n]*no sourced time\/rate data exists/);
+    // material drying is costed (F-36): without an electricity price it names that, and is never also called "no sourced data"
+    expect(warn({}, 'Generic ABS')).not.toMatch(/Material Drying required/);
   });
 });
 

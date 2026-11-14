@@ -131,7 +131,7 @@ function uncostedOpWarning(label: string, detail?: string): string {
   const why = unread
     ? `the reference holds ${unread}, which the cost model does not read yet`
     : 'no sourced time/rate data exists for this operation yet';
-  return `⚠ ${label} required${detail ? ` (${detail})` : ''} — not costed: ${why}; excluded from Direct Process Costs rather than estimated.`;
+  return `${label} required${detail ? ` (${detail})` : ''} — not costed: ${why}; excluded from Direct Process Costs rather than estimated.`;
 }
 
 // Hot-tip and sub gates self-de-gate; no vestige trimming needed.
@@ -528,12 +528,6 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (routed.has('lsr_compound_dosing')) {
     warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.lsr_compound_dosing, 'LSR two-component A+B metering'));
   }
-  if (routed.has('material_drying')) {
-    warnings.push(uncostedOpWarning(
-      UNCOSTED_OPERATION_LABELS.material_drying,
-      materialGrade ? `${materialGrade} is hygroscopic` : undefined,
-    ));
-  }
   // The press's own setup time (mhr_records.setup_time_hr, from the machine data) is the sourced setup of this route; with none on file, setup stays
   // uncosted and the route says so rather than carrying an invented time.
   const pressSetupMin = mhrRate.setupTimeHr != null && mhrRate.setupTimeHr >= 0 ? mhrRate.setupTimeHr * 60 : null;
@@ -661,22 +655,26 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (routed.has('ultrasonic_welding')) {
     warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.ultrasonic_welding, `${signals.assemblyFeatureCount ?? '?'} assembly/weld feature(s)`));
   }
-  // Visual inspection: the part surface at the secondary-process inspection rate (F-34), charged at the bench rate.
+  // Visual inspection: the part surface at the secondary-process inspection rate (F-34), the operator's time at the press labour rate (no machine).
   if (routed.has('visual_inspection')) {
     const look = runVisualInspectionTime({
       surfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null,
       minPerM2: plasticRef?.featureRules.visualInspectMinPerM2 ?? null,
       percent: plasticRef?.featureRules.inspectedPercent ?? null,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
-    if (look.derivable) {
-      const inspectLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.visual_inspection, null, batchSize, look.cycleSec / 60, input.deburrRate));
+    if (look.derivable && mhrRate.labourRate != null) {
+      const inspector: MHRRateInput = {
+        rate: 0, labourRate: mhrRate.labourRate, operators: 1, source: mhrRate.source,
+        machineClass: 'visual_inspection', machineName: 'Visual inspection (operator)', commodityCode: null,
+      };
+      const inspectLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.visual_inspection, null, batchSize, look.cycleSec / 60, inspector));
       inspectLine.calculationTrace = look.trace;
       if (look.calculator.id) inspectLine.calculatorId = look.calculator.id;
       inspectLine.calculatorName = look.calculator.name;
       if (look.calculator.version != null) inspectLine.calculatorVersion = look.calculator.version;
       processLines.push(inspectLine);
     } else {
-      warnings.push(`${UNCOSTED_OPERATION_LABELS.visual_inspection} not costed: missing ${look.missing.join('; ')}.`);
+      warnings.push(`${UNCOSTED_OPERATION_LABELS.visual_inspection} not costed: missing ${look.derivable ? `the operator labour rate of ${mhrRate.machineName ?? 'the press'}` : look.missing.join('; ')}.`);
     }
   }
   if (routed.has('dimensional_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
