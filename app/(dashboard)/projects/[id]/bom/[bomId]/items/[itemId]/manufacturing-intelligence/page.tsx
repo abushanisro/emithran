@@ -8131,13 +8131,6 @@ function AnalysisTabsPanel({
             display={{ symbol: summaryForPartTab?.currencySymbol ?? '$', fromUsd: summaryForPartTab?.usdToDisplayRate ?? 1 }}
           />
         )}
-
-        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'excel' && tab !== 'validation' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'copilot' && tab !== 'vendor_network' && (
-          <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
-            <AlertCircle className="h-6 w-6 opacity-30" />
-            <p className="text-xs text-center">{RIGHT_TABS.find((t) => t.key === tab)?.label} coming in Phase 2.</p>
-          </div>
-        )}
       </div>
     </div>
   );
