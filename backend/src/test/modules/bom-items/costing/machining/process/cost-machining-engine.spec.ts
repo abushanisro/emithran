@@ -1,4 +1,5 @@
 import type { CalculationTraceStep } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
+import { calculatorInputSteps } from '../../../../../../modules/bom-items/costing/machining/process/machining-trace';
 import {
   computeMillingCostSummary,
   computeTurningCostSummary,
@@ -310,6 +311,23 @@ describe('machining inputs light exactly the features they counted', () => {
     const deburr = r.processLines.find((l) => l.process === 'Deburring')!;
     expect(step(deburr.calculationTrace, 'Sharp Edge Length')!.ref).toEqual({ kind: 'faces', label: 'sharp edges', faceIds: [3, 5, 8] });
     expect(deburr.featureBreakdown).toEqual([expect.objectContaining({ name: 'Sharp edges (1443 mm)', faceIds: [3, 5, 8] })]);
+  });
+
+  it('an analysis without the sharp-edge faces still lists the Deburring row (no highlight until Refresh analysis)', () => {
+    const r = computeMillingCostSummary(milledInput({ sharpEdgeLengthMm: 1442.7, deburrLinearSpeedMmPerSec: 20 }), mc('3_axis_mill'));
+    const deburr = r.processLines.find((l) => l.process === 'Deburring')!;
+    expect(deburr.featureBreakdown).toEqual([expect.objectContaining({ name: 'Sharp edges (1443 mm)' })]);
+    expect(deburr.featureBreakdown![0]!.faceIds).toBeUndefined();
+  });
+
+  it('a line run once per thread size fills its calculator from the first size, under the calculator\'s own field names', () => {
+    const r = computeMillingCostSummary(milledInput({ threads: [{ size: 'M2', count: 4, depthMm: 5 }, { size: 'M3', count: 4, depthMm: 6 }], tappingTable: TAPPING, materialGrade: 'AISI 1018' }), mc('3_axis_mill'));
+    const steps = calculatorInputSteps(r.processLines.find((l) => l.process === 'Tapping')!.calculationTrace!);
+    const byName = Object.fromEntries(steps.map((s) => [s.fieldName, s]));
+    expect(byName['Thread Diameter']!.value).toBe(2);
+    expect(byName['Thread Depth']!.value).toBe(5);
+    expect(byName['Thread Diameter']!.source).toMatch(/M2, the first of 2 groups \(M2, M3\)/);
+    expect(steps.some((s) => s.fieldName.startsWith('M3'))).toBe(false);
   });
 });
 

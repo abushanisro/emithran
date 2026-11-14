@@ -152,6 +152,12 @@ export interface CalculationTraceStep {
   evidence?: CadEvidenceKey;
   /** 'input' steps: where the value was read, structured (see SourceRef), for the input's eye in the calculator dialog. */
   ref?: SourceRef;
+  /**
+   * A line that ran one calculator per group (a thread size, a hole diameter): the group this step belongs to ("M2"), and the calculator's
+   * own field name (fieldName carries the group prefix, "M2 · Thread Diameter").
+   */
+  group?: string;
+  groupField?: string;
   /** Plastic molding: the registered formula (costing/plastic-molding/formula-registry.ts) that produced a calculated step, its version and validation state. */
   formulaId?: string;
   formulaVersion?: number;

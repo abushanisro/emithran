@@ -51,3 +51,18 @@ describe('keepsSavedOperation', () => {
     expect(keepsSavedOperation(saved, selected)).toBe(expected);
   });
 });
+
+describe('a line hosted on another class\'s machine (Tapping saved as "tapping", run on the 3 Axis Mill)', () => {
+  it('keeps its saved operation and route while it is still on the machine it was saved on', () => {
+    expect(keepsSavedOperation('tapping', '3_axis_mill', true)).toBe(true);
+    const r = resolveLineIdentity({
+      savedMachineClass: 'tapping', savedProcessRoute: '3 Axis Mill', savedOperation: 'Tapping',
+      selectedMachineClass: '3_axis_mill', selectedOperation: '', classCatalog: null, sameMachine: true,
+    });
+    expect(r).toEqual({ ok: true, processRoute: '3 Axis Mill', operation: 'Tapping', source: 'saved' });
+  });
+
+  it('moved to another machine of another class, the saved operation no longer applies', () => {
+    expect(keepsSavedOperation('tapping', '3_axis_mill', false)).toBe(false);
+  });
+});

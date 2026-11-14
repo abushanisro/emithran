@@ -38,3 +38,18 @@ describe('buildEngineCalculatorSeeds', () => {
     expect(buildEngineCalculatorSeeds([{ calculationTrace: costSummaryLine.calculationTrace }])).toEqual({});
   });
 });
+
+describe('a line run once per group (thread sizes)', () => {
+  it('fills the calculator from the first group under its own field names, and says which group', () => {
+    const seeds = buildEngineCalculatorSeeds([{
+      calculatorId: 'rigid-tapping',
+      calculationTrace: [
+        { kind: 'input', fieldName: 'M2 · Thread Diameter', value: 2, source: 'Thread size M2', group: 'M2', groupField: 'Thread Diameter' },
+        { kind: 'input', fieldName: 'M3 · Thread Diameter', value: 3, source: 'Thread size M3', group: 'M3', groupField: 'Thread Diameter' },
+        { kind: 'input', fieldName: 'Bar Diameter', value: 30, source: 'Blank optimizer' },
+      ],
+    }]);
+    expect(seeds['rigid-tapping']!.inputs).toEqual({ 'Thread Diameter': 2, 'Bar Diameter': 30 });
+    expect(seeds['rigid-tapping']!.provenance['Thread Diameter']).toBe('Thread size M2 — M2, the first of 2 groups (M2, M3)');
+  });
+});

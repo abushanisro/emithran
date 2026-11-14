@@ -898,7 +898,10 @@ export function ProcessCostDialog({
   // machine class — once the engineer moves it to another class (e.g. an
   // Inspection line to a Black Oxide machine) the old operation no longer
   // belongs to it (see lib/processCatalog/line-identity.ts).
-  const savedOperationApplies = keepsSavedOperation(editData?.machineClass, selectedMachineClass);
+  // Still on the machine the line was saved on: its operation stands even when that machine's class is not the saved one (a hosted Tapping line).
+  const savedMachineId = editData ? String(editData.mhrId || editData.machineId || '') : '';
+  const onSavedMachine = !!savedMachineId && selectedMHRId === savedMachineId;
+  const savedOperationApplies = keepsSavedOperation(editData?.machineClass, selectedMachineClass, onSavedMachine);
   // The category's own operation in the process catalog: what a new line's catalog operations share when the part has no live line to attach them to.
   const categoryOperation = useMemo(
     () => activeMappings.find((m) => m.machineClass && categoryMachineClasses.has(m.machineClass))?.operation ?? null,
@@ -935,6 +938,7 @@ export function ProcessCostDialog({
     selectedMachineClass,
     selectedOperation,
     classCatalog: classCatalogRow ? { processRoute: classCatalogRow.processRoute, operation: classCatalogRow.operation } : null,
+    sameMachine: onSavedMachine,
   });
 
 
