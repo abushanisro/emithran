@@ -289,7 +289,7 @@ export class ProcessesService {
     if (error) throw new InternalServerErrorException(`Failed to read the machine (${error.message})`);
     if (!own) throw new NotFoundException(`Machine ${machineId} not found`);
     let q = db.from('mhr_records')
-      .select('id, machine_name, machine_class, location, machine_power_kw, operators, setup_time_hr, mhr_usd_per_hour, usd_labor_rate_per_hr, specs')
+      .select('*')
       .eq('machine_class', own.machine_class);
     q = own.location == null ? q.is('location', null) : q.eq('location', own.location);
     const { data: rows, error: rowsError } = await q.limit(500);
