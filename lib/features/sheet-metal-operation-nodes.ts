@@ -16,8 +16,21 @@ export interface OperationTreeNode {
   kind: 'feature';
   label: string;
   v2FeatureIds?: string[];
+  /** The faces of each feature instance on the 3D model (face_map face_ids), one occurrence each: sand casting's analysis features. */
+  faceOccurrences?: number[][];
   attrs: { name: string; value: string }[];
   children?: OperationTreeNode[];
+}
+
+/**
+ * What a row highlights: its features' own faces when the backend found them on the 3D model (a sand casting's analysis features are
+ * not feature_graph_v2 entries, so their ids match nothing there), else the feature_graph_v2 ids. An instance with no face found is
+ * left out, never shown in another's place.
+ */
+function highlightOf(featureIds: string[], featureFaceIds: number[][] | undefined): Pick<OperationTreeNode, 'v2FeatureIds' | 'faceOccurrences'> {
+  if (!featureFaceIds) return { v2FeatureIds: featureIds };
+  const faceOccurrences = featureFaceIds.filter((faces) => faces.length > 0);
+  return faceOccurrences.length > 0 ? { faceOccurrences } : {};
 }
 
 const STATUS_LABEL: Record<CatalogOperation['status'], string> = {
@@ -35,7 +48,7 @@ export function sheetMetalOperationNodes(idPrefix: string, operations: readonly 
       id,
       kind: 'feature',
       label: `${op.featureType}${dia} ×${op.count}`,
-      v2FeatureIds: op.featureIds,
+      ...highlightOf(op.featureIds, op.featureFaceIds),
       attrs: [
         { name: 'Operation', value: name },
         { name: 'Status', value: STATUS_LABEL[op.status] },
@@ -50,7 +63,7 @@ export function sheetMetalOperationNodes(idPrefix: string, operations: readonly 
               id: `${id}_${j}`,
               kind: 'feature' as const,
               label: c.featureType,
-              v2FeatureIds: op.featureIds,
+              ...highlightOf(op.featureIds, op.featureFaceIds ? (c.featureFaceIds ?? []) : undefined),
               attrs: [{ name: 'Operation', value: c.operation }],
             })),
           }

@@ -21,6 +21,7 @@ import {
 import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
 import { CalculationTracePanel } from './CalculationTracePanel';
+import { ReferenceTable } from './ReferenceTable';
 import { isStockDrivenBlank } from '@/lib/costing/material-usage';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
@@ -2320,124 +2321,27 @@ export function RawMaterialDialog({
                 </Button>
               </div>
 
-              {/* Hint */}
-              <div className="px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex items-center gap-1.5">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 16v-4" />
-                  <path d="M12 8h.01" />
-                </svg>
-                Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
-              </div>
-
-              <div
-                className="flex-1 p-3 relative overflow-auto"
-                style={{
-                  height: 'calc(100vh - 120px)',
-                  pointerEvents: 'auto',
-                  zIndex: 61
+              <ReferenceTable
+                columns={lookupTableData.column_definitions}
+                rows={lookupTableData.rows}
+                fieldLabel={lookupTableData.fieldLabel}
+                note={selectedMaterial ? <span>The material selected in this dialog is marked ★.</span> : undefined}
+                // The row of the material selected in this dialog: where the auto-filled value came from.
+                isCurrent={(row) => !!selectedMaterial && (
+                  (!!row.materialGrade && row.materialGrade === selectedMaterial.materialGrade) ||
+                  (!!row.materialName && row.materialName === selectedMaterial.material)
+                )}
+                currentTitle="The material selected in this dialog"
+                onPick={(value) => {
+                  if (selectedLookupField) setCalculatorInputs((prev: Record<string, any>) => ({ ...prev, [selectedLookupField.fieldName]: value }));
+                  // Close only the reference table, after the input update has been queued.
+                  setTimeout(() => {
+                    setShowLookupTable(false);
+                    setSelectedLookupField(null);
+                    setLookupTableData(null);
+                  }, 0);
                 }}
-                onClick={(e) => e.stopPropagation()}
-                onScroll={(e) => e.stopPropagation()}
-              >
-                <div className="w-full">
-                  <table className="w-full border-collapse text-sm bg-background">
-                    <thead>
-                      <tr className="bg-muted/60">
-                        <th className="border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
-                          #
-                        </th>
-                        {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
-                          const isOutputCol = colIdx === lookupTableData.column_definitions.length - 1;
-                          return (
-                            <th
-                              key={col.name}
-                              className={`border border-border text-left text-xs font-semibold py-1 px-2 ${isOutputCol ? 'text-primary bg-primary/10' : 'text-foreground'}`}
-                            >
-                              {col.label}
-                              {isOutputCol && <span className="ml-1 text-primary/60">(↵ select)</span>}
-                              {col.unit && (
-                                <span className="text-primary/70 ml-1">({col.unit})</span>
-                              )}
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lookupTableData.rows.map((row: any, rowIndex: number) => {
-                        const outputCol = lookupTableData.column_definitions[lookupTableData.column_definitions.length - 1];
-                        const getVal = (col: any) => {
-                          const camel = col.name.replace(/_([a-z])/g, (_: string, l: string) => l.toUpperCase());
-                          return row[col.name] !== undefined ? row[col.name] : row[camel];
-                        };
-                        const outputValue = outputCol ? getVal(outputCol) : undefined;
-                        // Highlight the row matching the material actually selected in
-                        // this dialog, so a user opening the lookup table can see exactly
-                        // which real raw_materials row the auto-filled value came from.
-                        const isSelectedMaterialRow = !!selectedMaterial && (
-                          (row.materialGrade && row.materialGrade === selectedMaterial.materialGrade) ||
-                          (row.materialName && row.materialName === selectedMaterial.material)
-                        );
-                        return (
-                          <tr
-                            key={rowIndex}
-                            className={`hover:bg-primary/10 cursor-pointer transition-colors ${isSelectedMaterialRow ? 'bg-emerald-100 dark:bg-emerald-950/50 font-semibold' : ''}`}
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              e.nativeEvent?.stopImmediatePropagation?.();
-                              
-                              if (selectedLookupField && outputValue !== undefined) {
-                                setCalculatorInputs((prev: Record<string, any>) => ({
-                                  ...prev,
-                                  [selectedLookupField.fieldName]: typeof outputValue === "number"
-                                    ? outputValue
-                                    : parseFloat(outputValue) || outputValue,
-                                }));
-                              }
-                              
-                              // Use setTimeout to ensure state updates don't conflict
-                              setTimeout(() => {
-                                // Close ONLY lookup table after selection
-                                setShowLookupTable(false);
-                                setSelectedLookupField(null);
-                                setLookupTableData(null);
-                              }, 0);
-                              
-                              return false;
-                            }}
-                            title={
-                              (isSelectedMaterialRow ? 'This is the currently selected material. ' : '') +
-                              (outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`)
-                            }
-                          >
-                            <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground font-mono bg-muted/20">
-                              {rowIndex + 1}
-                            </td>
-                            {lookupTableData.column_definitions.map((col: any) => {
-                              const value = getVal(col);
-                              const isOutput = col.name === outputCol?.name;
-                              return (
-                                <td
-                                  key={col.name}
-                                  className={`border border-border py-1 px-2 text-xs${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
-                                >
-                                  {value !== undefined && value !== null ? String(value) : '—'}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              />
             </div>
           </>
         );

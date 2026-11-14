@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { strokeFactorColumnOf, withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
+import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
 
 const columns = [
   { name: 'machine_name', label: 'Machine' },
@@ -18,14 +18,5 @@ describe('withOutputColumnLast', () => {
   it('leaves the table as it is when the column is not in it', () => {
     expect(withOutputColumnLast(columns, 'nope').map((c) => c.name)).toEqual(columns.map((c) => c.name));
     expect(withOutputColumnLast(columns, undefined)).toHaveLength(4);
-  });
-});
-
-describe('strokeFactorColumnOf', () => {
-  it('reads the part complexity from the input source text', () => {
-    expect(strokeFactorColumnOf('Lookup Table 1 — 22.0 t machine, inter part (sm_reference_data strokeRateFactor)')).toBe('intermediate');
-    expect(strokeFactorColumnOf('Lookup Table 1 — 30.6 t machine, simple part')).toBe('simple');
-    expect(strokeFactorColumnOf('Lookup Table 1 — 30.6 t machine, complex part')).toBe('complex');
-    expect(strokeFactorColumnOf('typed by hand')).toBeUndefined();
   });
 });

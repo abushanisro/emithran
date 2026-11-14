@@ -211,6 +211,10 @@ interface ProcessTreeNode {
   v2FeatureId?: string;
   // Machining catalog-type nodes: the exact feature_graph_v2 ids they group.
   v2FeatureIds?: string[];
+  // Sand casting's analysis features: each instance's faces on the 3D model (face_map face_ids), found
+  // by the backend from the worker's face keys (casting-face-bridge.ts). They are not feature_graph_v2
+  // entries, so v2FeatureIds cannot highlight them.
+  faceOccurrences?: number[][];
   // Exact occurrences (feature_graph_v2 entry id + occurrence index) — one
   // machined instance of an entry, not every occurrence of it.
   v2Occurrences?: { featureId: string; occurrenceIndex: number }[];
@@ -1267,6 +1271,19 @@ function computeFeatureNodeVisual(
   if (node.v2FeatureId != null) {
     const exact = v2Features.find((f) => f.id === node.v2FeatureId);
     return exact ? merge(`hl-${node.v2FeatureId}`, [exact], '#f97316') : null;
+  }
+  if (node.faceOccurrences?.length) {
+    // The faces are known, their positions are not: the viewer measures each occurrence's centre from its own triangles.
+    const featureType = node.label.split(/[\s×]/)[0] ?? node.label;
+    return {
+      highlight: {
+        id: `hl-${node.id}`,
+        feature_type: featureType as FeatureNodeV2['feature_type'],
+        occurrences: node.faceOccurrences.map((face_ids) => ({ centroid: [0, 0, 0] as [number, number, number], face_ids })),
+        centroidFromFaces: true,
+      },
+      color: '#d97706',
+    };
   }
   if (node.v2Occurrences?.length) {
     const occurrences = node.v2Occurrences.flatMap((r) => {

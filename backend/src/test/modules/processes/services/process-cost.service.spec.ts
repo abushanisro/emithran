@@ -305,6 +305,31 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
       expect(payload.machine_class).toBe('fiber_laser');
     });
 
+    // A line that charges more than machine and crew time (a melt's electricity, migration 1005) keeps it in its total when the engineer
+    // edits the line: other_cost_per_part is "included in total_cost_per_part", so the recalculated time cost is added to it, not put in its place.
+    it('keeps the energy a line charges in its total when the line is edited', async () => {
+      const database = makeDatabaseStub({
+        existingRecord: { data: existingRow({ other_cost_per_part: '0.0029', scrap: 0, setup_time: 0, batch_size: 2500 }), error: null },
+      });
+      const service = new ProcessCostService(database as any, fakeLogger, fakeExchangeRateService);
+
+      await service.update('existing-id', { cycleTime: 0.0041 } as UpdateProcessCostDto, 'user-1', 'token');
+
+      const payload = database.updatePayload();
+      const timeCost = (50 / 3600) * 0.0041;
+      expect(payload.total_cost_per_part).toBeCloseTo(timeCost + 0.0029, 6);
+      expect(payload.total_batch_cost).toBeCloseTo(payload.total_cost_per_part * 2500, 9);
+      expect(payload.calculation_breakdown.otherCostPerPart).toBeCloseTo(0.0029, 6);
+    });
+
+    it('a line with nothing beyond time is unchanged: its total is the time cost', async () => {
+      const database = makeDatabaseStub({ existingRecord: { data: existingRow({ other_cost_per_part: null }), error: null } });
+      const service = new ProcessCostService(database as any, fakeLogger, fakeExchangeRateService);
+      await service.update('existing-id', { setupTime: 20 } as UpdateProcessCostDto, 'user-1', 'token');
+      const payload = database.updatePayload();
+      expect(payload.total_cost_per_part).toBe(payload.calculation_breakdown.totalCostPerPart);
+    });
+
     it('throws BadRequestException when the update changes mhrId to an unresolvable value', async () => {
       const database = makeDatabaseStub({
         existingRecord: { data: existingRow({ mhr_id: 'old-mhr' }), error: null },

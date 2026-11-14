@@ -20856,6 +20856,80 @@
         ]
       }
     },
+    "/api/v1/processes/source-tables/machine/{id}": {
+      "get": {
+        "operationId": "ProcessesController_getMachineSourceTable_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "column",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The machine a calculator input was read from, among the machines of its class and location, shaped as a lookup table",
+        "tags": [
+          "Processes"
+        ]
+      }
+    },
+    "/api/v1/processes/source-tables/material/{id}": {
+      "get": {
+        "operationId": "ProcessesController_getMaterialSourceTable_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "column",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The material a calculator input was read from, among the materials of its group, shaped as a lookup table",
+        "tags": [
+          "Processes"
+        ]
+      }
+    },
     "/api/v1/processes/stroke-rate-factor-table": {
       "get": {
         "operationId": "ProcessesController_getStrokeRateFactorTable_v1",

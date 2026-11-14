@@ -35,6 +35,7 @@ import {
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useToolingCatalog, useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import type { ToolingCatalogItem } from '@/lib/api/tooling-catalogs';
+import { ReferenceTable } from './ReferenceTable';
 import { catalogItemFields, catalogSourceLine, defaultAmortization, domainForProcessGroup, processLabel } from '@/lib/costing/tooling-catalog';
 
 interface ToolingCostDialogProps {
@@ -901,94 +902,18 @@ export function ToolingCostDialog({
             </SheetHeader>
             
             <div className="mt-6 flex flex-col h-[calc(100vh-200px)]">
-              <div className="px-3 py-1.5 bg-primary/5 border border-border rounded text-xs text-muted-foreground flex items-center gap-1.5 mb-4 shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 16v-4" />
-                  <path d="M12 8h.01" />
-                </svg>
-                Click any row to use that value for <strong className="text-foreground mx-0.5">{selectedLookupField?.displayLabel || selectedLookupField?.fieldName}</strong>.
-              </div>
-
               {lookupTableData && (
-                <div className="flex-1 overflow-auto">
-                  <table className="w-full border-collapse text-sm bg-background">
-                    <thead>
-                      <tr className="bg-muted/60">
-                        <th className="border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
-                          #
-                        </th>
-                        {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
-                          const isOutputCol = colIdx === lookupTableData.column_definitions.length - 1;
-                          return (
-                            <th
-                              key={col.name}
-                              className={`border border-border text-left text-xs font-semibold py-1 px-2 ${isOutputCol ? 'text-primary bg-primary/10' : 'text-foreground'}`}
-                            >
-                              {col.label}
-                              {isOutputCol && <span className="ml-1 text-primary/60">(↵ select)</span>}
-                              {col.unit && (
-                                <span className="text-primary/70 ml-1">({col.unit})</span>
-                              )}
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lookupTableData.rows.map((row: any, rowIndex: number) => {
-                        const outputCol = lookupTableData.column_definitions[lookupTableData.column_definitions.length - 1];
-                        const getVal = (col: any) => {
-                          const camel = col.name.replace(/_([a-z])/g, (_: string, l: string) => l.toUpperCase());
-                          return row[col.name] !== undefined ? row[col.name] : row[camel];
-                        };
-                        const outputValue = outputCol ? getVal(outputCol) : undefined;
-                        return (
-                          <tr
-                            key={rowIndex}
-                            className="hover:bg-primary/10 cursor-pointer transition-colors"
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              
-                              if (selectedLookupField && outputValue !== undefined) {
-                                setCalculatorInputs((prev: Record<string, any>) => ({
-                                  ...prev,
-                                  [selectedLookupField.fieldName]: typeof outputValue === "number"
-                                    ? outputValue
-                                    : parseFloat(outputValue) || outputValue,
-                                }));
-                              }
-                              setLookupTableOpen(false);
-                              setSelectedLookupField(null);
-                              setLookupTableData(null);
-                            }}
-                          >
-                            <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground">
-                              {rowIndex + 1}
-                            </td>
-                            {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
-                              const value = getVal(col);
-                              const isOutputCol = colIdx === lookupTableData.column_definitions.length - 1;
-                              return (
-                                <td
-                                  key={col.name}
-                                  className={`border border-border py-1 px-2 text-sm ${isOutputCol ? 'font-medium text-primary' : ''}`}
-                                >
-                                  {value}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <ReferenceTable
+                  columns={lookupTableData.column_definitions}
+                  rows={lookupTableData.rows}
+                  fieldLabel={selectedLookupField?.displayLabel || selectedLookupField?.fieldName || 'this input'}
+                  onPick={(value) => {
+                    if (selectedLookupField) setCalculatorInputs((prev: Record<string, any>) => ({ ...prev, [selectedLookupField.fieldName]: value }));
+                    setLookupTableOpen(false);
+                    setSelectedLookupField(null);
+                    setLookupTableData(null);
+                  }}
+                />
               )}
               
               {!lookupTableData && selectedLookupField && (

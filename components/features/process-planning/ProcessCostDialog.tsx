@@ -7,7 +7,8 @@ import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/co
 import { formatFieldValue } from '@/lib/costing/cycle-fields';
 import { checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
-import { strokeFactorColumnOf, withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
+import { ReferenceTable } from './ReferenceTable';
+import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
 import type { CadEvidence } from './CadEvidencePanel';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
@@ -52,9 +53,9 @@ import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
 import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
-import { isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
+import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { calculationPanel, evidenceOfRef, lookupPanel, opensTable, recordPanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
+import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
 import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
@@ -77,6 +78,17 @@ const isTurretReferenceField = (fieldName: string, machineClass: string | undefi
 const WATERJET_PIERCE_DELAY_FIELD = 'Pierce Delay Per Start';
 const isWaterjetReferenceField = (fieldName: string, machineClass: string | undefined) =>
   machineClass === 'waterjet' && fieldName === WATERJET_PIERCE_DELAY_FIELD;
+
+/** A sheet-metal table an smTable ref names, from the endpoint that serves it: a machine-library table's own, else the sm_lookup_* passthrough. */
+function fetchSheetMetalTable(api: typeof import('@/lib/api/processes').processesApi, table: string) {
+  if (!isSheetMetalLibraryTable(table)) return api.getSmLookupTableByName(table);
+  switch (table) {
+    case 'turret_machines': return api.getTurretMachinesTable();
+    case 'waterjet_machines': return api.getWaterjetMachinesTable();
+    case 'deslag_allowance': return api.getDeslagAllowanceTable();
+    case 'stroke_rate_factor': return api.getStrokeRateFactorTable();
+  }
+}
 
 /** Required vs selected tonnage from the calculator's last run, or null while it has no required force. */
 function tonnageCheckOf(results: Record<string, any> | null | undefined, inputs: Record<string, any>): TonnageCheck | null {
@@ -186,7 +198,7 @@ function computeAdHocMatchedRow(
   if (tableName === 'inspection_operation_defaults') {
     const feature = INSPECTION_FEATURE_BY_FIELD[fieldName];
     if (!feature || !Number.isFinite(num)) return null;
-    return rows.find((r) => r.feature === feature && Math.abs(Number(r.cycleTimeSec) - num) < 1e-6) ?? null;
+    return rows.find((r) => r.feature === feature && Math.abs(Number(columnValue(r, 'cycle_time_sec')) - num) < 1e-6) ?? null;
   }
   if (tableName === 'surface_treatment_rates') {
     if (!Number.isFinite(num)) return rows.find((r) => r.location === location) ?? null;
@@ -198,12 +210,10 @@ function computeAdHocMatchedRow(
     // multiple matched PEM specs (see ProcessCostDialog's PEM featureBreakdown
     // block), no single row produced it, so this correctly falls through to
     // null (no highlight) rather than guessing one of the contributing rows.
-    // Row keys are raw DB columns (snake_case) here, not camelCase — this
-    // table is fetched via getSmLookupTableByName's live passthrough
-    // (buildLiveSmLookupTablePayload's rowData: r), which returns the row
-    // exactly as stored, unlike the other ad-hoc cases above.
+    // The passthrough returns the row as stored, but the API camelCases every
+    // response key: cells are read by either spelling (columnValue).
     if (!Number.isFinite(num)) return null;
-    return rows.find((r) => Math.abs(Number(r.insertion_cycle_sec) - num) < 1e-6) ?? null;
+    return rows.find((r) => Math.abs(Number(columnValue(r, 'insertion_cycle_sec')) - num) < 1e-6) ?? null;
   }
   if (tableName === 'sm_lookup_roll_forming') {
     // Single real row (migration 442) — match against whichever column this
@@ -212,7 +222,7 @@ function computeAdHocMatchedRow(
     // highlight instead of always pointing at the one row regardless.
     const col = fieldName === 'Setup Time' ? 'setup_time_min' : 'line_speed_m_min';
     if (!Number.isFinite(num)) return null;
-    return rows.find((r) => Math.abs(Number(r[col]) - num) < 1e-6) ?? null;
+    return rows.find((r) => Math.abs(Number(columnValue(r, col)) - num) < 1e-6) ?? null;
   }
   return null;
 }
@@ -408,6 +418,9 @@ export function ProcessCostDialog({
   // to re-derive the match themselves.
   // An interpolated lookup holds the two real rows it sits between.
   const [calculatorMatchedRowKeys, setCalculatorMatchedRowKeys] = useState<Record<string, Record<string, any> | Record<string, any>[]>>({});
+  // Where an input's value was read when the dialog itself resolved it (a machining calculator's inputs re-resolved for edited keys): it
+  // replaces the engine seed's ref for that field. null = the value has no source to open (the engineer entered it).
+  const [calculatorInputRefs, setCalculatorInputRefs] = useState<Record<string, SourceRef | null>>({});
   // Scrolls the "eye" viewer straight to the highlighted (currently-used)
   // row when it opens — see the matchedCurrentRowRef assignment below.
   const matchedCurrentRowRef = useRef<HTMLTableRowElement | null>(null);
@@ -1158,6 +1171,7 @@ export function ProcessCostDialog({
     setCalculatorError(null);
     setCalculatorInputs({});
     setCalculatorInputProvenance({});
+    setCalculatorInputRefs({});
     setCalculatorInputGaps({});
     // Don't reset selectedCalculatorId for processCalculator as we want to keep it selected
     if (calculatorTarget !== 'processCalculator') {
@@ -1329,6 +1343,7 @@ export function ProcessCostDialog({
         inputs: Record<string, number>;
         provenance: Record<string, string>;
         lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
+        refs?: Record<string, SourceRef>;
         missing: string[];
       }>(`/bom-items/${bomItemData.id}/machining-calculator-inputs`, {
         calculatorId,
@@ -1351,6 +1366,11 @@ export function ProcessCostDialog({
         ...prev,
         ...Object.fromEntries(Object.entries(pick(d.lookupMatches)).map(([f, m]) => [f, m.row])),
       }));
+      // Every value taken from this response carries its own source (or none), never the engine seed's for a different row.
+      setCalculatorInputRefs((prev) => ({
+        ...prev,
+        ...Object.fromEntries(Object.keys(pick(d.inputs)).map((f) => [f, d.refs?.[f] ?? null])),
+      }));
       setMachiningMissing(d.missing ?? []);
     } catch (err: any) {
       setMachiningMissing([`Could not read this calculator's inputs from the database: ${err?.message ?? String(err)}`]);
@@ -1365,6 +1385,7 @@ export function ProcessCostDialog({
     if (!field || field.dataSource === MACHINING_LOOKUP_DATA_SOURCE) return;
     machiningEditedRef.current.add(fieldName);
     setCalculatorInputProvenance((prev) => ({ ...prev, [fieldName]: 'Entered in the calculator' }));
+    setCalculatorInputRefs((prev) => ({ ...prev, [fieldName]: null }));
     const current = calculatorInputsRef.current;
     const keys = Object.fromEntries(
       [...machiningEditedRef.current]
@@ -1390,6 +1411,7 @@ export function ProcessCostDialog({
       machiningEditedRef.current = new Set();
       setCalculatorInputs(seed ? { ...seed.inputs } : {});
       setCalculatorInputProvenance(seed ? { ...seed.provenance } : {});
+      setCalculatorInputRefs({});
       setCalculatorInputGaps({});
       setCalculatorMatchedRowKeys(seed
         ? Object.fromEntries(Object.entries(seed.lookupMatches).map(([f, m]) => [f, m.row]))
@@ -2231,8 +2253,15 @@ export function ProcessCostDialog({
   const handleViewLookup = useCallback((field: CalculatorField) => { void viewLookupRef.current(field); }, []);
   const onShowEvidenceRef = useRef(onShowEvidence);
   onShowEvidenceRef.current = onShowEvidence;
-  /** Where the engine read an input of the open calculator (SourceRef on its trace step); undefined for a value it did not read from a record. */
+  /**
+   * Where the engine read an input of the open calculator (SourceRef on its trace step); undefined for a value it did not read from a
+   * record. A machine-dependent input is re-derived here for the machine selected in this dialog (autoPopulateFromBOM), so the engine's
+   * source for its own machine does not describe the value shown: it has none.
+   */
   const sourceRefFor = (fieldName: string): SourceRef | undefined => {
+    if (isMachineDependentField(fieldName)) return undefined;
+    // A value re-read for this dialog (a machining lookup re-resolved for an edited key) carries its own source, or none.
+    if (fieldName in calculatorInputRefs) return calculatorInputRefs[fieldName] ?? undefined;
     const seed = engineSeedRef.current?.calculatorId === selectedCalculatorId ? engineSeedRef.current : engineSeedsRef.current[selectedCalculatorId] ?? null;
     return seed?.refs[fieldName];
   };
@@ -2270,6 +2299,7 @@ export function ProcessCostDialog({
         else if (ref.kind === 'machine') panel = recordPanel(await processesApi.getRecordSourceTable('machine', ref.machineId, ref.column));
         else if (ref.kind === 'material') panel = recordPanel(await processesApi.getRecordSourceTable('material', ref.materialId, ref.column));
         else if (ref.kind === 'calculation') panel = calculationPanel(ref);
+        else if (ref.kind === 'smTable') panel = smTablePanel(ref, await fetchSheetMetalTable(processesApi, ref.table), current);
         else return;
         setLookupTableData({ fieldName: field.fieldName, fieldLabel: field.displayLabel || field.fieldName, tableId: null, ...panel });
         setShowLookupTable(true);
@@ -2309,22 +2339,25 @@ export function ProcessCostDialog({
         return;
       }
 
-      // Turret Press: the machine table (punch rate, tool change, nibble speed) with the selected
-      // machine marked, or Lookup Table 1 with the row of that machine's tonnage marked.
+      // Turret Press, for an input the engine did not read (no ref: the calculator opened without the
+      // engine's turret line, or a value typed here): the machine table (punch rate, tool change, nibble
+      // speed) with the selected machine marked, or Lookup Table 1 with the row of that machine's tonnage
+      // marked, to pick a value from. An engine-read input opens its own row and column through its ref.
       if (isTurretReferenceField(field.fieldName, selectedMachineClass)) {
         const machineName = selectedMHR?.machineName;
         let table: any;
         let matchedRowKeys: Record<string, unknown> | null = machineName ? { machine_name: machineName } : null;
-        let outputColumn: string | undefined = TURRET_FIELD_COLUMN[field.fieldName];
+        const outputColumn: string | undefined = TURRET_FIELD_COLUMN[field.fieldName];
         if (field.fieldName === STROKE_RATE_FACTOR_FIELD) {
-          outputColumn = strokeFactorColumnOf(calculatorInputProvenance[field.fieldName]);
           const [factors, machines] = await Promise.all([processesApi.getStrokeRateFactorTable(), processesApi.getTurretMachinesTable()]);
           table = factors;
-          const tonnage = Number(((machines.rows ?? []) as any[]).find((r) => r.machine_name === machineName)?.machine_tonnage_t);
+          // Response keys arrive camelCased: read cells by either spelling.
+          const tonnage = Number(columnValue(((machines.rows ?? []) as any[]).find((r) => columnValue(r, 'machine_name') === machineName), 'machine_tonnage_t'));
+          const tonnageOf = (r: any) => Number(columnValue(r, 'tonnage_t'));
           const nearest = Number.isFinite(tonnage)
-            ? ((factors.rows ?? []) as any[]).reduce<any>((best, r) => (best == null || Math.abs(r.tonnage_t - tonnage) < Math.abs(best.tonnage_t - tonnage) ? r : best), null)
+            ? ((factors.rows ?? []) as any[]).reduce<any>((best, r) => (best == null || Math.abs(tonnageOf(r) - tonnage) < Math.abs(tonnageOf(best) - tonnage) ? r : best), null)
             : null;
-          matchedRowKeys = nearest ? { tonnage_t: nearest.tonnage_t } : null;
+          matchedRowKeys = nearest ? { tonnage_t: tonnageOf(nearest) } : null;
         } else {
           table = await processesApi.getTurretMachinesTable();
         }
@@ -2505,6 +2538,7 @@ export function ProcessCostDialog({
       setSelectedCalculatorId('');
       setCalculatorInputs({});
       setCalculatorInputProvenance({});
+      setCalculatorInputRefs({});
       setCalculatorResults(null);
       setCalculatorError(null);
       setCalculatorTarget(null);
@@ -2648,6 +2682,9 @@ export function ProcessCostDialog({
   // The selected machine's own labour rate; a line with no machine (Inspection: labour, no equipment)
   // keeps the labour rate the cost engine costed it with, which the page passes in.
   const lineOnlyLabourRate = !selectedMHR && Number(editData?.liveLabourRate) > 0 ? Number(editData.liveLabourRate) : null;
+  // What the saved line charges beyond machine and crew time (a melt's energy, USD per part; process_cost_records.other_cost_per_part):
+  // part of its total, kept when the line is saved, so the preview below shows it too.
+  const lineOtherCostUsd = Number(editData?.otherCostPerPart) > 0 ? Number(editData.otherCostPerPart) : 0;
   const effectiveLaborRate = machineLabour ? machineLabour.rate : (lineOnlyLabourRate ?? 0);
 
   // Cost preview: calls the exact same eMithranTerms()-based engine that computes the
@@ -2832,7 +2869,7 @@ export function ProcessCostDialog({
       partsPerCycle: parseFloat(partsPerCycle as string) || 0,
       scrap: parseFloat(scrap as string) || 0,
       machineValue: parseFloat(machineValue as string) || 0,
-      totalCost,
+      totalCost: totalCost + lineOtherCostUsd,
       facilityId,
       facilityRateId,
     });
@@ -3428,11 +3465,16 @@ export function ProcessCostDialog({
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-primary">
                       {currencySymbol}{(() => {
-                        const displayTotal = totalCost * conversionRate;
+                        const displayTotal = (totalCost + lineOtherCostUsd) * conversionRate;
                         return displayTotal > 0 && displayTotal < 0.01 ? displayTotal.toFixed(4) : displayTotal.toFixed(2);
                       })()}
                     </span>
                   </div>
+                  {lineOtherCostUsd > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Includes {currencySymbol}{(lineOtherCostUsd * conversionRate).toFixed(4)} per part this line charges beyond machine and crew time (energy, consumables); it is kept when you save.
+                    </p>
+                  )}
                   {/* Why the number above is not a real total, when it is not. A
                       zero here has three genuinely different causes and they must
                       not all read as "this operation is free": the inputs are
@@ -3899,130 +3941,33 @@ export function ProcessCostDialog({
             </Button>
           </div>
 
-          {/* Hint */}
-          <div className="shrink-0 px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex flex-wrap items-center gap-x-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-            Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
-            {lookupTableData.note && <span className="text-foreground ml-1">{lookupTableData.note}</span>}
-            {lookupTableData.matchedRowKeys && (
-              <span className="text-primary font-medium ml-1">
-                {Array.isArray(lookupTableData.matchedRowKeys)
-                  ? 'The value in use is interpolated between the two rows outlined below.'
-                  : 'The row outlined below is the one currently in use.'}
-              </span>
-            )}
-          </div>
-
-          <div
-            className="flex-1 min-h-0 px-3 pb-3 relative overflow-auto"
-            style={{
-              pointerEvents: 'auto',
-              zIndex: 10000
+          <ReferenceTable
+            columns={lookupTableData.column_definitions}
+            rows={lookupTableData.rows}
+            fieldLabel={lookupTableData.fieldLabel}
+            note={<>
+              {lookupTableData.note && <span className="text-foreground">{lookupTableData.note} </span>}
+              {lookupTableData.matchedRowKeys && (
+                <span className="font-medium text-primary">
+                  {Array.isArray(lookupTableData.matchedRowKeys)
+                    ? 'The value in use is interpolated between the two rows marked ★.'
+                    : 'The row marked ★ is the one in use.'}
+                </span>
+              )}
+            </>}
+            isCurrent={(row) => isMatchedLookupRow(row, lookupTableData.matchedRowKeys)}
+            currentTitle={`Currently used for ${lookupTableData.fieldLabel}`}
+            currentRowRef={matchedCurrentRowRef}
+            onPick={(value) => {
+              if (selectedLookupField) setCalculatorInputs((prev: Record<string, any>) => ({ ...prev, [selectedLookupField.fieldName]: value }));
+              // Close only the reference table, after the input update has been queued.
+              setTimeout(() => {
+                setShowLookupTable(false);
+                setSelectedLookupField(null);
+                setLookupTableData(null);
+              }, 0);
             }}
-            onClick={(e) => { e.stopPropagation(); }}
-            onScroll={(e) => { e.stopPropagation(); }}
-          >
-            <div className="w-full">
-              <table className="w-full border-collapse text-sm bg-background">
-                <thead>
-                  {/* The heading row stays pinned while the rows scroll. */}
-                  <tr>
-                    <th className="sticky top-0 z-10 bg-muted border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
-                      #
-                    </th>
-                    {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
-                      const isOutputCol = colIdx === lookupTableData.column_definitions.length - 1;
-                      return (
-                        <th
-                          key={col.name}
-                          className={`sticky top-0 z-10 bg-muted border border-border text-left text-xs font-semibold py-1 px-2 whitespace-nowrap ${isOutputCol ? 'text-primary' : 'text-foreground'
-                            }`}
-                        >
-                          {col.label}
-                          {isOutputCol && <span className="ml-1 text-primary/60">(↵ select)</span>}
-                          {col.unit && (
-                            <span className="text-primary/70 ml-1">({col.unit})</span>
-                          )}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {lookupTableData.rows.map((row: any, rowIndex: number) => {
-                    const outputCol = lookupTableData.column_definitions[lookupTableData.column_definitions.length - 1];
-                    const getVal = (col: any) => {
-                      const camel = col.name.replace(/_([a-z])/g, (_: string, l: string) => l.toUpperCase());
-                      return row[col.name] !== undefined ? row[col.name] : row[camel];
-                    };
-                    const outputValue = outputCol ? getVal(outputCol) : undefined;
-                    // This row IS the exact one the lookup already resolved
-                    // for the field the "eye" button was clicked on — every
-                    // key in matchedRowKeys (the snapshot taken at
-                    // resolution time) must match this row's own value.
-                    // Numeric comparison tolerates string-vs-number typing
-                    // differences between the two API responses; real
-                    // lookup values never differ by a meaningful amount.
-                    const isCurrentMatch = isMatchedLookupRow(row, lookupTableData.matchedRowKeys);
-                    return (
-                      <tr
-                        key={rowIndex}
-                        ref={isCurrentMatch ? matchedCurrentRowRef : undefined}
-                        className={`hover:bg-primary/10 cursor-pointer transition-colors${isCurrentMatch ? ' ring-2 ring-inset ring-primary bg-primary/10' : ''}`}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          e.nativeEvent?.stopImmediatePropagation?.();
-                          
-                          if (selectedLookupField && outputValue !== undefined) {
-                            setCalculatorInputs((prev: Record<string, any>) => ({
-                              ...prev,
-                              [selectedLookupField.fieldName]: typeof outputValue === "number"
-                                ? outputValue
-                                : parseFloat(outputValue) || outputValue,
-                            }));
-                          }
-                          
-                          // Use setTimeout to ensure state updates don't conflict
-                          setTimeout(() => {
-                            // Close ONLY lookup table after selection
-                            setShowLookupTable(false);
-                            setSelectedLookupField(null);
-                            setLookupTableData(null);
-                          }, 0);
-                          
-                          return false;
-                        }}
-                        title={isCurrentMatch
-                          ? `Currently used for ${lookupTableData.fieldLabel}`
-                          : (outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`)}
-                      >
-                        <td className={`border border-border text-center text-xs py-0.5 px-1 font-mono ${isCurrentMatch ? 'text-primary bg-primary/20' : 'text-muted-foreground bg-muted/20'}`}>
-                          {isCurrentMatch ? '★' : rowIndex + 1}
-                        </td>
-                        {lookupTableData.column_definitions.map((col: any) => {
-                          const value = getVal(col);
-                          const isOutput = col.name === outputCol?.name;
-                          return (
-                            <td
-                              key={col.name}
-                              className={`border border-border py-0.5 px-2 text-xs whitespace-nowrap${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
-                            >
-                              {value !== undefined && value !== null ? String(value) : '—'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          />
         </div>
         </>
         ))()}

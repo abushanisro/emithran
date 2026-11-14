@@ -691,8 +691,13 @@ export interface CatalogOperation {
   count: number;
   featureIds: string[];
   status: 'resolved' | 'undecided' | 'infeasible';
-  children: Array<{ operation: string; featureType: string }>;
+  children: { operation: string; featureType: string; featureFaceIds?: number[][] }[];
   reason?: string;
+  /**
+   * Sand casting with a casting analysis: each feature's faces on the 3D model (face_map face_ids), in featureIds order. Its features are
+   * the analysis's own, not feature_graph_v2 entries, so these faces, not featureIds, are what a click highlights.
+   */
+  featureFaceIds?: number[][];
 }
 
 export interface FeatureOp {

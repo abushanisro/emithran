@@ -1,4 +1,5 @@
 import { PROCESS_COMPATIBILITY_KEYS, parseProcessCompatibility, type ProcessCompatibility } from '../process-compatibility';
+import type { MachineRecord } from '../calculators/plastic-input-sources';
 import { Injectable } from '@nestjs/common';
 import type { DbClient } from '../../../../../common/db/postgrest-client';
 import { DatabaseService } from '../../../../../common/database/database.service';
@@ -30,6 +31,8 @@ interface PressRecord {
   dryCycleTimeS: number | null;
   /** good_part_yield (migration 633): share of shots that are good parts. */
   goodPartYield: number | null;
+  /** The record itself (id, name, class, location): a calculator input read from it opens it. */
+  record: MachineRecord;
 }
 
 /**
@@ -135,13 +138,14 @@ export class PlasticReferenceService {
   async getPressRecords(client: DbClient, mhrIds: string[]): Promise<Map<string, PressRecord>> {
     const ids = [...new Set(mhrIds.filter(Boolean))];
     if (ids.length === 0) return new Map();
-    const { data, error } = await client.from('mhr_records').select('id, press_cycle_time_s, good_part_yield, specs').in('id', ids);
+    const { data, error } = await client.from('mhr_records').select('id, machine_name, machine_class, location, press_cycle_time_s, good_part_yield, specs').in('id', ids);
     if (error) return new Map();
     const num = (v: unknown) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
     return new Map((data ?? []).map((r: any) => [String(r.id), {
       injectionRateMm3PerS: num(r.specs?.injection_rate_mm3_per_s),
       dryCycleTimeS: num(r.press_cycle_time_s),
       goodPartYield: num(r.good_part_yield),
+      record: { id: String(r.id), name: String(r.machine_name ?? ''), machineClass: String(r.machine_class ?? ''), location: r.location == null ? null : String(r.location) },
     }]));
   }
 }

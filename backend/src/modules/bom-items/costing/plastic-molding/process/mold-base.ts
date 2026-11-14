@@ -19,9 +19,14 @@ export interface MoldBaseChoice {
   base: { name: string; widthMm: number; lengthMm: number };
   cavityDepthBorderMm: number;
   coreDepthBorderMm: number;
+  /** The Max Press Force (kN) of the tblCavityPlateDepthBorder and tblCorePlateDepthBorder rows read: the rows the depth borders came from. */
+  cavityDepthBorderRowKn: number;
+  coreDepthBorderRowKn: number;
 }
 
-const byForce = (rows: ReadonlyArray<{ maxKn: number; mm: number }>, kn: number) => (rows.find((r) => kn <= r.maxKn) ?? rows[rows.length - 1])?.mm;
+/** The first row whose press force covers the press (the last covers the rest). */
+const rowByForce = (rows: ReadonlyArray<{ maxKn: number; mm: number }>, kn: number) => rows.find((r) => kn <= r.maxKn) ?? rows[rows.length - 1];
+const byForce = (rows: ReadonlyArray<{ maxKn: number; mm: number }>, kn: number) => rowByForce(rows, kn)?.mm;
 
 export function selectMoldBase(input: {
   /** The part's footprint on the parting plane: its two longest sides, mm. */
@@ -50,10 +55,12 @@ export function selectMoldBase(input: {
   if (!base) {
     return { missing: [`no standard mold base in tblStandardMoldBaseSizes (${ref.system}) holds ${Math.round(requiredWidthMm)} x ${Math.round(requiredLengthMm)} mm: a custom base is not modelled`] };
   }
+  const cavityDepth = rowByForce(ref.cavityDepthBorderByKn, input.clampKn)!;
+  const coreDepth = rowByForce(ref.coreDepthBorderByKn, input.clampKn)!;
   return {
     layout: { widthWise: layout.widthWise, lengthWise: layout.lengthWise, runnerCoefficient: layout.runnerCoefficient },
     regionWidthMm, regionLengthMm, edgeBorderXMm, edgeBorderYMm, requiredWidthMm, requiredLengthMm, base,
-    cavityDepthBorderMm: byForce(ref.cavityDepthBorderByKn, input.clampKn)!,
-    coreDepthBorderMm: byForce(ref.coreDepthBorderByKn, input.clampKn)!,
+    cavityDepthBorderMm: cavityDepth.mm, coreDepthBorderMm: coreDepth.mm,
+    cavityDepthBorderRowKn: cavityDepth.maxKn, coreDepthBorderRowKn: coreDepth.maxKn,
   };
 }

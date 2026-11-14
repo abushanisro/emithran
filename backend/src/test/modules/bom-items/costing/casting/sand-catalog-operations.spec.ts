@@ -1,4 +1,5 @@
 import { resolveSandCatalogOperations, sandFeaturesFromCastingResult, type SandFeature } from '../../../../../modules/bom-items/costing/casting/sand/sand-catalog-operations';
+import { stableFaceHash } from '../../../../../modules/bom-items/costing/casting/sand/casting-face-bridge';
 
 // The sand-casting report: each recognised feature under the catalog operation that makes it (memory/Sand casting/Processes/operations.csv,
 // staged as process_taxonomy_operations). Faces are "As Cast" by the moulding process; holes, voids, rings and sharp edges are made by the
@@ -83,6 +84,28 @@ describe('sandFeaturesFromCastingResult', () => {
       { id: 'SimpleHole:1', type: 'SimpleHole', core: null, diameterMm: 3.2 },
       { id: 'MultiStepHole:1', type: 'MultiStepHole', core: null, diameterMm: null },
     ]);
+  });
+
+  it('finds each feature on the cad-engine mesh by its face keys (worker 0.19.0), the child steps by their own faces', () => {
+    const keys = ['cylinder|10.000|1.000|2.000|3.000', 'plane|20.000|4.000|5.000|6.000'];
+    const withFaces = { parts: [{ face_keys: keys, features: [
+      { id: 'SimpleHole:1', type: 'SimpleHole', parent: null, faces: [], edge_faces: [], parameters: { diameter_mm: 3.2 } },
+      { id: 'CurvedWall:1', type: 'CurvedWall', parent: 'SimpleHole:1', faces: [0], edge_faces: [], parameters: {} },
+      { id: 'Edge:1', type: 'Edge', parent: 'SimpleHole:1', faces: [], edge_faces: [0, 1], parameters: {} },
+    ] }] };
+    // The cad-engine numbers the two faces the other way round.
+    const stable = { '0': stableFaceHash(keys[1]!), '1': stableFaceHash(keys[0]!) };
+    const features = sandFeaturesFromCastingResult(withFaces, stable)!;
+    expect(features).toEqual([expect.objectContaining({ id: 'SimpleHole:1', faces: { faces: [0, 1], childFaces: { CurvedWall: [1], Edge: [0, 1] } } })]);
+    const { moulding } = run(features, true);
+    const hole = moulding.find((o) => o.featureType === 'SimpleHole')!;
+    expect(hole.featureFaceIds).toEqual([[0, 1]]);
+    expect(hole.children).toEqual([{ operation: 'As Cast', featureType: 'Edge', featureFaceIds: [[0, 1]] }]);
+  });
+
+  it('gives no faces without face keys (a worker before 0.19.0): the row is listed, not highlighted', () => {
+    const { moulding } = run(sandFeaturesFromCastingResult(result, { '0': 'abc' })!, true);
+    expect(moulding.every((o) => o.featureFaceIds === undefined)).toBe(true);
   });
 
   it('is null for a result without parts or features (nothing to report, not "no features")', () => {

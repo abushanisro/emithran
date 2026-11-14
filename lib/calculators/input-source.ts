@@ -5,14 +5,26 @@
  * dialog fetches the rows, this shapes them.
  */
 import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
+import { columnValue } from '@/lib/calculators/lookup-row-match';
+import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
 
 export type SourceRef =
   | { kind: 'variable'; domain: string; name: string }
   | { kind: 'lookup'; domain: string; table: string; column: string; row: Record<string, string | number> | null }
-  | { kind: 'machine'; machineId: string; machineName: string; machineClass: string; location: string | null; column: string }
+  | { kind: 'machine'; machineId: string; machineName: string; machineClass?: string; location?: string | null; column: string }
   | { kind: 'material'; materialId: string; materialName: string; column: string }
   | { kind: 'cad'; evidence: string }
-  | { kind: 'calculation'; name: string; evidence: string | null; steps: CalculationTraceStep[] };
+  | { kind: 'calculation'; name: string; evidence: string | null; steps: CalculationTraceStep[] }
+  /** A sheet-metal reference table served by name (backend SheetMetalSourceTable): an sm_lookup_* table, inspection_operation_defaults, or a machine-library table. */
+  | { kind: 'smTable'; table: string; column: string; row: Record<string, string | number> | null };
+
+/**
+ * The machine-library tables of sm_reference_data, each served by its own endpoint (backend SHEET_METAL_LIBRARY_TABLES); every other
+ * smTable is served by GET /processes/sm-lookup-tables/by-name/:table.
+ */
+export type SheetMetalLibraryTable = 'turret_machines' | 'waterjet_machines' | 'deslag_allowance' | 'stroke_rate_factor';
+export const isSheetMetalLibraryTable = (table: string): table is SheetMetalLibraryTable =>
+  table === 'turret_machines' || table === 'waterjet_machines' || table === 'deslag_allowance' || table === 'stroke_rate_factor';
 
 /** The dialog's reference-table panel (ProcessCostDialog lookupTableData). The last column is the one the value is in. */
 export interface SourcePanel {
@@ -60,10 +72,11 @@ export function lookupPanel(
 ): SourcePanel {
   const base = { tableName: table.key.replace(/^lookupTables_Component_/, ''), column_definitions: valueColumnLast(table.columns, ref.column), rows: table.rows };
   if (ref.row) return { ...base, matchedRowKeys: ref.row };
-  const holding = table.rows.filter((r) => close(r[ref.column], value));
+  // The API camelCases row keys (cutting_speed -> cuttingSpeed): read the column by either spelling.
+  const holding = table.rows.filter((r) => close(columnValue(r, ref.column), value));
   const [only] = holding;
   if (holding.length === 1 && only) {
-    return { ...base, matchedRowKeys: { [ref.column]: only[ref.column] }, note: `The row whose ${ref.column} is the value in use.` };
+    return { ...base, matchedRowKeys: { [ref.column]: columnValue(only, ref.column) }, note: `The row whose ${ref.column} is the value in use.` };
   }
   return {
     ...base, matchedRowKeys: null,
@@ -73,7 +86,7 @@ export function lookupPanel(
 
 /**
  * The domain's variables (GET /processes/variables) for a variable ref: the variable's row outlined, its value column last. The endpoint
- * also lists the domain's staged lookup tables; only the variables are rows here.
+ * also lists the domain's staged lookup tables, operations, processes and wage grades; only the variables are rows here.
  */
 export function variablePanel(
   ref: Extract<SourceRef, { kind: 'variable' }>,
@@ -82,8 +95,37 @@ export function variablePanel(
   return {
     tableName: `Variables (${ref.domain.replace(/_/g, ' ')})`,
     column_definitions: [{ name: 'key', label: 'Variable' }, { name: 'unit_type', label: 'Unit' }, { name: 'notes', label: 'Notes' }, { name: 'value', label: 'Value' }],
-    rows: variables.filter((v) => v.category !== 'lookup_table').map((v) => ({ key: v.key, unit_type: v.unitType ?? null, notes: v.notes ?? null, value: v.value })),
+    rows: variables.filter((v) => v.category == null || v.category === 'variable').map((v) => ({ key: v.key, unit_type: v.unitType ?? null, notes: v.notes ?? null, value: v.value })),
     matchedRowKeys: { key: ref.name },
+  };
+}
+
+/**
+ * A sheet-metal table for an smTable ref, as its endpoint serves it (rows plain, or wrapped as { rowData } by the sm_lookup_* passthrough;
+ * keys may arrive camelCased): the row the engine read outlined, the value's column last. Without the engine's row, the one row whose
+ * column holds the value, as lookupPanel does.
+ */
+export function smTablePanel(
+  ref: Extract<SourceRef, { kind: 'smTable' }>,
+  table: { tableName: string; columnDefinitions?: { name: string; label: string; unit?: string }[]; rows?: Record<string, unknown>[] },
+  value: unknown,
+): SourcePanel {
+  const rows = (table.rows ?? []).map((r) => (r && typeof r.rowData === 'object' && r.rowData !== null ? (r.rowData as Record<string, unknown>) : r));
+  const columns = table.columnDefinitions ?? [];
+  const base = {
+    tableName: table.tableName,
+    column_definitions: withOutputColumnLast(columns, ref.column),
+    rows,
+  };
+  if (ref.row) return { ...base, matchedRowKeys: ref.row };
+  const holding = rows.filter((r) => close(columnValue(r, ref.column), value));
+  const [only] = holding;
+  if (holding.length === 1 && only) {
+    return { ...base, matchedRowKeys: { [ref.column]: columnValue(only, ref.column) }, note: `The row whose ${ref.column} is the value in use.` };
+  }
+  return {
+    ...base, matchedRowKeys: null,
+    note: holding.length > 1 ? `${holding.length} rows have the value in use: the engine did not record which one it read.` : 'No row holds the value in use (it was changed here).',
   };
 }
 

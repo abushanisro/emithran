@@ -324,6 +324,14 @@ export const CASTING_RESULT_SCHEMA = {
             "minimum": 0
           }
         },
+        "face_keys": {
+          "description": "Absent in results of workers before 0.19.0. Each face's geometric key, numbered as the features, the draft and glb_faces number faces: \"<surface>|<area mm2>|<cx>|<cy>|<cz>\" (3 decimals, part coordinates), the fingerprint the cad-engine hashes for its stable face ids, so a feature's faces can be found on the cad-engine's mesh",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z_0-9]+\\|[^|]+\\|[^|]+\\|[^|]+\\|[^|]+$"
+          }
+        },
         "features": {
           "type": "array",
           "items": {
@@ -797,6 +805,14 @@ export const CASTING_RESULT_SCHEMA = {
             "items": {
               "$ref": "#/$defs/xyz"
             }
+          }
+        },
+        "edge_faces": {
+          "description": "Absent in results of workers before 0.19.0. Edge features: the faces meeting at its edges (two per edge, each once), so the edge can be shown by its faces; empty for the others",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "parameters": {

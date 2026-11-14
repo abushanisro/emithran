@@ -735,14 +735,19 @@ export class ProcessCostService {
     if (updateDto.processRouteId !== undefined) updateData.process_route_id = updateDto.processRouteId;
     if (updateDto.bomItemId !== undefined) updateData.bom_item_id = updateDto.bomItemId;
 
-    // Always update calculated fields
-    updateData.total_cost_per_part = calculationResult.totalCostPerPart;
+    // Always update calculated fields. What the line charges beyond machine and crew time (a melt's energy: other_cost_per_part,
+    // migration 1005, "included in total_cost_per_part") stays in the total: the engine recalculates the time cost only.
+    const otherCostPerPart = existing.other_cost_per_part != null ? Number(existing.other_cost_per_part) : 0;
+    const totalCostPerPart = calculationResult.totalCostPerPart + otherCostPerPart;
+    updateData.total_cost_per_part = totalCostPerPart;
     updateData.setup_cost_per_part = calculationResult.setupCostPerPart;
     updateData.total_cycle_cost_per_part = calculationResult.totalCycleCostPerPart;
-    updateData.total_cost_before_scrap = calculationResult.totalCostBeforeScrap;
+    updateData.total_cost_before_scrap = calculationResult.totalCostBeforeScrap + otherCostPerPart;
     updateData.scrap_adjustment = calculationResult.scrapAdjustment;
-    updateData.total_batch_cost = calculationResult.totalBatchCost;
-    updateData.calculation_breakdown = calculationResult;
+    updateData.total_batch_cost = totalCostPerPart * merged.batchSize;
+    updateData.calculation_breakdown = otherCostPerPart > 0
+      ? { ...calculationResult, otherCostPerPart, totalCostPerPart, totalBatchCost: updateData.total_batch_cost }
+      : calculationResult;
 
     // Any manual update via the dialog marks the row as engineer-overridden
     updateData.is_override = true;

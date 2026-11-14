@@ -194,7 +194,7 @@ export function priceCoreRoute(input: CoreRouteInput): CoreRouteResult {
     }
     if (reasons.length) return { m, reasons, run: null, sec: 0, blow: 0, box: null, boxMaterial: mat, sandType, sandRow: null, cost: Infinity };
     const run = runReferenceCalculator(calcs, 'Coremaking', {
-      'Base Cycle Time': castingSeed.machine(m.name, 'Base Cycle Time (s)', blow!),
+      'Base Cycle Time': castingSeed.machine(m, 'base_cycle_time_s', 'Base Cycle Time (s)', blow!),
       'Core Count': coreCountSeed,
     });
     if (run.value == null) return { m, reasons: run.missing, run: null, sec: 0, blow: 0, box: null, boxMaterial: mat, sandType, sandRow: null, cost: Infinity };
@@ -312,9 +312,9 @@ export function priceCoreRoute(input: CoreRouteInput): CoreRouteResult {
     if (reasons.length) return { ...o, reasons, run: null, sec: 0, cost: Infinity };
     const run = runReferenceCalculator(calcs, o.kind, {
       ...common, ...o.extra,
-      'Bed Length': castingSeed.machine(o.m.name, 'Bed Length (mm)', dims.L!),
-      'Bed Width': castingSeed.machine(o.m.name, 'Bed Width (mm)', dims.W!),
-      'Bed Height': castingSeed.machine(o.m.name, 'Bed Height (mm)', dims.H!),
+      'Bed Length': castingSeed.machine(o.m, 'bed_length_mm', 'Bed Length (mm)', dims.L!),
+      'Bed Width': castingSeed.machine(o.m, 'bed_width_mm', 'Bed Width (mm)', dims.W!),
+      'Bed Height': castingSeed.machine(o.m, 'bed_height_mm', 'Bed Height (mm)', dims.H!),
     });
     if (run.value == null) return { ...o, reasons: run.missing, run: null, sec: 0, cost: Infinity };
     if (!(run.outputs['Parts per Load']! >= 1)) return { ...o, reasons: ['the bed does not hold one part core set'], run: null, sec: 0, cost: Infinity };

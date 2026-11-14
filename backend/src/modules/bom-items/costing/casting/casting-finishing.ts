@@ -16,10 +16,10 @@
 // is at or above the part weight. Internal surfaces are not measured
 // separately, so the internal rate is not used.
 
-import type { CalculatorRunDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
+import type { CalculationTraceStep, CalculatorRunDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import { eMithranTerms, resolveSetupMinutes, type EMithranTermsArgs } from '../shared/core/engine-kernel';
 import { runReferenceCalculator, type CalcRun, type CalcSeed, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
-import { castingSeed, runOnLine, runView, SeedSet } from './casting-calculator-seeds';
+import { castingSeed, runOnLine, runView, SeedSet, type AlloyRecord, type MachineRecord } from './casting-calculator-seeds';
 import { machineChoice, roundPerPart, type ChoiceEval } from './machine-choice';
 
 export interface FinishingMachine {
@@ -120,9 +120,9 @@ export function cleaningLine(input: {
     if (h == null || w == null) reasons.push('no max width / height on file');
     else if (!(a != null && b != null && ((a <= w && b <= h) || (a <= h && b <= w)))) reasons.push(`part ${r2(a ?? 0)} x ${r2(b ?? 0)} mm does not fit ${w} x ${h} mm`);
     const seeds = new SeedSet()
-      .put('Time per Load', perLoad != null && perLoad > 0 ? perLoad : null, (x) => castingSeed.machine(m.name, 'Time per Load (min)', x), 'no Time per Load on file')
-      .put('Weight Capacity', cap != null && cap > 0 ? cap : null, (x) => castingSeed.machine(m.name, 'Weight Capacity (kg)', x), 'no Weight Capacity on file')
-      .put('Max Batch Size', maxBatch != null && maxBatch > 0 ? maxBatch : null, (x) => castingSeed.machine(m.name, 'Max Batch Size', x), 'no Max Batch Size on file');
+      .put('Time per Load', perLoad != null && perLoad > 0 ? perLoad : null, (x) => castingSeed.machine(m, 'time_per_load_min', 'Time per Load (min)', x), 'no Time per Load on file')
+      .put('Weight Capacity', cap != null && cap > 0 ? cap : null, (x) => castingSeed.machine(m, 'weight_capacity_kg', 'Weight Capacity (kg)', x), 'no Weight Capacity on file')
+      .put('Max Batch Size', maxBatch != null && maxBatch > 0 ? maxBatch : null, (x) => castingSeed.machine(m, 'max_batch_size', 'Max Batch Size', x), 'no Max Batch Size on file');
     reasons.push(...seeds.missing);
     if (reasons.length) return { m, reasons, run: null, sec: 0, cost: Infinity };
     const run = runReferenceCalculator(input.calculators, P, seeds.with({ 'Part Weight': input.partWeight! }));
@@ -176,7 +176,7 @@ export function visualInspectionLine(input: {
   const row = weightBand(input.rows, input.partMassKg);
   if (!row) return { line: gap(P, input.processGroup, input.machineClass, `tblVisualInspection has no row for ${r2(input.partMassKg)} kg`), warnings };
   const run = runReferenceCalculator(input.calculators, P, {
-    'Surface Area': castingSeed.cad(input.surfaceAreaMm2, 'part surface area (mm²)'),
+    'Surface Area': castingSeed.cad(input.surfaceAreaMm2, 'part surface area (mm²)', 'part_surface'),
     'External Inspection Rate': castingSeed.lookup('tblVisualInspection', 'External Inspection Rate (min / m^2)', row.externalMinPerM2, { 'Max Weight (kg)': row.maxWeightKg }),
   });
   if (run.value == null) return { line: gap(P, input.processGroup, input.machineClass, run.missing.join('; ')), warnings };
@@ -220,8 +220,8 @@ export function trimLine(input: {
   partingPerimeterMm: number | null;
   partMassKg: number | null;
   dimensions: ReadonlyArray<{ maxWeightKg: number; partingLineThicknessMm: number }>;
-  /** The alloy name and its Shear Strength (MPa); null when not on file. */
-  alloyName: string | null;
+  /** The alloy's raw_materials record, and its Shear Strength (MPa); null when not on file. */
+  alloy: AlloyRecord | null;
   shearStrengthMpa: number | null;
   batchSize: number;
   processGroup: string;
@@ -236,7 +236,7 @@ export function trimLine(input: {
     .put('Parting Line Perimeter', input.partingPerimeterMm, (x) => castingSeed.cad(x, 'parting-line perimeter (mm)'), 'parting-line perimeter not measured (re-run analysis)')
     .put('Flash Thickness', flash?.partingLineThicknessMm, (x) => castingSeed.lookup('tblGrindingDimensions', 'Parting Line Thickness (mm)', x, { 'Max Weight (kg)': flash!.maxWeightKg }),
       `tblGrindingDimensions has no row for ${input.partMassKg != null ? `${r2(input.partMassKg)} kg` : 'an unknown part weight'}`)
-    .put('Shear Strength', input.shearStrengthMpa, (x) => castingSeed.alloy(input.alloyName ?? 'alloy', 'Shear Strength (MPa)', x), 'the alloy has no Shear Strength on file');
+    .put('Shear Strength', input.shearStrengthMpa, (x) => castingSeed.alloy(input.alloy ?? { id: null, name: 'alloy' }, 'shear_strength', 'Shear Strength (MPa)', x), 'the alloy has no Shear Strength on file');
   const forceRaw = forceSeeds.missing.length ? null : runReferenceCalculator(input.calculators, 'Trim Force', forceSeeds.seeds, 'Trim Force');
   const forceRun = forceRaw ? runView('Die Casting - Trim Force', 'Trim Force', forceRaw) : null;
   const requiredKn = forceRaw?.value ?? null;
@@ -255,7 +255,7 @@ export function trimLine(input: {
       else if (force < requiredKn) reasons.push(`Press Force ${force} kN below the ${r2(requiredKn)} kN trim force`);
     }
     if (reasons.length) return { m, reasons, run: null, sec: 0, cycle: 0, cost: Infinity };
-    const run = runReferenceCalculator(input.calculators, P, stroke.with({ 'Press Cycle Time': castingSeed.machine(m.name, 'Cycle Time (s)', cycle!) }));
+    const run = runReferenceCalculator(input.calculators, P, stroke.with({ 'Press Cycle Time': castingSeed.machine(m, 'cycle_time_s', 'Cycle Time (s)', cycle!) }));
     if (run.value == null) return { m, reasons: run.missing, run: null, sec: 0, cycle: 0, cost: Infinity };
     return { m, reasons, run, sec: run.value, cycle: cycle!, cost: (crewed(m) * run.value) / 3600 };
   });
@@ -354,8 +354,8 @@ export function partingLineGrindingLine(input: {
     else if (maxKg < input.partMassKg!) reasons.push(`part ${r2(input.partMassKg!)} kg over its ${maxKg} kg Max Weight`);
     if (reasons.length) return { m, reasons, run: null, sec: 0, speed: 0, gateSpeed: 0, cost: Infinity };
     const run = runReferenceCalculator(input.calculators, P, seeds.with({
-      'Grinding Speed Parting Line': castingSeed.machine(m.name, 'Grinding Speed Parting Line (mm³/s)', speed!),
-      'Grinding Speed Gating': castingSeed.machine(m.name, 'Grinding Speed Gating (mm³/s)', gateSpeed!),
+      'Grinding Speed Parting Line': castingSeed.machine(m, 'grinding_speed_parting_line_mm3_per_s', 'Grinding Speed Parting Line (mm³/s)', speed!),
+      'Grinding Speed Gating': castingSeed.machine(m, 'grinding_speed_gating_mm3_per_s', 'Grinding Speed Gating (mm³/s)', gateSpeed!),
     }));
     if (run.value == null) return { m, reasons: run.missing, run: null, sec: 0, speed: 0, gateSpeed: 0, cost: Infinity };
     return { m, reasons, run, sec: run.value, speed: speed!, gateSpeed: gateSpeed!, cost: (crewed(m) * run.value) / 3600 };
@@ -401,13 +401,15 @@ export function partingLineGrindingLine(input: {
 export function meltingLine(input: {
   furnaces: readonly FinishingMachine[];
   calculators: ReferenceCalculators | null;
-  /** The ductile-iron melter whose Conversion Cost prices the melt, in the line currency per kg; null when not on file. */
-  ductileIron: { name: string; costPerKg: number } | null;
+  /** The ductile-iron melter (its HR Rates record) whose Conversion Cost prices the melt, in the line currency per kg; null when not on file. */
+  ductileIron: (MachineRecord & { costPerKg: number }) | null;
   regionConvFactor: number;
   furnaceCapacitySafetyFactor: number;
   shotVolumeMm3: number | null;
+  /** The calculator run that computed the shot volume (HpdcResult.shotVolumeRun); null when not known. */
+  shotVolumeRun?: { name: string; trace: CalculationTraceStep[] } | null;
   cavities: number | null;
-  alloyName: string | null;
+  alloy: AlloyRecord | null;
   densityKgM3: number | null;
   injectionTempC: number | null;
   batchSize: number;
@@ -420,10 +422,10 @@ export function meltingLine(input: {
   if (input.ductileIron == null) return g('the ductile-iron melter (Induction - DI, HR Rates class casting_pm_melting) has no Conversion Cost on file for this location');
   if (input.injectionTempC == null) return g('the alloy has no Injection Temp on file, so no furnace can be checked for it');
   const seeds = new SeedSet()
-    .put('Shot Volume', input.shotVolumeMm3, (x) => castingSeed.calculator(x, 'Shot Volume'), 'melted metal per part not derived (casting line not costed)')
+    .put('Shot Volume', input.shotVolumeMm3, (x) => castingSeed.calculator(x, input.shotVolumeRun?.name ?? 'Shot Volume', input.shotVolumeRun ?? undefined, 'part_volume'), 'melted metal per part not derived (casting line not costed)')
     .put('Cavities', input.cavities, (x) => castingSeed.engine(x, `${x} cavit${x === 1 ? 'y' : 'ies'} per shot`), 'cavities')
-    .put('Density', input.densityKgM3, (x) => castingSeed.alloy(input.alloyName ?? 'alloy', 'Density (kg/m^3)', x), 'alloy density')
-    .put('Conversion Cost', input.ductileIron.costPerKg, (x) => castingSeed.machine(input.ductileIron!.name, 'Conversion Cost per kg', x), 'Conversion Cost')
+    .put('Density', input.densityKgM3, (x) => castingSeed.alloy(input.alloy ?? { id: null, name: 'alloy' }, 'density_kg_m3', 'Density (kg/m^3)', x), 'alloy density')
+    .put('Conversion Cost', input.ductileIron.costPerKg, (x) => castingSeed.machine(input.ductileIron!, 'conversion_cost_usd_per_kg', 'Conversion Cost per kg (USD on file, converted to the line currency)', x), 'Conversion Cost')
     .put('Region Conversion Factor', input.regionConvFactor, (x) => castingSeed.variable('regionConvFactor', x), 'variables regionConvFactor')
     .put('Batch Size', input.batchSize, (x) => castingSeed.scenario(x, 'batch size'), 'batch size')
     .put('Furnace Capacity Safety Factor', input.furnaceCapacitySafetyFactor, (x) => castingSeed.variable('furnaceCapacitySafetyFactor', x), 'variables furnaceCapacitySafetyFactor');

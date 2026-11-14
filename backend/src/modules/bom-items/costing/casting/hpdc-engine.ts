@@ -42,7 +42,7 @@
 // hours). Metal per shot (part + overflow) is reported here and priced in
 // casting-cost-summary.ts; the die is costed by die-tooling.ts.
 
-import type { CalculatorRunDto, FeatureOp, MachineChoiceDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
+import type { CalculationTraceStep, CalculatorRunDto, FeatureOp, MachineChoiceDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import { eMithranTerms, type EMithranTermsArgs } from '../shared/core/engine-kernel';
 import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
 import type { CastingMaterial, CastingReference } from './casting-reference';
@@ -162,12 +162,12 @@ export function hpdcCycleSeeds(input: {
   s.put('Projected Area', pos(g.projectedAreaMm2), (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)'), 'measured projected area (re-run analysis as a casting process)');
   s.put('Wall Nominal', pos(g.wallNominalMm), (x) => castingSeed.cad(x, 'nominal wall thickness (mm)'), 'measured nominal wall thickness');
   s.put('Wall Max', pos(g.wallMaxMm), (x) => castingSeed.cad(x, 'thickest wall (mm)'), 'measured maximum wall thickness');
-  s.put('Injection Temp', m.injectionTempC, (x) => castingSeed.alloy(m.name, 'Injection Temp (C)', x), `${m.name}: Injection Temp`);
-  s.put('Liquidus Temp', m.liquidusTempC, (x) => castingSeed.alloy(m.name, 'Liquidus Temp (C)', x), `${m.name}: Liquidus Temp`);
-  s.put('Mold Temp', m.moldTempC, (x) => castingSeed.alloy(m.name, 'Mold Temp (C)', x), `${m.name}: Mold Temp`);
-  s.put('Cooling Factor', m.coolingFactorSPerMm, (x) => castingSeed.alloy(m.name, 'Cooling Factor (s/mm)', x), `${m.name}: Cooling Factor`);
+  s.put('Injection Temp', m.injectionTempC, (x) => castingSeed.alloy(m, 'injection_temp', 'Injection Temp (C)', x), `${m.name}: Injection Temp`);
+  s.put('Liquidus Temp', m.liquidusTempC, (x) => castingSeed.alloy(m, 'liquidus_temp', 'Liquidus Temp (C)', x), `${m.name}: Liquidus Temp`);
+  s.put('Mold Temp', m.moldTempC, (x) => castingSeed.alloy(m, 'mold_temp', 'Mold Temp (C)', x), `${m.name}: Mold Temp`);
+  s.put('Cooling Factor', m.coolingFactorSPerMm, (x) => castingSeed.alloy(m, 'cooling_factor', 'Cooling Factor (s/mm)', x), `${m.name}: Cooling Factor`);
   const z = m.materialType ? ref.latentHeatConstantByType.get(m.materialType) : null;
-  s.put('Latent Heat Constant', z, (x) => castingSeed.lookup('tblLatentHeatConstant', 'Latent Heat Constant', x, { 'Material Name': m.materialType! }),
+  s.put('Latent Heat Constant', z, (x) => castingSeed.lookup('tblLatentHeatConstant', 'Latent Heat Constant (°C)', x, { 'Material Name': m.materialType! }),
     m.materialType ? `tblLatentHeatConstant row for material type ${m.materialType}` : `${m.name}: Material Type (needed for its tblLatentHeatConstant row)`);
   const qIndex = input.surfaceQualityIndex ?? ref.defaultSurfaceQuality?.index ?? null;
   const solids = ref.percentSolids.find((p) => p.index === qIndex) ?? null;
@@ -208,6 +208,8 @@ export interface HpdcResult {
   machineChecks: MachineCheck[];
   /** Metal per shot, every cavity (mm3); null when not derivable. */
   shotVolumeMm3: number | null;
+  /** The calculator run that computed shotVolumeMm3 (its name and steps); null when not derived. */
+  shotVolumeRun: { name: string; trace: CalculationTraceStep[] } | null;
   /** Cavities per die; null before the alloy and reference are resolved. */
   cavities: HpdcCavities | null;
   /** The alloy materials_master Yield Loss Factor; null when not on file or no alloy. */
@@ -249,7 +251,7 @@ export function computeHpdc(input: {
       physicsGap: { gapType: 'unsupported_operation', process: HPDC_PROCESS, machineClass: HPDC_MACHINE_CLASS_ID, reason },
       ...(choice ? { machineChoice: choice } : {}),
     }],
-    requiredClampKn, machineChecks, shotVolumeMm3: null, cavities, yieldLossFactor: input.material?.yieldLossFactor ?? null, machine: null,
+    requiredClampKn, machineChecks, shotVolumeMm3: null, shotVolumeRun: null, cavities, yieldLossFactor: input.material?.yieldLossFactor ?? null, machine: null,
     calculatorRuns, trace, warnings: [...warnings, reason],
   });
   let requiredClampKn: number | null = null;
@@ -283,7 +285,7 @@ export function computeHpdc(input: {
     .put('Cavities', n, (x) => castingSeed.engine(x, cav.trace), 'cavities')
     .put('Projected Area', area != null && area > 0 ? area : null, (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)'), 'no measured projected area (re-run analysis as a casting process)')
     .put('Clamping Pressure', mat.clampingPressureMpa != null && mat.clampingPressureMpa > 0 ? mat.clampingPressureMpa : null,
-      (x) => castingSeed.alloy(mat.name, 'Clamping Pressure (MPa)', x), `${mat.name} has no Clamping Pressure in materials_master`)
+      (x) => castingSeed.alloy(mat, 'clamping_pressure', 'Clamping Pressure (MPa)', x), `${mat.name} has no Clamping Pressure in materials_master`)
     .put('Clamp Force Safety Factor', ref.clampForceSafetyFactor, (x) => castingSeed.variable('clampForceSafetyFactor', x), 'variables clampForceSafetyFactor');
   if (clampSeeds.missing.length) return gapLine(`Clamp force not derivable: ${clampSeeds.missing.join('; ')}.`);
   const clampRun = runReferenceCalculator(calcs, CLAMP_CALCULATOR, clampSeeds.seeds, 'Required Clamp Force');
@@ -316,7 +318,7 @@ export function computeHpdc(input: {
   // Price every capable machine with its own dry cycle, the calculator per machine; keep the cheapest per part.
   const runs = selection.capable
     .filter((m) => m.dryCycleTimeS != null)
-    .map((m) => ({ m, run: runReferenceCalculator(calcs, HPDC_CALCULATOR, cyc.seeds.with({ 'Dry Cycle Time': castingSeed.machine(m.name, 'Dry Cycle Time (s)', m.dryCycleTimeS!) })) }));
+    .map((m) => ({ m, run: runReferenceCalculator(calcs, HPDC_CALCULATOR, cyc.seeds.with({ 'Dry Cycle Time': castingSeed.machine(m, 'dry_cycle_time_s', 'Dry Cycle Time (s)', m.dryCycleTimeS!) })) }));
   const unpriced = runs.find((r) => r.run.value == null);
   if (unpriced && runs.every((r) => r.run.value == null)) {
     return gapLine(`HPDC cycle time not derivable: ${unpriced.run.missing.join('; ')}.`, selection.capable[0]);
@@ -360,10 +362,11 @@ export function computeHpdc(input: {
 
   // Metal per shot (calculator Shot Volume): parts + overflow + runner.
   let shotVolumeMm3: number | null = null;
+  let shotVolumeRun: HpdcResult['shotVolumeRun'] = null;
   const g = input.geometry;
   const ov = g.wallNominalMm != null ? overflowRow(ref, g.wallNominalMm, cyc.surfaceQualityIndex) : null;
   const shotSeeds = new SeedSet()
-    .put('Part Volume', vol != null && vol > 0 ? vol : null, (x) => castingSeed.cad(x, 'part volume (mm³)'), 'part volume')
+    .put('Part Volume', vol != null && vol > 0 ? vol : null, (x) => castingSeed.cad(x, 'part volume (mm³)', 'part_volume'), 'part volume')
     .put('Cavities', n, (x) => castingSeed.engine(x, cav.trace), 'cavities')
     .put('Overflow Ratio', ov?.ratio, (x) => castingSeed.lookup('tblOverflowDim', ov!.column, x, { 'Wall Thickness (mm)': ov!.wallMm }),
       'a tblOverflowDim row (nominal wall below the first row, or not measured)')
@@ -379,6 +382,7 @@ export function computeHpdc(input: {
     if (shotRun.value == null) warnings.push(`Shot volume not derived: ${shotRun.missing.join('; ')}.`);
     else {
       shotVolumeMm3 = shotRun.value;
+      shotVolumeRun = { name: 'Shot Volume', trace: shotRun.trace };
       trace.push({ label: 'Shot volume', value: `${r2(shotVolumeMm3)} mm³ (parts + overflow + runner, Shot Volume calculator)` });
     }
   }
@@ -406,7 +410,7 @@ export function computeHpdc(input: {
       machineChoice: choice,
       ...runOnLine(best.run),
     }],
-    requiredClampKn, machineChecks, shotVolumeMm3, cavities, yieldLossFactor: mat.yieldLossFactor, machine: best.m, calculatorRuns, trace, warnings,
+    requiredClampKn, machineChecks, shotVolumeMm3, shotVolumeRun, cavities, yieldLossFactor: mat.yieldLossFactor, machine: best.m, calculatorRuns, trace, warnings,
   };
 }
 

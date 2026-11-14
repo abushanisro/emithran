@@ -44,7 +44,7 @@
 namespace {
 
 constexpr int kSchemaVersion = 1;
-constexpr const char* kWorkerVersion = "0.18.0";
+constexpr const char* kWorkerVersion = "0.19.0";
 
 int fail(const char* code, int exit_code) {
   std::cout << "{\"error\":\"" << code << "\"}\n";
@@ -231,6 +231,8 @@ void write_part(JsonWriter& json, const PartProperties& p) {
   write_casting(json, p.casting);
   json.key("glb_faces").begin_array();
   for (const int f : p.glb_faces) json.value(f);
+  json.end_array().key("face_keys").begin_array();
+  for (const std::string& k : p.face_keys) json.value(k);
   json.end_array().key("features").begin_array();
   for (const Feature& f : p.features) {
     json.begin_object().key("id").value(f.id).key("type").value(f.type).key("parent");
@@ -247,6 +249,8 @@ void write_part(JsonWriter& json, const PartProperties& p) {
       for (const Xyz& pt : line) json.begin_array().value(pt[0]).value(pt[1]).value(pt[2]).end_array();
       json.end_array();
     }
+    json.end_array().key("edge_faces").begin_array();
+    for (const int i : f.edge_faces) json.value(i);
     json.end_array().key("parameters").begin_object();
     for (const auto& [name, value] : f.parameters) json.key(name).value(value);
     json.end_object().end_object();
@@ -501,6 +505,7 @@ int main(int argc, char** argv) {
     }
     try {
       p.features = recognise_features(labels.at(p.id), p.casting);
+      p.face_keys = face_keys(labels.at(p.id));
     } catch (const Standard_Failure&) {
       p.problems.push_back("failed:features");
     }

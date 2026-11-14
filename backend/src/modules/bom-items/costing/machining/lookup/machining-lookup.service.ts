@@ -12,6 +12,7 @@ import {
 } from './machining-material-hardness';
 import { readAllRows } from '../../../../../common/database/read-all-rows';
 import { MACHINING_REFERENCE_SOURCE_VERSION } from './machining-lookup-tables';
+import { rowKeys } from '../calculators/machining-source-refs';
 import { SETUP_AXIS_VARIABLE_KEYS, resolveSetupAxisRule, type SetupAxisRule } from '../setup-axis-rule';
 import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
 import {
@@ -55,6 +56,8 @@ interface EdgeToolParams {
   dataFound: boolean;
   /** The material cut code of the row the speed came from. */
   materialCutCode?: string;
+  /** The staged table and row the speed came from (the trace's lookup match). */
+  match?: { table: string; row: Record<string, string | number> };
 }
 
 interface CylindricalGrindingParams {
@@ -434,7 +437,9 @@ export class MachiningLookupService {
     if (!rows?.length) return noData;
     const row = nearestByHardness(rows, MACHINING_MATERIAL[materialClass]);
     if (!row || typeof row.linear_speed_mm_s !== 'number') return noData;
-    return { linearSpeedMmPerSec: row.linear_speed_mm_s, dataFound: true, materialCutCode: row.material_cut_code_name };
+    // A material code has one row per deburring tool: the code, deburr type and tool series identify the one read.
+    const match = { table: 'tblDeburring', row: rowKeys(row, ['material_cut_code_name', 'deburr_type', 'tool_series']) };
+    return { linearSpeedMmPerSec: row.linear_speed_mm_s, dataFound: true, materialCutCode: row.material_cut_code_name, match };
   }
 
   // ── Corner Rounding Mill (tblCornerRoundingMill.json, 91 real rows) —

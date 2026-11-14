@@ -151,9 +151,10 @@ export class PlasticRouteComparisonService {
     }) : []);
     const sfmCandidate = mhrRates.structuralFoamMolding.selection?.balanced?.candidate;
     const rimCandidate = mhrRates.reactionInjectionMolding.selection?.balanced?.candidate;
+    const compressionCandidate = mhrRates.compressionMolding.selection?.balanced?.candidate;
     const pressRecordsRC = await this.plasticReference.getPressRecords(
       client,
-      [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? '', rimCandidate?.machineId ?? ''],
+      [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? '', rimCandidate?.machineId ?? '', compressionCandidate?.machineId ?? ''],
     );
     const rcUsdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
     const imCommon = buildMoldingCommonInput({
@@ -161,6 +162,7 @@ export class PlasticRouteComparisonService {
       material: {
         materialCostPerKg, materialDensityKgM3, materialSource, materialType: rcMaterialType, materialStockForm: rcStockForm,
         materialMatlState: rcMatlState, materialClamp: rcClampProperties, realResinInputs: rcRealResinInputs,
+        materialRecord: input.material.materialRecord,
       },
       plasticReference: { plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing },
       electricity: electricityUsd(await loadLocationElectricity(client, location), location,
@@ -294,6 +296,9 @@ export class PlasticRouteComparisonService {
       // Real per-grade cure_time_min — same resolved material row as
       // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+      // The press's HR Rates record, for its open/close time's source (the rate itself comes from the same record through the rate resolver).
+      machineRecord: compressionCandidate?.machineId ? pressRecordsRC.get(compressionCandidate.machineId)?.record ?? null : null,
+      materialRecord: input.material.materialRecord,
       calculators, calculatorOverrides,
     });
     // A route is a real alternative only on a material the dataset flags for that process, and only where a real machine rate resolved.
@@ -340,6 +345,8 @@ export class PlasticRouteComparisonService {
       // The fill time is the CAD part volume (mm3) over the selected machine's staged injection rate (mm3/s): formula registry F-19.
       partVolumeMm3: partVolumeMm3 > 0 ? partVolumeMm3 : null,
       injectionRateMm3PerS: rimCandidate?.machineId ? pressRecordsRC.get(rimCandidate.machineId)?.injectionRateMm3PerS ?? null : null,
+      machineRecord: rimCandidate?.machineId ? pressRecordsRC.get(rimCandidate.machineId)?.record ?? null : null,
+      materialRecord: input.material.materialRecord,
       calculators, calculatorOverrides,
     });
     const rimGap = compatGap('reaction_injection');
