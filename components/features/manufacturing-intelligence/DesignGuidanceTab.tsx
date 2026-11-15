@@ -113,8 +113,9 @@ const HELP: Record<Topic, { title: string; body: { heading?: string; text: strin
     title: 'Tolerances and Finishing Operations',
     body: [
       { text: 'A tolerance tighter than the primary process holds costs an operation. The first count is the features carrying a tolerance requirement (from the model, the drawing, or the part\'s tolerance policy).' },
-      { heading: 'Driving machining', text: 'Features whose tolerance the primary process cannot hold, so they are machined after it.' },
+      { heading: 'Driving machining', text: 'Features whose tolerance the process that makes them cannot hold. On a cast or molded part they are machined afterwards; on a machined part they need a finer operation than the one that makes them (reaming or boring a drilled hole, a fine finishing pass on a milled face).' },
       { heading: 'Driving specialized finishing', text: 'Features whose tolerance only an abrasive process holds (grinding, honing, lapping): a further, slower operation on a separate machine.' },
+      { heading: 'Held by the operations', text: 'What each feature gets with no further operation: the size, position, form and finish its own operation holds, from the process capability table and ISO 286 at the feature\'s size. The first value is the finest the operation holds, the second the coarsest. A requirement inside that range costs nothing extra; one finer than it drives machining.' },
     ],
   },
   setups: {
@@ -304,6 +305,8 @@ export function DesignGuidanceView({ guidance: g, features = [], operations = []
           {list('drivingMachining', g.tolerances.machiningItems)}
           <Row label="Driving specialized finishing" value={count(g.tolerances.drivingFinishing)} why={why.drivingFinishing} review={{ key: 'drivingFinishing', items: g.tolerances.finishingItems }} {...rowProps} />
           {list('drivingFinishing', g.tolerances.finishingItems)}
+          <Row label="Held by the operations" value={count(g.tolerances.heldByOperations)} why={why.drivingMachining} review={{ key: 'held', items: g.tolerances.heldItems }} {...rowProps} />
+          {list('held', g.tolerances.heldItems)}
         </Panel>
 
         {g.setups && (

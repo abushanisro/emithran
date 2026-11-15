@@ -18,6 +18,7 @@ import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-
 import type { CostTable } from '../costing/shared/cost-table';
 import { buildDesignGuidance, type DesignGuidance, type DesignGuidanceInput, type GuidanceFeature, type GuidanceSeverity, type ReviewItem } from '../costing/shared/design-guidance';
 import { resolveCostingInputs } from '../costing/shared/physics/costing-inputs';
+import type { Achieved } from '../costing/shared/tolerance/process-capability';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
 import { CostTableService } from './cost-table.service';
 import { FeatureToleranceService } from './feature-tolerance.service';
@@ -34,6 +35,17 @@ const num = (v: unknown): number | null => {
   return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null;
 };
 const severityOf = (s: string): GuidanceSeverity => (s.toLowerCase() as GuidanceSeverity);
+
+const CATEGORY_NAME: Partial<Record<Achieved['category'], string>> = { diamTolerance: 'diameter', tolerance: 'size', positionTolerance: 'position', flatness: 'flatness', roughness: 'Ra' };
+const trim = (n: number) => String(Number(n.toFixed(n < 0.1 ? 4 : 3)));
+
+/** "diameter ±0.0375 to ±0.24 mm (IT11 to IT15)": the finest and the coarsest the process holds in one category. */
+function achievedText(a: Achieved): string {
+  const sign = a.category === 'diamTolerance' || a.category === 'tolerance' ? '±' : '';
+  const range = a.best === a.worst ? `${sign}${trim(a.best)}` : `${sign}${trim(a.best)} to ${sign}${trim(a.worst)}`;
+  const unit = a.unit === 'um' ? 'µm' : a.unit === 'deg' ? '°' : 'mm';
+  return `${CATEGORY_NAME[a.category] ?? a.category} ${range} ${unit}${a.grade ? ` (IT${a.grade.best} to IT${a.grade.worst})` : ''}`;
+}
 
 /** The library keeps density in kg/m3 (density_kg_m3) or, on older rows, g/cm3 (density). */
 const densityOf = (r: { density_kg_m3?: unknown; density?: unknown }): number | null => num(r.density_kg_m3) ?? (num(r.density) != null ? num(r.density)! * 1000 : null);
@@ -79,7 +91,7 @@ export class DesignGuidanceService {
       this.library(client, processGroup, info.materialCol, grade),
       this.findings({ item, fg, grade, token, machined, molded, sand: casting === 'sand_casting' }),
       this.toleranced(item.id, token),
-      machined ? Promise.resolve({ value: null, reason: null }) : this.secondaryMachining(item.id, token),
+      this.secondaryMachining(item.id, token),
       features.length > 0 ? this.machiningLookup.getSetupAxisRule() : Promise.resolve({ rule: null, missing: [] }),
     ]);
 
@@ -217,7 +229,14 @@ export class DesignGuidanceService {
       });
       // Specialised finishing: every operation able to hold the feature's tolerances is an abrasive one.
       const finishing = needing.filter((f) => f.candidates.length > 0 && f.candidates.every((c) => SPECIALISED_FINISHING.test(c.capabilityProcess) || SPECIALISED_FINISHING.test(c.operation)));
-      return { value: { items: needing.map(toItem), finishingItems: finishing.map(toItem) }, reason: null };
+      // What each feature's process holds on it, as the capability table states it: the tolerances the part gets with no further operation.
+      const held = need.result.features.filter((f) => f.achieved.length > 0).map((f): ReviewItem => ({
+        label: `${f.label} · ${f.primaryProcess}`,
+        detail: f.achieved.map(achievedText).join(' · '),
+        severity: null,
+        occurrences: f.featureId ? [{ featureId: f.featureId, occurrenceIndex: f.occurrenceIndex }] : [], faces: f.faceIds,
+      }));
+      return { value: { items: needing.map(toItem), finishingItems: finishing.map(toItem), heldItems: held }, reason: null };
     } catch (error) {
       return { value: null, reason: error instanceof Error ? error.message : 'Which features need machining after the primary process could not be assessed.' };
     }

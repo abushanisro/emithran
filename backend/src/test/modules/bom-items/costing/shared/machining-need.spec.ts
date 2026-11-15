@@ -130,3 +130,52 @@ describe('other casting features (real memory/Die Casting tables)', () => {
     expect(need.features[0]!.forming?.operation).toBe('Step Drilling');
   });
 });
+
+describe('a machined part: each feature is judged by the operation that makes it', () => {
+  const machined = {
+    features: [
+      { feature_type: 'SimpleHole', variant: 'blind', occurrences: [
+        { face_ids: [1], source_face_stable_ids: ['m1'], diameter_mm: 4, depth_mm: 10 },
+        { face_ids: [2], source_face_stable_ids: ['m2'], diameter_mm: 4, depth_mm: 10 },
+      ] },
+      { feature_type: 'Edge', variant: 'round', occurrences: [{ face_ids: [3], source_face_stable_ids: ['m3'] }] },
+    ],
+  };
+  const instances = featureInstances(machined);
+  const keyOf = (label: string) => instances.find((i) => i.label === label)!.key!;
+  const capabilityOf = new Map(links.map((l) => [l.operation, l.capabilityProcess]));
+  const operationOf: Record<string, string> = { SimpleHole: 'Drilling', Edge: 'Rounding' };
+  const run = (manualRows: ManualTolerance[]) => evaluateMachiningNeed({
+    primaryProcess: 'Machining',
+    features: resolveFeatureRequirements({ instances, manual: manualRows, policy: { mode: 'assume_achieved' }, callouts: [] }).instances,
+    capability, iso, links,
+    primaryProcessOf: ({ instance }) => capabilityOf.get(operationOf[instance.featureType]!) ?? null,
+  });
+
+  it('with no requirement every feature is held by its operation, and what that operation holds is stated', () => {
+    const r = run([]);
+    expect(r.machiningRequired).toBe(false);
+    const hole = r.features.find((f) => f.label === 'SimpleHole:1')!;
+    expect(hole).toMatchObject({ verdict: 'as_primary', primaryProcess: 'Drilling' });
+    expect(hole.achieved.map((a) => a.category)).toEqual(['diamTolerance', 'positionTolerance', 'roughness']);
+    expect(hole.achieved[0]).toMatchObject({ best: 0.0375, worst: 0.24 });
+  });
+
+  it('a diameter finer than drilling holds needs a finer operation, and drilling itself is not offered again', () => {
+    // +/-0.005 mm on a 4 mm hole: a 10 um band = IT6; drilling holds IT11 at best.
+    const r = run([{ featureKey: keyOf('SimpleHole:1'), category: 'diamTolerance', value: 0.005 }]);
+    const hole = r.features.find((f) => f.label === 'SimpleHole:1')!;
+    expect(hole.verdict).toBe('needs_machining');
+    expect(hole.reasons.join(' ')).toMatch(/IT6; Drilling best is IT11/);
+    expect(hole.candidates.map((c) => c.capabilityProcess)).toEqual(expect.arrayContaining(['Reaming', 'Boring']));
+    expect(hole.candidates.some((c) => c.capabilityProcess === 'Drilling')).toBe(false);
+    expect(r.features.find((f) => f.label === 'SimpleHole:2')!.verdict).toBe('as_primary');
+  });
+
+  it('a feature whose operation has no capability on file is undecided when it carries a requirement, never passed', () => {
+    const r = run([{ featureKey: keyOf('Edge:1'), category: 'tolerance', value: 0.05 }]);
+    const edge = r.features.find((f) => f.label === 'Edge:1')!;
+    expect(edge).toMatchObject({ verdict: 'undecided', primaryProcess: null, achieved: [] });
+    expect(edge.reasons.join(' ')).toMatch(/no operation with a capability on file/);
+  });
+});

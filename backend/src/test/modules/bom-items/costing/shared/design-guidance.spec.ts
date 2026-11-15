@@ -68,7 +68,23 @@ describe('buildDesignGuidance', () => {
     const g = buildDesignGuidance(base());
     expect(g.machining).toMatchObject({ routing: '3 Axis Mill → Deburring', scrapPct: 75, machinedFeatures: 11 });
     expect(g.moldTooling).toBeNull();
-    expect(g.notModelled.drivingMachining).toMatch(/Every feature of a machined part/);
+  });
+
+  it('on a machined part counts the features that need a finer operation, and the ones whose operation holds a stated tolerance', () => {
+    const reamed: ReviewItem = { label: 'SimpleHole:1', detail: 'diamTolerance 0.005 mm = IT6; Drilling best is IT11', severity: null, occurrences: [{ featureId: 'h4', occurrenceIndex: 0 }], faces: [0] };
+    const held: ReviewItem = { label: 'SimpleHole:1 · Drilling', detail: 'diameter ±0.0375 to ±0.24 mm (IT11 to IT15)', severity: null, occurrences: [{ featureId: 'h4', occurrenceIndex: 0 }], faces: [0] };
+    const g = buildDesignGuidance(base({ secondaryMachining: { items: [reamed], finishingItems: [], heldItems: [held, held] }, toleranced: [reamed] }));
+    expect(g.tolerances).toMatchObject({ withTolerances: 1, drivingMachining: 1, drivingFinishing: 0, heldByOperations: 2 });
+    expect(g.notModelled.drivingMachining).toBeUndefined();
+    // The machined features stay all of the part's: the ones needing a finer operation do not narrow them.
+    expect(g.machining).toMatchObject({ machinedFeatures: 11 });
+    expect(g.setups).toMatchObject({ count: 2 });
+  });
+
+  it('when the tolerances were not assessed the counts are unknown with the reason, not zero', () => {
+    const g = buildDesignGuidance(base({ secondaryMachining: null, secondaryMachiningReason: 'Tolerance reference data not staged.' }));
+    expect(g.tolerances).toMatchObject({ drivingMachining: null, drivingFinishing: null, heldByOperations: null });
+    expect(g.notModelled.drivingFinishing).toBe('Tolerance reference data not staged.');
   });
 
   it('without an applied cost the routing and the scrap are null with the reason, never zero', () => {
@@ -82,7 +98,7 @@ describe('buildDesignGuidance', () => {
     const needs: ReviewItem = { label: 'SimpleHole:1', detail: 'position 0.05 not held', severity: null, occurrences: [{ featureId: 'h6', occurrenceIndex: 0 }], faces: [0] };
     const g = buildDesignGuidance(base({
       family: 'die_cast', processGroup: 'Die Casting', machined: false, utilizationPct: 90,
-      secondaryMachining: { items: [needs], finishingItems: [] }, moldTooling: { slides: 2, lifters: null, cores: 1, liftersReason: 'no lifters', items: [] },
+      secondaryMachining: { items: [needs], finishingItems: [], heldItems: [] }, moldTooling: { slides: 2, lifters: null, cores: 1, liftersReason: 'no lifters', items: [] },
     }));
     expect(g.machining).toMatchObject({ machinedFeatures: 1, scrapPct: null });
     expect(g.setups).toMatchObject({ count: 1, fewFeatureSetups: 1 });

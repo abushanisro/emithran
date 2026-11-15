@@ -73,6 +73,8 @@ INSERT INTO public.raw_materials (name) VALUES ('Generic Nylon, Type 11 40% Glas
 ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN usd_labor_rate_per_hr numeric, ADD COLUMN usd_lhr_total numeric;
 INSERT INTO public.mhr_records (machine_class, location, usd_labor_rate_per_hr, usd_lhr_total) VALUES
   ('surface_black_oxide', 'USA', NULL, NULL), ('surface_oven_cure', 'USA', 29.95, 29.95), ('surface_shot_blast', 'USA', 29.95, 29.95);
+-- the material cost record table as the real database has it (migration 040): migration 1041 adds the stock label to it
+CREATE TABLE public.raw_material_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid NOT NULL, user_id uuid NOT NULL, is_active boolean DEFAULT true);
 -- the machining reference table as the real database has it (migration 638): migration 1026 completes its tblTapping row from its tblReaming row
 CREATE TABLE public.machining_reference_data (
   id serial PRIMARY KEY, category varchar(20) NOT NULL, source_region varchar(10) NOT NULL, source_version varchar(20) NOT NULL, key text NOT NULL,
