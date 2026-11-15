@@ -13,7 +13,7 @@ import { MHR_RATE_MACHINE_CLASSES } from '../../../modules/bom-items/services/ra
 // they do not produce a wrong number, they make a real applied route disappear
 // and let a fabricated preview take its place.
 
-const SERVICE = join(__dirname, '..', '..', '..', 'modules', 'bom-items', 'bom-items.service.ts');
+const SERVICE = join(__dirname, '..', '..', '..', 'modules', 'bom-items', 'bom-item-costing.service.ts');
 const source = readFileSync(SERVICE, 'utf8');
 
 describe('the applied-generation read is not filtered by process class', () => {

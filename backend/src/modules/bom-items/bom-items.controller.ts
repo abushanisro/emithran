@@ -2,7 +2,6 @@ import { Throttle } from '@nestjs/throttler';
 import { AuditService } from '../../common/audit/audit.service';
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { breakerFor, CAD_ENGINE, isServiceUnavailable } from '../../common/resilience/circuit-breaker';
-import { catalogRowForLine, identityRows, type CatalogRow } from './process-catalog/catalog-row-for-line';
 import {
   Controller,
   Get,
@@ -20,9 +19,7 @@ import {
   NotFoundException,
   Logger,
   Patch,
-  InternalServerErrorException,
   ServiceUnavailableException,
-  ConflictException,
   UseGuards,
   ParseUUIDPipe,
   ParseEnumPipe,
@@ -37,18 +34,17 @@ import { memoryStorage } from 'multer';
 import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { BOMItemsService } from './bom-items.service';
+import { BomItemCostingService } from './bom-item-costing.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
 import { AnalysisStatusService } from './services/analysis-status.service';
-import { currentFeatureGraphVersion, MISSING_ANALYSIS_TEXT, type AnalysisStatus } from './analysis-status';
+import { currentFeatureGraphVersion, type AnalysisStatus } from './analysis-status';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
 import { MachineOverrideDto } from './dto/machine-selection.dto';
 import { CostOverrideDto } from './dto/cost-override.dto';
-import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from './dto/apply-route.dto';
-import type { PhysicsGap } from './dto/cost-breakdown.dto';
-import { LOCATION_INFO } from './costing/shared/core/default-rates.constants';
-import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { ApplyRouteDto, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from './dto/apply-route.dto';
+import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
 import { deriveImplications } from './intelligence/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PmiReviewService, type PmiReviewRequest } from './services/pmi-review.service';
@@ -67,13 +63,6 @@ import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
 import { MaterialResolutionService } from './services/material-resolution.service';
 import { DatabaseService } from '../../common/database/database.service';
-import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge } from './costing/shared/core/engine-kernel';
-import { RouteResultDto } from './dto/route-comparison.dto';
-import {
-  PersistedLineCurrency,
-  resolvePersistedCostCurrencyBasis,
-} from './costing/shared/core/persisted-currency-contract';
-import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
 import { RouteApplicationService } from './services/route-application.service';
 import { ScenarioApplicationService } from './services/scenario-application.service';
@@ -118,6 +107,7 @@ export class BOMItemsController {
 
   constructor(
     private readonly bomItemsService: BOMItemsService,
+    private readonly costing: BomItemCostingService,
     private readonly fileStorageService: FileStorageService,
     private readonly stepConverterService: StepConverterService,
     private readonly cadAnalysisService: CADAnalysisService,
@@ -433,7 +423,7 @@ export class BOMItemsController {
     const keys = Object.fromEntries(Object.entries(body.keys ?? {})
       .map(([k, v]) => [k, Number(v)] as const)
       .filter(([, v]) => Number.isFinite(v)));
-    return this.bomItemsService.resolveMachiningCalculatorInputs(id, body.calculatorId, keys, user.id, token, body.location, body.batchSize);
+    return this.costing.resolveMachiningCalculatorInputs(id, body.calculatorId, keys, user.id, token, body.location, body.batchSize);
   }
 
   // Any reference calculator (Machining, Die Casting): its inputs for this
@@ -450,7 +440,7 @@ export class BOMItemsController {
     const keys = Object.fromEntries(Object.entries(body.keys ?? {})
       .map(([k, v]) => [k, Number(v)] as const)
       .filter(([, v]) => Number.isFinite(v)));
-    return this.bomItemsService.resolveCalculatorInputs(id, body.calculatorId, keys, user.id, token, body.location, body.batchSize, body.runKey);
+    return this.costing.resolveCalculatorInputs(id, body.calculatorId, keys, user.id, token, body.location, body.batchSize, body.runKey);
   }
 
   // ── Required tolerances per feature instance (GD&T tab, migration 881) ────
@@ -506,7 +496,7 @@ export class BOMItemsController {
   @Get(':id/sand-dfm')
   @ApiOperation({ summary: "Design-for-casting checks of the item's sand casting analysis (severity, measured value, threshold, the rule's note, the faces); rules the analysis cannot measure are listed as not evaluated" })
   async getSandDfm(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
-    return this.bomItemsService.getSandDfm(id, user.id, token);
+    return this.costing.getSandDfm(id, user.id, token);
   }
 
   @Put(':id/tolerance-policy')
@@ -1509,7 +1499,7 @@ export class BOMItemsController {
     // No `?? 1` here any more: an absent batch size is passed through as
     // undefined so the canonical resolver (costing-inputs.ts) applies the one
     // default. A fallback here would be a second, competing default.
-    return this.bomItemsService.getCostSummary(
+    return this.costing.getCostSummary(
       id,
       user.id,
       token,
@@ -1587,7 +1577,7 @@ export class BOMItemsController {
     if (!sheetWidthMm || !sheetLengthMm) {
       throw new BadRequestException('sheetWidthMm and sheetLengthMm query params are required — pass the sheet already selected by the existing nesting/cost result');
     }
-    const { result, reason } = await this.bomItemsService.getTrueNest(
+    const { result, reason } = await this.costing.getTrueNest(
       id,
       user.id,
       token,
@@ -1623,7 +1613,7 @@ export class BOMItemsController {
     // No `?? 1` here any more: an absent batch size is passed through as
     // undefined so the canonical resolver (costing-inputs.ts) applies the one
     // default. A fallback here would be a second, competing default.
-    return this.bomItemsService.getRouteComparison(
+    return this.costing.getRouteComparison(
       id,
       user.id,
       token,
@@ -1651,7 +1641,7 @@ export class BOMItemsController {
     // No `?? 1` here any more: an absent batch size is passed through as
     // undefined so the canonical resolver (costing-inputs.ts) applies the one
     // default. A fallback here would be a second, competing default.
-    return this.bomItemsService.getCandidateRoutes(
+    return this.costing.getCandidateRoutes(
       id,
       user.id,
       token,
@@ -1669,7 +1659,7 @@ export class BOMItemsController {
     @Param('id') id: string,
     @AccessToken() token: string,
   ) {
-    return this.bomItemsService.getGdtAnalysis(id, token);
+    return this.costing.getGdtAnalysis(id, token);
   }
 
   @Post(':id/machine-override')
@@ -1684,7 +1674,7 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ) {
     if (!dto.location) throw new BadRequestException('location is required in the request body — send the digital factory location');
-    return this.bomItemsService.setMachineOverride(
+    return this.costing.setMachineOverride(
       id,
       user.id,
       token,
@@ -1706,7 +1696,7 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ) {
     if (!dto.location) throw new BadRequestException('location is required in the request body — send the digital factory location');
-    return this.bomItemsService.setCostOverride(
+    return this.costing.setCostOverride(
       id,
       user.id,
       token,

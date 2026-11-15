@@ -12,6 +12,7 @@ import type { FeatureToleranceService } from '../../../modules/bom-items/service
 import type { SheetMetalCatalogOperationsService } from '../../../modules/bom-items/costing/sheet-metal/operation/catalog-operations.service';
 import type { HydroformingReferenceService } from '../../../modules/bom-items/costing/hydroforming/hydroforming-reference.service';
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
+import { BomItemCostingService } from '../../../modules/bom-items/bom-item-costing.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
@@ -26,7 +27,8 @@ import { type InspectionKnowledgeService } from '../../../modules/manufacturing-
 import type { CostSummaryDto } from '../../../modules/bom-items/dto/cost-breakdown.dto';
 
 function buildService() {
-  return new BOMItemsService(
+  return new BomItemCostingService(
+    new BOMItemsService({} as never, {} as never),
     {} as unknown as DatabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,

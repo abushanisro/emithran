@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { BOMItemsService } from '../bom-items/bom-items.service';
+import { BomItemCostingService } from '../bom-items/bom-item-costing.service';
 import { CopilotMemoryService, type MemoryProposal } from './copilot-memory.service';
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import { COPILOT_SYSTEM_PROMPT } from './copilot.prompt';
@@ -50,6 +51,7 @@ export class CopilotService {
   constructor(
     config: ConfigService,
     private readonly bomItems: BOMItemsService,
+    private readonly costing: BomItemCostingService,
     private readonly memory: CopilotMemoryService,
     private readonly costAggregation: CostAggregationService,
     private readonly ai: AiBudgetService,
@@ -99,7 +101,7 @@ export class CopilotService {
       conversationId: dto.conversationId,
       turn: dto.turn,
     };
-    const tools = new CopilotToolRunner(toolCtx, this.bomItems, this.memory, this.costAggregation, this.results);
+    const tools = new CopilotToolRunner(toolCtx, this.costing, this.memory, this.costAggregation, this.results);
     const messages = this.conversation(dto);
     const usage: CopilotUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, iterations: 0 };
     const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);

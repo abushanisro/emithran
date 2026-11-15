@@ -8,7 +8,7 @@ import { CurrentOrganization } from '../../common/decorators/current-organizatio
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { OrgRole } from '../../common/authz/authz-policy';
-import { BOMItemsService } from './bom-items.service';
+import { BomItemCostingService } from './bom-item-costing.service';
 import { SAND_CASTING_SOURCE_VERSION } from './costing/casting/sand/sand-reference';
 import { SandSnapshotsService } from './costing/casting/sand/sand-snapshots.service';
 import { SandVariableOverridesService } from './costing/casting/sand/sand-variable-overrides.service';
@@ -71,7 +71,7 @@ export class ReviewSandSnapshotDto {
 export class SandSnapshotsController {
   constructor(
     private readonly snapshots: SandSnapshotsService,
-    private readonly items: BOMItemsService,
+    private readonly costing: BomItemCostingService,
     private readonly overrides: SandVariableOverridesService,
     private readonly database: DatabaseService,
   ) {}
@@ -93,7 +93,7 @@ export class SandSnapshotsController {
     @CurrentOrganization() organizationId: string,
   ) {
     if (!body.location) throw new BadRequestException('location is required');
-    const summary = await this.items.getCostSummary(id, user.id, token, body.batchSize, body.location, body.productionLifeYears);
+    const summary = await this.costing.getCostSummary(id, user.id, token, body.batchSize, body.location, body.productionLifeYears);
     const rows = await SandVariableOverridesService.rows(this.database.getUserClient(token), id);
     const snapshot = await this.snapshots.create(
       { bomItemId: id, userId: user.id, organizationId, token },

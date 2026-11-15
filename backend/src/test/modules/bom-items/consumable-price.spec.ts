@@ -1,7 +1,7 @@
 // resolveConsumablePrice (private, exercised via `as any` like bom-items.currency.spec.ts):
 // a missing price is null (so the waterjet engine can warn), a failed query is an error,
 // and the price is converted into the caller's costing currency — never a guessed location.
-import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
+import { BomItemCostingService } from '../../../modules/bom-items/bom-item-costing.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 
 type Row = { data: { price_per_unit: number | null } | null; error: { message: string } | null };
@@ -25,7 +25,7 @@ function serviceReturning(rowsByLocation: Record<string, Row>) {
     }),
   };
   const deps = Array.from({ length: 16 }, () => ({}));
-  const service = new (BOMItemsService as any)(db, ...deps) as BOMItemsService;
+  const service = new (BomItemCostingService as any)({}, db, ...deps) as BomItemCostingService;
   return { service: service as any, asked };
 }
 
@@ -42,7 +42,7 @@ const rates: RateSnapshot = {
   organizationId: null,
 };
 
-describe('BOMItemsService.resolveConsumablePrice', () => {
+describe('BomItemCostingService.resolveConsumablePrice', () => {
   it("converts the location's own USD price into the costing currency", async () => {
     const { service } = serviceReturning({ India: { data: { price_per_unit: 0.5 }, error: null } });
     await expect(service.resolveConsumablePrice('t', 'garnet_abrasive', 'India', 'INR', rates)).resolves.toBe(40);

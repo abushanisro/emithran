@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { DatabaseService } from '../../common/database/database.service';
 import { CostAggregationService, BomItemCostDto, ProcessLine, MaterialLine } from './cost-aggregation.service';
-import { BOMItemsService } from '../bom-items/bom-items.service';
+import { BomItemCostingService } from '../bom-items/bom-item-costing.service';
 import type { CostSummaryDto, CalculationTraceStep, FeatureOp } from '../bom-items/dto/cost-breakdown.dto';
 
 interface BomItemHeaderFields {
@@ -57,7 +57,7 @@ export class ExcelReportService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly costAggregation: CostAggregationService,
-    private readonly bomItemsService: BOMItemsService,
+    private readonly costing: BomItemCostingService,
   ) {}
 
   async generateBomItemReport(
@@ -87,7 +87,7 @@ export class ExcelReportService {
     let liveSummaryError: string | null = null;
     if (location) {
       try {
-        liveSummary = await this.bomItemsService.getCostSummary(bomItemId, userId, accessToken, batchSize, location);
+        liveSummary = await this.costing.getCostSummary(bomItemId, userId, accessToken, batchSize, location);
       } catch (err: any) {
         liveSummaryError = err?.message ?? 'Live recompute failed';
       }

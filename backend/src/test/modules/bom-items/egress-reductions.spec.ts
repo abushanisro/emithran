@@ -23,19 +23,7 @@ import { type DatabaseService } from '../../../common/database/database.service'
 
 function buildService(database: unknown = {}) {
   const none = {} as never;
-  return new BOMItemsService(
-    database as DatabaseService,
-    none, none, none, none, none, none, none, none, none, none,
-    {} as SecondaryProcessService,
-    {} as PlasticReferenceService,
-    {} as never, // PlasticRouteComparisonService
-    {} as CastingReferenceService,
-    {} as SandCostService,
-    {} as FeatureToleranceService,
-    {} as SheetMetalCatalogOperationsService,
-    {} as PlasticCatalogOperationsService,
-    {} as HydroformingReferenceService,
-  );
+  return new BOMItemsService(database as DatabaseService, none);
 }
 
 /** A user client whose bom_items select resolves to `rows`, recording the columns asked for. */
