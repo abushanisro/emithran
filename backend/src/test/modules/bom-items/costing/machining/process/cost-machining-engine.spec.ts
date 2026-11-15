@@ -2489,3 +2489,44 @@ describe('Part Setup: loading, unloading and reorienting each part is part of th
     expect(line({})).toBeUndefined();
   });
 });
+
+describe('operator labour on machining lines', () => {
+  const base = computeMillingCostSummary(milledInput(), mc('3_axis_mill'));
+  const crewed = (operators: number | null, labourRate: number | null = 48) => {
+    const withCrew = (r: MHRRateInput): MHRRateInput => ({ ...r, operators, labourRate });
+    const input = milledInput();
+    return computeMillingCostSummary({ ...input, mhrRate: withCrew(input.mhrRate), tappingRate: withCrew(input.tappingRate), deburrRate: withCrew(input.deburrRate), inspectionRate: withCrew(input.inspectionRate) }, mc('3_axis_mill'));
+  };
+
+  it('charges the machine\'s labour rate times its operator count for the same minutes, on top of the machine rate', () => {
+    const r = crewed(1);
+    for (const line of r.processLines.filter((l) => l.totalCost > 0)) {
+      const before = base.processLines.find((l) => l.process === line.process)!;
+      const factor = 1 + 48 / line.hourlyRate;
+      expect(line.machineCostPerPart).toBe(before.runCost);
+      expect(line.laborCostPerPart).toBeCloseTo(before.runCost * (48 / line.hourlyRate), 1);
+      expect(line.runCost).toBeCloseTo(before.runCost * factor, 1);
+      expect(line.setupCost).toBeCloseTo(before.setupCost * factor, 1);
+      expect(line.totalCost).toBeCloseTo(line.setupCost + line.runCost, 2);
+      expect(line.cycleTimeMin).toBe(before.cycleTimeMin);
+      expect(line.operators).toBe(1);
+    }
+    expect(r.totalProcessCost).toBeGreaterThan(base.totalProcessCost);
+    expect(r.totalProcessCost).toBeCloseTo(r.processLines.reduce((t, l) => t + l.totalCost, 0), 2);
+    expect(r.warnings.some((w) => /operator labour not costed/.test(w))).toBe(false);
+  });
+
+  it('two operators cost twice the labour of one', () => {
+    const one = crewed(1).processLines.find((l) => l.totalCost > 0)!;
+    const two = crewed(2).processLines.find((l) => l.process === one.process)!;
+    expect(two.laborCostPerPart).toBeCloseTo(one.laborCostPerPart! * 2, 1);
+  });
+
+  it('a machine with no operator count or no labour rate charges no labour and says so; a count is never assumed', () => {
+    for (const r of [crewed(null), crewed(1, null)]) {
+      expect(r.totalProcessCost).toBe(base.totalProcessCost);
+      expect(r.processLines.every((l) => (l.laborCostPerPart ?? 0) === 0)).toBe(true);
+      expect(r.warnings.some((w) => /operator labour not costed on its lines/.test(w))).toBe(true);
+    }
+  });
+});
