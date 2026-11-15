@@ -508,7 +508,7 @@ function FeatureBreakdown({
   fg,
   onSelectHighlight,
 }: {
-  items: { name: string; timeSec: number; featureType: string; count: number; featureIds?: string[] | undefined }[] | undefined;
+  items: { name: string; timeSec: number; featureType: string; count: number; featureIds?: string[] | undefined; basis?: { requirement: string; source: string; reason: string } | undefined }[] | undefined;
   fg?: FeatureGraph | null | undefined;
   onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
 }) {
@@ -529,7 +529,16 @@ function FeatureBreakdown({
             title={highlight ? 'Click to highlight in the 3D view' : undefined}
             className="w-full flex items-center justify-between py-0.5 pl-3 border-l-2 border-brand-500/20 text-left transition-colors disabled:cursor-default enabled:hover:border-brand-500/60 enabled:hover:bg-brand-500/5"
           >
-            <span className="text-[11px] text-muted-foreground/80 font-mono">{op.name}</span>
+            <span className="min-w-0">
+              <span className="text-[11px] text-muted-foreground/80 font-mono">{op.name}</span>
+              {/* Why this feature is machined after the primary process: the requirement, where it was read, and what the process holds instead. */}
+              {op.basis && (
+                <span className="block text-[10px] text-muted-foreground/60 leading-tight" title={op.basis.reason}>
+                  {op.basis.requirement === 'none' ? op.basis.source : `${op.basis.requirement} · ${op.basis.source}`}
+                  <span className="block">{op.basis.reason}</span>
+                </span>
+              )}
+            </span>
             <span className="text-[11px] text-muted-foreground/60 tabular-nums">{formatCycleMin(op.timeSec / 60)}</span>
           </button>
         );

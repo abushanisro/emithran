@@ -15,12 +15,18 @@
 //                                   applied to the instance whose faces they
 //                                   name; values finer than replaceBelow.threshold
 //                                   are replaced by replaceBelow.with
+//                  auto_detect      the model's tolerances that auto-detect.ts reads
+//                                   as a requirement on one feature (native or
+//                                   engineer-approved PMI, a validated
+//                                   interpretation, no conflict); the rest is
+//                                   listed for review and applies nothing
 //
 // Every requirement carries its source; nothing is inferred from geometry.
 
 import { createHash } from 'crypto';
 import type { GdtCallout } from '../physics/gdt-callouts';
 import { GTOL_CATEGORIES, type GtolCategory, type Requirement } from './process-capability';
+import { EMPTY_DETECTION, type ToleranceDetection } from './auto-detect';
 
 export interface FeatureInstance {
   /** Stable across re-analysis; null when a face has no stable id (not editable). */
@@ -134,7 +140,8 @@ export function featureInstances(featureGraphV2: unknown): FeatureInstance[] {
 export type TolerancePolicy =
   | { mode: 'assume_achieved' }
   | { mode: 'uniform'; values: Partial<Record<GtolCategory, number>> }
-  | { mode: 'cad'; replaceBelow: { thresholdMm: number; withMm: number } | null };
+  | { mode: 'cad'; replaceBelow: { thresholdMm: number; withMm: number } | null }
+  | { mode: 'auto_detect' };
 
 /** No policy stored = the first option of the policy dialog. */
 const DEFAULT_TOLERANCE_POLICY: TolerancePolicy = { mode: 'assume_achieved' };
@@ -147,6 +154,7 @@ export function parseTolerancePolicy(raw: unknown): { policy: TolerancePolicy | 
   const r = raw as Record<string, unknown>;
   const errors: string[] = [];
   if (r.mode === 'assume_achieved') return { policy: { mode: 'assume_achieved' }, errors };
+  if (r.mode === 'auto_detect') return { policy: { mode: 'auto_detect' }, errors };
   if (r.mode === 'uniform') {
     const values: Partial<Record<GtolCategory, number>> = {};
     for (const [k, v] of Object.entries((r.values ?? {}) as Record<string, unknown>)) {
@@ -177,7 +185,7 @@ export function parseTolerancePolicy(raw: unknown): { policy: TolerancePolicy | 
  * of an axis, and the capability table carries only concentricity.
  * profile_of_line has no capability row and stays unmapped (reported).
  */
-const PMI_CATEGORY: Readonly<Record<string, GtolCategory>> = {
+export const PMI_CATEGORY: Readonly<Record<string, GtolCategory>> = {
   angularity: 'angularity',
   circular_runout: 'runout',
   coaxiality: 'concentricity',
@@ -196,9 +204,14 @@ const PMI_CATEGORY: Readonly<Record<string, GtolCategory>> = {
 
 // ── Resolution ──────────────────────────────────────────────────────────────
 
-type RequirementSource = 'manual' | 'policy_uniform' | 'cad_model' | 'cad_model_replaced';
+type RequirementSource = 'manual' | 'policy_uniform' | 'cad_model' | 'cad_model_replaced' | 'auto_detected';
 
-export interface ResolvedRequirement extends Requirement { source: RequirementSource; note?: string }
+export interface ResolvedRequirement extends Requirement {
+  source: RequirementSource;
+  note?: string;
+  /** The annotation an auto-detected requirement was read from, and why it may drive a decision. */
+  origin?: { recordId: string; annotationRef: string; basis: 'native_pmi' | 'engineer_approved'; stated: string };
+}
 
 export interface ManualTolerance { featureKey: string; category: GtolCategory; value: number }
 
@@ -213,6 +226,8 @@ export interface ToleranceResolution {
   orphanedManual: ManualTolerance[];
   /** CAD tolerances not applied, with why (cad policy only). */
   unappliedCad: Array<{ type: string; toleranceMm: number; reason: string }>;
+  /** What the part's files state about tolerances and how each reads (auto-detect.ts), whatever the policy; applied only by the auto_detect policy. */
+  detection: ToleranceDetection;
 }
 
 export function resolveFeatureRequirements(input: {
@@ -220,6 +235,7 @@ export function resolveFeatureRequirements(input: {
   manual: readonly ManualTolerance[];
   policy: TolerancePolicy;
   callouts: readonly GdtCallout[];
+  detection?: ToleranceDetection;
 }): ToleranceResolution {
   const byKey = new Map<string, ManualTolerance[]>();
   for (const m of input.manual) byKey.set(m.featureKey, [...(byKey.get(m.featureKey) ?? []), m]);
@@ -255,6 +271,22 @@ export function resolveFeatureRequirements(input: {
     }
   }
 
+  // Auto-detected values per instance (auto_detect policy only): the interpretable detections, each on the features it names.
+  const detection = input.detection ?? EMPTY_DETECTION;
+  const detectedByKey = new Map<string, ResolvedRequirement[]>();
+  if (input.policy.mode === 'auto_detect') {
+    for (const d of detection.detected) {
+      if (d.status !== 'interpretable' || !d.category || d.value == null || !d.basis) continue;
+      for (const key of d.featureKeys) {
+        const list = detectedByKey.get(key) ?? [];
+        if (!list.some((x) => x.category === d.category)) {
+          list.push({ category: d.category, value: d.value, source: 'auto_detected', origin: { recordId: d.recordId, annotationRef: d.annotationRef, basis: d.basis, stated: d.stated } });
+        }
+        detectedByKey.set(key, list);
+      }
+    }
+  }
+
   const instances = input.instances.map((instance) => {
     const manual = instance.key ? byKey.get(instance.key) ?? [] : [];
     const requirements: ResolvedRequirement[] = manual.map((m) => ({ category: m.category, value: m.value, source: 'manual' as const }));
@@ -264,9 +296,11 @@ export function resolveFeatureRequirements(input: {
         ? Object.entries(input.policy.values).map(([category, value]) => ({ category: category as GtolCategory, value: value!, source: 'policy_uniform' as const }))
         : input.policy.mode === 'cad' && instance.key
           ? cadByKey.get(instance.key) ?? []
-          : [];
+          : input.policy.mode === 'auto_detect' && instance.key
+            ? detectedByKey.get(instance.key) ?? []
+            : [];
     for (const a of auto) if (!set.has(a.category)) requirements.push(a);
     return { instance, requirements };
   });
-  return { instances, orphanedManual, unappliedCad };
+  return { instances, orphanedManual, unappliedCad, detection };
 }

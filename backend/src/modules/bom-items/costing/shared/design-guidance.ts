@@ -68,6 +68,9 @@ export interface DesignGuidance {
     /** The features whose operation has a capability on file, each with what that operation holds on it (size, form, finish). Null when that was not assessed. */
     heldByOperations: number | null;
     heldItems: ReviewItem[];
+    /** Tolerances in the part's files that could not be read as a requirement, and toleranced features its process leaves undecided: none adds a cost. */
+    needsReview: number | null;
+    reviewItems: ReviewItem[];
   };
   /** Null when the part has no machined features. */
   setups: { count: number | null; perpendicular: number | null; oblique: number | null; fewFeatureSetups: number | null; fewFeatureLimit: number; items: ReviewItem[] } | null;
@@ -133,6 +136,7 @@ export interface DesignGuidanceInput {
   secondaryMachiningReason: string | null;
   /** The features carrying a tolerance requirement; null when they could not be read. */
   toleranced: ReviewItem[] | null;
+  toleranceReview: ReviewItem[] | null;
   setupRule: SetupAxisRule | null;
   /** The holes no standard drill makes (the machining DFM check); null when the check did not run. */
   nonStandardHoles: ReviewItem | null | 'none';
@@ -334,6 +338,8 @@ export function buildDesignGuidance(input: DesignGuidanceInput): DesignGuidance 
       items: input.toleranced ?? [], machiningItems: input.secondaryMachining?.items ?? [], finishingItems: input.secondaryMachining?.finishingItems ?? [],
       heldByOperations: input.secondaryMachining ? input.secondaryMachining.heldItems.length : null,
       heldItems: input.secondaryMachining?.heldItems ?? [],
+      needsReview: input.toleranceReview ? input.toleranceReview.length : null,
+      reviewItems: input.toleranceReview ?? [],
     },
     setups,
     holesAndFillets,

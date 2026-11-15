@@ -15,7 +15,8 @@ export type GtolCategory =
 export type TolerancePolicy =
   | { mode: 'assume_achieved' }
   | { mode: 'uniform'; values: Partial<Record<GtolCategory, number>> }
-  | { mode: 'cad'; replaceBelow: { thresholdMm: number; withMm: number } | null };
+  | { mode: 'cad'; replaceBelow: { thresholdMm: number; withMm: number } | null }
+  | { mode: 'auto_detect' };
 
 export interface FeatureInstance {
   key: string | null;
@@ -39,14 +40,42 @@ export interface FeatureInstance {
 export interface ResolvedRequirement {
   category: GtolCategory;
   value: number;
-  source: 'manual' | 'policy_uniform' | 'cad_model' | 'cad_model_replaced';
+  source: 'manual' | 'policy_uniform' | 'cad_model' | 'cad_model_replaced' | 'auto_detected';
   note?: string;
+  /** The annotation an auto-detected requirement was read from. */
+  origin?: { recordId: string; annotationRef: string; basis: 'native_pmi' | 'engineer_approved'; stated: string };
+}
+
+/** One tolerance the part's files state and how it reads (backend costing/shared/tolerance/auto-detect.ts). */
+export interface DetectedTolerance {
+  recordId: string;
+  annotationRef: string;
+  origin: 'model_pmi' | 'drawing';
+  characteristic: string;
+  category: GtolCategory | null;
+  value: number | null;
+  stated: string;
+  basis: 'native_pmi' | 'engineer_approved' | null;
+  featureKeys: string[];
+  labels: string[];
+  association: string;
+  status: 'interpretable' | 'review' | 'not_a_requirement';
+  reviewCode: string | null;
+  reason: string;
+}
+
+export interface ToleranceDetection {
+  detected: DetectedTolerance[];
+  general: { text: string; standard: string; applied: false; reason: string } | null;
+  conflicts: Array<{ characteristic: string; drawingMm: number; modelMm: number[]; detail: string }>;
 }
 
 export interface FeatureTolerancesView {
   instances: Array<{ instance: FeatureInstance; requirements: ResolvedRequirement[] }>;
   orphanedManual: Array<{ featureKey: string; category: GtolCategory; value: number }>;
   unappliedCad: Array<{ type: string; toleranceMm: number; reason: string }>;
+  /** What the part's files state, whatever the policy; applied only by the auto_detect policy. */
+  detection: ToleranceDetection;
   policy: TolerancePolicy;
   policyErrors: string[];
 }
@@ -118,6 +147,23 @@ export interface MachiningNeedView {
   reason: string | null;
   missing: string[];
   result: { primaryProcess: string; features: FeatureMachiningNeed[]; machiningRequired: boolean } | null;
+  /** How the part's process treats tolerances, and its decision on every feature (backend process-profile.ts). */
+  profile: { process: string; capability: 'primary_process' | 'feature_operation' | 'not_validated'; operation: string; cost: 'priced' | 'reported' | 'none'; note: string };
+  decisions: ToleranceDecision[];
+}
+
+export interface ToleranceDecision {
+  featureKey: string | null;
+  label: string;
+  featureType: string;
+  featureId: string | null;
+  occurrenceIndex: number;
+  faceIds: number[];
+  decision: 'no_requirement' | 'held' | 'add_operation' | 'needs_review';
+  judgedAs: string | null;
+  operations: string[];
+  requirements: ResolvedRequirement[];
+  reason: string;
 }
 
 export function useMachiningNeed(itemId: string | undefined) {

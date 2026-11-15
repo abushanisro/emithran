@@ -15,7 +15,7 @@ const CANNULA: DesignGuidance = {
   thickness: { recommendedMinMm: 0.8, recommendedMaxMm: null, partMinMm: 0.8, partMaxMm: 4.261, maxMinRatio: 5.326, source: 'tblMachiningMinWall (aluminum)', items: [] },
   moldTooling: null,
   machining: { routing: '5 Axis Mill → Part Setup → Tapping', scrapPct: 92.2, machinedFeatures: 93, items: [] },
-  tolerances: { withTolerances: 0, drivingMachining: 0, drivingFinishing: 0, items: [], machiningItems: [], finishingItems: [], heldByOperations: 55, heldItems: [{ label: 'SimpleHole:5 · Drilling', detail: 'diameter ±0.0375 to ±0.24 mm (IT11 to IT15)', severity: null, occurrences: [{ featureId: 'h', occurrenceIndex: 0 }], faces: [1] }] },
+  tolerances: { withTolerances: 0, drivingMachining: 0, drivingFinishing: 0, items: [], machiningItems: [], finishingItems: [], needsReview: 2, reviewItems: [], heldByOperations: 55, heldItems: [{ label: 'SimpleHole:5 · Drilling', detail: 'diameter ±0.0375 to ±0.24 mm (IT11 to IT15)', severity: null, occurrences: [{ featureId: 'h', occurrenceIndex: 0 }], faces: [1] }] },
   setups: { count: 2, perpendicular: 1, oblique: 1, fewFeatureSetups: 1, fewFeatureLimit: 5, items: [] },
   holesAndFillets: { holeDiametersMm: [1.6, 2.5, 4, 18.4], filletRadiiMm: [1.5, 2], nonStandardTools: 1, holeItems: [], filletItems: [], nonStandardItems: [] },
   notModelled: { thicknessRecommendedMax: 'A machined part is cut from solid stock: there is no recommended maximum wall.' },
@@ -48,6 +48,7 @@ describe('DesignGuidanceView', () => {
     expect(markup).toContain('title="A machined part is cut from solid stock: there is no recommended maximum wall."');
     expect(out).toContain('|Driving machining|0|');
     expect(out).toContain('|Held by the operations|55|');
+    expect(out).toContain('|Needs review|2|');
   });
 
   it('a Review with nothing behind it is disabled; one with items is not', () => {

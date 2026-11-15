@@ -85,6 +85,11 @@ export interface FeatureOp {
   occurrenceRefs?: Array<{ featureId: string; occurrenceIndex: number }>;
   /** CAD faces (face_map ids) the entry acts on when no feature lists them (the faces meeting at the sharp edges deburred). */
   faceIds?: number[];
+  /**
+   * Why this feature is machined after the primary process (secondary-machining-cost.ts): the requirement, where it was read, and what the primary process
+   * holds instead. Absent on every other entry.
+   */
+  basis?: { requirement: string; source: string; reason: string };
 }
 
 /**

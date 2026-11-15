@@ -116,6 +116,7 @@ const HELP: Record<Topic, { title: string; body: { heading?: string; text: strin
       { heading: 'Driving machining', text: 'Features whose tolerance the process that makes them cannot hold. On a cast or molded part they are machined afterwards; on a machined part they need a finer operation than the one that makes them (reaming or boring a drilled hole, a fine finishing pass on a milled face).' },
       { heading: 'Driving specialized finishing', text: 'Features whose tolerance only an abrasive process holds (grinding, honing, lapping): a further, slower operation on a separate machine.' },
       { heading: 'Held by the operations', text: 'What each feature gets with no further operation: the size, position, form and finish its own operation holds, from the process capability table and ISO 286 at the feature\'s size. The first value is the finest the operation holds, the second the coarsest. A requirement inside that range costs nothing extra; one finer than it drives machining.' },
+      { heading: 'Needs review', text: 'Tolerances in the model or the drawing that could not be read as a requirement on one feature (not tied to a face, read from drawn text and not approved, a kind with no validated reading, a conflict), and toleranced features the part\'s process has no validated answer for. None of them adds a cost: enter the value on the feature in the GD&T tab to make it count.' },
     ],
   },
   setups: {
@@ -307,6 +308,8 @@ export function DesignGuidanceView({ guidance: g, features = [], operations = []
           {list('drivingFinishing', g.tolerances.finishingItems)}
           <Row label="Held by the operations" value={count(g.tolerances.heldByOperations)} why={why.drivingMachining} review={{ key: 'held', items: g.tolerances.heldItems }} {...rowProps} />
           {list('held', g.tolerances.heldItems)}
+          <Row label="Needs review" value={count(g.tolerances.needsReview)} why={why.tolerances} review={{ key: 'toleranceReview', items: g.tolerances.reviewItems }} {...rowProps} />
+          {list('toleranceReview', g.tolerances.reviewItems)}
         </Panel>
 
         {g.setups && (

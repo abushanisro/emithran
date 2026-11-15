@@ -6,6 +6,7 @@ import { DatabaseService } from '../../../common/database/database.service';
 import {
   canReviewPmi, PMI_REVIEW_BASES, pmiFileSha256, resolvePmiRecords, reviewTargetOf,
   type PmiRecord, type PmiReviewRow, type PmiReviewScope,
+  pmiReviewRowOf,
 } from '../costing/shared/tolerance/pmi-records';
 
 export interface PmiReviewRequest {
@@ -28,15 +29,6 @@ export interface PmiRecordsView {
 }
 
 const MAX_NOTES = 2000;
-
-function toRow(r: any): PmiReviewRow {
-  return {
-    recordKey: r.record_key, scope: r.scope, decision: r.decision, recordFingerprint: r.record_fingerprint,
-    fileSha256: r.file_sha256, reviewerId: r.reviewer_id, reviewerEmail: r.reviewer_email ?? null, reviewedAt: r.reviewed_at,
-    approvedValues: r.approved_values ?? {}, decodedStatus: r.decoded_status, basis: r.basis, notes: r.notes ?? null,
-    supersededAt: r.superseded_at ?? null,
-  };
-}
 
 /**
  * Engineer review of PMI values the CAD engine could only decode from drawn glyphs (migration 908).
@@ -79,7 +71,7 @@ export class PmiReviewService {
       .eq('bom_item_id', id)
       .is('superseded_at', null);
     if (error) throw new InternalServerErrorException(`Failed to read PMI reviews (is migration 908 applied?): ${error.message}`);
-    return (data ?? []).map(toRow);
+    return (data ?? []).map(pmiReviewRowOf);
   }
 
   async get(id: string, userId: string, accessToken: string): Promise<PmiRecordsView> {

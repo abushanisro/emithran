@@ -20,7 +20,7 @@ const base = (over: Partial<DesignGuidanceInput> = {}): DesignGuidanceInput => (
   },
   thickness: { partMinMm: 1, partMaxMm: 4, recommendedMinMm: 0.8, recommendedMaxMm: null, source: 'tblMachiningMinWall (aluminum)', reasons: { max: 'no maximum' }, items: [] },
   moldTooling: null, routing: ['3 Axis Mill', 'Deburring'], utilizationPct: 25,
-  secondaryMachining: null, secondaryMachiningReason: null, toleranced: [], setupRule: RULE, nonStandardHoles: 'none',
+  secondaryMachining: null, secondaryMachiningReason: null, toleranced: [], toleranceReview: [], setupRule: RULE, nonStandardHoles: 'none',
   ...over,
 });
 
@@ -73,7 +73,8 @@ describe('buildDesignGuidance', () => {
   it('on a machined part counts the features that need a finer operation, and the ones whose operation holds a stated tolerance', () => {
     const reamed: ReviewItem = { label: 'SimpleHole:1', detail: 'diamTolerance 0.005 mm = IT6; Drilling best is IT11', severity: null, occurrences: [{ featureId: 'h4', occurrenceIndex: 0 }], faces: [0] };
     const held: ReviewItem = { label: 'SimpleHole:1 · Drilling', detail: 'diameter ±0.0375 to ±0.24 mm (IT11 to IT15)', severity: null, occurrences: [{ featureId: 'h4', occurrenceIndex: 0 }], faces: [0] };
-    const g = buildDesignGuidance(base({ secondaryMachining: { items: [reamed], finishingItems: [], heldItems: [held, held] }, toleranced: [reamed] }));
+    const g = buildDesignGuidance(base({ secondaryMachining: { items: [reamed], finishingItems: [], heldItems: [held, held] }, toleranced: [reamed], toleranceReview: [reamed] }));
+    expect(g.tolerances.needsReview).toBe(1);
     expect(g.tolerances).toMatchObject({ withTolerances: 1, drivingMachining: 1, drivingFinishing: 0, heldByOperations: 2 });
     expect(g.notModelled.drivingMachining).toBeUndefined();
     // The machined features stay all of the part's: the ones needing a finer operation do not narrow them.

@@ -117,7 +117,8 @@ export class DesignGuidanceService {
       routing,
       utilizationPct: typeof utilization === 'number' && utilization > 0 ? utilization : null,
       secondaryMachining: secondary.value, secondaryMachiningReason: secondary.reason,
-      toleranced,
+      toleranced: toleranced?.items ?? null,
+      toleranceReview: toleranced ? [...toleranced.review, ...secondary.review] : null,
       setupRule: setup.rule,
       nonStandardHoles: dfm.nonStandardHoles,
     };
@@ -202,26 +203,36 @@ export class DesignGuidanceService {
   }
 
   /** The features carrying a tolerance requirement (a drawing or model callout, a manual value, or the item's uniform policy). */
-  private async toleranced(id: string, token: string): Promise<ReviewItem[] | null> {
+  private async toleranced(id: string, token: string): Promise<{ items: ReviewItem[]; review: ReviewItem[] } | null> {
     try {
       const view = await this.tolerances.get(id, token);
-      return view.instances.filter((i) => i.requirements.length > 0).map(({ instance, requirements }) => ({
+      const items = view.instances.filter((i) => i.requirements.length > 0).map(({ instance, requirements }) => ({
         label: instance.label,
         detail: requirements.map((r) => `${r.category} ${r.value}`).join(', '),
         severity: null,
         occurrences: instance.featureId ? [{ featureId: instance.featureId, occurrenceIndex: instance.occurrenceIndex }] : [],
         faces: instance.faceIds,
       }));
+      // What the part's files state that could not be read as a requirement on a feature (auto-detect.ts): each with its reason, none applied.
+      const review = view.detection.detected.filter((d) => d.status === 'review').map((d): ReviewItem => ({
+        label: `${d.stated} (${d.origin === 'drawing' ? 'drawing' : d.annotationRef})`, detail: d.reason, severity: null, occurrences: [], faces: [],
+      }));
+      return { items, review };
     } catch {
       return null;
     }
   }
 
   /** On a part whose primary process is not machining: the features that process leaves short of their tolerances (or cannot form). */
-  private async secondaryMachining(id: string, token: string): Promise<{ value: DesignGuidanceInput['secondaryMachining']; reason: string | null }> {
+  private async secondaryMachining(id: string, token: string): Promise<{ value: DesignGuidanceInput['secondaryMachining']; reason: string | null; review: ReviewItem[] }> {
     try {
       const need = await this.tolerances.getMachiningNeed(id, token);
-      if (!need.assessed || !need.result) return { value: null, reason: need.reason ?? 'Which features need machining after the primary process was not assessed.' };
+      // The toleranced features the part's process leaves undecided (process-profile.ts): listed, never costed.
+      const review = need.decisions.filter((d) => d.decision === 'needs_review' && d.requirements.length > 0).map((d): ReviewItem => ({
+        label: d.label, detail: d.reason, severity: null,
+        occurrences: d.featureId ? [{ featureId: d.featureId, occurrenceIndex: d.occurrenceIndex }] : [], faces: d.faceIds,
+      }));
+      if (!need.assessed || !need.result) return { value: null, reason: need.reason ?? 'Which features need machining after the primary process was not assessed.', review };
       const needing = need.result.features.filter((f) => f.verdict === 'needs_machining');
       const toItem = (f: (typeof needing)[number]): ReviewItem => ({
         label: f.label, detail: f.reasons.join(' ') || null, severity: null,
@@ -236,9 +247,9 @@ export class DesignGuidanceService {
         severity: null,
         occurrences: f.featureId ? [{ featureId: f.featureId, occurrenceIndex: f.occurrenceIndex }] : [], faces: f.faceIds,
       }));
-      return { value: { items: needing.map(toItem), finishingItems: finishing.map(toItem), heldItems: held }, reason: null };
+      return { value: { items: needing.map(toItem), finishingItems: finishing.map(toItem), heldItems: held }, reason: null, review };
     } catch (error) {
-      return { value: null, reason: error instanceof Error ? error.message : 'Which features need machining after the primary process could not be assessed.' };
+      return { value: null, reason: error instanceof Error ? error.message : 'Which features need machining after the primary process could not be assessed.', review: [] };
     }
   }
 
