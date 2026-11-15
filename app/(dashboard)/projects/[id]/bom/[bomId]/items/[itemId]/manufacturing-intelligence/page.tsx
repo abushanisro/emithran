@@ -8696,7 +8696,7 @@ function GeometricCostDriversPanel({
               {geometryGroups.map((g) => (
                 <div key={g.type}>
                   <div className="flex items-baseline px-3 py-1.5 gap-2">
-                    <span className="text-[10px] text-muted-foreground flex-1 truncate">{g.type}</span>
+                    <span className="text-[10px] text-muted-foreground flex-1 truncate" title={g.type}>{g.label}</span>
                     <span className="text-xs font-medium tabular-nums">{fmtInt(g.count)}</span>
                   </div>
                   {g.rows.map((r) => (

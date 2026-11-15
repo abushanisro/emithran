@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
+import { featureTypeLabel, geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
 import type { FeatureNodeV2 } from '@/lib/types/manufacturing';
 
 const occ = (n: number, extra: Record<string, unknown> = {}) => Array.from({ length: n }, () => ({ centroid: [0, 0, 0], face_ids: [1], ...extra }));
@@ -39,6 +39,12 @@ describe('geometryFeatureGroups', () => {
     expect(group('Edge').rows.map((r) => r.label)).toEqual(['round', 'R21.0 mm · round']);
     expect(group('Slot').rows[0]!.label).toBe('R4.0 mm · groove');
     expect(group('PocketV2').rows[0]!.label).toBe('default');
+  });
+
+  it('names each type in words, in the plural, from the catalog name itself', () => {
+    expect(groups.map((g) => g.label)).toEqual(['Edges', 'Planar faces', 'Pockets', 'Simple holes', 'Slots']);
+    expect(['MultiStepHole', 'CurvedSurface', 'CurvedWall', 'Boss', 'SharpEdge', 'Keyway'].map(featureTypeLabel))
+      .toEqual(['Multi step holes', 'Curved surfaces', 'Curved walls', 'Bosses', 'Sharp edges', 'Keyways']);
   });
 
   it('each row carries the feature it stands for, for highlighting', () => {
