@@ -460,6 +460,29 @@ describe('provisional rules for what the drawing does not state', () => {
     expect(run('Mask-Spray').status).toBe('not_applicable');
   });
 
+  it('mask spray on a machined part: each hole is masked to its own measured depth, with no wall thickness needed', () => {
+    // Cannula Holder Left: tapped holes of three sizes, each with the depth the analysis measured; a solid part has no wall thickness.
+    const holes = [
+      { id: 'h1', feature_type: 'SimpleHole', diameter_mm: 3.2, occurrences: [{ depth_mm: 6 }, { depth_mm: 6 }] },
+      { id: 'h2', feature_type: 'SimpleHole', diameter_mm: 2.5, occurrences: [{ depth_mm: 4.5 }] },
+    ];
+    const r = run('Mask-Spray', { ...part, wallThicknessMm: null, features: holes, holeDiametersMm: [3.2, 2.5] });
+    const area = 2 * Math.PI * 3.2 * 6 + Math.PI * 2.5 * 4.5;
+    expect(r.status).toBe('costed');
+    expect(r.trace.find((t) => t.label === 'Masked area')?.value).toBeCloseTo(area, 0);
+    expect(r.trace.find((t) => t.label === 'Masked area')?.source).toMatch(/measured depth/);
+    expect(r.warnings.join(' ')).toMatch(/at its measured depth/);
+  });
+
+  it('mask spray with a hole whose depth is not measured falls back to the wall, and with neither is a stated gap', () => {
+    const noDepth = [{ id: 'h1', feature_type: 'SimpleHole', diameter_mm: 4, occurrences: [{ depth_mm: 6 }, {}] }];
+    const byWall = run('Mask-Spray', { ...part, wallThicknessMm: 2, features: noDepth, holeDiametersMm: [4, 4] });
+    expect(byWall.trace.find((t) => t.label === 'Masked area')?.value).toBeCloseTo(2 * Math.PI * 4 * 2, 0);
+    const gap = run('Mask-Spray', { ...part, wallThicknessMm: null, features: noDepth, holeDiametersMm: [4, 4] });
+    expect(gap.status).toBe('gap');
+    expect(gap.reason).toMatch(/no measured depth/);
+  });
+
   it('Black Oxide has a wage grade in memory/ and every other machine of that grade carries one labor rate (migration 981 gives it)', () => {
     const grades = new Map(parseCsv('surface_treatment_wage_grades.csv').map((x) => [x['Process Name']!, x['Wage Grade Name']!]));
     expect(grades.get('Black Oxide')).toBe('2 - Metal');

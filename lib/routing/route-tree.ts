@@ -153,7 +153,8 @@ export function adaptRoutesToTree(routes: RouteResultDto[]): RouteNode[] {
     incompatible: route.compatibility?.status === 'incompatible',
     compatibilityWarnings: route.compatibility?.warnings ?? [],
     cost: route.totalCost,
-    cycleTimeMin: route.cycleTimes.totalMin,
+    // A route that was not priced has no cycle: absent, not a measured zero.
+    cycleTimeMin: route.processLines.length > 0 ? route.cycleTimes.totalMin : null,
     machineName: route.processLines[0]?.machineName ?? null,
     hourlyRate: route.processLines[0]?.hourlyRate ?? null,
     machineClass: route.processLines[0]?.machineClass ?? null,

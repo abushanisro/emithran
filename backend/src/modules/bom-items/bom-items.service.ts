@@ -73,7 +73,7 @@ import { buildOperationSequence, injectDrawingIntelligence } from './costing/mac
 import type { OperationLine } from './costing/machining/operation/operation-sequencer';
 import { splitDeepHoleOccurrences, resolveDeepHoleRules } from './costing/machining/operation/deep-hole-routing';
 import { broachWidthRangeMm, splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
-import { machiningCatalogCompatibility } from './costing/machining/operation/catalog-compatibility';
+import { catalogGapSummary, machiningCatalogCompatibility } from './costing/machining/operation/catalog-compatibility';
 import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-routing';
 import { undercutCountFromDraftSummary } from './costing/plastic-molding/draft-signals';
 import { sideActionSignals } from './costing/plastic-molding/side-action-signals';
@@ -8693,9 +8693,15 @@ export class BOMItemsService {
       .join(' ');
   }
 
+  /** The part's features as the operation catalog is checked against them. */
+  private static catalogFeatures(fg: any): unknown[] | undefined {
+    return (fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2)?.features as unknown[] | undefined;
+  }
+
   /** A machine that cannot make the part: listed in the route comparison with each operation it lacks, never costed. */
-  private listedMachiningRoute(cls: string, compatibility: NonNullable<ReturnType<typeof machiningCatalogCompatibility>>, ratesSource: string): RouteResultDto {
-    const reasons = compatibility.incompatibilities.map((i) => `${i.count} x ${i.featureType}: ${i.reason}`);
+  private listedMachiningRoute(cls: string, compatibility: NonNullable<ReturnType<typeof machiningCatalogCompatibility>>, ratesSource: string, features: readonly unknown[] | undefined): RouteResultDto {
+    // One sentence; the operation-by-operation detail stays on `compatibility`.
+    const reasons = [catalogGapSummary(this.humanizeMachineClass(cls), features, compatibility.incompatibilities)];
     return {
       routeId: cls as unknown as RouteId, routeLabel: this.humanizeMachineClass(cls), processFamily: 'cutting', toolingVolumeNote: null,
       autoRoutable: false, processLines: [], materialCost: 0, abrasiveCost: 0, totalProcessCost: 0, totalCost: null,
@@ -8713,7 +8719,7 @@ export class BOMItemsService {
   /** A machine the catalog says can make the part but that cannot be priced from the reference: listed with the reason, not costed. */
   private unpricedMachiningRoute(cls: string, compatibility: NonNullable<ReturnType<typeof machiningCatalogCompatibility>>, ratesSource: string, reason: string): RouteResultDto {
     return {
-      ...this.listedMachiningRoute(cls, compatibility, ratesSource),
+      ...this.listedMachiningRoute(cls, compatibility, ratesSource, undefined),
       isFeasible: true, warnings: [reason], machineCapabilityWarnings: [reason],
       dataGaps: [{ process: this.humanizeMachineClass(cls), machineClass: cls, reason }],
       capability: { cuttingCapable: true, pressBrakeCapable: true, overallCapable: true, confidence: 'high', estimatedTonnage: null, reasonCodes: [], warnings: [reason] },
@@ -8727,7 +8733,7 @@ export class BOMItemsService {
   private async machiningVerdicts(role: MachiningRouteRole, fg: any, location: string, accessToken: string) {
     const stations = loadMachiningCalculatorSpec().stations;
     const catalog = await this.machiningLookup.getOperationCatalog();
-    const features = (fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2)?.features as unknown[] | undefined;
+    const features = BOMItemsService.catalogFeatures(fg);
     const classes = await this.machineDiscoveryService.getEligibleClasses(role, location, accessToken);
     return classes.map((cls) => ({ cls, verdict: machiningCatalogCompatibility(features, catalog, stations[cls] ?? this.humanizeMachineClass(cls)) }));
   }
@@ -8735,7 +8741,7 @@ export class BOMItemsService {
   /** The machines of a role the catalog rules out for this part, each as a listed route. */
   private async machinesThatCannotMake(role: MachiningRouteRole, fg: any, location: string, accessToken: string, ratesSource: string): Promise<RouteResultDto[]> {
     return (await this.machiningVerdicts(role, fg, location, accessToken))
-      .flatMap(({ cls, verdict }) => (verdict?.status === 'incompatible' ? [this.listedMachiningRoute(cls, verdict, ratesSource)] : []));
+      .flatMap(({ cls, verdict }) => (verdict?.status === 'incompatible' ? [this.listedMachiningRoute(cls, verdict, ratesSource, BOMItemsService.catalogFeatures(fg))] : []));
   }
 
   /** The routers of the location for this part: listed with the operations they lack, or as able to make it but not priced. */
@@ -8743,7 +8749,7 @@ export class BOMItemsService {
     return (await this.machiningVerdicts('primary_routing', fg, location, accessToken)).flatMap(({ cls, verdict }) => {
       if (!verdict) return [];
       return [verdict.status === 'incompatible'
-        ? this.listedMachiningRoute(cls, verdict, ratesSource)
+        ? this.listedMachiningRoute(cls, verdict, ratesSource, BOMItemsService.catalogFeatures(fg))
         : this.unpricedMachiningRoute(cls, verdict, ratesSource, BOMItemsService.ROUTER_NOT_PRICED)];
     });
   }
@@ -8995,7 +9001,7 @@ export class BOMItemsService {
       };
     });
     // Listed, never costed: the machine cannot make the part, and the reason is each operation it lacks.
-    for (const cls of cannotMake) routes.push(this.listedMachiningRoute(cls, compatibilityOf(cls)!, primaryRateByClass.get(cls)!.source));
+    for (const cls of cannotMake) routes.push(this.listedMachiningRoute(cls, compatibilityOf(cls)!, primaryRateByClass.get(cls)!.source, BOMItemsService.catalogFeatures(fg)));
     routes.push(...await this.routerRoutes(fg, location, accessToken, routes[0]?.ratesSource ?? RATES_SOURCE_LABEL));
 
     // Badges — only among capable routes. The lowest-cost capable route here is
