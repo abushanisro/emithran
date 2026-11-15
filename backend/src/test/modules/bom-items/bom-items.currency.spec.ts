@@ -29,6 +29,7 @@ import type { CostSummaryDto } from '../../../modules/bom-items/dto/cost-breakdo
 function buildService() {
   return new BomItemCostingService(
     new BOMItemsService({} as never, {} as never),
+    {} as never, // NestingCostService
     {} as unknown as DatabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,

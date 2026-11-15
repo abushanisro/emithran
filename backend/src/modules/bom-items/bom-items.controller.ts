@@ -35,6 +35,7 @@ import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { BOMItemsService } from './bom-items.service';
 import { BomItemCostingService } from './bom-item-costing.service';
+import { NestingCostService } from './services/nesting-cost.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
 import { AnalysisStatusService } from './services/analysis-status.service';
 import { currentFeatureGraphVersion, type AnalysisStatus } from './analysis-status';
@@ -108,6 +109,7 @@ export class BOMItemsController {
   constructor(
     private readonly bomItemsService: BOMItemsService,
     private readonly costing: BomItemCostingService,
+    private readonly nesting: NestingCostService,
     private readonly fileStorageService: FileStorageService,
     private readonly stepConverterService: StepConverterService,
     private readonly cadAnalysisService: CADAnalysisService,
@@ -1577,7 +1579,7 @@ export class BOMItemsController {
     if (!sheetWidthMm || !sheetLengthMm) {
       throw new BadRequestException('sheetWidthMm and sheetLengthMm query params are required — pass the sheet already selected by the existing nesting/cost result');
     }
-    const { result, reason } = await this.costing.getTrueNest(
+    const { result, reason } = await this.nesting.getTrueNest(
       id,
       user.id,
       token,

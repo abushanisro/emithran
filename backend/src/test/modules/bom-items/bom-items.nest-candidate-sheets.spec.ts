@@ -1,6 +1,6 @@
 // Nest view candidate sheets: standard sheet + library laser sheets that fit
 // the selected laser's bed; the costed sheet always included.
-import { BomItemCostingService } from '../../../modules/bom-items/bom-item-costing.service';
+import { NestingCostService } from '../../../modules/bom-items/services/nesting-cost.service';
 
 // Real reference values: standardSheetWidth/Length (migration 479) and the
 // distinct fiber-laser nominal sheets in machine_library.csv.
@@ -11,7 +11,7 @@ const LIBRARY = [
 ];
 
 function service() {
-  const svc = Object.create(BomItemCostingService.prototype) as BomItemCostingService;
+  const svc = Object.create(NestingCostService.prototype) as NestingCostService;
   (svc as any).smLookup = { getStandardSheet: async () => STANDARD, getLaserNominalSheetSizes: async () => LIBRARY };
   return svc;
 }

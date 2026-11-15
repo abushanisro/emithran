@@ -4,29 +4,12 @@
 //   - BOMItemsService.resolveGrossUsageForCalculator -- Gross Usage
 // Same instantiate-with-mocked-DI-and-spy-on-public-methods pattern already
 // established in bom-items.true-nest-costing.spec.ts.
-import { type PlasticCatalogOperationsService } from '../../../modules/bom-items/costing/plastic-molding/operation/plastic-catalog-operations.service';
-import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
-import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
-import type { CastingReferenceService } from '../../../modules/bom-items/costing/casting/casting-reference.service';
-import type { SandCostService } from '../../../modules/bom-items/costing/casting/sand/sand-cost.service';
-import type { FeatureToleranceService } from '../../../modules/bom-items/services/feature-tolerance.service';
-import type { SheetMetalCatalogOperationsService } from '../../../modules/bom-items/costing/sheet-metal/operation/catalog-operations.service';
-import type { HydroformingReferenceService } from '../../../modules/bom-items/costing/hydroforming/hydroforming-reference.service';
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
-import { BomItemCostingService } from '../../../modules/bom-items/bom-item-costing.service';
+import { NestingCostService } from '../../../modules/bom-items/services/nesting-cost.service';
 import { resolveNetUsagePhysics } from '../../../modules/bom-items/costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
-import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
-import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
 import { realPartSpacingTable } from './costing/sheet-metal/real-part-spacing';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
-import { type RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
-import { type MaterialResolutionService } from '../../../modules/bom-items/services/material-resolution.service';
-import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
-import { type MachineDiscoveryService } from '../../../modules/bom-items/services/machine-discovery.service';
-import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
-import { type DatabaseService } from '../../../common/database/database.service';
-import { type InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
 
 import type { BOMItemResponseDto } from '../../../modules/bom-items/dto/bom-item-response.dto';
 
@@ -41,11 +24,8 @@ function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknow
   const cadAnalysisService = { computeTrueNest } as unknown as CADAnalysisService;
   // The item records the costing reads and writes: stubbed below.
   const items = new BOMItemsService({} as never, {} as never);
-  const service = new BomItemCostingService(
+  const service = new NestingCostService(
     items,
-    {} as unknown as DatabaseService,
-    {} as unknown as InspectionKnowledgeService,
-    {} as unknown as BlankOptimizerService,
     {
       getPartSpacingTable: async () => realPartSpacingTable(),
       // No laser sheet resolvable here; the reference standard sheet is
@@ -53,22 +33,7 @@ function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknow
       getNominalSheetForMachine: async () => null,
       getStandardSheet: async () => ({ widthMm: 1219.2, lengthMm: 2438.4 }),
     } as unknown as SheetMetalLookupService,
-    {} as unknown as MachiningLookupService,
-    {} as unknown as ExchangeRateService,
     cadAnalysisService,
-    {} as unknown as RateResolutionService,
-    {} as unknown as CalculatorCatalogService,
-    {} as unknown as MaterialResolutionService,
-    {} as unknown as MachineDiscoveryService,
-    {} as unknown as SecondaryProcessService,
-    {} as unknown as PlasticReferenceService,
-    {} as never, // PlasticRouteComparisonService
-    {} as unknown as CastingReferenceService,
-    {} as unknown as SandCostService,
-    {} as unknown as FeatureToleranceService,
-    {} as unknown as SheetMetalCatalogOperationsService,
-    {} as unknown as PlasticCatalogOperationsService,
-    {} as unknown as HydroformingReferenceService,
   );
   const findOneSpy = jest.spyOn(items, 'findOne')
     .mockResolvedValue({ id: 'item-1', featureGraph: { summary } } as unknown as BOMItemResponseDto);
@@ -134,20 +99,20 @@ describe('BOMItemsService.resolveGrossUsageForCalculator — "Sheet Metal - Gros
   it('returns the exact gap message when no itemId is bound (no calculator form field can supply a real outline)', async () => {
     const { service } = buildService(jest.fn());
     const result = await service.resolveGrossUsageForCalculator(validInputs, { userId: 'u', accessToken: 't' });
-    expect(result._gapReason).toBe(BomItemCostingService.GROSS_USAGE_GAP_REASON);
+    expect(result._gapReason).toBe(NestingCostService.GROSS_USAGE_GAP_REASON);
   });
 
   it('returns the exact gap message when required scalar inputs are missing, without touching the BOM item at all', async () => {
     const { service, findOneSpy } = buildService(jest.fn());
     const result = await service.resolveGrossUsageForCalculator({}, { itemId: 'item-1', userId: 'u', accessToken: 't' });
-    expect(result._gapReason).toBe(BomItemCostingService.GROSS_USAGE_GAP_REASON);
+    expect(result._gapReason).toBe(NestingCostService.GROSS_USAGE_GAP_REASON);
     expect(findOneSpy).not.toHaveBeenCalled();
   });
 
   it('returns the exact gap message when the bound item has no verified flat-pattern outline (never a rectangle-grid number under this identity)', async () => {
     const { service } = buildService(jest.fn(), {}); // no flatPatternOutlinePointsMm
     const result = await service.resolveGrossUsageForCalculator(validInputs, { itemId: 'item-1', userId: 'u', accessToken: 't' });
-    expect(result._gapReason).toBe(BomItemCostingService.GROSS_USAGE_GAP_REASON);
+    expect(result._gapReason).toBe(NestingCostService.GROSS_USAGE_GAP_REASON);
     expect(result['Gross Weight Per Part']).toBeUndefined();
   });
 
