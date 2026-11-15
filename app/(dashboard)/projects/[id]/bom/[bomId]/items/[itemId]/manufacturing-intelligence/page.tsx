@@ -123,6 +123,7 @@ import {
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
+import { geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
 import { isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -8527,6 +8528,11 @@ function GeometricCostDriversPanel({
   const typedCostDrivers = fg?.summary?.costDrivers ?? [];
   // A machined part's cost drivers are read from its features, not from the summary's short list.
   const machiningFeatures = isMachiningTreeFamily(family) ? fg?.feature_graph_v2?.features ?? [] : [];
+  // A machined or cast part's geometry is its analysed features (feature_graph_v2), every type of them; sheet metal and molded parts have their own rows below.
+  const geometryGroups = useMemo(
+    () => (isIM || family === 'sheet_metal' ? [] : geometryFeatureGroups(fg?.feature_graph_v2?.features ?? [])),
+    [isIM, family, fg?.feature_graph_v2?.features],
+  );
   const isFeatureSelected = !!(selectedHoleGroup || selectedBend);
 
   // Look up per-instance occurrence data from Feature Graph v2 for the selected feature.
@@ -8658,7 +8664,50 @@ function GeometricCostDriversPanel({
               <span className="text-xs font-medium tabular-nums">{fmt(summary.sheetThicknessMm, 1)} mm</span>
             </div>
           )}
-          {summary.holeCount > 0 && (
+          {geometryGroups.length > 0 && (
+            <>
+              {[item.maxLength, item.maxWidth, item.maxHeight].every((v) => (v ?? 0) > 0) && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Envelope (L × W × H)</span>
+                  <span className="text-xs font-medium tabular-nums">{fmt(item.maxLength ?? 0, 1)} × {fmt(item.maxWidth ?? 0, 1)} × {fmt(item.maxHeight ?? 0, 1)} mm</span>
+                </div>
+              )}
+              {(item.volume ?? 0) > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Volume</span>
+                  <span className="text-xs font-medium tabular-nums">{fmt(item.volume ?? 0, 0)} mm³</span>
+                </div>
+              )}
+              {(item.surfaceArea ?? 0) > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Surface Area</span>
+                  <span className="text-xs font-medium tabular-nums">{fmt(item.surfaceArea ?? 0, 0)} mm²</span>
+                </div>
+              )}
+              {geometryGroups.map((g) => (
+                <div key={g.type}>
+                  <div className="flex items-baseline px-3 py-1.5 gap-2">
+                    <span className="text-[10px] text-muted-foreground flex-1 truncate">{g.type}</span>
+                    <span className="text-xs font-medium tabular-nums">{fmtInt(g.count)}</span>
+                  </div>
+                  {g.rows.map((r) => (
+                    <button
+                      key={r.feature.id}
+                      type="button"
+                      title="Click to highlight in the 3D view"
+                      onClick={() => { onSelectHighlight(r.feature); }}
+                      className="w-full flex items-baseline px-3 py-1 gap-2 text-left hover:bg-muted/40"
+                      style={{ paddingLeft: '28px' }}
+                    >
+                      <span className="text-[10px] text-muted-foreground flex-1 truncate">{r.label}</span>
+                      <span className="text-xs font-medium tabular-nums">× {r.count}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
+          {geometryGroups.length === 0 && summary.holeCount > 0 && (
             <>
               <div className="flex items-baseline px-3 py-1.5 gap-2">
                 <span className="text-[10px] text-muted-foreground flex-1 truncate">Holes</span>
@@ -8694,7 +8743,7 @@ function GeometricCostDriversPanel({
               <span className="text-xs font-medium tabular-nums">{fmt(summary.flatPatternAreaMm2, 0)} mm²</span>
             </div>
           )}
-          {!isIM && !summary.holeCount && !summary.bendCount && !summary.cutLengthMm && !summary.flatPatternAreaMm2 && !summary.sheetThicknessMm && (
+          {!isIM && geometryGroups.length === 0 && !summary.holeCount && !summary.bendCount && !summary.cutLengthMm && !summary.flatPatternAreaMm2 && !summary.sheetThicknessMm && (
             <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
               <AlertCircle className="h-6 w-6 opacity-30" />
               <p className="text-[11px]">Run Auto-Fill to see geometry.</p>
