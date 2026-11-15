@@ -4,7 +4,7 @@ import { isTurnedFamily } from '../../../../../domain/part-family';
 import {
   type BoundingBox, type BlankResult, type StockForm, type StockProfile,
   sortedDimensions, requiredSection, roundBarCandidates, hexBarCandidates, rectangularBarCandidates, squareBarCandidates, plateCandidates,
-  selectBestAutoCandidate, selectForcedFormCandidate, billetFallback, BAR_LENGTH_ALLOWANCE_MM,
+  selectBestAutoCandidate, selectTurnedCandidate, selectForcedFormCandidate, billetFallback, BAR_LENGTH_ALLOWANCE_MM,
 } from './blank-stock-candidates';
 
 import {
@@ -52,25 +52,22 @@ export class BlankOptimizerService {
 
       if (profiles.length === 0) return billetFallback(bbox, partVolMm3, allowance);
 
-      const candidates =
-        family === "turned" || family === "mill_turn"
-          // Turning: a round bar of at least the OD plus the stock allowance
-          ? roundBarCandidates(profiles, minDiam, barLen, partVolMm3)
-          // Milled: try round bar (if roughly cylindrical), hex bar (if
-          // roughly hexagonal), and rectangular bar — real stock_profiles
-          // data exists for all three (migration 350); scoring picks
-          // whichever real candidate wastes the least material.
-          : [
-              ...roundBarCandidates(profiles, minDiam, barLen, partVolMm3),
-              ...hexBarCandidates(profiles, minDiam, barLen, partVolMm3),
-              ...rectangularBarCandidates(profiles, W, H, barLen, partVolMm3),
-              ...squareBarCandidates(preferredSizes, W, H, barLen, partVolMm3),
-              ...plateCandidates(preferredSizes, bbox, allowance, partVolMm3),
-            ];
-
-      const best = selectBestAutoCandidate(candidates, bbox, allowance);
+      // Turning: a round bar of at least the OD plus the stock allowance, the smallest one stocked (selectTurnedCandidate: a lathe turns a
+      // bar, never a billet, so no billet comparison). Milled: round, hex, rectangular, square bar and plate; scoring picks whichever wastes
+      // the least material and is still smaller than the box billet.
+      const best = turnedFamily
+        ? selectTurnedCandidate(roundBarCandidates(profiles, minDiam, barLen, partVolMm3))
+        : selectBestAutoCandidate([
+            ...roundBarCandidates(profiles, minDiam, barLen, partVolMm3),
+            ...hexBarCandidates(profiles, minDiam, barLen, partVolMm3),
+            ...rectangularBarCandidates(profiles, W, H, barLen, partVolMm3),
+            ...squareBarCandidates(preferredSizes, W, H, barLen, partVolMm3),
+            ...plateCandidates(preferredSizes, bbox, allowance, partVolMm3),
+          ], bbox, allowance);
       if (!best) {
-        this.logger.debug('Blank optimizer: no stock profile smaller than bbox billet — using billet');
+        this.logger.debug(turnedFamily
+          ? `Blank optimizer: no stocked round bar holds a Ø${minDiam.toFixed(1)} mm turned section — using billet (turning is not priced without a bar)`
+          : 'Blank optimizer: no stock profile smaller than bbox billet — using billet');
         return billetFallback(bbox, partVolMm3, allowance);
       }
 
