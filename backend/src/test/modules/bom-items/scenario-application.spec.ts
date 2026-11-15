@@ -43,7 +43,7 @@ function build(over: {
     applyCustomRoute: jest.fn().mockImplementation(() => { calls.push('custom-route'); return Promise.resolve({ created: 2, operations: ['x'], routeLabel: 'Custom', needsManualCycleTime: [] }); }),
   };
   const audit = { recordBestEffort: jest.fn().mockResolvedValue(undefined) };
-  const svc = new ScenarioApplicationService(bomItems as never, bomItems as never, database as never, materials as never, toolingCosts as never, routes as never, audit as never);
+  const svc = new ScenarioApplicationService(bomItems as never, bomItems as never, bomItems as never, database as never, materials as never, toolingCosts as never, routes as never, audit as never);
   return { svc, calls, patches, bomItems, materials, toolingCosts, routes, audit };
 }
 const input = (request: object) => ({ bomItemId: 'i1', userId: 'u', organizationId: 'o', token: 't', request: { location: 'USA', route: { mode: 'auto' }, ...request } as never });

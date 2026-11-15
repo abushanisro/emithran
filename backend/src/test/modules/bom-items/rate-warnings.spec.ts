@@ -1,9 +1,9 @@
-import { BomItemCostingService } from '../../../modules/bom-items/bom-item-costing.service';
+import { MachineRateService } from '../../../modules/bom-items/services/machine-rate.service';
 
 // appendRateWarnings reads nothing from the service, so it is called on its prototype.
 const append = (lines: Array<Record<string, unknown>>, location = 'USA') => {
   const result = { processLines: lines, warnings: [] as string[] } as never as { processLines: any[]; warnings: string[] };
-  (BomItemCostingService.prototype as any).appendRateWarnings.call({}, result, location);
+  (MachineRateService.prototype as any).appendRateWarnings.call({}, result, location);
   return result.warnings;
 };
 

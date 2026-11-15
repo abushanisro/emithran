@@ -35,6 +35,9 @@ import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { BOMItemsService } from './bom-items.service';
 import { BomItemCostingService } from './bom-item-costing.service';
+import { NestingCostService } from './services/nesting-cost.service';
+import { GdtAnalysisService } from './services/gdt-analysis.service';
+import { CostOverridesService } from './services/cost-overrides.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
 import { AnalysisStatusService } from './services/analysis-status.service';
 import { currentFeatureGraphVersion, type AnalysisStatus } from './analysis-status';
@@ -108,6 +111,9 @@ export class BOMItemsController {
   constructor(
     private readonly bomItemsService: BOMItemsService,
     private readonly costing: BomItemCostingService,
+    private readonly nesting: NestingCostService,
+    private readonly gdt: GdtAnalysisService,
+    private readonly overrides: CostOverridesService,
     private readonly fileStorageService: FileStorageService,
     private readonly stepConverterService: StepConverterService,
     private readonly cadAnalysisService: CADAnalysisService,
@@ -1577,7 +1583,7 @@ export class BOMItemsController {
     if (!sheetWidthMm || !sheetLengthMm) {
       throw new BadRequestException('sheetWidthMm and sheetLengthMm query params are required — pass the sheet already selected by the existing nesting/cost result');
     }
-    const { result, reason } = await this.costing.getTrueNest(
+    const { result, reason } = await this.nesting.getTrueNest(
       id,
       user.id,
       token,
@@ -1659,7 +1665,7 @@ export class BOMItemsController {
     @Param('id') id: string,
     @AccessToken() token: string,
   ) {
-    return this.costing.getGdtAnalysis(id, token);
+    return this.gdt.getGdtAnalysis(id, token);
   }
 
   @Post(':id/machine-override')
@@ -1674,7 +1680,7 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ) {
     if (!dto.location) throw new BadRequestException('location is required in the request body — send the digital factory location');
-    return this.costing.setMachineOverride(
+    return this.overrides.setMachineOverride(
       id,
       user.id,
       token,
@@ -1696,7 +1702,7 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ) {
     if (!dto.location) throw new BadRequestException('location is required in the request body — send the digital factory location');
-    return this.costing.setCostOverride(
+    return this.overrides.setCostOverride(
       id,
       user.id,
       token,
