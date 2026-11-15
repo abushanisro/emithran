@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { featureTypeLabel, geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
+import { featureCountSummary, featureTypeLabel, geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
 import type { FeatureNodeV2 } from '@/lib/types/manufacturing';
 
 const occ = (n: number, extra: Record<string, unknown> = {}) => Array.from({ length: n }, () => ({ centroid: [0, 0, 0], face_ids: [1], ...extra }));
@@ -45,6 +45,10 @@ describe('geometryFeatureGroups', () => {
     expect(groups.map((g) => g.label)).toEqual(['Edges', 'Planar faces', 'Pockets', 'Simple holes', 'Slots']);
     expect(['MultiStepHole', 'CurvedSurface', 'CurvedWall', 'Boss', 'SharpEdge', 'Keyway'].map(featureTypeLabel))
       .toEqual(['Multi step holes', 'Curved surfaces', 'Curved walls', 'Bosses', 'Sharp edges', 'Keyways']);
+  });
+
+  it('summarises the part in counts, largest group first', () => {
+    expect(featureCountSummary(features)).toEqual(['32 edges', '24 planar faces', '13 simple holes', '6 pockets', '2 slots']);
   });
 
   it('each row carries the feature it stands for, for highlighting', () => {
