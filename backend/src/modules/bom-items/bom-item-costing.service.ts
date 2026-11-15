@@ -1975,14 +1975,7 @@ export class BomItemCostingService {
         width:  ((item as any).maxWidth  ?? 0) as number,
         height: ((item as any).maxHeight ?? 0) as number,
       };
-      const blankResult = await this.blankOptimizer.selectOptimalBlank(
-        bbox,
-        (item.volume ?? 0) as number,
-        family as MachiningFamily,
-        accessToken,
-        resolveScenarioStockForm(item.scenarioOverrides),
-        this.resolveTurnedGeometry(fg, bbox),
-      );
+      const blankResult = await this.selectBlank(item, fg, family as MachiningFamily, accessToken);
 
       // Fix 3 + 4: Feature-based cycle time from feature_graph_v2.
       // machinabilityRating from machining_features.material_machinability or raw_materials.
@@ -4910,6 +4903,7 @@ export class BomItemCostingService {
         routeCylindricalGrindingParams, routeInternalGrindingParams, routeJigBoreTable, routeKeywayBroach, routeWireEdmParams,
         routeTurningParams,
         accessToken,
+        family as MachiningFamily,
       );
       // A mill the operation catalog says can make every feature of this turned part is priced as its milled route,
       // beside the lathes. (The mills it rules out are already listed by buildTurnedRoutes.)
@@ -6038,7 +6032,6 @@ export class BomItemCostingService {
     const { family } = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
 
     const isCNC = isMachiningFamily(family);
-    const bbox  = { length: maxLength, width: maxWidth, height: maxHeight };
 
     // Phase 2: material density + MHR rates (parallel)
     // One FX snapshot for this whole request — see getCostSummary's identical comment.
@@ -6058,13 +6051,7 @@ export class BomItemCostingService {
     ]);
 
     // Phase 3: blank optimizer for CNC primary routes (conditional)
-    const blankResult = isCNC
-      ? await this.blankOptimizer.selectOptimalBlank(
-          bbox, volume, family as MachiningFamily, accessToken,
-          resolveScenarioStockForm(item.scenarioOverrides),
-          this.resolveTurnedGeometry(fg, bbox),
-        )
-      : null;
+    const blankResult = isCNC ? await this.selectBlank(item, fg, family as MachiningFamily, accessToken) : null;
 
     // Blank spec shared by all primary routes (same stock across machine class variants)
     const primaryBlankSpec = this.buildCandidateBlankSpec({
@@ -7069,10 +7056,8 @@ export class BomItemCostingService {
     // the operations and stock the Cost tab shows.
     const featurePlan = await this.machiningFeaturePlan(item, fg, grade, accessToken);
     comparisonWarnings.push(...featurePlan.warnings);
-    const blankResult = await this.blankOptimizer.selectOptimalBlank(
-      { length: maxLength, width: maxWidth, height: maxHeight }, (item.volume ?? 0) as number, 'milled', accessToken,
-      resolveScenarioStockForm(item.scenarioOverrides),
-    );
+    // A mill cuts this part from milled stock, whatever the part's own family.
+    const blankResult = await this.selectBlank(item, fg, 'milled', accessToken);
 
     const baseInput: Omit<MachiningCostInput, 'mhrRate' | 'tappingRate'> = {
       blankResult,
@@ -7310,6 +7295,24 @@ export class BomItemCostingService {
     };
   }
 
+  /**
+   * The stock a machined part is cut from (BlankOptimizerService): the one call the cost summary, the route comparison (milled and turned
+   * routes) and the candidate routes all make, so a route is applied at the stock the Cost tab shows. The turned routes once skipped it:
+   * with no blank the turning engine had no bar diameter, every lathe route was data-incomplete, and Apply found no route to choose.
+   */
+  private selectBlank(item: any, fg: any, family: MachiningFamily, accessToken: string) {
+    const bbox = {
+      length: ((item as any).maxLength ?? 0) as number,
+      width:  ((item as any).maxWidth  ?? 0) as number,
+      height: ((item as any).maxHeight ?? 0) as number,
+    };
+    return this.blankOptimizer.selectOptimalBlank(
+      bbox, (item.volume ?? 0) as number, family, accessToken,
+      resolveScenarioStockForm(item.scenarioOverrides),
+      this.resolveTurnedGeometry(fg, bbox),
+    );
+  }
+
   private async buildTurnedRoutes(
     id: string,
     item: any,
@@ -7344,7 +7347,10 @@ export class BomItemCostingService {
       dataFound: boolean;
     } | null,
     accessToken: string = '',
+    /** turned or mill_turn: the blank is chosen for the part's own family, as on the Cost tab. */
+    family: MachiningFamily = 'turned',
   ): Promise<Omit<RouteComparisonDto, 'recommendedRouteId'>> {
+    const blankResult = await this.selectBlank(item, fg, family, accessToken);
     // Fix 1: turned parts also use feature recognizer hole count
     const turnedCncSummary = machiningFeatureCounts(fg?.machining_features);
     const holeCount = turnedCncSummary !== null
@@ -7361,6 +7367,7 @@ export class BomItemCostingService {
     const finishedWeightKg = ((item as any).weight ?? 0) as number;
 
     const baseInput: Omit<MachiningCostInput, 'mhrRate' | 'tappingRate'> = {
+      blankResult,
       volume:               (item.volume ?? 0) as number,
       surfaceArea:          (item.surfaceArea ?? 0) as number,
       maxLength, maxWidth, maxHeight,

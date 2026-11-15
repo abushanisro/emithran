@@ -10,6 +10,8 @@ const CALCS = specAsCalculators();
 import { resolveDrillingParams } from '../../../../../../modules/bom-items/costing/machining/lookup/drilling-table';
 import { resolvePartoffParams } from '../../../../../../modules/bom-items/costing/machining/lookup/partoff-table';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
+import { findRouteDataGaps } from '../../../../../../modules/bom-items/costing/shared/core/engine-kernel';
+import { requiredSection, roundBarCandidates, selectTurnedCandidate, type StockProfile } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/blank-stock-candidates';
 import { realDrillingTable, realHobbingReference, realPartoffTable } from '../real-reference-tables';
 
 // Machining cycle times from real inputs only — CAD geometry and the real
@@ -219,5 +221,38 @@ describe('lookup-table viewer: the row a machining input came from is identifiab
     const outlined = flat.rows.filter((r: any) => Object.entries(match.row).every(([k, v]) => r[k] === v));
     expect(outlined.map((r: any) => r.diameter_mm)).toEqual([0.1, 19.9]);
     expect(outlined.every((r: any) => r.cutting_speed_m_min === c.trace.find((s) => s.fieldName === 'Cutting Speed')!.value)).toBe(true);
+  });
+});
+
+// The route comparison prices each lathe route with the same engine as the Cost tab. Its input once had no blank: the turning engine then
+// had no bar diameter, so every lathe route carried a "round-bar stock" data gap, no route was data-complete, and Apply on the R_M-0230-032
+// lead nut housing (30 x 24.5 x 21 mm, mill-turn) found "no route both feasible and fully costed" while the Cost tab priced it.
+describe('a lathe route is priced from the bar the blank optimizer chose (route comparison = Cost tab)', () => {
+  const bars: StockProfile[] = [25, 30, 35, 40, 45].map((d) => ({ form: 'round_bar', size_a_mm: d, size_b_mm: null }));
+  const leadNut = (blankResult?: unknown) => computeTurningCostSummary({
+    volume: 5539.5, surfaceArea: 5563.39, maxLength: 30, maxWidth: 24.5, maxHeight: 21,
+    holeCount: 0, holeGroups: [], pocketCount: 0,
+    materialGrade: 'Aluminum, AA 1100', materialCostPerKg: 5.981, materialDensityKgM3: 2710,
+    materialSource: 'db', threads: [], tightestToleranceMm: null, gdtFeatureCount: 0,
+    batchSize: 3, family: 'turned', finishedWeightKg: 0.015,
+    mhrRate: rate(60, { machineClass: '3_axis_bar_feed_lathe_with_sub_spindle' }),
+    tappingRate: rate(60, { machineClass: 'tapping' }),
+    deburrRate: rate(40, { machineClass: 'manual_deburr' }),
+    inspectionRate: rate(45, { machineClass: 'machining_inspection' }),
+    surfaceTreatment: null, machiningCalculators: CALCS, partoffTable: realPartoffTable(),
+    ...(blankResult ? { blankResult } : {}),
+  } as any, mc('3_axis_bar_feed_lathe_with_sub_spindle'));
+  const barGaps = (r: ReturnType<typeof leadNut>) =>
+    findRouteDataGaps(r.processLines).filter((g) => JSON.stringify(g).includes('round-bar stock'));
+
+  it('without a blank, turning and parting are data gaps: the route cannot be recommended', () => {
+    expect(barGaps(leadNut()).length).toBeGreaterThan(0);
+  });
+
+  it('with the Ø30 bar the optimizer chooses for this part, the bar gaps are gone', () => {
+    const { minDiam } = requiredSection(24.5, 21, 1.23, true);
+    const bar = selectTurnedCandidate(roundBarCandidates(bars, minDiam, 35, 5539.5))!;
+    expect(bar.barDiameterMm).toBe(30);
+    expect(barGaps(leadNut({ form: bar.form, sizeLabel: bar.sizeLabel, billetVolMm3: bar.billetVolMm3, utilizationPct: bar.utilizationPct, barDiameterMm: bar.barDiameterMm }))).toEqual([]);
   });
 });
