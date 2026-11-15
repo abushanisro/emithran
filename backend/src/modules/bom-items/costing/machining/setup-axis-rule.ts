@@ -177,7 +177,7 @@ export function requiredMilledClassFromToolAxes(
   if (obliqueSetups > rule.maxOblique4AMSetups) {
     return {
       required: '5_axis_mill', principalSetups, obliqueSetups,
-      reason: `${obliqueSetups} oblique setup${obliqueSetups === 1 ? '' : 's'} (a 4 axis mill takes at most ${rule.maxOblique4AMSetups}).`,
+      reason: `${obliqueSetups} oblique setup${obliqueSetups === 1 ? '' : 's'} (a 3 or 4 axis mill takes ${rule.maxOblique4AMSetups === 0 ? 'none' : `at most ${rule.maxOblique4AMSetups}`}).`,
     };
   }
   if (principalSetups > rule.perpendicularCountFor3AM) {

@@ -1,4 +1,4 @@
-import { machiningCatalogCompatibility } from '../../../../../../modules/bom-items/costing/machining/operation/catalog-compatibility';
+import { catalogGapSummary, machiningCatalogCompatibility } from '../../../../../../modules/bom-items/costing/machining/operation/catalog-compatibility';
 import { readMachiningMemoryCsv } from '../real-reference-tables';
 
 // The reference operation catalog itself (memory/Machining/operations_full__operations.csv, 1174 rows).
@@ -35,6 +35,16 @@ describe('machiningCatalogCompatibility: what a machine can make, read from the 
 
   it('an operation that is a step of a compound feature counts (Rounding // SimpleHole : Rounding // Edge)', () => {
     expect(machiningCatalogCompatibility([feature('Edge', 'Rounding', 1)], ['X:Rounding//SimpleHole:Rounding//Edge'], 'X')!.status).toBe('compatible');
+  });
+
+  it('says why in one sentence: each operation the machine lacks, with the features that need it', () => {
+    const v = machiningCatalogCompatibility(PART, CATALOG, '2 Axis Lathe')!;
+    const sentence = catalogGapSummary('2 Axis Lathe', PART, v.incompatibilities);
+    expect(sentence).toMatch(/^2 Axis Lathe cannot make this part: the machining catalog gives it no /);
+    expect(sentence).toContain('Rough Milling (16 × PocketV2, 1 × Keyway)');
+    expect(sentence).toContain('Rounding (32 × Edge)');
+    // The machine is named once, not once per feature group.
+    expect(sentence.match(/2 Axis Lathe/g)).toHaveLength(1);
   });
 
   it('gives no verdict without a catalog or without a feature that states its operation', () => {

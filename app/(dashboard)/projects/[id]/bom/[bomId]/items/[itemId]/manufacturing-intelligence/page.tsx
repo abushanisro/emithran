@@ -3852,7 +3852,8 @@ function RouteSelectionDialog({
             return {
               ...node,
               selectable: false,
-              selectionNote: dto.warnings?.[0] ?? 'This machine cannot produce the part (capability check failed).',
+              // Why this machine cannot be picked: its own capability reason. The route's general warnings (chip loss, stock price) are about the part.
+              selectionNote: dto.capability.warnings[0] ?? 'This machine cannot produce the part (capability check failed).',
             };
           }
           return node;

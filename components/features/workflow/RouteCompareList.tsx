@@ -262,7 +262,7 @@ export function RouteCompareList({
                           constraint has to be readable before the click, and
                           a tooltip is invisible to touch and to anyone who
                           never hovers a row they assumed was disabled-looking. */}
-                      {!node.selectable && node.selectionNote && (
+                      {!node.selectable && node.selectionNote && !node.infeasibleReason?.includes(node.selectionNote) && (
                         <p className="mt-1.5 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground">
                           <Info className="mt-px h-3 w-3 shrink-0" />
                           <span>{node.selectionNote}</span>

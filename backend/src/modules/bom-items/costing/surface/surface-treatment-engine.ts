@@ -773,29 +773,46 @@ function maskBench(base: Base, part: SecondaryPartFacts, ref: SecondaryReference
   }, ref, part.batchSize);
 }
 
+/** The part's holes that carry both a measured diameter and a measured depth (mm), one per occurrence; empty when any hole lacks either. */
+function measuredBores(part: SecondaryPartFacts): Array<{ diameterMm: number; depthMm: number }> {
+  const holes = part.features.filter((f) => /hole/i.test(String(f.feature_type)))
+    .flatMap((f) => (f.occurrences as Array<Record<string, unknown>>).map((o) => ({
+      diameterMm: num(o.diameter_mm) ?? num((f as { diameter_mm?: unknown }).diameter_mm), depthMm: num(o.depth_mm),
+    })));
+  const measured = holes.filter((h): h is { diameterMm: number; depthMm: number } => (h.diameterMm ?? 0) > 0 && (h.depthMm ?? 0) > 0);
+  return measured.length === holes.length ? measured : [];
+}
+
 function maskSpray(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
   if (pool.length === 0) return notCosted(base, 'gap', noMachineRate('mask spray booth'));
   const layers = variable(ref, 'defaultNumMaskantLayers');
   if (layers == null) return notCosted(base, 'gap', 'defaultNumMaskantLayers is not staged: run migration 819.');
-  const dias = part.holeDiametersMm ?? [];
+  // Each hole is masked as deep as it is: its measured depth where the analysis has one (a machined or cast part), else the wall it goes through (a sheet).
+  const bores = measuredBores(part);
+  const dias = bores.length > 0 ? bores.map((b) => b.diameterMm) : part.holeDiametersMm ?? [];
   if (dias.length === 0) return notCosted(base, 'not_applicable', 'The part has no CAD-counted hole to mask; the reference does not say which other surfaces are masked.');
-  if (part.wallThicknessMm == null || part.wallThicknessMm <= 0) return notCosted(base, 'gap', 'The wall thickness is needed for the depth of a hole to mask.');
+  const byWall = bores.length === 0;
+  if (byWall && (part.wallThicknessMm == null || part.wallThicknessMm <= 0)) {
+    return notCosted(base, 'gap', 'The holes have no measured depth and the part has no wall thickness, so the area to mask is not known: re-run the analysis.');
+  }
   const m = pickMachine(base.process, pool.filter((x) => num(x.specs.spray_rate_mm2_per_s) != null && num(x.specs.spray_rate_mm2_per_s)! > 0), ref);
   if (!m) return notCosted(base, 'gap', 'No mask spray booth with a spray rate is on file.');
   const rate = num(m.specs.spray_rate_mm2_per_s)!;
-  // Masked area = the bore of every CAD-counted hole (pi x diameter x wall); the depth of a hole is not read.
-  const areaMm2 = dias.reduce((a, d) => a + Math.PI * d * part.wallThicknessMm!, 0);
+  // Masked area = the bore of every hole: pi x diameter x depth.
+  const areaMm2 = byWall
+    ? dias.reduce((a, d) => a + Math.PI * d * part.wallThicknessMm!, 0)
+    : bores.reduce((a, b) => a + Math.PI * b.diameterMm * b.depthMm, 0);
   const progHr = num(m.specs.programming_time_hr) ?? 0;
   return costed(base, m, {
     perPartSec: (areaMm2 * layers) / rate,
     batchExtraSec: progHr * 3600,
     trace: [
-      { label: 'Masked area', value: Number(areaMm2.toFixed(1)), unit: 'mm²', source: `ASSUMED: the bore of ${dias.length} CAD-counted holes (π × diameter × wall ${part.wallThicknessMm} mm)` },
+      { label: 'Masked area', value: Number(areaMm2.toFixed(1)), unit: 'mm²', source: byWall ? `ASSUMED: the bore of ${dias.length} CAD-counted holes (π × diameter × wall ${part.wallThicknessMm} mm)` : `CAD: the bore of ${dias.length} holes, each π × its diameter × its measured depth` },
       { label: 'Maskant layers', value: layers, source: `${SRC_VAR} (defaultNumMaskantLayers)` },
       { label: 'Spray rate', value: rate, unit: 'mm²/s', source: `machine ${m.name}` },
       { label: 'Programming (once per batch)', value: progHr, unit: 'hr', source: `machine ${m.name}` },
     ],
-    warnings: ['Provisional: only the bores of the CAD-counted holes are masked (the reference does not say which surfaces are), each as wall thickness deep. The tack time between layers and the maskant material are not priced.'],
+    warnings: [`Provisional: only the bores of the CAD-counted holes are masked (the reference does not say which surfaces are), each ${byWall ? 'as wall thickness deep' : 'at its measured depth'}. The tack time between layers and the maskant material are not priced.`],
     highlight: 'whole_part', provisional: true,
   }, ref, part.batchSize);
 }

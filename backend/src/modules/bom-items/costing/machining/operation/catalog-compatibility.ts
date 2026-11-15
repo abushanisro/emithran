@@ -27,6 +27,22 @@ function performs(catalog: ReadonlySet<string>, compound: readonly string[], pro
 }
 
 /**
+ * One sentence for a machine the catalog rules out: each operation it lacks, with how many of the part's features need it.
+ * "2 Axis Lathe cannot make this part: the machining catalog gives it no Rounding (52 × Edge), Rough Milling (5 × PocketV2, 1 × Keyway)."
+ */
+export function catalogGapSummary(process: string, features: readonly unknown[] | null | undefined, incompatibilities: RouteCompatibility['incompatibilities']): string {
+  const operationOf = new Map(((features ?? []) as CatalogFeature[]).filter((f) => f.id && f.canonical_operation?.includes('//'))
+    .map((f) => [f.id!, f.canonical_operation!.split('//')[0]!.trim()]));
+  const byOperation = new Map<string, string[]>();
+  for (const i of incompatibilities) {
+    const operation = operationOf.get(i.featureIds[0] ?? '') ?? 'an operation';
+    byOperation.set(operation, [...(byOperation.get(operation) ?? []), `${i.count} × ${i.featureType}`]);
+  }
+  const gaps = [...byOperation].map(([operation, needs]) => `${operation} (${needs.join(', ')})`);
+  return `${process} cannot make this part: the machining catalog gives it no ${gaps.join(', ')}.`;
+}
+
+/**
  * The verdict for one process, or null when nothing is known (no catalog, or no feature that states its operation):
  * nothing is then held against the route.
  */

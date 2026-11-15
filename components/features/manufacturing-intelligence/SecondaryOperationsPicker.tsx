@@ -84,6 +84,10 @@ export function SecondaryOperationsPicker({
                               {o.cycleTimeSec != null && ` · ${(o.cycleTimeSec / 60).toFixed(2)} min`}
                             </span>
                           )}
+                          {/* Why there is no price: stated on the row, not left to a hover. */}
+                          {o.costPerPart == null && o.reason && (
+                            <span className="block text-[10px] leading-snug text-muted-foreground">{o.reason}</span>
+                          )}
                         </span>
                         <span className={`shrink-0 tabular-nums ${o.costPerPart == null ? 'text-muted-foreground' : ''}`}>{cost(o)}</span>
                       </label>
