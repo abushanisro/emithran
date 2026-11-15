@@ -1,4 +1,4 @@
-import { BOMItemsService, hasCostModel } from '../../../modules/bom-items/bom-items.service';
+import { BomItemCostingService, hasCostModel } from '../../../modules/bom-items/bom-item-costing.service';
 
 /**
  * A part whose family has no cost model is not priced as sheet metal with zero geometry: its summary has no price and says what is
@@ -15,7 +15,7 @@ describe('which part families have a cost model', () => {
 });
 
 describe('the unpriced summary', () => {
-  const service = Object.create(BOMItemsService.prototype) as unknown as {
+  const service = Object.create(BomItemCostingService.prototype) as unknown as {
     unpricedSummary(input: { costingInputs: object; batchSize: number; family: string; missingInputs: string[]; warnings: string[] }): Record<string, unknown>;
   };
   const input = { costingInputs: { batchSize: 100 }, batchSize: 100 };
@@ -35,7 +35,7 @@ describe('the unpriced summary', () => {
 });
 
 describe('hasMeasuredGeometry', () => {
-  const { hasMeasuredGeometry } = require('../../../modules/bom-items/bom-items.service');
+  const { hasMeasuredGeometry } = require('../../../modules/bom-items/bom-item-costing.service');
   it('needs a positive volume and all three bounding-box sides', () => {
     expect(hasMeasuredGeometry({ volume: 10, maxLength: 1, maxWidth: 1, maxHeight: 1 })).toBe(true);
     expect(hasMeasuredGeometry({ volume: 10, maxLength: 1, maxWidth: 1 })).toBe(false);

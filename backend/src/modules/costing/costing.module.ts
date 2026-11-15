@@ -9,7 +9,7 @@ import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.mod
 import { BOMItemsModule } from '../bom-items/bom-items.module';
 
 @Module({
-  // BOMItemsModule gives ExcelReportService access to BOMItemsService.getCostSummary —
+  // BOMItemsModule gives ExcelReportService access to BomItemCostingService.getCostSummary —
   // the SAME live CAD-geometry-driven computation (calculation traces, feature
   // breakdowns, real machine selection) the Direct Process Costs panel renders on
   // screen, so the "verify the calculation" sheet can't drift from what's displayed.

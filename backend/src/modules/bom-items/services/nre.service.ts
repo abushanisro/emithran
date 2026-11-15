@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
 import { ReferenceMemo } from '../../../common/cache/reference-memo';
 import { BOMItemsService } from '../bom-items.service';
+import { BomItemCostingService } from '../bom-item-costing.service';
 import { MachineDiscoveryService } from './machine-discovery.service';
 import { SecondaryProcessService } from './secondary-process.service';
 import { MACHINING_REFERENCE_SOURCE_VERSION } from '../costing/machining/lookup/machining-lookup-tables';
@@ -61,6 +62,7 @@ export class NreService {
   constructor(
     private readonly database: DatabaseService,
     private readonly bomItems: BOMItemsService,
+    private readonly costing: BomItemCostingService,
     private readonly discovery: MachineDiscoveryService,
     private readonly secondary: SecondaryProcessService,
   ) {}
@@ -102,7 +104,7 @@ export class NreService {
   }): Promise<NreResponse> {
     const { itemId, userId, accessToken, location } = input;
     const item: any = await this.bomItems.findOne(itemId, userId, accessToken);
-    const cost = await this.bomItems.getCostSummary(itemId, userId, accessToken, input.batchSize, location, input.productionLifeYears);
+    const cost = await this.costing.getCostSummary(itemId, userId, accessToken, input.batchSize, location, input.productionLifeYears);
     const inputs = resolveCostingInputs({
       requested: { batchSize: input.batchSize ?? null, location, productionLifeYears: input.productionLifeYears ?? null },
       scenarioOverrides: item.scenarioOverrides,

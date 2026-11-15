@@ -14,7 +14,8 @@ describe('applying a route requires the part to be analysed', () => {
     const getRouteComparison = jest.fn().mockRejectedValue(new Error('reached the route comparison'));
     const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
     Object.assign(c, {
-      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }), getRouteComparison },
+      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }) },
+      costing: { getRouteComparison },
       analysisStatusService: { forItem: jest.fn().mockResolvedValue(status) },
       audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
     });
@@ -57,7 +58,8 @@ describe('applying "auto" when every route is incompatible', () => {
     const getRouteComparison = jest.fn().mockResolvedValue(comparison);
     const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
     Object.assign(c, {
-      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }), getRouteComparison },
+      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }) },
+      costing: { getRouteComparison },
       analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
       audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
     });
@@ -94,7 +96,8 @@ describe('a kept route that is no longer a route for the part', () => {
   function service() {
     const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
     Object.assign(c, {
-      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }), getRouteComparison: jest.fn().mockResolvedValue(comparison) },
+      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }) },
+      costing: { getRouteComparison: jest.fn().mockResolvedValue(comparison) },
       analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
       audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
     });

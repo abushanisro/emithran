@@ -4,6 +4,7 @@ import { AuditService } from '../../../common/audit/audit.service';
 import { DatabaseService } from '../../../common/database/database.service';
 import { currentFeatureGraphVersion, MISSING_ANALYSIS_TEXT } from '../analysis-status';
 import { BOMItemsService } from '../bom-items.service';
+import { BomItemCostingService } from '../bom-item-costing.service';
 import { AUTO_ROUTE_ID } from '../dto/apply-route.dto';
 import type { AppliedScenarioState, ApplyScenarioDto, ScenarioApplicationResult } from '../dto/apply-scenario.dto';
 import { MaterialCostSnapshotService } from './material-cost-snapshot.service';
@@ -46,6 +47,7 @@ export class ScenarioApplicationService {
 
   constructor(
     private readonly bomItems: BOMItemsService,
+    private readonly costing: BomItemCostingService,
     private readonly database: DatabaseService,
     private readonly materials: MaterialCostSnapshotService,
     private readonly toolingCosts: ToolingCostSnapshotService,
@@ -99,7 +101,7 @@ export class ScenarioApplicationService {
       let material: ScenarioApplicationResult['material'] = null;
       if (grade) {
         const item = await this.bomItems.findOne(id, userId, token);
-        const summary = await this.bomItems.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
+        const summary = await this.costing.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
         const snapshot = await this.materials.ensure({ item, grade, location: request.location, summary, userId, organizationId, token });
         material = { grade, action: snapshot.action, recordId: snapshot.recordId };
       }
@@ -108,14 +110,14 @@ export class ScenarioApplicationService {
       const route = await this.applyRoute(id, request, user, token, warnings);
 
       // 5b. The tooling the applied route needs (the mold), from the cost summary at this scenario.
-      const afterRoute = await this.bomItems.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
+      const afterRoute = await this.costing.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
       const tooling = await this.toolingCosts.ensure({ bomItemId: id, summary: afterRoute, userId, organizationId, token });
 
       // 6. The machines picked in the Workflow Builder: a machine that cannot be saved is reported, and does not undo the route.
       const machineOverrides: ScenarioApplicationResult['machineOverrides'] = { saved: 0, failed: [] };
       for (const ov of request.machineOverrides ?? []) {
         try {
-          await this.bomItems.setMachineOverride(id, userId, token, ov.processKey, ov.mhrRecordId ?? null, request.location);
+          await this.costing.setMachineOverride(id, userId, token, ov.processKey, ov.mhrRecordId ?? null, request.location);
           machineOverrides.saved += 1;
         } catch (e: unknown) {
           machineOverrides.failed.push({ processKey: ov.processKey, message: e instanceof Error ? e.message : String(e) });

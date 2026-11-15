@@ -1,6 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import type Anthropic from '@anthropic-ai/sdk';
-import type { BOMItemsService } from '../bom-items/bom-items.service';
+import type { BomItemCostingService } from '../bom-items/bom-item-costing.service';
 import { modelData, modelText } from '../../common/ai/model-text';
 import { MAX_PREFERENCE_CHARS, MAX_PROPOSAL_ENTRIES, type CopilotMemoryService, type MemoryProposal } from './copilot-memory.service';
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
@@ -427,7 +427,7 @@ export class CopilotToolRunner {
 
   constructor(
     private readonly ctx: ToolContext,
-    private readonly bomItems: BOMItemsService,
+    private readonly costing: BomItemCostingService,
     private readonly memory: CopilotMemoryService,
     private readonly costAggregation: CostAggregationService,
     private readonly results: ResultCache,
@@ -521,7 +521,7 @@ export class CopilotToolRunner {
       scenarios.map(async (sc, i) => {
         const label = sc.label ?? `scenario ${i + 1}`;
         try {
-          const cs = await this.bomItems.getCostSummary(
+          const cs = await this.costing.getCostSummary(
             bomItemId,
             userId,
             accessToken,
@@ -552,7 +552,7 @@ export class CopilotToolRunner {
     const { bomItemId, userId, accessToken, batchSize, location, productionLifeYears } = this.ctx;
     this.costSummary ??= this.results.get(
       `cost|${userId}|${bomItemId}|${batchSize}|${location}|${productionLifeYears}`,
-      () => this.bomItems.getCostSummary(bomItemId, userId, accessToken, batchSize, location, productionLifeYears),
+      () => this.costing.getCostSummary(bomItemId, userId, accessToken, batchSize, location, productionLifeYears),
     );
     return this.costSummary;
   }
@@ -561,7 +561,7 @@ export class CopilotToolRunner {
     const { bomItemId, userId, accessToken, batchSize, location, productionLifeYears } = this.ctx;
     this.routeComparison ??= this.results.get(
       `route|${userId}|${bomItemId}|${batchSize}|${location}|${productionLifeYears}`,
-      () => this.bomItems.getRouteComparison(bomItemId, userId, accessToken, batchSize, location, productionLifeYears),
+      () => this.costing.getRouteComparison(bomItemId, userId, accessToken, batchSize, location, productionLifeYears),
     );
     return this.routeComparison;
   }

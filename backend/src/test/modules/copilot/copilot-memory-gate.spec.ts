@@ -66,7 +66,7 @@ function setup() {
   ]);
   const memory = new CopilotMemoryService(db.database, new AuditService(db.database));
   const bomItems = { findOne: async () => item } as unknown as BOMItemsService;
-  const service = new CopilotService(configOf({}), bomItems, memory, {} as CostAggregationService, aiBudget(db.database, model.client));
+  const service = new CopilotService(configOf({}), bomItems, bomItems as never, memory, {} as CostAggregationService, aiBudget(db.database, model.client));
   const offered = () => model.requests.map((r) => (r.tools as Array<{ name: string }>).map((t) => t.name));
   const memoryWrites = () => db.calls.filter((c) => c.table === 'copilot_user_memory' && c.op !== 'select');
   return { service, memory, db, state, offered, memoryWrites };
@@ -136,7 +136,7 @@ describe('CopilotToolRunner.update_preferences', () => {
   it('refuses when the user did not ask, even if the model emits the call, and proposes nothing', async () => {
     const { memory, db } = setup();
     const ctx = { item, bomItemId: ITEM_ID, userId: 'u', accessToken: 't', location: 'India', conversationId: CONVERSATION, turn: 1, memoryWritesAllowed: false } as ToolContext;
-    const runner = new CopilotToolRunner(ctx, {} as BOMItemsService, memory, {} as CostAggregationService, new ResultCache());
+    const runner = new CopilotToolRunner(ctx, {} as never, memory, {} as CostAggregationService, new ResultCache());
     const outcome = await runner.run('update_preferences', { add: ['x'] });
     expect(outcome.isError).toBe(true);
     expect(outcome.memoryProposal).toBeUndefined();

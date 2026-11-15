@@ -4,7 +4,7 @@ import { DatabaseService } from '../../common/database/database.service';
 import { evaluateCalculatorFormulas } from './calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from './physics-registry';
 import { SheetMetalLookupService, normaliseLaserMaterial } from '../bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
-import { BOMItemsService } from '../bom-items/bom-items.service';
+import { BomItemCostingService } from '../bom-items/bom-item-costing.service';
 import { resolveNetUsagePhysics } from '../bom-items/costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
 import {
   CreateCalculatorDto,
@@ -34,7 +34,7 @@ export class CalculatorsServiceV2 {
     private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly sheetMetalLookup: SheetMetalLookupService,
-    private readonly bomItemsService: BOMItemsService,
+    private readonly costing: BomItemCostingService,
   ) { }
 
   /**
@@ -463,7 +463,7 @@ export class CalculatorsServiceV2 {
     } else if (physicsKey === 'sheet_metal_gross_usage_nesting') {
       // Same implementation the cost-engine path (bom-items.service.ts's
       // evaluateCalculatorFields) dispatches to -- the two can never drift.
-      rawResults = await this.bomItemsService.resolveGrossUsageForCalculator(dto.inputValues, {
+      rawResults = await this.costing.resolveGrossUsageForCalculator(dto.inputValues, {
         itemId: dto.itemId, userId, accessToken,
       });
     } else {

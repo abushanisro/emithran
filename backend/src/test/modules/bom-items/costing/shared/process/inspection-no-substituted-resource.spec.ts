@@ -86,7 +86,7 @@ describe('a CMM-tier check never borrows the inspection-bench rate', () => {
 
 describe('the removed substitutions cannot return', () => {
   const serviceSrc = readFileSync(
-    join(__dirname, '..', '..', '..', '..', '..', '..', 'modules', 'bom-items', 'bom-items.service.ts'),
+    join(__dirname, '..', '..', '..', '..', '..', '..', 'modules', 'bom-items', 'bom-item-costing.service.ts'),
     'utf8',
   );
   const engineSrc = readFileSync(

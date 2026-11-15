@@ -3,6 +3,7 @@ import { AuditService } from '../../../common/audit/audit.service';
 import { DatabaseService } from '../../../common/database/database.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { BOMItemsService } from '../bom-items.service';
+import { BomItemCostingService } from '../bom-item-costing.service';
 import { AnalysisStatusService } from './analysis-status.service';
 
 interface User {
@@ -34,6 +35,7 @@ export class RouteApplicationService {
 
   constructor(
     private readonly bomItemsService: BOMItemsService,
+    private readonly costing: BomItemCostingService,
     private readonly databaseService: DatabaseService,
     private readonly exchangeRateService: ExchangeRateService,
     private readonly audit: AuditService,
@@ -83,7 +85,7 @@ export class RouteApplicationService {
     // getRouteComparison just before its single conversion to display currency
     // (P1b-iv-c). The response itself is unchanged.
     const localOut: { routes?: RouteResultDto[]; localCurrency?: string } = {};
-    const comparison = await this.bomItemsService.getRouteComparison(
+    const comparison = await this.costing.getRouteComparison(
       id, user.id, token, dto.batchSize, location, undefined, localOut,
     );
     // The batch the route was ACTUALLY costed at — persist that, not the request.
@@ -195,7 +197,7 @@ export class RouteApplicationService {
     const location  = dto.location;
 
     // Same canonical resolution as applyRoute above — see its comment.
-    const comparison = await this.bomItemsService.getRouteComparison(
+    const comparison = await this.costing.getRouteComparison(
       id, user.id, token, dto.batchSize, location,
     );
     const batchSize = comparison.resolvedInputs.batchSize;

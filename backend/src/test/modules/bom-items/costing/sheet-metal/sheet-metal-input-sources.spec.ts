@@ -3,6 +3,7 @@ import type { CalculationTraceStep, ManufacturingPhysicsResult, SourceRef } from
 import type { CalculatorCatalogService } from '../../../../../modules/bom-items/services/calculator-catalog.service';
 import type { MHRRateInput } from '../../../../../modules/bom-items/costing/shared/core/cost-engine';
 import { BOMItemsService } from '../../../../../modules/bom-items/bom-items.service';
+import { BomItemCostingService } from '../../../../../modules/bom-items/bom-item-costing.service';
 import { SheetMetalLookupService } from '../../../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import {
   inspectionSeedRefs, laserCutSeedRefs, materialSeedRefs, pressBrakeSeedRefs, turretSeedRefs, waterjetSeedRefs,
@@ -137,7 +138,8 @@ const catalog = {
   fields: Object.values(CALCULATORS).flatMap((c) => c.fields),
 };
 
-const service = new BOMItemsService(
+const service = new BomItemCostingService(
+    new BOMItemsService({} as never, {} as never),
   DB, {} as never, {} as never, lookup, {} as never, {} as never, {} as never, {} as never,
   { loadCalculatorCatalog: async () => catalog } as unknown as CalculatorCatalogService,
   {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never,

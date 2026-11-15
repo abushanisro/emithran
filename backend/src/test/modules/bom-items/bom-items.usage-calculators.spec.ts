@@ -13,6 +13,7 @@ import type { FeatureToleranceService } from '../../../modules/bom-items/service
 import type { SheetMetalCatalogOperationsService } from '../../../modules/bom-items/costing/sheet-metal/operation/catalog-operations.service';
 import type { HydroformingReferenceService } from '../../../modules/bom-items/costing/hydroforming/hydroforming-reference.service';
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
+import { BomItemCostingService } from '../../../modules/bom-items/bom-item-costing.service';
 import { resolveNetUsagePhysics } from '../../../modules/bom-items/costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -38,7 +39,10 @@ const AREA_MM2 = (NET_WEIGHT_KG * 1e9) / (THICKNESS_MM * DENSITY_KG_M3);
 
 function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknown> = {}) {
   const cadAnalysisService = { computeTrueNest } as unknown as CADAnalysisService;
-  const service = new BOMItemsService(
+  // The item records the costing reads and writes: stubbed below.
+  const items = new BOMItemsService({} as never, {} as never);
+  const service = new BomItemCostingService(
+    items,
     {} as unknown as DatabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
@@ -66,9 +70,9 @@ function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknow
     {} as unknown as PlasticCatalogOperationsService,
     {} as unknown as HydroformingReferenceService,
   );
-  const findOneSpy = jest.spyOn(service, 'findOne')
+  const findOneSpy = jest.spyOn(items, 'findOne')
     .mockResolvedValue({ id: 'item-1', featureGraph: { summary } } as unknown as BOMItemResponseDto);
-  const updateSpy = jest.spyOn(service, 'update')
+  const updateSpy = jest.spyOn(items, 'update')
     .mockResolvedValue({} as unknown as BOMItemResponseDto);
   return { service, findOneSpy, updateSpy };
 }
@@ -130,20 +134,20 @@ describe('BOMItemsService.resolveGrossUsageForCalculator — "Sheet Metal - Gros
   it('returns the exact gap message when no itemId is bound (no calculator form field can supply a real outline)', async () => {
     const { service } = buildService(jest.fn());
     const result = await service.resolveGrossUsageForCalculator(validInputs, { userId: 'u', accessToken: 't' });
-    expect(result._gapReason).toBe(BOMItemsService.GROSS_USAGE_GAP_REASON);
+    expect(result._gapReason).toBe(BomItemCostingService.GROSS_USAGE_GAP_REASON);
   });
 
   it('returns the exact gap message when required scalar inputs are missing, without touching the BOM item at all', async () => {
     const { service, findOneSpy } = buildService(jest.fn());
     const result = await service.resolveGrossUsageForCalculator({}, { itemId: 'item-1', userId: 'u', accessToken: 't' });
-    expect(result._gapReason).toBe(BOMItemsService.GROSS_USAGE_GAP_REASON);
+    expect(result._gapReason).toBe(BomItemCostingService.GROSS_USAGE_GAP_REASON);
     expect(findOneSpy).not.toHaveBeenCalled();
   });
 
   it('returns the exact gap message when the bound item has no verified flat-pattern outline (never a rectangle-grid number under this identity)', async () => {
     const { service } = buildService(jest.fn(), {}); // no flatPatternOutlinePointsMm
     const result = await service.resolveGrossUsageForCalculator(validInputs, { itemId: 'item-1', userId: 'u', accessToken: 't' });
-    expect(result._gapReason).toBe(BOMItemsService.GROSS_USAGE_GAP_REASON);
+    expect(result._gapReason).toBe(BomItemCostingService.GROSS_USAGE_GAP_REASON);
     expect(result['Gross Weight Per Part']).toBeUndefined();
   });
 

@@ -50,7 +50,7 @@ async function run(injection: string, question: string) {
     getCostSummary: async () => ({ currency: 'USD', warnings: [injection, `Press brake: ${injection}`], processLines: [{ process: injection, machineName: injection }] }),
   } as unknown as BOMItemsService;
   const memory = new CopilotMemoryService(db.database, new AuditService(db.database));
-  const service = new CopilotService(configOf({}), bomItems, memory, {} as CostAggregationService, aiBudget(db.database, model.client));
+  const service = new CopilotService(configOf({}), bomItems, bomItems as never, memory, {} as CostAggregationService, aiBudget(db.database, model.client));
 
   const dto = { bomItemId: ITEM_ID, conversationId: CONVERSATION, turn: 1, location: 'India', messages: [{ role: 'user', content: question }] } as CopilotChatDto;
   const events: CopilotEvent[] = [];
