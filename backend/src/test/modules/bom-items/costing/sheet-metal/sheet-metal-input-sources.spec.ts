@@ -140,6 +140,7 @@ const catalog = {
 
 const service = new BomItemCostingService(
     new BOMItemsService({} as never, {} as never),
+    {} as never, {} as never, {} as never, // MachineRateService, CostOverridesService, GdtAnalysisService
     {} as never, // NestingCostService
   DB, {} as never, {} as never, lookup, {} as never, {} as never, {} as never, {} as never,
   { loadCalculatorCatalog: async () => catalog } as unknown as CalculatorCatalogService,

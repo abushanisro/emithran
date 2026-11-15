@@ -5,6 +5,7 @@ import { DatabaseService } from '../../../common/database/database.service';
 import { currentFeatureGraphVersion, MISSING_ANALYSIS_TEXT } from '../analysis-status';
 import { BOMItemsService } from '../bom-items.service';
 import { BomItemCostingService } from '../bom-item-costing.service';
+import { CostOverridesService } from './cost-overrides.service';
 import { AUTO_ROUTE_ID } from '../dto/apply-route.dto';
 import type { AppliedScenarioState, ApplyScenarioDto, ScenarioApplicationResult } from '../dto/apply-scenario.dto';
 import { MaterialCostSnapshotService } from './material-cost-snapshot.service';
@@ -48,6 +49,7 @@ export class ScenarioApplicationService {
   constructor(
     private readonly bomItems: BOMItemsService,
     private readonly costing: BomItemCostingService,
+    private readonly overrides: CostOverridesService,
     private readonly database: DatabaseService,
     private readonly materials: MaterialCostSnapshotService,
     private readonly toolingCosts: ToolingCostSnapshotService,
@@ -117,7 +119,7 @@ export class ScenarioApplicationService {
       const machineOverrides: ScenarioApplicationResult['machineOverrides'] = { saved: 0, failed: [] };
       for (const ov of request.machineOverrides ?? []) {
         try {
-          await this.costing.setMachineOverride(id, userId, token, ov.processKey, ov.mhrRecordId ?? null, request.location);
+          await this.overrides.setMachineOverride(id, userId, token, ov.processKey, ov.mhrRecordId ?? null, request.location);
           machineOverrides.saved += 1;
         } catch (e: unknown) {
           machineOverrides.failed.push({ processKey: ov.processKey, message: e instanceof Error ? e.message : String(e) });

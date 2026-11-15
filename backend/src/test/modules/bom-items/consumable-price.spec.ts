@@ -25,7 +25,7 @@ function serviceReturning(rowsByLocation: Record<string, Row>) {
     }),
   };
   const deps = Array.from({ length: 16 }, () => ({}));
-  const service = new (BomItemCostingService as any)({}, {}, db, ...deps) as BomItemCostingService;
+  const service = new (BomItemCostingService as any)({}, {}, {}, {}, {}, db, ...deps) as BomItemCostingService;
   return { service: service as any, asked };
 }
 
