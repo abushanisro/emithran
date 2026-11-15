@@ -208,6 +208,16 @@ export function selectBestAutoCandidate(
   return sorted.find((c) => c.billetVolMm3 < bboxFallbackVol) ?? null;
 }
 
+// A turned (or mill-turn) part is turned from a round bar: the lathe, fed by a bar feeder, cannot hold a billet. Its stock is the smallest
+// stocked round bar that holds the turned section, whatever a billet cut to the part's box would weigh: the milled-part guard above ("never
+// larger than the box billet") rejected the bar of a squat turned part (a 30 x 24.5 x 21 mm housing on a Ø30 bar), leaving turning without a
+// bar diameter. Null when no stocked bar is large enough; turning then names the missing bar.
+export function selectTurnedCandidate(roundBars: ScoredCandidate[]): ScoredCandidate | null {
+  const bars = roundBars.filter((c) => c.form === 'round_bar');
+  if (bars.length === 0) return null;
+  return [...bars].sort((a, b) => a.billetVolMm3 - b.billetVolMm3)[0]!;
+}
+
 // Explicit "Stock Form" override path — the user picked a specific form
 // rather than letting the score-based auto-decide choose one. Unlike
 // auto-decide, this never rejects a fitting candidate just because it's

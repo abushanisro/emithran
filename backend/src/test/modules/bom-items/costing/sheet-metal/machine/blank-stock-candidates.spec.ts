@@ -1,6 +1,6 @@
 import {
   roundBarCandidates, hexBarCandidates, rectangularBarCandidates,
-  selectBestAutoCandidate, selectForcedFormCandidate, billetFallback,
+  selectBestAutoCandidate, selectTurnedCandidate, selectForcedFormCandidate, billetFallback,
   sortedDimensions, scoreCandidate, requiredSection, squareBarCandidates, plateCandidates, preferredSizeAtLeast,
   type StockProfile, type BoundingBox,
 } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/blank-stock-candidates';
@@ -239,5 +239,31 @@ describe('square bar, plate and round tube: the reference stock forms sized from
     const tube = selectForcedFormCandidate('round_tube', [], bbox, 11274, 59.33, 69.6, 49.51, 48.9, 2.25, SIZES);
     expect(tube.form).toBe('billet');
     expect(tube.requestedFormUnavailable?.reason).toMatch(/bore through the part axis/);
+  });
+});
+
+// A turned part is turned from a round bar: the lathe (a bar feeder) cannot hold a billet. The milled-part guard "never larger than the
+// billet cut to the part's box" threw the bar away for a squat turned part, so turning and parting had no bar diameter and stayed unpriced
+// (the lead nut housing: 30 x 24.5 x 21 mm, a Ø30 bar 35 mm long is larger than its 32 x 27 x 23 billet).
+describe('selectTurnedCandidate', () => {
+  const PROFILES: StockProfile[] = [25, 30, 35, 40, 45].map((d) => ({ form: 'round_bar', size_a_mm: d, size_b_mm: null }));
+  const bbox: BoundingBox = { length: 30, width: 24.5, height: 21 };
+  const allowance = stockAllowancePerSideMm(STOCK_RULE, bbox);
+  const part = sortedDimensions(bbox);
+  const barLen = part.L + 5;
+  const { minDiam } = requiredSection(part.W, part.H, allowance, true);
+
+  it('is the smallest stocked round bar that holds the turned section, even when it is larger than the box billet', () => {
+    const bars = roundBarCandidates(PROFILES, minDiam, barLen, 5539.5);
+    const billet = billetFallback(bbox, 5539.5, allowance);
+    const chosen = selectTurnedCandidate(bars)!;
+    expect(chosen.form).toBe('round_bar');
+    expect(chosen.barDiameterMm).toBe(30);
+    expect(chosen.billetVolMm3).toBeGreaterThan(billet.billetVolMm3); // the case the milled guard rejected
+    expect(selectBestAutoCandidate(bars, bbox, allowance)).toBeNull(); // and why: that guard still holds for milled parts
+  });
+
+  it('is none when no stocked bar is large enough (turning then names the missing bar)', () => {
+    expect(selectTurnedCandidate(roundBarCandidates(PROFILES, 60, barLen, 5539.5))).toBeNull();
   });
 });
