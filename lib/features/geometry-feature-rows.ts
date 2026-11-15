@@ -56,3 +56,10 @@ export function geometryFeatureGroups(features: readonly FeatureNodeV2[]): Geome
     })),
   }));
 }
+
+/** The part's features in one line of counts, largest group first: "32 edges", "24 planar faces", "13 simple holes" ... */
+export function featureCountSummary(features: readonly FeatureNodeV2[]): string[] {
+  return geometryFeatureGroups(features)
+    .sort((a, b) => b.count - a.count)
+    .map((g) => `${g.count} ${g.label.toLowerCase()}`);
+}

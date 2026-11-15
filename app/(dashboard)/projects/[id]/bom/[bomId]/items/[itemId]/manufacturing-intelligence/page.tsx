@@ -123,7 +123,7 @@ import {
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
-import { geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
+import { featureCountSummary, featureTypeLabel, geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
 import { isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -6462,7 +6462,7 @@ function MachiningFeatureTreePanel({
                     <Chevron open={typeOpen} />
                   </button>
                   <button type="button" onClick={() => pick(typeKey)} className={cn(rowCls(selectedKey === typeKey), 'py-1')}>
-                    <span className="text-[10px] font-medium text-foreground flex-1">{g.type}</span>
+                    <span className="text-[10px] font-medium text-foreground flex-1" title={g.type}>{featureTypeLabel(g.type)}</span>
                     <span className="text-[10px] tabular-nums text-muted-foreground">{g.occurrenceCount}</span>
                   </button>
                 </div>
@@ -6728,6 +6728,11 @@ function PartDetailTab({
     if (holeCount > 0) complexityDrivers.push(`${holeCount} holes`);
     if (undraftedFaceCount > 0) complexityDrivers.push(`${undraftedFaceCount} undrafted`);
     if (ribCount > 0) complexityDrivers.push(`${ribCount} ribs`);
+  } else if (!isSM && (fg?.feature_graph_v2?.features ?? []).length > 0) {
+    // A machined or cast part: every feature type the analysis found, counted by occurrence. The summary's hole count is a sheet-metal field and
+    // counted hole sizes here, not holes.
+    complexityDrivers.push(...featureCountSummary(fg?.feature_graph_v2?.features ?? []));
+    if (threadTotal > 0) complexityDrivers.push(`${threadTotal} threads`);
   } else {
     if (holeCount > 0) complexityDrivers.push(`${holeCount} holes`);
     if (bendCount > 0) complexityDrivers.push(`${bendCount} bends`);
