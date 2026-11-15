@@ -1,4 +1,4 @@
-import { broachWidthRangeMm, splitKeywayOccurrences } from '../../../../../../modules/bom-items/costing/machining/operation/keyway-routing';
+import { broachWidthRangeMm, isClosedKeyway, splitKeywayOccurrences } from '../../../../../../modules/bom-items/costing/machining/operation/keyway-routing';
 
 // Pure function, zero DB dependency — no mocking needed or used, per this
 // project's standing rule against mocked-database spec files.
@@ -116,5 +116,47 @@ describe('a keyway no broach in the reference cuts is milled', () => {
     const r = splitKeywayOccurrences([feature(6)], range);
     expect(r.keywayCandidates).toEqual([{ lengthMm: 34, widthMm: 6, depthMm: 0.675, count: 1 }]);
     expect(r.filteredFeatures).toEqual([]);
+  });
+});
+
+describe('a keyway closed at an end is milled: a broach has to pass straight through', () => {
+  const range = { min: 1.61, max: 25.4 };
+  // Cannula Holder Left: a 5 x 15 mm recess 1 mm deep, walled all round (walled_fraction 1), on a milled part.
+  const keyway = (walled_fraction?: number) => ({ feature_type: 'Keyway', variant: 'default', occurrences: [{ length_mm: 15, width_mm: 5, depth_mm: 1, ...(walled_fraction != null ? { walled_fraction } : {}) }] });
+
+  it('open at both ends, only the two long sides are walled: 2L / (2L + 2W)', () => {
+    expect(isClosedKeyway(15, 5, 0.75)).toBe(false);      // both ends open
+    expect(isClosedKeyway(15, 5, 0.76)).toBe(false);      // within the measuring slack
+    expect(isClosedKeyway(15, 5, 0.875)).toBe(true);      // one end closed: (2L + W) / (2L + 2W)
+    expect(isClosedKeyway(15, 5, 1)).toBe(true);          // walled all round
+    expect(isClosedKeyway(100, 4, 0.97)).toBe(false);     // a long open keyway is nearly all wall, and still open
+    expect(isClosedKeyway(100, 4, 1)).toBe(true);
+  });
+
+  it('a closed keyway inside the broach width range stays a milled feature', () => {
+    const r = splitKeywayOccurrences([keyway(1)], range);
+    expect(r.keywayCandidates).toEqual([]);
+    expect(r.filteredFeatures).toEqual([keyway(1)]);
+  });
+
+  it('an open keyway of the same size is broached', () => {
+    const r = splitKeywayOccurrences([keyway(0.75)], range);
+    expect(r.keywayCandidates).toEqual([{ lengthMm: 15, widthMm: 5, depthMm: 1, count: 1 }]);
+    expect(r.filteredFeatures).toEqual([]);
+  });
+
+  it('an analysis with no wall measurement keeps the routing it had', () => {
+    expect(isClosedKeyway(15, 5, undefined)).toBe(false);
+    expect(splitKeywayOccurrences([keyway()], range).keywayCandidates).toHaveLength(1);
+  });
+
+  it('a part with one closed and one open keyway mills the first and broaches the second', () => {
+    const both = { feature_type: 'Keyway', variant: 'default', occurrences: [
+      { length_mm: 15, width_mm: 5, depth_mm: 1, walled_fraction: 1 },
+      { length_mm: 20, width_mm: 6, depth_mm: 3, walled_fraction: 0.77 },
+    ] };
+    const r = splitKeywayOccurrences([both], range);
+    expect(r.keywayCandidates).toEqual([{ lengthMm: 20, widthMm: 6, depthMm: 3, count: 1 }]);
+    expect(r.filteredFeatures).toEqual([{ ...both, occurrences: [both.occurrences[0]] }]);
   });
 });
