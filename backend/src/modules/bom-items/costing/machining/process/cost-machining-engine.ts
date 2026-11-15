@@ -1190,17 +1190,23 @@ function makeLine(
   const identity = hostClass
     ? (hostIdentity ? { processGroup: hostIdentity.processGroup, processRoute: hostIdentity.processRoute, operation: process } : undefined)
     : processIdentityByMachineClass?.[rate.machineClass];
+  // The callers time the line at the machine's hour rate (rate.rate: its direct and indirect overhead). The operators who run the machine are charged on top, for
+  // the same minutes: the machine's own labour rate times its own operator count (HR Rates). A machine with no operator count or no labour rate on file charges
+  // no labour, and missingOperatorLabourWarnings() says so; a count is never assumed.
+  const labourPerHr = rate.operators != null && rate.labourRate != null ? rate.labourRate * rate.operators : 0;
+  const setupLabour = rate.rate > 0 ? (setupCost / rate.rate) * labourPerHr : 0;
+  const runLabour = rate.rate > 0 ? (runCost / rate.rate) * labourPerHr : 0;
   return {
     process,
     ...(identity ? { processGroup: identity.processGroup, processRoute: identity.processRoute, operation: identity.operation } : {}),
     ...(hostClass ? { hostMachineClass: hostClass } : {}),
-    setupCost: r2(setupCost),
-    runCost: r2(runCost),
-    totalCost: r2(setupCost + runCost),
-    // Every machining line is timed at the machine's hour rate alone (rate.rate: its direct and indirect overhead):
-    // the cycle is all machine cost and no operator cost is charged. Stated so the cost table need not guess the split.
+    setupCost: r2(setupCost + setupLabour),
+    runCost: r2(runCost + runLabour),
+    totalCost: r2(setupCost + setupLabour + runCost + runLabour),
+    // The cycle's two parts, kept apart so the cost table need not guess the split.
     machineCostPerPart: r2(runCost),
-    laborCostPerPart: 0,
+    laborCostPerPart: r2(runLabour),
+    operators: rate.operators ?? null,
     // Four decimals (0.006 s): two decimals of a minute is 0.6 s, which turned
     // a real 2.63 s drilling cycle into a displayed 2.4 s.
     cycleTimeMin: Math.round(cycleTimeMin * 10000) / 10000,
@@ -1213,6 +1219,14 @@ function makeLine(
     setupTimeMin: setupDisclosure.setupTimeMin,
     setupTimeSource: setupDisclosure.setupTimeSource,
   };
+}
+
+/** One sentence per machine whose lines carry no operator labour because HR Rates has no operator count or no labour rate for it. */
+function missingOperatorLabourWarnings(lines: readonly ProcessLineCost[]): string[] {
+  const machines = new Set(lines
+    .filter((l) => l.rateSource === 'mhr_database' && l.totalCost > 0 && (l.operators == null || l.labourRate == null))
+    .map((l) => `${l.machineName ?? l.machineClass}: no ${l.operators == null ? 'operator count' : 'labour rate'} on file`));
+  return [...machines].map((m) => `${m}, operator labour not costed on its lines.`);
 }
 
 /**
@@ -1738,6 +1752,7 @@ export function computeMillingCostSummary(
     input.machiningCalculators, warnings, input.processIdentityByMachineClass,
   ));
 
+  warnings.push(...missingOperatorLabourWarnings(processLines));
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
   const totalCost = r2(materialCost + totalProcessCost);
   const totalMin = r2(processLines.reduce((s, l) => s + l.cycleTimeMin, 0));
@@ -2248,6 +2263,7 @@ export function computeTurningCostSummary(
     input.machiningCalculators, warnings, input.processIdentityByMachineClass,
   ));
 
+  warnings.push(...missingOperatorLabourWarnings(processLines));
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
   const totalCost = r2(materialCost + totalProcessCost);
   const totalMin = r2(processLines.reduce((s, l) => s + l.cycleTimeMin, 0));

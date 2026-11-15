@@ -2256,6 +2256,7 @@ export class BOMItemsService {
       // rate, or tapping labour would silently be uncosted.
       labourRate: primary.labourRate ?? null,
       labourRateSource: primary.labourRateSource ?? 'no_lhr_rate',
+      operators: primary.operators ?? null,
     };
   }
 
