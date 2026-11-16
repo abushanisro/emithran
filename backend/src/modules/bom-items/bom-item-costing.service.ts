@@ -5,6 +5,7 @@ import { electricityUsd, loadLocationElectricity } from './costing/shared/locati
 import { castingSourcePath } from '../sand-casting/casting-source';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
+import { liveToolHoles, liveToolingVerdict } from './costing/machining/capability/live-tooling';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
 import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
 import { PlasticCatalogOperationsService, type PlasticFeatureGraph } from './costing/plastic-molding/operation/plastic-catalog-operations.service';
@@ -7458,6 +7459,8 @@ export class BomItemCostingService {
 
 
     const threadCount = baseInput.threads.reduce((s, t) => s + t.count, 0);
+    // Cross holes and axial holes off the turning centreline: a lathe drills them only with a live tool (live-tooling.ts).
+    const liveHoles = liveToolHoles(fg?.machining_features?.features);
 
     const routes: RouteResultDto[] = machineClasses.map((mc) => {
       const routeRate = primaryRateByClass.get(mc)!;
@@ -7466,10 +7469,15 @@ export class BomItemCostingService {
         mc,
       );
       const routeCandidate = routeRate.selection?.balanced?.candidate;
-      const capability = checkMachiningCapability(
+      const envelope = checkMachiningCapability(
         mc, maxLength, maxWidth, maxHeight, finishedWeightKg,
         routeCandidate?.capability, routeCandidate?.capabilitySource,
       );
+      const liveTooling = liveToolingVerdict(liveHoles, routeCandidate?.capability, routeRate.machineName ?? this.humanizeMachineClass(mc));
+      const capability = {
+        overallCapable: envelope.overallCapable && liveTooling.capable,
+        machineCapabilityWarnings: [...envelope.machineCapabilityWarnings, ...liveTooling.warnings],
+      };
       const routeSetups = cost.setupCount ?? 1;
       return {
         routeId: mc as unknown as RouteId,

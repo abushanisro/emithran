@@ -27,6 +27,8 @@ export interface MachineCapability {
   shotCapacityGrams: number | null; // max shot weight in grams
   minMoldHeightMm: number | null;   // min daylight (mold height)
   maxMoldHeightMm: number | null;   // max daylight (mold height)
+  /** Live-tool (driven) spindle power, kW (mhr_records.live_tooling_power_kw, migration 1043): 0 = none, so no cross or off-axis hole; null = not known. */
+  liveToolingPowerKw: number | null;
 }
 
 export const EMPTY_CAPABILITY: MachineCapability = {
@@ -39,6 +41,7 @@ export const EMPTY_CAPABILITY: MachineCapability = {
   cuttableMaterials: null,
   tieBarXMm: null, tieBarYMm: null, shotCapacityGrams: null,
   minMoldHeightMm: null, maxMoldHeightMm: null,
+  liveToolingPowerKw: null,
 };
 
 interface SeedEntry {
