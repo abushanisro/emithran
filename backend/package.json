@@ -97,7 +97,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.35.3",
-    "snake-case": "^3.0.4",
+    "snake-case": "^4.0.0",
     "tesseract.js": "^7.0.0",
     "uuid": "^14.0.3",
     "winston": "^3.11.0",
