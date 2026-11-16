@@ -21,6 +21,18 @@ updates:
     ignore:
       - dependency-name: "@nestjs/*"
         update-types: ["version-update:semver-major"]
+      # @types/node describes one Node major: it follows the runtime (.nvmrc, Node 24), not the newest release. @types/node 26 on Node 24
+      # type-checks APIs Node 24 does not have, and it dropped the Array.at declaration the backend's lib setting had leaned on.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # ESM-only from these majors (uuid 12+, snake-case/camel-case 4+/5+ of change-case 5); the backend compiles to CommonJS and Jest
+      # cannot load them ("Must use import to load ES Module"). Moving the backend to ESM is the deliberate step that lifts this.
+      - dependency-name: "uuid"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "snake-case"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "camel-case"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch: { update-types: [minor, patch] }
 

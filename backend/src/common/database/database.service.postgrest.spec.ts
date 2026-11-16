@@ -12,7 +12,7 @@ const postgrest = { POSTGREST_URL: 'http://rest.internal:3000/', DB_JWT_SECRET: 
 /** What actually goes over the wire: the URL, the Authorization header, and a canned answer. */
 function captureRequests() {
   const calls: Array<{ url: string; authorization: string | null; method: string }> = [];
-  jest.spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => {
+  jest.spyOn(globalThis, 'fetch').mockImplementation((async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const headers = new Headers(init?.headers);
     calls.push({ url: String(input), authorization: headers.get('authorization'), method: init?.method ?? 'GET' });
     return new Response('[{"id":1}]', { status: 200, headers: { 'content-type': 'application/json' } });
