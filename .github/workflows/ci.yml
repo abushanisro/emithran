@@ -7,7 +7,10 @@ on:
     branches: [main, develop]
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # A push gets a group of its own commit: a group holds one running and ONE waiting run, so with a shared group a third merge in a row
+  # cancelled the waiting one (cancel-in-progress only protects the running one) and develop commits went unverified. Pull requests keep
+  # one group per branch, so a newer push still replaces an older run.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   # A newer push to a pull request makes its older run pointless, so that is cancelled. A push to main or develop is NEVER cancelled: each commit that lands there
   # keeps its own complete result (merging two pull requests in a row used to cancel the first one's 40-minute run, so no commit was ever fully verified).
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
