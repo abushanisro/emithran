@@ -1891,13 +1891,9 @@ export function RawMaterialDialog({
       {/* Calculator Side Panel */}
       <Sheet open={calculatorOpen} onOpenChange={(open) => {
         
-        // Prevent calculator from closing if lookup table is open
-        if (!open && showLookupTable) {
-          return;
-        }
-        
         if (!open) {
-          // When closing calculator, also close lookup table
+          // Its X always closes it, and its reference table with it: a guard that ignored the X while the table was open made it look
+          // dead, and the next click fell through this non-modal panel onto the dialog under it.
           setShowLookupTable(false);
           setSelectedLookupField(null);
           setLookupTableData(null);
@@ -2312,7 +2308,7 @@ export function RawMaterialDialog({
                     setSelectedLookupField(null);
                     setLookupTableData(null);
                   }}
-                  className="h-6 w-6 p-0"
+                  className="h-8 w-8 p-0"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 6 6 18"></path>
