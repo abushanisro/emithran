@@ -1386,7 +1386,8 @@ export class BOMItemsController {
       );
     }
 
-    const cadAnalysis = await cadResponse.json();
+    // The CAD engine's analysis envelope: only `success` is read here (fetch's json() is typed unknown).
+    const cadAnalysis = (await cadResponse.json()) as { success?: boolean };
     if (!cadAnalysis.success) {
       throw new BadRequestException('CAD engine analysis returned unsuccessful result');
     }

@@ -6,7 +6,7 @@ describe('createDbClient', () => {
 
   beforeEach(() => {
     calls.length = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       calls.push({ url: String(input), authorization: new Headers(init?.headers).get('authorization') });
       return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
     }) as typeof fetch;
