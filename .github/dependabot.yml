@@ -14,6 +14,16 @@ updates:
     ignore:
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 (the native Go port) has no JavaScript compiler API: scripts/check-frontend-boundary.ts uses ts.preProcessFile.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # @types/node follows the runtime (.nvmrc, Node 24), not the newest Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # react-resizable-panels 4 is a new API (PanelGroup -> Group, PanelResizeHandle -> Separator, no order prop): moving the Manufacturing
+      # Intelligence and Electronics layouts to it is a UI change to make and check on screen, not a weekly bump.
+      - dependency-name: "react-resizable-panels"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch: { update-types: [minor, patch] }
 
@@ -42,6 +52,12 @@ updates:
       # TypeScript 7 turns strict on by default: 1,390 errors across the backend (strictPropertyInitialization on every DTO, unknown in
       # catch and json()). Adopting it is a deliberate migration, not a weekly bump.
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # ESLint 10 removed FlatESLint, which the electronics import-boundary check (lint-electronics-boundary, its spec) constructs.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # jose 6 is ESM-only and dropped the KeyLike type: the backend (CommonJS) and Jest cannot load the token verifier.
+      - dependency-name: "jose"
         update-types: ["version-update:semver-major"]
     groups:
       # OpenTelemetry's stable packages are released together and sdk-node pins them to one version: one major moved alone (#564,
