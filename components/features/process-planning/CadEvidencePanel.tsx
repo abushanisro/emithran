@@ -66,7 +66,7 @@ export function CadEvidencePanel({
             <p className="text-xs text-amber-600">The CAD faces for this value were not recorded by this analysis</p>
           )}
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0" title="Close">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0" title="Close">
           <X className="h-4 w-4" />
         </Button>
       </div>
