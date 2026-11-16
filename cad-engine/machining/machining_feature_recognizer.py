@@ -321,6 +321,8 @@ class MachiningFeatureRecognizer:
                 params: Dict = {
                     "diameter_mm": diameter_mm,
                     "depth_mm": round(cyl["length"], 3),
+                    # As on a cross hole: 0 on the turning centreline (a stationary tool drills it), more off it (a live tool does).
+                    "distance_from_axis_mm": round(cyl["dist_from_axis"], 3),
                     "centroid": centroid,
                 }
                 _annotate_hole_depth(params, diameter_mm, cyl["length"])

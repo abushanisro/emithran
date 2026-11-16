@@ -307,3 +307,29 @@ def test_real_elongated_recess_open_along_one_long_side_is_a_pocket_not_a_keyway
         assert f.params["width_mm"] == 6.0
         assert f.params["width_confined"] is False
         assert f.face_ids
+
+
+# ── Distance of an axial bore from the turning axis ─────────────────────────
+# A lathe drills a hole on its centreline with a stationary tool; an axial hole off the centreline needs a live tool (C axis), like a cross
+# hole. Cross holes already carry distance_from_axis_mm; axial bores now do too, so costing can tell the two apart (backend live-tooling.ts).
+
+
+def _shaft_with_off_axis_hole(offset=8.0):
+    body = BRepPrimAPI_MakeCylinder(15.0, 40.0).Shape()
+    ax = gp_Ax2(gp_Pnt(offset, 0, 40.0), gp_Dir(0, 0, -1))
+    drill = BRepPrimAPI_MakeCylinder(ax, 2.0, 12.0).Shape()
+    return _unify(BRepAlgoAPI_Cut(body, drill).Shape())
+
+
+def test_coaxial_blind_hole_is_on_the_axis():
+    tree = _recognize(_stepped_shaft_with_holes(), "turned")
+    (blind,) = _by_type(tree, "SimpleHole", "blind")
+    assert blind.params["distance_from_axis_mm"] == 0.0
+
+
+def test_axial_hole_off_the_centreline_reports_its_distance():
+    tree = _recognize(_shaft_with_off_axis_hole(8.0), "turned")
+    holes = [f for f in _by_type(tree, "SimpleHole") if f.variant in ("blind", "through")]
+    assert len(holes) == 1
+    assert holes[0].params["diameter_mm"] == 4.0
+    assert abs(holes[0].params["distance_from_axis_mm"] - 8.0) < 0.01
