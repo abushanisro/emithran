@@ -106,5 +106,12 @@ describe('a push to a long-lived branch is never cancelled', () => {
       expect(text).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
       expect(text).not.toMatch(/cancel-in-progress: true/);
     });
+
+    // A concurrency group holds one running and ONE waiting run: with one group per branch, a third merge in a row cancelled the waiting
+    // run whatever cancel-in-progress said, and develop commits went unverified. A push gets a group of its own commit.
+    it(`${file} gives every push its own concurrency group (its commit), so a later merge cannot cancel a waiting run`, () => {
+      const text = read(`.github/workflows/${file}`);
+      expect(text).toMatch(/group: [a-z]+-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event_name == 'pull_request' && github\.ref \|\| github\.sha \}\}/);
+    });
   }
 });
