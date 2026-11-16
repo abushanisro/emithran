@@ -65,7 +65,7 @@ const BASE_COLUMNS =
   'id, machine_name, commodity_code, process_group, machine_class, ' +
   'total_machine_hour_rate, manual_mhr_value, fully_burdened_local_per_hr, ' +
   'capacity_utilization_rate, operators, usd_lhr_total, ' +
-  'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg, setup_time_hr, ' +
+  'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg, setup_time_hr, machine_power_kw, ' +
   'cut_to_length_cycle_const_s, cut_to_length_cycle_mass_coeff_s_per_kg, cut_to_length_cut_speed_s, ' +
   'number_spindles, drum_index_time_s, transfer_time_s, stock_feed_time_s, speed_synchronization_time_s, ' +
   // The two components the canonical MHR is DEFINED as (migration 581:
@@ -129,6 +129,7 @@ interface RawMachineRow {
   stock_feed_time_s?: number | string | null;
   speed_synchronization_time_s?: number | string | null;
   setup_time_hr?: number | string | null;
+  machine_power_kw?: number | string | null;
   direct_overhead_rate?: number | string | null;
   indirect_overhead_rate?: number | string | null;
   // Capability columns — absent until migration 324 runs
@@ -458,6 +459,7 @@ export async function fetchMachinePool(
       stockFeedTimeS: num(raw.stock_feed_time_s),
       speedSynchronizationTimeS: num(raw.speed_synchronization_time_s),
       setupTimeHr: num(raw.setup_time_hr),
+      machinePowerKw: num(raw.machine_power_kw),
       directOverheadRate: num(raw.direct_overhead_rate),
       indirectOverheadRate: num(raw.indirect_overhead_rate),
     });
@@ -1122,6 +1124,7 @@ function makeNoMachineCandidate(cls: MachineClass): MachineCandidate {
     stockFeedTimeS: null,
     speedSynchronizationTimeS: null,
     setupTimeHr: null,
+    machinePowerKw: null,
     directOverheadRate: null,
     indirectOverheadRate: null,
   };

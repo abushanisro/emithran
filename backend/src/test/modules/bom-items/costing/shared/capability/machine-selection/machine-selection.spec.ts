@@ -71,6 +71,7 @@ function candidate(overrides: {
     stockFeedTimeS: null,
     speedSynchronizationTimeS: null,
     setupTimeHr: null,
+    machinePowerKw: null,
   directOverheadRate: null,
   indirectOverheadRate: null,
   };

@@ -193,7 +193,7 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v61"  # bumped 2026-11-14: (38) a machining pocket / slot / keyway is a floor with a wall rising
+    CACHE_VERSION = "geo_v62"  # bumped 2026-11-16: (39) detect_part_family() needs a turned outer diameter (turned_od_count, shared.machining_geometry.turned_diameter_count) for turned / mill_turn: a block whose holes share one axis (R_M-0230-032 lead nut housing) was mill_turn, now milled. Prior: geo_v61 bumped 2026-11-14: (38) a machining pocket / slot / keyway is a floor with a wall rising
     # from it (machining/recessed_floor.py): rib tops, boss tops and hole bottoms are no longer pockets; its occurrence
     # carries the measured depth_mm, walled_fraction and width_confined, and material_removed_mm3 is floor area x depth.
     # Previous: geo_v60, 2026-11-14: (37) machining feature_graph_v2 occurrences carry tool_axis /
@@ -602,6 +602,14 @@ class AdvancedCADMemoryOptimizer:
                 thin_wall_ratio = round(_tight_frac * (1.0 - _area_ratio), 3)
             except Exception as e:
                 logger.warning(f"[mfg_intel] thin_wall_ratio computation failed: {e}")
+            # The part's turned outer diameters: a lathe turns about one; a block whose holes merely share an axis has none
+            # (shared.machining_geometry.turned_diameter_count). None when it could not be measured: the classifier then does not use it.
+            try:
+                from shared.machining_geometry import turned_diameter_count  # type: ignore
+                turned_od_count = turned_diameter_count(shape)
+            except Exception as e:
+                logger.warning(f"[mfg_intel] turned_od_count computation failed: {e}")
+                turned_od_count = None
             detected_family, family_confidence, classification_reasons = detect_part_family(
                 dims_list,
                 holes.get('count', 0),
@@ -617,6 +625,7 @@ class AdvancedCADMemoryOptimizer:
                 # yet (see InjectionMoldedFeatureExtractor docstring); the gate falls
                 # back to pocket_count when draft isn't available.
                 volume_mm3=volume_mm3,
+                turned_od_count=turned_od_count,
             )
 
             # ── Post-classification SMF cross-check ───────────────────────────
@@ -746,6 +755,7 @@ class AdvancedCADMemoryOptimizer:
                     'rotational_face_ratio':  round(rotational_face_ratio, 3),
                     'secondary_features_count': secondary_features_count,
                     'large_cyl_count':        large_cyl_count,
+                    'turned_od_count':        turned_od_count,
                     'pocket_count':           pocket_count,
                     'thin_wall_ratio':        thin_wall_ratio,
                     'classification_version': 'v6',

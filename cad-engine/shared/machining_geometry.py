@@ -545,3 +545,42 @@ def collect_cylinders(
         exp.Next()
 
     return results
+
+
+def dominant_cylinder_axis(shape) -> Optional[Tuple[float, float, float]]:
+    """
+    The part's dominant cylinder axis: each cylindrical face votes for its axis direction (count, not radius, weighted; near-parallel axes
+    snap to one key), the plurality wins. None when the part has no cylindrical face. The machining recognizer's turning axis.
+    """
+    from OCC.Core.GeomAbs import GeomAbs_Cylinder  # type: ignore
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+    from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+    from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
+
+    votes: Dict[Tuple[float, float, float], int] = {}
+    exp = TopExp_Explorer(shape, TopAbs_FACE)
+    while exp.More():
+        surf = BRepAdaptor_Surface(exp.Current())
+        if surf.GetType() == GeomAbs_Cylinder:
+            d = surf.Cylinder().Axis().Direction()
+            key = (round(abs(d.X()), 2), round(abs(d.Y()), 2), round(abs(d.Z()), 2))
+            votes[key] = votes.get(key, 0) + 1
+        exp.Next()
+    if not votes:
+        return None
+    return max(votes, key=lambda k: votes[k])
+
+
+def turned_diameter_count(shape) -> Optional[int]:
+    """
+    The part's turned outer diameters: convex cylindrical faces on its dominant axis (collect_cylinders' external_diameter). A lathe turns
+    a part about such a surface; a part with none (a block whose only round faces are holes and corner rounds) is not turned, however many
+    of its holes share one axis. The family classifier's evidence that a part is turned (component_feature_analyzer.detect_part_family).
+
+    None when the part has no analytic cylinder to find its axis by (an export that writes every face as a B-spline): not measured, so the
+    classifier does not use it, rather than reading a turned part as having no diameter.
+    """
+    axis = dominant_cylinder_axis(shape)
+    if axis is None:
+        return None
+    return sum(1 for c in collect_cylinders(shape, axis, part_bounding_box(shape)) if c["kind"] == "external_diameter")

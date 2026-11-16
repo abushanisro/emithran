@@ -6,6 +6,8 @@ import { castingSourcePath } from '../sand-casting/casting-source';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { liveToolHoles, liveToolingVerdict } from './costing/machining/capability/live-tooling';
+import { applySustainabilityFactors } from './costing/shared/physics/sustainability';
+import { gridCarbonFactor, materialCarbonFactor, stockOf } from './costing/shared/physics/carbon-factors';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
 import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
 import { PlasticCatalogOperationsService, type PlasticFeatureGraph } from './costing/plastic-molding/operation/plastic-catalog-operations.service';
@@ -86,7 +88,7 @@ import { getProcessLabelForClass, getEnginesForFamily, getRouteCoreProcessClasse
 import { computePressBrakeCost } from './costing/sheet-metal/process/press-brake-engine';
 import { resolveEffectiveSheetThicknessMm, resolveScenarioFxSnapshot, resolveScenarioStockForm, resolveScenarioCavityCount } from './costing/shared/physics/scenario-overrides';
 import { resolveCostingInputs } from './costing/shared/physics/costing-inputs';
-import type { CostSummaryDto, CostSummaryResponseDto, ProcessLineCost, FeatureOp, CostStatus } from './dto/cost-breakdown.dto';
+import type { CostSummaryDto, CostSummaryResponseDto, ProcessLineCost, FeatureOp, CostStatus, SustainabilitySummaryDto } from './dto/cost-breakdown.dto';
 import type { BlankSpecDto } from './dto/blank-spec.dto';
 import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candidate-route.dto';
 import type { RouteComparisonDto, RouteComparisonResponseDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
@@ -1677,8 +1679,31 @@ export class BomItemCostingService {
   ): Promise<CostSummaryResponseDto> {
     const dto = await this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears);
     const item = await this.items.findOne(id, userId, accessToken);
-    const sec = await this.resolveSecondaryOperations(item, dto.resolvedInputs.location ?? requestedLocation, dto.resolvedInputs.batchSize, accessToken, dto.toUsdRate ?? 1);
-    return { ...appendLines(dto, sec.lines), secondaryOperations: sec.dto };
+    const location = dto.resolvedInputs.location ?? requestedLocation;
+    const sec = await this.resolveSecondaryOperations(item, location, dto.resolvedInputs.batchSize, accessToken, dto.toUsdRate ?? 1);
+    const summary = appendLines(dto, sec.lines);
+    return { ...summary, ...(await this.realSustainability(summary, location, accessToken)), secondaryOperations: sec.dto };
+  }
+
+  /**
+   * The sustainability panel from real factors (sustainability.ts), over every line the summary prices (secondary operations included):
+   * the location's grid, the material class's embodied carbon (sustainability-factors.constants.ts, published sources) and each line's own
+   * machine power (mhr_records.machine_power_kw). The engines' weights, scrap and waste are kept. Before this the panel used India's grid
+   * for every location, 2 kg CO2e/kg for any grade not spelt as a short code (aluminium included), and 4 kW for any class not in a table.
+   */
+  private async realSustainability(summary: { sustainability?: SustainabilitySummaryDto; processLines: ProcessLineCost[]; materialGrade: string; family: string; resolvedInputs: { batchSize: number } }, location: string, accessToken: string) {
+    if (!summary.sustainability) return {};
+    const pool = await fetchMachinePool(this.databaseService.getClient(accessToken), location);
+    const power = new Map(pool.map((c) => [`${c.machineClass}|${c.machineName}`, c.machinePowerKw]));
+    return {
+      sustainability: applySustainabilityFactors(summary.sustainability, summary.processLines, {
+        grid: gridCarbonFactor(location),
+        material: materialCarbonFactor(summary.materialGrade),
+        machinePowerKw: (l) => power.get(`${l.machineClass}|${l.machineName ?? ''}`) ?? null,
+        stock: stockOf(summary.family),
+        batchSize: summary.resolvedInputs.batchSize,
+      }),
+    };
   }
 
   /** The design-for-casting checks of a sand-cast item's casting analysis. */

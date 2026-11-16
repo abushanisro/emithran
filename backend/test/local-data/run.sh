@@ -70,7 +70,9 @@ INSERT INTO public.calculators (id, name, is_global) VALUES
 CREATE TABLE public.raw_materials (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name varchar(255) NOT NULL, cut_code decimal(10,2));
 INSERT INTO public.raw_materials (name) VALUES ('Generic Nylon, Type 11 40% Glass');
 -- the machine table (00_stubs.sql has it), plus the columns migration 981 reads and writes: a Black Oxide machine with no labor rate, and two machines of its wage grade that agree on one
-ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN usd_labor_rate_per_hr numeric, ADD COLUMN usd_lhr_total numeric;
+-- machine_name (migration 130) and updated_at as the real database has them: migration 1043 matches each turning machine by class and name
+ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN usd_labor_rate_per_hr numeric, ADD COLUMN usd_lhr_total numeric,
+  ADD COLUMN machine_name varchar(255), ADD COLUMN updated_at timestamptz;
 INSERT INTO public.mhr_records (machine_class, location, usd_labor_rate_per_hr, usd_lhr_total) VALUES
   ('surface_black_oxide', 'USA', NULL, NULL), ('surface_oven_cure', 'USA', 29.95, 29.95), ('surface_shot_blast', 'USA', 29.95, 29.95);
 -- the material cost record table as the real database has it (migration 040): migration 1041 adds the stock label to it
