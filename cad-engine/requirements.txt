@@ -26,7 +26,7 @@ pydantic==2.10.4
 # Every upload the engine receives is parsed by it, so it tracks the advisory
 # fixes: 0.0.31 closes all 8 open ones (arbitrary file write, header/preamble
 # DoS, querystring CPU DoS, parameter smuggling, negative Content-Length).
-python-multipart==0.0.32
+python-multipart==0.0.33
 
 # Telemetry (shared/telemetry.py): off unless OTEL_EXPORTER_OTLP_ENDPOINT is set. The SDK and API move together;
 # the FastAPI instrumentation is the matching 0.x (beta) release of the same train.
