@@ -8,6 +8,12 @@ updates:
     directory: /
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
+    # ESLint 10 removed SourceCode#getTokenOrCommentAfter, which eslint-plugin-import (2.32, peer eslint up to ^9) calls: every lint
+    # crashed. ESLint 10 also brought minimatch 10.2.6 (GHSA-g3hv-75wg-m249); 9.x uses minimatch 3, outside the advisory. Lift this when
+    # eslint-plugin-import supports ESLint 10.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch: { update-types: [minor, patch] }
 
