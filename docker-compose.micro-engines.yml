@@ -16,7 +16,7 @@ services:
         limits: { cpus: '1', memory: 200M, pids: 512 }
 
   cad-proxy:
-    image: alpine/socat:1.8.0.3
+    image: alpine/socat:1.8.1.1
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
@@ -32,7 +32,7 @@ services:
         limits: { cpus: '0.25', memory: 16M, pids: 64 }
 
   ecad-proxy:
-    image: alpine/socat:1.8.0.3
+    image: alpine/socat:1.8.1.1
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
