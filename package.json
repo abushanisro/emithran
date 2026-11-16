@@ -51,7 +51,7 @@
     "date-fns": "^3.6.0",
     "dxf-viewer": "1.0.50",
     "exceljs": "4.4.0",
-    "framer-motion": "^12.23.26",
+    "framer-motion": "^14.13.0",
     "html2canvas": "^1.4.1",
     "jspdf": "4.2.1",
     "jspdf-autotable": "^5.0.9",
