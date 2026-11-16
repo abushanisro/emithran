@@ -54,7 +54,7 @@ services:
 
   storage:
     <<: *data-hardened
-    image: chrislusf/seaweedfs@sha256:c2658820e763294a9e9de7b36c81e59b879e3459148351aee4e31a126ca64860
+    image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     # The image's seaweed user (uid 1000) owns the data volume; started as it, the entrypoint needs no root and no capabilities.
     user: "1000:1000"
     command: ["server", "-s3", "-dir=/data", "-ip.bind=0.0.0.0"]

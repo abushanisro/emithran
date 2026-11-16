@@ -38,7 +38,7 @@ services:
     ports: ["127.0.0.1:${LOCAL_API_PORT:-3001}:3000"]
 
   storage:
-    image: chrislusf/seaweedfs@sha256:c2658820e763294a9e9de7b36c81e59b879e3459148351aee4e31a126ca64860
+    image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     restart: unless-stopped
     command: ["server", "-s3", "-s3.config=/s3.json", "-dir=/data"]
     ports: ["127.0.0.1:${LOCAL_S3_PORT:-8333}:8333"]
