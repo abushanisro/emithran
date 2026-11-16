@@ -59,7 +59,7 @@ const CAPABILITY_COLUMNS =
   'max_thickness_ms_mm, max_thickness_ss_mm, max_thickness_al_mm, max_thickness_cu_mm, ' +
   'cuttable_materials, availability_status, next_available_at, scheduled_load_pct, ' +
   'maintenance_window_start, maintenance_window_end, ' +
-  'tie_bar_x_mm, tie_bar_y_mm, shot_capacity_grams, min_mold_height_mm, max_mold_height_mm';
+  'tie_bar_x_mm, tie_bar_y_mm, shot_capacity_grams, min_mold_height_mm, max_mold_height_mm, live_tooling_power_kw';
 
 const BASE_COLUMNS =
   'id, machine_name, commodity_code, process_group, machine_class, ' +
@@ -159,6 +159,7 @@ interface RawMachineRow {
   shot_capacity_grams?: number | string | null;
   min_mold_height_mm?: number | string | null;
   max_mold_height_mm?: number | string | null;
+  live_tooling_power_kw?: number | string | null;
 }
 
 function num(v: number | string | null | undefined): number | null {
@@ -293,6 +294,16 @@ function hydrateCapability(row: RawMachineRow, cls: MachineClass): {
   capability: MachineCapability;
   source: 'imported' | 'seed' | 'default_class';
 } {
+  // The machine's own live-tool spindle (migration 1043) goes with whichever limits it ends up with: it is a fact of the machine, not one of
+  // the envelope limits below, so it neither makes a record "staged" nor is replaced by a seed or a class default.
+  const limits = hydrateCapabilityLimits(row, cls);
+  return { ...limits, capability: { ...limits.capability, liveToolingPowerKw: num(row.live_tooling_power_kw) } };
+}
+
+function hydrateCapabilityLimits(row: RawMachineRow, cls: MachineClass): {
+  capability: MachineCapability;
+  source: 'imported' | 'seed' | 'default_class';
+} {
   const db: MachineCapability = {
     maxXMm: num(row.max_x_mm),
     maxYMm: num(row.max_y_mm),
@@ -313,6 +324,7 @@ function hydrateCapability(row: RawMachineRow, cls: MachineClass): {
     shotCapacityGrams: num(row.shot_capacity_grams),
     minMoldHeightMm: num(row.min_mold_height_mm),
     maxMoldHeightMm: num(row.max_mold_height_mm),
+    liveToolingPowerKw: null,
   };
 
   const hasDbCapability = Object.entries(db).some(([k, v]) => k !== 'cuttableMaterials' && v != null);
