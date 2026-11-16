@@ -73,6 +73,9 @@ export interface MachineCandidate {
   // the way Sheet Metal classes do — real setup_time_hr genuinely IS a
   // fixed per-machine value for these). null when not set for this machine.
   setupTimeHr: number | null;
+  /** mhr_records.machine_power_kw: the machine's power draw, kW (the HR Rates engine's electricity input). Its energy per part in the
+   *  sustainability panel is this x the line's cycle time. null when not on file. */
+  machinePowerKw: number | null;
   /**
    * The two components the canonical Machine Hour Rate is DEFINED as
    * (migration 581: MHR = Direct Overhead Rate + Indirect Overhead Rate,

@@ -31,6 +31,7 @@ def detect_part_family(
     thin_wall_ratio: float = 0.0,
     draft_face_ratio: float = 0.0,
     volume_mm3: float = 0.0,
+    turned_od_count: Optional[int] = None,
 ) -> Tuple[str, float, List[str]]:
     """
     Heuristic family classification from bounding-box geometry + cylindrical face signals.
@@ -79,6 +80,11 @@ def detect_part_family(
       bosses produces several close-but-distinct thin bins (nominal wall, rib walls, boss
       walls — all thin, none identical). High thin_wall_ratio with no single dominant bin is
       evidence for plastic_molded, not sheet_metal.
+
+    turned_od_count: the part's turned outer diameters (shared.machining_geometry.turned_diameter_count): convex cylindrical faces on
+      its dominant axis. A part a lathe turns has at least one. 0 rules out turned and mill_turn: the rotational signals below
+      (circularity is the bounding box's mid/max ratio, alignment and face ratio count hole walls too) also fire on a block whose holes
+      share one axis, the R_M-0230-032 lead nut housing. None = not measured: the rotational gates apply as before.
 
     draft_face_ratio: fraction of "vertical" walls (relative to the shortest bbox axis, the
       likely mold pull direction) sitting at a small non-zero angle (roughly 0.3°–5°) off
@@ -269,9 +275,12 @@ def detect_part_family(
     # Disc / flange / ring (lens holders, pulleys, bearing races):
     # rotational_face_ratio > 0.30 guards against round milled housings / pipe manifolds
     # where a few through-holes make cyl_axis_alignment look high.
+    # A lathe turns a part about an outer diameter: none measured, none of the rotational gates below applies (turned_od_count).
+    no_turned_od = turned_od_count == 0
     if (circularity > 0.80
             and cyl_axis_alignment > 0.60
-            and rotational_face_ratio > 0.30):
+            and rotational_face_ratio > 0.30
+            and not no_turned_od):
         reasons = [
             f"Circular cross-section (circularity={circularity:.2f} > 0.80)",
             f"Most cylindrical faces share a common axis (alignment={cyl_axis_alignment:.2f} > 0.60)",
@@ -285,7 +294,7 @@ def detect_part_family(
         else:
             candidates.append((TURNED, 0.80, reasons))
 
-    if elongation > 2.5 and flatness > 0.20:
+    if elongation > 2.5 and flatness > 0.20 and not no_turned_od:
         reasons = [
             f"Elongated geometry (elongation={elongation:.2f} > 2.5)",
             f"Not flat (flatness={flatness:.2f} > 0.20)",
@@ -346,13 +355,16 @@ def detect_part_family(
             reasons.append(f"Elevated pocket count ({pocket_count}) consistent with ribs/bosses")
         candidates.append((PLASTIC_MOLDED, round(confidence, 3), reasons))
 
-    candidates.append((MILLED, 0.65, [
+    milled_reasons = [
         f"No strong rotational or sheet-metal signal "
         f"(flatness={flatness:.2f}, elongation={elongation:.2f}, "
         f"circularity={circularity:.2f}, "
         f"cyl_alignment={cyl_axis_alignment:.2f}, "
         f"rot_ratio={rotational_face_ratio:.2f})",
-    ]))
+    ]
+    if no_turned_od:
+        milled_reasons.append("no turned outer diameter: no convex cylindrical face on the part's axis, so a lathe has nothing to turn")
+    candidates.append((MILLED, 0.65, milled_reasons))
 
     # ── Highest-scoring family wins ─────────────────────────────────────────
     # milled's catch-all above always contributes a candidate, so this

@@ -895,38 +895,11 @@ class MachiningFeatureRecognizer:
     # ── OCC collection helpers ────────────────────────────────────────────────
 
     def _dominant_cylinder_axis(self, shape) -> Tuple[float, float, float]:
-        """
-        Returns the dominant cylinder axis as a normalized unit vector.
-        Votes are cast by each cylindrical face; the plurality wins.
-        Falls back to (0, 0, 1) if the shape has no cylindrical faces.
-        """
-        from OCC.Core.GeomAbs import GeomAbs_Cylinder  # type: ignore
-        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
-        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
-        from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
-
-        # Count-based voting (not radius-weighted) to match memory_optimizer.py's
-        # _compute_cyl_signals, which correctly classifies this family.
-        # Radius-weighted voting is biased toward fewer large features and can
-        # mis-elect a perpendicular axis when many small bores dominate by count.
-        votes: Dict[Tuple[float, float, float], int] = {}
-        exp = TopExp_Explorer(shape, TopAbs_FACE)
-        while exp.More():
-            surf = BRepAdaptor_Surface(exp.Current())
-            if surf.GetType() == GeomAbs_Cylinder:
-                d = surf.Cylinder().Axis().Direction()
-                # Snap to 2-decimal grid so near-parallel axes collapse to same key
-                key = (round(abs(d.X()), 2), round(abs(d.Y()), 2), round(abs(d.Z()), 2))
-                votes[key] = votes.get(key, 0) + 1
-            exp.Next()
-
-        if not votes:
-            return (0.0, 0.0, 1.0)
-        dominant = max(votes, key=lambda k: votes[k])
-        logger.info(
-            f"[machining_features] dominant_axis={dominant} votes={votes[dominant]}/{sum(votes.values())}"
-        )
-        return dominant
+        """The dominant cylinder axis (shared.machining_geometry.dominant_cylinder_axis); (0, 0, 1) when the part has no cylinder."""
+        from shared.machining_geometry import dominant_cylinder_axis
+        axis = dominant_cylinder_axis(shape)
+        logger.info(f"[machining_features] dominant_axis={axis}")
+        return axis if axis is not None else (0.0, 0.0, 1.0)
 
     def _collect_cylinders(
         self,

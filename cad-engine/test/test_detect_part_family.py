@@ -313,3 +313,35 @@ def test_large_cylinder_ratio_veto_fires_just_over_50_percent():
         pocket_count=0,
     )
     assert family != "sheet_metal"
+
+
+# ── A turned part has a turned outer diameter ──────────────────────────────
+# R_M-0230-032 lead nut housing (local database, classification signals): a prismatic aluminium block, 30 x 24.5 x 21 mm, with rounded
+# corners, a Ø20 bore, a Ø16 counterbore and 8 Ø8 holes all along one axis. The bounding box's mid/max ratio (0.82) and the shared axis of
+# those holes read as "rotational", and it was classed mill_turn at 0.75; it has no outer surface a lathe could turn.
+LEAD_NUT = dict(
+    bbox_dims=[30.0, 24.5, 21.0], hole_count=17, secondary_features_count=5,
+    cyl_axis_alignment=0.773, rotational_face_ratio=0.45, planar_face_fraction=0.40, total_face_count=60,
+    large_cyl_count=2, pocket_count=0, volume_mm3=5539.5,
+)
+
+
+def test_a_block_with_no_turned_outer_diameter_is_milled_not_mill_turn():
+    family, _, reasons = detect_part_family(**LEAD_NUT, turned_od_count=0)
+    assert family == "milled"
+    assert any("no turned outer diameter" in r for r in reasons)
+
+
+def test_the_same_signals_with_a_turned_outer_diameter_stay_mill_turn():
+    family, _, _ = detect_part_family(**LEAD_NUT, turned_od_count=1)
+    assert family == "mill_turn"
+
+
+def test_an_elongated_bar_with_no_turned_outer_diameter_is_milled():
+    family, _, _ = detect_part_family(bbox_dims=[25.0, 30.0, 100.0], hole_count=0, secondary_features_count=0, turned_od_count=0)
+    assert family == "milled"
+
+
+def test_not_measured_keeps_the_rotational_gates_as_they_were():
+    family, _, _ = detect_part_family(**LEAD_NUT)
+    assert family == "mill_turn"
