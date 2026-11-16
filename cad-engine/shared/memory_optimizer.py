@@ -193,7 +193,7 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v62"  # bumped 2026-11-16: (39) detect_part_family() needs a turned outer diameter (turned_od_count, shared.machining_geometry.turned_diameter_count) for turned / mill_turn: a block whose holes share one axis (R_M-0230-032 lead nut housing) was mill_turn, now milled. Prior: geo_v61 bumped 2026-11-14: (38) a machining pocket / slot / keyway is a floor with a wall rising
+    CACHE_VERSION = "geo_v63"  # bumped 2026-11-16: (40) axial bores carry distance_from_axis_mm (as cross holes do), for the backend's live-tooling check. Prior: geo_v62 bumped 2026-11-16: (39) detect_part_family() needs a turned outer diameter (turned_od_count, shared.machining_geometry.turned_diameter_count) for turned / mill_turn: a block whose holes share one axis (R_M-0230-032 lead nut housing) was mill_turn, now milled. Prior: geo_v61 bumped 2026-11-14: (38) a machining pocket / slot / keyway is a floor with a wall rising
     # from it (machining/recessed_floor.py): rib tops, boss tops and hole bottoms are no longer pockets; its occurrence
     # carries the measured depth_mm, walled_fraction and width_confined, and material_removed_mm3 is floor area x depth.
     # Previous: geo_v60, 2026-11-14: (37) machining feature_graph_v2 occurrences carry tool_axis /
