@@ -307,3 +307,46 @@ def test_real_elongated_recess_open_along_one_long_side_is_a_pocket_not_a_keyway
         assert f.params["width_mm"] == 6.0
         assert f.params["width_confined"] is False
         assert f.face_ids
+
+
+# ── Turned outer diameters, the signal the family classifier needs ──────────
+from shared.machining_geometry import turned_diameter_count  # noqa: E402
+
+
+def _rounded_block_with_coaxial_bores():
+    """A 30 x 30 x 30 block with rounded vertical edges, a Ø20 through bore and a Ø8 hole beside it, all along Z: holes along one axis,
+    no outer surface to turn (the lead nut housing's shape in miniature)."""
+    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet
+    from OCC.Core.TopExp import TopExp_Explorer
+    from OCC.Core.TopAbs import TopAbs_EDGE
+    from OCC.Core.TopoDS import topods
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+    from OCC.Core.GeomAbs import GeomAbs_Line
+    box = BRepPrimAPI_MakeBox(gp_Pnt(-15, -15, 0), 30.0, 30.0, 30.0).Shape()
+    fillet = BRepFilletAPI_MakeFillet(box)
+    exp = TopExp_Explorer(box, TopAbs_EDGE)
+    while exp.More():
+        e = topods.Edge(exp.Current())
+        c = BRepAdaptor_Curve(e)
+        if c.GetType() == GeomAbs_Line and abs(c.Line().Direction().Z()) > 0.99:
+            fillet.Add(3.0, e)
+        exp.Next()
+    body = fillet.Shape()
+    body = BRepAlgoAPI_Cut(body, BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), 10.0, 32.0).Shape()).Shape()
+    body = BRepAlgoAPI_Cut(body, BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(11, 11, 10), gp_Dir(0, 0, 1)), 2.0, 21.0).Shape()).Shape()
+    return _unify(body)
+
+
+def test_a_rounded_block_with_coaxial_bores_has_no_turned_diameter():
+    assert turned_diameter_count(_rounded_block_with_coaxial_bores()) == 0
+
+
+def test_a_stepped_shaft_has_its_turned_diameters():
+    assert turned_diameter_count(_stepped_shaft_with_holes()) >= 2
+
+
+def test_a_part_with_no_cylinder_to_find_its_axis_by_is_not_measured():
+    # A plain box has no cylindrical face: its axis is unknown, so the count is None (not used), never 0 (which would rule out turning).
+    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox
+    assert turned_diameter_count(BRepPrimAPI_MakeBox(10.0, 20.0, 30.0).Shape()) is None
