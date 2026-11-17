@@ -54,7 +54,8 @@ export function buildPowderMetalCostSummary(input: {
     materialCost: r2(materialCost),
     materialGrade: input.materialGrade ?? 'Unknown',
     grossWeightKg: r3(grossKg),
-    materialCostPerKg: input.materialCostPerKg,
+    // The price per kg the route charged (the powder, in the location's currency); the material resolution's own price is not in it.
+    materialCostPerKg: route ? route.material.costPerKgUsd : input.materialCostPerKg,
     materialSource: input.materialSource,
     processLines,
     totalProcessCost: r2(totalProcessCost),
@@ -62,7 +63,7 @@ export function buildPowderMetalCostSummary(input: {
     cycleTimes: { laserMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: r3(processLines.reduce((s, l) => s + l.cycleTimeMin, 0)) },
     batchSize: input.batchSize,
     family: 'powder_metal',
-    sustainability: computeSustainability(input.materialGrade, input.materialCostPerKg, netKg, grossKg, input.batchSize, processLines),
+    sustainability: computeSustainability(input.materialGrade, route ? route.material.costPerKgUsd : input.materialCostPerKg, netKg, grossKg, input.batchSize, processLines),
     warnings: warnings.filter(Boolean),
     ratesSource: input.ratesSource,
     ...(Object.keys(calculatorRuns).length ? { calculatorRuns } : {}),

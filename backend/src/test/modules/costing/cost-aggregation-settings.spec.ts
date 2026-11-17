@@ -1,6 +1,7 @@
 import { CostAggregationService, readSellingPriceSettings } from '../../../modules/costing/cost-aggregation.service';
 import type { DatabaseService } from '../../../common/database/database.service';
 import type { Logger } from '../../../common/logger/logger.service';
+import type { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 
 const logger = { log: () => undefined, warn: () => undefined, error: () => undefined } as unknown as Logger;
 
@@ -20,7 +21,7 @@ function serviceWith(settings: { data: unknown; error: unknown }, tables: Record
     getPrivilegedClient: () => ({ from: () => query(settings) }),
     getUserClient: () => ({ from: (table: string) => query(tables[table] ?? { data: [], error: null }) }),
   } as unknown as DatabaseService;
-  return new CostAggregationService(db, logger);
+  return new CostAggregationService(db, logger, { getSnapshot: async () => ({ toUsd: (v: number) => v }) } as unknown as ExchangeRateService);
 }
 
 describe('readSellingPriceSettings', () => {

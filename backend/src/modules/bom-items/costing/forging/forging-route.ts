@@ -139,7 +139,8 @@ export interface ForgingRoute {
   flash: { thicknessMm: number; widthMm: number; volumeMm3: number } | null;
   /** Route lines in order, costs per part in USD. */
   lines: ProcessLineCost[];
-  material: { netKg: number; forgedKg: number; boughtKg: number; yieldPct: number; costUsd: number; runs: Record<string, ReferenceCalcRun> };
+  /** The bar bought for one part: its cost (USD, unrounded: a cents-rounded USD cost loses ~1% once converted) and its price per kg. */
+  material: { netKg: number; forgedKg: number; boughtKg: number; yieldPct: number; costUsd: number; costPerKgUsd: number; runs: Record<string, ReferenceCalcRun> };
   tooling: { dieSets: number; finishDieUsd: number; trimDieUsd: number; toolingCostUsd: number; perPartUsd: number; run: ReferenceCalcRun } | null;
   /** Material + process lines + tooling per part (USD); null while a line is a gap. */
   totalUsd: number | null;
@@ -397,7 +398,7 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
       key: args.key, label: labelOf(args.key), complexity, barDiameterMm: args.mult.bar, multLengthMm: r2(args.mult.multLength),
       heating: args.mult.induction ? 'induction' : 'furnace', hits: args.hits, forming: { ...args.forming, value: r2(args.forming.value) },
       trimForceKn: args.trimForceKn != null ? r2(args.trimForceKn) : null, flash: args.flash, lines,
-      material: { netKg: r4(netKg), forgedKg: r4(args.forgedKg), boughtKg: r4(boughtKg), yieldPct: r2((100 * netKg) / boughtKg), costUsd: r2(materialCost), runs: { ...args.runs, stock: args.mult.stock.run } },
+      material: { netKg: r4(netKg), forgedKg: r4(args.forgedKg), boughtKg: r4(boughtKg), yieldPct: r2((100 * netKg) / boughtKg), costUsd: materialCost, costPerKgUsd: materialCost / boughtKg, runs: { ...args.runs, stock: args.mult.stock.run } },
       tooling, totalUsd: complete ? r2(materialCost + lines.reduce((s, l) => s + l.totalCost, 0) + toolingPerPart) : null, complete, warnings,
     });
   };
@@ -615,7 +616,9 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
  */
 export function chooseForgingRoute(routes: readonly ForgingRoute[], gaps: readonly ForgingRouteGap[], chosen: ForgingRouteKey | null): { route: ForgingRoute | null; note: string | null } {
   if (routes.length === 0) return { route: null, note: null };
-  const money = (n: number) => n.toFixed(2);
+  // Route totals are USD per part (material, process and dies), the currency the routes are built in: said so, since this note is shown
+  // as it is beside a quote in any currency.
+  const money = (n: number) => `${n.toFixed(2)} USD`;
   const said = (r: ForgingRoute) => (r.complete ? `${r.label} ${money(r.totalUsd!)}` : `${r.label} incomplete (${r.lines.filter(isGap).map((l) => l.process).join(', ')})`);
   const others = (pick: ForgingRoute) => [...routes.filter((r) => r !== pick).map(said), ...gaps.map((g) => `${g.label} not a route for this part (${g.reason})`)].join('; ');
   const user = chosen ? routes.find((r) => r.key === chosen) : undefined;
@@ -624,5 +627,6 @@ export function chooseForgingRoute(routes: readonly ForgingRoute[], gaps: readon
   const pick = complete[0] ?? [...routes].sort((a, b) => a.lines.filter(isGap).length - b.lines.filter(isGap).length)[0]!;
   const why = complete[0] ? 'the cheapest complete forging route (material, process and dies per part)' : 'no forging route is complete: the one with the fewest gaps';
   const pre = chosen && !user ? `The Cost Guide's ${labelOf(chosen)} is not a route for this part. ` : '';
-  return { route: pick, note: `${pre}Forging: ${pick.label} is quoted, ${why}. ${others(pick)}.` };
+  const own = pick.complete ? ` (${money(pick.totalUsd!)} per part)` : '';
+  return { route: pick, note: `${pre}Forging: ${pick.label} is quoted${own}, ${why}. ${others(pick)}.` };
 }

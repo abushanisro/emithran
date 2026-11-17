@@ -1,7 +1,8 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { DatabaseService } from '../../common/database/database.service';
-import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
+import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { PERSISTED_PROCESS_COST_COLUMNS, processCostRowsInUsd, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
 
 export interface CostDriver {
   label: string;
@@ -95,6 +96,7 @@ export class CostAggregationService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   async computeBomItemCost(bomItemId: string, accessToken?: string): Promise<BomItemCostDto> {
@@ -127,7 +129,7 @@ export class CostAggregationService {
         .eq('is_active', true),
       client
         .from('process_cost_records')
-        .select(`op_nbr, operation, process_group, process_route, machine_name, machine_class, labor_type, location, mhr_id, lhr_id, feature_type, ${PERSISTED_PROCESS_COST_COLUMNS}`)
+        .select(`op_nbr, operation, process_group, process_route, machine_name, machine_class, labor_type, location, mhr_id, lhr_id, feature_type, organization_id, currency, ${PERSISTED_PROCESS_COST_COLUMNS}`)
         .eq('bom_item_id', bomItemId)
         .eq('is_active', true)
         .order('op_nbr', { ascending: true }),
@@ -218,7 +220,9 @@ export class CostAggregationService {
     // with the re-derivation by more than 1%. The shared resolver reads the
     // stored value and falls back to this exact formula only for rows that have
     // none, so no legacy total moves.
-    const processLines: ProcessLine[] = (processRows ?? []).map(r => {
+    // In USD like every other table of the report: a route applied in a non-USD factory is stored in that factory's currency.
+    const processRowsUsd = await processCostRowsInUsd(processRows ?? [], (org) => this.exchangeRateService.getSnapshot(accessToken ?? null, org));
+    const processLines: ProcessLine[] = processRowsUsd.map(r => {
       const { totalCostPerPart, setupCostPerPart, cycleCostPerPart } = resolvePersistedProcessCost(r);
 
       return {

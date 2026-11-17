@@ -215,10 +215,9 @@ export class RateResolutionService {
     const requirements = physics?.requirements ?? {};
     const overrides = physics?.overrides ?? new Map<string, string>();
     const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
-    // mhr_records.total_machine_hour_rate is stored in the location own
-    // currency; usd_lhr_total is USD. Labour is converted so the two can be
-    // added on one line — they were previously summed unconverted, which is
-    // only correct for USD locations.
+    // HR Rates holds every machine in USD, whatever its location (machine hour
+    // rate and labour alike): mhrRateFromCandidate converts both to the
+    // location's currency, so the two are added on one line in one currency.
     const usdToLocal = fxRates.convertStrict('USD', localCurrencyCode);
 
     const get = (cls: MachineClass): MHRRateInput => {

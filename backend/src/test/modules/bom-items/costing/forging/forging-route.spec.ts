@@ -277,9 +277,13 @@ describe('forging: what it refuses, the part and the summary', () => {
   it('the summary carries the quoted route, every option, the dies as tooling, and the route to apply', () => {
     const { routes, gaps } = routesOf();
     const { route, note } = chooseForgingRoute(routes, gaps, 'closed_die_press');
-    const s = buildForgingCostSummary({ forging: { route, routes, gaps, note, missing: [], warnings: [] }, materialGrade: 'Steel, AISI 4140, Medium-Carbon', materialCostPerKg: 0.968, materialSource: 'db', batchSize: 1000, warnings: [], ratesSource: 'test' });
+    const s = buildForgingCostSummary({ forging: { route, routes, gaps, note, missing: [], warnings: [] }, materialGrade: 'Steel, AISI 4140, Medium-Carbon', materialCostPerKg: 99, materialSource: 'db', batchSize: 1000, warnings: [], ratesSource: 'test' });
     expect(s.family).toBe('forged');
-    expect(s.materialCost).toBe(route!.material.costUsd);
+    // The price per kg is the one the route charged for the bar (round_bar_unit_cost 0.968), not the material resolution's (99 here): the
+    // material record is written from it and the charged mass, and gives the material cost.
+    expect(s.materialCostPerKg).toBeCloseTo(0.968, 6);
+    expect(s.materialCostPerKg * s.castingMetal!.chargedKg).toBeCloseTo(s.materialCost, 2);
+    expect(s.materialCost).toBeCloseTo(route!.material.costUsd, 2);
     expect(s.castingMetal).toEqual({ partKg: route!.material.netKg, chargedKg: route!.material.boughtKg });
     expect(s.forging).toMatchObject({ route: 'closed_die_press', complexity: 7, complete: true });
     expect(s.forging!.options.map((o) => o.route).sort()).toEqual([...routes.map((r) => r.key), ...gaps.map((g) => g.key)].sort());
