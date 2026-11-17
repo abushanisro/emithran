@@ -47,7 +47,7 @@ import { PartDetailsSheet } from '@/components/features/manufacturing-intelligen
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
 import { routeMachineDrift } from '@/lib/costing/applied-route';
 import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
-import { formatCycleMin, formatCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
+import { formatCycleMin, storableCycleSec } from '@/lib/costing/format-cycle';
 import { featureInstances, machiningCostDrivers, operationCosts, type FeatureInstance, type PricedLine } from '@/lib/features/machining-feature-detail';
 import { buildApplyScenarioRequest } from '@/lib/scenario/build-apply-request';
 import { useAnalysisStatus } from '@/lib/api/hooks/useAnalysisStatus';
@@ -89,18 +89,16 @@ import { moldingRouteSelectability } from '@/lib/routing/molding-route-selectabi
 import { PartSummaryTab } from '@/components/features/manufacturing-intelligence/PartSummaryTab';
 import { DesignGuidanceTab as PartDesignGuidance } from '@/components/features/manufacturing-intelligence/DesignGuidanceTab';
 import { PlasticDfmFindings } from '@/components/features/manufacturing-intelligence/PlasticDfmFindings';
-import { isSupersededPlasticCheck, isSupersededPlasticWarning, plasticDfmReadiness } from '@/lib/dfm/plastic-superseded';
+import { isSupersededPlasticCheck, isSupersededPlasticWarning } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, type PlasticDfmView, usePlasticDfm, useMachiningDfm } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, usePlasticDfm, useMachiningDfm } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
 import { groupDieCastFeatures, occurrenceProperties } from '@/lib/features/die-casting-feature-tree';
-import { sheetMetalOperationNodes, type OperationTreeNode } from '@/lib/features/sheet-metal-operation-nodes';
-import { gdtCalloutNodes } from '@/lib/features/gdt-callout-nodes';
 import { drawingCadConsistencyNodes } from '@/lib/features/drawing-cad-consistency-nodes';
 import { effectiveProcessGroupOf , optionsKeepingSelection } from '@/lib/processCatalog/hr-rates-process-selection';
 import { useFactoryCurrency, useFactories, useCurrencies, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
@@ -116,15 +114,15 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // "Secondary" tab/panel has been removed, not the underlying data or the
 // real costing engine it reads (secondary-process.service.ts's compute(),
 // also used by NRE and by the drawing-callout surface-treatment auto-cost).
-import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/api/hooks/useSecondaryProcesses';
+import { useSecondaryProcesses, useNre } from '@/lib/api/hooks/useSecondaryProcesses';
 import {
-  familyToProcessGroupLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
+  processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import { featureCountSummary, featureTypeLabel, geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
-import { isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
+import { isMachiningTreeFamily } from '@/lib/features/process-tree-family';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
@@ -137,95 +135,23 @@ import { useCreateProcessCost, useUpdateProcessCost, useDeleteProcessCost, usePr
 import { usePackagingLogisticsCosts } from '@/lib/api/hooks/usePackagingLogisticsCosts';
 import { useProcuredPartsCosts } from '@/lib/api/hooks/useProcuredPartsCosts';
 import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
-import { isBend, isBlankProfile, isExtrudedHole, isPlainHole, type FeatureGraphEntryLike } from '@/lib/features/feature-graph';
+import { isBend, isExtrudedHole, isPlainHole, type FeatureGraphEntryLike } from '@/lib/features/feature-graph';
 import { cutLengthHighlight } from '@/lib/features/cut-length-highlight';
 import { CadEvidencePanel, type CadEvidence } from '@/components/features/process-planning/CadEvidencePanel';
-import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, DFMSeverity, HoleGroup, HoleGroupLocation, FeatureNodeV2, FaceMapEntry, DFMScoresResponse } from '@/lib/types/manufacturing';
+import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, HoleGroup, FeatureNodeV2, DFMScoresResponse } from '@/lib/types/manufacturing';
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { useAuth } from '@/lib/providers/auth-context';
+import type { PanelId, ManualRouteOption, AddProcessRequest } from '@/lib/features/mi-page-types';
+import { fmt, materialLabel, splitMaterialDisplay, fmtInt, formatCell, machineDisplayLabel, familyLabel, confidenceCls, formatEstCycleTime, money } from '@/lib/features/display-format';
+import { type ProcessTreeNode, resolveDisplayFamily, resolveProcessGroupLabel, collectLeaves, findNode, buildProcessTree } from '@/lib/features/process-tree';
+import { resolveFeatureOpHighlight, mergeFeaturesToHL, type OperationVisual, computeOperationVisual, computeFeatureNodeVisual, getVizLabel } from '@/lib/features/operation-highlight';
+import { normalizeFeatureGraph, buildSummary } from '@/lib/features/feature-graph-normalize';
+import { costedGrade, partProcessGroup, appliedRouteIsStale, lastApplyError, deriveReadiness, buildRiskFlags } from '@/lib/features/part-status';
+import { IM_MACHINE_CLASSES, cuttingMachineClassesFromRoutes, cuttingMachineClassToRouteId, orderingWarnings } from '@/lib/features/route-machine-classes';
+import { type FeatureMetadata, severityClass, buildFeatureMetadata } from '@/lib/features/feature-metadata';
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-type PanelId = 'left' | 'center' | 'right' | 'process' | 'drivers';
-
-interface ManualRouteOption {
-  id: string;
-  label: string;
-  complexityLevel: 'simple' | 'standard' | 'complex';
-  isRecommended: boolean;
-  processes: string[];
-  rationale: string;
-  // Real machine picks made in the Workflow Builder (page.tsx's
-  // RouteSelectionDialog) — applied via useMachineOverride AFTER apply-route
-  // creates the process_cost_records rows, since machine-override updates an
-  // existing row rather than creating one.
-  machineOverrides?: { processKey: string; mhrRecordId: string }[];
-  // Exact identity of a dynamically-assembled (Workflow Builder) route, so
-  // reopening the dialog to EDIT this same route restores exactly what's
-  // applied instead of resetting to the CAD-optimal default. `processes`
-  // above is cosmetic-label-only and `id` is a synthetic `custom-<timestamp>`
-  // — neither can round-trip back to a real cuttingRouteId ('sm-laser' etc.)
-  // or the real additional-step identities, so this is tracked separately.
-  dynamicCuttingRouteId?: string;
-  dynamicSteps?: { process: string; machineClass: string; isReal: boolean; processGroup?: string; processRoute?: string }[];
-  // The cutting route's OWN process line (e.g. "Turret Punching") — tracked
-  // separately from dynamicSteps ("additional steps" only, deliberately, so
-  // the Workflow Builder's cutting-method selector and its additional-steps
-  // list don't show it twice). apply-custom-route writes ONLY what's in its
-  // `steps` payload — it does NOT implicitly add baseCuttingRouteId's own
-  // cutting line — so this must be prepended at the call site, or the
-  // cutting operation is silently missing from every applied route.
-  dynamicCuttingStep?: { process: string; machineClass: string };
-  // A die-casting process (High Pressure / Gravity Die Casting) picked in the
-  // Workflow Builder: committed as the scenario's dieCastingProcess so the
-  // Cost Summary quotes it, and its route (directApplyRouteId) is applied like
-  // any complete route, so the Cost tab lists its lines.
-  dieCastingProcess?: string;
-  // A real, already-valid apply-route.dto.ts routeId (e.g. one of the 3 real
-  // Injection Molding tonnage tiers) to apply directly via the plain
-  // applyRoute mutation — for a family whose real routes are already
-  // complete, self-contained multi-line quotes (no separate cutting +
-  // additional-steps composition the way Sheet Metal's dynamic path needs).
-  // Distinct from dynamicCuttingRouteId (Sheet Metal's composed-route
-  // identity) — this is the real id itself, sourced straight from the backend's own
-  // route-comparison result, never a second hand-kept mapping table.
-  directApplyRouteId?: string;
-}
-
-interface ProcessTreeNode {
-  id: string;
-  kind: 'part' | 'group' | 'operation' | 'feature';
-  label: string;
-  // The process an operation node stands for when its label is decorated
-  // (e.g. "Melting — unresolved"): what vendor matching searches by.
-  processName?: string;
-  factory?: string;
-  machine?: string;
-  children?: ProcessTreeNode[];
-  attrs?: { name: string; value: string }[];
-  source?: string;
-  // Set on hole-diameter-group feature nodes ("Ø1.6 × 24") so
-  // computeFeatureNodeVisual can match this row to its v2Features occurrences
-  // for highlighting — matching by diameter, not by parsing the display label.
-  holeDiameterMm?: number;
-  // Set on CNC canonical-operation feature nodes (built from real
-  // feature_graph_v2 entries carrying a backend-attached canonical_operation —
-  // see canonical-operation.ts) so a click can highlight the exact matching
-  // feature_graph_v2 entry by id instead of re-deriving a match by label/diameter.
-  v2FeatureId?: string;
-  // Machining catalog-type nodes: the exact feature_graph_v2 ids they group.
-  v2FeatureIds?: string[];
-  // Sand casting's analysis features: each instance's faces on the 3D model (face_map face_ids), found
-  // by the backend from the worker's face keys (casting-face-bridge.ts). They are not feature_graph_v2
-  // entries, so v2FeatureIds cannot highlight them.
-  faceOccurrences?: number[][];
-  // Exact occurrences (feature_graph_v2 entry id + occurrence index) — one
-  // machined instance of an entry, not every occurrence of it.
-  v2Occurrences?: { featureId: string; occurrenceIndex: number }[];
-  // A process that acts on the whole part surface (cleaning, NDT, packaging).
-  wholePart?: boolean;
-}
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -237,59 +163,6 @@ interface ProcessTreeNode {
 // an operation now comes from that operation's own cost line (featureBreakdown
 // + its featureIds) or from real CAD/drawing extraction, and a step with
 // neither says so instead of showing a stand-in.
-
-// Cast alloys that can never run a laser + press-brake route, however flat the
-// geometry looks (ALBC bronze plate ≙ sheet steel to the geometric classifier).
-// Mirrors backend isSheetFormableMaterial — keep the keyword lists in sync.
-const NON_SHEET_FORMABLE_RE = /BRONZE|ALBC|AL\.?\s?BR|CU\s?AL|C9[0-5]\d|GUNMETAL|LG[124]\b|CAST\s?IRON|FG\s?\d{3}|SG\s?IRON|EN-?GJ/i;
-function isSheetFormableMaterial(materialText: string): boolean {
-  if (materialText.trim().length === 0) return true; // unknown → don't veto
-  return !NON_SHEET_FORMABLE_RE.test(materialText);
-}
-
-// Family for routing/display: geometric classification with the material veto
-// applied. Single source of truth — every consumer of classification.family on
-// this page must go through here or a bronze plate gets a press-brake route.
-// The grade a part is costed on, by the backend precedence (bom-items.service
-// getCostSummary): the Material Grade, else the material picked at Create BOM.
-function costedGrade(item: { materialGrade?: string | null; material?: string | null }): string {
-  return item.materialGrade ?? item.material ?? '';
-}
-
-function resolveDisplayFamily(
-  item: { materialGrade?: string | null; material?: string | null },
-  fg: { classification?: { family?: string | null } } | null,
-): string {
-  // '' = the CAD engine did not classify this part. Never defaulted to
-  // 'milled': that showed every unanalysed/unclassified part as Machining.
-  const family = fg?.classification?.family ?? '';
-  if (family !== 'sheet_metal') return family;
-  return isSheetFormableMaterial(`${item.materialGrade ?? ''} ${item.material ?? ''}`)
-    ? family
-    : 'milled';
-}
-
-// CATEGORY-level label (the umbrella domain a CAD family belongs to — matches
-// process_taxonomy.process_group, migration 733). 'Plastic Molding' covers
-// all 4 real sibling processes (Injection/Compression/Reaction Injection/
-// Structural Foam Molding) — deliberately different from familyLabel()'s
-// 'Injection Moulded' below, which names the SPECIFIC process. Both are
-// correct at their own grain; do not "fix" one to match the other.
-// The part's process group for the Manufacturing Process tree: the Process
-// the user chose (Create/Edit BOM Item or Cost Guide, persisted as
-// scenario_overrides.processGroup), else the analysed family mapped through
-// the one shared family->group table (lib/features/process-group.ts).
-// Replaces a third hand-kept copy of that table here, which keyed die casting
-// as 'casting' (never a CAD family) and turned parts as 'Turning' (no such
-// process_group) — so every die-cast part showed "Unclassified".
-function resolveProcessGroupLabel(
-  item: { scenarioOverrides?: Record<string, unknown> | null },
-  family: string,
-): string {
-  const chosen = item.scenarioOverrides?.processGroup;
-  if (typeof chosen === 'string' && chosen) return chosen;
-  return familyToProcessGroupLabel(family) ?? 'Unclassified';
-}
 
 // ── Validation tab types & constants ──────────────────────────────────────────
 type SolverType = 'fea_plastic_elastic' | 'fea_elastic_only' | 'geometric_unfolding';
@@ -334,77 +207,6 @@ type RightTabKey = (typeof RIGHT_TABS)[number]['key'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function fmt(n: number | undefined | null, d = 1): string {
-  if (n == null || isNaN(n)) return '—';
-  return n.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
-}
-// A bare grade/temper fragment ("T6 - Round Bar", "HAZ Weldable Sheet") means
-// nothing on its own — "T6" applies to many unrelated aluminum alloys. Prefix
-// the material name so the saved/displayed value is unambiguous, unless the
-// grade string already names the material (e.g. "AA6061-T6" already says
-// aluminum) — avoids "Aluminum AA6061-T6 Aluminum".
-function materialLabel(material: string, materialGrade?: string | null): string {
-  if (!materialGrade) return material;
-  const g = materialGrade.toLowerCase();
-  const m = material.toLowerCase();
-  if (g.includes(m) || m.includes(g)) return materialGrade;
-  return `${material} ${materialGrade}`;
-}
-// Display-only Material/Grade split for the Material Database table.
-// Root-caused live (2026-09-17): the "Generic ..." Digital Factory material
-// family (memory/database/Raw_Material_Database_june.json, 509 real rows)
-// was seeded with material_grade = NULL for every row — the full real name
-// (e.g. "Generic Aluminum - Honeycomb (Expanded 1)") lives in the `material`
-// column alone. This never touches m.material/m.materialGrade themselves
-// (search, alias matching, and apply-to-BOM below all keep using the real,
-// unmodified pair) — it only decides how these two columns present an
-// already-real name when materialGrade is genuinely absent.
-// Verified directly against all 509 real rows: 220 use ", " as a real
-// Material/Grade separator, 23 use " - ". The remaining ~266 (including
-// "Generic Aluminum Bronze" — a real, distinct alloy family, not "Aluminum"
-// with grade "Bronze" — and single-product names like "Generic Accura 60")
-// have no real separator; inventing one for those would fabricate a grade
-// that doesn't exist in the source data, so they correctly keep showing
-// the full name in Material with Grade as "—", same as before this split.
-function splitMaterialDisplay(
-  material: string,
-  materialGrade?: string | null,
-): { material: string; grade: string | null } {
-  if (materialGrade) return { material, grade: materialGrade };
-  const commaIdx = material.indexOf(',');
-  if (commaIdx > 0) {
-    return { material: material.slice(0, commaIdx).trim(), grade: material.slice(commaIdx + 1).trim() || null };
-  }
-  const dashMatch = /^(.+?)\s+-\s+(.+)$/.exec(material);
-  if (dashMatch) {
-    // Both groups are mandatory (non-optional) in the regex above, so they
-    // are always present whenever dashMatch itself is truthy.
-    return { material: dashMatch[1]!.trim(), grade: dashMatch[2]!.trim() || null };
-  }
-  return { material, grade: null };
-}
-function fmtInt(n: number | undefined | null): string {
-  if (n == null || isNaN(n)) return '—';
-  return n.toLocaleString('en-IN');
-}
-// A real ~5s operation (e.g. a short cut path + a handful of pierces) rounds
-// to "0.0 min" at 1-decimal-place minutes, indistinguishable from unset/zero.
-// Show sub-minute durations in seconds instead.
-// A lookup-table cell for display: numbers/strings as-is, objects as JSON, empty as a dash.
-function formatCell(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—';
-  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
-}
-
-// Never substitute the process route/group for a missing machine name — that
-// silently displays the process as if it were the machine (e.g. "Laser Cutting"
-// shown where a real machine like "Trumpf 3030" belongs). Say what's actually true.
-function machineDisplayLabel(proc: { machineName?: string | null; mhrId?: string | null }): string {
-  if (proc.machineName) return proc.machineName;
-  if (proc.mhrId) return 'Machine name unavailable';
-  return 'Manual rate — not linked to a machine';
-}
 // Process › Category › Operation for a saved process row, read only from the
 // database: the HR Rates machine the line is linked to (the machine that
 // actually does the work) first, then the row's own saved catalog values
@@ -438,62 +240,6 @@ function ProcessHierarchyLabel({ proc }: {
       })}
     </>
   );
-}
-// Maps one FeatureBreakdown row to the 3D-viewer highlight it represents, so
-// clicking "Bend R1mm x2" shows exactly those 2 bends (not every bend in the
-// part), "Pierces x19"/pierce cleanup shows all pierced holes, and cut-path/
-// edge-length rows (no discrete feature — the cut path runs around the whole
-// part) show the full model outline via the face map. Returns null when there's
-// nothing to highlight (feature graph not loaded, or an unrecognized type),
-// which the caller uses to disable the row rather than showing a dead click.
-function resolveFeatureOpHighlight(
-  op: { name: string; featureType: string; featureIds?: string[] | undefined },
-  v2Features: FeatureNodeV2[],
-  faceMap: FaceMapEntry[],
-): FeatureNodeV2 | null {
-  if (op.featureType === 'bend') {
-    const bendFeatures = v2Features.filter(isBend);
-    const m = /R([\d.]+)mm/.exec(op.name);
-    if (m) {
-      const bucket = parseFloat(m[1]!);
-      const matched = bendFeatures.filter((f) => Math.round((f.radius_mm ?? 0) * 2) / 2 === bucket);
-      if (matched.length) return mergeFeaturesToHL(`fb_bend_r${bucket}`, matched);
-    }
-    return mergeFeaturesToHL('fb_bend_all', bendFeatures);
-  }
-  if (op.featureType === 'pierce' || op.featureType === 'deburr_pierce') {
-    return mergeFeaturesToHL('fb_holes', v2Features.filter(isPlainHole));
-  }
-  if (op.featureType === 'pem_insertion') {
-    // buildPemFeatureBreakdown (bom-items.service.ts) names each row
-    // "<part spec> x<count> (ØXmm, Ys/insertion)" — extract the diameter and
-    // match holes at that diameter (0.3mm tolerance, same as the backend's
-    // own sm_lookup_pem_hardware match tolerance in getPemMatches), same
-    // bucket-matching pattern as bend/radius above. The feature graph has no
-    // separate "this hole is a PEM insertion point" tag, so diameter is the
-    // real, available signal — not a guess.
-    const holeFeatures = v2Features.filter(isPlainHole);
-    const m = /Ø([\d.]+)mm/.exec(op.name);
-    if (m) {
-      const dia = parseFloat(m[1]!);
-      const matched = holeFeatures.filter((f) => Math.abs((f.diameter_mm ?? 0) - dia) < 0.3);
-      if (matched.length) return mergeFeaturesToHL(`fb_pem_d${dia}`, matched);
-    }
-    return mergeFeaturesToHL('fb_pem_all', holeFeatures);
-  }
-  if (op.featureType === 'laser_cut' || op.featureType === 'deburr_edge') {
-    return buildFullModelHL('fb_outline', faceMap);
-  }
-  // Machining: the backend names the exact feature_graph_v2 entries each
-  // operation machines (FeatureOp.featureIds, from the sequencer), so the
-  // highlight is exactly those occurrences — never every feature of a type,
-  // and never a diameter parsed back out of the display label.
-  if (op.featureIds?.length) {
-    const ids = new Set(op.featureIds);
-    const matched = v2Features.filter((f) => ids.has(f.id));
-    if (matched.length) return mergeFeaturesToHL(`fb_${op.featureIds.join('_')}`, matched);
-  }
-  return null;
 }
 
 // eMithran-style per-feature sub-operation list (cut path, pierces, bends...) —
@@ -546,85 +292,6 @@ function FeatureBreakdown({
     </div>
   );
 }
-// SPECIFIC-process label (the CAD family's own detected process, one level
-// finer than resolveProcessGroupLabel's category above — 'Injection Moulded'
-// here is deliberately narrower than the 'Plastic Molding' process group;
-// the CAD classifier itself has no sub-classification
-// among Injection/Compression/RIM/Structural Foam Molding yet, so this
-// always reads 'Injection Moulded' for the plastic_molded family today).
-function familyLabel(f: string): string {
-  const m: Record<string, string> = {
-    sheet_metal: 'Sheet Metal', milled: 'Milled', turned: 'Turned',
-    mill_turn: 'Mill-Turn', plastic_molded: 'Injection Moulded',
-    casting: 'Casting', forging: 'Forging',
-    extrusion: 'Extrusion', weldment: 'Weldment', additive: 'Additive',
-  };
-  if (!f) return '—';
-  return m[f] ?? f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-function confidenceCls(c: number): string {
-  if (c >= 0.85) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-  if (c >= 0.65) return 'text-amber-700 bg-amber-50 border-amber-200';
-  return 'text-red-700 bg-red-50 border-red-200';
-}
-// TODO: Remove after all BOM items are migrated to feature_graph_version >= 4
-function normalizeFeatureGraph(raw: FeatureGraph | null): FeatureGraph | null {
-  if (!raw?.summary) return raw;
-  const summary = raw.summary;
-
-  // Rebuild holeGroups for old DB entries that have holeDiameters but no holeGroups.
-  // NaN→null serialization bug in old pipeline left holeGroups: [] with diameter_mm: null entries.
-  const validGroups = (summary.holeGroups ?? []).filter(
-    (g): g is { diameter_mm: number; count: number } =>
-      typeof g.diameter_mm === 'number' && isFinite(g.diameter_mm) && g.diameter_mm > 0 && g.count > 0,
-  );
-  let holeGroups = validGroups;
-
-  if (holeGroups.length === 0 && (summary.holeDiameters ?? []).length > 0) {
-    const acc: Record<string, number> = {};
-    for (const d of summary.holeDiameters!) {
-      if (typeof d === 'number' && isFinite(d) && d > 0) {
-        const k = d.toFixed(1);
-        acc[k] = (acc[k] ?? 0) + 1;
-      }
-    }
-    holeGroups = Object.entries(acc)
-      .map(([k, count]) => ({ id: `hole_d${k}_c${count}`, diameter_mm: parseFloat(k), count, geometry_refs: { faces: [], edges: [] } }))
-      .sort((a, b) => a.diameter_mm - b.diameter_mm);
-  }
-
-  if (holeGroups === validGroups) return raw;
-  return { ...raw, summary: { ...summary, holeGroups } };
-}
-
-function buildSummary(item: BOMItem, fg: import('@/lib/types/manufacturing').FeatureGraph | null): FeatureGraphSummary {
-  return {
-    bendCount: item.bendCount ?? 0,
-    cutLengthMm: item.cutLengthMm ?? 0,
-    holeCount: item.holeCount ?? 0,
-    sheetThicknessMm: item.sheetThicknessMm ?? 0,
-    slotCount: 0,
-    pierceCount: item.pierceCount ?? 0,
-    flatPatternAreaMm2: item.flatPatternAreaMm2 ?? 0,
-    holeDiameters: fg?.summary?.holeDiameters ?? [],
-    holeGroups: fg?.summary?.holeGroups ?? [],
-    bendRadii: fg?.summary?.bendRadii ?? [],
-  };
-}
-function collectLeaves(node: ProcessTreeNode): ProcessTreeNode[] {
-  if (!node.children?.length) return node.kind === 'feature' ? [node] : [];
-  return node.children.flatMap(collectLeaves);
-}
-function findNode(node: ProcessTreeNode, id: string): ProcessTreeNode | null {
-  if (node.id === id) return node;
-  for (const c of node.children ?? []) { const f = findNode(c, id); if (f) return f; }
-  return null;
-}
-
-function formatEstCycleTime(sec: number | null, allocated = false): string {
-  if (sec == null || !Number.isFinite(sec)) return 'unavailable';
-  return allocated ? `≈${formatCycleSec(sec)}` : formatCycleSec(sec);
-}
 
 // tappingCandidateCount was here — a Ø<=6mm-holes-in-thin-sheet heuristic that
 // claimed to be the "single source of truth for does this part need X", shared
@@ -636,513 +303,7 @@ function formatEstCycleTime(sec: number | null, allocated = false): string {
 
 // ── buildProcessTree ───────────────────────────────────────────────────────────
 
-function buildProcessTree(
-  item: BOMItem,
-  fg: FeatureGraph | null,
-  summary: FeatureGraphSummary,
-  factory: string,
-  overrideProcesses?: string[],
-  cost?: CostSummaryDto | null,
-  materialDensityGcm3?: number | null,
-  procRecords?: { opNbr?: number; category?: string; operation?: string; processGroup?: string; machineName?: string; machineClass?: string | null; isActive?: boolean }[] | null,
-  secondaryLines?: SecondaryProcessLine[] | null,
-): ProcessTreeNode {
-  const family = resolveDisplayFamily(item, fg);
-  const groupLabel = resolveProcessGroupLabel(item, family);
-  // The process list is the APPLIED (or explicitly chosen) route, else the
-  // cad-engine's own recommendations. Nothing is added to either.
-  //
-  // autoCompleteRoute used to augment whichever list arrived here, inventing
-  // steps that were never applied and never recommended: an unconditional
-  // "Fiber Laser Cutting" whenever no cutting process was present — a routing
-  // decision the backend's route comparison exists to make — plus unconditional
-  // Deburring and Inspection, and a Tapping step gated on its own heuristic
-  // ("small holes in thin sheet") rather than on real thread features. That gate
-  // disagreed with the backend, which requires threads.length > 0: confirmed
-  // live, a part with NO thread features showed "Tapping / As Tapped / Potential
-  // tapping features" in this tree while the costed route correctly had no
-  // tapping at all. Two definitions of the same route, and this one was not the
-  // one being quoted.
-  // Real, confirmed live gap (2026-09-11): an injection-molded part with real,
-  // manually-added Direct Process Costs (Mold Setup/Injection/Packing/Cooling/
-  // Ejection/Inspections — all real cost.processLines) still showed a
-  // completely empty Process Step tree (only the top-level part row, zero
-  // operation children) — because fg?.processRecommendations is a Sheet-Metal-
-  // shaped, cad-engine-computed recommendation list that is never populated
-  // for this family, and no route had been explicitly applied/recommended
-  // (overrideProcesses unset) even though real costed process lines already
-  // existed. The exact same "cost lines as a real, already-computed process
-  // list" fallback already exists elsewhere on this page (the Part/Complexity
-  // summary card's routeFromCost) — reused here rather than reinvented, so the
-  // tree reflects what was actually costed instead of showing nothing.
-  const overrideRecs = overrideProcesses?.map((p) => ({ process: p, estimated_time_sec: null as number | null }));
-  const fgRecs = fg?.processRecommendations;
-  // Real, confirmed live gap (2026-09-11): once no route was ever "applied"
-  // (only individual rows added via Add Process), this used to fall straight
-  // through to `costRecs` below — the cost ENGINE's own hypothetical
-  // recompute of every step it would run (including steps like "Material
-  // Drying"/"Weight Check" that the user never actually added), each
-  // re-matched to whichever machine the engine's OWN default selection
-  // picked. That is a second, independent representation of "what this
-  // part's process is" — confirmed live, it disagreed with Direct Process
-  // Costs both on WHICH steps exist and on WHICH machine runs each one
-  // (tree: "Arburg Allrounder 420 C..."; Direct Process Costs, from the
-  // same item's real stored rows: "Netstal Synergy 1200"). Direct Process
-  // Costs already settled this exact question for engine vs. stored data
-  // (see the "engine rows shown only when no stored records exist" comment
-  // at this file's DIRECT PROCESS COSTS section) — the tree must agree with
-  // it, not maintain its own separate answer. `procRecords` (real
-  // process_cost_records rows for this item) now takes priority over the
-  // engine's own costRecs fallback whenever real stored rows exist.
-  const storedRecs = procRecords?.length
-    ? [...procRecords]
-        .filter((r) => r.isActive !== false)
-        .sort((a, b) => (a.opNbr ?? 0) - (b.opNbr ?? 0))
-        .map((r) => ({
-          process: r.category || r.operation || r.processGroup || 'Process',
-          estimated_time_sec: null as number | null,
-          // The machine class is the step's real identity: a saved row is named by its category or
-          // operation ("Deburring"), its live cost line by the engine ("Finishing").
-          machineClass: r.machineClass ?? null,
-        }))
-    : null;
-  // Real machine actually recorded on the stored row for a given process
-  // label — kept separate from `recs` itself (whose candidates come from
-  // three structurally different sources with no common "machine" field)
-  // so any path through the fallback chain below can still show the real
-  // selected machine for a step that has one, instead of falling through to
-  // the engine's own (possibly different) default-machine recompute.
-  const storedMachineByProcess = new Map<string, string>();
-  for (const r of procRecords ?? []) {
-    if (r.isActive === false) continue;
-    const label = r.category || r.operation || r.processGroup;
-    if (label && r.machineName) storedMachineByProcess.set(label, r.machineName);
-  }
-  const costRecs = cost?.processLines?.length
-    ? cost.processLines.map((l) => ({ process: l.process, estimated_time_sec: l.cycleTimeMin * 60 }))
-    : null;
-  // `?? []` alone would stop here the moment fgRecs is a real EMPTY array
-  // (not null/undefined) — `??` only falls through on nullish, not on falsy
-  // length — so each candidate is explicitly checked for real content before
-  // falling through to the next.
-  type TreeRec = { process: string; estimated_time_sec?: number | null; machineClass?: string | null };
-  const recs: TreeRec[] = (overrideRecs && overrideRecs.length > 0 ? overrideRecs : null)
-    ?? (storedRecs && storedRecs.length > 0 ? storedRecs : null)
-    ?? (fgRecs && fgRecs.length > 0 ? fgRecs : null)
-    ?? costRecs
-    ?? [];
-
-  // Machined families: every operation's features come from the backend's own
-  // per-line featureIds (the operation sequencer). A line that reports none
-  // yet (the turned path; Tapping) gets the part's unattributed features under
-  // the part's first operation - the line that bills its machining - never a
-  // frontend process-name-to-feature table. Which operation counts as
-  // machining is decided by the part family, not by the step name containing
-  // "Milling"/"Machining": that substring test skipped real steps such as
-  // "4 Axis Mill", which is why they showed no features at all.
-  const isMachiningFamily = isMachiningTreeFamily(family);
-  const v2All = fg?.feature_graph_v2?.features ?? [];
-  const v2ById = new Map(v2All.map((f) => [f.id, f]));
-  // The cost line of a step: by the engine's name for it, else by machine class when exactly one line
-  // runs on that class (a step saved as "Deburring" is the engine's "Finishing" line).
-  const lineForRec = (rec: TreeRec) => {
-    const lines = cost?.processLines ?? [];
-    const byName = lines.find((l) => l.process === rec.process);
-    if (byName || !rec.machineClass) return byName;
-    const onClass = lines.filter((l) => l.machineClass === rec.machineClass);
-    return onClass.length === 1 ? onClass[0] : undefined;
-  };
-  const claimedIds = new Set(
-    recs.flatMap((r) => (lineForRec(r)?.featureBreakdown ?? []).flatMap((b) => b.featureIds ?? [])),
-  );
-
-  const featureLeaf = (idPrefix: string, f: FeatureNodeV2, machine: string, alone = false): ProcessTreeNode => {
-    const occ = f.occurrences.length;
-    const dia = f.diameter_mm != null ? ` Ø${f.diameter_mm.toFixed(1)}` : '';
-    // "(default)" only tells variants apart; a type with a single feature has nothing to tell it from.
-    const showVariant = !!f.variant && !(alone && f.variant === 'default');
-    const variant = showVariant ? ` (${f.variant})` : '';
-    return {
-      id: `${idPrefix}_${f.id}`,
-      kind: 'feature',
-      label: `${f.canonical_operation ?? String(f.feature_type)}${variant}${dia} ×${occ}`,
-      factory, machine,
-      v2FeatureIds: [f.id],
-      attrs: [
-        { name: 'Feature', value: String(f.feature_type) },
-        ...(showVariant ? [{ name: 'Variant', value: f.variant as string }] : []),
-        ...(f.canonical_operation ? [{ name: 'Operation', value: f.canonical_operation }] : []),
-        { name: 'Occurrences', value: String(occ) },
-        ...(f.diameter_mm != null ? [{ name: 'Diameter', value: `${f.diameter_mm.toFixed(1)} mm` }] : []),
-      ],
-    };
-  };
-  // Type group ("SimpleHole ×12") -> one row per real feature_graph_v2 entry.
-  const typeGroupNodes = (idPrefix: string, features: FeatureNodeV2[], machine: string): ProcessTreeNode[] =>
-    groupFeaturesByType(features).map((g) => {
-      const members = g.variants.flatMap((v) => v.features);
-      // One feature in the group: a child row would repeat the group row ("SharpEdge ×160" over "SharpEdge ×160"), so the group
-      // row is that feature, with its own attributes.
-      if (members.length === 1) {
-        const only = featureLeaf(idPrefix, members[0]!, machine, true);
-        return { ...only, id: `${idPrefix}_${g.type}`, label: `${g.type} ×${g.occurrenceCount}` };
-      }
-      return {
-        id: `${idPrefix}_${g.type}`,
-        kind: 'feature' as const,
-        label: `${g.type} ×${g.occurrenceCount}`,
-        factory, machine,
-        v2FeatureIds: members.map((f) => f.id),
-        attrs: [
-          { name: 'Count', value: String(g.occurrenceCount) },
-          ...g.variants.map((v) => ({ name: v.variant, value: `×${v.occurrenceCount}` })),
-        ],
-        children: members.map((f) => featureLeaf(`${idPrefix}_${g.type}`, f, machine)),
-      };
-    });
-
-  const operations: ProcessTreeNode[] = recs.map((rec, opIdx) => {
-    // Moulded-part geometry is PART-level: it belongs to the part's first
-    // resolved operation, whatever the engineer named or however many steps
-    // they added (exact-name gates on "Injection"/"Molding" silently dropped it).
-    const isFirstOpForMolded = family === 'plastic_molded' && opIdx === 0;
-
-    // Only the real machine: the stored row's own machine, else the live cost
-    // line's DB-resolved machine, else '—'. Matched by exact process name.
-    const matchedCostLine = lineForRec(rec);
-    const machine = storedMachineByProcess.get(rec.process) ?? matchedCostLine?.machineName ?? '—';
-    const breakdown = matchedCostLine?.featureBreakdown ?? [];
-    const featureNodes: ProcessTreeNode[] = [];
-
-    // Sheet metal: the catalog operations this step performs on the part's own
-    // CAD features ("Punching // SimpleHole Ø4.0 ×14"), resolved by the backend.
-    // Plastic molding: the same, from the recognised features and the molding process's catalog rows (backend plastic-catalog-operation-resolver.ts).
-    if (showsCatalogOperations(family) && matchedCostLine?.catalogOperations?.length) {
-      const withMachine = (n: OperationTreeNode): ProcessTreeNode =>
-        ({ ...n, factory, machine, ...(n.children ? { children: n.children.map(withMachine) } : {}) });
-      featureNodes.push(...sheetMetalOperationNodes(`catop_${opIdx}`, matchedCostLine.catalogOperations).map(withMachine));
-    }
-
-    // GD&T callouts this line covers (Inspection; family-agnostic — the
-    // backend resolver serves both sheet-metal and machining parts alike).
-    // Click-to-highlight the toleranced face uses the same v2FeatureIds
-    // mechanism as every other node; a callout with no real face link (no
-    // AP242 link on this part, or a drawing-sourced callout, which never has
-    // one) renders the same way, just without a highlight on click.
-    if (matchedCostLine?.gdtCallouts?.length) {
-      featureNodes.push(...gdtCalloutNodes(`gdt_${opIdx}`, matchedCostLine.gdtCallouts).map((n) => ({ ...n, factory, machine })));
-    }
-
-    // Sheet metal steps show only the catalog operations above (the backend attaches them to every
-    // line, live or applied). The earlier grouped-by-diameter hole and grouped-by-radius bend rows were a
-    // second representation of the same CAD features and are gone.
-    if (isMachiningFamily && (matchedCostLine?.featureOperations?.length ?? 0) > 0) {
-      // Casting and machining: "Feature ×n", its catalog operation an attribute,, each listing the
-      // feature instances it applies to (highlight exactly those).
-      matchedCostLine!.featureOperations!.forEach((g, i) => {
-        featureNodes.push({
-          id: `castop_${opIdx}_${i}`,
-          kind: 'feature',
-          label: `${g.featureType} ×${g.instances.length}`,
-          factory, machine,
-          v2Occurrences: g.instances.filter((x) => x.featureId).map((x) => ({ featureId: x.featureId!, occurrenceIndex: x.occurrenceIndex })),
-          attrs: [{ name: 'Operation', value: g.operation ?? 'Undetermined' }, { name: 'Why', value: g.reason }],
-          children: g.instances.map((x, j) => ({
-            id: `castop_${opIdx}_${i}_${j}`,
-            kind: 'feature' as const,
-            label: x.label,
-            factory, machine,
-            ...(x.featureId ? { v2Occurrences: [{ featureId: x.featureId, occurrenceIndex: x.occurrenceIndex }] } : {}),
-          })),
-        });
-      });
-    } else if (isMachiningFamily) {
-      if (breakdown.some((b) => (b.occurrenceRefs ?? []).length > 0 || (b.faceIds ?? []).length > 0)) {
-        // One row per entry, highlighting exactly what it acts on: machined feature instances ("Reaming // SimpleHole (SimpleHole:3)"),
-        // tapped holes, the inspected holes, or the faces meeting at the sharp edges deburred (no feature lists those).
-        breakdown.forEach((b, i) => {
-          const refs = (b.occurrenceRefs ?? []).filter((r) => v2ById.get(r.featureId)?.occurrences[r.occurrenceIndex]);
-          featureNodes.push({
-            id: `machining_occ_${opIdx}_${i}`,
-            kind: 'feature',
-            label: b.name,
-            factory, machine,
-            ...(refs.length > 0 ? { v2Occurrences: refs } : (b.faceIds ?? []).length > 0 ? { faceOccurrences: [b.faceIds!] } : {}),
-            attrs: [{ name: 'Time', value: formatEstCycleTime(b.timeSec) }],
-          });
-        });
-      } else if (breakdown.some((b) => (b.featureIds ?? []).length > 0)) {
-        // Real per-operation breakdown ("Spot Drill ×8", "Pocket Mill ×2", ...),
-        // each row carrying the exact feature ids it machines and its real time.
-        breakdown.forEach((b, i) => {
-          const feats = (b.featureIds ?? []).map((id) => v2ById.get(id)).filter((f): f is FeatureNodeV2 => f != null);
-          featureNodes.push({
-            id: `machining_line_${opIdx}_${i}`,
-            kind: 'feature',
-            label: b.name,
-            factory, machine,
-            ...(feats.length > 0 ? { v2FeatureIds: feats.map((f) => f.id) } : {}),
-            attrs: [
-              { name: 'Count', value: String(b.count) },
-              { name: 'Time', value: formatEstCycleTime(b.timeSec) },
-            ],
-            ...(feats.length > 0 ? { children: typeGroupNodes(`machining_type_${opIdx}_${i}`, feats, machine) } : {}),
-          });
-        });
-      } else if (opIdx === 0) {
-        const unclaimed = v2All.filter((f) => !claimedIds.has(f.id));
-        featureNodes.push(...typeGroupNodes(`machining_type_${opIdx}`, unclaimed, machine));
-      }
-    } else if (isFirstOpForMolded) {
-      const wall = summary.wallThicknessNominalMm ?? null;
-      const wallMin = summary.wallThicknessMinMm;
-      const wallMax = summary.wallThicknessMaxMm;
-      const bossCount = summary.holeOrBossCount ?? 0;
-      const ribCount = summary.ribCount ?? summary.ribCountProxy ?? 0;
-      const volMm3 = (item.volume as number | null | undefined) ?? 0;
-      // Real density for this item's own grade (useMaterialDensity); '—' until resolved.
-      const densityGcm3 = materialDensityGcm3 ?? null;
-      const massG = volMm3 > 0 && densityGcm3 != null ? Math.round((volMm3 / 1e3) * densityGcm3 * 10) / 10 : 0;
-      const undercutCount = summary.undercutFaceCount ?? 0;
-      const undraftedCount = summary.undraftedFaceCount ?? 0;
-      const avgDraftDeg = summary.avgDraftAngleDeg ?? null;
-      const partingComplexity = summary.partingComplexity ?? null;
-
-      featureNodes.push({
-        id: 'feat_im_part', kind: 'feature', label: 'Moulded Part',
-        factory, machine,
-        attrs: [
-          { name: 'Volume',    value: volMm3 > 0 ? `${fmtInt(volMm3)} mm³` : '—' },
-          { name: 'Est. mass', value: massG > 0 ? `${massG} g (net part)` : '—' },
-          ...(wall != null ? [{ name: 'Wall nom.', value: `${fmt(wall, 1)} mm` }] : []),
-          ...(wallMin != null && wallMax != null
-            ? [{ name: 'Wall range', value: `${fmt(wallMin, 1)} – ${fmt(wallMax, 1)} mm` }]
-            : []),
-          ...(partingComplexity != null ? [{ name: 'Parting complexity', value: `${Math.round(partingComplexity * 100)}%` }] : []),
-          ...(bossCount > 0 ? [{ name: 'Bosses / holes', value: String(bossCount) }] : []),
-          ...(ribCount > 0  ? [{ name: 'Ribs (detected)', value: String(ribCount) }] : []),
-        ],
-      });
-
-      // ── DFM feature nodes — clickable → 3D face highlighting ─────────────
-      if (undercutCount > 0) {
-        featureNodes.push({
-          id: 'feat_im_undercut', kind: 'feature', label: `Undercuts (${undercutCount} face${undercutCount > 1 ? 's' : ''})`,
-          factory, machine,
-          attrs: [
-            // Classification rule (cad-engine/injection_molding/feature_extractor.py's
-            // UNDERCUT_NEG_DOT_THRESHOLD), not a per-part measurement — every face
-            // counted above already exceeds this by construction.
-            { name: 'Classification', value: 'Back-angle >5° opposing pull direction' },
-            { name: 'Action', value: 'Click to highlight in 3D viewer' },
-          ],
-        });
-      }
-      if (undraftedCount > 0) {
-        featureNodes.push({
-          id: 'feat_im_undrafted', kind: 'feature', label: `Undrafted Faces (${undraftedCount})`,
-          factory, machine,
-          attrs: [
-            // Classification rule (UNDRAFTED_ABS_DOT_THRESHOLD), not a per-part
-            // measurement — paired with the part's own real average draft angle
-            // below when the CAD engine resolved one (avg_draft_angle_deg).
-            { name: 'Classification', value: 'Draft angle <0.3°' },
-            ...(avgDraftDeg != null ? [{ name: 'Part avg. draft angle', value: `${fmt(avgDraftDeg, 2)}°` }] : []),
-            { name: 'Action', value: 'Click to highlight in 3D viewer' },
-          ],
-        });
-      }
-    }
-
-    // A step that acts on the whole part (a sand casting's melting, pouring, cooling, ...): the part is its feature, highlighted whole.
-    if (featureNodes.length === 0 && matchedCostLine?.actsOnWholePart) {
-      featureNodes.push({ id: `whole_part_${opIdx}`, kind: 'feature', label: 'Whole casting', factory, machine, wholePart: true });
-    }
-
-    // A secondary process (CMM, cleaning, NDT, packaging): what it acts on, from
-    // the secondary-process engine's own result for this step.
-    const secondary = featureNodes.length === 0
-      ? secondaryLines?.find((l) => l.process === rec.process && l.status === 'costed')
-      : undefined;
-    if (secondary) {
-      const feats = secondary.featureIds.map((id) => v2ById.get(id)).filter((f): f is FeatureNodeV2 => f != null);
-      if (feats.length > 0) featureNodes.push(...typeGroupNodes(`secfeat_${opIdx}`, feats, machine));
-      else if (secondary.highlight === 'whole_part') {
-        featureNodes.push({
-          id: `secondary_part_${opIdx}`, kind: 'feature', label: 'Whole part surface', factory, machine, wholePart: true,
-          attrs: secondary.trace.map((t) => ({ name: t.label, value: `${t.value}${t.unit ? ` ${t.unit}` : ''}` })),
-        });
-      }
-    }
-
-    // Any step not covered above: its own cost line's feature breakdown, as is.
-    if (featureNodes.length === 0 && breakdown.length > 0 && showsStepTextRows(family)) {
-      breakdown.forEach((b, i) => {
-        const ids = (b.featureIds ?? []).filter((id) => v2ById.has(id));
-        featureNodes.push({
-          id: `line_${opIdx}_${i}`,
-          kind: 'feature',
-          label: b.name,
-          factory, machine,
-          ...(ids.length > 0 ? { v2FeatureIds: ids } : {}),
-          attrs: [
-            { name: 'Count', value: String(b.count) },
-            { name: 'Time', value: formatEstCycleTime(b.timeSec) },
-          ],
-        });
-      });
-    }
-    // Nothing real to show: say so, rather than a stand-in step name.
-    if (featureNodes.length === 0 && showsStepTextRows(family)) {
-      featureNodes.push({
-        id: `nodata_${opIdx}`,
-        kind: 'feature',
-        label: 'No feature data',
-        factory, machine,
-        attrs: [{
-          name: 'Reason',
-          value: matchedCostLine
-            ? 'The cost engine reports no per-feature breakdown for this step.'
-            : 'No live cost line for this step yet - nothing to break down.',
-        }],
-      });
-    }
-
-    // A step that machines individual instances shows how many: "3 Axis Mill [5]".
-    const instanceCount = breakdown.filter((b) => (b.occurrenceRefs ?? []).length > 0).length;
-    const label = instanceCount > 0 ? `${rec.process} [${instanceCount}]` : rec.process;
-    return { id: `op_${opIdx}`, kind: 'operation', label, factory, machine, children: featureNodes };
-  });
-  // The process group of each step: its cost line's own processGroup (the
-  // machining after a casting is "Machining"), else the part's group.
-  const opGroups = recs.map((rec) => lineForRec(rec)?.processGroup ?? groupLabel);
-
-  // Inject Threaded Features from drawing intelligence for CNC families.
-  //
-  // FIXED: this used to always create a brand-new top-level "Threaded
-  // Features" operation node with a hardcoded `machine: 'Tapping Machine'` —
-  // a fabricated label, never the real resolved machine every other node in
-  // this tree uses (realMachineName, off cost.processLines). Whenever a real
-  // "Tapping" operation already exists (the normal case — Tapping is
-  // costed/applied like any other step), that operation's own row already
-  // shows the correct real machine (e.g. "Haas DS-30 with BAR3010SS
-  // Feeder"); injecting a sibling with a different, fake machine name for
-  // the same physical operation broke the Process → Machine → Operation
-  // hierarchy the rest of the tree follows. Thread Features now nests
-  // UNDER the real Tapping operation and inherits its real machine.
-  const diThreadSpecs = isMachiningFamily
-    ? ((item.drawingIntelligence as any)?.threads as { size: string; pitch: number; count: number }[] | undefined)
-    : undefined;
-  if (diThreadSpecs && diThreadSpecs.length > 0) {
-    const tappingOp = operations.find((op) => op.label === 'Tapping');
-    // '—' matches this tree's own convention elsewhere for "no machine
-    // resolved yet" (see `machine` above) — never a fabricated name.
-    const tappingMachine: string = tappingOp?.machine ?? '—';
-    const threadChildren: ProcessTreeNode[] = diThreadSpecs.map((t, i) => ({
-      id: `thread_di_${i}`,
-      kind: 'feature' as const,
-      label: `${t.size} ×${t.count}`,
-      factory,
-      machine: tappingMachine,
-      source: 'drawing_intelligence',
-      attrs: [
-        { name: 'Specification', value: `${t.size} × ${t.pitch}` },
-        { name: 'Count',         value: String(t.count) },
-      ],
-    }));
-    const threadSubOp: ProcessTreeNode = {
-      id: 'thread_features',
-      kind: 'feature',
-      label: 'Drawing thread callouts',
-      children: threadChildren,
-    };
-    if (tappingOp) {
-      tappingOp.children = [...(tappingOp.children ?? []), threadSubOp];
-    } else {
-      // No real Tapping process step exists on this part yet (e.g. not
-      // costed/applied) — keep the finding visible as its own disclosed
-      // top-level node rather than silently dropping it, but with an
-      // honest '—' machine instead of a fabricated one.
-      const deburrIdx = operations.findIndex((op) => op.label === 'Deburring');
-      operations.splice(deburrIdx >= 0 ? deburrIdx : operations.length, 0, {
-        id: 'op_threads',
-        kind: 'operation',
-        label: 'Threaded Features',
-        factory,
-        machine: '—',
-        children: [threadSubOp],
-      });
-    }
-  }
-
-  // Processes the live engine computed for THIS route but that could never be
-  // applied/persisted — physicsGap set (findRouteDataGaps rejects the WHOLE
-  // apply-route request whenever any line has one, see engine-kernel.ts).
-  // `recs` above deliberately never includes these once real stored rows
-  // exist (storedRecs wins, per the comment on that fallback chain above), so
-  // without this the tree would say nothing happened here at all — the same
-  // gap the Direct Process Costs list had before its own unresolved row was
-  // added. Append-only: never reads or mutates `recs`, so none of the real
-  // fixes already documented on this function are at risk.
-  // The cost line behind each unresolved step, so it groups with its own process group.
-  const gapLineByOpId = new Map<string, NonNullable<typeof cost>['processLines'][number]>();
-  const gapProcessLines = (cost?.processLines ?? []).filter(
-    (l) => l.physicsGap && !operations.some((op) => op.label === l.process),
-  );
-  for (const l of gapProcessLines) {
-    const gap = l.physicsGap!;
-    const reasonText = gap.gapType === 'missing_lookup' ? gap.requiredAction : gap.reason;
-    gapLineByOpId.set(`op_gap_${l.process}`, l);
-    operations.push({
-      id: `op_gap_${l.process}`,
-      kind: 'operation',
-      label: `${l.process} — unresolved`,
-      processName: l.process,
-      factory,
-      machine: 'Not applied',
-      attrs: [{ name: 'Reason', value: reasonText }],
-    });
-  }
-
-  // One group per process group, in route order; steps appended after the
-  // route (threads, unresolved lines) stay in the part's group.
-  const groups: ProcessTreeNode[] = [];
-  operations.forEach((op) => {
-    const idx = recs.findIndex((_, i) => op.id === `op_${i}`);
-    const line = idx >= 0 ? lineForRec(recs[idx]!) : gapLineByOpId.get(op.id);
-    const name = idx >= 0 ? opGroups[idx]! : line?.processGroup ?? groupLabel;
-    let g = groups.find((x) => x.label === name);
-    if (!g) {
-      g = { id: `grp_${groups.length}`, kind: 'group', label: name, factory, children: [] };
-      groups.push(g);
-    }
-    // A step in a process group other than the part's own (the machining after
-    // a casting) sits under its machine class: Machining > 3 Axis Mill > Drilling.
-    const route = line?.processRoute;
-    if (route && route !== line?.process && name !== groupLabel) {
-      let parent = g.children!.find((c) => c.kind === 'operation' && c.label === route && c.id.startsWith('route_'));
-      if (!parent) {
-        parent = { id: `route_${g.id}_${route}`, kind: 'operation', label: route, factory, machine: op.machine ?? '—', children: [] };
-        g.children!.push(parent);
-      }
-      parent.children!.push(op);
-      return;
-    }
-    g.children!.push(op);
-  });
-  return { id: 'root', kind: 'part', label: item.name, factory, children: groups };
-}
-
 // ── Operation → 3D highlight helpers ──────────────────────────────────────────
-
-function mergeFeaturesToHL(id: string, features: FeatureNodeV2[]): FeatureNodeV2 | null {
-  if (!features.length) return null;
-  const first = features[0]!;
-  const occurrences = features.flatMap((f) =>
-    f.occurrences.map((occ) => ({ centroid: occ.centroid, face_ids: occ.face_ids })),
-  );
-  return { id, feature_type: first.feature_type, occurrences };
-}
 
 /**
  * "Cut Length" and its per-category breakdown. Each row highlights exactly the
@@ -1186,202 +347,6 @@ function CutLengthRows({ cutLengthMm, fg, onSelectHighlight, label = 'Cut Length
 // Each operation gets a semantically correct face set AND a distinct color.
 // Only hole/bend FEATURE nodes use the existing selectedV2Feature chain (unchanged).
 
-type OperationVisual = { highlight: FeatureNodeV2; color: string } | null;
-
-function buildFullModelHL(id: string, faceMap: FaceMapEntry[]): FeatureNodeV2 | null {
-  if (!faceMap.length) return null;
-  return { id, feature_type: 'Blank', occurrences: [{ centroid: [0, 0, 0] as [number, number, number], face_ids: faceMap.map((e) => e.face_id) }] };
-}
-
-function computeOperationVisual(
-  label: string,
-  v2Features: FeatureNodeV2[],
-  faceMap: FaceMapEntry[],
-): OperationVisual {
-  const l = label.toLowerCase();
-  const merge = (id: string, feats: FeatureNodeV2[], color: string): OperationVisual => {
-    const hl = mergeFeaturesToHL(id, feats);
-    return hl ? { highlight: hl, color } : null;
-  };
-  if (l.includes('laser') || l.includes('cutting') || l.includes('punch') || l.includes('waterjet'))
-    return merge('op-cutting', v2Features.filter((f) => isPlainHole(f) || isBlankProfile(f)), '#3b82f6');
-  if (l.includes('press brake') || l.includes('bending'))
-    return merge('op-bending', v2Features.filter(isBend), '#eab308');
-  if (l.includes('tapping'))
-    return merge('op-tapping',
-      v2Features.filter((f) => isPlainHole(f) && (f.diameter_mm ?? 99) <= 6.0), '#f26822');
-  if (l.includes('deburr')) {
-    // Phase 2: replace with true edge highlight (EdgeHighlight component exists in EDrawingsViewer)
-    return merge('op-deburr',
-      v2Features.filter((f) => isPlainHole(f) || isBend(f)), '#06b6d4');
-  }
-  if (l.includes('surface treatment') || l.includes('coating')) {
-    const hl = buildFullModelHL('op-surface', faceMap);
-    return hl ? { highlight: hl, color: '#93c5fd' } : null;
-  }
-  if (l.includes('inspection')) {
-    return merge('op-inspection', v2Features, '#e2e8f0');
-  }
-  if (l.includes('turning') || l.includes('milling') || l.includes('machining'))
-    return merge('op-all', v2Features, '#64748b');
-  // ── Injection molding operations ──
-  // Real, confirmed live gap (2026-09-11): this section only ever matched
-  // 'injection mould(ing)'/'injection mold(ing)' — the OLD coarse single-
-  // recommendation label. The real per-step operations now populating the
-  // tree (cost-injection-molding-engine.ts's own makeLine labels: 'Mold
-  // Setup', 'Injection', 'Packing/Holding', 'Cooling', 'Ejection', 'Weight
-  // Check') don't contain that substring, so clicking any of them produced
-  // no highlight at all — confirmed live, the exact "no process-level
-  // highlight" gap reported alongside the missing feature nodes. Each real
-  // step gets the whole-part tint (none of these individual steps has its
-  // own distinct face-level geometry beyond the undercut/undraft/parting
-  // detail already handled by computeFeatureNodeVisual's feat_im_* nodes).
-  if (l.includes('material drying') || l.includes('drying'))
-    return null; // Pre-process — no part geometry involved yet
-  if (l === 'mold setup' || l === 'mould setup') {
-    const hl = buildFullModelHL('op-mold-setup', faceMap);
-    return hl ? { highlight: hl, color: '#94a3b8' } : null; // slate — tooling/machine setup
-  }
-  if (l.includes('injection mould') || l.includes('injection mold') || l === 'injection') {
-    const hl = buildFullModelHL('op-injection', faceMap);
-    return hl ? { highlight: hl, color: '#f97316' } : null; // orange — molten cavity fill
-  }
-  if (l.includes('packing') || l.includes('holding')) {
-    const hl = buildFullModelHL('op-packing', faceMap);
-    return hl ? { highlight: hl, color: '#fb923c' } : null; // amber-orange — pack/hold pressure
-  }
-  if (l === 'cooling') {
-    const hl = buildFullModelHL('op-cooling', faceMap);
-    return hl ? { highlight: hl, color: '#38bdf8' } : null; // sky blue — cooling
-  }
-  if (l === 'ejection') {
-    const hl = buildFullModelHL('op-ejection', faceMap);
-    return hl ? { highlight: hl, color: '#94a3b8' } : null; // slate — part release
-  }
-  if (l.includes('weight check')) {
-    const hl = buildFullModelHL('op-weight-check', faceMap);
-    return hl ? { highlight: hl, color: '#e2e8f0' } : null; // light — quality overlay
-  }
-  if (l.includes('gate trimming') || l.includes('degating') || l.includes('deflashing')) {
-    const hl = buildFullModelHL('op-gate-trim', faceMap);
-    return hl ? { highlight: hl, color: '#eab308' } : null; // yellow — secondary bench op
-  }
-  return null;
-}
-
-function computeFeatureNodeVisual(
-  node: ProcessTreeNode,
-  v2Features: FeatureNodeV2[],
-  faceMap: FaceMapEntry[],
-): OperationVisual {
-  const merge = (id: string, feats: FeatureNodeV2[], color: string): OperationVisual => {
-    const hl = mergeFeaturesToHL(id, feats);
-    return hl ? { highlight: hl, color } : null;
-  };
-  // Real canonical-operation CNC feature nodes (v2feat_*, built from
-  // feature_graph_v2 entries the backend already classified) — match by the
-  // exact feature id tagged at build time, never by re-deriving from label.
-  if (node.v2FeatureId != null) {
-    const exact = v2Features.find((f) => f.id === node.v2FeatureId);
-    return exact ? merge(`hl-${node.v2FeatureId}`, [exact], '#f97316') : null;
-  }
-  if (node.faceOccurrences?.length) {
-    // The faces are known, their positions are not: the viewer measures each occurrence's centre from its own triangles.
-    const featureType = node.label.split(/[\s×]/)[0] ?? node.label;
-    return {
-      highlight: {
-        id: `hl-${node.id}`,
-        feature_type: featureType as FeatureNodeV2['feature_type'],
-        occurrences: node.faceOccurrences.map((face_ids) => ({ centroid: [0, 0, 0] as [number, number, number], face_ids })),
-        centroidFromFaces: true,
-      },
-      color: '#d97706',
-    };
-  }
-  if (node.v2Occurrences?.length) {
-    const occurrences = node.v2Occurrences.flatMap((r) => {
-      const occ = v2Features.find((f) => f.id === r.featureId)?.occurrences[r.occurrenceIndex];
-      return occ ? [{ centroid: occ.centroid, face_ids: occ.face_ids }] : [];
-    });
-    const first = v2Features.find((f) => f.id === node.v2Occurrences![0]!.featureId);
-    return occurrences.length && first
-      ? { highlight: { id: `hl-${node.id}`, feature_type: first.feature_type, occurrences }, color: '#d97706' }
-      : null;
-  }
-  if (node.v2FeatureIds?.length) {
-    const ids = new Set(node.v2FeatureIds);
-    return merge(`hl-${node.id}`, v2Features.filter((f) => ids.has(f.id)), '#d97706');
-  }
-  if (node.wholePart) {
-    const hl = buildFullModelHL(`hl-${node.id}`, faceMap);
-    return hl ? { highlight: hl, color: '#22d3ee' } : null;
-  }
-  // ── Injection molding feature nodes ──
-  if (node.id === 'feat_im_part') {
-    const hl = buildFullModelHL('hl-im-part', faceMap);
-    return hl ? { highlight: hl, color: '#f97316' } : null; // orange — molded geometry
-  }
-  // Individual hole-diameter-group rows ("Ø1.6 × 24") nested under Flat
-  // Pattern — previously fell through every branch above to `return null`,
-  // so clicking one never highlighted anything at all. Match by diameter
-  // (tagged on the node at build time) rather than parsing the label.
-  if (node.holeDiameterMm != null) {
-    // Round both sides to 1dp before comparing — summary.holeGroups and
-    // feature_graph_v2.features are computed by two separate backend calls
-    // that both round to 1dp with the same formula, but comparing raw floats
-    // risks a spurious mismatch from binary floating-point representation
-    // (e.g. 1.6 stored as 1.5999999999999999 on one side).
-    const targetD = Math.round(node.holeDiameterMm * 10) / 10;
-    const matches = v2Features.filter(
-      (f) => isPlainHole(f) && f.diameter_mm != null && Math.round(f.diameter_mm * 10) / 10 === targetD,
-    );
-    const hl = mergeFeaturesToHL(`hl-hole-${targetD}`, matches);
-    if (hl) return { highlight: hl, color: '#3b82f6' };
-    // No v2 occurrence matched this diameter (e.g. stale/out-of-sync feature
-    // graph data) — fall back to the full-model tint rather than nothing,
-    // same convention Flat Pattern's own highlight below uses.
-    const full = buildFullModelHL(`hl-hole-${targetD}`, faceMap);
-    return full ? { highlight: full, color: '#3b82f6' } : null;
-  }
-  if (node.label === 'Flat Pattern') {
-    // The complete laser-cutting operation: every hole (every diameter group
-    // — "symmetric" repeats — and any one-off/ungrouped "asymmetric" hole
-    // alike) TOGETHER WITH every real cut boundary's side-wall faces
-    // ('cut_profile' — every panel's outer perimeter AND any cutout in it,
-    // whatever shape it is — what the laser actually cuts along, not the
-    // flat panel surface itself), merged into one highlight. Falls back to
-    // the full-model tint only when the part has neither (e.g.
-    // feature_graph_v2 not yet computed for this part), so clicking Flat
-    // Pattern always shows something.
-    const cutFeatures = v2Features.filter((f) => isPlainHole(f) || isBlankProfile(f));
-    const holeHl = mergeFeaturesToHL('hl-flat-pattern', cutFeatures);
-    if (holeHl) return { highlight: holeHl, color: '#38bdf8' }; // sky blue — unfolded blank
-    const hl = buildFullModelHL('hl-flat-pattern', faceMap);
-    return hl ? { highlight: hl, color: '#38bdf8' } : null;
-  }
-  return null;
-}
-
-function getVizLabel(node: ProcessTreeNode): string | null {
-  const l = node.label.toLowerCase();
-  if (node.id === 'feat_im_part') return 'Moulded part — full cavity geometry';
-  if (node.id.startsWith('secondary_') || node.id.startsWith('secfeat_')) {
-    return `${node.label} — ${node.wholePart ? 'whole part surface' : 'measured features'}`;
-  }
-  if (node.kind === 'operation') {
-    if (l.includes('laser') || l.includes('cutting')) return 'Pierce holes';
-    if (l.includes('press brake') || l.includes('bending')) return 'Bend lines';
-    if (l.includes('tapping')) return 'Tapped holes';
-    if (l.includes('deburr')) return 'All cut edges — holes & bends';
-    if (l.includes('surface treatment') || l.includes('coating')) return 'Full exterior surface';
-    if (l.includes('inspection')) return 'Holes & bends (geometric features)';
-    if (l.includes('injection mould') || l.includes('injection mold')) return 'Cavity + core faces — full mold geometry';
-    if (l.includes('gate trimming')) return 'Gate vestige — bench degating operation';
-    if (l.includes('material drying')) return null; // pre-process, no geometry
-  }
-  return null;
-}
-
 // ── PanelHeader ────────────────────────────────────────────────────────────────
 
 function PanelHeader({
@@ -1415,30 +380,6 @@ function PanelHeader({
 
 
 // ── CostSummaryTab — eMithran-style with inline editing ─────────────────────
-
-/**
- * The Process the user picked in Create/Edit BOM Item, persisted as scenario_overrides.processGroup; items saved before that existed fall back to
- * their stored family's process-group label. One rule for the Cost Guide and the tooling dialog.
- */
-function partProcessGroup(item: BOMItem, fg: FeatureGraph | null | undefined): string | null {
-  // || on purpose: a blank saved choice falls back to the family, like an absent one
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/no-unnecessary-condition
-  return (item.scenarioOverrides?.processGroup as string | undefined) || familyToProcessGroupLabel(item.familyClassification ?? fg?.classification?.family) || null;
-}
-
-/** The applied route is no longer one the engine offers for this part (the part's process changed since). */
-function appliedRouteIsStale(appliedRouteId: string | null | undefined, routes: ReadonlyArray<{ routeId: string }> | undefined): boolean {
-  return !!appliedRouteId && !!routes && routes.length > 0 && !routes.some((r) => r.routeId === appliedRouteId);
-}
-
-/** Why the last Apply was refused (scenario_overrides.appliedScenario), or null when it was not. */
-function lastApplyError(item: { scenarioOverrides?: Record<string, unknown> | null }): string | null {
-  const applied = item.scenarioOverrides?.['appliedScenario'] as { status?: string; error?: string } | undefined;
-  return applied?.status === 'failed' && applied.error ? applied.error : null;
-}
-
-/** An operation picked in the Workflow Builder to add to the part by hand: opened in the Edit Process Cost dialog as a new line. */
-interface AddProcessRequest { key: number; processRoute: string; operation: string; machineClass: string | null; category: string | null }
 
 function CostSummaryTab({
   item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest,
@@ -3604,11 +2545,6 @@ function TreeRow({
   );
 }
 
-// The 4 real Plastic Molding machine_class slugs (migration 633/645/734) —
-// used to scope the Tonnage/Clamp Force panel to rows actually costed on one
-// of these real machines, never on an Inspection/manual-rate row.
-const IM_MACHINE_CLASSES = new Set(['injection_molding', 'compression_molding', 'reaction_injection_molding', 'structural_foam_molding']);
-
 // Which molding routes can be set is moldingRouteSelectability (lib/routing/molding-route-selectability.ts): every molding process the apply endpoint accepts, when the part can be made by it and it is priced.
 
 
@@ -3619,69 +2555,6 @@ const IM_MACHINE_CLASSES = new Set(['injection_molding', 'compression_molding', 
 // testable function instead of JSX-embedded math. See WorkflowRouteStep's own
 // doc comments for the provenance rules on each field.
 type DynamicRouteStep = WorkflowRouteStep;
-
-// Every route getRouteComparison returns shares identical non-cutting lines
-// (deburr/press-brake/tapping/burring — computed once, reused across all
-// routes; see that method's "Shared process lines" section) — only each
-// route's own cutting line differs. So "which machineClass is a cutting
-// machineClass" is derivable structurally from the live API response itself
-// (whatever machineClass ISN'T common to every route), never a hardcoded set
-// that silently goes stale the moment the backend's engine registry grows.
-function cuttingMachineClassesFromRoutes(routes: Pick<RouteResultDto, 'processLines'>[]): Set<string> {
-  if (routes.length === 0) return new Set();
-  const classSets = routes.map((r) => new Set(r.processLines.map((l) => l.machineClass)));
-  const shared = new Set([...classSets[0]!].filter((cls) => classSets.every((s) => s.has(cls))));
-  const cutting = new Set<string>();
-  for (const s of classSets) for (const cls of s) if (!shared.has(cls)) cutting.add(cls);
-  return cutting;
-}
-// Inverse of the above — used to recover which real cutting route a stored
-// process_cost_records row's machine_class corresponds to (see the routing-
-// restoration effect below), never a guessed/computed mapping.
-function cuttingMachineClassToRouteId(routes: Pick<RouteResultDto, 'routeId' | 'processLines'>[]): Record<string, string> {
-  const cuttingClasses = cuttingMachineClassesFromRoutes(routes);
-  const map: Record<string, string> = {};
-  for (const r of routes) {
-    const cuttingLine = r.processLines.find((l) => cuttingClasses.has(l.machineClass));
-    if (cuttingLine) map[cuttingLine.machineClass] = r.routeId;
-  }
-  return map;
-}
-
-// Real physical ordering already encoded elsewhere in this codebase
-// (cost-engine.ts's real processLines sequence, autoCompleteRoute's insertion
-// points) — used only to softly WARN on an invalid custom reorder, never to
-// block it (a real shop may have a genuine reason to deviate).
-// Real process names as cost-engine.ts/turret-punch-engine.ts/waterjet-engine.ts
-// actually emit them (confirmed by grep — "Laser Cutting" and "Press Brake",
-// NOT the old WORKFLOW_KB display labels "Fiber Laser Cutting"/"CNC Press
-// Brake", which never matched and silently made every ordering check a no-op).
-// Hole Extrusion (Burring) + Tapping come BEFORE Press Brake + Deburring:
-// the thread sits in the extruded collar, so the collar must be formed and
-// tapped while the part is still flat (tapping an already-bent flange risks
-// tool access/interference, and this also avoids handling an already-bent
-// part through tapping) — see the matching reorder in cost-engine.ts /
-// bom-items.service.ts::getRouteComparison's allLines assembly.
-const REAL_PROCESS_ORDER = [
-  'Laser Cutting', 'Turret Punching', 'Waterjet Cutting',
-  'Hole Extrusion (Burring)', 'Tapping', 'Press Brake', 'Deburring',
-  'Counterboring', 'Countersinking', 'PEM Insertion', 'Reaming', 'CMM Inspection',
-  'Surface Treatment',
-];
-function orderingWarnings(orderedProcesses: string[]): Record<string, string> {
-  const warnings: Record<string, string> = {};
-  for (let i = 0; i < orderedProcesses.length; i++) {
-    const p = orderedProcesses[i]!;
-    const pIdx = REAL_PROCESS_ORDER.indexOf(p);
-    if (pIdx < 0) continue;
-    for (let j = 0; j < i; j++) {
-      const q = orderedProcesses[j]!;
-      const qIdx = REAL_PROCESS_ORDER.indexOf(q);
-      if (qIdx > pIdx) { warnings[p] = `Typically performed before ${q}`; break; }
-    }
-  }
-  return warnings;
-}
 
 // ── RouteSelectionDialog (Workflow Builder) ────────────────────────────────────
 
@@ -6657,32 +5530,6 @@ function DieCastingFeatureTreePanel({
 // absent, bends x 2 + holes / 20 + threads x 5 against 10/30. Invented weights
 // and thresholds; the real drivers are listed instead.
 
-function deriveReadiness(item: BOMItem, plasticDfm: PlasticDfmView | undefined): { label: string; ready: boolean } {
-  const hasCritical = (item.featureGraph?.dfmWarnings ?? []).filter((w) => !isSupersededPlasticWarning(w)).some((w) => w.severity === 'critical')
-    || plasticDfmReadiness(plasticDfm).critical;
-  if (hasCritical) return { label: 'DFM Issues Found', ready: false };
-  if (!costedGrade(item)) return { label: 'Material Pending', ready: false };
-  if (!item.file2dPath && !item.drawingIntelligence) return { label: 'Drawing Required', ready: false };
-  return { label: 'Ready for RFQ', ready: true };
-}
-
-function buildRiskFlags(item: BOMItem, plasticDfm: PlasticDfmView | undefined): string[] {
-  const flags: string[] = [];
-  if (!costedGrade(item)) flags.push('Material not confirmed');
-  if (item.tightestToleranceMm != null && item.tightestToleranceMm < 0.1)
-    flags.push(`Tightest tolerance ±${item.tightestToleranceMm} mm`);
-  if ((item.holeCount ?? 0) > 200) flags.push(`${item.holeCount ?? 0} holes — high pierce count`);
-  if ((item.bendCount ?? 0) > 40) flags.push(`${item.bendCount ?? 0} bends`);
-  for (const w of (item.featureGraph?.dfmWarnings ?? []).filter((x) => !isSupersededPlasticWarning(x))) {
-    if (w.severity === 'critical' || w.severity === 'warning') flags.push(w.message);
-  }
-  for (const v of (item.featureGraph?.validationResults ?? []).filter((x) => !isSupersededPlasticCheck(x))) {
-    if (!v.passed && v.severity !== 'info') flags.push(v.check);
-  }
-  flags.push(...plasticDfmReadiness(plasticDfm).flags);
-  return flags;
-}
-
 function PartDetailTab({
   item, batchSize, factory = 'USA', selectedMachiningFeatureKey, onMachiningFeatureSelect,
 }: {
@@ -8218,91 +7065,6 @@ function ProcessTreePanel({
 
 // ── FeatureMetadata ────────────────────────────────────────────────────────────
 
-interface FeatureMetadata {
-  label: string;
-  headline: string;
-  process: string;
-  dimensions: { label: string; value: string }[];
-  location?: HoleGroupLocation;
-  /** Per-instance occurrence data from Feature Graph v2. Takes precedence over location for display. */
-  v2Feature?: FeatureNodeV2;
-  whyItMatters: string;
-  risks: string[];
-  dfmWarnings: DFMWarning[];
-}
-
-function severityClass(s: DFMSeverity): string {
-  return s === 'critical'
-    ? 'bg-red-500/10 text-red-400'
-    : s === 'warning'
-    ? 'bg-yellow-500/10 text-yellow-400'
-    : 'bg-blue-500/10 text-blue-400';
-}
-
-// Categories semantically linked to each feature type — used as fallback when
-// the CAD engine hasn't populated featureRef on individual warnings.
-const BEND_DFM_CATEGORIES = new Set(['sharp_corner', 'fillet', 'thin_wall']);
-const HOLE_DFM_CATEGORIES = new Set(['deep_pocket', 'undercut']);
-
-function matchWarnings(warnings: DFMWarning[], featureId: string | undefined, fallbackCategories: Set<string>): DFMWarning[] {
-  const byRef = featureId ? warnings.filter((w) => w.featureRef === featureId) : [];
-  if (byRef.length > 0) return byRef;
-  // CAD engine didn't set featureRef — surface all category-relevant warnings
-  return warnings.filter((w) => !w.featureRef && fallbackCategories.has(w.category));
-}
-
-function buildFeatureMetadata(
-  holeGroup: HoleGroup | null,
-  bend: FeatureNodeV2 | null,
-  dfmWarnings: DFMWarning[],
-  v2Feature?: FeatureNodeV2,
-): FeatureMetadata | null {
-  if (holeGroup) {
-    return {
-      label: 'Hole Group',
-      headline: `Ø${holeGroup.diameter_mm.toFixed(1)} mm × ${holeGroup.count}`,
-      process: 'Laser Pierce',
-      dimensions: [
-        { label: 'Diameter', value: `${holeGroup.diameter_mm.toFixed(1)} mm` },
-        { label: 'Count', value: String(holeGroup.count) },
-      ],
-      ...(holeGroup.location && { location: holeGroup.location }),
-      ...(v2Feature && { v2Feature }),
-      whyItMatters:
-        `Each of the ${holeGroup.count} pierces adds laser pause time and heat input. ` +
-        `At Ø${holeGroup.diameter_mm.toFixed(1)} mm, pierce tip wear and heat-affected zone ` +
-        `size are the primary quality risks. Consolidating holes or adjusting spacing can ` +
-        `reduce cycle time and improve edge quality.`,
-      risks: ['Burr formation', 'Heat-affected zone', 'Tool wear'],
-      dfmWarnings: matchWarnings(dfmWarnings, holeGroup.id, HOLE_DFM_CATEGORIES),
-    };
-  }
-
-  if (bend) {
-    const count = bend.occurrences.length;
-    const radius = bend.radius_mm ?? 0;
-    return {
-      label: 'Bend',
-      headline: `R${radius.toFixed(1)} mm × ${count}`,
-      process: 'Press Brake',
-      dimensions: [
-        { label: 'Bend Radius', value: `${radius.toFixed(1)} mm` },
-        { label: 'Count', value: String(count) },
-      ],
-      ...(v2Feature && { v2Feature }),
-      whyItMatters:
-        `Press brake bends add cycle time proportional to count and require setup changeovers ` +
-        `for each unique bend radius. At R${radius.toFixed(1)} mm, verify the inner radius is ` +
-        `≥ material thickness to avoid cracking. Grouping bends of the same radius minimises ` +
-        `die changes and reduces setup cost.`,
-      risks: ['Cracking', 'Springback', 'Tool collision'],
-      dfmWarnings: matchWarnings(dfmWarnings, bend.id, BEND_DFM_CATEGORIES),
-    };
-  }
-
-  return null;
-}
-
 // ── FeatureDetailPanel ─────────────────────────────────────────────────────────
 
 function FeatureDetailPanel({ metadata }: { metadata: FeatureMetadata | null }) {
@@ -8426,8 +7188,6 @@ function FeatureDetailPanel({ metadata }: { metadata: FeatureMetadata | null }) 
 
 // ── GeometricCostDriversPanel ──────────────────────────────────────────────────
 
-
-const money = (n: number, symbol: string) => `${n < 0 ? '-' : '+'}${symbol}${Math.abs(n).toFixed(Math.abs(n) < 0.1 ? 3 : 2)}`;
 
 /** What the driver is worth: the cost engine run again with only this driver moved one step. Zero is shown as zero: the cost model does not read that driver. */
 function DriverImpactLine({ impact, currencySymbol }: { impact: DriverImpact | undefined; currencySymbol: string }) {
