@@ -186,12 +186,13 @@ export class FeatureToleranceService {
    * other hole is drilled after.
    */
   private async assessDieDirection(
-    item: Awaited<ReturnType<FeatureToleranceService['loadItem']>>, tolerances: FeatureTolerancesView,
+    item: Awaited<ReturnType<FeatureToleranceService['loadItem']>>, tolerances: FeatureTolerancesView, accessToken: string,
     process: { primaryProcess: string; sourceVersion: string; rule: DirectionalHoleRule },
   ): Promise<Omit<MachiningNeedView, 'profile' | 'decisions'>> {
     const { reference, missing } = await this.toleranceReference.get();
     if (!reference) return { assessed: false, reason: 'Tolerance reference data not staged.', missing, result: null, instances: [] };
-    const { data } = await this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read')
+    // The reference table is public-read (its row-level policy lets every user read it): the user's own client reads it.
+    const { data } = await this.database.getUserClient(accessToken)
       .from('machining_reference_data').select('value')
       .eq('category', 'variable').eq('source_version', process.sourceVersion).eq('key', process.rule.minHoleVariable).maybeSingle();
     const minHole = Number((data as { value?: string } | null)?.value);
@@ -229,8 +230,8 @@ export class FeatureToleranceService {
       });
       return { assessed: true, reason: null, missing: [], result, instances: tolerances.instances.map((i) => i.instance) };
     }
-    if (family === 'forged') return this.assessDieDirection(item, tolerances, { primaryProcess: 'Forging', sourceVersion: '2026-Forging', rule: FORGED_HOLES });
-    if (family === 'powder_metal') return this.assessDieDirection(item, tolerances, { primaryProcess: 'Powder Metal', sourceVersion: '2026-PowderMetal', rule: PRESSED_HOLES });
+    if (family === 'forged') return this.assessDieDirection(item, tolerances, accessToken, { primaryProcess: 'Forging', sourceVersion: '2026-Forging', rule: FORGED_HOLES });
+    if (family === 'powder_metal') return this.assessDieDirection(item, tolerances, accessToken, { primaryProcess: 'Powder Metal', sourceVersion: '2026-PowderMetal', rule: PRESSED_HOLES });
     if (!casting) {
       return { assessed: false, reason: `No primary-process capability assessment for family ${family} yet.`, missing: [], result: null, instances: [] };
     }
