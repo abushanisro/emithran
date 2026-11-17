@@ -22,7 +22,8 @@ import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type 
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
 import { useMaterialUsage, type MaterialUsageExplanation } from '@/lib/api/hooks/useMaterialUsage';
 import { CalculationTracePanel } from './CalculationTracePanel';
-import { MaterialUsageJustification } from './MaterialUsageJustification';
+import { MaterialUsageJustification, UsageWorking } from './MaterialUsageJustification';
+import { formatKg, USAGE_SOURCE_LABEL } from '@/lib/costing/material-usage-view';
 import { ReferenceTable } from './ReferenceTable';
 import { isStockDrivenBlank } from '@/lib/costing/material-usage';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -307,21 +308,16 @@ export function RawMaterialDialog({
     setGrossUsageOverridden(false);
     setGrossUsageOverrideReason('');
   };
-  // The calculator buttons beside Net and Gross Usage, for a part whose usage the engine calculates: the fields take the calculated figures and the
-  // dialog shows where they come from. The working is the panel under the fields, which may be scrolled out of sight (and when the fields already
-  // hold the calculated figures nothing else changes), so the button brings it into view and marks it for a moment.
-  const usageCalculationRef = useRef<HTMLDivElement>(null);
-  const [usageCalculationMarked, setUsageCalculationMarked] = useState(false);
-  const showUsageCalculation = (usage: MaterialUsageExplanation) => {
-    applyCalculatedUsage(usage);
-    usageCalculationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setUsageCalculationMarked(true);
+  // The calculator buttons beside Net and Gross Usage, for a part whose usage the cost engine calculates (every family but sheet metal, which has
+  // its own reference calculators here): the calculator panel opens on the engine's own working of that figure, with a button that puts the
+  // calculated figures in the fields.
+  const showUsageCalculation = (target: 'netUsage' | 'grossUsage') => {
+    setCalculatorTarget(target);
+    setCalculatorResults(null);
+    setCalculatorWarnings([]);
+    setCalculatorOpen(true);
   };
-  useEffect(() => {
-    if (!usageCalculationMarked) return;
-    const timer = setTimeout(() => setUsageCalculationMarked(false), 1800);
-    return () => clearTimeout(timer);
-  }, [usageCalculationMarked]);
+  const calculatorShowsEngineUsage = !isSheetMetalItem && usageIsCalculated;
   // A new record starts from the calculated usage once a material is chosen, instead of from empty fields. Once per open: it never overwrites typing.
   const usageAutoFilledRef = useRef(false);
   useEffect(() => { if (!open) usageAutoFilledRef.current = false; }, [open]);
@@ -1545,7 +1541,7 @@ export function RawMaterialDialog({
                     onClick={(e) => {
                       e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
                       // Every family but sheet metal (which has its own reference calculators here): the button fills the fields from the engine's calculation.
-                      if (!isSheetMetalItem && usageIsCalculated) { showUsageCalculation(materialUsage); return; }
+                      if (calculatorShowsEngineUsage) { showUsageCalculation('netUsage'); return; }
                       setCalculatorTarget('netUsage');
                       setCalculatorResults(null);
                       setCalculatorWarnings([]);
@@ -1558,7 +1554,7 @@ export function RawMaterialDialog({
                     }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    title={!isSheetMetalItem && usageIsCalculated ? 'Show how the usage is calculated, and fill Net, Gross and Scrap from it' : 'Use DB Calculator'}
+                    title={!isSheetMetalItem && usageIsCalculated ? 'Open the calculation of this usage' : 'Use DB Calculator'}
                     disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
@@ -1610,7 +1606,7 @@ export function RawMaterialDialog({
                     type="button" variant="outline" size="icon"
                     onClick={(e) => {
                       e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
-                      if (!isSheetMetalItem && usageIsCalculated) { showUsageCalculation(materialUsage); return; }
+                      if (calculatorShowsEngineUsage) { showUsageCalculation('grossUsage'); return; }
                       setCalculatorTarget('grossUsage');
                       setCalculatorResults(null);
                       setCalculatorWarnings([]);
@@ -1623,7 +1619,7 @@ export function RawMaterialDialog({
                     }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    title={isSheetMetalItem && grossUsageCalculator ? 'View calculation & override' : usageIsCalculated ? 'Show how the usage is calculated, and fill Net, Gross and Scrap from it' : 'Use DB Calculator'}
+                    title={isSheetMetalItem && grossUsageCalculator ? 'View calculation & override' : usageIsCalculated ? 'Open the calculation of this usage' : 'Use DB Calculator'}
                     disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
@@ -1762,14 +1758,12 @@ export function RawMaterialDialog({
               </div>
             </div>
 
-            <div ref={usageCalculationRef} className={`rounded-lg transition-shadow duration-300 ${usageCalculationMarked ? 'ring-2 ring-primary' : ''}`}>
-              <MaterialUsageJustification
-                usage={materialUsage}
-                loading={materialUsageLoading}
-                fields={{ net: netUsage, gross: grossUsage }}
-                onUse={applyCalculatedUsage}
-              />
-            </div>
+            <MaterialUsageJustification
+              usage={materialUsage}
+              loading={materialUsageLoading}
+              fields={{ net: netUsage, gross: grossUsage }}
+              onUse={applyCalculatedUsage}
+            />
 
             {/* Scrap, Reclaim Rate, Overhead */}
             <div className="grid grid-cols-3 gap-4">
@@ -1970,6 +1964,33 @@ export function RawMaterialDialog({
             </SheetTitle>
           </SheetHeader>
 
+          {calculatorShowsEngineUsage && materialUsage ? (
+            // The usage of this part is calculated by the cost engine: its working, not a calculator to pick and fill by hand.
+            <div className="mt-6 space-y-5" data-testid="engine-usage-calculation">
+              <p className="text-xs text-muted-foreground">
+                Calculated by the cost engine for this part ({USAGE_SOURCE_LABEL[materialUsage.source]}). Every input is shown with where it was read.
+              </p>
+              <div className="rounded-lg border border-border/60 px-3 py-3 space-y-4">
+                {calculatorTarget === 'netUsage' ? (
+                  <UsageWorking label="Net usage" justification={materialUsage.net} />
+                ) : (
+                  <>
+                    <UsageWorking label="Gross usage" justification={materialUsage.gross} />
+                    <UsageWorking label="Scrap" justification={materialUsage.scrap} />
+                  </>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">
+                  {calculatorTarget === 'netUsage' ? 'Net usage' : 'Gross usage'}:{' '}
+                  <span className="font-semibold tabular-nums">{formatKg(calculatorTarget === 'netUsage' ? materialUsage.netUsage : materialUsage.grossUsage)} kg</span>
+                </span>
+                <Button type="button" onClick={() => { applyCalculatedUsage(materialUsage); setCalculatorOpen(false); }}>
+                  Use calculated values
+                </Button>
+              </div>
+            </div>
+          ) : (
           <div className="mt-6 space-y-6">
             {/* Calculator Selector */}
             <div className="space-y-2">
@@ -2325,6 +2346,7 @@ export function RawMaterialDialog({
               </>
             )}
           </div>
+          )}
         </SheetContent>
       </Sheet>
 

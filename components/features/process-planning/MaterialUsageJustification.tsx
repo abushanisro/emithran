@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import type { MaterialUsageExplanation, UsageJustification } from '@/lib/api/hooks/useMaterialUsage';
 import { formatKg, USAGE_SOURCE_LABEL, usageDrift } from '@/lib/costing/material-usage-view';
 
-function Working({ label, justification }: { label: string; justification: UsageJustification }) {
+/** One usage figure's working: the calculator or rule, every input with where it was read, and each result with its formula. */
+export function UsageWorking({ label, justification }: { label: string; justification: UsageJustification }) {
   const inputs = justification.trace.filter((s) => s.kind === 'input');
   const results = justification.trace.filter((s) => s.kind === 'calculated');
   return (
@@ -79,9 +80,9 @@ export function MaterialUsageJustification({ usage, loading, fields, onUse }: {
       )}
       {derived ? (
         <>
-          <Working label="Net usage" justification={usage.net} />
-          <Working label="Gross usage" justification={usage.gross} />
-          <Working label="Scrap" justification={usage.scrap} />
+          <UsageWorking label="Net usage" justification={usage.net} />
+          <UsageWorking label="Gross usage" justification={usage.gross} />
+          <UsageWorking label="Scrap" justification={usage.scrap} />
         </>
       ) : (
         <p className="text-[11px] text-muted-foreground">{usage.net.title}. Enter the usage by hand.</p>
