@@ -6,7 +6,7 @@ import { groupFeaturesByType } from '@/lib/features/machining-feature-tree';
 import {
   familyToProcessGroupLabel,
 } from '@/lib/features/process-group';
-import { isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
+import { firstStepHoldsUnclaimedFeatures, isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
 import { sheetMetalOperationNodes, type OperationTreeNode } from '@/lib/features/sheet-metal-operation-nodes';
 import type { FeatureGraph, FeatureGraphSummary, FeatureNodeV2 } from '@/lib/types/manufacturing';
 
@@ -353,7 +353,7 @@ export function buildProcessTree(
             ...(feats.length > 0 ? { children: typeGroupNodes(`machining_type_${opIdx}_${i}`, feats, machine) } : {}),
           });
         });
-      } else if (opIdx === 0) {
+      } else if (opIdx === 0 && firstStepHoldsUnclaimedFeatures(family)) {
         const unclaimed = v2All.filter((f) => !claimedIds.has(f.id));
         featureNodes.push(...typeGroupNodes(`machining_type_${opIdx}`, unclaimed, machine));
       }

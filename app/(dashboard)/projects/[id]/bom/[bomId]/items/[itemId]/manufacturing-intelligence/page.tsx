@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 
 import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
+import { ForgingSection } from '@/components/costing/ForgingSection';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -4528,43 +4529,13 @@ function CostGuidePanel({
 
             {cgpCostSummary?.family === 'forged' && (
               <Section title="Forging">
-                {/* The part complexity score sets the flash the forging carries and the pressure its finishing blow needs (memory/Forging
-                    partComplexityBasedData). Unset, the data's least score for a 3D part is used and the Cost tab says so. */}
-                <label className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-muted-foreground">Part complexity (1 simple to 12 complex)</span>
-                  <select
-                    value={typeof item.scenarioOverrides?.forgingComplexity === 'number' ? String(item.scenarioOverrides.forgingComplexity) : ''}
-                    onChange={(e) => { patchScenarioOverrides.mutate({ id: item.id, patch: { forgingComplexity: e.target.value ? Number(e.target.value) : null } }); }}
-                    className="w-28 text-xs border border-border rounded px-2 py-1 bg-background"
-                  >
-                    <option value="">{`Default (${cgpCostSummary.forging?.complexity ?? 7})`}</option>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                </label>
-                {/* The route: unset, the cheapest complete one is quoted. Each option shows its total per part, or why it is not a route for the part. */}
-                {cgpCostSummary.forging && (
-                  <label className="mt-2 flex items-center justify-between gap-2 text-xs">
-                    <span className="text-muted-foreground">Route</span>
-                    <select
-                      value={typeof item.scenarioOverrides?.forgingRoute === 'string' ? item.scenarioOverrides.forgingRoute : ''}
-                      onChange={(e) => { patchScenarioOverrides.mutate({ id: item.id, patch: { forgingRoute: e.target.value || null } }); }}
-                      className="w-56 text-xs border border-border rounded px-2 py-1 bg-background"
-                    >
-                      <option value="">Cheapest complete route</option>
-                      {cgpCostSummary.forging.options.map((o) => (
-                        <option key={o.route} value={o.route} title={o.reason ?? undefined}>
-                          {o.label} · {o.complete && o.totalCost != null ? `${o.totalCost.toFixed(2)} ${cgpCostSummary.currency ?? ''}`.trim() : o.reason ?? 'incomplete'}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                {cgpCostSummary.forging && (
-                  <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
-                    {cgpCostSummary.forging.routeLabel} · {cgpCostSummary.forging.barDiameterMm} mm bar, {cgpCostSummary.forging.multLengthMm} mm mults, {cgpCostSummary.forging.heating === 'induction' ? 'induction heated' : 'gas furnace heated'} · {cgpCostSummary.forging.hits} {cgpCostSummary.forging.hits === 1 ? 'blow' : 'blows'} at {cgpCostSummary.forging.forming.quantity === 'energy_j' ? `${Math.round(cgpCostSummary.forging.forming.value / 1000)} kJ` : `${Math.round(cgpCostSummary.forging.forming.value)} kN`}
-                    {cgpCostSummary.forging.flash && ` · flash ${cgpCostSummary.forging.flash.thicknessMm} × ${cgpCostSummary.forging.flash.widthMm} mm`}
-                  </p>
-                )}
+                <ForgingSection
+                  forging={cgpCostSummary.forging}
+                  complexity={typeof item.scenarioOverrides?.forgingComplexity === 'number' ? item.scenarioOverrides.forgingComplexity : null}
+                  route={typeof item.scenarioOverrides?.forgingRoute === 'string' ? item.scenarioOverrides.forgingRoute : null}
+                  currency={cgpCostSummary.currency}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
               </Section>
             )}
 

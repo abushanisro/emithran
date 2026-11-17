@@ -21,3 +21,15 @@ export function isMachiningTreeFamily(family: string): boolean {
 export function showsStepTextRows(family: string): boolean {
   return family !== 'sand_cast'
 }
+
+/** Families made by machining alone: their first step is the one that machines the part. */
+const MACHINED_FAMILIES: ReadonlySet<string> = new Set(['milled', 'turned', 'mill_turn'])
+
+/**
+ * Whether the features no step claims are shown under the part's first step. A machined part's first step machines it, so it holds them; a
+ * cast or forged part's first step (melting, a wax pattern, sawing the bar) makes none of them, and a feature that is machined afterwards is
+ * listed under its machining step.
+ */
+export function firstStepHoldsUnclaimedFeatures(family: string): boolean {
+  return MACHINED_FAMILIES.has(family)
+}

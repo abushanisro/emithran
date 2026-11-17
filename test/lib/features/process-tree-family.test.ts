@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
+import { firstStepHoldsUnclaimedFeatures, isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
 
 describe('process-tree-family', () => {
   it('sheet metal, plastic molding and sand casting show catalog operations; the others the machining tree', () => {
@@ -16,5 +16,14 @@ describe('process-tree-family', () => {
     expect(showsStepTextRows('sand_cast')).toBe(false);
     expect(showsStepTextRows('sheet_metal')).toBe(true);
     expect(showsStepTextRows('machined')).toBe(true);
+  });
+});
+
+describe('the features no step claims', () => {
+  it('sit under the first step of a machined part, which machines it', () => {
+    for (const f of ['milled', 'turned', 'mill_turn']) expect(firstStepHoldsUnclaimedFeatures(f)).toBe(true);
+  });
+  it('are not put under the first step of a cast or forged part (melting, a wax pattern, sawing the bar)', () => {
+    for (const f of ['die_cast', 'investment_cast', 'forged', 'sand_cast', '']) expect(firstStepHoldsUnclaimedFeatures(f)).toBe(false);
   });
 });
