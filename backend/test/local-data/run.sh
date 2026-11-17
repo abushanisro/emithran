@@ -55,6 +55,9 @@ INSERT INTO public.process_calculator_mappings (process_group, process_route, op
 SELECT 'Casting Investment', n, n, false FROM unnest(ARRAY['Band Saw','Belt Sand','Cooling','Drying','Flash Fire De-Waxing','Knockout','Metal Pouring','Mold Burnout',
   'Mold Preheating','Primary Sand Coating','Primary Slurry Dipping','Robotic Assist','Secondary Sand Coating','Secondary Slurry Dipping','Steam Autoclave De-Waxing',
   'Wax Pattern Molding']) AS n;
+-- the forging catalog rows migration 790 seeds: migration 1051 links the forging calculators to them and fails if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Forging', n, n, false FROM unnest(ARRAY['Band Saw','Conveyor Induction Heat','Press','Mechanical Press','Trim']) AS n;
 -- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;
