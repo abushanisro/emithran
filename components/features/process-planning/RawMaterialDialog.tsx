@@ -22,8 +22,8 @@ import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type 
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
 import { useMaterialUsage, type MaterialUsageExplanation } from '@/lib/api/hooks/useMaterialUsage';
 import { CalculationTracePanel } from './CalculationTracePanel';
-import { MaterialUsageJustification, UsageWorking } from './MaterialUsageJustification';
-import { formatKg, USAGE_SOURCE_LABEL } from '@/lib/costing/material-usage-view';
+import { MaterialUsageJustification } from './MaterialUsageJustification';
+import { UsageCalculatorForm } from './UsageCalculatorForm';
 import { ReferenceTable } from './ReferenceTable';
 import { isStockDrivenBlank } from '@/lib/costing/material-usage';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -1965,31 +1965,8 @@ export function RawMaterialDialog({
           </SheetHeader>
 
           {calculatorShowsEngineUsage && materialUsage ? (
-            // The usage of this part is calculated by the cost engine: its working, not a calculator to pick and fill by hand.
-            <div className="mt-6 space-y-5" data-testid="engine-usage-calculation">
-              <p className="text-xs text-muted-foreground">
-                Calculated by the cost engine for this part ({USAGE_SOURCE_LABEL[materialUsage.source]}). Every input is shown with where it was read.
-              </p>
-              <div className="rounded-lg border border-border/60 px-3 py-3 space-y-4">
-                {calculatorTarget === 'netUsage' ? (
-                  <UsageWorking label="Net usage" justification={materialUsage.net} />
-                ) : (
-                  <>
-                    <UsageWorking label="Gross usage" justification={materialUsage.gross} />
-                    <UsageWorking label="Scrap" justification={materialUsage.scrap} />
-                  </>
-                )}
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm">
-                  {calculatorTarget === 'netUsage' ? 'Net usage' : 'Gross usage'}:{' '}
-                  <span className="font-semibold tabular-nums">{formatKg(calculatorTarget === 'netUsage' ? materialUsage.netUsage : materialUsage.grossUsage)} kg</span>
-                </span>
-                <Button type="button" onClick={() => { applyCalculatedUsage(materialUsage); setCalculatorOpen(false); }}>
-                  Use calculated values
-                </Button>
-              </div>
-            </div>
+            // The usage of this part is calculated by the cost engine: the calculator behind the figure as a form, filled with the engine's values.
+            <UsageCalculatorForm usage={materialUsage} target={calculatorTarget === 'netUsage' ? 'netUsage' : 'grossUsage'} onUse={(u) => { applyCalculatedUsage(u); setCalculatorOpen(false); }} />
           ) : (
           <div className="mt-6 space-y-6">
             {/* Calculator Selector */}

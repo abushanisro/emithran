@@ -51,6 +51,27 @@ describe('explainMaterialUsage', () => {
     reconciles(e);
   });
 
+  it('investment casting: the net weight of the metal calculator and the Bought Weight of the material-cost calculator', () => {
+    const metal = run('Investment Casting - Metal per casting', 'Poured Weight', 0.0665, [
+      step('input', 'Part Volume', 5178.74), step('input', 'Density', 7700), step('input', 'Gating Efficiency', 0.6), step('input', 'Patterns per Tree', 40),
+      step('calculated', 'Net Weight', 0.0399, { formula: '{Part Volume} * 1e-9 * {Density}' }), step('calculated', 'Poured Weight', 0.0665, { formula: '{Net Weight} / {Gating Efficiency}' }),
+      step('calculated', 'Poured per Tree', 2.66, { formula: '{Poured Weight} * {Patterns per Tree}' }),
+    ]);
+    const cost = run('Investment Casting - Material cost', 'Material Cost', 0.08, [
+      step('input', 'Net Weight', 0.0399), step('input', 'Poured Weight', 0.0665), step('input', 'Furnace Yield', 0.95), step('input', 'Remelt Allowance', 97.5), step('input', 'Price', 1.82),
+      step('calculated', 'Melt Loss', 0.0035, { formula: '{Poured Weight} / {Furnace Yield} - {Poured Weight}' }),
+      step('calculated', 'Bought Weight', 0.044074, { formula: '{Net Weight} + {Melt Loss} + ({Poured Weight} - {Net Weight}) * (1 - min(max({Remelt Allowance} / 100, 0), 1))' }),
+      step('calculated', 'Material Cost', 0.08, { formula: '{Bought Weight} * {Price}' }),
+    ]);
+    const e = explainMaterialUsage({ ...base, castingMetal: { partKg: 0.0399, chargedKg: 0.044074 }, calculatorRuns: { 'Investment metal per casting': metal, 'Investment material cost': cost } });
+    expect(e.net.title).toBe('Investment Casting - Metal per casting');
+    expect(steps(e.net)).toEqual(['Part Volume=5178.74', 'Density=7700', 'Net Weight=0.0399']);
+    expect(e.gross.title).toBe('Investment Casting - Material cost');
+    // The price belongs to the cost, not to the weight bought.
+    expect(steps(e.gross)).toEqual(['Net Weight=0.0399', 'Poured Weight=0.0665', 'Furnace Yield=0.95', 'Remelt Allowance=97.5', 'Melt Loss=0.0035', 'Bought Weight=0.044074']);
+    reconciles(e);
+  });
+
   it('never shows a calculator whose result is not the recorded figure: it falls back to the rule in words', () => {
     const stale = run('Die Casting - Gross Material Usage', 'Gross Usage', 0.5, [step('calculated', 'Gross Usage', 0.5)]);
     const e = explainMaterialUsage({ ...base, itemVolumeMm3: 10000, densityKgM3: 2700, castingMetal: { partKg: 0.027, chargedKg: 0.03 }, calculatorRuns: { 'Gross Material Usage': stale } });
