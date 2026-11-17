@@ -102,7 +102,8 @@ export class ForgingCostService {
 
   private cached: SandReference | null = null;
 
-  private async reference(): Promise<{ reference: SandReference | null; missing: string[] }> {
+  /** The staged memory/Forging variables and lookup tables (read once; a read error is reported and not cached). */
+  async reference(): Promise<{ reference: SandReference | null; missing: string[] }> {
     if (this.cached) return { reference: this.cached, missing: [] };
     const read = await readStagedReference(this.database, SOURCE_VERSION, 'Forging', 823);
     if (read.reference) this.cached = read.reference;

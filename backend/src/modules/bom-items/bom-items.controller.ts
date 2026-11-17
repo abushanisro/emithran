@@ -80,6 +80,7 @@ import { DesignGuidanceService } from './services/design-guidance.service';
 import type { DesignGuidance } from './costing/shared/design-guidance';
 import { PlasticDfmService, MOLDING_PROCESS_NAMES } from './costing/plastic-molding/dfm/plastic-dfm.service';
 import { MachiningDfmService } from './costing/machining/dfm/machining-dfm.service';
+import { ForgingDfmService } from './costing/forging/dfm/forging-dfm.service';
 import { AnalysisRunService, type AnalysisRunResult } from './services/analysis-run.service';
 import { BomItemReanalysisService } from './services/bom-item-reanalysis.service';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
@@ -127,6 +128,7 @@ export class BOMItemsController {
     private readonly dfmScoringService: DFMScoringService,
     private readonly plasticDfm: PlasticDfmService,
     private readonly machiningDfm: MachiningDfmService,
+    private readonly forgingDfm: ForgingDfmService,
     private readonly partSummaries: PartSummaryService,
     private readonly materialSnapshots: MaterialCostSnapshotService,
     private readonly designGuidance: DesignGuidanceService,
@@ -535,6 +537,19 @@ export class BOMItemsController {
     return this.machiningDfm.evaluate({
       featureGraph: item.featureGraph, grade: item.materialGrade ?? null,
       part: { dimensionsMm: [item.maxLength, item.maxWidth, item.maxHeight], weightKg: item.weight },
+    });
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/forging-dfm')
+  @ApiOperation({ summary: 'Design-for-forging checks of a forged part against the forging reference rules (forging_manufacturabilitySeverity); findings carry the faces to highlight' })
+  @ApiResponse({ status: 200, description: 'The findings, and every check with its limit, source and status (passed, failed, or not evaluated with why)' })
+  async getForgingDfm(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    const threads = ((item.drawingIntelligence as { threads?: Array<{ count?: unknown }> } | null)?.threads ?? []).reduce((n, t) => n + (Number(t.count) || 1), 0);
+    return this.forgingDfm.evaluate({
+      id, accessToken: token, client: this.databaseService.getClient(token),
+      featureGraph: item.featureGraph, grade: item.materialGrade ?? null, threads,
     });
   }
 

@@ -14305,6 +14305,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/forging-dfm": {
+      "get": {
+        "operationId": "BOMItemsController_getForgingDfm_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The findings, and every check with its limit, source and status (passed, failed, or not evaluated with why)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Design-for-forging checks of a forged part against the forging reference rules (forging_manufacturabilitySeverity); findings carry the faces to highlight",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/gdt-analysis": {
       "get": {
         "operationId": "BOMItemsController_getGdtAnalysis_v1",
