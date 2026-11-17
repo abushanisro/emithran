@@ -687,6 +687,8 @@ export interface CostSummaryDto {
   investmentCasting?: InvestmentCastingBreakdown;
   /** Powder metal: what the press-and-sinter route decided (green density, compaction, fill, sintering belt). */
   powderMetal?: PowderMetalBreakdown;
+  /** Composites: the ply stack read from the laminate, the core, the layup route quoted and every route. */
+  composites?: CompositesBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
 
@@ -786,6 +788,28 @@ export interface ForgingBreakdown {
   /** False while a step no machine can do is a gap. */
   complete: boolean;
   /** Every route: its total per part (summary currency, tooling included) when complete, or why it is not a route for the part. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
+/** What the composites route decided: the plies read from the laminate's thickness, the core, the autoclave load and the layup route. */
+export interface CompositesBreakdown {
+  /** The quoted route (composites-route.ts COMPOSITES_ROUTES key) and its name. */
+  route: string;
+  routeLabel: string;
+  /** The laminate at its thickest (core excluded) and the cured ply thickness of the material it is divided by. */
+  laminateMm: number;
+  plyThicknessMm: number;
+  /** From the thickness map, or the ply count set in the Cost Guide. */
+  plySource: 'geometry' | 'scenario';
+  plies: Array<{ index: number; areaMm2: number; perimeterMm: number; level: number }>;
+  core: { areaMm2: number; perimeterMm: number; depthMm: number } | null;
+  /** Parts sharing one autoclave cycle (a share of its length when the autoclave is shared). */
+  partsPerLoad: number | null;
+  /** Prepreg bought (m²) and the plies' mass (kg). */
+  boughtAreaM2: number;
+  plyMassKg: number;
+  complete: boolean;
+  /** Every route: its total per part (summary currency) when complete, or why it is not a route for the part. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
 }
 

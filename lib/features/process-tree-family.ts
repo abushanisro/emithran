@@ -26,7 +26,7 @@ export function showsStepTextRows(family: string): boolean {
  * Families whose steps list features only, never their cost line's text ("Band Saw: 10.46 s per casting"): every step either forms the part's
  * features or acts on the whole part, and its time is on the Cost tab.
  */
-const FEATURE_ONLY_FAMILIES: ReadonlySet<string> = new Set(['sand_cast', 'forged', 'powder_metal'])
+const FEATURE_ONLY_FAMILIES: ReadonlySet<string> = new Set(['sand_cast', 'forged', 'powder_metal', 'composite'])
 
 /** What a step that acts on the whole part shows as its feature: the casting, or the part. */
 export function wholePartLabel(family: string): string {

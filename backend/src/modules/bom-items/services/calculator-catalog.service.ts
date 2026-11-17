@@ -8,6 +8,7 @@ import { loadHeatTreatmentCalculatorSpec } from '../costing/heat/calculators/hea
 import { loadSandCastingCalculatorSpec } from '../costing/casting/sand/calculators/sand-casting-calculator-spec';
 import { loadInvestmentCastingCalculatorSpec } from '../costing/casting/investment/calculators/investment-casting-calculator-spec';
 import { loadPowderMetalCalculatorSpec } from '../costing/powder-metal/calculators/powder-metal-calculator-spec';
+import { loadCompositesCalculatorSpec } from '../costing/composites/calculators/composites-calculator-spec';
 import { loadForgingCalculatorSpec } from '../costing/forging/calculators/forging-calculator-spec';
 import { loadPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
@@ -187,6 +188,11 @@ export class CalculatorCatalogService {
 
   loadPowderMetalCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('powder-metal-calculators', loadPowderMetalCalculatorSpec(), accessToken);
+  }
+
+  /** The composites calculators (migration 1065) keyed by their own name: one not in the database is absent. */
+  loadCompositesCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('composites-calculators', loadCompositesCalculatorSpec(), accessToken);
   }
 
   private loadSpecCalculators(cacheKey: string, spec: DomainCalculatorSpec, accessToken: string): Promise<ReferenceCalculators> {

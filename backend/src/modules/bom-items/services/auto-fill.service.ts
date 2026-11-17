@@ -572,6 +572,27 @@ export class AutoFillService {
             angleToDieDeg: h.angle_to_die_deg == null ? null : Number(h.angle_to_die_deg), variant: String(h.variant ?? ''),
           })).filter((h) => Number.isFinite(h.diameterMm) && h.diameterMm > 0),
         } : {}),
+        // A laid-up composite: the laminate on its tool (cad-engine composites/feature_extractor.py). The composites cost reads the skins, the
+        // thickness levels (the plies and the core are read from them), the outline and the curvature. null = not measured, never 0.
+        ...(family.family === 'composite' ? {
+          compositeLaminate: cadMI?.features?.extraction_version ? {
+            extractionVersion: cadMI.features.extraction_version,
+            layupDirection: cadMI.features.layup_direction?.vector ?? null,
+            toolAreaMm2: cadMI.features.surfaces?.tool_area_mm2 ?? null,
+            bagAreaMm2: cadMI.features.surfaces?.bag_area_mm2 ?? null,
+            outerAreaMm2: cadMI.features.outline?.outer_area_mm2 ?? null,
+            trimLengthMm: cadMI.features.outline?.trim_length_mm ?? null,
+            openingsAreaMm2: ((cadMI.features.outline?.openings ?? []) as Array<{ area_mm2?: number }>).reduce((s, o) => s + Number(o.area_mm2 ?? 0), 0),
+            footprintMm: cadMI.features.outline?.footprint_mm ?? null,
+            heightMm: cadMI.features.outline?.height_mm ?? null,
+            curvaturePerM: cadMI.features.curvature?.average_per_m ?? null,
+            holeCount: Array.isArray(cadMI.features.holes) ? cadMI.features.holes.length : 0,
+            levels: ((cadMI.features.thickness?.levels ?? []) as Array<Record<string, unknown>>).map((l) => ({
+              thicknessMm: Number(l.thickness_mm), regionAreaMm2: Number(l.region_area_mm2), regionPerimeterMm: Number(l.region_perimeter_mm),
+              faceIds: (l.face_ids ?? []) as number[],
+            })),
+          } : null,
+        } : {}),
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
         // (cadMI.features). Detection + highlighting only; process routing and
         // costing are a later phase (see the Die Casting Phase 1 plan).
