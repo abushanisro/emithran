@@ -38,7 +38,7 @@ from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
 from OCC.Core.Standard import Standard_Failure  # type: ignore
 
 from shared.error_reporting import report_failure
-from shared.part_family import ALL_FAMILIES, CASTING_FAMILY_DOMAIN, MILLED, PLASTIC_MOLDED, SHEET_METAL
+from shared.part_family import ALL_FAMILIES, CASTING_FAMILY_DOMAIN, FORGED, MILLED, PLASTIC_MOLDED, SHEET_METAL
 
 logger = logging.getLogger(__name__)
 
@@ -799,6 +799,14 @@ class AdvancedCADMemoryOptimizer:
                     face_map=holes.get('face_map', []),
                     face_map_tri_total=holes.get('face_map_tri_total', 0),
                     domain=CASTING_FAMILY_DOMAIN[detected_family],
+                )
+            elif detected_family == FORGED:
+                from forging.feature_extractor import ForgingFeatureExtractor  # type: ignore
+                manufacturing_intelligence['features'] = ForgingFeatureExtractor().extract(
+                    shape, dims_list,
+                    face_map=holes.get('face_map', []),
+                    face_map_tri_total=holes.get('face_map_tri_total', 0),
+                    die_direction_override=pull_direction,
                 )
             # holes= here is the coarse _detect_holes_real count (a classification
             # signal only — may include bend-radius cylinder faces; see that

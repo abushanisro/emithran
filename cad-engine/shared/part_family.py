@@ -25,9 +25,12 @@ DIE_CAST = "die_cast"
 # through the explicit family_hint (the user's chosen process).
 SAND_CAST = "sand_cast"
 INVESTMENT_CAST = "investment_cast"
+# Closed-die forging: measured by forging/feature_extractor.py. Like the casting families, reached only through the explicit family_hint (the
+# user's chosen process): no shape is a forging by its geometry alone.
+FORGED = "forged"
 
 ALL_FAMILIES: FrozenSet[str] = frozenset({
-    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST,
+    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED,
 })
 
 # Casting families -> the reference-catalog domain their features validate

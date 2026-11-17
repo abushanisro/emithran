@@ -47,6 +47,8 @@ cad-engine/
     feature_extractor.py         — InjectionMoldedFeatureExtractor
   die_casting/
     feature_extractor.py         — die-casting extractor (reached through family_hint="die_cast")
+  forging/
+    feature_extractor.py         — closed-die forging measurements (reached through family_hint="forged")
   contract/
     assembly.schema.json         — /analyze/assembly result contract
   machining/
