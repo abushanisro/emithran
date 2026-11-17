@@ -549,6 +549,22 @@ export class AutoFillService {
           forgingPlanWidthMm:         cadMI?.features?.plan?.width_mm ?? null,
           forgingSectionMinMm:        cadMI?.features?.section_thickness?.min_mm ?? null,
           forgingSectionMaxMm:        cadMI?.features?.section_thickness?.max_mm ?? null,
+          // What the forging DFM judges, per face (forging-dfm.ts): each wall's draft to the die direction and how much of it is covered from its
+          // own die half, the section behind each face, the rounded edges, the edges with no radius, and the trapped volumes.
+          forgingDraftFaces: ((cadMI?.features?.draft?.faces ?? null) as Array<Record<string, unknown>> | null)?.map((f) => ({
+            faceId: Number(f.face_id), draftDeg: f.draft_deg == null ? null : Number(f.draft_deg), undercutFraction: Number(f.undercut_fraction ?? 0),
+          })) ?? null,
+          forgingThicknessFaces: ((cadMI?.features?.section_thickness?.faces ?? null) as Array<Record<string, unknown>> | null)?.map((f) => ({
+            faceId: Number(f.face_id), thicknessMm: Number(f.thickness_mm),
+          })) ?? null,
+          forgingRadii: ((cadMI?.features?.radii ?? null) as Array<Record<string, unknown>> | null)?.map((r) => ({
+            kind: r.kind === 'corner' ? 'corner' : 'fillet', radiusMm: Number(r.radius_mm), faceIds: (r.face_ids ?? []) as number[],
+          })) ?? null,
+          forgingSharpEdges: cadMI?.features?.sharp_edges ? {
+            internal: ((cadMI.features.sharp_edges.internal_edges ?? []) as Array<Record<string, unknown>>).map((e) => ({ faceIds: (e.face_ids ?? []) as number[], lengthMm: Number(e.length_mm) })),
+            externalCount: Number(cadMI.features.sharp_edges.external_count ?? 0),
+          } : null,
+          forgingTrappedVolumeCount:  cadMI?.features?.trapped_volumes?.count ?? null,
           // The holes, with their angle to the die direction: a bore along it makes a ring; one too small or across it is machined.
           forgingHoles: ((cadMI?.features?.holes ?? []) as Array<Record<string, unknown>>).map((h) => ({
             diameterMm: Number(h.diameter_mm), depthMm: h.depth_mm == null ? null : Number(h.depth_mm),

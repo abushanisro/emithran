@@ -63,6 +63,8 @@ interface FeatureMachiningNeed {
   candidates: MachiningCandidate[];
   /** Catalog operations rejected for this feature, with why. */
   rejected: Array<{ operation: string; reason: string }>;
+  /** The tolerance categories the primary process does not hold on this feature (the requirements that make it short). */
+  shortCategories: string[];
 }
 
 export interface MachiningNeedResult {
@@ -102,6 +104,7 @@ export function evaluateMachiningNeed(input: {
     const reasons: string[] = [];
     let short = false;
     let undecided = false;
+    const shortCategories: string[] = [];
 
     const primary = input.primaryProcessOf ? input.primaryProcessOf({ instance, requirements }) : input.primaryProcess;
     const form = input.formability?.({ instance, requirements }) ?? null;
@@ -118,7 +121,7 @@ export function evaluateMachiningNeed(input: {
       if (primary == null) break;
       const h = processHolds(primary, req, instance.sizeMm, input.capability, input.iso);
       reasons.push(`${h.detail} [${req.source}]`);
-      if (h.held === false) short = true;
+      if (h.held === false) { short = true; if (!shortCategories.includes(req.category)) shortCategories.push(req.category); }
       if (h.held === null) undecided = true;
     }
 
@@ -165,7 +168,7 @@ export function evaluateMachiningNeed(input: {
         const a = processAchieves(primary, c, instance.sizeMm, input.capability, input.iso);
         return a ? [a] : [];
       }),
-      reasons, requirements, forming, candidates, rejected,
+      reasons, requirements, forming, candidates, rejected, shortCategories,
     };
   });
   return { primaryProcess: input.primaryProcess, features, machiningRequired: features.some((f) => f.verdict === 'needs_machining') };

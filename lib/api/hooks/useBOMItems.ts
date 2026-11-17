@@ -626,6 +626,17 @@ export function useMachiningDfm(bomItemId: string | undefined, enabled: boolean)
   });
 }
 
+/** The design-for-forging checks of a forged part against the forging reference rules (same result shape as the machining checks). */
+export function useForgingDfm(bomItemId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['bom-items', bomItemId, 'forging-dfm'],
+    queryFn: async () => apiClient.get<MachiningDfmView>(`/bom-items/${bomItemId ?? ''}/forging-dfm`),
+    enabled: useAuthEnabledWith(!!bomItemId && enabled),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
 // ── Cost Summary ──────────────────────────────────────────────────────────────
 
 // ── Machine selection (physics-based capability engine) ──────────────────────

@@ -19,3 +19,13 @@ describe('machiningDfmHighlight', () => {
     expect(machiningDfmHighlight({ rule: 'ToolReach', severity: 'minor', occurrences: [{ featureId: 'gone', occurrenceIndex: 0 }] }, [pockets])).toBeNull();
   });
 });
+
+describe('a finding about faces no feature holds', () => {
+  it('highlights those faces (a forging wall with too little draft)', () => {
+    const node = machiningDfmHighlight({ rule: 'InsufficientDraftAngle', severity: 'critical', occurrences: [], faces: [3, 7] }, []);
+    expect(node?.occurrences).toEqual([{ centroid: [0, 0, 0], face_ids: [3, 7] }]);
+  });
+  it('still points at nothing when it names neither features nor faces', () => {
+    expect(machiningDfmHighlight({ rule: 'Threaded', severity: 'critical', occurrences: [], faces: [] }, [])).toBeNull();
+  });
+});

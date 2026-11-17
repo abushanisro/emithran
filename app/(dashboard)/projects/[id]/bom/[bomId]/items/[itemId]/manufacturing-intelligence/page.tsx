@@ -26,7 +26,7 @@ import { GcdToleranceTab } from '@/components/features/manufacturing-intelligenc
 import { MachineChoicePanel } from '@/components/features/manufacturing-intelligence/MachineChoicePanel';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
 import { MachineSpecPanel } from '@/components/features/manufacturing-intelligence/MachineSpecPanel';
-import { MachiningDfmCheckRows, MachiningDfmFindings } from '@/components/features/manufacturing-intelligence/MachiningDfmFindings';
+import { MachiningDfmCheckRows, MachiningDfmFindings, type DfmProcess } from '@/components/features/manufacturing-intelligence/MachiningDfmFindings';
 import { SecondaryOperationsPicker } from '@/components/features/manufacturing-intelligence/SecondaryOperationsPicker';
 import { VendorNetworkPanel } from '@/components/features/manufacturing-intelligence/VendorNetworkPanel';
 import { CalculationTracePanel } from '@/components/features/process-planning/CalculationTracePanel';
@@ -92,7 +92,7 @@ import { PlasticDfmFindings } from '@/components/features/manufacturing-intellig
 import { isSupersededPlasticCheck, isSupersededPlasticWarning } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, usePlasticDfm, useMachiningDfm } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, usePlasticDfm, useMachiningDfm, useForgingDfm } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -5961,8 +5961,12 @@ function ValidationTab({
   // A machined part's design-for-machining checks are listed with the DFM checks below.
   const machinedFeatures = isMachiningTreeFamily(item.familyClassification ?? fg?.classification.family ?? '') ? v2FeaturesForDcc : [];
   // The same request MachiningDfmCheckRows makes (deduped): its checks are counted in the section heading.
-  const { data: machiningDfm } = useMachiningDfm(item.id, machinedFeatures.length > 0);
-  const machiningCheckCount = machiningDfm?.result?.checks.length ?? 0;
+  // A forged part is checked against the forging rules (forging_manufacturabilitySeverity), whatever features it has.
+  const dfmProcess = (item.familyClassification ?? fg?.classification.family) === 'forged' ? 'forging' as const : 'machining' as const;
+  const showPartDfm = dfmProcess === 'forging' || machinedFeatures.length > 0;
+  const { data: machiningDfm } = useMachiningDfm(item.id, dfmProcess === 'machining' && showPartDfm);
+  const { data: forgingDfm } = useForgingDfm(item.id, dfmProcess === 'forging');
+  const machiningCheckCount = (dfmProcess === 'forging' ? forgingDfm : machiningDfm)?.result?.checks.length ?? 0;
   const resolveDccHighlight = (ids: string[] | undefined): FeatureNodeV2 | null => {
     if (!ids?.length) return null;
     const idSet = new Set(ids);
@@ -6247,12 +6251,12 @@ function ValidationTab({
               DFM Checks ({checks.length + machiningCheckCount})
             </span>
           </div>
-          {machinedFeatures.length > 0 ? (
+          {showPartDfm ? (
             <div className="divide-y divide-border/30 border border-border/40 rounded text-[11px] mb-1.5">
-              <MachiningDfmCheckRows itemId={item.id} features={machinedFeatures} onSelectHighlight={onSelectHighlight} />
+              <MachiningDfmCheckRows itemId={item.id} process={dfmProcess} features={fg?.feature_graph_v2?.features ?? []} onSelectHighlight={onSelectHighlight} />
             </div>
           ) : null}
-          {checks.length === 0 ? (machinedFeatures.length > 0 ? null : (
+          {checks.length === 0 ? (showPartDfm ? null : (
             <p className="text-xs text-muted-foreground pl-4">No DFM checks available.</p>
           )) : (
             <div className="divide-y divide-border/30 border border-border/40 rounded text-[11px]">
@@ -6335,7 +6339,7 @@ function DesignGuidanceTab({ fg, plastic, machining }: {
   fg: FeatureGraph | null;
   plastic?: { itemId: string; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined;
   /** A machined part: its checks against the machining reference limits replace the empty placeholder. */
-  machining?: { itemId: string; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined;
+  machining?: { itemId: string; process: DfmProcess; onSelectHighlight: (node: FeatureNodeV2 | null) => void } | undefined;
 }) {
   // On a molded part the fixed-threshold warnings the rule-based engine replaced are not shown (an analysis stored before the change still holds them).
   const warnings = (fg?.dfmWarnings ?? []).filter((w) => !plastic || !isSupersededPlasticWarning(w));
@@ -6358,7 +6362,7 @@ function DesignGuidanceTab({ fg, plastic, machining }: {
   return (
     <div className="p-3 space-y-2">
       {plastic && <PlasticDfmFindings itemId={plastic.itemId} onSelectHighlight={plastic.onSelectHighlight} />}
-      {machining && <MachiningDfmFindings itemId={machining.itemId} features={fg.feature_graph_v2?.features ?? []} onSelectHighlight={machining.onSelectHighlight} />}
+      {machining && <MachiningDfmFindings itemId={machining.itemId} process={machining.process} features={fg.feature_graph_v2?.features ?? []} onSelectHighlight={machining.onSelectHighlight} />}
       {warnings.length === 0 ? (plastic || machining ? null : (
         <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
           <span className="text-lg">✅</span>
@@ -7725,7 +7729,7 @@ function GeometricCostDriversPanel({
       {/* Design / DFM tab */}
       {tab === 'design' && (
         <div className="flex-1 overflow-y-auto min-h-0">
-          <DesignGuidanceTab fg={fg} plastic={isIM ? { itemId: item.id, onSelectHighlight } : undefined} machining={machiningFeatures.length > 0 ? { itemId: item.id, onSelectHighlight } : undefined} />
+          <DesignGuidanceTab fg={fg} plastic={isIM ? { itemId: item.id, onSelectHighlight } : undefined} machining={family === 'forged' ? { itemId: item.id, process: 'forging', onSelectHighlight } : machiningFeatures.length > 0 ? { itemId: item.id, process: 'machining', onSelectHighlight } : undefined} />
         </div>
       )}
     </div>
