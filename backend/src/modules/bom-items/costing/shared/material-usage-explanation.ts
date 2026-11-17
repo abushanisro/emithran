@@ -116,12 +116,14 @@ export function explainMaterialUsage(input_: ExplainMaterialUsageInput): Materia
       };
     }
     case 'casting_charge': {
-      // Die casting has a calculator for each figure. Sand casting buys the part metal, the melt loss and the gating and risers that are not remelted:
-      // the Bought Weight of its material-cost calculator (which goes on to price it).
+      // Die casting has a calculator for each figure. Sand and investment casting buy the part metal, the melt loss and the gating that is not
+      // remelted: the Bought Weight of their material-cost calculator (which goes on to price it).
       const net = fromRun(calculatorRuns?.['Net Material Usage'], usage.netUsage)
-        ?? fromRun(calculatorRuns?.['Sand metal per casting'], usage.netUsage, 'Net Weight');
+        ?? fromRun(calculatorRuns?.['Sand metal per casting'], usage.netUsage, 'Net Weight')
+        ?? fromRun(calculatorRuns?.['Investment metal per casting'], usage.netUsage, 'Net Weight');
       const gross = fromRun(calculatorRuns?.['Gross Material Usage'], usage.grossUsage)
-        ?? fromRun(calculatorRuns?.['Sand material cost'], usage.grossUsage, 'Bought Weight');
+        ?? fromRun(calculatorRuns?.['Sand material cost'], usage.grossUsage, 'Bought Weight')
+        ?? fromRun(calculatorRuns?.['Investment material cost'], usage.grossUsage, 'Bought Weight');
       const melted = usage.grossUsage > usage.netUsage;
       return {
         ...usage, scrap,
