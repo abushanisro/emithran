@@ -68,7 +68,10 @@ def hole_features(holes: Sequence[Dict[str, Any]], stable_face_ids: Dict[int, st
         stable = [stable_face_ids.get(f) for f in h["face_ids"]]
         if stable and all(stable):
             occ["source_face_stable_ids"] = stable
-        out.append({"id": h["id"], "feature_type": h["feature_type"], "variant": h["variant"], "occurrences": [occ]})
+        # A stepped bore is the catalog's MultiStepHole "stepped" (as the machining and die casting analyses emit it): its through/blind
+        # (the recogniser's variant) does not name a MultiStepHole operation, and with it machining after forging priced no operation.
+        variant = "stepped" if h["feature_type"] == "MultiStepHole" else h["variant"]
+        out.append({"id": h["id"], "feature_type": h["feature_type"], "variant": variant, "occurrences": [occ]})
     return out
 
 

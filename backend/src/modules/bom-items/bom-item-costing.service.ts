@@ -113,6 +113,7 @@ import { estimatedToolHeightMm } from './costing/shared/capability/machine-selec
 import { explainCandidate, fetchMachinePool } from './costing/shared/capability/machine-selection/selector';
 import type { CapabilityCheck, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
 import { convertSelectionRates } from './costing/shared/capability/machine-selection/rate-from-candidate';
+import { benchStepsFor } from './costing/machining/bench-steps';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { RateResolutionService } from './services/rate-resolution.service';
@@ -2489,8 +2490,11 @@ export class BomItemCostingService {
           else accessNotes.push(`Machining after ${nearNet}: part reorientation between the ${setups} setups not costed (componentLoadTime has no row for a ${partKg != null ? Math.round(partKg * 100) / 100 : '?'} kg, ${Math.round(maxDim)} mm part).`);
         }
         // Bench work after machining (user decision 2026-10-04): the memory/
-        // Machining Bench Operation steps, timed by its reference variables.
-        const benchSteps = await this.resolveBenchSteps();
+        // Machining Bench Operation steps, timed by its reference variables;
+        // Spark Testing only on a steel or an iron (bench-steps.ts).
+        const bench = benchStepsFor(await this.resolveBenchSteps(), materialType, grade);
+        warnings.push(...bench.notes);
+        const benchSteps = bench.steps;
         const machiningClasses = [mill, mhrRates.jigBore, mhrRates.gunDrill, mhrRates.deepBoreMachine, mhrRates.surfaceGrinder,
           mhrRates.internalGrinder, mhrRates.cylindricalGrinder, mhrRates.jigGrind, deburrMachine, mhrRates.manualBenchCell].map((r) => r?.machineClass).filter((c): c is string => !!c);
         const [drillingTable, reamTable, finishBoringTable, gunDrillTable, deepBoreMaterials, surfaceGrindingParams, internalGrindingParams, capabilityRuleSet, machiningCalculators, deburrParams, machiningIdentities] = await Promise.all([
