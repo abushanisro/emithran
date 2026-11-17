@@ -13,6 +13,8 @@ import type { BlankSpecDto } from '../../dto/blank-spec.dto';
  * - `casting_charge`: die casting -- Net is the part metal, Gross the metal
  *   charged (part x the alloy Yield Loss Factor), the same figures the engine
  *   prices material on (cost summary castingMetal).
+ * - `molding_allowance`: plastic molding -- Net is the part (volume x density), Gross the weight the molding engine
+ *   charges per part (the part plus its material allowance): the cost summary's own gross weight.
  * - `scrap_allowance_fallback`: no real stock/nesting result is available yet
  *   (cost summary still loading, or material density unresolved), so Gross is
  *   estimated as Net / (1 - scrap allowance). A disclosed estimate, never
@@ -23,6 +25,7 @@ export type MaterialUsageSource =
   | 'sheet_nesting'
   | 'stock_blank'
   | 'casting_charge'
+  | 'molding_allowance'
   | 'scrap_allowance_fallback'
   | 'none';
 
@@ -78,6 +81,8 @@ export interface DeriveMaterialUsageInput {
   cadWeightKg: number | null | undefined;
   /** A casting's per-part metal (cost summary castingMetal: die casting and sand casting). */
   castingMetal?: { partKg: number; chargedKg: number } | null;
+  /** Plastic molding: the gross weight per part the molding engine charges (cost summary `grossWeightKg`). */
+  moldingGrossKg?: number | null;
 }
 
 /**
@@ -117,6 +122,14 @@ export function deriveMaterialUsage(input: DeriveMaterialUsageInput): MaterialUs
       scrapPct: r2(((grossUsage - netUsage) / grossUsage) * 100),
       source: 'stock_blank',
     };
+  }
+
+  // Plastic molding: the engine already charges the part plus its allowance. A second, different allowance here would make the record disagree with it.
+  const partKg = itemVolumeMm3 && densityKgM3 ? (itemVolumeMm3 * densityKgM3) / 1e9 : 0;
+  if (input.moldingGrossKg != null && partKg > 0 && input.moldingGrossKg >= partKg) {
+    const grossUsage = r6(input.moldingGrossKg);
+    const netUsage = r6(partKg);
+    return { grossUsage, netUsage, scrapPct: r2(((grossUsage - netUsage) / grossUsage) * 100), source: 'molding_allowance' };
   }
 
   const fromNet = (net: number): MaterialUsage => ({

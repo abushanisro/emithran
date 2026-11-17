@@ -20,7 +20,9 @@ import {
 } from '@/components/ui/select';
 import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
+import { useMaterialUsage, type MaterialUsageExplanation } from '@/lib/api/hooks/useMaterialUsage';
 import { CalculationTracePanel } from './CalculationTracePanel';
+import { MaterialUsageJustification } from './MaterialUsageJustification';
 import { ReferenceTable } from './ReferenceTable';
 import { isStockDrivenBlank } from '@/lib/costing/material-usage';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -212,6 +214,9 @@ export function RawMaterialDialog({
   const nestingItemId = open ? (bomItemData?.id as string | undefined) : undefined;
   const { data: nestingCostSummary } = useCostSummary(nestingItemId, costBatchSize, location);
   const nestingBlankSpec = nestingCostSummary?.blankSpec;
+  // What the cost engine calculates as this part's usage, with the working behind each figure (every process family). Fetched while the dialog is open.
+  const { data: materialUsage, isLoading: materialUsageLoading } = useMaterialUsage(nestingItemId, costBatchSize, location);
+  const usageIsCalculated = !!materialUsage && materialUsage.source !== 'none';
   const hasRealNesting = nestingBlankSpec?.form === 'sheet' && typeof nestingBlankSpec.partsPerSheet === 'number';
   // "Nesting ran" is not the same as "nesting is trustworthy": when the true
   // unfolded flat-pattern rectangle couldn't be resolved, the engine falls
@@ -289,6 +294,27 @@ export function RawMaterialDialog({
   const [grossUsageEditOpen, setGrossUsageEditOpen] = useState(false);
   const [grossUsageEditDraft, setGrossUsageEditDraft] = useState('');
   const [grossUsageEditReasonDraft, setGrossUsageEditReasonDraft] = useState('');
+
+  // Net Usage, Gross Usage and Scrap % from the engine's calculation: what the calculator buttons and "Use calculated values" do. A manual gross
+  // override is dropped, since the point of the action is to return to the calculated figures.
+  const applyCalculatedUsage = (usage: MaterialUsageExplanation) => {
+    setNetUsage(usage.netUsage);
+    setScrap(usage.scrapPct);
+    setGrossUsage(usage.grossUsage);
+    setCadFilled(false);
+    setGrossUsageOverridden(false);
+    setGrossUsageOverrideReason('');
+  };
+  // A new record starts from the calculated usage once a material is chosen, instead of from empty fields. Once per open: it never overwrites typing.
+  const usageAutoFilledRef = useRef(false);
+  useEffect(() => { if (!open) usageAutoFilledRef.current = false; }, [open]);
+  useEffect(() => {
+    if (!open || editData || usageAutoFilledRef.current || !selectedMaterialId || !materialUsage || materialUsage.source === 'none') return;
+    if (netUsage !== '' && netUsage !== 0) return;
+    usageAutoFilledRef.current = true;
+    applyCalculatedUsage(materialUsage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editData, selectedMaterialId, materialUsage]);
 
   // Lookup table state
   const [selectedLookupField, setSelectedLookupField] = useState<any>(null);
@@ -641,7 +667,10 @@ export function RawMaterialDialog({
   }, [calculatorOpen]);
 
   // Fetch raw materials from API
-  const { data: rawMaterialsData, isLoading } = useRawMaterials();
+  // The selected group's whole list. The endpoint pages at 100 rows by default and the library holds far more, so an unscoped read left most materials
+  // out: a saved record's own material was then missing from the picker ("Select material", "Material has no cost data"). Before a group is known
+  // (a record saved without one) the first page is still read, as before, to find the record's material by name.
+  const { data: rawMaterialsData, isLoading } = useRawMaterials(materialGroup ? { materialGroup, limit: 1000 } : undefined);
   const { data: filterOptions, isLoading: isLoadingOptions } = useRawMaterialFilterOptions();
   // Regional/shorthand designations (e.g. "AL6101" for "Generic Aluminum, ANSI
   // 6101") that don't appear in a material's own name -- without these, typing
@@ -739,11 +768,12 @@ export function RawMaterialDialog({
   // materialName = "IS2062 E250 CRCA" but DB has material.material = "CRCA Steel").
   const findMaterialByEditData = (pool: RawMaterial[] | null | undefined, ed: any) => {
     if (!pool || !ed) return undefined;
-    const direct = pool.find(m =>
+    // The record's own row first: several groups carry a material of the same name (an alloy listed under Sand Casting, Die Casting, ...), and a name
+    // match alone could pick another group's row, with another price.
+    const direct = pool.find(m => m.id === ed.materialId) ?? pool.find(m =>
       m.material === ed.materialName ||
       (m as any).materialName === ed.materialName ||
-      m.materialGrade === ed.materialName ||
-      m.id === ed.materialId,
+      m.materialGrade === ed.materialName,
     );
     if (direct) return direct;
     // Alias fallback: a saved line's materialName can be a shorthand/regional
@@ -1497,6 +1527,8 @@ export function RawMaterialDialog({
                     type="button" variant="outline" size="icon"
                     onClick={(e) => {
                       e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
+                      // Every family but sheet metal (which has its own reference calculators here): the button fills the fields from the engine's calculation.
+                      if (!isSheetMetalItem && usageIsCalculated) { applyCalculatedUsage(materialUsage); return; }
                       setCalculatorTarget('netUsage');
                       setCalculatorResults(null);
                       setCalculatorWarnings([]);
@@ -1509,7 +1541,7 @@ export function RawMaterialDialog({
                     }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    title="Use DB Calculator"
+                    title={!isSheetMetalItem && usageIsCalculated ? 'Fill Net, Gross and Scrap from the calculation below' : 'Use DB Calculator'}
                     disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
@@ -1561,6 +1593,7 @@ export function RawMaterialDialog({
                     type="button" variant="outline" size="icon"
                     onClick={(e) => {
                       e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
+                      if (!isSheetMetalItem && usageIsCalculated) { applyCalculatedUsage(materialUsage); return; }
                       setCalculatorTarget('grossUsage');
                       setCalculatorResults(null);
                       setCalculatorWarnings([]);
@@ -1573,7 +1606,7 @@ export function RawMaterialDialog({
                     }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    title={isSheetMetalItem && grossUsageCalculator ? 'View calculation & override' : 'Use DB Calculator'}
+                    title={isSheetMetalItem && grossUsageCalculator ? 'View calculation & override' : usageIsCalculated ? 'Fill Net, Gross and Scrap from the calculation below' : 'Use DB Calculator'}
                     disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
@@ -1694,6 +1727,9 @@ export function RawMaterialDialog({
                   </p>
                 ) : isSheetMetalItem ? (
                   <p className="text-[11px] text-muted-foreground">Flat-pattern geometry unavailable — nesting could not run for this part. Enter Gross Usage manually.</p>
+                ) : usageIsCalculated && materialUsage.source !== 'scrap_allowance_fallback' ? (
+                  // The engine has a real figure for this part (a casting's charge, a molding shot): the working is in the panel below, not this generic formula.
+                  <p className="text-[11px] text-muted-foreground">{materialUsage.gross.title}: see the calculation below</p>
                 ) : typeof netUsage === 'number' && netUsage > 0 ? (
                   <p className="text-[11px] text-muted-foreground font-mono">
                     {netUsage} ÷ (1 − {typeof scrap === 'number' ? scrap : 0}% / 100)
@@ -1708,6 +1744,13 @@ export function RawMaterialDialog({
                 )}
               </div>
             </div>
+
+            <MaterialUsageJustification
+              usage={materialUsage}
+              loading={materialUsageLoading}
+              fields={{ net: netUsage, gross: grossUsage }}
+              onUse={applyCalculatedUsage}
+            />
 
             {/* Scrap, Reclaim Rate, Overhead */}
             <div className="grid grid-cols-3 gap-4">

@@ -14586,6 +14586,51 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/material-usage": {
+      "get": {
+        "operationId": "BOMItemsController_getMaterialUsage_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "batchSize",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The material usage with its justification (kg, %)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The part's net and gross material usage and scrap at a location and batch size, as Apply would record them, with the working behind each figure: the reference calculator that ran or the rule, and every value it read with where it came from. Nothing is written",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/nre": {
       "get": {
         "operationId": "BOMItemsController_getNre_v1",
