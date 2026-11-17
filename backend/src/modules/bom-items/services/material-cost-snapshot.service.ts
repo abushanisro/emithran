@@ -4,7 +4,8 @@ import { RawMaterialsService } from '../../raw-materials/raw-materials.service';
 import { RawMaterialCostService } from '../../raw-materials/services/raw-material-cost.service';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
 import type { CostSummaryResponseDto } from '../dto/cost-breakdown.dto';
-import { deriveMaterialUsage, type MaterialUsage } from '../costing/shared/material-usage';
+import { deriveMaterialUsage, type DeriveMaterialUsageInput, type MaterialUsage } from '../costing/shared/material-usage';
+import { explainMaterialUsage, type MaterialUsageExplanation } from '../costing/shared/material-usage-explanation';
 
 export interface MaterialSnapshotInput {
   item: BOMItemResponseDto;
@@ -49,8 +50,7 @@ export class MaterialCostSnapshotService {
 
   async ensure(input: MaterialSnapshotInput): Promise<MaterialSnapshotResult> {
     const { item, grade, location, summary, userId, organizationId, token } = input;
-    const liveGross = (summary.grossWeightKg ?? 0) > 0 ? summary.grossWeightKg : null;
-    const liveNet = (summary.blankSpec?.netWeightKg ?? 0) > 0 ? summary.blankSpec!.netWeightKg : null;
+    const { liveGross, liveNet } = liveWeights(summary);
 
     const active = (await this.costRecords.findAll({ bomItemId: item.id, isActive: true, page: 1, limit: 10 } as never, userId, token)).records ?? [];
 
@@ -79,19 +79,7 @@ export class MaterialCostSnapshotService {
     }
 
     const material = await this.findMaterial(grade, userId, token);
-    const featureGraph = item.featureGraph as { classification?: { family?: string } } | null | undefined;
-    const isSheetMetal = featureGraph?.classification?.family === 'sheet_metal'
-      || Number((featureGraph as { summary?: { sheetThicknessMm?: number } } | null | undefined)?.summary?.sheetThicknessMm ?? 0) > 0;
-    const usage = deriveMaterialUsage({
-      blankSpec: summary.blankSpec,
-      isSheetMetal,
-      engineGrossKg: liveGross,
-      engineNetKg: liveNet,
-      itemVolumeMm3: item.volume,
-      densityKgM3: material?.densityKgM3 ?? null,
-      cadWeightKg: typeof item.weight === 'number' && item.weight > 0 ? item.weight : null,
-      castingMetal: summary.castingMetal ?? null,
-    });
+    const usage = deriveMaterialUsage(usageInput(item, summary, material?.densityKgM3 ?? null));
 
     // unitCost 0 asks the cost-record service for the grade's price at the location (see its create()).
     const created = await this.costRecords.create(
@@ -134,6 +122,15 @@ export class MaterialCostSnapshotService {
     return { action: 'replaced', recordId: created.id, usage };
   }
 
+  /**
+   * The usage Apply would record for the part at this cost summary, with the working behind each figure (the calculator that ran, or the rule, and every
+   * value it read). Nothing is written: the Raw Material dialog shows it and fills its fields from it.
+   */
+  async explain(item: BOMItemResponseDto, grade: string, summary: CostSummaryResponseDto, userId: string, token: string): Promise<MaterialUsageExplanation> {
+    const material = grade ? await this.findMaterial(grade, userId, token) : null;
+    return explainMaterialUsage({ ...usageInput(item, summary, material?.densityKgM3 ?? null), calculatorRuns: summary.calculatorRuns ?? null, runnerSystem: summary.injectionMolding?.runnerSystemType ?? null });
+  }
+
   /** The raw_materials row of the grade: the exact name or grade, else the ranked search's unambiguous best (the ranker the costing engine resolves with). */
   private async findMaterial(grade: string, userId: string, token: string) {
     try {
@@ -144,4 +141,30 @@ export class MaterialCostSnapshotService {
       return null; // a failed lookup leaves the record without links, and priced by the service from the name
     }
   }
+}
+
+/** The engine's live per-part weights; null where it reported none. */
+function liveWeights(summary: CostSummaryResponseDto): { liveGross: number | null; liveNet: number | null } {
+  return {
+    liveGross: (summary.grossWeightKg ?? 0) > 0 ? summary.grossWeightKg : null,
+    liveNet: (summary.blankSpec?.netWeightKg ?? 0) > 0 ? summary.blankSpec!.netWeightKg : null,
+  };
+}
+
+/** What the usage of a part is derived from: the engine's results in the cost summary, the part's geometry and the material's density. */
+function usageInput(item: BOMItemResponseDto, summary: CostSummaryResponseDto, densityKgM3: number | null): DeriveMaterialUsageInput {
+  const { liveGross, liveNet } = liveWeights(summary);
+  const featureGraph = item.featureGraph as { classification?: { family?: string }; summary?: { sheetThicknessMm?: number } } | null | undefined;
+  const family = summary.family ?? featureGraph?.classification?.family;
+  return {
+    blankSpec: summary.blankSpec,
+    isSheetMetal: featureGraph?.classification?.family === 'sheet_metal' || Number(featureGraph?.summary?.sheetThicknessMm ?? 0) > 0,
+    engineGrossKg: liveGross,
+    engineNetKg: liveNet,
+    itemVolumeMm3: item.volume,
+    densityKgM3,
+    cadWeightKg: typeof item.weight === 'number' && item.weight > 0 ? item.weight : null,
+    castingMetal: summary.castingMetal ?? null,
+    moldingGrossKg: family === 'plastic_molded' ? liveGross : null,
+  };
 }

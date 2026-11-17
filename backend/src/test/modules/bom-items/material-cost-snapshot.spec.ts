@@ -92,3 +92,20 @@ describe('MaterialCostSnapshotService.ensure', () => {
     expect(dto).not.toHaveProperty('materialId');
   });
 });
+
+describe('MaterialCostSnapshotService.explain', () => {
+  it('explains the same usage ensure records, from the same summary, and writes nothing', async () => {
+    const { svc, costRecords } = build([]);
+    const s = summary({ family: 'plastic_molded', grossWeightKg: 0.1134, blankSpec: undefined, injectionMolding: { runnerSystemType: 'cold' } });
+    const item = { id: 'i1', volume: 100000, weight: 0.5, featureGraph: { classification: { family: 'plastic_molded' } } } as never;
+    const explained = await svc.explain(item, 'ABS', s as never, 'u', 't');
+    // 100,000 mm³ of ABS at 1050 kg/m³ is 0.105 kg; the molding engine charges 0.1134 kg (the part plus its 8 % cold-runner allowance).
+    expect(explained).toMatchObject({ source: 'molding_allowance', netUsage: 0.105, grossUsage: 0.1134, scrapPct: 7.41 });
+    expect(explained.gross.trace.map((t) => `${t.displayLabel}=${t.value}`)).toEqual(['Net Usage=0.105', 'Runner Allowance=8', 'Gross Usage=0.1134']);
+    expect(costRecords.create).not.toHaveBeenCalled();
+    expect(costRecords.update).not.toHaveBeenCalled();
+
+    const recorded = await svc.ensure(input(s));
+    expect(recorded.usage).toMatchObject({ netUsage: explained.netUsage, grossUsage: explained.grossUsage, scrapPct: explained.scrapPct, source: explained.source });
+  });
+});

@@ -72,6 +72,8 @@ import { ScenarioApplicationService } from './services/scenario-application.serv
 import { CostTableService } from './services/cost-table.service';
 import type { CostTable } from './costing/shared/cost-table';
 import { ApplyScenarioDto, type ScenarioApplicationResult } from './dto/apply-scenario.dto';
+import type { MaterialUsageExplanation } from './costing/shared/material-usage-explanation';
+import { MaterialCostSnapshotService } from './services/material-cost-snapshot.service';
 import { PartSummaryService } from './services/part-summary.service';
 import type { PartSummary } from './costing/shared/part-summary';
 import { DesignGuidanceService } from './services/design-guidance.service';
@@ -126,6 +128,7 @@ export class BOMItemsController {
     private readonly plasticDfm: PlasticDfmService,
     private readonly machiningDfm: MachiningDfmService,
     private readonly partSummaries: PartSummaryService,
+    private readonly materialSnapshots: MaterialCostSnapshotService,
     private readonly designGuidance: DesignGuidanceService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     private readonly databaseService: DatabaseService,
@@ -1488,6 +1491,25 @@ export class BOMItemsController {
       drawingIntelligence: item.drawingIntelligence as any,
     });
     return { bomItemId: id, implications };
+  }
+
+  @OrgRole('viewer')
+  @Get(':id/material-usage')
+  @ApiOperation({ summary: "The part's net and gross material usage and scrap at a location and batch size, as Apply would record them, with the working behind each figure: the reference calculator that ran or the rule, and every value it read with where it came from. Nothing is written" })
+  @ApiResponse({ status: 200, description: 'The material usage with its justification (kg, %)' })
+  async getMaterialUsage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('batchSize') batchSize: string,
+    @Query('location') location: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<MaterialUsageExplanation> {
+    if (!location) throw new BadRequestException('location query param is required: the usage is read from the part costed at a digital factory location');
+    const [item, summary] = await Promise.all([
+      this.bomItemsService.findOne(id, user.id, token),
+      this.costing.getCostSummary(id, user.id, token, batchSize ? parseInt(batchSize, 10) : undefined, location),
+    ]);
+    return this.materialSnapshots.explain(item, summary.materialGrade ?? '', summary, user.id, token);
   }
 
   @OrgRole('viewer')
