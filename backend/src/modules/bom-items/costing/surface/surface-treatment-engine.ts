@@ -136,9 +136,11 @@ function laserEngraving(base: Base, part: SecondaryPartFacts, ref: SecondaryRefe
   const materials = ref.lookups.get('tblLaserEngraving');
   if ([len, wid, step, speed, passes].some((v) => v == null) || !materials) return notCosted(base, 'gap', 'Laser engraving reference data is not staged: run migration 819.');
   if (!part.materialTypeName) return notCosted(base, 'gap', 'The part material type is needed to check laser-engraving compatibility (tblLaserEngraving).');
-  const allowed = materials.map((r) => String(r['Material Type Name'] ?? '')).filter(Boolean);
-  if (!allowed.includes(part.materialTypeName)) {
-    return notCosted(base, 'not_applicable', `Material type "${part.materialTypeName}" is not in ${SRC_LOOKUP('tblLaserEngraving')}: ${allowed.join(', ')}.`);
+  // tblLaserEngraving lists the material types the process is not used on (flame-retardant plastics and composites: their additives and resins
+  // give off toxic or corrosive fumes under the beam). It was read as the list of materials that can be engraved, which ruled out every metal.
+  const excluded = materials.map((r) => String(r['Material Type Name'] ?? '')).filter(Boolean);
+  if (excluded.includes(part.materialTypeName)) {
+    return notCosted(base, 'not_applicable', `Material type "${part.materialTypeName}" is not laser engraved (${SRC_LOOKUP('tblLaserEngraving')} lists the materials the process is not used on: ${excluded.join(', ')}).`);
   }
   const m = pickMachine(base.process, envelopeCapable(pool, part).filter((x) => num(x.specs['max_engrave_speed_mm_per_s']) != null), ref);
   if (!m) return notCosted(base, 'gap', 'No laser engraver takes this part.');
@@ -817,10 +819,43 @@ function maskSpray(base: Base, part: SecondaryPartFacts, ref: SecondaryReference
   }, ref, part.batchSize);
 }
 
+/**
+ * Conveyor Conversion Coating (a pretreatment washer: clean, rinse, coat, rinse, drain). The line runs no faster than lets a part spend the
+ * minimum time in a rinse stage and in a drain zone, and a part takes its pitch on the load bar at that speed. The material must take a chromate
+ * or a phosphate coat (tblConversionCoating).
+ */
+function conveyorConversionCoating(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const minRinse = variable(ref, 'conversionCoatingMinRinseTime');
+  const minDrain = variable(ref, 'conversionCoatingMinDrainTime');
+  const materials = ref.lookups.get('tblConversionCoating');
+  if (minRinse == null || minDrain == null || !materials) return notCosted(base, 'gap', 'Conversion coating reference data is not staged: run migration 819.');
+  if (!part.materialTypeName) return notCosted(base, 'gap', 'The part material type is needed to check which conversion coat it takes (tblConversionCoating).');
+  const row = materials.find((r) => String(r['Material Type Name']) === part.materialTypeName);
+  const coats = ['Chromate', 'Phosphate'].filter((c) => String(row?.[`Can ${c} Coat`]) === 'true');
+  if (!row) return notCosted(base, 'gap', `Material type "${part.materialTypeName}" has no row in ${SRC_LOOKUP('tblConversionCoating')}, so the coats it takes are not known.`);
+  if (coats.length === 0) return notCosted(base, 'not_applicable', `Material type "${part.materialTypeName}" takes neither a chromate nor a phosphate coat (${SRC_LOOKUP('tblConversionCoating')}).`);
+  const trace: SecondaryTraceStep[] = [{ label: 'Coat the material takes', value: coats.join(' or '), source: SRC_LOOKUP('tblConversionCoating') }];
+  const pitch = conveyorPitch(part, ref, trace);
+  if (typeof pitch === 'string') return notCosted(base, 'gap', pitch, { trace });
+  if (pool.length === 0) return notCosted(base, 'gap', 'No conveyor pretreatment washer is on file for this location (migration 1048 seeds USA).', { trace });
+  const m = pickMachine(base.process, conveyorCapable(pool, part)
+    .filter((x) => num(x.specs['rinse_stage_length_mm']) != null && num(x.specs['drain_zone_length_mm']) != null), ref);
+  if (!m) return notCosted(base, 'gap', 'No conveyor pretreatment washer opening takes this part.', { trace });
+  const rinse = num(m.specs['rinse_stage_length_mm'])!;
+  const drain = num(m.specs['drain_zone_length_mm'])!;
+  const speed = Math.min(rinse / minRinse, drain / minDrain);
+  trace.push({
+    label: 'Line speed', value: Number(speed.toFixed(3)), unit: 'mm/s',
+    source: `the slower of rinse stage ${rinse} mm / ${minRinse} s and drain zone ${drain} mm / ${minDrain} s (machine ${m.name}; ${SRC_VAR} conversionCoatingMinRinseTime, conversionCoatingMinDrainTime)`,
+  });
+  return costed(base, m, {
+    perPartSec: pitch / speed, trace, highlight: 'whole_part',
+    warnings: ['The cleaning and coating solutions are not priced: the reference gives their reuse (conversionCoatingSolutionReusePercent) but no solution price or spray volume per part.'],
+  }, ref, part.batchSize);
+}
+
 /** Why each remaining process cannot be timed from the reference data. */
-const UNDEFINED: Record<string, string> = {
-  'Conveyor Conversion Coating': 'The reference has no machine file for this process.',
-};
+const UNDEFINED: Record<string, string> = {};
 
 type Model = (base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]) => SecondaryProcessResult;
 
@@ -834,6 +869,7 @@ const MODELS: Record<string, Model> = {
   'Shot Peen': shotPeen,
   'Conveyor Shot Blast': conveyorShotBlast,
   'Conveyor Dry': conveyorDry,
+  'Conveyor Conversion Coating': conveyorConversionCoating,
   'Conveyor Abrasive Finishing': conveyorAbrasiveFinishing,
   'Conveyor Part Loading': handling,
   'Conveyor Part Unloading': handling,

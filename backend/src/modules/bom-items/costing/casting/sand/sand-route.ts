@@ -264,6 +264,8 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
   const perGood = (l: ProcessLineCost): ProcessLineCost => (isGap(l) ? l : {
     ...l, setupCost: roundLineCost(l.setupCost / finalYield), runCost: roundLineCost(l.runCost / finalYield), totalCost: roundLineCost(l.totalCost / finalYield),
     ...(l.otherCostPerPartUsd != null ? { otherCostPerPartUsd: roundPerPart(l.otherCostPerPartUsd / finalYield) } : {}),
+    ...(l.machineCostPerPart != null ? { machineCostPerPart: roundPerPart(l.machineCostPerPart / finalYield) } : {}),
+    ...(l.laborCostPerPart != null ? { laborCostPerPart: roundPerPart(l.laborCostPerPart / finalYield) } : {}),
   });
   const scaled = lines.map(perGood);
   const warnings = [...notes, ...steps.flatMap((s) => s.warnings)];

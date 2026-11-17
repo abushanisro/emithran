@@ -43,7 +43,6 @@ import { cueRefreshAnalysis } from '@/lib/analysis/refresh-analysis-cue';
 import { RefreshAnalysisButton } from '@/components/features/analysis/RefreshAnalysisButton';
 import { QuoteValidationNote } from '@/components/features/manufacturing-intelligence/QuoteValidationNote';
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
-import { PartDetailsSheet } from '@/components/features/manufacturing-intelligence/PartDetailsSheet';
 import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
 import { routeMachineDrift } from '@/lib/costing/applied-route';
 import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
@@ -116,7 +115,7 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // also used by NRE and by the drawing-callout surface-treatment auto-cost).
 import { useSecondaryProcesses, useNre } from '@/lib/api/hooks/useSecondaryProcesses';
 import {
-  processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
+  isCostedProcessGroup, processGroupOptionLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
 } from '@/lib/features/process-group';
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
@@ -195,13 +194,12 @@ const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
 const RIGHT_TABS = [
   { key: 'copilot',       label: '✦ Copilot'   },
   { key: 'cost',          label: 'Cost'         },
-  { key: 'part_summary',  label: 'Part Summary' },
-  { key: 'design_guidance', label: 'Design Guidance' },
+  { key: 'part_summary',  label: 'Summary'      },
+  { key: 'design_guidance', label: 'Validation' },
   { key: 'sustainability', label: 'Sustain'     },
   { key: 'detail',        label: 'Detail'       },
   { key: 'investment',    label: 'Invest'       },
   { key: 'vendor_network', label: 'Vendors'     },
-  { key: 'excel',          label: 'Excel'       },
 ] as const;
 type RightTabKey = (typeof RIGHT_TABS)[number]['key'];
 
@@ -2607,6 +2605,8 @@ function RouteSelectionDialog({
   // Die-cast parts: one complete route per die-casting process (High Pressure / Gravity); sand-cast parts: the sand route as quoted.
   const isDieCast = partFamily === 'die_cast';
   const isSandCast = partFamily === 'sand_cast';
+  // Investment-cast parts: the investment casting route as quoted, like sand.
+  const isInvestmentCast = partFamily === 'investment_cast';
   const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
@@ -3083,7 +3083,7 @@ function RouteSelectionDialog({
     if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     // A die-casting process route: feasible ones only, the same rule apply-route
     // enforces (an infeasible row still says why).
-    if (isDieCast || isSandCast) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
+    if (isDieCast || isSandCast || isInvestmentCast) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     return false;
   };
 
@@ -3219,10 +3219,13 @@ function RouteSelectionDialog({
               errorMessage={comparison.error instanceof Error ? comparison.error.message : null}
               cuttingGroupMeta={isDieCast ? {
                 title: 'Casting process',
-                description: 'Each die-casting process priced as the full quote for this part (casting, its machining after casting, finishing). The recommended one is the cheapest feasible, die and coreboxes included.',
+                description: 'Each casting process priced as the full quote for this part (casting, its machining after casting, finishing): the die-casting processes, and for a part whose Process is Casting the sand and investment casting routes too. The recommended one is the cheapest feasible, tooling included.',
               } : isSandCast ? {
                 title: 'Sand casting',
                 description: 'The sand-casting route as quoted: melting, coremaking, moulding on the cheapest capable machine, pouring, shakeout and finishing. The Cost Guide compares the moulding machines.',
+              } : isInvestmentCast ? {
+                title: 'Investment casting',
+                description: 'The investment casting route as quoted: wax pattern, tree, shell dips, de-waxing, burnout, pour, knockout, cut-off and finishing, each on the cheapest capable machine. Steps a tree shares are divided by its patterns.',
               } : isIM ? {
                 title: 'Molding process',
                 description: 'Real, priced alternatives for this part. Any molding process can be set when the part\'s material and features can be made by it and it is priced; a process that cannot says why on its row.',
@@ -4111,9 +4114,14 @@ function CostGuidePanel({
                 >
                   {!selectedProcessGroup && <option value="">Select process…</option>}
                   {processGroupChoices.map((g) => (
-                    <option key={g} value={g}>{g}</option>
+                    <option key={g} value={g}>{processGroupOptionLabel(g)}</option>
                   ))}
                 </select>
+                {selectedProcessGroup && !isCostedProcessGroup(selectedProcessGroup) && (
+                  <p className="text-[10px] text-destructive leading-tight mt-1">
+                    {selectedProcessGroup} has no cost model yet, so this part is not costed. Choose a process that is not marked.
+                  </p>
+                )}
                 {analysisStatus.data?.cad === 'stale' && (
                   <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight mt-1">
                     The stored features do not match this process (or are out of date): Apply Scenario analyses the part again.
@@ -6732,7 +6740,8 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
   const die = cost.dieTooling;
   const boxes = cost.coreboxTooling;
   const mold = cost.tooling;
-  if (!die && !boxes && !mold) return null;
+  const pattern = cost.patternTooling;
+  if (!die && !boxes && !mold && !pattern) return null;
   const money = (usd: number | null | undefined, d = 2) =>
     usd == null ? 'not priced' : `${currencySymbol}${(usd * conversionRate).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d })}`;
   const perPart = (usd: number | null | undefined) => (usd == null ? 'not amortised' : `${money(usd, 4)}/part`);
@@ -6766,6 +6775,14 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
           </summary>
           <div className="mt-2"><DieToolingSection tooling={die} /></div>
         </details>
+      )}
+      {pattern && (
+        <div className="rounded border border-border px-3 py-2">
+          <div className="flex items-baseline justify-between gap-2 text-xs">
+            <span className="font-medium text-foreground">Wax pattern die × {pattern.tools}</span>
+            <span className="tabular-nums">{money(pattern.costUsd, 0)} · {perPart(pattern.perPartUsd)}</span>
+          </div>
+        </div>
       )}
       {boxes && (
         <div className="rounded border border-border px-3 py-2">
@@ -6893,7 +6910,7 @@ function AnalysisTabsPanel({
   // 'USA' (useCostSummary's own fallback), running a second, wasted full
   // cost computation on every load/Apply regardless of the real Digital
   // Factory. `factory` is already a real prop on this component.
-  const { data: summaryForPartTab, dataUpdatedAt: summaryUpdatedAt } = useCostSummary(item.id, batchSize, factory);
+  const { data: summaryForPartTab } = useCostSummary(item.id, batchSize, factory);
   // What this part is actually being priced at, read back from the engine.
   // Panels below that need a definite quantity (an RFQ volume, the Copilot's
   // context) get these rather than a number this component chose.
@@ -6914,7 +6931,7 @@ function AnalysisTabsPanel({
 
       <div className="flex-1 overflow-y-auto min-h-0">
         {tab === 'part_summary' && (
-          <PartSummaryTab itemId={item.id} uncostedWarnings={(summaryForPartTab?.warnings ?? []).filter((w) => /not costed/i.test(w))} />
+          <PartSummaryTab itemId={item.id} uncostedOperations={summaryForPartTab?.uncostedOperations ?? []} />
         )}
 
         {tab === 'design_guidance' && (
@@ -6989,13 +7006,6 @@ function AnalysisTabsPanel({
           />
         )}
 
-        {tab === 'excel' && (
-          <PartDetailsSheet
-            itemId={item.id}
-            refreshKey={summaryUpdatedAt}
-            display={{ symbol: summaryForPartTab?.currencySymbol ?? '$', fromUsd: summaryForPartTab?.usdToDisplayRate ?? 1 }}
-          />
-        )}
       </div>
     </div>
   );

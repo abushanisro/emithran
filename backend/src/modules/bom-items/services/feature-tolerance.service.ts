@@ -164,10 +164,11 @@ export class FeatureToleranceService {
    * whose names tblGtolProcessCapabilities carries; any other family is
    * reported as not yet assessed rather than guessed.
    */
-  async getMachiningNeed(id: string, accessToken: string, primaryProcessOverride?: string): Promise<MachiningNeedView> {
+  /** `familyOverride`: the family the cost summary prices the part as, when it is not the one it was analysed as (a Casting part priced as each casting family). */
+  async getMachiningNeed(id: string, accessToken: string, primaryProcessOverride?: string, familyOverride?: string): Promise<MachiningNeedView> {
     const item = await this.loadItem(id, accessToken);
     const tolerances = await this.get(id, accessToken);
-    const family = item.feature_graph?.classification?.family ?? item.family_classification ?? 'unknown';
+    const family = familyOverride ?? item.feature_graph?.classification?.family ?? item.family_classification ?? 'unknown';
     const assessed = await this.assessNeed(item, tolerances, family, accessToken, primaryProcessOverride);
     // The process's own reading of each feature (process-profile.ts): held, an operation added, or left for review. Never a cost by itself.
     const profile = toleranceProfileOf(family);

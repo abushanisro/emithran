@@ -271,14 +271,17 @@ export function selectAndCost(input: {
   costContext: CostContext;
   ref: SandReference;
   criteria: string[];
+  /** The process group of the line; sand casting when absent (the other casting routes that cost their steps the same way name their own). */
+  processGroup?: string;
 }): CostedStep {
+  const processGroup = input.processGroup ?? SAND_PROCESS_GROUP;
   const warnings: string[] = [];
   const evaluated = input.machines.map((m) => {
     if (m.machineRatePerHr == null) return { m, outcome: fail('no machine hour rate on file, and the HR Rates engine could not price it') as StepOutcome, costed: null as ProcessLineCost | null };
     const outcome = input.evaluate(m);
     if (!outcome.ok) return { m, outcome, costed: null };
     const base = line({
-      process: input.process, processGroup: SAND_PROCESS_GROUP, processRoute: input.process, machineClass: input.machineClass,
+      process: input.process, processGroup, processRoute: input.process, machineClass: input.machineClass,
       machine: asFinishingMachine(m), sec: outcome.sec, batchSize: input.batchSize, costContext: input.costContext, warnings: [], run: outcome.run,
       breakdown: `${input.process}: ${roundSec(outcome.sec)} s per casting${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
     });
@@ -309,7 +312,7 @@ export function selectAndCost(input: {
   if (!best) {
     const first = evaluated.find((e) => !e.outcome.ok);
     const why = first && !first.outcome.ok ? `${first.m.name}: ${first.outcome.reasons.join('; ')}` : `no machines of class ${input.machineClass}`;
-    return { line: { ...gap(input.process, SAND_PROCESS_GROUP, input.machineClass, `no ${input.process} machine fits (${why})`), machineChoice: choice }, machine: null, outcome: null, warnings };
+    return { line: { ...gap(input.process, processGroup, input.machineClass, `no ${input.process} machine fits (${why})`), machineChoice: choice }, machine: null, outcome: null, warnings };
   }
   const outcome = best.outcome as Extract<StepOutcome, { ok: true }>;
   warnings.push(...outcome.notes);

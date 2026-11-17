@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Optional, Injectable } from '@nestjs/common';
+import { MHRService } from '../../mhr/mhr.service';
 import { DatabaseService } from '../../../common/database/database.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { isMachiningFamily } from '../../../domain/part-family';
@@ -90,6 +91,8 @@ export class SecondaryProcessService {
     private readonly exchangeRates: ExchangeRateService,
     private readonly materials: MaterialResolutionService,
     private readonly calculatorCatalog: CalculatorCatalogService,
+    /** Prices a machine that has no stored hour rate; optional so a hand-built service (tests) need not pass it. */
+    @Optional() private readonly mhr?: MHRService,
   ) {}
 
   /** Variables, lookup tables and default machines of one staged folder
@@ -174,9 +177,12 @@ export class SecondaryProcessService {
         .eq('location', location)
         .in('machine_class', classes));
     if (error || !data) return [];
+    // A machine with no stored hour rate is priced by the HR Rates engine, the rate the HR Rates screens show for it (only those rows are read in full).
+    const engineRates = await this.engineRates((data as any[]).filter((r) => num(r.mhr_usd_per_hour) == null).map((r) => r.id as string), accessToken);
     return (data as any[])
       .map((r): SecondaryMachine | null => {
-        const mhr = num(r.mhr_usd_per_hour);
+        const engine = engineRates.get(r.id);
+        const mhr = num(r.mhr_usd_per_hour) ?? engine?.ratePerHr ?? null;
         const lhr = num(r.usd_lhr_total);
         const operators = num(r.operators);
         const laborTimeStandard = num(r.labor_time_standard);
@@ -193,9 +199,26 @@ export class SecondaryProcessService {
           maxXmm: num(r.max_x_mm), maxYmm: num(r.max_y_mm), maxZmm: num(r.max_z_mm),
           maxLengthMm: num(r.max_length_mm), maxWorkpieceKg: num(r.max_workpiece_weight_kg),
           specs: (r.specs ?? {}) as Record<string, unknown>,
+          ...(num(r.mhr_usd_per_hour) == null && engine ? { engineRateDefaults: engine.assumedDefaults } : {}),
         };
       })
       .filter((m): m is SecondaryMachine => m != null);
+  }
+
+  /** The HR Rates engine's hour rate of each of these machines; one the engine cannot price is absent (and so stays unrated and is left out). */
+  private async engineRates(ids: string[], accessToken: string): Promise<Map<string, { ratePerHr: number; assumedDefaults: string[] }>> {
+    const rates = new Map<string, { ratePerHr: number; assumedDefaults: string[] }>();
+    if (ids.length === 0 || !this.mhr) return rates;
+    const { data } = await this.database.getClient(accessToken).from('mhr_records').select('*').in('id', ids);
+    for (const row of (data ?? []) as Array<Record<string, any>>) {
+      try {
+        const rate = this.mhr.engineHourRate(row);
+        if (rate.ratePerHr > 0) rates.set(String(row.id), rate);
+      } catch {
+        // the engine could not price it: the machine has no rate and is left out, as any unrated machine is
+      }
+    }
+    return rates;
   }
 
   /**
@@ -254,7 +277,9 @@ export class SecondaryProcessService {
       ? await this.materials.resolveCutCode(accessToken, grade, family)
       : { cutCode: null, materialType: null, materialClass: null };
     const dims = [item.maxLength, item.maxWidth, item.maxHeight].map((v) => num(v));
-    const wall = num(fg?.summary?.wallThicknessNominalMm) ?? (family === 'sheet_metal' ? num(item.sheetThicknessMm ?? fg?.summary?.sheetThicknessMm) : null);
+    // The measured wall: a molded part's nominal wall, a casting's (the casting extractor writes its own key), a sheet-metal part's thickness.
+    const wall = num(fg?.summary?.wallThicknessNominalMm) ?? num(fg?.summary?.castingWallNominalMm)
+      ?? (family === 'sheet_metal' ? num(item.sheetThicknessMm ?? fg?.summary?.sheetThicknessMm) : null);
 
     const part: SecondaryPartFacts = {
       bboxMm: dims.every((d) => d != null && d > 0) ? { length: dims[0]!, width: dims[1]!, height: dims[2]! } : null,

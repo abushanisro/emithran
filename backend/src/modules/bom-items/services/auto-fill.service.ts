@@ -22,7 +22,7 @@ import { REFERENCE_FEATURE_OPERATIONS } from '../costing/shared/reference-featur
 import { MachiningLookupService } from '../costing/machining/lookup/machining-lookup.service';
 import { requiredMilledClassFromToolAxes } from '../costing/machining/setup-axis-rule';
 import { machiningFeatureCounts } from '../costing/machining/operation/machining-feature-counts';
-import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
+import { CAD_FAMILY_TO_PROCESS_GROUP, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
 import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 import { currentFeatureGraphVersion } from '../analysis-status';
 import { plasticCostDrivers } from '../costing/plastic-molding/plastic-cost-drivers';
@@ -1187,18 +1187,17 @@ export class AutoFillService {
   private static readonly CAD_FAMILY_TO_PROCESS_GROUP = CAD_FAMILY_TO_PROCESS_GROUP;
 
   /**
-   * The cad-engine family_hint for a user-chosen process_group label — the
-   * inverse of CAD_FAMILY_TO_PROCESS_GROUP, so the forward and reverse
-   * mappings can never drift apart. Machining covers milled/turned/mill_turn;
-   * the first entry (milled) is the general one; Sand Casting is sand_cast. A
-   * group with no CAD family (Assembly, ...) returns undefined: there is no
-   * extractor to force, so the real classifier chain runs.
+   * The cad-engine family_hint for a user-chosen process_group label: the
+   * first family the group is costed as (familiesOfProcessGroup), so the
+   * analysis and the costing can never disagree. Machining covers
+   * milled/turned/mill_turn; the first entry (milled) is the general one; Sand
+   * Casting is sand_cast; Casting is analysed as a die casting. A group with no
+   * cost model (Assembly, ...) returns undefined: there is no extractor to
+   * force, so the real classifier chain runs.
    */
   familyHintForProcessGroup(processGroup: string | null | undefined): string | undefined {
     if (!processGroup) return undefined;
-    const entry = Object.entries(AutoFillService.CAD_FAMILY_TO_PROCESS_GROUP)
-      .find(([, group]) => group === processGroup);
-    return entry?.[0];
+    return familiesOfProcessGroup(processGroup)[0];
   }
 
   /**

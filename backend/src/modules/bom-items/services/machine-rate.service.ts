@@ -44,6 +44,7 @@ function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[])
     totalCost: dto.totalCost + extra,
     cycleTimes: { ...dto.cycleTimes, totalMin: dto.cycleTimes.totalMin + lines.reduce((t, l) => t + l.cycleTimeMin, 0) },
     ...(incomplete.length ? { incompleteProcesses: incomplete, costStatus: 'incomplete' as const } : {}),
+    ...(gaps.length ? { uncostedOperations: [...new Set([...(dto.uncostedOperations ?? []), ...gaps])] } : {}),
   };
 }
 

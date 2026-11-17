@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { resolveUtsMpa, isSheetFormableMaterial } from '../costing/shared/core/default-rates.constants';
-import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
+import { CAD_FAMILY_TO_PROCESS_GROUP, costedProcessGroups, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
 import { isPlasticGrade } from '../costing/plastic-molding/process/process-tree';
 import { isDiscouragedShapeForFamily } from '../../raw-materials/constants/material-shape-ranking';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
@@ -78,6 +78,9 @@ interface MaterialMatch {
   ambiguityNote: string | null;
 }
 
+/** The family of a part whose chosen Process has no cost model: no engine prices it. */
+export const UNCOSTED_PROCESS_FAMILY = 'unknown';
+
 @Injectable()
 export class MaterialResolutionService {
   // Cached per-process, not per-request: migration 619 adds raw_materials.
@@ -136,24 +139,29 @@ export class MaterialResolutionService {
   // silent ~80-90× error.
   // ── Family resolution ───────────────────────────────────────────────────────
   // Single precedence chain used by BOTH costing endpoints (summary ≡ route
-  // invariant): user override > material physics > geometry classifier.
+  // invariant): user override > chosen process > material physics > geometry.
   //
   // Geometry alone cannot distinguish a machined plate from a molded cover of
   // the identical shape — the material can. This is the eMithran routing model:
-  // geometry proposes, material routes, user override is final.
+  // geometry proposes, material routes, the engineer's choice is final.
   //   1. manufacturing_family_override — explicit user intent, always wins
   //      (e.g. machined-PEEK prototype pinned to milled).
-  //   2. Thermoplastic grade → plastic_molded, whatever the shape classifier
+  //   2. The Process the engineer chose (scenario_overrides.processGroup, the
+  //      one the page shows and the CAD analysis ran as). The part is costed as
+  //      that process; a material the process cannot run is that engine's named
+  //      gap, never a silent switch to another process. A Process with no cost
+  //      model is not costed at all, and says which processes are.
+  //   3. Thermoplastic grade → plastic_molded, whatever the shape classifier
   //      guessed (a PA66 cover and an aluminium cover are the same geometry).
-  //   3. Non-sheet-formable alloy on a sheet-shaped part → milled (flat
+  //   4. Non-sheet-formable alloy on a sheet-shaped part → milled (flat
   //      bronze casting can never run a laser + press-brake route).
-  //   4. Geometry classifier result.
+  //   5. Geometry classifier result.
   resolveEffectiveFamily(input: {
     item: BOMItemResponseDto;
     fg: any;
     grade: string | null;
     sheetThicknessMm: number;
-  }): { family: string; familySource: 'override' | 'material' | 'geometry'; warning: string | null } {
+  }): { family: string; familySource: 'override' | 'process' | 'material' | 'geometry'; warning: string | null } {
     const override = (input.item.manufacturingFamilyOverride ?? '').trim();
     if (override) return { family: override, familySource: 'override', warning: null };
 
@@ -163,6 +171,21 @@ export class MaterialResolutionService {
       // A thickness is a family only for a part costed from entered values. With a 3D model the classifier has not run yet,
       // and a guess would price the part as sheet metal before its geometry is known.
       (!input.item.file3dPath && input.sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
+
+    const chosenGroup = input.item.scenarioOverrides?.['processGroup'];
+    if (typeof chosenGroup === 'string' && chosenGroup.trim() !== '') {
+      const chosenFamilies = familiesOfProcessGroup(chosenGroup);
+      // A Process with no cost model is not costed: the part's material or an earlier analysis as another process must not price it as that one.
+      if (chosenFamilies.length === 0) {
+        return {
+          family: UNCOSTED_PROCESS_FAMILY, familySource: 'process',
+          warning: `The Process "${chosenGroup}" has no cost model yet, so this part is not costed. Set its Process to one that has: ${costedProcessGroups().join(', ')}.`,
+        };
+      }
+      // Machining holds several families (milled / turned / mill-turn): the geometry picks among them.
+      const family = chosenFamilies.includes(geoFamily) ? geoFamily : chosenFamilies[0];
+      return { family, familySource: 'process', warning: null };
+    }
 
     if (isPlasticGrade(input.grade) && geoFamily !== 'plastic_molded') {
       return {

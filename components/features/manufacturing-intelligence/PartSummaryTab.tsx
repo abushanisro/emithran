@@ -2,7 +2,7 @@
 
 import { type PartSummary, usePartSummary } from '@/lib/api/hooks/useBOMItems';
 
-// The Part Summary tab: six panels (component, production and material information; cost by category; cost by process; component costs and targets) under a banner that says
+// The Summary tab (Part Summary): six panels (component, production and material information; cost by category; cost by process; component costs and targets) under a banner that says
 // when the part has operations that failed to cost. Every value is the part summary the backend projects from the applied cost table; a value the model does not hold shows a
 // dash and says why on hover, never a made-up number.
 
@@ -10,13 +10,15 @@ const number = (n: number | null | undefined, digits = 2): string =>
   n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const integer = (n: number | null | undefined): string => number(n, 0);
 
-/** The text of the banner: what failed to cost, or null when nothing did. */
-export function uncostedBanner(summary: PartSummary | undefined, uncostedWarnings: readonly string[]): string | null {
-  const names = [...(summary?.uncosted ?? [])];
-  const count = names.length + uncostedWarnings.length;
-  if (count === 0) return null;
-  return `Part has ${count === 1 ? 'an operation' : `${count} operations`} that failed to cost. ` +
-    `${names.length > 0 ? `${names.join(', ')}: no cost was applied. ` : ''}The Cost tab lists the warning for each.`;
+/**
+ * The text of the banner: the operations that failed to cost, by name, or null when none did. Two lists: the applied records that carry no cost
+ * (summary.uncosted) and the operations the live cost leaves uncosted (the cost summary's uncostedOperations). Both are data: a warning that only
+ * mentions "not costed" (a scope note such as "Patterns are not costed") is not a failed operation and is never counted.
+ */
+export function uncostedBanner(summary: PartSummary | undefined, uncostedOperations: readonly string[]): string | null {
+  const names = [...new Set([...(summary?.uncosted ?? []), ...uncostedOperations])];
+  if (names.length === 0) return null;
+  return `Part has ${names.length === 1 ? 'an operation' : `${names.length} operations`} that failed to cost: ${names.join(', ')}. The Cost tab lists the warning for each.`;
 }
 
 // A titled card. The grid that holds the panels sizes its columns from the width it is given (not the viewport: the
@@ -56,8 +58,8 @@ function Bar({ pct, color, label }: { pct: number | null; color: string; label: 
   );
 }
 
-export function PartSummaryView({ summary, uncostedWarnings = [] }: { summary: PartSummary; uncostedWarnings?: readonly string[] }) {
-  const banner = uncostedBanner(summary, uncostedWarnings);
+export function PartSummaryView({ summary, uncostedOperations = [] }: { summary: PartSummary; uncostedOperations?: readonly string[] }) {
+  const banner = uncostedBanner(summary, uncostedOperations);
   const { component: c, production: p, material: m, costs, notModelled: why } = summary;
   const applied = summary.basis === 'applied';
   const categories = summary.costByCategory;
@@ -155,9 +157,9 @@ export function PartSummaryView({ summary, uncostedWarnings = [] }: { summary: P
 }
 
 /** The tab: loads the summary and says so while it does. */
-export function PartSummaryTab({ itemId, uncostedWarnings = [] }: { itemId: string; uncostedWarnings?: readonly string[] }) {
+export function PartSummaryTab({ itemId, uncostedOperations = [] }: { itemId: string; uncostedOperations?: readonly string[] }) {
   const { data, isLoading, error } = usePartSummary(itemId);
   if (isLoading) return <p className="p-3 text-[11px] text-muted-foreground">Reading the part summary…</p>;
   if (error || !data) return <p className="p-3 text-[11px] text-muted-foreground">The part summary could not be loaded.</p>;
-  return <PartSummaryView summary={data} uncostedWarnings={uncostedWarnings} />;
+  return <PartSummaryView summary={data} uncostedOperations={uncostedOperations} />;
 }

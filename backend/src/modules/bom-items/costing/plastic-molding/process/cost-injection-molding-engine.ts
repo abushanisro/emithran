@@ -438,6 +438,9 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   const cavityConstrainedBy = sizing.constrainedBy;
 
   const warnings: string[] = [];
+  // The routed operations this quote leaves out of the cost, by name: what a view says failed to cost (never found by reading the warnings' text).
+  const uncosted: string[] = [];
+  const notCosted = (operation: string, warning: string) => { if (!uncosted.includes(operation)) uncosted.push(operation); warnings.push(warning); };
   const processLines: ProcessLineCost[] = [];
   const moldingSubtype = resolveSubtype(input);
 
@@ -532,13 +535,13 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   const inspectionMin = 0;
 
   if (routed.has('lsr_compound_dosing')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.lsr_compound_dosing, 'LSR two-component A+B metering'));
+    notCosted(UNCOSTED_OPERATION_LABELS.lsr_compound_dosing, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.lsr_compound_dosing, 'LSR two-component A+B metering'));
   }
   // The press's own setup time (mhr_records.setup_time_hr, from the machine data) is the sourced setup of this route; with none on file, setup stays
   // uncosted and the route says so rather than carrying an invented time.
   const pressSetupMin = mhrRate.setupTimeHr != null && mhrRate.setupTimeHr >= 0 ? mhrRate.setupTimeHr * 60 : null;
   if (routed.has('mold_setup') && pressSetupMin === null) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.mold_setup));
+    notCosted(UNCOSTED_OPERATION_LABELS.mold_setup, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.mold_setup));
   }
 
   // One molding process line (the catalog's own process, not one row per
@@ -576,7 +579,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   }
   processLines.push(line);
 
-  if (routed.has('gate_trimming')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
+  if (routed.has('gate_trimming')) notCosted(UNCOSTED_OPERATION_LABELS.gate_trimming, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
   // Material drying (F-36): a machine-mounted desiccant dryer runs with the press, so its hour (ownership + rated energy) is charged with the press
   // time per part. No operator: the hopper is fed with the press's material handling (no handling time is on file for a machine-mounted dryer).
   if (routed.has('material_drying')) {
@@ -599,7 +602,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       if (dry.calculator.version != null) dryLine.calculatorVersion = dry.calculator.version;
       processLines.push(dryLine);
     } else {
-      warnings.push(`${UNCOSTED_OPERATION_LABELS.material_drying} not costed: missing ${dry.derivable ? 'the dryer hourly cost' : dry.missing.join('; ')}.`);
+      notCosted(UNCOSTED_OPERATION_LABELS.material_drying, `${UNCOSTED_OPERATION_LABELS.material_drying} not costed: missing ${dry.derivable ? 'the dryer hourly cost' : dry.missing.join('; ')}.`);
     }
   }
   // Deflashing: the parting line trimmed by hand, timed by its stored calculator (length / cmManualFlashTrimmingRate) and charged at the bench rate.
@@ -616,7 +619,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       if (trim.calculator.version != null) deflashLine.calculatorVersion = trim.calculator.version;
       processLines.push(deflashLine);
     } else {
-      warnings.push(`Deflashing not costed: missing ${trim.missing.join('; ')}.`);
+      notCosted(UNCOSTED_OPERATION_LABELS.deflashing, `Deflashing not costed: missing ${trim.missing.join('; ')}.`);
     }
   }
   if (routed.has('side_action')) {
@@ -637,33 +640,33 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         if (move.calculator.version != null) slideLine.calculatorVersion = move.calculator.version;
         processLines.push(slideLine);
       } else {
-        warnings.push(`${UNCOSTED_OPERATION_LABELS.side_action} not costed: missing ${move.missing.join('; ')}.`);
+        notCosted(UNCOSTED_OPERATION_LABELS.side_action, `${UNCOSTED_OPERATION_LABELS.side_action} not costed: missing ${move.missing.join('; ')}.`);
       }
     } else if (signals.slideBundleCount === 0 && (signals.slideOrLifterBundleCount ?? 0) > 0) {
       warnings.push(`${UNCOSTED_OPERATION_LABELS.side_action}: the ${signals.slideOrLifterBundleCount} side-action bundle(s) are costed as lifters, which ride on the ejector stroke and add no cycle time; their blocks are in the tooling.`);
     } else {
-      warnings.push(uncostedOpWarning(
+      notCosted(UNCOSTED_OPERATION_LABELS.side_action, uncostedOpWarning(
         UNCOSTED_OPERATION_LABELS.side_action,
         `${signals.undercutCount ?? '?'} undercut feature(s) — slide/lifter tooling required`,
       ));
     }
   }
   if (routed.has('core_unscrewing')) {
-    warnings.push(uncostedOpWarning(
+    notCosted(UNCOSTED_OPERATION_LABELS.core_unscrewing, uncostedOpWarning(
       UNCOSTED_OPERATION_LABELS.core_unscrewing,
       `${(signals as any).unscrewingCoreCount ?? '?'} unscrewing core(s) — hydraulic/servo rotation required`,
     ));
   }
   if (routed.has('insert_loading')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_loading, `${signals.insertCount ?? '?'} insert(s)`));
+    notCosted(UNCOSTED_OPERATION_LABELS.insert_loading, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_loading, `${signals.insertCount ?? '?'} insert(s)`));
   }
-  if (routed.has('insert_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_inspection));
+  if (routed.has('insert_inspection')) notCosted(UNCOSTED_OPERATION_LABELS.insert_inspection, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_inspection));
   if (routed.has('insert_installation')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_installation, `${signals.insertCount ?? '?'} insert candidate(s)`));
+    notCosted(UNCOSTED_OPERATION_LABELS.insert_installation, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_installation, `${signals.insertCount ?? '?'} insert candidate(s)`));
   }
-  if (routed.has('secondary_cure_oven')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.secondary_cure_oven));
+  if (routed.has('secondary_cure_oven')) notCosted(UNCOSTED_OPERATION_LABELS.secondary_cure_oven, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.secondary_cure_oven));
   if (routed.has('ultrasonic_welding')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.ultrasonic_welding, `${signals.assemblyFeatureCount ?? '?'} assembly/weld feature(s)`));
+    notCosted(UNCOSTED_OPERATION_LABELS.ultrasonic_welding, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.ultrasonic_welding, `${signals.assemblyFeatureCount ?? '?'} assembly/weld feature(s)`));
   }
   // Visual inspection: the part surface at the secondary-process inspection rate (F-34), the operator's time at the press labour rate (no machine).
   if (routed.has('visual_inspection')) {
@@ -684,10 +687,10 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       if (look.calculator.version != null) inspectLine.calculatorVersion = look.calculator.version;
       processLines.push(inspectLine);
     } else {
-      warnings.push(`${UNCOSTED_OPERATION_LABELS.visual_inspection} not costed: missing ${look.derivable ? `the operator labour rate of ${mhrRate.machineName ?? 'the press'}` : look.missing.join('; ')}.`);
+      notCosted(UNCOSTED_OPERATION_LABELS.visual_inspection, `${UNCOSTED_OPERATION_LABELS.visual_inspection} not costed: missing ${look.derivable ? `the operator labour rate of ${mhrRate.machineName ?? 'the press'}` : look.missing.join('; ')}.`);
     }
   }
-  if (routed.has('dimensional_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
+  if (routed.has('dimensional_inspection')) notCosted(UNCOSTED_OPERATION_LABELS.dimensional_inspection, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
   // Weight check: the press operator weighs one part every sampling interval on a bench scale (F-35), at the operator rate plus the scale's rate.
   if (routed.has('weight_check')) {
     const weigh = runWeightCheck(weightCheckReference(), withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
@@ -704,7 +707,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       processLines.push(weighLine);
     } else {
       const why = !weigh.derivable ? weigh.missing.join('; ') : `the operator labour rate of ${mhrRate.machineName ?? 'the press'}`;
-      warnings.push(`${UNCOSTED_OPERATION_LABELS.weight_check} not costed: missing ${why}.`);
+      notCosted(UNCOSTED_OPERATION_LABELS.weight_check, `${UNCOSTED_OPERATION_LABELS.weight_check} not costed: missing ${why}.`);
     }
   }
 
@@ -878,6 +881,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (validation && plasticRef) line.calculationSnapshot = buildCalculationSnapshot(validation, plasticRef, COST_ENGINE_CONTRACT_VERSION, PLASTIC_ENGINE_BUILD, input as unknown as Record<string, unknown>, cycle.derivable ? [cycle.calculator] : []);
 
   return {
+    ...(uncosted.length ? { uncostedOperations: uncosted } : {}),
     materialCost,
     materialGrade: materialGrade ?? 'Unknown',
     grossWeightKg: r6(shotWeightKg),

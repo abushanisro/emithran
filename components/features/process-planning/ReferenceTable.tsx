@@ -1,13 +1,17 @@
 'use client';
 
 import { columnValue } from '@/lib/calculators/lookup-row-match';
-import { cellText, outputColumn, pickedValue, type ReferenceColumn } from '@/lib/calculators/reference-table';
+import { cellText, columnShares, outputColumn, pickedValue, type ReferenceColumn } from '@/lib/calculators/reference-table';
 
 import type { ReactNode, Ref } from 'react';
 
+/** The narrowest a column is laid out (rem): below it the panel scrolls sideways instead of squeezing a table of many columns. */
+const MIN_COLUMN_REM = 5;
+
 /**
- * The reference table a calculator input is picked from (Process, Raw Material and Tooling dialogs): click a row to use its value. The value
- * column (the last) is pinned to the right edge so it is always in view, and long text (notes, sources) wraps instead of pushing it off-screen.
+ * The reference table a calculator input is picked from (Process, Raw Material and Tooling dialogs): click a row to use its value. Every
+ * column is in view at once: each gets a share of the width by the text it holds (columnShares) and long text (names, notes, sources) wraps
+ * inside it. The value column (the last) is pinned to the right edge, for a table of so many columns that the panel scrolls sideways.
  */
 export function ReferenceTable({ columns, rows, fieldLabel, note, isCurrent, currentTitle, currentRowRef, onPick }: {
   columns: readonly ReferenceColumn[];
@@ -24,6 +28,7 @@ export function ReferenceTable({ columns, rows, fieldLabel, note, isCurrent, cur
 }) {
   const output = outputColumn(columns);
   const stop = (e: { stopPropagation: () => void; preventDefault: () => void }) => { e.stopPropagation(); e.preventDefault(); };
+  const shares = columnShares(columns, rows, columnValue);
   const label = (c: ReferenceColumn) => <>{c.label}{c.unit && <span className="ml-1 font-normal text-muted-foreground">({c.unit})</span>}</>;
 
   return (
@@ -35,16 +40,20 @@ export function ReferenceTable({ columns, rows, fieldLabel, note, isCurrent, cur
       </p>
 
       <div className="min-h-0 flex-1 overflow-auto" onClick={(e) => { e.stopPropagation(); }} onScroll={(e) => { e.stopPropagation(); }}>
-        <table className="w-full border-separate border-spacing-0 text-xs">
+        <table className="w-full table-fixed border-separate border-spacing-0 text-xs" style={{ minWidth: `${2.5 + columns.length * MIN_COLUMN_REM}rem` }}>
+          <colgroup>
+            <col className="w-10" />
+            {columns.map((c, i) => <col key={c.name} style={{ width: `${shares[i]}%` }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th className="sticky top-0 z-20 w-8 border-b border-r border-border bg-muted px-1 py-1.5 text-center font-medium text-muted-foreground">#</th>
+              <th className="sticky top-0 z-20 border-b border-r border-border bg-muted px-1 py-1.5 text-center font-medium text-muted-foreground">#</th>
               {columns.map((c) => c === output ? (
-                <th key={c.name} className="sticky right-0 top-0 z-30 whitespace-nowrap border-b border-l border-border bg-muted px-2 py-1.5 text-left font-semibold text-primary shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.35)]">
+                <th key={c.name} className="sticky right-0 top-0 z-30 break-words border-b border-l border-border bg-muted px-2 py-1.5 text-right align-bottom font-semibold text-primary shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.35)]">
                   {label(c)}
                 </th>
               ) : (
-                <th key={c.name} className="sticky top-0 z-20 whitespace-nowrap border-b border-r border-border bg-muted px-2 py-1.5 text-left font-semibold text-foreground">
+                <th key={c.name} className="sticky top-0 z-20 break-words border-b border-r border-border bg-muted px-2 py-1.5 text-left align-bottom font-semibold text-foreground">
                   {label(c)}
                 </th>
               ))}
@@ -58,20 +67,20 @@ export function ReferenceTable({ columns, rows, fieldLabel, note, isCurrent, cur
                 <tr
                   key={i}
                   ref={current ? currentRowRef : undefined}
-                  className={`group cursor-pointer ${current ? 'bg-primary/10' : 'hover:bg-primary/5'}`}
+                  className={`group cursor-pointer ${current ? 'bg-primary/10' : 'hover:bg-muted/60'}`}
                   title={current ? currentTitle ?? `Currently used for ${fieldLabel}` : `Use ${output?.label ?? 'value'} = ${cellText(value)}`}
                   onMouseDown={stop}
                   onClick={(e) => { stop(e); if (value !== undefined) onPick(pickedValue(value)); }}
                 >
-                  <td className={`border-b border-r border-border px-1 py-1 text-center font-mono ${current ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}>
+                  <td className={`border-b border-r border-border px-1 py-1.5 text-center align-top font-mono tabular-nums ${current ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
                     {current ? '★' : i + 1}
                   </td>
                   {columns.map((c) => c === output ? (
-                    <td key={c.name} className={`sticky right-0 z-10 whitespace-nowrap border-b border-l border-border px-2 py-1 text-right font-mono font-semibold tabular-nums text-primary shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.35)] ${current ? 'bg-primary/20' : 'bg-background group-hover:bg-muted'}`}>
+                    <td key={c.name} className={`sticky right-0 z-10 break-words border-b border-l border-border px-2 py-1.5 text-right align-top font-mono font-semibold tabular-nums text-primary shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.35)] ${current ? 'bg-background bg-[linear-gradient(hsl(var(--primary)/0.18),hsl(var(--primary)/0.18))]' : 'bg-background group-hover:bg-muted'}`}>
                       {cellText(value)}
                     </td>
                   ) : (
-                    <td key={c.name} className={`min-w-[5rem] max-w-[22rem] whitespace-normal break-words border-b border-r border-border px-2 py-1 align-top ${current ? 'font-medium text-foreground' : 'text-foreground/90'}`}>
+                    <td key={c.name} className={`break-words border-b border-r border-border px-2 py-1.5 align-top leading-snug ${current ? 'font-medium text-foreground' : 'text-foreground/90'}`}>
                       {cellText(columnValue(row, c.name))}
                     </td>
                   ))}

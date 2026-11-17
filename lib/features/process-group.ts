@@ -39,7 +39,27 @@ export function familyToProcessGroupLabel(family: string | null | undefined): st
  */
 export function processGroupToFamilyHint(group: string | null | undefined): string | undefined {
   if (!group) return undefined;
-  return Object.entries(FAMILY_HINT_TO_PROCESS_GROUP).find(([, g]) => g === group)?.[0];
+  return Object.entries(FAMILY_HINT_TO_PROCESS_GROUP).find(([, g]) => g === group)?.[0] ?? COSTED_AS_FAMILY[group];
+}
+
+/**
+ * Process groups with no CAD family of their own, and the family their CAD analysis runs as (the first of the backend's COSTED_AS_FAMILIES,
+ * part-family-process-group.ts): a hydroformed part is a sheet-metal part; a Casting part is analysed as a die casting and priced by every
+ * casting process.
+ */
+const COSTED_AS_FAMILY: Readonly<Record<string, string>> = { 'Sheet Metal - Hydroforming': 'sheet_metal', Casting: 'die_cast' };
+
+/**
+ * Whether a process group has a cost model (the backend's familiesOfProcessGroup, part-family-process-group.ts). A part whose Process has none
+ * is not costed, so the Process fields say so on the option instead of letting it be chosen blind.
+ */
+export function isCostedProcessGroup(group: string | null | undefined): boolean {
+  return !!group && (Object.values(FAMILY_HINT_TO_PROCESS_GROUP).includes(group) || group in COSTED_AS_FAMILY);
+}
+
+/** A process group as an option of a Process field: marked when it has no cost model. */
+export function processGroupOptionLabel(group: string): string {
+  return isCostedProcessGroup(group) ? group : `${group} (not costed yet)`;
 }
 
 /** A family whose process group is a casting process (die, sand, investment). */

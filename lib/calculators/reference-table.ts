@@ -25,3 +25,22 @@ export function cellText(v: unknown): string {
   if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') return v.toString();
   return JSON.stringify(v);
 }
+
+/** The fewest and most characters a column is sized for: a unit still gets room for its header, and one long note does not take the whole table. */
+const MIN_COLUMN_CHARS = 6;
+const MAX_COLUMN_CHARS = 36;
+
+/**
+ * Each column's share of the table width (percent, summing to 100), by the longest text it shows: its header or its widest cell, between
+ * MIN_COLUMN_CHARS and MAX_COLUMN_CHARS. The table is laid out to these shares so every column is in view at once and long text wraps in its
+ * own column, instead of the table growing wider than its panel and hiding columns behind the pinned value column.
+ */
+export function columnShares(columns: readonly ReferenceColumn[], rows: readonly Record<string, unknown>[], cell: (row: Record<string, unknown>, column: string) => unknown): number[] {
+  const chars = columns.map((c) => {
+    const header = c.label.length + (c.unit ? c.unit.length + 3 : 0);
+    const widest = rows.reduce((max, row) => Math.max(max, cellText(cell(row, c.name)).length), header);
+    return Math.min(MAX_COLUMN_CHARS, Math.max(MIN_COLUMN_CHARS, widest));
+  });
+  const total = chars.reduce((a, b) => a + b, 0);
+  return chars.map((n) => (100 * n) / total);
+}

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Optional, Injectable } from '@nestjs/common';
+import { InvestmentReferenceService } from '../costing/casting/investment/investment-reference.service';
 
 import { DatabaseService } from '../../../common/database/database.service';
 import { escapeLikePattern, quoteFilterValue } from '../../../common/db/postgrest-filter';
@@ -14,7 +15,7 @@ import { detectMaterialClass } from '../costing/machining/process/cost-machining
 import { PlasticDfmService } from '../costing/plastic-molding/dfm/plastic-dfm.service';
 import { sideActionSignals } from '../costing/plastic-molding/side-action-signals';
 import { DEFAULT_COSTING_LOCATION, LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
-import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
+import { CAD_FAMILY_TO_PROCESS_GROUP, CASTING_PROCESS_GROUP, appliedCastingFamily } from '../costing/shared/core/part-family-process-group';
 import type { CostTable } from '../costing/shared/cost-table';
 import { buildDesignGuidance, type DesignGuidance, type DesignGuidanceInput, type GuidanceFeature, type GuidanceSeverity, type ReviewItem } from '../costing/shared/design-guidance';
 import { resolveCostingInputs } from '../costing/shared/physics/costing-inputs';
@@ -67,15 +68,22 @@ export class DesignGuidanceService {
     private readonly sandCost: SandCostService,
     private readonly castingReference: CastingReferenceService,
     private readonly tolerances: FeatureToleranceService,
+    /** The investment casting design limits; optional so a hand-built service (tests) need not pass it. */
+    @Optional() private readonly investmentReference?: InvestmentReferenceService,
   ) {}
 
   async forItem(item: BOMItemResponseDto, token: string): Promise<DesignGuidance> {
     const fg = (item.featureGraph ?? null) as { summary?: Summary; feature_graph_v2?: { features?: unknown } } | null;
     const summary: Summary = fg?.summary ?? {};
     const grade = item.materialGrade?.trim() || null;
-    const { family } = this.materials.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm: Number(item.sheetThicknessMm) || 0 });
     const chosenGroup = typeof item.scenarioOverrides?.processGroup === 'string' ? item.scenarioOverrides.processGroup : null;
-    const processGroup = chosenGroup || CAD_FAMILY_TO_PROCESS_GROUP[family] || null;
+    const table = await this.costTables.forItem(item.id, token);
+    const resolved = this.materials.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm: Number(item.sheetThicknessMm) || 0 }).family;
+    // A Casting part is analysed as a die casting and quoted on the cheapest casting process: its guidance is that of the process it was applied as.
+    const family = (chosenGroup === CASTING_PROCESS_GROUP && !item.manufacturingFamilyOverride?.trim()
+      ? appliedCastingFamily(table.rows.filter((r) => r.kind === 'group').map((r) => r.name)) : null) ?? resolved;
+    // The process the guidance is for: the chosen one, and for a Casting part the casting process it was applied as.
+    const processGroup = (family !== resolved ? CAD_FAMILY_TO_PROCESS_GROUP[family] : null) || chosenGroup || CAD_FAMILY_TO_PROCESS_GROUP[family] || null;
     const machined = isMachiningFamily(family);
     const casting = castingProcessOfFamily(family);
     const molded = family === 'plastic_molded';
@@ -86,12 +94,11 @@ export class DesignGuidanceService {
     const location = inputs.location ?? DEFAULT_COSTING_LOCATION;
     const info = LOCATION_INFO[location] ?? LOCATION_INFO[DEFAULT_COSTING_LOCATION]!;
 
-    const [table, library, dfm, toleranced, secondary, setup] = await Promise.all([
-      this.costTables.forItem(item.id, token),
+    const [library, dfm, toleranced, secondary, setup] = await Promise.all([
       this.library(client, processGroup, info.materialCol, grade),
       this.findings({ item, fg, grade, token, machined, molded, sand: casting === 'sand_casting' }),
       this.toleranced(item.id, token),
-      this.secondaryMachining(item.id, token),
+      this.secondaryMachining(item.id, token, family !== resolved ? family : undefined),
       features.length > 0 ? this.machiningLookup.getSetupAxisRule() : Promise.resolve({ rule: null, missing: [] }),
     ]);
 
@@ -224,9 +231,9 @@ export class DesignGuidanceService {
   }
 
   /** On a part whose primary process is not machining: the features that process leaves short of their tolerances (or cannot form). */
-  private async secondaryMachining(id: string, token: string): Promise<{ value: DesignGuidanceInput['secondaryMachining']; reason: string | null; review: ReviewItem[] }> {
+  private async secondaryMachining(id: string, token: string, familyOverride?: string): Promise<{ value: DesignGuidanceInput['secondaryMachining']; reason: string | null; review: ReviewItem[] }> {
     try {
-      const need = await this.tolerances.getMachiningNeed(id, token);
+      const need = await this.tolerances.getMachiningNeed(id, token, undefined, familyOverride);
       // The toleranced features the part's process leaves undecided (process-profile.ts): listed, never costed.
       const review = need.decisions.filter((d) => d.decision === 'needs_review' && d.requirements.length > 0).map((d): ReviewItem => ({
         label: d.label, detail: d.reason, severity: null,
@@ -274,6 +281,15 @@ export class DesignGuidanceService {
         items: [],
       };
     }
+    if (casting === 'investment_casting') {
+      return {
+        slides: typeof summary.castingSlideBundleCount === 'number' ? summary.castingSlideBundleCount : null,
+        lifters: null, cores: null,
+        liftersReason: 'A wax pattern die has slides, not lifters.',
+        coresReason: 'The investment casting route forms holes and voids with the shell: it has no cores.',
+        items: [],
+      };
+    }
     if (casting === 'sand_casting') {
       const cores = Array.isArray(summary.castingCores) ? summary.castingCores.length : null;
       return {
@@ -303,8 +319,15 @@ export class DesignGuidanceService {
     if (req.casting) {
       const measured = { partMinMm: num(summary.castingWallMinMm), partMaxMm: num(summary.castingWallMaxMm) };
       if (req.casting === 'investment_casting') {
-        const why = 'The investment casting wall limits are not staged yet.';
-        return { ...base, ...measured, reasons: { min: why, max: why } };
+        // The investment casting design limits: one row per material type (memory/Casting Investment, tblDTCMinWallThickness).
+        const limits = (await this.investmentReference?.get())?.reference?.table('tblDTCMinWallThickness') ?? [];
+        const row = limits.find((r) => String(r['Material Type']) === req.materialType);
+        const why = limits.length === 0 ? 'The investment casting wall table (tblDTCMinWallThickness) is not staged.'
+          : !req.materialType ? 'The material has no Material Type in the library, which the wall table is keyed by.'
+          : `tblDTCMinWallThickness has no row for ${req.materialType}.`;
+        return row
+          ? { ...base, ...measured, recommendedMinMm: num(row['Min Wall Thickness (mm)']), recommendedMaxMm: num(row['Max Wall Thickness (mm)']), source: `tblDTCMinWallThickness (${req.materialType})` }
+          : { ...base, ...measured, reasons: { min: why, max: why } };
       }
       const { reference } = await this.castingReference.getCastabilityReference(req.casting);
       const names = [...req.appliedProcesses, castingProcessLabel(req.casting)];

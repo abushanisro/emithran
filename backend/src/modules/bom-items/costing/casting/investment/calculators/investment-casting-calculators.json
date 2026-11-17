@@ -1,0 +1,1888 @@
+{
+  "domain": "investment casting",
+  "processGroup": "Casting Investment",
+  "calculators": [
+    {
+      "key": "investment.tree",
+      "name": "Investment Casting - Tree",
+      "description": "The wax tree (carousel): layers of patterns stacked on the down pole up to the tallest tree the plant builds and every step of the route can take, the patterns of a layer around it; never more patterns than the batch.",
+      "operations": [],
+      "helper": true,
+      "output": "Patterns per Tree",
+      "results": [
+        "Layers",
+        "Tree Height",
+        "Tree Width",
+        "Trees in Batch"
+      ],
+      "fields": [
+        {
+          "name": "Pattern Length",
+          "unit": "mm",
+          "source": {
+            "cad": "length_mm"
+          }
+        },
+        {
+          "name": "Pattern Stack Dimension",
+          "unit": "mm",
+          "source": {
+            "cad": "stack_mm"
+          }
+        },
+        {
+          "name": "Pattern Radial Dimension",
+          "unit": "mm",
+          "source": {
+            "cad": "radial_mm"
+          }
+        },
+        {
+          "name": "Max Tree Height",
+          "unit": "mm",
+          "source": {
+            "engine": "max_tree_height_mm"
+          }
+        },
+        {
+          "name": "Runner Length Allowance",
+          "unit": "mm",
+          "source": {
+            "variable": "runnerLengthAllowance"
+          }
+        },
+        {
+          "name": "Layer Spacing",
+          "unit": "mm",
+          "source": {
+            "engine": "layer_spacing_mm"
+          }
+        },
+        {
+          "name": "Patterns per Layer",
+          "unit": null,
+          "source": {
+            "variable": "maxNumWaxPatternsPerLayer_carousel"
+          }
+        },
+        {
+          "name": "Runner Width",
+          "unit": "mm",
+          "source": {
+            "engine": "runner_width_mm"
+          }
+        },
+        {
+          "name": "Gate Length",
+          "unit": "mm",
+          "source": {
+            "variable": "gateLengthAllowance"
+          }
+        },
+        {
+          "name": "Batch Size",
+          "unit": "pcs",
+          "source": {
+            "scenario": "batch_size"
+          }
+        },
+        {
+          "name": "Layer Pitch",
+          "unit": "mm",
+          "formula": "{Pattern Stack Dimension} + {Layer Spacing}"
+        },
+        {
+          "name": "Layers",
+          "unit": null,
+          "formula": "max(1, floor(({Max Tree Height} - {Runner Length Allowance} + {Layer Spacing}) / {Layer Pitch}))"
+        },
+        {
+          "name": "Tree Height",
+          "unit": "mm",
+          "formula": "{Layers} * {Layer Pitch} - {Layer Spacing} + {Runner Length Allowance}"
+        },
+        {
+          "name": "Tree Width",
+          "unit": "mm",
+          "formula": "max({Runner Width} + 2 * ({Gate Length} + {Pattern Radial Dimension}), {Pattern Length})"
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "formula": "min({Layers} * {Patterns per Layer}, {Batch Size})"
+        },
+        {
+          "name": "Trees in Batch",
+          "unit": null,
+          "formula": "CEIL({Batch Size} / {Patterns per Tree})"
+        }
+      ]
+    },
+    {
+      "key": "investment.metal",
+      "name": "Investment Casting - Metal per casting",
+      "description": "Metal poured for one casting: its own weight over the gating efficiency of its size class (the rest is the gates, runner and pour cup).",
+      "operations": [],
+      "helper": true,
+      "output": "Poured Weight",
+      "results": [
+        "Net Weight",
+        "Poured per Tree"
+      ],
+      "fields": [
+        {
+          "name": "Part Volume",
+          "unit": "mm³",
+          "source": {
+            "cad": "volume_mm3"
+          }
+        },
+        {
+          "name": "Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Gating Efficiency",
+          "unit": null,
+          "source": {
+            "engine": "gating_efficiency"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Net Weight",
+          "unit": "kg",
+          "formula": "{Part Volume} * 1e-9 * {Density}"
+        },
+        {
+          "name": "Poured Weight",
+          "unit": "kg",
+          "formula": "{Net Weight} / {Gating Efficiency}"
+        },
+        {
+          "name": "Poured per Tree",
+          "unit": "kg",
+          "formula": "{Poured Weight} * {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.material_cost",
+      "name": "Investment Casting - Material cost",
+      "description": "Metal bought per casting: the net weight, the furnace melt loss, and the gating not returned to the furnace (the remelt allowance, percent).",
+      "operations": [],
+      "helper": true,
+      "output": "Material Cost",
+      "results": [
+        "Bought Weight"
+      ],
+      "fields": [
+        {
+          "name": "Net Weight",
+          "unit": "kg",
+          "source": {
+            "engine": "net_kg"
+          }
+        },
+        {
+          "name": "Poured Weight",
+          "unit": "kg",
+          "source": {
+            "engine": "poured_kg"
+          }
+        },
+        {
+          "name": "Furnace Yield",
+          "unit": null,
+          "source": {
+            "engine": "furnace_yield"
+          }
+        },
+        {
+          "name": "Remelt Allowance",
+          "unit": "%",
+          "source": {
+            "variable": "defaultRemeltAllowanceInvestmentCasting"
+          }
+        },
+        {
+          "name": "Price",
+          "unit": "USD/kg",
+          "source": {
+            "material": "price_usd_per_kg"
+          }
+        },
+        {
+          "name": "Melt Loss",
+          "unit": "kg",
+          "formula": "{Poured Weight} / {Furnace Yield} - {Poured Weight}"
+        },
+        {
+          "name": "Bought Weight",
+          "unit": "kg",
+          "formula": "{Net Weight} + {Melt Loss} + ({Poured Weight} - {Net Weight}) * (1 - min(max({Remelt Allowance} / 100, 0), 1))"
+        },
+        {
+          "name": "Material Cost",
+          "unit": "USD",
+          "formula": "{Bought Weight} * {Price}"
+        }
+      ]
+    },
+    {
+      "key": "investment.wax_pattern",
+      "name": "Investment Casting - Wax pattern molding",
+      "description": "One shot of the wax press: fill at the press flow rate, cool the thickest wall to the eject temperature (plate cooling by conduction to the die), open and close over the pattern height, and unload each pattern.",
+      "operations": [
+        "Wax Pattern Molding"
+      ],
+      "results": [
+        "Cool Time",
+        "Shot Time"
+      ],
+      "fields": [
+        {
+          "name": "Pattern Volume",
+          "unit": "mm³",
+          "source": {
+            "cad": "volume_mm3"
+          }
+        },
+        {
+          "name": "Pattern Height",
+          "unit": "mm",
+          "source": {
+            "cad": "height_mm"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Injection Flow Rate",
+          "unit": "mm³/s",
+          "source": {
+            "machine": "injection_flow_rate_mm3_per_s"
+          }
+        },
+        {
+          "name": "Clamp Opening Speed",
+          "unit": "mm/s",
+          "source": {
+            "machine": "clamp_opening_speed_mm_per_s"
+          }
+        },
+        {
+          "name": "Clamp Closing Speed",
+          "unit": "mm/s",
+          "source": {
+            "machine": "clamp_closing_speed_mm_per_s"
+          }
+        },
+        {
+          "name": "Cooling Wall",
+          "unit": "mm",
+          "source": {
+            "engine": "cooling_wall_mm"
+          }
+        },
+        {
+          "name": "Wax Conductivity",
+          "unit": "W/(m K)",
+          "source": {
+            "variable": "waxPatternThermalConductivity"
+          }
+        },
+        {
+          "name": "Wax Density",
+          "unit": "kg/m³",
+          "source": {
+            "lookup": "tblWaxProperties.Density (kg / m^3)"
+          }
+        },
+        {
+          "name": "Wax Specific Heat",
+          "unit": "J/(kg K)",
+          "source": {
+            "lookup": "tblWaxProperties.Specific Heat (J / kg * K)"
+          }
+        },
+        {
+          "name": "Wax Melting Temp",
+          "unit": "°C",
+          "source": {
+            "lookup": "tblWaxProperties.Melting Temp (°C)"
+          }
+        },
+        {
+          "name": "Wax Eject Temp",
+          "unit": "°C",
+          "source": {
+            "lookup": "tblWaxProperties.Eject Temp (°C)"
+          }
+        },
+        {
+          "name": "Die Temp",
+          "unit": "°C",
+          "source": {
+            "variable": "waxPatternDieTemperature"
+          }
+        },
+        {
+          "name": "Open Stroke Factor",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternMoldOpenStrokeFactor"
+          }
+        },
+        {
+          "name": "Handling Time",
+          "unit": "s",
+          "source": {
+            "lookup": "tblHandlingTimes.Handling Time (s)"
+          }
+        },
+        {
+          "name": "Chill Load Time",
+          "unit": "s",
+          "source": {
+            "engine": "chill_load_s"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Fill Time",
+          "unit": "s",
+          "formula": "{Pattern Volume} * {Cavities} / {Injection Flow Rate}"
+        },
+        {
+          "name": "Wax Diffusivity",
+          "unit": "m²/s",
+          "formula": "{Wax Conductivity} / ({Wax Density} * {Wax Specific Heat})"
+        },
+        {
+          "name": "Cool Time",
+          "unit": "s",
+          "formula": "({Cooling Wall} / 1000) ^ 2 / (pi ^ 2 * {Wax Diffusivity}) * LN(4 / pi * ({Wax Melting Temp} - {Die Temp}) / ({Wax Eject Temp} - {Die Temp}))"
+        },
+        {
+          "name": "Open Stroke",
+          "unit": "mm",
+          "formula": "{Pattern Height} * {Open Stroke Factor}"
+        },
+        {
+          "name": "Open Close Time",
+          "unit": "s",
+          "formula": "{Open Stroke} / {Clamp Opening Speed} + {Open Stroke} / {Clamp Closing Speed}"
+        },
+        {
+          "name": "Shot Time",
+          "unit": "s",
+          "formula": "{Fill Time} + {Cool Time} + {Open Close Time} + {Chill Load Time} + {Handling Time} * {Cavities}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Shot Time} / {Cavities} * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.pattern_finishing",
+      "name": "Investment Casting - Bench: Pattern finishing",
+      "description": "Hand finishing of the wax pattern: its surface at the finishing rate.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Pattern Surface",
+          "unit": "mm²",
+          "source": {
+            "cad": "area_mm2"
+          }
+        },
+        {
+          "name": "Finishing Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "waxPatternFinishingRate"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Pattern Surface} / {Finishing Rate}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.tree_assembly",
+      "name": "Investment Casting - Bench: Tree assembly",
+      "description": "Each gate of the pattern attached to the tree, plus the pour cup and the wax vents shared by the patterns of the tree.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Gates",
+          "unit": null,
+          "source": {
+            "lookup": "partMassBasedData.Number of Gates"
+          }
+        },
+        {
+          "name": "Time per Gate",
+          "unit": "s",
+          "source": {
+            "lookup": "partMassBasedData.Tree Assembly Time Per Gate (s)"
+          }
+        },
+        {
+          "name": "Pour Cup Attach Time",
+          "unit": "s",
+          "source": {
+            "variable": "pourCupAttachTime"
+          }
+        },
+        {
+          "name": "Wax Vents",
+          "unit": null,
+          "source": {
+            "engine": "wax_vents"
+          }
+        },
+        {
+          "name": "Vent Add Time",
+          "unit": "s",
+          "source": {
+            "variable": "singleWaxVentAddTime"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Gates} * {Time per Gate} + ({Pour Cup Attach Time} + {Wax Vents} * {Vent Add Time}) / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.slurry_dipping",
+      "name": "Investment Casting - Slurry dipping",
+      "description": "The dips of one coat group (primary face coats, or secondary backup coats), each a dip of the whole tree; shared by its patterns.",
+      "operations": [
+        "Primary Slurry Dipping",
+        "Secondary Slurry Dipping"
+      ],
+      "fields": [
+        {
+          "name": "Dips",
+          "unit": null,
+          "source": {
+            "engine": "dips"
+          }
+        },
+        {
+          "name": "Dip Time per Tree",
+          "unit": "s",
+          "source": {
+            "engine": "dip_time_s"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Dips} * {Dip Time per Tree} / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.sand_coating",
+      "name": "Investment Casting - Sand coating",
+      "description": "One stucco coat of the tree after each dip of the coat group; shared by its patterns.",
+      "operations": [
+        "Primary Sand Coating",
+        "Secondary Sand Coating"
+      ],
+      "fields": [
+        {
+          "name": "Coats",
+          "unit": null,
+          "source": {
+            "engine": "dips"
+          }
+        },
+        {
+          "name": "Coat Time per Tree",
+          "unit": "s",
+          "source": {
+            "engine": "coat_time_s"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Coats} * {Coat Time per Tree} / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.robotic_assist",
+      "name": "Investment Casting - Robotic assist",
+      "description": "The robot holding the tree through every dip and stucco coat; shared by its patterns.",
+      "operations": [
+        "Robotic Assist"
+      ],
+      "fields": [
+        {
+          "name": "Dip Cycles",
+          "unit": null,
+          "source": {
+            "engine": "total_dips"
+          }
+        },
+        {
+          "name": "Dip Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "slurryDipTimePerTreeRobotic"
+          }
+        },
+        {
+          "name": "Coat Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "sandCoatTimePerTreeRobotic"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Dip Cycles} * ({Dip Time per Tree} + {Coat Time per Tree}) / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.drying",
+      "name": "Investment Casting - Drying",
+      "description": "The shell drying after every dip cycle and the final drying, for the tree; shared by its patterns.",
+      "operations": [
+        "Drying"
+      ],
+      "fields": [
+        {
+          "name": "Dip Cycles",
+          "unit": null,
+          "source": {
+            "engine": "total_dips"
+          }
+        },
+        {
+          "name": "Drying per Dip Cycle",
+          "unit": "s",
+          "source": {
+            "variable": "dryingTimePerTree_inCycle"
+          }
+        },
+        {
+          "name": "Final Drying",
+          "unit": "s",
+          "source": {
+            "variable": "dryingTimePerTree_final"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Dip Cycles} * {Drying per Dip Cycle} + {Final Drying}) / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.flash_fire",
+      "name": "Investment Casting - Flash fire de-waxing",
+      "description": "One furnace load of trees: the soak time for the shell (by its dip cycles) plus loading and unloading each tree; shared by the trees of the load and their patterns. The bed holds the trees that nest on it, up to its drainage posts.",
+      "operations": [
+        "Flash Fire De-Waxing"
+      ],
+      "results": [
+        "Trees per Load"
+      ],
+      "fields": [
+        {
+          "name": "Tree Width",
+          "unit": "mm",
+          "source": {
+            "engine": "tree_width_mm"
+          }
+        },
+        {
+          "name": "Bed Length",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_length_mm"
+          }
+        },
+        {
+          "name": "Bed Width",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_width_mm"
+          }
+        },
+        {
+          "name": "Nesting Factor",
+          "unit": null,
+          "source": {
+            "variable": "nestingAllowanceFactor_tree_flashFireFurnace"
+          }
+        },
+        {
+          "name": "Trees in Batch",
+          "unit": null,
+          "source": {
+            "engine": "trees_in_batch"
+          }
+        },
+        {
+          "name": "Drainage Posts",
+          "unit": null,
+          "source": {
+            "machine": "num_d_header_truncated"
+          }
+        },
+        {
+          "name": "Soak Time",
+          "unit": "hr",
+          "source": {
+            "lookup": "dipCycleBasedData.Flash Fire Furnace Soak Time (hr)"
+          }
+        },
+        {
+          "name": "Load Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultLoadTimePerTree_flashFireFurnace"
+          }
+        },
+        {
+          "name": "Unload Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultUnloadTimePerTree_flashFireFurnace"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Bed Capacity",
+          "unit": "trees",
+          "formula": "max(1, min(floor({Nesting Factor} * {Bed Length} * {Bed Width} / {Tree Width} ^ 2), {Drainage Posts}))"
+        },
+        {
+          "name": "Trees per Load",
+          "unit": null,
+          "formula": "min({Bed Capacity}, {Trees in Batch})"
+        },
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "formula": "{Soak Time} * 3600 + {Trees per Load} * ({Load Time per Tree} + {Unload Time per Tree})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Load Time} / ({Trees per Load} * {Patterns per Tree})"
+        }
+      ]
+    },
+    {
+      "key": "investment.autoclave",
+      "name": "Investment Casting - Steam autoclave de-waxing",
+      "description": "One autoclave load of trees: the soak time plus loading and unloading each tree; shared by the trees of the load and their patterns.",
+      "operations": [
+        "Steam Autoclave De-Waxing"
+      ],
+      "results": [
+        "Trees per Load"
+      ],
+      "fields": [
+        {
+          "name": "Tree Width",
+          "unit": "mm",
+          "source": {
+            "engine": "tree_width_mm"
+          }
+        },
+        {
+          "name": "Bed Length",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_length_mm"
+          }
+        },
+        {
+          "name": "Bed Width",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_width_mm"
+          }
+        },
+        {
+          "name": "Nesting Factor",
+          "unit": null,
+          "source": {
+            "variable": "nestingAllowanceFactor_tree_autoclave"
+          }
+        },
+        {
+          "name": "Trees in Batch",
+          "unit": null,
+          "source": {
+            "engine": "trees_in_batch"
+          }
+        },
+        {
+          "name": "Soak Time",
+          "unit": "s",
+          "source": {
+            "variable": "defaultSoakTime_autoclave"
+          }
+        },
+        {
+          "name": "Load Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultLoadTimePerTree_autoclave"
+          }
+        },
+        {
+          "name": "Unload Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultUnloadTimePerTree_autoclave"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Bed Capacity",
+          "unit": "trees",
+          "formula": "max(1, floor({Nesting Factor} * {Bed Length} * {Bed Width} / {Tree Width} ^ 2))"
+        },
+        {
+          "name": "Trees per Load",
+          "unit": null,
+          "formula": "min({Bed Capacity}, {Trees in Batch})"
+        },
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "formula": "{Soak Time} + {Trees per Load} * ({Load Time per Tree} + {Unload Time per Tree})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Load Time} / ({Trees per Load} * {Patterns per Tree})"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.vent_plugging",
+      "name": "Investment Casting - Bench: Wax vent plugging",
+      "description": "Plugging the wax vents of the tree after de-waxing; shared by its patterns.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Wax Vents",
+          "unit": null,
+          "source": {
+            "engine": "wax_vents"
+          }
+        },
+        {
+          "name": "Plug Time",
+          "unit": "s",
+          "source": {
+            "variable": "defaultSinglePlugWaxVentTime"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Wax Vents} * {Plug Time} / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.mold_cleaning",
+      "name": "Investment Casting - Bench: Mold cleaning",
+      "description": "Cleaning the shell with water or compressed air after de-waxing; shared by the patterns of the tree.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Clean Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultCycleTime_cleanMold"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Clean Time per Tree} / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.shell_inspection",
+      "name": "Investment Casting - Bench: Shell inspection",
+      "description": "Inspection of the shell after de-waxing: visual, and the surface (blue dye) and internal (borescope) inspections the plant has enabled; shared by the patterns of the tree.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Visual Inspection Time",
+          "unit": "s",
+          "source": {
+            "variable": "defaultInvestmentShellVisualInspectionTime"
+          }
+        },
+        {
+          "name": "Blue Dye Inspection Time",
+          "unit": "s",
+          "source": {
+            "engine": "blue_dye_s"
+          }
+        },
+        {
+          "name": "Borescope Inspection Time",
+          "unit": "s",
+          "source": {
+            "engine": "borescope_s"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Visual Inspection Time} + {Blue Dye Inspection Time} + {Borescope Inspection Time}) / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.burnout",
+      "name": "Investment Casting - Mold burnout",
+      "description": "One furnace load of shells: the burnout soak time for the shell (by its dip cycles) plus loading and unloading each tree; shared by the trees of the load and their patterns.",
+      "operations": [
+        "Mold Burnout"
+      ],
+      "results": [
+        "Trees per Load"
+      ],
+      "fields": [
+        {
+          "name": "Tree Width",
+          "unit": "mm",
+          "source": {
+            "engine": "tree_width_mm"
+          }
+        },
+        {
+          "name": "Bed Length",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_length_mm"
+          }
+        },
+        {
+          "name": "Bed Width",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_width_mm"
+          }
+        },
+        {
+          "name": "Nesting Factor",
+          "unit": null,
+          "source": {
+            "variable": "nestingAllowanceFactor_tree_burnoutFurnace"
+          }
+        },
+        {
+          "name": "Trees in Batch",
+          "unit": null,
+          "source": {
+            "engine": "trees_in_batch"
+          }
+        },
+        {
+          "name": "Soak Time",
+          "unit": "hr",
+          "source": {
+            "lookup": "dipCycleBasedData.Mold Burnout Soak Time (hr)"
+          }
+        },
+        {
+          "name": "Load Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultLoadTimePerTree_burnoutFurnace"
+          }
+        },
+        {
+          "name": "Unload Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultUnloadTimePerTree_burnoutFurnace"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Bed Capacity",
+          "unit": "trees",
+          "formula": "max(1, floor({Nesting Factor} * {Bed Length} * {Bed Width} / {Tree Width} ^ 2))"
+        },
+        {
+          "name": "Trees per Load",
+          "unit": null,
+          "formula": "min({Bed Capacity}, {Trees in Batch})"
+        },
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "formula": "{Soak Time} * 3600 + {Trees per Load} * ({Load Time per Tree} + {Unload Time per Tree})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Load Time} / ({Trees per Load} * {Patterns per Tree})"
+        }
+      ]
+    },
+    {
+      "key": "investment.preheat",
+      "name": "Investment Casting - Mold preheating",
+      "description": "One furnace load of shells soaked at the preheat temperature (the same time for a full load or one tree) plus loading and unloading each tree; shared by the trees of the load and their patterns.",
+      "operations": [
+        "Mold Preheating"
+      ],
+      "results": [
+        "Trees per Load"
+      ],
+      "fields": [
+        {
+          "name": "Tree Width",
+          "unit": "mm",
+          "source": {
+            "engine": "tree_width_mm"
+          }
+        },
+        {
+          "name": "Bed Length",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_length_mm"
+          }
+        },
+        {
+          "name": "Bed Width",
+          "unit": "mm",
+          "source": {
+            "machine": "bed_width_mm"
+          }
+        },
+        {
+          "name": "Nesting Factor",
+          "unit": null,
+          "source": {
+            "variable": "nestingAllowanceFactor_tree_preheatFurnace"
+          }
+        },
+        {
+          "name": "Trees in Batch",
+          "unit": null,
+          "source": {
+            "engine": "trees_in_batch"
+          }
+        },
+        {
+          "name": "Soak Time",
+          "unit": "s",
+          "source": {
+            "variable": "defaultSoakTime_preheatFurnace"
+          }
+        },
+        {
+          "name": "Load Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultLoadTimePerTree_preheatFurnace"
+          }
+        },
+        {
+          "name": "Unload Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultUnloadTimePerTree_preheatFurnace"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Bed Capacity",
+          "unit": "trees",
+          "formula": "max(1, floor({Nesting Factor} * {Bed Length} * {Bed Width} / {Tree Width} ^ 2))"
+        },
+        {
+          "name": "Trees per Load",
+          "unit": null,
+          "formula": "min({Bed Capacity}, {Trees in Batch})"
+        },
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "formula": "{Soak Time} + {Trees per Load} * ({Load Time per Tree} + {Unload Time per Tree})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Load Time} / ({Trees per Load} * {Patterns per Tree})"
+        }
+      ]
+    },
+    {
+      "key": "investment.metal_pouring",
+      "name": "Investment Casting - Metal pouring",
+      "description": "Melting one crucible of ingot, shared by the trees it fills, then pouring each tree and moving it to cool; shared by the patterns of the tree. The melt energy is the heat to the pouring temperature and of fusion, times the furnace factor.",
+      "operations": [
+        "Metal Pouring"
+      ],
+      "results": [
+        "Energy Cost",
+        "Trees per Crucible"
+      ],
+      "fields": [
+        {
+          "name": "Poured per Tree",
+          "unit": "kg",
+          "source": {
+            "engine": "poured_per_tree_kg"
+          }
+        },
+        {
+          "name": "Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Furnace Capacity",
+          "unit": "m³",
+          "source": {
+            "machine": "furnace_capacity_m3"
+          }
+        },
+        {
+          "name": "Crucible Fill Factor",
+          "unit": null,
+          "source": {
+            "variable": "meltingFurnaceCrucibleFillFactor"
+          }
+        },
+        {
+          "name": "Furnace Yield",
+          "unit": null,
+          "source": {
+            "machine": "yield_l_header_truncated"
+          }
+        },
+        {
+          "name": "Furnace Factor",
+          "unit": null,
+          "source": {
+            "machine": "furnace_fa_header_truncated"
+          }
+        },
+        {
+          "name": "Melt Time per Crucible",
+          "unit": "s",
+          "source": {
+            "variable": "ingotMeltTimePerCrucible"
+          }
+        },
+        {
+          "name": "Pour Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultPourMetalTimePerTree"
+          }
+        },
+        {
+          "name": "Move Time per Tree",
+          "unit": "s",
+          "source": {
+            "variable": "defaultMoveToCoolBoxTimePerTree"
+          }
+        },
+        {
+          "name": "Specific Heat",
+          "unit": "J/(kg K)",
+          "source": {
+            "material": "specific_heat_rt"
+          }
+        },
+        {
+          "name": "Pour Temperature",
+          "unit": "°C",
+          "source": {
+            "material": "pour_temp"
+          }
+        },
+        {
+          "name": "Ambient Temperature",
+          "unit": "°C",
+          "source": {
+            "variable": "investmentMoldEjectionTemperature"
+          }
+        },
+        {
+          "name": "Heat of Fusion",
+          "unit": "J/kg",
+          "source": {
+            "material": "heat_of_fusion"
+          }
+        },
+        {
+          "name": "Energy Price",
+          "unit": "USD/kWh",
+          "source": {
+            "scenario": "energy_price"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Trees per Crucible",
+          "unit": null,
+          "formula": "max(1, floor({Furnace Capacity} * {Density} * {Crucible Fill Factor} / {Poured per Tree}))"
+        },
+        {
+          "name": "Metal Melted per Tree",
+          "unit": "kg",
+          "formula": "{Poured per Tree} / {Furnace Yield}"
+        },
+        {
+          "name": "Heat of the Melt",
+          "unit": "J/kg",
+          "formula": "{Specific Heat} * ({Pour Temperature} - {Ambient Temperature}) + {Heat of Fusion}"
+        },
+        {
+          "name": "Energy per Casting",
+          "unit": "J",
+          "formula": "{Metal Melted per Tree} * {Heat of the Melt} * {Furnace Factor} / {Patterns per Tree}"
+        },
+        {
+          "name": "Energy Cost",
+          "unit": "USD",
+          "formula": "{Energy per Casting} / 3.6e6 * {Energy Price}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Melt Time per Crucible} / {Trees per Crucible} + {Pour Time per Tree} + {Move Time per Tree}) / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.cooling",
+      "name": "Investment Casting - Cooling",
+      "description": "Chvorinov's rule: time in the shell = B x (V/A)^n, with the mould constant B from the metal and the investment shell (preheated to a share of the liquidus), times the plant's calibration factor; the tree cools as one, shared by its patterns.",
+      "operations": [
+        "Cooling"
+      ],
+      "results": [
+        "Cooling Time"
+      ],
+      "fields": [
+        {
+          "name": "Metal Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Heat of Fusion",
+          "unit": "J/kg",
+          "source": {
+            "material": "heat_of_fusion"
+          }
+        },
+        {
+          "name": "Specific Heat",
+          "unit": "J/(kg K)",
+          "source": {
+            "material": "specific_heat_rt"
+          }
+        },
+        {
+          "name": "Pour Temperature",
+          "unit": "°C",
+          "source": {
+            "material": "pour_temp"
+          }
+        },
+        {
+          "name": "Liquidus",
+          "unit": "°C",
+          "source": {
+            "material": "liquidus_temp"
+          }
+        },
+        {
+          "name": "Shell Conductivity",
+          "unit": "W/(m K)",
+          "source": {
+            "variable": "investmentMoldThermalConductivity"
+          }
+        },
+        {
+          "name": "Shell Density",
+          "unit": "kg/m³",
+          "source": {
+            "variable": "investmentMoldDensity"
+          }
+        },
+        {
+          "name": "Shell Specific Heat",
+          "unit": "J/(kg K)",
+          "source": {
+            "variable": "investmentMoldSpecificHeat"
+          }
+        },
+        {
+          "name": "Liquidus to Preheat",
+          "unit": "%",
+          "source": {
+            "variable": "liquidusToPreheatPercentage"
+          }
+        },
+        {
+          "name": "Modulus",
+          "unit": "mm",
+          "source": {
+            "cad": "modulus_mm"
+          }
+        },
+        {
+          "name": "Exponent",
+          "unit": null,
+          "source": {
+            "variable": "modulusConstant"
+          }
+        },
+        {
+          "name": "Calibration Factor",
+          "unit": null,
+          "source": {
+            "variable": "coolingTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Shell Temperature",
+          "unit": "°C",
+          "formula": "{Liquidus} * (1 - {Liquidus to Preheat} / 100)"
+        },
+        {
+          "name": "Superheat",
+          "unit": "K",
+          "formula": "max({Pour Temperature} - {Liquidus}, 0)"
+        },
+        {
+          "name": "Heat Term",
+          "unit": null,
+          "formula": "{Metal Density} * ({Heat of Fusion} + {Specific Heat} * {Superheat}) / ({Liquidus} - {Shell Temperature})"
+        },
+        {
+          "name": "Mould Constant",
+          "unit": "s/m²",
+          "formula": "{Heat Term} ^ 2 * pi / (4 * {Shell Conductivity} * {Shell Density} * {Shell Specific Heat})"
+        },
+        {
+          "name": "Cooling Time",
+          "unit": "s",
+          "formula": "{Mould Constant} * ({Modulus} / 1000) ^ {Exponent} * {Calibration Factor}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cooling Time} / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.knockout",
+      "name": "Investment Casting - Knockout",
+      "description": "Breaking the shell off the tree: the knockout time for the shell (by its dip cycles); shared by the patterns of the tree.",
+      "operations": [
+        "Knockout"
+      ],
+      "fields": [
+        {
+          "name": "Knockout Time per Tree",
+          "unit": "hr",
+          "source": {
+            "lookup": "dipCycleBasedData.Knockout Time (hr)"
+          }
+        },
+        {
+          "name": "Patterns per Tree",
+          "unit": null,
+          "source": {
+            "engine": "patterns_per_tree"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Knockout Time per Tree} * 3600 / {Patterns per Tree}"
+        }
+      ]
+    },
+    {
+      "key": "investment.band_saw",
+      "name": "Investment Casting - Band saw cut-off",
+      "description": "Cutting the casting off the tree: each of its gates at the band saw time for its weight.",
+      "operations": [
+        "Band Saw"
+      ],
+      "fields": [
+        {
+          "name": "Gates",
+          "unit": null,
+          "source": {
+            "lookup": "partMassBasedData.Number of Gates"
+          }
+        },
+        {
+          "name": "Time per Gate",
+          "unit": "s",
+          "source": {
+            "lookup": "partMassBasedData.Band Saw Time Per Gate (s)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Gates} * {Time per Gate}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.wheel_cutting",
+      "name": "Investment Casting - Bench: Abrasive wheel cutting",
+      "description": "Cutting a casting too heavy for the band saw off the tree: each of its gates at the abrasive wheel time for its weight.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Gates",
+          "unit": null,
+          "source": {
+            "lookup": "partMassBasedData.Number of Gates"
+          }
+        },
+        {
+          "name": "Time per Gate",
+          "unit": "s",
+          "source": {
+            "lookup": "partMassBasedData.Abrasive Wheel Cut Time Per Gate (s)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Gates} * {Time per Gate}"
+        }
+      ]
+    },
+    {
+      "key": "investment.belt_sand",
+      "name": "Investment Casting - Belt sanding",
+      "description": "Grinding the gate stubs flush: each gate at the belt sand time for the casting weight.",
+      "operations": [
+        "Belt Sand"
+      ],
+      "fields": [
+        {
+          "name": "Gates",
+          "unit": null,
+          "source": {
+            "lookup": "partMassBasedData.Number of Gates"
+          }
+        },
+        {
+          "name": "Time per Gate",
+          "unit": "s",
+          "source": {
+            "lookup": "partMassBasedData.Belt Sand Time Per Gate (s)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Gates} * {Time per Gate}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.disc_grinding",
+      "name": "Investment Casting - Bench: Abrasive disc grinding",
+      "description": "Grinding the gate stubs of a casting too heavy for the belt sander: each gate at the disc grinding time for its weight.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Gates",
+          "unit": null,
+          "source": {
+            "lookup": "partMassBasedData.Number of Gates"
+          }
+        },
+        {
+          "name": "Time per Gate",
+          "unit": "s",
+          "source": {
+            "lookup": "partMassBasedData.Abrasive Disc Grinding Time Per Gate (s)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Gates} * {Time per Gate}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.finishing",
+      "name": "Investment Casting - Bench: Finishing",
+      "description": "Hand blending of surface imperfections over the share of the surface the casting weight calls for (never under the minimum time), and the visual check.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Surface",
+          "unit": "mm²",
+          "source": {
+            "cad": "area_mm2"
+          }
+        },
+        {
+          "name": "Finished Share",
+          "unit": "%",
+          "source": {
+            "lookup": "partMassBasedData.Finishing Percentage Surface Area (%)"
+          }
+        },
+        {
+          "name": "Finishing Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "surfaceFinishingRate"
+          }
+        },
+        {
+          "name": "Minimum Finishing Time",
+          "unit": "s",
+          "source": {
+            "variable": "minTotalSurfaceFinishingTime"
+          }
+        },
+        {
+          "name": "Visual Check Time",
+          "unit": "s",
+          "source": {
+            "lookup": "partMassBasedData.Finishing Visual Check Time (s)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "max({Minimum Finishing Time}, {Surface} * {Finished Share} / 100 / {Finishing Rate}) + {Visual Check Time}"
+        }
+      ]
+    },
+    {
+      "key": "investment.bench.dimensional_inspecting",
+      "name": "Investment Casting - Bench: Dimensional inspecting",
+      "description": "Gauging the inspected features of the casting, each at the single-feature inspection time.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Features Inspected",
+          "unit": null,
+          "source": {
+            "variable": "defaultTotalNumFeaturesInspected"
+          }
+        },
+        {
+          "name": "Time per Feature",
+          "unit": "s",
+          "source": {
+            "variable": "defaultSingleFeatureInspectionTime"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Features Inspected} * {Time per Feature}"
+        }
+      ]
+    },
+    {
+      "key": "investment.pattern_tooling",
+      "name": "Investment Casting - Wax pattern tooling",
+      "description": "The wax pattern die over the lifetime volume: the single cavity mold base cost from the plant's regression on the mold base area and the pattern height (read in square inches and inches), with the tolerance, construction, finishing, cooling line and action allowances; one die makes its shots per tool.",
+      "operations": [],
+      "helper": true,
+      "output": "Cost per Part",
+      "results": [
+        "Tool Cost",
+        "Tools",
+        "Tooling Cost"
+      ],
+      "fields": [
+        {
+          "name": "Pattern Length",
+          "unit": "mm",
+          "source": {
+            "cad": "length_mm"
+          }
+        },
+        {
+          "name": "Pattern Width",
+          "unit": "mm",
+          "source": {
+            "cad": "width_mm"
+          }
+        },
+        {
+          "name": "Pattern Height",
+          "unit": "mm",
+          "source": {
+            "cad": "height_mm"
+          }
+        },
+        {
+          "name": "Forming Margin Length",
+          "unit": "mm",
+          "source": {
+            "variable": "formingRegionLengthMargin_patternWax"
+          }
+        },
+        {
+          "name": "Forming Margin Width",
+          "unit": "mm",
+          "source": {
+            "variable": "formingRegionWidthMargin_patternWax"
+          }
+        },
+        {
+          "name": "Base Margin Length",
+          "unit": "mm",
+          "source": {
+            "variable": "moldBaseLengthMargin_patternWax"
+          }
+        },
+        {
+          "name": "Base Margin Width",
+          "unit": "mm",
+          "source": {
+            "variable": "moldBaseWidthMargin_patternWax"
+          }
+        },
+        {
+          "name": "Minimum Tool Length",
+          "unit": "mm",
+          "source": {
+            "variable": "waxPatternMinimumToolLength"
+          }
+        },
+        {
+          "name": "Minimum Tool Width",
+          "unit": "mm",
+          "source": {
+            "variable": "waxPatternMinimumToolWidth"
+          }
+        },
+        {
+          "name": "Coefficient A",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternMoldToolingCoefficientA"
+          }
+        },
+        {
+          "name": "Coefficient B",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternMoldToolingCoefficientB"
+          }
+        },
+        {
+          "name": "Coefficient C",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternMoldToolingCoefficientC"
+          }
+        },
+        {
+          "name": "Height Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternMoldHeightMultiplier"
+          }
+        },
+        {
+          "name": "Tolerance Factor",
+          "unit": null,
+          "source": {
+            "engine": "tolerance_factor"
+          }
+        },
+        {
+          "name": "Cavity Material Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternToolingCavityMaterialMultiplier"
+          }
+        },
+        {
+          "name": "Construction Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternToolingConstructionMultiplier"
+          }
+        },
+        {
+          "name": "Finishing Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternToolingFinishingMultiplier"
+          }
+        },
+        {
+          "name": "Cooling Lines Allowance",
+          "unit": "%",
+          "source": {
+            "variable": "waxPatternWaterCoolingLinesPercentageAllowance"
+          }
+        },
+        {
+          "name": "Slides",
+          "unit": null,
+          "source": {
+            "engine": "slides"
+          }
+        },
+        {
+          "name": "Slide Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "defaultSlideToolingMultiplier"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Cavities Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternToolingNumberCavitiesMultiplier"
+          }
+        },
+        {
+          "name": "Regional Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "waxPatternToolingRegionalMultiplier"
+          }
+        },
+        {
+          "name": "Shots per Tool",
+          "unit": null,
+          "source": {
+            "lookup": "tblWaxProperties.Num Shots Per Tool"
+          }
+        },
+        {
+          "name": "Lifetime Volume",
+          "unit": "pcs",
+          "source": {
+            "scenario": "lifetime_volume"
+          }
+        },
+        {
+          "name": "Tool Length",
+          "unit": "mm",
+          "formula": "max({Minimum Tool Length}, {Pattern Length} + 2 * {Forming Margin Length} + 2 * {Base Margin Length})"
+        },
+        {
+          "name": "Tool Width",
+          "unit": "mm",
+          "formula": "max({Minimum Tool Width}, {Pattern Width} + 2 * {Forming Margin Width} + 2 * {Base Margin Width})"
+        },
+        {
+          "name": "Base Area",
+          "unit": "in²",
+          "formula": "{Tool Length} * {Tool Width} / 645.16"
+        },
+        {
+          "name": "Single Cavity Base Cost",
+          "unit": "USD",
+          "formula": "{Coefficient A} * {Base Area} ^ 2 + {Coefficient B} * {Base Area} + {Coefficient C} + {Height Multiplier} * {Pattern Height} / 25.4"
+        },
+        {
+          "name": "Allowances",
+          "unit": null,
+          "formula": "1 + {Tolerance Factor} + {Cavity Material Multiplier} + {Construction Multiplier} + {Finishing Multiplier} + {Cooling Lines Allowance} / 100 + {Slides} * {Slide Multiplier}"
+        },
+        {
+          "name": "Tool Cost",
+          "unit": "USD",
+          "formula": "{Single Cavity Base Cost} * {Allowances} * {Cavities} * {Cavities Multiplier} * {Regional Multiplier}"
+        },
+        {
+          "name": "Tools",
+          "unit": null,
+          "formula": "max(1, CEIL({Lifetime Volume} / ({Shots per Tool} * {Cavities})))"
+        },
+        {
+          "name": "Tooling Cost",
+          "unit": "USD",
+          "formula": "{Tools} * {Tool Cost}"
+        },
+        {
+          "name": "Cost per Part",
+          "unit": "USD",
+          "formula": "{Tooling Cost} / {Lifetime Volume}"
+        }
+      ]
+    }
+  ]
+}
