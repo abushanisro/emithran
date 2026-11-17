@@ -50,6 +50,11 @@ INSERT INTO public.process_calculator_mappings (process_group, process_route, op
 SELECT 'Sand Casting', n, n, false FROM unnest(ARRAY['Cleaning','CO2 Cured','Cooling','Core Refractory Coat','Degating','Finishing','Horizontal Automatic','Hot Box',
   'Isocure Gas','Manual Coremaking','Manual Floor Moldmaking','Manual Pit Moldmaking','Manual Std Moldmaking','Melting','Mold Refractory Coat','No Bake','Oil Core','Pour',
   'Refractory Coat Air Dry','Refractory Coat Oven Dry','Shakeout','Shell','Stock Core','Vertical Automatic','Visual Inspection']) AS n;
+-- the investment casting catalog rows migration 871 seeds: migration 1046 links the investment casting calculators to them and fails if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Casting Investment', n, n, false FROM unnest(ARRAY['Band Saw','Belt Sand','Cooling','Drying','Flash Fire De-Waxing','Knockout','Metal Pouring','Mold Burnout',
+  'Mold Preheating','Primary Sand Coating','Primary Slurry Dipping','Robotic Assist','Secondary Sand Coating','Secondary Slurry Dipping','Steam Autoclave De-Waxing',
+  'Wax Pattern Molding']) AS n;
 -- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;
@@ -75,6 +80,16 @@ ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN
   ADD COLUMN machine_name varchar(255), ADD COLUMN updated_at timestamptz;
 INSERT INTO public.mhr_records (machine_class, location, usd_labor_rate_per_hr, usd_lhr_total) VALUES
   ('surface_black_oxide', 'USA', NULL, NULL), ('surface_oven_cure', 'USA', 29.95, 29.95), ('surface_shot_blast', 'USA', 29.95, 29.95);
+-- process_group as the real database has it (migration 330): migrations 1044 and 1047 find each India machine's USA row by it (none here, so they add nothing);
+-- and the machine columns migration 1048 fills for the conveyor conversion coating machines
+ALTER TABLE public.mhr_records ADD COLUMN process_group varchar, ADD COLUMN landed_machine_cost numeric, ADD COLUMN power_kwh_per_hour numeric,
+  ADD COLUMN electricity_cost_per_kwh numeric, ADD COLUMN wage_grade varchar, ADD COLUMN machine_price_usd numeric, ADD COLUMN manufacturer_country varchar,
+  ADD COLUMN setup_time_hr numeric, ADD COLUMN currency_code varchar, ADD COLUMN country_code char(2), ADD COLUMN max_y_mm numeric, ADD COLUMN max_z_mm numeric,
+  ADD COLUMN capability_source varchar, ADD COLUMN benchmark_labor_rate_usd_hr numeric, ADD COLUMN benchmark_source_key text, ADD COLUMN labor_time_standard numeric,
+  ADD COLUMN avg_utilization numeric, ADD COLUMN good_part_yield numeric, ADD COLUMN machine_width_mm numeric, ADD COLUMN machine_life_yr numeric,
+  ADD COLUMN machine_power_kw numeric, ADD COLUMN machine_uptime_pct numeric, ADD COLUMN annual_maintenance_factor_pct numeric,
+  ADD COLUMN footprint_allowance_factor numeric, ADD COLUMN installation_factor_pct numeric, ADD COLUMN supplies_cost_per_year numeric,
+  ADD COLUMN salvage_value_factor_pct numeric, ADD COLUMN work_center_labor_rate_factor numeric, ADD COLUMN specs jsonb;
 -- the material cost record table as the real database has it (migration 040): migration 1041 adds the stock label to it
 CREATE TABLE public.raw_material_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid NOT NULL, user_id uuid NOT NULL, is_active boolean DEFAULT true);
 -- the machining reference table as the real database has it (migration 638): migration 1026 completes its tblTapping row from its tblReaming row
