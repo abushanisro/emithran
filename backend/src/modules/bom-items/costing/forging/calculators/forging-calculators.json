@@ -5,11 +5,12 @@
     {
       "key": "forging.forged_shape",
       "name": "Forging - Forged shape",
-      "description": "The forging before flash: the part, the holes too small to forge (forged solid, machined afterwards) and the slug left in each pierced hole. A hole along the die direction at least minForgeableHoleDiameter across is forged and pierced; its slug is slugThicknessFactor of the hole's depth, as the reference data states. No machining stock is added: the data gives a finish allowance per machined feature, and which features are machined is decided after forging.",
+      "description": "The finished part's weight, and the forging before flash: the part, the holes too small to forge (forged solid, machined afterwards) and the slug left in each pierced hole. A hole along the die direction at least minForgeableHoleDiameter across is forged and pierced; its slug is slugThicknessFactor of the hole's depth, as the reference data states. No machining stock is added: the data gives a finish allowance per machined feature, and which features are machined is decided after forging.",
       "operations": [],
       "helper": true,
       "output": "Forged Weight",
       "results": [
+        "Part Weight",
         "Forged Volume",
         "Slug Weight"
       ],
@@ -55,6 +56,11 @@
           "source": {
             "variable": "slugThicknessFactor"
           }
+        },
+        {
+          "name": "Part Weight",
+          "unit": "kg",
+          "formula": "{Part Volume} * {Density} / 1000000000"
         },
         {
           "name": "Forged Volume",

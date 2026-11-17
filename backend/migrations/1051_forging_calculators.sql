@@ -30,10 +30,10 @@ BEGIN
   SELECT id INTO v_id FROM public.calculators WHERE name = $q$Forging - Forged shape$q$ AND user_id IS NULL AND retired_at IS NULL;
   IF v_id IS NULL THEN
     INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, $q$Forging - Forged shape$q$, 'process', 'single', false, true, true, $q$The forging before flash: the part, the holes too small to forge (forged solid, machined afterwards) and the slug left in each pierced hole. A hole along the die direction at least minForgeableHoleDiameter across is forged and pierced; its slug is slugThicknessFactor of the hole's depth, as the reference data states. No machining stock is added: the data gives a finish allowance per machined feature, and which features are machined is decided after forging.$q$)
+    VALUES (NULL, $q$Forging - Forged shape$q$, 'process', 'single', false, true, true, $q$The finished part's weight, and the forging before flash: the part, the holes too small to forge (forged solid, machined afterwards) and the slug left in each pierced hole. A hole along the die direction at least minForgeableHoleDiameter across is forged and pierced; its slug is slugThicknessFactor of the hole's depth, as the reference data states. No machining stock is added: the data gives a finish allowance per machined feature, and which features are machined is decided after forging.$q$)
     RETURNING id INTO v_id;
   ELSE
-    UPDATE public.calculators SET calc_category = 'process', description = $q$The forging before flash: the part, the holes too small to forge (forged solid, machined afterwards) and the slug left in each pierced hole. A hole along the die direction at least minForgeableHoleDiameter across is forged and pierced; its slug is slugThicknessFactor of the hole's depth, as the reference data states. No machining stock is added: the data gives a finish allowance per machined feature, and which features are machined is decided after forging.$q$, updated_at = now() WHERE id = v_id;
+    UPDATE public.calculators SET calc_category = 'process', description = $q$The finished part's weight, and the forging before flash: the part, the holes too small to forge (forged solid, machined afterwards) and the slug left in each pierced hole. A hole along the die direction at least minForgeableHoleDiameter across is forged and pierced; its slug is slugThicknessFactor of the hole's depth, as the reference data states. No machining stock is added: the data gives a finish allowance per machined feature, and which features are machined is decided after forging.$q$, updated_at = now() WHERE id = v_id;
   END IF;
 
   DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
@@ -46,10 +46,11 @@ BEGIN
     (v_id, $q$Pierced Hole Area$q$, $q$Pierced Hole Area (mm²)$q$, $q$number$q$, $q$mm²$q$, NULL, NULL, NULL, NULL, 4, true),
     (v_id, $q$Pierced Hole Depth$q$, $q$Pierced Hole Depth (mm)$q$, $q$number$q$, $q$mm$q$, NULL, NULL, NULL, NULL, 5, true),
     (v_id, $q$Slug Thickness Factor$q$, $q$Slug Thickness Factor$q$, $q$number$q$, NULL, NULL, NULL, NULL, NULL, 6, true),
-    (v_id, $q$Forged Volume$q$, $q$Forged Volume (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q${Part Volume} + {Unforged Hole Volume}$q$, 7, false),
-    (v_id, $q$Slug Thickness$q$, $q$Slug Thickness (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Slug Thickness Factor} * {Pierced Hole Depth}$q$, 8, false),
-    (v_id, $q$Slug Weight$q$, $q$Slug Weight (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q${Pierced Hole Area} * {Slug Thickness} * {Density} / 1000000000$q$, 9, false),
-    (v_id, $q$Forged Weight$q$, $q$Forged Weight (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q${Forged Volume} * {Density} / 1000000000$q$, 10, false);
+    (v_id, $q$Part Weight$q$, $q$Part Weight (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q${Part Volume} * {Density} / 1000000000$q$, 7, false),
+    (v_id, $q$Forged Volume$q$, $q$Forged Volume (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q${Part Volume} + {Unforged Hole Volume}$q$, 8, false),
+    (v_id, $q$Slug Thickness$q$, $q$Slug Thickness (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Slug Thickness Factor} * {Pierced Hole Depth}$q$, 9, false),
+    (v_id, $q$Slug Weight$q$, $q$Slug Weight (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q${Pierced Hole Area} * {Slug Thickness} * {Density} / 1000000000$q$, 10, false),
+    (v_id, $q$Forged Weight$q$, $q$Forged Weight (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q${Forged Volume} * {Density} / 1000000000$q$, 11, false);
 END
 $calc$;
 
@@ -425,7 +426,7 @@ DECLARE bad TEXT;
 BEGIN
   SELECT string_agg(e.name, ', ') INTO bad
   FROM (VALUES
-    ($q$Forging - Forged shape$q$, 10, 0),
+    ($q$Forging - Forged shape$q$, 11, 0),
     ($q$Forging - Flash$q$, 14, 0),
     ($q$Forging - Billet$q$, 8, 0),
     ($q$Forging - Bar$q$, 10, 0),
