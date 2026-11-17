@@ -26,6 +26,11 @@ export interface MachiningDfmPart {
    * axis, pocket corner radius and the wall behind each feature. False = an analysis from before that measurement.
    */
   accessMeasured: boolean;
+  /**
+   * Why tool access, inside corners and walls are not measured when they are not: an older machining analysis (Refresh analysis measures them),
+   * or the analysis of another process (a forging, a casting), which never measures them. Absent: the older analysis.
+   */
+  unmeasuredReason?: string;
   /** Bounding dimensions, mm; any missing = the part-shape checks are not evaluated. */
   dimensionsMm: ReadonlyArray<number | null | undefined>;
   weightKg: number | null | undefined;
@@ -275,7 +280,7 @@ export function evaluateMachiningDfm(features: readonly unknown[] | null | undef
   });
 
   // ── Corners, walls and tool access: measured by the CAD analysis (machining/feature_access.py) ──────────────
-  const STALE = 'This analysis is from before the measurement: use Refresh analysis.';
+  const STALE = part.unmeasuredReason ?? 'This analysis is from before the measurement: use Refresh analysis.';
   const measured = part.accessMeasured;
   const pocketDepth = (o: Record<string, unknown>) => size(o).depth;
   const corners = instances(['PocketV2'], (_f, o) => (typeof o.corner_radius_mm === 'number' && o.corner_radius_mm >= 0 ? o.corner_radius_mm : null));

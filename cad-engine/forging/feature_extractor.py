@@ -40,6 +40,9 @@ from shared.core_geometry import trapped_cores
 from shared.edge_length import sharp_edge_length
 from shared.section_profile import section_area_profile
 from shared.stable_face_id import build_stable_face_id_map
+from shared.feature_extent import annotate_occurrence_extents
+from die_casting.features.combo_void import detect_voids
+from die_casting.features.surfaces import classify_surfaces
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +69,45 @@ def hole_features(holes: Sequence[Dict[str, Any]], stable_face_ids: Dict[int, st
         if stable and all(stable):
             occ["source_face_stable_ids"] = stable
         out.append({"id": h["id"], "feature_type": h["feature_type"], "variant": h["variant"], "occurrences": [occ]})
+    return out
+
+
+def face_features(shape: Any, bbox_dims: Sequence[float], die: Vec, hole_face_ids: Sequence[int], stable_face_ids: Dict[int, str]) -> List[Dict[str, Any]]:
+    """
+    Every other face of the part as a feature, for the process tree and the 3D highlight: the voids a die closing along `die` leaves (pockets,
+    cavities), then the planar faces, curved walls, curved surfaces and sharp edges, each occurrence with its faces. Recognised as a die casting's
+    are (die_casting/features: combo_void, surfaces): a closed die forms the same shapes, and the forging reference data has no feature catalog of
+    its own. The faces the holes claimed are not listed again.
+    """
+    out: List[Dict[str, Any]] = []
+
+    def stable(occ: Dict[str, Any]) -> Dict[str, Any]:
+        ids = [stable_face_ids.get(f) for f in occ["face_ids"]]
+        return {**occ, "source_face_stable_ids": ids} if ids and all(ids) else occ
+
+    claimed = set(hole_face_ids)
+    try:
+        voids = detect_voids(shape, list(bbox_dims), list(die))
+    except Exception as e:
+        logger.warning(f"[forging] void recognition failed: {e}")
+        voids = {"void_candidates": [], "claimed_face_ids": []}
+    if voids.get("void_candidates"):
+        out.append({"id": "void", "feature_type": "Void", "variant": "default", "occurrences": [
+            stable({"centroid": o["centroid_mm"], "face_ids": list(o["face_ids"])}) for o in voids["void_candidates"]]})
+    claimed |= set(voids.get("claimed_face_ids", []))
+    try:
+        surfaces = classify_surfaces(shape, claimed_face_ids=claimed)
+    except Exception as e:
+        logger.warning(f"[forging] surface recognition failed: {e}")
+        return out
+    for key, ftype in (("planar_face_candidates", "PlanarFace"), ("curved_wall_candidates", "CurvedWall"), ("curved_surface_candidates", "CurvedSurface")):
+        occs = surfaces.get(key) or []
+        if occs:
+            out.append({"id": ftype.lower(), "feature_type": ftype, "variant": "default", "occurrences": [
+                stable({"centroid": o["centroid_mm"], "face_ids": list(o["face_ids"]), "area_mm2": o["area_mm2"]}) for o in occs]})
+    if surfaces.get("sharp_edges"):
+        out.append({"id": "sharp_edge", "feature_type": "SharpEdge", "variant": "default", "occurrences": [
+            stable({"centroid": e["midpoint_mm"] or [0.0, 0.0, 0.0], "face_ids": list(e["face_ids"]), "length_mm": e["length_mm"]}) for e in surfaces["sharp_edges"]]})
     return out
 
 
@@ -211,6 +253,13 @@ class ForgingFeatureExtractor:
             stable_face_ids = build_stable_face_id_map(shape)
         except Exception as e:  # the ids only serve highlighting; a part that cannot be hashed is still measured
             logger.warning(f"[Forging] stable_face_id build failed: {e}")
+        features = hole_features(holes["holes"], stable_face_ids)
+        features += face_features(shape, bbox_dims, die.vector, [f for h in holes["holes"] for f in h["face_ids"]], stable_face_ids)
+        # Nominal size for ISO 286 grading of the tolerances on non-hole features, as every other analysis gives it.
+        try:
+            annotate_occurrence_extents(shape, features)
+        except Exception as e:
+            logger.warning(f"[Forging] feature extents failed: {e}")
 
         logger.info(
             f"[Forging] die={[round(c, 3) for c in die.vector]} ({die.source}) projected_area={silhouette['area_mm2']:.1f}mm2 "
@@ -253,11 +302,11 @@ class ForgingFeatureExtractor:
             "sharp_edges": _sharp_edges(shape),
             "trapped_volumes": {"count": trapped["core_count"], "volumes": trapped["cores"]},
             # The holes as hole features, in the form every other analysis gives them, so the tolerances on them and the machining after
-            # forging (a hole too small to pierce, or across the die direction, is drilled) are read the same way. The forging reference data has
-            # no feature catalog of its own; the other faces are not features.
+            # forging (a hole too small to pierce, or across the die direction, is drilled) are read the same way; then every other face as a
+            # feature (face_features), so each step of the process tree lists them and a click highlights them.
             "feature_graph_v2": {
                 "metadata": {"face_map": face_map or [], "stl_tri_total": face_map_tri_total or None, "stable_face_ids": stable_face_ids},
-                "features": hole_features(holes["holes"], stable_face_ids),
+                "features": features,
                 "conditions": [],
             },
         }

@@ -4,7 +4,7 @@ import { buildApplyScenarioRequest, type StagedScenario } from "@/lib/scenario/b
 
 const base: StagedScenario = {
   location: "USA", batchSizeDraft: null, batchSizeAuto: false, productionLife: null, annualVolumeDraft: 1000, annualVolumeSaved: 1000,
-  materialGrade: "", processRouting: "auto", manualRoute: null, isDieCast: false,
+  materialGrade: "", processRouting: "auto", manualRoute: null, isDieCast: false, isForged: false,
 };
 const built = (over: Partial<StagedScenario>) => {
   const r = buildApplyScenarioRequest({ ...base, ...over });
@@ -70,5 +70,12 @@ describe("buildApplyScenarioRequest", () => {
     const manual = { label: "HPDC", directApplyRouteId: "dc-hpdc", dieCastingProcess: "High Pressure Die Casting" };
     expect(built({ isDieCast: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", dieCastingProcess: "High Pressure Die Casting" });
     expect(built({ isDieCast: true, scenarioPatch: { scenarioCurrency: "EUR" } }).scenarioPatch).toEqual({ processRouting: "auto", dieCastingProcess: null, scenarioCurrency: "EUR" });
+  });
+
+  it("a forging route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
+    const manual = { label: "Closed-die forging · die hammer", directApplyRouteId: "forging-closed_die_hammer", forgingRoute: "closed_die_hammer" };
+    expect(built({ isForged: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", forgingRoute: "closed_die_hammer" });
+    expect(built({ isForged: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "forging-closed_die_hammer" });
+    expect(built({ isForged: true }).scenarioPatch).toEqual({ processRouting: "auto", forgingRoute: null });
   });
 });

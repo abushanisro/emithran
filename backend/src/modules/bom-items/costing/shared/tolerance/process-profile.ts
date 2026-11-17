@@ -39,6 +39,10 @@ const PROFILES: Readonly<Record<string, ToleranceProcessProfile>> = {
     process: 'Forging', ...CASTING,
     note: 'Judged by what forging holds (its row of the capability table); a feature it leaves short, and a hole too small to pierce or across the die direction, is machined after forging and priced.',
   },
+  powder_metal: {
+    process: 'Powder Metal', ...CASTING,
+    note: 'Judged by what powder metal holds (its row of the capability table); a feature it leaves short, and a hole too small to press or across the press direction, is machined after pressing and priced.',
+  },
   sheet_metal: {
     process: 'Sheet Metal', capability: 'not_validated', operation: 'none', cost: 'none',
     note: 'No validated tolerance capability yet: which sheet-metal operation makes each feature is not mapped to the capability table, so toleranced features are listed for review and add no cost.',

@@ -59,3 +59,32 @@ describe('findNode', () => {
     expect(findNode(tree, 'missing')).toBeNull();
   });
 });
+
+// Cannula Holder Left, Process Forging: each step listed "Band Saw: 10.46 s per casting". A forging's steps list its features only: the forming
+// step every feature of the part (each highlighting its faces), the others the whole part. Times are on the Cost tab.
+describe('buildProcessTree: a forged part', () => {
+  const forgedItem = { ...item, familyClassification: 'forged' } as unknown as BOMItem;
+  const fg = {
+    classification: { family: 'forged' },
+    feature_graph_v2: { features: [
+      { id: 'planarface', feature_type: 'PlanarFace', variant: 'default', occurrences: [{ face_ids: [0] }, { face_ids: [1] }] },
+      { id: 'h1', feature_type: 'SimpleHole', variant: 'through', occurrences: [{ face_ids: [2], diameter_mm: 6 }] },
+    ] },
+  } as unknown as FeatureGraph;
+  const lines = { processLines: [
+    { process: 'Band Saw', machineName: 'DoAll', cycleTimeMin: 0.17, actsOnWholePart: true, featureBreakdown: [{ name: 'Band Saw', timeSec: 10.46, count: 1 }] },
+    { process: 'Hammer', machineName: 'Lasco HO 125', cycleTimeMin: 0.18, formsPartFeatures: true },
+  ] } as unknown as CostSummaryDto;
+  const tree = buildProcessTree(forgedItem, fg, summary, 'USA', ['Band Saw', 'Hammer'], lines);
+  const steps = (tree.children ?? []).flatMap((g) => g.children ?? []);
+  const rows = (process: string) => (steps.find((s) => s.label === process)?.children ?? []).map((c) => c.label);
+
+  it('the forming step lists every feature, grouped by type, each highlighting its faces', () => {
+    expect(rows('Hammer')).toEqual(['PlanarFace ×2', 'SimpleHole ×1']);
+  });
+
+  it('a step on the whole part shows the part, highlighted whole; never its time as text', () => {
+    expect(rows('Band Saw')).toEqual(['Whole part']);
+    expect(JSON.stringify(tree)).not.toMatch(/10\.46/);
+  });
+});

@@ -1,0 +1,332 @@
+{
+  "domain": "powder_metal",
+  "processGroup": "Powder Metal",
+  "calculators": [
+    {
+      "key": "powder_metal.powder",
+      "name": "Powder Metal - Powder",
+      "description": "The powder a part takes: the part's volume at its green density, bought at the powder's price, over the material utilization (defaultUtilization: the powder lost in feeding, filling and handling).",
+      "operations": [],
+      "helper": true,
+      "output": "Material Cost",
+      "results": [
+        "Part Mass",
+        "Powder Mass"
+      ],
+      "fields": [
+        {
+          "name": "Part Volume",
+          "unit": "mm³",
+          "source": {
+            "cad": "volume_mm3"
+          }
+        },
+        {
+          "name": "Green Density",
+          "unit": "kg/m³",
+          "source": {
+            "engine": "green_density_kg_m3"
+          }
+        },
+        {
+          "name": "Powder Price",
+          "unit": "USD/kg",
+          "source": {
+            "material": "unit_cost_usd_per_kg"
+          }
+        },
+        {
+          "name": "Utilization",
+          "unit": null,
+          "source": {
+            "variable": "defaultUtilization"
+          }
+        },
+        {
+          "name": "Part Mass",
+          "unit": "kg",
+          "formula": "{Part Volume} * {Green Density} * 1e-9"
+        },
+        {
+          "name": "Powder Mass",
+          "unit": "kg",
+          "formula": "{Part Mass} / {Utilization}"
+        },
+        {
+          "name": "Material Cost",
+          "unit": "USD",
+          "formula": "{Powder Mass} * {Powder Price}"
+        }
+      ]
+    },
+    {
+      "key": "powder_metal.compaction_pressure",
+      "name": "Powder Metal - Compaction pressure",
+      "description": "The pressure that compacts the powder to its green density: the powder's compaction curve, a quadratic in the green density in g/cm³ (the material's Compaction Curve Coef A, B and C).",
+      "operations": [],
+      "helper": true,
+      "output": "Compaction Pressure",
+      "fields": [
+        {
+          "name": "Curve Coef A",
+          "unit": "MPa per (g/cm³)²",
+          "source": {
+            "material": "compaction_curve_coef_a"
+          }
+        },
+        {
+          "name": "Curve Coef B",
+          "unit": "MPa per g/cm³",
+          "source": {
+            "material": "compaction_curve_coef_b"
+          }
+        },
+        {
+          "name": "Curve Coef C",
+          "unit": "MPa",
+          "source": {
+            "material": "compaction_curve_coef_c"
+          }
+        },
+        {
+          "name": "Green Density",
+          "unit": "kg/m³",
+          "source": {
+            "engine": "green_density_kg_m3"
+          }
+        },
+        {
+          "name": "Green Density gcc",
+          "unit": "g/cm³",
+          "formula": "{Green Density} / 1000"
+        },
+        {
+          "name": "Compaction Pressure",
+          "unit": "MPa",
+          "formula": "{Curve Coef A} * {Green Density gcc} ^ 2 + {Curve Coef B} * {Green Density gcc} + {Curve Coef C}"
+        }
+      ]
+    },
+    {
+      "key": "powder_metal.press_force",
+      "name": "Powder Metal - Press force",
+      "description": "The force that compacts the part: the compaction pressure over the part's outline along the press direction.",
+      "operations": [],
+      "helper": true,
+      "output": "Required Force",
+      "fields": [
+        {
+          "name": "Compaction Pressure",
+          "unit": "MPa",
+          "source": {
+            "engine": "compaction_pressure_mpa"
+          }
+        },
+        {
+          "name": "Projected Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "projected_area_mm2"
+          }
+        },
+        {
+          "name": "Required Force",
+          "unit": "kN",
+          "formula": "{Compaction Pressure} * {Projected Area} / 1000"
+        }
+      ]
+    },
+    {
+      "key": "powder_metal.fill_height",
+      "name": "Powder Metal - Fill height",
+      "description": "The depth of loose powder the die is filled to: the part's height along the press direction times the compression ratio (green density over apparent density).",
+      "operations": [],
+      "helper": true,
+      "output": "Fill Height",
+      "results": [
+        "Compression Ratio"
+      ],
+      "fields": [
+        {
+          "name": "Part Height",
+          "unit": "mm",
+          "source": {
+            "cad": "die_depth_mm"
+          }
+        },
+        {
+          "name": "Green Density",
+          "unit": "kg/m³",
+          "source": {
+            "engine": "green_density_kg_m3"
+          }
+        },
+        {
+          "name": "Apparent Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "apparent_density"
+          }
+        },
+        {
+          "name": "Compression Ratio",
+          "unit": null,
+          "formula": "{Green Density} / {Apparent Density}"
+        },
+        {
+          "name": "Fill Height",
+          "unit": "mm",
+          "formula": "{Part Height} * {Compression Ratio}"
+        }
+      ]
+    },
+    {
+      "key": "powder_metal.compaction",
+      "name": "Powder Metal - Compaction",
+      "description": "Compaction pressing: one press stroke per part at the press's rated stroke rate. The data gives no slowing of the stroke for a deep fill, so this is the press's best rate.",
+      "operations": [
+        "Compaction Pressing"
+      ],
+      "fields": [
+        {
+          "name": "Stroke Rate",
+          "unit": "strokes/min",
+          "source": {
+            "machine": "max_stroke_rate_cycles_per_min"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "60 / {Stroke Rate} * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "powder_metal.sintering",
+      "name": "Powder Metal - Sintering",
+      "description": "Sintering on a mesh belt furnace: the belt runs so a part soaks the soak time in the heat zone (within the belt's speed range, in inches per minute), carrying as many parts across as fit between the edge offsets and as many per metre as the belt load allows. The time per part is the belt's throughput.",
+      "operations": [
+        "Furnace Sintering"
+      ],
+      "results": [
+        "Belt Speed",
+        "Parts Across",
+        "Parts per Metre"
+      ],
+      "fields": [
+        {
+          "name": "Heat Zone Length",
+          "unit": "mm",
+          "source": {
+            "machine": "heat_zone"
+          }
+        },
+        {
+          "name": "Soak Time",
+          "unit": "min",
+          "source": {
+            "variable": "soakTime"
+          }
+        },
+        {
+          "name": "Min Belt Speed",
+          "unit": "in/min",
+          "source": {
+            "machine": "min_be"
+          }
+        },
+        {
+          "name": "Max Belt Speed",
+          "unit": "in/min",
+          "source": {
+            "machine": "max_belt_s"
+          }
+        },
+        {
+          "name": "Belt Width",
+          "unit": "mm",
+          "source": {
+            "machine": "belt_width_mm"
+          }
+        },
+        {
+          "name": "Edge Offset",
+          "unit": "mm",
+          "source": {
+            "variable": "partOffsetToBeltEdge"
+          }
+        },
+        {
+          "name": "Part Spacing",
+          "unit": "mm",
+          "source": {
+            "variable": "spaceBetweenParts"
+          }
+        },
+        {
+          "name": "Part Length",
+          "unit": "mm",
+          "source": {
+            "engine": "part_length_mm"
+          }
+        },
+        {
+          "name": "Part Width",
+          "unit": "mm",
+          "source": {
+            "engine": "part_width_mm"
+          }
+        },
+        {
+          "name": "Part Mass",
+          "unit": "kg",
+          "source": {
+            "engine": "part_kg"
+          }
+        },
+        {
+          "name": "Max Belt Load",
+          "unit": "kg/m",
+          "source": {
+            "variable": "maxBeltLoad"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Belt Speed",
+          "unit": "mm/min",
+          "formula": "min(max({Heat Zone Length} / {Soak Time}, {Min Belt Speed} * 25.4), {Max Belt Speed} * 25.4)"
+        },
+        {
+          "name": "Parts Across",
+          "unit": null,
+          "formula": "floor(({Belt Width} - 2 * {Edge Offset} + {Part Spacing}) / ({Part Width} + {Part Spacing}))"
+        },
+        {
+          "name": "Parts per Metre",
+          "unit": null,
+          "formula": "min({Parts Across} * 1000 / ({Part Length} + {Part Spacing}), {Max Belt Load} / {Part Mass})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "60 / ({Belt Speed} / 1000 * {Parts per Metre}) * {Cycle Time Factor}"
+        }
+      ]
+    }
+  ]
+}

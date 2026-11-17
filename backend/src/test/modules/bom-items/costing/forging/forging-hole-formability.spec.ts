@@ -1,4 +1,4 @@
-import { forgedHoleFormability } from '../../../../../modules/bom-items/costing/forging/forging-hole-formability';
+import { directionalHoleFormability, forgedHoleFormability, PRESSED_HOLES } from '../../../../../modules/bom-items/costing/forging/forging-hole-formability';
 
 // Which holes of a forging are pierced in the dies and which are drilled after forging (the machining after forging).
 const Z = [0, 0, 1];
@@ -26,5 +26,15 @@ describe('a forging hole: pierced or drilled', () => {
 
   it('a feature that is not a hole is judged by its tolerances alone', () => {
     expect(forgedHoleFormability({ featureType: 'Pocket', sizeMm: 30, axis: Z }, 10, Z)).toBeNull();
+  });
+});
+
+// A powder metal part: a core rod forms a hole along the press direction, at least minPressableHoleDiameter (1.5 mm, memory/Powder metal) wide.
+describe('a powder metal hole: pressed or drilled', () => {
+  const pressed = (sizeMm: number, axis: number[]) => directionalHoleFormability(PRESSED_HOLES, { featureType: 'SimpleHole', sizeMm, axis }, 1.5, Z);
+  it('a hole along the press direction is pressed by a core rod; a cross hole or a pin hole is drilled after pressing', () => {
+    expect(pressed(6, Z)).toEqual({ formable: true, detail: 'pressed by a core rod along the press direction (Ø6 mm, at least 1.5 mm)' });
+    expect(pressed(6, [1, 0, 0])).toEqual({ formable: false, detail: 'across the press direction: no core rod can form it, it is drilled after pressing' });
+    expect(pressed(1, Z)!.detail).toMatch(/under the least pressable hole \(minPressableHoleDiameter 1.5 mm\): drilled after pressing/);
   });
 });

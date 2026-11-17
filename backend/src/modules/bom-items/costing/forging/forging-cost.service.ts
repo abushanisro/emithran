@@ -11,7 +11,7 @@ import type { SandReference } from '../casting/sand/sand-reference';
 import { readStagedReference } from '../casting/sand/sand-reference.service';
 import type { SandMaterial } from '../casting/sand/sand-steps';
 import { loadForgingCalculatorSpec } from './calculators/forging-calculator-spec';
-import { buildForgingRoutes, chooseForgingRoute, FORGING_PROCESS_GROUP, FORGING_ROUTE_CLASSES, FORGING_ROUTES, type ForgingHole, type ForgingPart, type ForgingRoute, type ForgingRouteGap, type ForgingRouteKey } from './forging-route';
+import { buildForgingRoutes, chooseForgingRoute, FORGING_PROCESS_GROUP, FORGING_ROUTE_CLASSES, FORGING_ROUTES, type ForgingHole, type ForgingOverrides, type ForgingPart, type ForgingRoute, type ForgingRouteGap, type ForgingRouteKey } from './forging-route';
 
 const SOURCE_VERSION = '2026-Forging';
 /** The forging material's hot-working properties the route reads (raw_material_properties keys of the forging materials, migration 823). */
@@ -19,6 +19,29 @@ const PROPERTY_KEYS = ['round_bar_unit_cost', 'shear_strength', 'strength_coeffi
 /** The Cost Guide keys: the part complexity score (1 to 12), and the forging route (a FORGING_ROUTES key; unset, the cheapest complete). */
 export const FORGING_COMPLEXITY_KEY = 'forgingComplexity';
 export const FORGING_ROUTE_KEY = 'forgingRoute';
+
+/** The scenario keys of the forging settings an engineer sets over the engine's in the Cost Guide (lib/costing/forging-view.ts mirrors them). */
+export const FORGING_OVERRIDE_KEYS = {
+  barDiameterMm: 'forgingBarDiameterMm',
+  heating: 'forgingHeating',
+  hits: 'forgingHits',
+  flashThicknessMm: 'forgingFlashThicknessMm',
+  flashWidthMm: 'forgingFlashWidthMm',
+} as const;
+
+/** The forging overrides of a part's scenario: only a usable value counts (a positive size, a whole number of blows, a heating the engine has). */
+export function forgingOverridesOf(o: Record<string, unknown>): ForgingOverrides {
+  const positive = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
+  const hits = positive(o[FORGING_OVERRIDE_KEYS.hits]);
+  const heating = o[FORGING_OVERRIDE_KEYS.heating];
+  return {
+    barDiameterMm: positive(o[FORGING_OVERRIDE_KEYS.barDiameterMm]),
+    heating: heating === 'induction' || heating === 'furnace' ? heating : null,
+    hits: hits != null && Number.isInteger(hits) ? hits : null,
+    flashThicknessMm: positive(o[FORGING_OVERRIDE_KEYS.flashThicknessMm]),
+    flashWidthMm: positive(o[FORGING_OVERRIDE_KEYS.flashWidthMm]),
+  };
+}
 
 const num = (v: unknown): number | null => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 const positive = (v: unknown): number | null => {
@@ -164,6 +187,7 @@ export class ForgingCostService {
         batchSize: req.batchSize, lifetimeVolume: lifetime,
         complexity: complexity != null && Number.isInteger(complexity) && complexity >= 1 && complexity <= 12 ? complexity : null,
         route: chosen,
+        overrides: forgingOverridesOf(o),
       },
     });
     if (missing.length) return none(...missing);

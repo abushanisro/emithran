@@ -28,10 +28,16 @@ INVESTMENT_CAST = "investment_cast"
 # Closed-die forging: measured by forging/feature_extractor.py. Like the casting families, reached only through the explicit family_hint (the
 # user's chosen process): no shape is a forging by its geometry alone.
 FORGED = "forged"
+# Powder metal (press and sinter): the part is pressed along one direction, so it is measured as a forging is, along that direction
+# (forging/feature_extractor.py). Reached only through the explicit family_hint, like the forging.
+POWDER_METAL = "powder_metal"
 
 ALL_FAMILIES: FrozenSet[str] = frozenset({
-    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED,
+    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED, POWDER_METAL,
 })
+
+# Families measured along one die (or press) direction by forging/feature_extractor.py.
+DIE_DIRECTION_FAMILIES: FrozenSet[str] = frozenset({FORGED, POWDER_METAL})
 
 # Casting families -> the reference-catalog domain their features validate
 # against (shared/reference_features.json). One map, read by the dispatcher.

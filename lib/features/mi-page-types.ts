@@ -34,6 +34,9 @@ export interface ManualRouteOption {
   // Cost Summary quotes it, and its route (directApplyRouteId) is applied like
   // any complete route, so the Cost tab lists its lines.
   dieCastingProcess?: string;
+  // A forging route picked in the Workflow Builder (its FORGING_ROUTES key): committed as the scenario's forgingRoute so the
+  // Cost Summary quotes it, and its route applied like any complete route.
+  forgingRoute?: string;
   // A real, already-valid apply-route.dto.ts routeId (e.g. one of the 3 real
   // Injection Molding tonnage tiers) to apply directly via the plain
   // applyRoute mutation — for a family whose real routes are already

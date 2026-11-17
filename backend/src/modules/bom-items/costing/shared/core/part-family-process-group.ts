@@ -19,6 +19,8 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   investment_cast: 'Casting Investment',
   // Closed-die forging: the cad-engine measures the part along its die direction (forging/feature_extractor.py).
   forged: 'Forging',
+  // Press and sinter: measured along its press direction by the same die-direction measurements as a forging.
+  powder_metal: 'Powder Metal',
 };
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */

@@ -17,7 +17,7 @@ Other Secondary Processes,Secondary process,24,1,0,11,0,0,1,51,engine: costing/s
 PCB,PCBA,46,0,0,31,2,0,0,208,separate module: modules/electronics-costing (not in the process ledger)
 Part Assembly,Part Assembly,23,0,0,9,0,0,0,25,none found
 Plastic Molding,Plastic Modeling,89,4,0,0,0,0,4,127,"engine: costing/plastic-molding (injection, RIM, structural foam, compression)"
-Powder Metal,Powder metal,12,0,0,2,0,0,0,16,none found
+Powder Metal,Powder metal,12,0,0,2,0,0,0,16,engine: costing/powder-metal (compaction pressing on the powder's compaction curve; mesh belt sintering; machining after pressing)
 Rapid Prototyping,Rapid prototyping,12,0,0,5,0,0,0,25,none found
 Roto & Blow Molding,Roto & blow molding,17,0,0,5,0,0,0,19,none found
 Sand Casting,Sand casting,52,0,0,25,0,0,0,507,engine: costing/casting/sand + modules/sand-casting

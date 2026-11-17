@@ -535,9 +535,10 @@ export class AutoFillService {
         // are present when extraction_version >= im_v2_phase2 and fall back to safe
         // defaults (0 / null) so older CAD engine responses keep working unchanged.
         ...imSummary,
-        // Closed-die forging: measured along the die direction (cad-engine forging/feature_extractor.py). The forging cost reads the outline
-        // and its parting line; the rest is shown and judged against the forging reference. null = not measured, never 0.
-        ...(family.family === 'forged' ? {
+        // Closed-die forging and powder metal: measured along the die (press) direction (cad-engine forging/feature_extractor.py). The forging
+        // cost reads the outline and its parting line, the powder metal cost the outline, height and plan; the rest is shown and judged against
+        // the reference. null = not measured, never 0.
+        ...(family.family === 'forged' || family.family === 'powder_metal' ? {
           forgingExtractionVersion:   cadMI?.features?.extraction_version ?? null,
           forgingDieDirection:        cadMI?.features?.die_direction?.vector ?? null,
           forgingUndercutAreaMm2:     cadMI?.features?.die_direction?.undercut_area_mm2 ?? null,

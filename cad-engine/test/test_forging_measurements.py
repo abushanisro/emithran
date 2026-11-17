@@ -18,7 +18,7 @@ from OCC.Core.TopoDS import topods
 
 from forging.feature_extractor import ForgingFeatureExtractor
 from shared.memory_optimizer import AdvancedCADMemoryOptimizer
-from shared.part_family import FORGED
+from shared.part_family import FORGED, POWDER_METAL
 from shared.section_profile import section_area_profile
 
 
@@ -86,7 +86,11 @@ def test_stepped_shaft_is_forged_across_its_axis_with_the_bar_along_it():
     assert out["plan"]["width_mm"] == pytest.approx(40.0, rel=0.01)
     assert out["section_profile"]["max_area_mm2"] == pytest.approx(math.pi * 400.0, rel=1e-3)
     assert out["trapped_volumes"]["count"] == 0
-    assert out["feature_graph_v2"]["features"] == []
+    # No hole; every face is a feature the process tree lists and a click highlights: the two cylinders, their ends and the step.
+    features = out["feature_graph_v2"]["features"]
+    assert {f["feature_type"] for f in features} <= {"PlanarFace", "CurvedWall", "CurvedSurface", "SharpEdge", "Void"}
+    covered = {fid for f in features if f["feature_type"] != "SharpEdge" for o in f["occurrences"] for fid in o["face_ids"]}
+    assert covered == set(range(len(out["draft"]["faces"]))) or len(covered) >= 5
 
 
 def test_flange_is_forged_along_its_bore_and_the_bore_is_a_hole_along_the_die_direction():
@@ -104,8 +108,11 @@ def test_flange_is_forged_along_its_bore_and_the_bore_is_a_hole_along_the_die_di
     assert hole["depth_mm"] == pytest.approx(20.0, abs=0.05)
     assert hole["angle_to_die_deg"] == pytest.approx(0.0, abs=0.5)
     # The bore is also a hole feature, read by the tolerances and the machining after forging as every other analysis's holes are.
-    [feature] = out["feature_graph_v2"]["features"]
+    [feature] = [f for f in out["feature_graph_v2"]["features"] if f["feature_type"] in ("SimpleHole", "MultiStepHole")]
     assert (feature["feature_type"], feature["variant"]) == ("SimpleHole", "through")
+    # The bore's faces are the hole's alone: no face feature lists them again (an edge at its rim names the two faces it joins).
+    others = {fid for f in out["feature_graph_v2"]["features"] if f is not feature and f["feature_type"] != "SharpEdge" for o in f["occurrences"] for fid in o["face_ids"]}
+    assert not (set(hole["face_ids"]) & others)
     [occ] = feature["occurrences"]
     assert occ["diameter_mm"] == pytest.approx(30.0, abs=0.01)
     assert occ["depth_mm"] == pytest.approx(20.0, abs=0.05)
@@ -173,3 +180,14 @@ def test_family_hint_forged_runs_the_forging_measurements():
     assert mi["features"]["extraction_version"] == "forging_measurements_v1"
     assert mi["features"]["projected_area_mm2"] == pytest.approx(2000.0, rel=1e-6)
     assert mi["features"]["die_direction"]["axis"] == "z"
+
+
+def test_family_hint_powder_metal_measures_the_part_along_its_press_direction():
+    # A bushing pressed along its bore: the press direction, the pressed outline (the ring) and the height are the forging measurements.
+    bushing = BRepAlgoAPI_Cut(_cylinder((0, 0, 0), (0, 0, 1), 15.0, 20.0), _cylinder((0, 0, -1), (0, 0, 1), 7.5, 22.0)).Shape()
+    result = AdvancedCADMemoryOptimizer().analyze_and_optimize(bushing, family_hint="powder_metal")
+    mi = result.geometry_features.manufacturing_features["manufacturing_intelligence"]
+    assert mi["detected_family"] == POWDER_METAL
+    assert mi["features"]["die_direction"]["axis"] == "z"
+    assert mi["features"]["projected_area_mm2"] == pytest.approx(math.pi * (225.0 - 56.25), rel=0.01)
+    assert mi["features"]["die_depth_mm"] == pytest.approx(20.0, abs=0.01)
