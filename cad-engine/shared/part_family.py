@@ -31,9 +31,12 @@ FORGED = "forged"
 # Powder metal (press and sinter): the part is pressed along one direction, so it is measured as a forging is, along that direction
 # (forging/feature_extractor.py). Reached only through the explicit family_hint, like the forging.
 POWDER_METAL = "powder_metal"
+# Composites (prepreg laid on a one-sided tool, bagged and autoclave cured): measured as a laminate by composites/feature_extractor.py. Reached only
+# through the explicit family_hint, like the casting and forging families.
+COMPOSITE = "composite"
 
 ALL_FAMILIES: FrozenSet[str] = frozenset({
-    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED, POWDER_METAL,
+    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED, POWDER_METAL, COMPOSITE,
 })
 
 # Families measured along one die (or press) direction by forging/feature_extractor.py.
