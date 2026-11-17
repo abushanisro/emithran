@@ -227,7 +227,9 @@ export function buildCastingCostSummary(input: {
     ...(Object.keys(calculatorRuns).length ? { calculatorRuns } : {}),
     // The metal the part is charged with, whatever the casting process: the material record is written from this one figure.
     ...(sand ? (sand.material.boughtKg != null ? { castingMetal: { partKg: netKg, chargedKg: sand.material.boughtKg } } : {})
-      : dc && netKg > 0 ? { castingMetal: { partKg: r3(netKg), chargedKg: r3(chargedKg) } } : {}),
+      // Not rounded to the gram: the material record is written from these, and a gram is 2-3 % of a 15 g casting (the record then disagreed with the
+      // calculators it is the result of). The record's own columns keep four decimals.
+      : dc && netKg > 0 ? { castingMetal: { partKg: netKg, chargedKg } } : {}),
     ...(input.cores?.corebox ? {
       coreboxTooling: {
         boxes: input.cores.corebox.boxes, detail: input.cores.corebox.detail,
