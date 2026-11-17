@@ -46,7 +46,26 @@ function fromRun(run: CalculatorRunDto | undefined, usageKg: number, step?: stri
   const at = run.trace.findIndex((t) => t.kind === 'calculated' && t.fieldName === (step ?? run.output));
   const value = at >= 0 ? Number(run.trace[at]!.value) : NaN;
   if (!Number.isFinite(value) || !sameKg(value, usageKg)) return null;
-  return { title: run.name, calculatorId: run.calculatorId, calculatorVersion: run.calculatorVersion, trace: run.trace.slice(0, at + 1), estimate: false };
+  return { title: run.name, calculatorId: run.calculatorId, calculatorVersion: run.calculatorVersion, trace: workingOf(run.trace, at), estimate: false };
+}
+
+/**
+ * The steps of a calculator that the step at `at` is computed from, in the calculator's order: the fields its formula names, and the fields theirs
+ * name. A run that goes on to price the metal also reads a price and a yield; they are not part of how the weight was reached.
+ */
+function workingOf(trace: CalculationTraceStep[], at: number): CalculationTraceStep[] {
+  const fields = (formula: string | undefined) => [...(formula ?? '').matchAll(/\{([^}]+)\}/g)].map((m) => m[1]!);
+  const needed = new Set(fields(trace[at]!.formula));
+  // A result with no formula on record cannot be traced back: every earlier step is kept.
+  if (needed.size === 0) return trace.slice(0, at + 1);
+  const keep = new Set<number>([at]);
+  for (let i = at - 1; i >= 0; i--) {
+    const step = trace[i]!;
+    if (step.kind !== 'calculated' || !needed.has(step.fieldName)) continue;
+    keep.add(i);
+    for (const f of fields(step.formula)) needed.add(f);
+  }
+  return trace.filter((step, i) => keep.has(i) || (i < at && step.kind === 'input' && needed.has(step.fieldName)));
 }
 
 const NET = 'Net Usage';

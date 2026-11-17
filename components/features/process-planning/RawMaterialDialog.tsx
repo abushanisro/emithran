@@ -298,9 +298,11 @@ export function RawMaterialDialog({
   // Net Usage, Gross Usage and Scrap % from the engine's calculation: what the calculator buttons and "Use calculated values" do. A manual gross
   // override is dropped, since the point of the action is to return to the calculated figures.
   const applyCalculatedUsage = (usage: MaterialUsageExplanation) => {
-    setNetUsage(usage.netUsage);
+    // Four decimals of a kg: what the record stores, and what this dialog's own gross field is kept to.
+    const kg = (v: number) => parseFloat(v.toFixed(4));
+    setNetUsage(kg(usage.netUsage));
     setScrap(usage.scrapPct);
-    setGrossUsage(usage.grossUsage);
+    setGrossUsage(kg(usage.grossUsage));
     setCadFilled(false);
     setGrossUsageOverridden(false);
     setGrossUsageOverrideReason('');

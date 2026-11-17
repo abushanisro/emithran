@@ -31,13 +31,23 @@ describe('explainMaterialUsage', () => {
   });
 
   it('sand casting: the gross usage is the Bought Weight of the material-cost calculator, not the poured weight', () => {
-    const metal = run('Sand Casting - Metal per casting', 'Poured Weight', 0.0802, [step('input', 'Volume', 14488.11), step('input', 'Density', 2700), step('calculated', 'Net Weight', 0.0391), step('calculated', 'Poured Weight', 0.0802)]);
-    const cost = run('Sand Casting - Material cost', 'Material Cost', 0.2327, [step('input', 'Net Weight', 0.0391), step('input', 'Poured Weight', 0.0802), step('calculated', 'Melt Loss', 0.0016), step('calculated', 'Bought Weight', 0.0408), step('calculated', 'Material Cost', 0.2327)]);
+    const metal = run('Sand Casting - Metal per casting', 'Poured Weight', 0.0802, [
+      step('input', 'Volume', 14488.11), step('input', 'Density', 2700), step('input', 'Gating', 0.0062), step('input', 'Risers', 0.0349),
+      step('calculated', 'Net Weight', 0.0391, { formula: '{Volume} / 1e9 * {Density}' }), step('calculated', 'Poured Weight', 0.0802, { formula: '{Net Weight} + {Gating} + {Risers}' }),
+    ]);
+    const cost = run('Sand Casting - Material cost', 'Material Cost', 0.2327, [
+      step('input', 'Net Weight', 0.0391), step('input', 'Poured Weight', 0.0802), step('input', 'Furnace Yield Loss Factor', 0.98), step('input', 'Remelt Allowance', 1),
+      step('input', 'Price', 5.711), step('input', 'Final Yield', 1),
+      step('calculated', 'Melt Loss', 0.0016, { formula: '{Poured Weight} / {Furnace Yield Loss Factor} - {Poured Weight}' }),
+      step('calculated', 'Bought Weight', 0.0408, { formula: '{Net Weight} + {Melt Loss} + ({Poured Weight} - {Net Weight}) * (1 - min(max({Remelt Allowance}, 0), 1))' }),
+      step('calculated', 'Material Cost', 0.2327, { formula: '{Bought Weight} * {Price} / {Final Yield}' }),
+    ]);
     const e = explainMaterialUsage({ ...base, castingMetal: { partKg: 0.0391, chargedKg: 0.040754 }, calculatorRuns: { 'Sand metal per casting': metal, 'Sand material cost': cost } });
     expect(e.net.title).toBe('Sand Casting - Metal per casting');
     expect(steps(e.net)).toEqual(['Volume=14488.11', 'Density=2700', 'Net Weight=0.0391']);
     expect(e.gross.title).toBe('Sand Casting - Material cost');
-    expect(last(e.gross).displayLabel).toBe('Bought Weight');
+    // Only what the weight is computed from: the gating and risers belong to the poured weight, the price and final yield to the cost.
+    expect(steps(e.gross)).toEqual(['Net Weight=0.0391', 'Poured Weight=0.0802', 'Furnace Yield Loss Factor=0.98', 'Remelt Allowance=1', 'Melt Loss=0.0016', 'Bought Weight=0.0408']);
     reconciles(e);
   });
 
