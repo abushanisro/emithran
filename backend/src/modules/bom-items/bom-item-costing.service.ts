@@ -181,6 +181,30 @@ function isCastingChoice(item: { scenarioOverrides?: Record<string, unknown> | n
   return item.scenarioOverrides?.['processGroup'] === CASTING_PROCESS_GROUP && !(item.manufacturingFamilyOverride ?? '').trim();
 }
 
+/**
+ * The drilled-hole groups of a part from its feature_graph_v2 hole features (a cast or forged part's own analysis): one group per diameter
+ * (to 0.1 mm), its hole count, its deepest hole and the occurrences that are its holes. A diameter is read from the occurrence, else the feature.
+ */
+export function holeGroupsOfGraph(features: unknown): Array<{ diameter_mm: number; count: number; depth_mm?: number; occurrences: FeatureOccurrenceRef[] }> {
+  if (!Array.isArray(features)) return [];
+  const groups = new Map<number, { diameter_mm: number; count: number; depth_mm?: number; occurrences: FeatureOccurrenceRef[] }>();
+  for (const f of features as Array<Record<string, any>>) {
+    if (f?.feature_type !== 'SimpleHole' || typeof f.id !== 'string') continue;
+    (Array.isArray(f.occurrences) ? f.occurrences : []).forEach((o: Record<string, any>, occurrenceIndex: number) => {
+      const diameter = Number(o?.diameter_mm ?? f.diameter_mm ?? f.params?.diameter_mm);
+      if (!(diameter > 0)) return;
+      const key = Math.round(diameter * 10) / 10;
+      const depth = Number(o?.depth_mm ?? f.depth_mm ?? f.params?.depth_mm);
+      const g = groups.get(key) ?? { diameter_mm: key, count: 0, occurrences: [] };
+      g.count += 1;
+      if (depth > 0) g.depth_mm = Math.max(g.depth_mm ?? 0, depth);
+      g.occurrences.push({ featureId: f.id, occurrenceIndex });
+      groups.set(key, g);
+    });
+  }
+  return [...groups.values()];
+}
+
 export function hasCostModel(family: string): boolean {
   return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || castingProcessOfFamily(family) !== null;
 }
@@ -6982,7 +7006,10 @@ export class BomItemCostingService {
   ): Array<{ diameter_mm: number; count: number; depth_mm?: number; occurrences?: FeatureOccurrenceRef[] }> {
     const features = fg?.machining_features?.features;
     if (!Array.isArray(features)) {
-      return (summary?.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>;
+      // A cast or forged part has no machining recognizer output: its holes are the hole features of its own analysis (feature_graph_v2),
+      // each occurrence one hole with its diameter and depth. Only when it has none either, the summary's hole groups.
+      const fromGraph = holeGroupsOfGraph(fg?.feature_graph_v2?.features);
+      return fromGraph.length > 0 ? fromGraph : (summary?.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>;
     }
     const DRILLED = new Set(['through', 'blind', 'threaded', 'cross', 'pcd_pattern']);
     // Each hole as the feature_graph_v2 occurrence it shares its faces with (feature-occurrences.ts): what its calculator inputs light.
