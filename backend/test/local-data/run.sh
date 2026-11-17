@@ -62,6 +62,10 @@ SELECT 'Forging', n, n, false FROM unnest(ARRAY['Band Saw','Conveyor Induction H
 -- the powder metal catalog rows: migration 1060 links the powder metal calculators to them and fails if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Powder Metal', n, n, false FROM unnest(ARRAY['Compaction Pressing','Furnace Sintering']) AS n;
+-- the composites catalog rows migration 790 seeds: migrations 1064 and 1065 give them a machine class and link the composites calculators to them and fails if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Composites', n, n, false FROM unnest(ARRAY['Tool Clean','Mold Preparation','Ultrasonic Cut','Hand Layup','Automated Tape Layup',
+  'Automated Fiber Placement','Vacuum Bag','Final Vacuum Bag','Autoclave Cure','Bench Operation']) AS n;
 -- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;

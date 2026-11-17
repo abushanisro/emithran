@@ -1,0 +1,1411 @@
+{
+  "domain": "composites",
+  "processGroup": "Composites",
+  "calculators": [
+    {
+      "key": "composites.ply_complexity",
+      "name": "Composites - Ply complexity",
+      "helper": true,
+      "operations": [],
+      "description": "How hard one ply is to lay, 0 (easy) to 1: the layup process's weightings (weightingHLU*, weightingATL*, weightingAFP*) of the material's flexibility, the ply's cutouts and the deformation draping it over the tool's curvature calls for, and for tape and fiber placement the ply's aspect against its fiber angle. memory/Composites holds the weightings, not how each rating is read: the three ratings are labelled (unverified rule).",
+      "output": "Complexity",
+      "results": [
+        "Drape Angle",
+        "Flexibility Rating (unverified rule)",
+        "Cutout Rating (unverified rule)",
+        "Deformation Rating (unverified rule)",
+        "Aspect Rating (unverified rule)"
+      ],
+      "fields": [
+        {
+          "name": "Ply Length",
+          "unit": "mm",
+          "source": {
+            "engine": "ply_length_mm"
+          }
+        },
+        {
+          "name": "Ply Width",
+          "unit": "mm",
+          "source": {
+            "engine": "ply_width_mm"
+          }
+        },
+        {
+          "name": "Average Curvature",
+          "unit": "1/m",
+          "source": {
+            "engine": "ply_curvature_per_m"
+          }
+        },
+        {
+          "name": "Deformation Average Angle",
+          "unit": "deg",
+          "source": {
+            "material": "deformation_average_angle"
+          }
+        },
+        {
+          "name": "Deformation Warning Angle",
+          "unit": "deg",
+          "source": {
+            "material": "deformation_warning_angle"
+          }
+        },
+        {
+          "name": "Deformation Limit Angle",
+          "unit": "deg",
+          "source": {
+            "material": "deformation_limit_angle"
+          }
+        },
+        {
+          "name": "Cutout Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ply_cutout_area_mm2"
+          }
+        },
+        {
+          "name": "Ply Outer Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ply_outer_area_mm2"
+          }
+        },
+        {
+          "name": "Square Ratio",
+          "unit": null,
+          "source": {
+            "variable": "approxSquareRatio"
+          }
+        },
+        {
+          "name": "Weight Flexibility",
+          "unit": null,
+          "source": {
+            "engine": "weight_flexibility"
+          }
+        },
+        {
+          "name": "Weight Cutout",
+          "unit": null,
+          "source": {
+            "engine": "weight_cutout"
+          }
+        },
+        {
+          "name": "Weight Deformation",
+          "unit": null,
+          "source": {
+            "engine": "weight_deformation"
+          }
+        },
+        {
+          "name": "Weight Aspect",
+          "unit": null,
+          "source": {
+            "engine": "weight_aspect"
+          }
+        },
+        {
+          "name": "Drape Angle",
+          "unit": "deg",
+          "formula": "{Ply Length} / 1000 * {Average Curvature} * 180 / pi"
+        },
+        {
+          "name": "Flexibility Rating (unverified rule)",
+          "unit": null,
+          "formula": "min(1, {Drape Angle} / max({Deformation Average Angle}, 0.001))"
+        },
+        {
+          "name": "Cutout Rating (unverified rule)",
+          "unit": null,
+          "formula": "min(1, {Cutout Area} / max({Ply Outer Area}, 1))"
+        },
+        {
+          "name": "Deformation Rating (unverified rule)",
+          "unit": null,
+          "formula": "min(1, max(0, ({Drape Angle} - {Deformation Warning Angle}) / max({Deformation Limit Angle} - {Deformation Warning Angle}, 0.001)))"
+        },
+        {
+          "name": "Aspect Rating (unverified rule)",
+          "unit": null,
+          "formula": "{Ply Width} / max({Ply Length}, 1) >= {Square Ratio} ? 0 : 1 - {Ply Width} / max({Ply Length}, 1) / {Square Ratio}"
+        },
+        {
+          "name": "Complexity",
+          "unit": null,
+          "formula": "min(1, {Weight Flexibility} * {Flexibility Rating (unverified rule)} + {Weight Cutout} * {Cutout Rating (unverified rule)} + {Weight Deformation} * {Deformation Rating (unverified rule)} + {Weight Aspect} * {Aspect Rating (unverified rule)})"
+        }
+      ]
+    },
+    {
+      "key": "composites.hand_ply_placement",
+      "name": "Composites - Hand ply placement",
+      "helper": true,
+      "operations": [],
+      "description": "Laying one ply by hand: its time between the least and the most tblPlyHandLayupTimes gives a ply of its area, by its complexity, longer by manualLayupGuideMultiplier where the cell has no laser projection.",
+      "output": "Ply Time",
+      "fields": [
+        {
+          "name": "Ply Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ply_area_mm2"
+          }
+        },
+        {
+          "name": "Layup Time Min",
+          "unit": "min",
+          "source": {
+            "lookup": "tblPlyHandLayupTimes.Ply Layup Time Min (min)"
+          }
+        },
+        {
+          "name": "Layup Time Max",
+          "unit": "min",
+          "source": {
+            "lookup": "tblPlyHandLayupTimes.Ply Layup Time Max (min)"
+          }
+        },
+        {
+          "name": "Complexity",
+          "unit": null,
+          "source": {
+            "engine": "ply_complexity"
+          }
+        },
+        {
+          "name": "Guide Multiplier",
+          "unit": null,
+          "source": {
+            "engine": "layup_guide_multiplier"
+          }
+        },
+        {
+          "name": "Ply Time",
+          "unit": "s",
+          "formula": "({Layup Time Min} + {Complexity} * ({Layup Time Max} - {Layup Time Min})) * 60 * {Guide Multiplier}"
+        }
+      ]
+    },
+    {
+      "key": "composites.auto_ply_placement",
+      "name": "Composites - Automated ply placement",
+      "helper": true,
+      "operations": [],
+      "description": "Laying one ply by tape layup or fiber placement: the ply's area at the head's band width and its deposition rate, derated by the ply's complexity down to minLayupRateFactor*, and a rapid traverse between courses.",
+      "output": "Ply Time",
+      "results": [
+        "Courses",
+        "Deposition Rate"
+      ],
+      "fields": [
+        {
+          "name": "Ply Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ply_area_mm2"
+          }
+        },
+        {
+          "name": "Ply Width",
+          "unit": "mm",
+          "source": {
+            "engine": "ply_width_mm"
+          }
+        },
+        {
+          "name": "Band Width",
+          "unit": "mm",
+          "source": {
+            "engine": "band_width_mm"
+          }
+        },
+        {
+          "name": "Max Deposition Rate",
+          "unit": "mm/s",
+          "source": {
+            "machine": "max_deposition_rate_mm_per_s"
+          }
+        },
+        {
+          "name": "Min Rate Factor",
+          "unit": null,
+          "source": {
+            "engine": "min_layup_rate_factor"
+          }
+        },
+        {
+          "name": "Complexity",
+          "unit": null,
+          "source": {
+            "engine": "ply_complexity"
+          }
+        },
+        {
+          "name": "Traverse Time",
+          "unit": "s",
+          "source": {
+            "engine": "rapid_traverse_s"
+          }
+        },
+        {
+          "name": "Courses",
+          "unit": null,
+          "formula": "CEIL({Ply Width} / {Band Width})"
+        },
+        {
+          "name": "Deposition Rate",
+          "unit": "mm/s",
+          "formula": "{Max Deposition Rate} * (1 - {Complexity} * (1 - {Min Rate Factor}))"
+        },
+        {
+          "name": "Ply Time",
+          "unit": "s",
+          "formula": "{Ply Area} / ({Band Width} * {Deposition Rate}) + {Courses} * {Traverse Time}"
+        }
+      ]
+    },
+    {
+      "key": "composites.ply_cut",
+      "name": "Composites - Ply cutting",
+      "helper": true,
+      "operations": [],
+      "description": "Cutting one ply from the roll on an ultrasonic cutter: its outline at the cut rate (cuttingDerateFactor when a stack of layers is cut), unrolling its length, unloading it by its size (plySmallLimitArea, plyMediumLimitArea) and identing it; a stack of layers is shared by the plies in it.",
+      "output": "Ply Time",
+      "results": [
+        "Cut Time",
+        "Unload Time"
+      ],
+      "fields": [
+        {
+          "name": "Ply Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ply_area_mm2"
+          }
+        },
+        {
+          "name": "Ply Perimeter",
+          "unit": "mm",
+          "source": {
+            "engine": "ply_perimeter_mm"
+          }
+        },
+        {
+          "name": "Ply Length",
+          "unit": "mm",
+          "source": {
+            "engine": "ply_length_mm"
+          }
+        },
+        {
+          "name": "Cut Rate",
+          "unit": "mm/min",
+          "source": {
+            "machine": "cut_rate_mm_per_min"
+          }
+        },
+        {
+          "name": "Stack Count",
+          "unit": null,
+          "source": {
+            "variable": "defaultRawMaterialStackCount"
+          }
+        },
+        {
+          "name": "Cutting Derate",
+          "unit": null,
+          "source": {
+            "variable": "cuttingDerateFactor"
+          }
+        },
+        {
+          "name": "Unroll Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "unrollRawMaterialRate"
+          }
+        },
+        {
+          "name": "Small Ply Limit",
+          "unit": "mm²",
+          "source": {
+            "variable": "plySmallLimitArea"
+          }
+        },
+        {
+          "name": "Medium Ply Limit",
+          "unit": "mm²",
+          "source": {
+            "variable": "plyMediumLimitArea"
+          }
+        },
+        {
+          "name": "Unload Small",
+          "unit": "s",
+          "source": {
+            "variable": "plyUnloadTimeSmall"
+          }
+        },
+        {
+          "name": "Unload Medium",
+          "unit": "s",
+          "source": {
+            "variable": "plyUnloadTimeMedium"
+          }
+        },
+        {
+          "name": "Unload Large",
+          "unit": "s",
+          "source": {
+            "variable": "plyUnloadTimeLarge"
+          }
+        },
+        {
+          "name": "Ident Time",
+          "unit": "s",
+          "source": {
+            "variable": "plyIdentTime"
+          }
+        },
+        {
+          "name": "Cut Time",
+          "unit": "s",
+          "formula": "{Ply Perimeter} / ({Cut Rate} / 60 * ({Stack Count} > 1 ? {Cutting Derate} : 1)) / {Stack Count}"
+        },
+        {
+          "name": "Unload Time",
+          "unit": "s",
+          "formula": "{Ply Area} <= {Small Ply Limit} ? {Unload Small} : ({Ply Area} <= {Medium Ply Limit} ? {Unload Medium} : {Unload Large})"
+        },
+        {
+          "name": "Ply Time",
+          "unit": "s",
+          "formula": "{Cut Time} + {Ply Length} / {Unroll Rate} / {Stack Count} + {Unload Time} + {Ident Time}"
+        }
+      ]
+    },
+    {
+      "key": "composites.core_placement",
+      "name": "Composites - Core placement",
+      "helper": true,
+      "operations": [],
+      "description": "Placing one honeycomb core: locating its template, aligning its perimeter (coreLayupRate), foaming adhesive along its splices (coreSpliceRate) and potting the holes through it (coreHolePottingTime).",
+      "output": "Core Time",
+      "fields": [
+        {
+          "name": "Core Perimeter",
+          "unit": "mm",
+          "source": {
+            "engine": "core_perimeter_mm"
+          }
+        },
+        {
+          "name": "Template Location Time",
+          "unit": "s",
+          "source": {
+            "variable": "coreTemplateLocationTime"
+          }
+        },
+        {
+          "name": "Core Layup Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "coreLayupRate"
+          }
+        },
+        {
+          "name": "Splice Length",
+          "unit": "mm",
+          "source": {
+            "engine": "core_splice_mm"
+          }
+        },
+        {
+          "name": "Splice Rate",
+          "unit": "m/s",
+          "source": {
+            "variable": "coreSpliceRate"
+          }
+        },
+        {
+          "name": "Potted Holes",
+          "unit": null,
+          "source": {
+            "engine": "core_potted_holes"
+          }
+        },
+        {
+          "name": "Potting Time",
+          "unit": "s",
+          "source": {
+            "variable": "coreHolePottingTime"
+          }
+        },
+        {
+          "name": "Core Time",
+          "unit": "s",
+          "formula": "{Template Location Time} + {Core Perimeter} / {Core Layup Rate} + {Splice Length} / ({Splice Rate} * 1000) + {Potted Holes} * {Potting Time}"
+        }
+      ]
+    },
+    {
+      "key": "composites.ply_material",
+      "name": "Composites - Ply material",
+      "helper": true,
+      "operations": [],
+      "description": "The prepreg one ply takes: its area with the trim round its edge (defaultTrimWidth, defaultTrimAreaFactor), over the material's utilization, at its price per square metre; and its mass from its areal weight.",
+      "output": "Ply Cost",
+      "results": [
+        "Blank Area",
+        "Bought Area",
+        "Ply Mass"
+      ],
+      "fields": [
+        {
+          "name": "Ply Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ply_area_mm2"
+          }
+        },
+        {
+          "name": "Ply Perimeter",
+          "unit": "mm",
+          "source": {
+            "engine": "ply_perimeter_mm"
+          }
+        },
+        {
+          "name": "Trim Width",
+          "unit": "mm",
+          "source": {
+            "variable": "defaultTrimWidth"
+          }
+        },
+        {
+          "name": "Trim Area Factor",
+          "unit": null,
+          "source": {
+            "variable": "defaultTrimAreaFactor"
+          }
+        },
+        {
+          "name": "Utilization",
+          "unit": "%",
+          "source": {
+            "material": "material_utilization"
+          }
+        },
+        {
+          "name": "Price per m²",
+          "unit": "USD/m²",
+          "source": {
+            "material": "cost_per_m2"
+          }
+        },
+        {
+          "name": "Areal Weight",
+          "unit": "g/m²",
+          "source": {
+            "material": "areal_weight"
+          }
+        },
+        {
+          "name": "Blank Area",
+          "unit": "mm²",
+          "formula": "{Ply Area} + {Ply Perimeter} * {Trim Width} * {Trim Area Factor}"
+        },
+        {
+          "name": "Bought Area",
+          "unit": "mm²",
+          "formula": "{Blank Area} / ({Utilization} / 100)"
+        },
+        {
+          "name": "Ply Mass",
+          "unit": "kg",
+          "formula": "{Ply Area} / 1000000 * {Areal Weight} / 1000"
+        },
+        {
+          "name": "Ply Cost",
+          "unit": "USD",
+          "formula": "{Bought Area} / 1000000 * {Price per m²}"
+        }
+      ]
+    },
+    {
+      "key": "composites.core_material",
+      "name": "Composites - Core material",
+      "helper": true,
+      "operations": [],
+      "description": "The honeycomb a core takes: its area with minimumCoreTrimWidth trimmed off each side, in as many layers of the stock thickness as its depth needs, over the material's utilization, at its price per square metre.",
+      "output": "Core Cost",
+      "results": [
+        "Layers",
+        "Bought Area"
+      ],
+      "fields": [
+        {
+          "name": "Core Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "core_area_mm2"
+          }
+        },
+        {
+          "name": "Core Perimeter",
+          "unit": "mm",
+          "source": {
+            "engine": "core_perimeter_mm"
+          }
+        },
+        {
+          "name": "Core Depth",
+          "unit": "mm",
+          "source": {
+            "engine": "core_depth_mm"
+          }
+        },
+        {
+          "name": "Stock Thickness",
+          "unit": "mm",
+          "source": {
+            "material": "cured_thickness"
+          }
+        },
+        {
+          "name": "Core Trim Width",
+          "unit": "mm",
+          "source": {
+            "variable": "minimumCoreTrimWidth"
+          }
+        },
+        {
+          "name": "Utilization",
+          "unit": "%",
+          "source": {
+            "material": "material_utilization"
+          }
+        },
+        {
+          "name": "Price per m²",
+          "unit": "USD/m²",
+          "source": {
+            "material": "cost_per_m2"
+          }
+        },
+        {
+          "name": "Layers",
+          "unit": null,
+          "formula": "max(1, CEIL({Core Depth} / {Stock Thickness} - 0.000001))"
+        },
+        {
+          "name": "Bought Area",
+          "unit": "mm²",
+          "formula": "({Core Area} + {Core Perimeter} * {Core Trim Width} + 4 * {Core Trim Width} ^ 2) * {Layers} / ({Utilization} / 100)"
+        },
+        {
+          "name": "Core Cost",
+          "unit": "USD",
+          "formula": "{Bought Area} / 1000000 * {Price per m²}"
+        }
+      ]
+    },
+    {
+      "key": "composites.autoclave_load",
+      "name": "Composites - Autoclave load",
+      "helper": true,
+      "operations": [],
+      "description": "How many parts share one autoclave cycle: the tool (the part with toolPerimeterAllowance round it and toolHeightAllowance above) must fit the usable diameter and length within autoclaveSizeCapacitySafetyFactor; a shared autoclave (autoclavesIsShared) charges the part its share of the usable length, one that is not as many tools as fit end to end.",
+      "output": "Parts per Load",
+      "results": [
+        "Fits"
+      ],
+      "fields": [
+        {
+          "name": "Footprint Length",
+          "unit": "mm",
+          "source": {
+            "cad": "footprint_length_mm"
+          }
+        },
+        {
+          "name": "Footprint Width",
+          "unit": "mm",
+          "source": {
+            "cad": "footprint_width_mm"
+          }
+        },
+        {
+          "name": "Part Height",
+          "unit": "mm",
+          "source": {
+            "cad": "height_mm"
+          }
+        },
+        {
+          "name": "Tool Allowance",
+          "unit": "mm",
+          "source": {
+            "variable": "toolPerimeterAllowance"
+          }
+        },
+        {
+          "name": "Height Allowance",
+          "unit": "mm",
+          "source": {
+            "variable": "toolHeightAllowance"
+          }
+        },
+        {
+          "name": "Usable Length",
+          "unit": "mm",
+          "source": {
+            "machine": "useable_length_mm"
+          }
+        },
+        {
+          "name": "Usable Diameter",
+          "unit": "mm",
+          "source": {
+            "machine": "useable_diameter_mm"
+          }
+        },
+        {
+          "name": "Safety Factor",
+          "unit": null,
+          "source": {
+            "variable": "autoclaveSizeCapacitySafetyFactor"
+          }
+        },
+        {
+          "name": "Shared",
+          "unit": null,
+          "source": {
+            "engine": "autoclave_shared"
+          }
+        },
+        {
+          "name": "Tool Length",
+          "unit": "mm",
+          "formula": "{Footprint Length} + 2 * {Tool Allowance}"
+        },
+        {
+          "name": "Tool Width",
+          "unit": "mm",
+          "formula": "{Footprint Width} + 2 * {Tool Allowance}"
+        },
+        {
+          "name": "Tool Height",
+          "unit": "mm",
+          "formula": "{Part Height} + {Height Allowance}"
+        },
+        {
+          "name": "Fits",
+          "unit": null,
+          "formula": "sqrt({Tool Width} ^ 2 + {Tool Height} ^ 2) <= {Usable Diameter} * {Safety Factor} and {Tool Length} <= {Usable Length} * {Safety Factor} ? 1 : 0"
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "formula": "{Fits} == 0 ? 0 : ({Shared} == 1 ? {Usable Length} * {Safety Factor} / {Tool Length} : floor({Usable Length} * {Safety Factor} / {Tool Length}))"
+        }
+      ]
+    },
+    {
+      "key": "composites.tool_clean",
+      "name": "Composites - Tool clean",
+      "operations": [
+        "Tool Clean"
+      ],
+      "description": "Cleaning the layup tool: its area (the part with toolPerimeterAllowance round it) at the cell's clean rate, the laser cell's own or, for manual cleaning, tblManualToolCleanRates for that area.",
+      "fields": [
+        {
+          "name": "Tool Side Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "tool_area_mm2"
+          }
+        },
+        {
+          "name": "Trim Length",
+          "unit": "mm",
+          "source": {
+            "cad": "trim_length_mm"
+          }
+        },
+        {
+          "name": "Tool Allowance",
+          "unit": "mm",
+          "source": {
+            "variable": "toolPerimeterAllowance"
+          }
+        },
+        {
+          "name": "Tool Area",
+          "unit": "mm²",
+          "formula": "{Tool Side Area} + {Trim Length} * {Tool Allowance} + 4 * {Tool Allowance} ^ 2"
+        },
+        {
+          "name": "Clean Rate",
+          "unit": "mm²/s",
+          "source": {
+            "engine": "clean_rate_mm2_s"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Tool Area} / {Clean Rate} * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "composites.mold_preparation",
+      "name": "Composites - Mold preparation",
+      "operations": [
+        "Mold Preparation"
+      ],
+      "description": "Preparing the tool: defaultNumMoldReleaseCoats coats of release over the tool (applyMoldReleaseRate), the tool tack (applyToolTackRate) and its cure (toolTackCureTime). memory/Composites gives no cure time for the release.",
+      "results": [
+        "Release Time",
+        "Tack Time"
+      ],
+      "fields": [
+        {
+          "name": "Tool Side Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "tool_area_mm2"
+          }
+        },
+        {
+          "name": "Trim Length",
+          "unit": "mm",
+          "source": {
+            "cad": "trim_length_mm"
+          }
+        },
+        {
+          "name": "Tool Allowance",
+          "unit": "mm",
+          "source": {
+            "variable": "toolPerimeterAllowance"
+          }
+        },
+        {
+          "name": "Tool Area",
+          "unit": "mm²",
+          "formula": "{Tool Side Area} + {Trim Length} * {Tool Allowance} + 4 * {Tool Allowance} ^ 2"
+        },
+        {
+          "name": "Release Coats",
+          "unit": null,
+          "source": {
+            "variable": "defaultNumMoldReleaseCoats"
+          }
+        },
+        {
+          "name": "Release Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "applyMoldReleaseRate"
+          }
+        },
+        {
+          "name": "Tack Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "applyToolTackRate"
+          }
+        },
+        {
+          "name": "Tack Cure Time",
+          "unit": "s",
+          "source": {
+            "variable": "toolTackCureTime"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Release Time",
+          "unit": "s",
+          "formula": "{Release Coats} * {Tool Area} / {Release Rate}"
+        },
+        {
+          "name": "Tack Time",
+          "unit": "s",
+          "formula": "{Tool Area} / {Tack Rate} + {Tack Cure Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Release Time} + {Tack Time}) * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "composites.ultrasonic_cut",
+      "name": "Composites - Ultrasonic cut",
+      "operations": [
+        "Ultrasonic Cut"
+      ],
+      "description": "Cutting the part's plies (Composites - Ply cutting, summed over its plies) and fetching each material's roll from cold storage and loading it (rawMaterialHandlingTime), once per batch.",
+      "fields": [
+        {
+          "name": "Ply Cutting Time",
+          "unit": "s",
+          "source": {
+            "engine": "ply_cut_s"
+          }
+        },
+        {
+          "name": "Rolls",
+          "unit": null,
+          "source": {
+            "engine": "material_rolls"
+          }
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": {
+            "engine": "batch_size"
+          }
+        },
+        {
+          "name": "Roll Handling Time",
+          "unit": "s",
+          "source": {
+            "variable": "rawMaterialHandlingTime"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Ply Cutting Time} + {Rolls} * {Roll Handling Time} / {Batch Size}) * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "composites.hand_layup",
+      "name": "Composites - Hand layup",
+      "operations": [
+        "Hand Layup"
+      ],
+      "description": "Laying the part up by hand: its plies (Composites - Hand ply placement) and cores (Composites - Core placement); a debulk after the first defaultNumPliesBeforeFirstDebulk plies and every defaultNumPliesPerDebulkCycle after, each bagged, held debulkTime and unbagged; thermocouples (one per thermocoupleApplicationDensity); the vacuum drop test; removing the bag.",
+      "results": [
+        "Debulks",
+        "Thermocouples"
+      ],
+      "fields": [
+        {
+          "name": "Ply Placement Time",
+          "unit": "s",
+          "source": {
+            "engine": "ply_placement_s"
+          }
+        },
+        {
+          "name": "Core Placement Time",
+          "unit": "s",
+          "source": {
+            "engine": "core_placement_s"
+          }
+        },
+        {
+          "name": "Plies",
+          "unit": null,
+          "source": {
+            "engine": "ply_count"
+          }
+        },
+        {
+          "name": "Plies Before First Debulk",
+          "unit": null,
+          "source": {
+            "variable": "defaultNumPliesBeforeFirstDebulk"
+          }
+        },
+        {
+          "name": "Plies per Debulk",
+          "unit": null,
+          "source": {
+            "variable": "defaultNumPliesPerDebulkCycle"
+          }
+        },
+        {
+          "name": "Debulk Hold",
+          "unit": "min",
+          "source": {
+            "variable": "debulkTime"
+          }
+        },
+        {
+          "name": "Tool Side Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "tool_area_mm2"
+          }
+        },
+        {
+          "name": "Trim Length",
+          "unit": "mm",
+          "source": {
+            "cad": "trim_length_mm"
+          }
+        },
+        {
+          "name": "Tool Allowance",
+          "unit": "mm",
+          "source": {
+            "variable": "toolPerimeterAllowance"
+          }
+        },
+        {
+          "name": "Bag Tape Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "applyVacuumBagRate"
+          }
+        },
+        {
+          "name": "Bag Removal Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "vacuumBagRemovalRate"
+          }
+        },
+        {
+          "name": "Vacuum Port Time",
+          "unit": "s",
+          "source": {
+            "variable": "installVacuumPortTime"
+          }
+        },
+        {
+          "name": "Bag Perimeter",
+          "unit": "mm",
+          "formula": "{Trim Length} + 8 * {Tool Allowance}"
+        },
+        {
+          "name": "Thermocouple Density",
+          "unit": "mm²",
+          "source": {
+            "variable": "thermocoupleApplicationDensity"
+          }
+        },
+        {
+          "name": "Thermocouple Attach",
+          "unit": "s",
+          "source": {
+            "variable": "thermocoupleApplicationRate"
+          }
+        },
+        {
+          "name": "Thermocouple Connect",
+          "unit": "s",
+          "source": {
+            "variable": "thermocoupleConnectionRate"
+          }
+        },
+        {
+          "name": "Drop Test Hold",
+          "unit": "min",
+          "source": {
+            "variable": "vacuumDropTestHoldTime"
+          }
+        },
+        {
+          "name": "Thermocouples",
+          "unit": null,
+          "formula": "CEIL({Tool Side Area} / {Thermocouple Density})"
+        },
+        {
+          "name": "Thermocouple Time",
+          "unit": "s",
+          "formula": "{Thermocouples} * ({Thermocouple Attach} + {Thermocouple Connect})"
+        },
+        {
+          "name": "Drop Test Time",
+          "unit": "s",
+          "formula": "{Drop Test Hold} * 60"
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Debulks",
+          "unit": null,
+          "formula": "{Plies} >= {Plies Before First Debulk} ? 1 + floor(({Plies} - {Plies Before First Debulk}) / {Plies per Debulk}) : 0"
+        },
+        {
+          "name": "Debulk Time",
+          "unit": "s",
+          "formula": "{Debulks} * ({Debulk Hold} * 60 + {Bag Perimeter} / {Bag Tape Rate} + {Vacuum Port Time} + {Bag Perimeter} / {Bag Removal Rate})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Ply Placement Time} + {Core Placement Time} + {Debulk Time} + {Thermocouple Time} + {Drop Test Time} + {Bag Perimeter} / {Bag Removal Rate}) * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "composites.automated_layup",
+      "name": "Composites - Automated layup",
+      "operations": [
+        "Automated Tape Layup",
+        "Automated Fiber Placement"
+      ],
+      "description": "Laying the part up on a tape layup or fiber placement machine: its plies (Composites - Automated ply placement), thermocouples and the vacuum drop test.",
+      "results": [
+        "Thermocouples"
+      ],
+      "fields": [
+        {
+          "name": "Ply Placement Time",
+          "unit": "s",
+          "source": {
+            "engine": "ply_placement_s"
+          }
+        },
+        {
+          "name": "Tool Side Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "tool_area_mm2"
+          }
+        },
+        {
+          "name": "Thermocouple Density",
+          "unit": "mm²",
+          "source": {
+            "variable": "thermocoupleApplicationDensity"
+          }
+        },
+        {
+          "name": "Thermocouple Attach",
+          "unit": "s",
+          "source": {
+            "variable": "thermocoupleApplicationRate"
+          }
+        },
+        {
+          "name": "Thermocouple Connect",
+          "unit": "s",
+          "source": {
+            "variable": "thermocoupleConnectionRate"
+          }
+        },
+        {
+          "name": "Drop Test Hold",
+          "unit": "min",
+          "source": {
+            "variable": "vacuumDropTestHoldTime"
+          }
+        },
+        {
+          "name": "Thermocouples",
+          "unit": null,
+          "formula": "CEIL({Tool Side Area} / {Thermocouple Density})"
+        },
+        {
+          "name": "Thermocouple Time",
+          "unit": "s",
+          "formula": "{Thermocouples} * ({Thermocouple Attach} + {Thermocouple Connect})"
+        },
+        {
+          "name": "Drop Test Time",
+          "unit": "s",
+          "formula": "{Drop Test Hold} * 60"
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Ply Placement Time} + {Thermocouple Time} + {Drop Test Time}) * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "composites.vacuum_bag",
+      "name": "Composites - Vacuum bag",
+      "operations": [
+        "Vacuum Bag",
+        "Final Vacuum Bag"
+      ],
+      "description": "Bagging the laid-up part for cure: release peel ply, release film and breather over the tool (their laying rates), unrolling the bag (vacuumBagMaterialUnrollRate), taping its sealant round the tool (applyVacuumBagRate, sealantTapeLengthMultiplier) and its vacuum port.",
+      "fields": [
+        {
+          "name": "Tool Side Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "tool_area_mm2"
+          }
+        },
+        {
+          "name": "Trim Length",
+          "unit": "mm",
+          "source": {
+            "cad": "trim_length_mm"
+          }
+        },
+        {
+          "name": "Tool Allowance",
+          "unit": "mm",
+          "source": {
+            "variable": "toolPerimeterAllowance"
+          }
+        },
+        {
+          "name": "Tool Area",
+          "unit": "mm²",
+          "formula": "{Tool Side Area} + {Trim Length} * {Tool Allowance} + 4 * {Tool Allowance} ^ 2"
+        },
+        {
+          "name": "Peel Ply Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "applyReleasePeelPlyRate"
+          }
+        },
+        {
+          "name": "Release Film Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "applyReleaseFilmRate"
+          }
+        },
+        {
+          "name": "Breather Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "applyBreatherClothRate"
+          }
+        },
+        {
+          "name": "Bag Unroll Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "vacuumBagMaterialUnrollRate"
+          }
+        },
+        {
+          "name": "Footprint Length",
+          "unit": "mm",
+          "source": {
+            "cad": "footprint_length_mm"
+          }
+        },
+        {
+          "name": "Bag Tape Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "applyVacuumBagRate"
+          }
+        },
+        {
+          "name": "Sealant Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "sealantTapeLengthMultiplier"
+          }
+        },
+        {
+          "name": "Vacuum Port Time",
+          "unit": "s",
+          "source": {
+            "variable": "installVacuumPortTime"
+          }
+        },
+        {
+          "name": "Bag Perimeter",
+          "unit": "mm",
+          "formula": "{Trim Length} + 8 * {Tool Allowance}"
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Tool Area} / {Peel Ply Rate} + {Tool Area} / {Release Film Rate} + {Tool Area} / {Breather Rate} + ({Footprint Length} + 2 * {Tool Allowance}) / {Bag Unroll Rate} + {Bag Perimeter} * {Sealant Multiplier} / {Bag Tape Rate} + {Vacuum Port Time}) * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "composites.autoclave_cure",
+      "name": "Composites - Autoclave cure",
+      "operations": [
+        "Autoclave Cure"
+      ],
+      "description": "Curing in the autoclave: moving the load in (moveIntoAutoclaveTime), the resin's cure cycle (ramp up from resinCureRampUpStartTemperature at the material's rate, dwell at its hold temperature, ramp down to resinCureRampDownFinishTemperature), shared by the parts in the load (Composites - Autoclave load).",
+      "results": [
+        "Load Cycle"
+      ],
+      "fields": [
+        {
+          "name": "Move In Time",
+          "unit": "s",
+          "source": {
+            "variable": "moveIntoAutoclaveTime"
+          }
+        },
+        {
+          "name": "Hold Temperature",
+          "unit": "°C",
+          "source": {
+            "material": "cure_hold_temperature"
+          }
+        },
+        {
+          "name": "Start Temperature",
+          "unit": "°C",
+          "source": {
+            "variable": "resinCureRampUpStartTemperature"
+          }
+        },
+        {
+          "name": "Finish Temperature",
+          "unit": "°C",
+          "source": {
+            "variable": "resinCureRampDownFinishTemperature"
+          }
+        },
+        {
+          "name": "Ramp Up Rate",
+          "unit": "°C/min",
+          "source": {
+            "material": "cure_temperature_ramp_up_rate"
+          }
+        },
+        {
+          "name": "Ramp Down Rate",
+          "unit": "°C/min",
+          "source": {
+            "material": "cure_temperature_ramp_down_rate"
+          }
+        },
+        {
+          "name": "Dwell Time",
+          "unit": "min",
+          "source": {
+            "material": "cure_dwell_time"
+          }
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "source": {
+            "engine": "parts_per_load"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Load Cycle",
+          "unit": "s",
+          "formula": "{Move In Time} + ({Hold Temperature} - {Start Temperature}) / {Ramp Up Rate} * 60 + {Dwell Time} * 60 + ({Hold Temperature} - {Finish Temperature}) / {Ramp Down Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Load Cycle} / {Parts per Load} * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "composites.bench_operation",
+      "name": "Composites - Bench operation",
+      "operations": [
+        "Bench Operation"
+      ],
+      "description": "Breaking the cured part out of its tool (tblHandlingTimes, by the part's footprint: tool and part handling) and inspecting its surface (finalInspectionRate).",
+      "fields": [
+        {
+          "name": "Tool Handling Time",
+          "unit": "s",
+          "source": {
+            "lookup": "tblHandlingTimes.Tool Handling Time (s)"
+          }
+        },
+        {
+          "name": "Part Handling Time",
+          "unit": "s",
+          "source": {
+            "lookup": "tblHandlingTimes.Part Handling Time (s)"
+          }
+        },
+        {
+          "name": "Surface Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "skin_area_mm2"
+          }
+        },
+        {
+          "name": "Inspection Rate",
+          "unit": "mm²/s",
+          "source": {
+            "variable": "finalInspectionRate"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Tool Handling Time} + {Part Handling Time} + {Surface Area} / {Inspection Rate}) * {Cycle Time Factor}"
+        }
+      ]
+    }
+  ]
+}
