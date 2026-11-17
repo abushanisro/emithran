@@ -239,6 +239,29 @@ export function buildProcessTree(
         { name: 'Occurrences', value: String(occ) },
         ...(f.diameter_mm != null ? [{ name: 'Diameter', value: `${f.diameter_mm.toFixed(1)} mm` }] : []),
       ],
+      // A feature with several occurrences (five curved walls, twelve planar faces) opens into one row per occurrence, each highlighting only
+      // its own faces; the feature's row highlights them all.
+      ...(occ > 1 ? { children: f.occurrences.map((o, i) => occurrenceLeaf(`${idPrefix}_${f.id}`, f, o, i, machine)) } : {}),
+    };
+  };
+  // One occurrence of a feature: its own faces, and what was measured on it.
+  const occurrenceLeaf = (idPrefix: string, f: FeatureNodeV2, o: FeatureNodeV2['occurrences'][number], i: number, machine: string): ProcessTreeNode => {
+    const m = o as unknown as { diameter_mm?: number | null; depth_mm?: number | null; area_mm2?: number | null; length_mm?: number | null };
+    const size = m.diameter_mm != null ? ` Ø${m.diameter_mm.toFixed(1)}` : '';
+    return {
+      id: `${idPrefix}_occ${i}`,
+      kind: 'feature',
+      label: `${String(f.feature_type)} ${i + 1}${size}`,
+      factory, machine,
+      v2Occurrences: [{ featureId: f.id, occurrenceIndex: i }],
+      attrs: [
+        { name: 'Feature', value: String(f.feature_type) },
+        ...(m.diameter_mm != null ? [{ name: 'Diameter', value: `${m.diameter_mm.toFixed(2)} mm` }] : []),
+        ...(m.depth_mm != null ? [{ name: 'Depth', value: `${m.depth_mm.toFixed(2)} mm` }] : []),
+        ...(m.area_mm2 != null ? [{ name: 'Area', value: `${m.area_mm2.toFixed(1)} mm²` }] : []),
+        ...(m.length_mm != null ? [{ name: 'Length', value: `${m.length_mm.toFixed(1)} mm` }] : []),
+        { name: 'Faces', value: String(o.face_ids.length) },
+      ],
     };
   };
   // Type group ("SimpleHole ×12") -> one row per real feature_graph_v2 entry.

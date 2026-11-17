@@ -207,10 +207,11 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
     };
   };
   const cad: Record<string, CalcSeed | undefined> = {
-    volume_mm3: { value: part.volumeMm3, source: 'part volume (mm³)' },
-    projected_area_mm2: { value: part.projectedAreaMm2, source: 'outline on the parting plane, along the die direction (mm²)' },
-    parting_perimeter_mm: { value: part.partingPerimeterMm, source: 'parting line: the length of that outline (mm)' },
-    die_depth_mm: part.dieDepthMm != null ? { value: part.dieDepthMm, source: "the part's extent along the die direction (mm)" } : undefined,
+    // Each with the faces it was measured on (feature_graph_v2.measurements), for the calculator dialog's eye.
+    volume_mm3: { value: part.volumeMm3, source: 'part volume (mm³)', ref: { kind: 'cad', evidence: 'part_volume' } },
+    projected_area_mm2: { value: part.projectedAreaMm2, source: 'outline on the parting plane, along the die direction (mm²)', ref: { kind: 'cad', evidence: 'projected_area' } },
+    parting_perimeter_mm: { value: part.partingPerimeterMm, source: 'parting line: the length of that outline (mm)', ref: { kind: 'cad', evidence: 'parting_perimeter' } },
+    die_depth_mm: part.dieDepthMm != null ? { value: part.dieDepthMm, source: "the part's extent along the die direction (mm)", ref: { kind: 'cad', evidence: 'die_depth' } } : undefined,
   };
   type Run = { run: ReferenceCalcRun } | { reasons: string[] };
   const run = (calculator: string, machine: SandMachine | null, engine: Record<string, CalcSeed | undefined>, output = 'Cycle Time', lookups: Record<string, CalcSeed | undefined> = {}, cadOverrides: Record<string, CalcSeed | undefined> = {}): Run => {

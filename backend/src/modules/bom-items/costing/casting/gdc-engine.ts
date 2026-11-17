@@ -132,7 +132,7 @@ export function computeGdc(input: {
   const pos = (x: number | null | undefined) => (x != null && x > 0 ? x : null);
   const seeds = new SeedSet()
     .put('Cavities', n, (x) => castingSeed.engine(x, cav.trace), 'cavities')
-    .put('Projected Area', pos(g.projectedAreaMm2), (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)'), 'measured projected area')
+    .put('Projected Area', pos(g.projectedAreaMm2), (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)', 'projected_area'), 'measured projected area')
     .put('Part Volume', pos(vol), (x) => castingSeed.cad(x, 'part volume (mm³)', 'part_volume'), 'part volume')
     .put('Wall Max', pos(g.wallMaxMm), (x) => castingSeed.cad(x, 'thickest wall (mm)'), 'measured maximum wall thickness')
     .put('Core Count', input.coreCount != null ? input.coreCount * n : null,

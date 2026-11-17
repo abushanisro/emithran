@@ -105,7 +105,7 @@ export function evaluateForgingDfm(part: ForgingDfmPart, ref: ForgingDfmReferenc
       if (!of.length) continue;
       const w = of.reduce((a, b) => ((worst === 'lowest' ? b.value < a.value : b.value > a.value) ? b : a));
       findings.push({
-        rule, severity: s, label: label(of.length, s, w), limit, source, recommendation,
+        rule, check: name, severity: s, label: label(of.length, s, w), limit, source, recommendation,
         featureIds: [...new Set(of.flatMap((h) => h.occurrences.map((o) => o.featureId)))],
         occurrences: of.flatMap((h) => h.occurrences), faces: [...new Set(of.flatMap((h) => h.faces))],
       });

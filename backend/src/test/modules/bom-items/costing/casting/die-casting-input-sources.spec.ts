@@ -124,8 +124,10 @@ describe('die-casting calculator inputs carry where they were read (SourceRef)',
     const vol = input(trace, 'Part Volume');
     expect(vol.ref).toEqual({ kind: 'cad', evidence: 'part_volume' });
     expect(vol.evidence).toBe('part_volume');
-    // A CAD value that is not a whole-part measurement names no faces.
-    expect(input(trace, 'Projected Area').ref).toBeUndefined();
+    // The projected area names the faces seen along the pull axis (feature_graph_v2.measurements.projected_area).
+    expect(input(trace, 'Projected Area').ref).toEqual({ kind: 'cad', evidence: 'projected_area' });
+    // A CAD value with no recorded face set (the thickest wall) names none.
+    expect(input(trace, 'Wall Max').ref).toBeUndefined();
   });
 
   it('finishing: a machine spec, the part weight\'s calculation, a lookup row and the part surface', () => {

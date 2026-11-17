@@ -48,6 +48,11 @@ export interface MachiningDfmFinding {
   occurrences: Array<{ featureId: string; occurrenceIndex: number }>;
   /** CAD faces of the offending instances, for the viewer highlight. */
   faces: number[];
+  /**
+   * The name of the check that raised it, when one rule has several checks (a forging's draft on walls and draft in forged holes are both
+   * InsufficientDraftAngle): the check's row then highlights its own finding. Absent: the rule's one check.
+   */
+  check?: string;
 }
 
 export interface MachiningDfmCheck {

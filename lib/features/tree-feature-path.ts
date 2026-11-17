@@ -60,3 +60,27 @@ export function featuresOfHighlight(highlight: Highlight | null | undefined, fea
     .sort((a, b) => b.shared - a.shared)
     .map((f) => f.id);
 }
+
+/**
+ * The ids from the root down to the row of one occurrence of a feature (a face picked on the 3D model): the row standing for exactly that
+ * occurrence, else the feature's own row, else a row that groups it; the first in tree order among equals. Null when no row stands for it.
+ */
+export function treePathForOccurrence(
+  root: FeatureTreeNode | null | undefined, featureId: string, occurrenceIndex: number,
+): string[] | null {
+  if (!root) return null;
+  const rank = (node: FeatureTreeNode): number => {
+    const occ = node.v2Occurrences ?? [];
+    if (occ.length === 1 && occ[0]!.featureId === featureId && occ[0]!.occurrenceIndex === occurrenceIndex) return 3;
+    return matchRank(node, featureId);
+  };
+  let best: { rank: number; path: string[] } | null = null;
+  const walk = (node: FeatureTreeNode, ancestors: string[]) => {
+    const path = [...ancestors, node.id];
+    const r = rank(node);
+    if (r > (best?.rank ?? 0)) best = { rank: r, path };
+    for (const child of node.children ?? []) walk(child, path);
+  };
+  walk(root, []);
+  return (best as { rank: number; path: string[] } | null)?.path ?? null;
+}

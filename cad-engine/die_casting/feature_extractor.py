@@ -11,6 +11,7 @@ disclosed, never silently dropped.
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Dict, List, Optional
 
 from shared.stable_face_id import build_stable_face_id_map
@@ -62,9 +63,10 @@ class DieCastingFeatureExtractor:
         parting_footprint = None
         pull_extent = None
         parting_perimeter = None
+        silhouette = None
         if primary_axis is not None:
             try:
-                silhouette = parting_plane_silhouette(shape, primary_axis)
+                silhouette = parting_plane_silhouette(shape, primary_axis, with_faces=True)
                 projected_area = round(silhouette["area_mm2"], 3)
                 parting_footprint = [round(x, 3) for x in silhouette["footprint_mm"]]
                 pull_extent = round(silhouette["pull_extent_mm"], 3)
@@ -200,6 +202,19 @@ class DieCastingFeatureExtractor:
         # Nominal size for ISO 286 grading of tolerances on non-hole features.
         annotate_occurrence_extents(shape, v2_features)
 
+        # The faces behind the projected area, the parting line, the depth along the pull axis and the volume, for the calculator dialog's
+        # eye (the same measurements a forging records along its die direction).
+        measurements: Dict[str, Any] = {}
+        if silhouette is not None and primary_axis is not None:
+            try:
+                from forging.feature_extractor import die_measurements, solid_volume  # type: ignore
+                from injection_molding.recognition.mesh import tessellate_faces  # type: ignore
+                deflection = max(0.1, math.sqrt(sum(float(x) ** 2 for x in bbox_dims)) * 0.001)
+                meshes = tessellate_faces(shape, linear_deflection=deflection)
+                measurements = die_measurements(meshes, silhouette, tuple(primary_axis), {}, solid_volume(shape), deflection * 2.0)
+            except Exception as e:
+                logger.warning(f"[DieCasting] measurement faces failed: {e}")
+
         feature_graph_v2 = {
             "metadata": {
                 "face_map": face_map or [],
@@ -207,6 +222,7 @@ class DieCastingFeatureExtractor:
                 "stable_face_ids": stable_face_ids,
             },
             "features": v2_features,
+            **({"measurements": measurements} if measurements else {}),
             "conditions": [],
         }
 

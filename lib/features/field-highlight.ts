@@ -44,6 +44,12 @@ const SOURCE_BY_EVIDENCE: Record<string, Source> = {
   part_volume: { kind: 'measurement', key: 'part_volume', label: 'part volume' },
   // A surface area is measured over every face of the part.
   part_surface: { kind: 'whole_part', label: 'part surface' },
+  // A forging or a powder metal part, measured along its die (press) direction.
+  projected_area: { kind: 'measurement', key: 'projected_area', label: 'projected area along the die direction' },
+  parting_perimeter: { kind: 'measurement', key: 'parting_perimeter', label: 'parting line' },
+  die_depth: { kind: 'measurement', key: 'die_depth', label: 'depth along the die direction' },
+  plan_length: { kind: 'measurement', key: 'plan_length', label: 'plan length' },
+  plan_width: { kind: 'measurement', key: 'plan_width', label: 'plan width' },
 };
 
 /** Every face of the part, from the face map: what a volume or a surface is measured over. Null without a face map (nothing to draw). */

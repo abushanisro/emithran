@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BOMItem, CostSummaryDto } from '@/lib/api/hooks/useBOMItems';
 import { buildProcessTree, collectLeaves, findNode, type ProcessTreeNode } from '@/lib/features/process-tree';
+import { treePathForOccurrence } from '@/lib/features/tree-feature-path';
 import type { FeatureGraph, FeatureGraphSummary } from '@/lib/types/manufacturing';
 
 // Records what the process tree shows today for a part with no feature data, so the tree's choice of which process list to show cannot change unnoticed.
@@ -81,6 +82,18 @@ describe('buildProcessTree: a forged part', () => {
 
   it('the forming step lists every feature, grouped by type, each highlighting its faces', () => {
     expect(rows('Hammer')).toEqual(['PlanarFace ×2', 'SimpleHole ×1']);
+  });
+
+  it('a type row opens into one row per feature, each highlighting only its own faces', () => {
+    const hammer = steps.find((s) => s.label === 'Hammer')!;
+    const planar = hammer.children!.find((c) => c.label === 'PlanarFace ×2')!;
+    expect(planar.children!.map((c) => c.label)).toEqual(['PlanarFace 1', 'PlanarFace 2']);
+    expect(planar.children![1]!.v2Occurrences).toEqual([{ featureId: 'planarface', occurrenceIndex: 1 }]);
+  });
+
+  it('a face picked on the 3D model selects the row of its own feature', () => {
+    const path = treePathForOccurrence(tree, 'planarface', 1)!;
+    expect(findNode(tree, path.at(-1)!)!.label).toBe('PlanarFace 2');
   });
 
   it('a step on the whole part shows the part, highlighted whole; never its time as text', () => {

@@ -16,6 +16,13 @@ export const CAD_EVIDENCE_KEYS = [
   'part_volume',
   // The part's whole surface (a casting's area for coating and blasting): every face.
   'part_surface',
+  // A part measured along its die (or press) direction, a forging or a powder metal part (cad-engine forging/feature_extractor.py
+  // die_measurements): the faces seen along it, those on the parting line, and those its depth and plan extents are measured between.
+  'projected_area',
+  'parting_perimeter',
+  'die_depth',
+  'plan_length',
+  'plan_width',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];

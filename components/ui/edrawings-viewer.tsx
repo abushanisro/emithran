@@ -54,6 +54,7 @@ import { FlatPatternView } from './flat-pattern-view';
 import { MeasurementOverlay } from './measurement-overlay';
 import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
 import { getResultColors } from './measurement-overlay';
+import { CLICK_MAX_DRAG_PX, MODEL_PICK_HOLD_MS, centreOf, zoomOnto } from '@/lib/viewer/feature-zoom';
 import { MeasurementPanel } from './measurement-panel';
 import type { FlatPatternBlank } from '@/lib/types/manufacturing';
 
@@ -1203,32 +1204,36 @@ function VertexHighlight({ point, color, size }: {
 // triggerKey encodes what's selected (featureId + occurrence index) so the effect re-fires
 // whenever the selection changes, not just when the feature type changes.
 // cx/cy/viewSpan are read from refs at fire time to avoid stale closures.
+// Brings a feature selected in a tree or a card into view: the camera aims at its centre (in 3D) from the distance its size needs, keeping the
+// direction the engineer was looking (lib/viewer/feature-zoom.ts). A feature picked on the model itself is already in view: the selection that
+// pick causes does not move the camera (modelPickAtRef), or the part would jump from under the cursor.
 function FeatureZoomEffect({
   triggerKey,
-  cx,
-  cy,
+  focus,
   viewSpan,
+  modelPickAtRef,
 }: {
   triggerKey: string | undefined;
-  cx: number;
-  cy: number;
+  focus: [number, number, number];
   viewSpan: number;
+  modelPickAtRef?: React.MutableRefObject<number> | undefined;
 }) {
   const { camera, controls } = useThree();
-  const cxRef = React.useRef(cx);
-  const cyRef = React.useRef(cy);
+  const focusRef = React.useRef(focus);
   const spanRef = React.useRef(viewSpan);
-  cxRef.current = cx;
-  cyRef.current = cy;
+  focusRef.current = focus;
   spanRef.current = viewSpan;
 
   useEffect(() => {
     if (!triggerKey || !controls || !('target' in controls)) return;
+    if (modelPickAtRef && performance.now() - modelPickAtRef.current < MODEL_PICK_HOLD_MS) return;
     const span = Math.max(spanRef.current, 8);
     const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
     const dist = (span / (2 * Math.tan(fov / 2))) * 1.8;
-    (controls as any).target.set(cxRef.current, cyRef.current, 0);
-    camera.position.set(cxRef.current, cyRef.current, dist);
+    const t = (controls as any).target as THREE.Vector3;
+    const next = zoomOnto([camera.position.x, camera.position.y, camera.position.z], [t.x, t.y, t.z], focusRef.current, dist);
+    t.set(...next.target);
+    camera.position.set(...next.position);
     (controls as any).update();
   }, [triggerKey, camera, controls]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2666,6 +2671,8 @@ function STLModel({
           userData={{ isPrimaryModel: true }}
           visible={!isExploded || explodedParts.length === 0}
           onClick={(e) => {
+            // A press that moved (rotating or panning the view) and ended on the part is not a click on it.
+            if (e.delta > CLICK_MAX_DRAG_PX) return;
             // Heatmap inspector — fires when heatmap is active (takes priority over measurement)
             if (heatmapActive && onHeatmapInspect && e.intersections.length > 0) {
               e.stopPropagation();
@@ -2921,7 +2928,7 @@ function Scene({
   occurrenceFaceIndices, groupFaceIndices,
   riskGroups, selectedOccurrenceColor, groupHighlightColor,
   heatmapActive, heatmapSources, heatmapNormalization, heatmapRiskValuesRef, onHeatmapInspect, onTrianglePick,
-  onLoadStatus,
+  onLoadStatus, modelPickAtRef,
 }: {
   fileUrl: string; modelColor: string; showGrid: boolean;
   viewPosition: [number, number, number]; autoFit: boolean; fitCenter: [number, number, number];
@@ -2957,6 +2964,8 @@ function Scene({
   heatmapNormalization?: HeatmapNormalization | undefined;
   heatmapRiskValuesRef?: React.RefObject<Float32Array | null> | undefined;
   onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
+  /** When a feature was last picked on the model (performance.now()): the selection it causes does not move the camera. */
+  modelPickAtRef?: React.MutableRefObject<number> | undefined;
   onTrianglePick?: ((triangleIndex: number) => void) | undefined;
   onLoadStatus: (status: ModelLoadStatus) => void;
 }) {
@@ -2993,11 +3002,11 @@ function Scene({
         const selOcc = selectedOccurrenceIndex !== null
           ? highlightOccurrences.occurrences[selectedOccurrenceIndex]
           : null;
-        let cx = 0, cy = 0, viewSpan = 80;
+        let focus: [number, number, number] = [0, 0, 0];
+        let viewSpan = 80;
         let triggerKey: string;
         if (selOcc) {
-          cx = selOcc.centroid[0];
-          cy = selOcc.centroid[1];
+          focus = [selOcc.centroid[0], selOcc.centroid[1], selOcc.centroid[2] ?? 0];
           const d = highlightOccurrences.diameter_mm;
           const r = highlightOccurrences.radius_mm;
           const sizeHint = d ? d * 4 : r ? r * Math.PI * 3 : 40;
@@ -3005,14 +3014,12 @@ function Scene({
           triggerKey = `${highlightOccurrences.id}#${selectedOccurrenceIndex}`;
         } else {
           const b = highlightOccurrences.bbox_centered;
-          if (b) {
-            cx = (b.x_min + b.x_max) / 2;
-            cy = (b.y_min + b.y_max) / 2;
-            viewSpan = Math.max(b.x_max - b.x_min, b.y_max - b.y_min, 8);
-          }
+          // The centre of the occurrences themselves, in 3D (the bbox is only in plan); its spread sizes the view.
+          focus = centreOf(highlightOccurrences.occurrences) ?? (b ? [(b.x_min + b.x_max) / 2, (b.y_min + b.y_max) / 2, 0] : focus);
+          if (b) viewSpan = Math.max(b.x_max - b.x_min, b.y_max - b.y_min, 8);
           triggerKey = `${highlightOccurrences.id}#all`;
         }
-        return <FeatureZoomEffect triggerKey={triggerKey} cx={cx} cy={cy} viewSpan={viewSpan} />;
+        return <FeatureZoomEffect triggerKey={triggerKey} focus={focus} viewSpan={viewSpan} modelPickAtRef={modelPickAtRef} />;
       })()}
 
       {/* Hole disc fill + HAZ ring — context-aware, reads featureType+sheetThickness from FeatureOverlayCtx */}
@@ -3225,12 +3232,15 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
   // face_id → FaceMapEntry lookup for O(1) triangle range access
   // Plain click on the model -> the B-Rep face under it (face_map triangle
   // ranges), so a host page can select the feature that owns that face.
+  const modelPickAtRef = useRef(0);
   const pickTriangle = useMemo(() => {
     if (!onBrepFacePick || !faceMap?.length) return undefined;
     const sorted = [...faceMap].sort((a, b) => a.tri_start - b.tri_start);
     return (triangleIndex: number) => {
       const faceId = faceIdForTriangle(sorted, triangleIndex);
-      if (faceId != null) onBrepFacePick(faceId);
+      if (faceId == null) return;
+      modelPickAtRef.current = performance.now();
+      onBrepFacePick(faceId);
     };
   }, [onBrepFacePick, faceMap]);
 
@@ -4143,6 +4153,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               heatmapRiskValuesRef={heatmapRiskValuesRef}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
               {...(pickTriangle ? { onTrianglePick: pickTriangle } : {})}
+              modelPickAtRef={modelPickAtRef}
               onLoadStatus={setModelLoadStatus}
             />
             {measureMode !== 'IDLE' && (

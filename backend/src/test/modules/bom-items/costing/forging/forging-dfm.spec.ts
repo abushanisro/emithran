@@ -55,6 +55,12 @@ describe('forging DFM on the real reference rules', () => {
     const holeDraft = r.findings.filter((x) => x.rule === 'InsufficientDraftAngle');
     expect(holeDraft.map((x) => [x.severity, x.faces])).toEqual([['major', [9]]]);
     expect(holeDraft[0]!.label).toMatch(/forged hole wall/);
+    // Two checks of one rule: each finding names its own, so the Validation list keys and highlights each row by it (a duplicate React key
+    // "InsufficientDraftAngle" before).
+    expect(holeDraft[0]!.check).toBe('Draft in forged holes');
+    const names = r.checks.filter((c) => c.rule === 'InsufficientDraftAngle').map((c) => c.name);
+    expect(names).toEqual(['Draft on walls', 'Draft in forged holes']);
+    expect(new Set(r.checks.map((c) => `${c.rule}:${c.name}`)).size).toBe(r.checks.length);
   });
 
   it('radii: a fillet under 5.84 mm or an inside edge with none, a corner under 2.79 mm or an outside edge with none (steel)', () => {
