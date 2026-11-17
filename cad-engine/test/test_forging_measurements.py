@@ -103,6 +103,14 @@ def test_flange_is_forged_along_its_bore_and_the_bore_is_a_hole_along_the_die_di
     assert hole["diameter_mm"] == pytest.approx(30.0, abs=0.01)
     assert hole["depth_mm"] == pytest.approx(20.0, abs=0.05)
     assert hole["angle_to_die_deg"] == pytest.approx(0.0, abs=0.5)
+    # The bore is also a hole feature, read by the tolerances and the machining after forging as every other analysis's holes are.
+    [feature] = out["feature_graph_v2"]["features"]
+    assert (feature["feature_type"], feature["variant"]) == ("SimpleHole", "through")
+    [occ] = feature["occurrences"]
+    assert occ["diameter_mm"] == pytest.approx(30.0, abs=0.01)
+    assert occ["depth_mm"] == pytest.approx(20.0, abs=0.05)
+    assert occ["face_ids"] == hole["face_ids"]
+    assert occ["angle_to_die_deg"] == pytest.approx(0.0, abs=0.5)
 
 
 def test_a_side_groove_is_an_undercut_when_the_engineer_fixes_the_die_direction_across_it():

@@ -5,6 +5,7 @@ import type { RouteId } from './route-comparison.dto';
 import { getCuttingRouteIds, getFormingRouteIds, getMachiningRouteIds } from '../costing/shared/core/manufacturing-process-registry';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
 import { DIE_CASTING_PROCESSES, dieCastingRouteId } from '../costing/casting/die-casting-process-choice';
+import { FORGING_ROUTE_IDS } from '../costing/forging/forging-route-comparison';
 
 // The locations this system holds real rate and material-cost data for, taken
 // from LOCATION_INFO itself so the validator can never drift from the table
@@ -25,6 +26,8 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   // The other molding processes, each priced by its own engine in the route comparison; apply still refuses one that is not feasible (material or process not compatible, no machine rate)
   ...OTHER_MOLDING_ROUTE_IDS,
   ...DIE_CASTING_PROCESSES.map(dieCastingRouteId),
+  // Each forging route, priced by the forging engine (forging-route-comparison.ts).
+  ...FORGING_ROUTE_IDS,
 ];
 
 /**

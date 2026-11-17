@@ -3,16 +3,15 @@
   "processGroup": "Forging",
   "calculators": [
     {
-      "key": "forging.forged_shape",
-      "name": "Forging - Forged shape",
-      "description": "The finished part's weight, and the forging before flash: the part, the holes too small to forge (forged solid, machined afterwards) and the slug left in each pierced hole. A hole along the die direction at least minForgeableHoleDiameter across is forged and pierced; its slug is slugThicknessFactor of the hole's depth, as the reference data states. No machining stock is added: the data gives a finish allowance per machined feature, and which features are machined is decided after forging.",
+      "key": "forging.forged_volume",
+      "name": "Forging - Forged volume",
+      "description": "The metal forged for one part: the part, the flash its complexity calls for (partComplexityBasedData), and the scale the heating burns off.",
       "operations": [],
       "helper": true,
-      "output": "Forged Weight",
+      "output": "Mult Volume",
       "results": [
-        "Part Weight",
         "Forged Volume",
-        "Slug Weight"
+        "Flash Volume"
       ],
       "fields": [
         {
@@ -23,98 +22,52 @@
           }
         },
         {
-          "name": "Density",
-          "unit": "kg/m³",
+          "name": "Flash Percentage",
+          "unit": "%",
           "source": {
-            "material": "density_kg_m3"
+            "lookup": "forging_partComplexityBasedData.Hot Forging - Flash Percentage Volume"
           }
         },
         {
-          "name": "Unforged Hole Volume",
-          "unit": "mm³",
+          "name": "Scale Loss",
+          "unit": "%",
           "source": {
-            "engine": "unforged_hole_volume_mm3"
+            "engine": "scale_loss_pct"
           }
-        },
-        {
-          "name": "Pierced Hole Area",
-          "unit": "mm²",
-          "source": {
-            "engine": "pierced_hole_area_mm2"
-          }
-        },
-        {
-          "name": "Pierced Hole Depth",
-          "unit": "mm",
-          "source": {
-            "engine": "pierced_hole_depth_mm"
-          }
-        },
-        {
-          "name": "Slug Thickness Factor",
-          "unit": null,
-          "source": {
-            "variable": "slugThicknessFactor"
-          }
-        },
-        {
-          "name": "Part Weight",
-          "unit": "kg",
-          "formula": "{Part Volume} * {Density} / 1000000000"
         },
         {
           "name": "Forged Volume",
           "unit": "mm³",
-          "formula": "{Part Volume} + {Unforged Hole Volume}"
+          "formula": "{Part Volume} * (1 + {Flash Percentage} / 100)"
         },
         {
-          "name": "Slug Thickness",
-          "unit": "mm",
-          "formula": "{Slug Thickness Factor} * {Pierced Hole Depth}"
+          "name": "Flash Volume",
+          "unit": "mm³",
+          "formula": "{Forged Volume} - {Part Volume}"
         },
         {
-          "name": "Slug Weight",
-          "unit": "kg",
-          "formula": "{Pierced Hole Area} * {Slug Thickness} * {Density} / 1000000000"
-        },
-        {
-          "name": "Forged Weight",
-          "unit": "kg",
-          "formula": "{Forged Volume} * {Density} / 1000000000"
+          "name": "Mult Volume",
+          "unit": "mm³",
+          "formula": "{Forged Volume} * (1 + {Scale Loss} / 100)"
         }
       ]
     },
     {
-      "key": "forging.flash",
-      "name": "Forging - Flash",
-      "description": "The flash of a closed-die forging. Land thickness and width are the empirical rule of Neuberger and Moeckel on the forging's weight in kg (t = A + B sqrt(W) - C W, w = t (A + B exp(C W))), with the coefficients of the reference data. The flash metal (land and gutter) is the flash mass per length of parting line by forging weight recommended by the National Association of Drop Forgings for steel, scaled by density for other alloys.",
+      "key": "forging.flash_land",
+      "name": "Forging - Flash land",
+      "description": "The flash gap and land of a closed die from the forged mass (Vieregge's empirical rule, with the coefficients of the forging data): thickness = A + B x sqrt(m) - C x m, width = thickness x (A + B x e^(C x m)).",
       "operations": [],
       "helper": true,
-      "output": "Flash Weight",
+      "output": "Flash Thickness",
       "results": [
-        "Land Thickness",
-        "Land Width"
+        "Flash Width"
       ],
       "fields": [
         {
-          "name": "Forged Weight",
+          "name": "Forged Mass",
           "unit": "kg",
           "source": {
             "engine": "forged_kg"
-          }
-        },
-        {
-          "name": "Parting Perimeter",
-          "unit": "mm",
-          "source": {
-            "cad": "parting_perimeter_mm"
-          }
-        },
-        {
-          "name": "Density",
-          "unit": "kg/m³",
-          "source": {
-            "material": "density_kg_m3"
           }
         },
         {
@@ -160,116 +113,40 @@
           }
         },
         {
-          "name": "Flash per Parting Length",
-          "unit": "kg/cm",
-          "source": {
-            "lookup": "forging_tblFlashMassPerPeriphery.Flash Mass (kg / cm of periphery)"
-          }
-        },
-        {
-          "name": "Steel Density (the density the flash table is for)",
-          "unit": "kg/m³",
-          "formula": "7850"
-        },
-        {
-          "name": "Land Thickness",
+          "name": "Flash Thickness",
           "unit": "mm",
-          "formula": "{Thickness Coefficient A} + {Thickness Coefficient B} * sqrt({Forged Weight}) - {Thickness Coefficient C} * {Forged Weight}"
+          "formula": "{Thickness Coefficient A} + {Thickness Coefficient B} * sqrt({Forged Mass}) - {Thickness Coefficient C} * {Forged Mass}"
         },
         {
-          "name": "Land Width",
+          "name": "Width to Thickness",
+          "unit": null,
+          "formula": "{Width Coefficient A} + {Width Coefficient B} * exp({Width Coefficient C} * {Forged Mass})"
+        },
+        {
+          "name": "Flash Width",
           "unit": "mm",
-          "formula": "{Land Thickness} * ({Width Coefficient A} + {Width Coefficient B} * exp({Width Coefficient C} * {Forged Weight}))"
-        },
-        {
-          "name": "Flash Weight",
-          "unit": "kg",
-          "formula": "{Parting Perimeter} / 10 * {Flash per Parting Length} * {Density} / {Steel Density (the density the flash table is for)}"
+          "formula": "{Flash Thickness} * {Width to Thickness}"
         }
       ]
     },
     {
-      "key": "forging.billet",
-      "name": "Forging - Billet",
-      "description": "The metal cut for one forging: the forging, its flash and its pierced slugs, plus the scale lost in heating, which the reference data states as a percentage of the forged volume with flash (1 % heated by induction, 3 % in a gas furnace).",
+      "key": "forging.stock",
+      "name": "Forging - Bar stock",
+      "description": "The round bar the mults are sawn from: each mult is the mult volume over the bar section, a standard bar gives the whole mults that fit with a saw kerf each, and the end left over is paid by the mults.",
       "operations": [],
       "helper": true,
-      "output": "Billet Weight",
+      "output": "Material Cost",
       "results": [
-        "Billet Volume",
-        "Scale Weight"
+        "Mult Length",
+        "Mults per Bar",
+        "Bought Mass"
       ],
       "fields": [
         {
-          "name": "Forged Weight",
-          "unit": "kg",
-          "source": {
-            "engine": "forged_kg"
-          }
-        },
-        {
-          "name": "Flash Weight",
-          "unit": "kg",
-          "source": {
-            "engine": "flash_kg"
-          }
-        },
-        {
-          "name": "Slug Weight",
-          "unit": "kg",
-          "source": {
-            "engine": "slug_kg"
-          }
-        },
-        {
-          "name": "Scale Loss",
-          "unit": "%",
-          "source": {
-            "engine": "scale_loss_pct"
-          }
-        },
-        {
-          "name": "Density",
-          "unit": "kg/m³",
-          "source": {
-            "material": "density_kg_m3"
-          }
-        },
-        {
-          "name": "Scale Weight",
-          "unit": "kg",
-          "formula": "({Forged Weight} + {Flash Weight} + {Slug Weight}) * {Scale Loss} / 100"
-        },
-        {
-          "name": "Billet Weight",
-          "unit": "kg",
-          "formula": "{Forged Weight} + {Flash Weight} + {Slug Weight} + {Scale Weight}"
-        },
-        {
-          "name": "Billet Volume",
-          "unit": "mm³",
-          "formula": "{Billet Weight} / {Density} * 1000000000"
-        }
-      ]
-    },
-    {
-      "key": "forging.bar",
-      "name": "Forging - Bar",
-      "description": "The billet as a length of standard round bar, and the bar bought for it: each cut loses the saw kerf, and the remnant of the bar that is too short for another billet is shared by the billets cut from it.",
-      "operations": [],
-      "helper": true,
-      "output": "Bought Weight",
-      "results": [
-        "Billet Length",
-        "Billets per Bar",
-        "Bar Section"
-      ],
-      "fields": [
-        {
-          "name": "Billet Volume",
+          "name": "Mult Volume",
           "unit": "mm³",
           "source": {
-            "engine": "billet_volume_mm3"
+            "engine": "mult_volume_mm3"
           }
         },
         {
@@ -280,6 +157,20 @@
           }
         },
         {
+          "name": "Kerf",
+          "unit": "mm",
+          "source": {
+            "variable": "bandSawKerfWidth"
+          }
+        },
+        {
+          "name": "Standard Stock Length",
+          "unit": "mm",
+          "source": {
+            "variable": "standardStockLength"
+          }
+        },
+        {
           "name": "Density",
           "unit": "kg/m³",
           "source": {
@@ -287,136 +178,57 @@
           }
         },
         {
-          "name": "Saw Kerf",
-          "unit": "mm",
+          "name": "Bar Price",
+          "unit": "USD/kg",
           "source": {
-            "variable": "bandSawKerfWidth"
+            "material": "round_bar_unit_cost"
           }
         },
         {
-          "name": "Stock Length",
-          "unit": "mm",
-          "source": {
-            "variable": "standardStockLength"
-          }
-        },
-        {
-          "name": "Bar Section",
+          "name": "Bar Area",
           "unit": "mm²",
-          "formula": "pi / 4 * {Bar Diameter} ^ 2"
+          "formula": "pi * {Bar Diameter} ^ 2 / 4"
         },
         {
-          "name": "Billet Length",
+          "name": "Mult Length",
           "unit": "mm",
-          "formula": "{Billet Volume} / {Bar Section}"
+          "formula": "{Mult Volume} / {Bar Area}"
         },
         {
-          "name": "Billets per Bar",
+          "name": "Mults per Bar",
           "unit": null,
-          "formula": "floor({Stock Length} / ({Billet Length} + {Saw Kerf}))"
+          "formula": "max(1, floor({Standard Stock Length} / ({Mult Length} + {Kerf})))"
         },
         {
           "name": "Bought Length",
           "unit": "mm",
-          "formula": "{Stock Length} / {Billets per Bar}"
+          "formula": "{Standard Stock Length} / {Mults per Bar}"
         },
         {
-          "name": "Bought Weight",
+          "name": "Bought Mass",
           "unit": "kg",
-          "formula": "{Bought Length} * {Bar Section} * {Density} / 1000000000"
-        }
-      ]
-    },
-    {
-      "key": "forging.material_cost",
-      "name": "Forging - Material cost",
-      "description": "The bar bought for one forging at the alloy's round bar price. The flash, slugs, kerf and bar remnant are credited at the alloy's scrap value only when the reference data enables the scrap credit (enableScrapMaterialCredit); scale is lost.",
-      "operations": [],
-      "helper": true,
-      "output": "Material Cost",
-      "results": [
-        "Scrap Credit"
-      ],
-      "fields": [
-        {
-          "name": "Bought Weight",
-          "unit": "kg",
-          "source": {
-            "engine": "bought_kg"
-          }
-        },
-        {
-          "name": "Forged Weight",
-          "unit": "kg",
-          "source": {
-            "engine": "forged_kg"
-          }
-        },
-        {
-          "name": "Scale Weight",
-          "unit": "kg",
-          "source": {
-            "engine": "scale_kg"
-          }
-        },
-        {
-          "name": "Price",
-          "unit": "USD/kg",
-          "source": {
-            "material": "price_usd_per_kg"
-          }
-        },
-        {
-          "name": "Scrap Value",
-          "unit": "%",
-          "source": {
-            "material": "scrap_cost_percent"
-          }
-        },
-        {
-          "name": "Scrap Credit Enabled",
-          "unit": null,
-          "source": {
-            "engine": "scrap_credit_enabled"
-          }
-        },
-        {
-          "name": "Scrap Weight",
-          "unit": "kg",
-          "formula": "max({Bought Weight} - {Forged Weight} - {Scale Weight}, 0)"
-        },
-        {
-          "name": "Scrap Credit",
-          "unit": "USD",
-          "formula": "{Scrap Credit Enabled} * {Scrap Weight} * {Price} * {Scrap Value} / 100"
+          "formula": "{Bar Area} * {Bought Length} * 1e-9 * {Density}"
         },
         {
           "name": "Material Cost",
           "unit": "USD",
-          "formula": "{Bought Weight} * {Price} - {Scrap Credit}"
+          "formula": "{Bought Mass} * {Bar Price}"
         }
       ]
     },
     {
       "key": "forging.band_saw",
       "name": "Forging - Band saw",
-      "description": "Sawing one billet off the bar: the bar's section over the saw's cutting rate for the alloy and bar width, the billet's unloading, and the bar's loading shared by the billets cut from it.",
+      "description": "Sawing one mult off the bar: the bar's section at the cutting rate for the material and width (bandSawCutting), unloading the mult, and the bar's loading shared by the mults it gives.",
       "operations": [
         "Band Saw"
       ],
       "fields": [
         {
-          "name": "Bar Section",
-          "unit": "mm²",
+          "name": "Bar Diameter",
+          "unit": "mm",
           "source": {
-            "engine": "bar_section_mm2"
-          }
-        },
-        {
-          "name": "Billets per Bar",
-          "unit": null,
-          "source": {
-            "engine": "billets_per_bar"
+            "engine": "bar_diameter_mm"
           }
         },
         {
@@ -424,6 +236,573 @@
           "unit": "mm²/min",
           "source": {
             "lookup": "forging_bandSawCutting.Cutting Rate (mm^2 / min)"
+          }
+        },
+        {
+          "name": "Mult Unload Time",
+          "unit": "s",
+          "source": {
+            "engine": "mult_unload_s"
+          }
+        },
+        {
+          "name": "Bar Load Time",
+          "unit": "s",
+          "source": {
+            "engine": "bar_load_s"
+          }
+        },
+        {
+          "name": "Mults per Bar",
+          "unit": null,
+          "source": {
+            "engine": "mults_per_bar"
+          }
+        },
+        {
+          "name": "Cut Time",
+          "unit": "s",
+          "formula": "pi * {Bar Diameter} ^ 2 / 4 / {Cutting Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cut Time} + {Mult Unload Time} + {Bar Load Time} / {Mults per Bar}"
+        }
+      ]
+    },
+    {
+      "key": "forging.induction_heat",
+      "name": "Forging - Induction heating",
+      "description": "Heating mults to the forging temperature in a conveyor induction coil: the heat time for the material and bar diameter (inductionHeating), with as many mults in the coil at once as its length holds.",
+      "operations": [
+        "Conveyor Induction Heat"
+      ],
+      "results": [
+        "Heat Time"
+      ],
+      "fields": [
+        {
+          "name": "Bar Diameter",
+          "unit": "mm",
+          "source": {
+            "engine": "bar_diameter_mm"
+          }
+        },
+        {
+          "name": "Heat Time Coefficient",
+          "unit": "s/mm²",
+          "source": {
+            "lookup": "forging_inductionHeating.Heat Time Coefficient (s / mm^2)"
+          }
+        },
+        {
+          "name": "Coil Length",
+          "unit": "mm",
+          "source": {
+            "machine": "total_coil_length_mm"
+          }
+        },
+        {
+          "name": "Mult Length",
+          "unit": "mm",
+          "source": {
+            "engine": "mult_length_mm"
+          }
+        },
+        {
+          "name": "Heat Time",
+          "unit": "s",
+          "formula": "{Heat Time Coefficient} * {Bar Diameter} ^ 2"
+        },
+        {
+          "name": "Mults in Coil",
+          "unit": null,
+          "formula": "max(1, floor({Coil Length} / {Mult Length}))"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Heat Time} / {Mults in Coil}"
+        }
+      ]
+    },
+    {
+      "key": "forging.press_force",
+      "name": "Forging - Press force",
+      "description": "The force of the finishing blow: the hot flow stress at the forging strain rate (sigma = C x strain rate ^ m, the material's strength coefficient and strain-rate sensitivity) over the part and its flash land, times the pressure-multiplying factor of the part's complexity.",
+      "operations": [],
+      "helper": true,
+      "output": "Required Force",
+      "results": [
+        "Flow Stress",
+        "Area with Flash"
+      ],
+      "fields": [
+        {
+          "name": "Strength Coefficient",
+          "unit": "MPa",
+          "source": {
+            "material": "strength_coefficient"
+          }
+        },
+        {
+          "name": "Strain Rate Sensitivity",
+          "unit": null,
+          "source": {
+            "material": "strain_rate_sensitivity"
+          }
+        },
+        {
+          "name": "Strain Rate",
+          "unit": "1/s",
+          "source": {
+            "variable": "forgingStrainRate"
+          }
+        },
+        {
+          "name": "Pressure Factor",
+          "unit": null,
+          "source": {
+            "engine": "pressure_factor"
+          }
+        },
+        {
+          "name": "Projected Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "projected_area_mm2"
+          }
+        },
+        {
+          "name": "Parting Perimeter",
+          "unit": "mm",
+          "source": {
+            "cad": "parting_perimeter_mm"
+          }
+        },
+        {
+          "name": "Flash Width",
+          "unit": "mm",
+          "source": {
+            "engine": "flash_width_mm"
+          }
+        },
+        {
+          "name": "Flow Stress",
+          "unit": "MPa",
+          "formula": "{Strength Coefficient} * {Strain Rate} ^ {Strain Rate Sensitivity}"
+        },
+        {
+          "name": "Area with Flash",
+          "unit": "mm²",
+          "formula": "{Projected Area} + {Parting Perimeter} * {Flash Width}"
+        },
+        {
+          "name": "Required Force",
+          "unit": "kN",
+          "formula": "{Pressure Factor} * {Flow Stress} * {Area with Flash} / 1000"
+        }
+      ]
+    },
+    {
+      "key": "forging.press",
+      "name": "Forging - Press",
+      "description": "Forging the heated mult on the press: one press cycle per hit (upset, block, finish as the plant enables them), and loading and unloading the part (materialHandling by its weight).",
+      "operations": [
+        "Press"
+      ],
+      "fields": [
+        {
+          "name": "Hits",
+          "unit": null,
+          "source": {
+            "engine": "hits"
+          }
+        },
+        {
+          "name": "Press Cycle Time",
+          "unit": "s",
+          "source": {
+            "machine": "cycle_time_s"
+          }
+        },
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "source": {
+            "engine": "load_s"
+          }
+        },
+        {
+          "name": "Unload Time",
+          "unit": "s",
+          "source": {
+            "engine": "unload_s"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Hits} * {Press Cycle Time} + {Load Time} + {Unload Time}) * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "forging.trim_force",
+      "name": "Forging - Trim force",
+      "description": "The force to shear the flash off along the parting line: the material's shear strength x the parting perimeter x the flash thickness.",
+      "operations": [],
+      "helper": true,
+      "output": "Required Force",
+      "fields": [
+        {
+          "name": "Shear Strength",
+          "unit": "MPa",
+          "source": {
+            "material": "shear_strength"
+          }
+        },
+        {
+          "name": "Parting Perimeter",
+          "unit": "mm",
+          "source": {
+            "cad": "parting_perimeter_mm"
+          }
+        },
+        {
+          "name": "Flash Thickness",
+          "unit": "mm",
+          "source": {
+            "engine": "flash_thickness_mm"
+          }
+        },
+        {
+          "name": "Required Force",
+          "unit": "kN",
+          "formula": "{Shear Strength} * {Parting Perimeter} * {Flash Thickness} / 1000"
+        }
+      ]
+    },
+    {
+      "key": "forging.trim",
+      "name": "Forging - Trim",
+      "description": "Trimming the flash: one trim press stroke, and loading and unloading the part (materialHandling by its weight).",
+      "operations": [
+        "Trim"
+      ],
+      "fields": [
+        {
+          "name": "Press Cycle Time",
+          "unit": "s",
+          "source": {
+            "machine": "cycle_time_s"
+          }
+        },
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "source": {
+            "engine": "load_s"
+          }
+        },
+        {
+          "name": "Unload Time",
+          "unit": "s",
+          "source": {
+            "engine": "unload_s"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Press Cycle Time} + {Load Time} + {Unload Time}) * {Cycle Time Factor}"
+        }
+      ]
+    },
+    {
+      "key": "forging.tooling",
+      "name": "Forging - Dies",
+      "description": "The forging dies over the lifetime volume: the finishing die's cavity machined at the tool shop rate (CNC setup and roughing rate per cubic inch of cavity, the forged volume), held within the range the data says that cost is valid in; the trim die at the least valid cost the data gives; one set lasts pressToolLifeNumberOfParts.",
+      "operations": [],
+      "helper": true,
+      "output": "Cost per Part",
+      "results": [
+        "Machined Die Cost",
+        "Finish Die Cost",
+        "Die Sets",
+        "Tooling Cost"
+      ],
+      "fields": [
+        {
+          "name": "Cavity Volume",
+          "unit": "mm³",
+          "source": {
+            "engine": "forged_volume_mm3"
+          }
+        },
+        {
+          "name": "CNC Setup Time",
+          "unit": "hr",
+          "source": {
+            "variable": "cavityCNCSetupTime"
+          }
+        },
+        {
+          "name": "Roughing Rate",
+          "unit": "hr/in³",
+          "source": {
+            "variable": "roughingCNCRate"
+          }
+        },
+        {
+          "name": "Machining Rate",
+          "unit": "USD/hr",
+          "source": {
+            "engine": "tool_shop_machining_usd_per_hr"
+          }
+        },
+        {
+          "name": "Min Finish Die Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "minFinishDieCost"
+          }
+        },
+        {
+          "name": "Max Finish Die Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "maxFinishDieCost"
+          }
+        },
+        {
+          "name": "Trim Die Cost",
+          "unit": "USD",
+          "source": {
+            "variable": "minTrimDieCostWithOutMaterial"
+          }
+        },
+        {
+          "name": "Tool Life",
+          "unit": "parts",
+          "source": {
+            "variable": "pressToolLifeNumberOfParts"
+          }
+        },
+        {
+          "name": "Lifetime Volume",
+          "unit": "pcs",
+          "source": {
+            "scenario": "lifetime_volume"
+          }
+        },
+        {
+          "name": "Machined Die Cost",
+          "unit": "USD",
+          "formula": "({CNC Setup Time} + {Roughing Rate} * {Cavity Volume} / 16387.064) * {Machining Rate}"
+        },
+        {
+          "name": "Finish Die Cost",
+          "unit": "USD",
+          "formula": "min(max({Machined Die Cost}, {Min Finish Die Cost}), {Max Finish Die Cost})"
+        },
+        {
+          "name": "Die Sets",
+          "unit": null,
+          "formula": "max(1, CEIL({Lifetime Volume} / {Tool Life}))"
+        },
+        {
+          "name": "Tooling Cost",
+          "unit": "USD",
+          "formula": "{Die Sets} * ({Finish Die Cost} + {Trim Die Cost})"
+        },
+        {
+          "name": "Cost per Part",
+          "unit": "USD",
+          "formula": "{Tooling Cost} / {Lifetime Volume}"
+        }
+      ]
+    },
+    {
+      "key": "forging.furnace_heat",
+      "name": "Forging - Furnace heating",
+      "description": "Heating a load of mults to the forging temperature in a gas furnace: the heat the load takes (mass x specific heat x the rise from the plant temperature) at the furnace's rated power, shared by the mults of the load. A lower bound: the reference gives no furnace efficiency.",
+      "operations": [
+        "Preheat"
+      ],
+      "results": [
+        "Heat Time"
+      ],
+      "fields": [
+        {
+          "name": "Mult Mass",
+          "unit": "kg",
+          "source": {
+            "engine": "mult_kg"
+          }
+        },
+        {
+          "name": "Mults per Load",
+          "unit": null,
+          "source": {
+            "engine": "mults_per_load"
+          }
+        },
+        {
+          "name": "Specific Heat",
+          "unit": "J/(kg K)",
+          "source": {
+            "material": "specific_heat_capacity"
+          }
+        },
+        {
+          "name": "Forging Temperature",
+          "unit": "°C",
+          "source": {
+            "material": "forging_temperature"
+          }
+        },
+        {
+          "name": "Initial Temperature",
+          "unit": "°C",
+          "source": {
+            "variable": "preheatInitialTemperature"
+          }
+        },
+        {
+          "name": "Furnace Power",
+          "unit": "kW",
+          "source": {
+            "machine": "machine_power_kw"
+          }
+        },
+        {
+          "name": "Load Heat",
+          "unit": "J",
+          "formula": "{Mults per Load} * {Mult Mass} * {Specific Heat} * ({Forging Temperature} - {Initial Temperature})"
+        },
+        {
+          "name": "Heat Time",
+          "unit": "s",
+          "formula": "{Load Heat} / ({Furnace Power} * 1000)"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Heat Time} / {Mults per Load}"
+        }
+      ],
+      "migration": 1054
+    },
+    {
+      "key": "forging.hammer_energy",
+      "name": "Forging - Hammer energy",
+      "description": "The blow energy a hammer must deliver: the work of deforming the forged volume (flow stress at the hammer's strain rate x volume x the upset strain), times the material's impact energy factor (materialTypeFactor) and the plant's adjustment.",
+      "operations": [],
+      "helper": true,
+      "output": "Required Energy",
+      "results": [
+        "Flow Stress"
+      ],
+      "fields": [
+        {
+          "name": "Strength Coefficient",
+          "unit": "MPa",
+          "source": {
+            "material": "strength_coefficient"
+          }
+        },
+        {
+          "name": "Strain Rate Sensitivity",
+          "unit": null,
+          "source": {
+            "material": "strain_rate_sensitivity"
+          }
+        },
+        {
+          "name": "Hammer Strain Rate",
+          "unit": "1/s",
+          "source": {
+            "variable": "forgingHammerStrainRate"
+          }
+        },
+        {
+          "name": "Forged Volume",
+          "unit": "mm³",
+          "source": {
+            "engine": "forged_volume_mm3"
+          }
+        },
+        {
+          "name": "Upset Strain",
+          "unit": null,
+          "source": {
+            "engine": "upset_strain"
+          }
+        },
+        {
+          "name": "Impact Energy Factor",
+          "unit": null,
+          "source": {
+            "lookup": "forging_materialTypeFactor.Impact Energy Factor"
+          }
+        },
+        {
+          "name": "Energy Adjustment",
+          "unit": null,
+          "source": {
+            "variable": "impactEnergyFactorAdjustment"
+          }
+        },
+        {
+          "name": "Flow Stress",
+          "unit": "MPa",
+          "formula": "{Strength Coefficient} * {Hammer Strain Rate} ^ {Strain Rate Sensitivity}"
+        },
+        {
+          "name": "Required Energy",
+          "unit": "J",
+          "formula": "{Impact Energy Factor} * {Energy Adjustment} * {Flow Stress} * {Forged Volume} * {Upset Strain} / 1000"
+        }
+      ],
+      "migration": 1054,
+      "supersededBy": 1057
+    },
+    {
+      "key": "forging.hammer",
+      "name": "Forging - Hammer",
+      "description": "Forging on a die hammer: one hammer cycle per blow, the loading and unloading the hammer needs for each stage the plant enables (its handling factors), and the final unload.",
+      "operations": [
+        "Hammer"
+      ],
+      "fields": [
+        {
+          "name": "Hits",
+          "unit": null,
+          "source": {
+            "engine": "hits"
+          }
+        },
+        {
+          "name": "Hammer Cycle Time",
+          "unit": "s",
+          "source": {
+            "machine": "cycle_time_s"
           }
         },
         {
@@ -441,188 +820,109 @@
           }
         },
         {
-          "name": "Cut Time",
-          "unit": "s",
-          "formula": "{Bar Section} / {Cutting Rate} * 60"
+          "name": "Upsetting Handling Factor",
+          "unit": null,
+          "source": {
+            "machine": "upsetting_handling_factor"
+          }
         },
         {
-          "name": "Bar Load Time per Billet",
+          "name": "Blocking Handling Factor",
+          "unit": null,
+          "source": {
+            "machine": "blocking_handling_factor"
+          }
+        },
+        {
+          "name": "Finishing Handling Factor",
+          "unit": null,
+          "source": {
+            "machine": "finishing_handling_factor"
+          }
+        },
+        {
+          "name": "Upset Enabled",
+          "unit": null,
+          "source": {
+            "engine": "upset_enabled"
+          }
+        },
+        {
+          "name": "Block Enabled",
+          "unit": null,
+          "source": {
+            "engine": "block_enabled"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Handling",
           "unit": "s",
-          "formula": "max({Load and Unload Time} - {Unload Time}, 0) / {Billets per Bar}"
+          "formula": "{Load and Unload Time} * ({Upset Enabled} * {Upsetting Handling Factor} + {Block Enabled} * {Blocking Handling Factor} + {Finishing Handling Factor})"
         },
         {
           "name": "Cycle Time",
           "unit": "s",
-          "formula": "{Cut Time} + {Unload Time} + {Bar Load Time per Billet}"
+          "formula": "({Hits} * {Hammer Cycle Time} + {Handling} + {Unload Time}) * {Cycle Time Factor}"
         }
-      ]
+      ],
+      "migration": 1054
     },
     {
-      "key": "forging.induction_heat",
-      "name": "Forging - Induction heating",
-      "description": "Heating the billet to its forging temperature in a conveyor induction heater: the reference data's heating time per bar section for the alloy; billets follow each other through the coil, so one leaves every (heating time x billet length / coil length). The energy is the heat the billet takes up over the coil's efficiency.",
+      "key": "forging.mechanical_press",
+      "name": "Forging - Mechanical press",
+      "description": "Forging on a multi-station mechanical press with a transfer system: every station strikes on each stroke, at the stroke rate the reference gives for the part complexity (partComplexityBasedData).",
       "operations": [
-        "Conveyor Induction Heat"
+        "Mechanical Press"
       ],
       "fields": [
         {
-          "name": "Bar Section",
-          "unit": "mm²",
+          "name": "Strokes per Minute",
+          "unit": "1/min",
           "source": {
-            "engine": "bar_section_mm2"
+            "lookup": "forging_partComplexityBasedData.SPM-Mechanical Press with Transfer System-High Production Volume"
           }
         },
         {
-          "name": "Billet Length",
-          "unit": "mm",
+          "name": "Max Stroke Rate",
+          "unit": "1/min",
           "source": {
-            "engine": "billet_length_mm"
+            "machine": "max_stroke_rate"
           }
         },
         {
-          "name": "Billet Weight",
-          "unit": "kg",
-          "source": {
-            "engine": "billet_kg"
-          }
-        },
-        {
-          "name": "Heat Time Coefficient",
-          "unit": "s/mm²",
-          "source": {
-            "lookup": "forging_inductionHeating.Heat Time Coefficient (s / mm^2)"
-          }
-        },
-        {
-          "name": "Coil Efficiency",
-          "unit": "%",
-          "source": {
-            "lookup": "forging_inductionHeating.Induction Coil Efficiency (%)"
-          }
-        },
-        {
-          "name": "Coil Length",
-          "unit": "mm",
-          "source": {
-            "machine": "total_coil_length_mm"
-          }
-        },
-        {
-          "name": "Forging Temperature",
-          "unit": "°C",
-          "source": {
-            "material": "forging_temperature"
-          }
-        },
-        {
-          "name": "Specific Heat",
-          "unit": "J/kg·K",
-          "source": {
-            "material": "specific_heat_capacity"
-          }
-        },
-        {
-          "name": "Start Temperature",
-          "unit": "°C",
-          "source": {
-            "variable": "preheatInitialTemperature"
-          }
-        },
-        {
-          "name": "Energy Price",
-          "unit": "USD/kWh",
-          "source": {
-            "scenario": "energy_price"
-          }
-        },
-        {
-          "name": "Heating Time",
-          "unit": "s",
-          "formula": "{Heat Time Coefficient} * {Bar Section}"
-        },
-        {
-          "name": "Billets in Coil",
+          "name": "Cycle Time Factor",
           "unit": null,
-          "formula": "max({Coil Length} / {Billet Length}, 1)"
-        },
-        {
-          "name": "Energy",
-          "unit": "kWh",
-          "formula": "{Billet Weight} * {Specific Heat} * ({Forging Temperature} - {Start Temperature}) / ({Coil Efficiency} / 100) / 3600000"
-        },
-        {
-          "name": "Energy Cost",
-          "unit": "USD",
-          "formula": "{Energy} * {Energy Price}"
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
         },
         {
           "name": "Cycle Time",
           "unit": "s",
-          "formula": "{Heating Time} / {Billets in Coil}"
+          "formula": "60 / min({Strokes per Minute}, {Max Stroke Rate}) * {Cycle Time Factor}"
         }
       ],
-      "results": [
-        "Energy",
-        "Energy Cost",
-        "Heating Time"
-      ]
+      "migration": 1054
     },
     {
-      "key": "forging.load",
-      "name": "Forging - Forging load",
-      "description": "The force to close the dies on the finishing impression: load factor x flow stress x projected area with the flash land (the empirical rule of Schey, Kalpakjian and Groover). The flow stress is the alloy's strength coefficient x strain rate ^ strain rate sensitivity at forging temperature (Altan), the strain rate being the ram speed over the forging's mean height. The load factor is 6 for a simple shape with flash, 8 for a complex one and 10 for a very complex one (Groover); which of the three a part is, is taken here from the shape complexity of EN 10243-1, the forging's volume over that of its enveloping box (above 0.63, above 0.32, below). That pairing of the two published rules is eMithran's own and is not verified against production.",
+      "key": "forging.open_die_force",
+      "name": "Forging - Open die force",
+      "description": "The force to upset the mult between flat dies to the part's height: the flow stress at the press's strain rate (ram speed over height) over the part's outline, raised by friction over the diameter-to-height ratio (frictionCoefficient, shapeFactorCoefficient).",
       "operations": [],
       "helper": true,
-      "output": "Forging Load",
+      "output": "Required Force",
       "results": [
         "Flow Stress",
-        "Load Factor (unverified rule)",
-        "Shape Complexity",
         "Strain Rate"
       ],
       "fields": [
-        {
-          "name": "Projected Area",
-          "unit": "mm²",
-          "source": {
-            "cad": "projected_area_mm2"
-          }
-        },
-        {
-          "name": "Parting Perimeter",
-          "unit": "mm",
-          "source": {
-            "cad": "parting_perimeter_mm"
-          }
-        },
-        {
-          "name": "Envelope Volume",
-          "unit": "mm³",
-          "source": {
-            "cad": "envelope_volume_mm3"
-          }
-        },
-        {
-          "name": "Land Width",
-          "unit": "mm",
-          "source": {
-            "engine": "land_width_mm"
-          }
-        },
-        {
-          "name": "Forged Volume",
-          "unit": "mm³",
-          "source": {
-            "engine": "forged_volume_mm3"
-          }
-        },
-        {
-          "name": "Ram Speed",
-          "unit": "mm/s",
-          "source": {
-            "engine": "ram_speed_mm_s"
-          }
-        },
         {
           "name": "Strength Coefficient",
           "unit": "MPa",
@@ -638,24 +938,44 @@
           }
         },
         {
-          "name": "Flash Land Area",
-          "unit": "mm²",
-          "formula": "{Parting Perimeter} * {Land Width}"
+          "name": "Ram Speed",
+          "unit": "mm/s",
+          "source": {
+            "machine": "ram_speed_mm_per_s"
+          }
         },
         {
-          "name": "Loaded Area",
-          "unit": "mm²",
-          "formula": "{Projected Area} + {Flash Land Area}"
-        },
-        {
-          "name": "Mean Height",
+          "name": "Height",
           "unit": "mm",
-          "formula": "{Forged Volume} / {Projected Area}"
+          "source": {
+            "cad": "die_depth_mm"
+          }
+        },
+        {
+          "name": "Projected Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "projected_area_mm2"
+          }
+        },
+        {
+          "name": "Friction Coefficient",
+          "unit": null,
+          "source": {
+            "variable": "frictionCoefficient"
+          }
+        },
+        {
+          "name": "Shape Factor Coefficient",
+          "unit": null,
+          "source": {
+            "variable": "shapeFactorCoefficient"
+          }
         },
         {
           "name": "Strain Rate",
           "unit": "1/s",
-          "formula": "{Ram Speed} / {Mean Height}"
+          "formula": "{Ram Speed} / {Height}"
         },
         {
           "name": "Flow Stress",
@@ -663,218 +983,277 @@
           "formula": "{Strength Coefficient} * {Strain Rate} ^ {Strain Rate Sensitivity}"
         },
         {
-          "name": "Shape Complexity",
-          "unit": null,
-          "formula": "{Forged Volume} / {Envelope Volume}"
+          "name": "Diameter",
+          "unit": "mm",
+          "formula": "sqrt(4 * {Projected Area} / pi)"
         },
         {
-          "name": "Load Factor (unverified rule)",
-          "unit": null,
-          "formula": "IF({Shape Complexity} > 0.63, 6, IF({Shape Complexity} > 0.32, 8, 10))"
-        },
-        {
-          "name": "Forging Load",
+          "name": "Required Force",
           "unit": "kN",
-          "formula": "{Load Factor (unverified rule)} * {Flow Stress} * {Loaded Area} / 1000"
+          "formula": "{Flow Stress} * {Projected Area} * (1 + {Friction Coefficient} * {Shape Factor Coefficient} * {Diameter} / {Height}) / 1000"
         }
-      ]
+      ],
+      "migration": 1054
     },
     {
-      "key": "forging.press",
-      "name": "Forging - Press",
-      "description": "Forging on a press: one stroke for each impression used (upsetting and blocking when the reference data enables them, then finishing) at the press's cycle time, and the billet's loading and the forging's unloading for its weight.",
+      "key": "forging.open_die_press",
+      "name": "Forging - Open die press",
+      "description": "Upsetting the mult on an open die press: calibrating its place on the press, the ram stroke from the mult length to the part height, the tool changes of the operations (upset, and punch and pierce for a ring preform), and loading and unloading.",
       "operations": [
-        "Press"
+        "Open Die Press"
       ],
       "fields": [
         {
-          "name": "Press Cycle Time",
+          "name": "Calibration Time",
           "unit": "s",
           "source": {
-            "machine": "cycle_time_s"
+            "variable": "openDiePressCalibrationTime"
           }
         },
         {
-          "name": "Upsetting Stroke",
-          "unit": null,
+          "name": "Mult Length",
+          "unit": "mm",
           "source": {
-            "engine": "upset_enabled"
+            "engine": "mult_length_mm"
           }
         },
         {
-          "name": "Blocking Stroke",
-          "unit": null,
+          "name": "Height",
+          "unit": "mm",
           "source": {
-            "engine": "block_enabled"
+            "engine": "upset_height_mm"
+          }
+        },
+        {
+          "name": "Ram Speed",
+          "unit": "mm/s",
+          "source": {
+            "machine": "ram_speed_mm_per_s"
+          }
+        },
+        {
+          "name": "Tool Change Time",
+          "unit": "s",
+          "source": {
+            "engine": "tool_change_s"
           }
         },
         {
           "name": "Load Time",
           "unit": "s",
           "source": {
-            "lookup": "forging_materialHandling.Load Time (s)"
+            "engine": "load_s"
           }
         },
         {
           "name": "Unload Time",
           "unit": "s",
           "source": {
-            "lookup": "forging_materialHandling.Unload Time (s)"
+            "engine": "unload_s"
           }
         },
         {
-          "name": "Cycle Time Adjustment",
+          "name": "Cycle Time Factor",
           "unit": null,
           "source": {
             "variable": "cycleTimeAdjustmentFactor"
           }
         },
         {
-          "name": "Strokes",
-          "unit": null,
-          "formula": "1 + {Upsetting Stroke} + {Blocking Stroke}"
+          "name": "Stroke Time",
+          "unit": "s",
+          "formula": "max({Mult Length} - {Height}, 0) / {Ram Speed}"
         },
         {
           "name": "Cycle Time",
           "unit": "s",
-          "formula": "({Strokes} * {Press Cycle Time} + {Load Time} + {Unload Time}) * {Cycle Time Adjustment}"
+          "formula": "({Calibration Time} + {Stroke Time} + {Tool Change Time} + {Load Time} + {Unload Time}) * {Cycle Time Factor}"
         }
       ],
-      "results": [
-        "Strokes"
-      ]
+      "migration": 1054
     },
     {
-      "key": "forging.mechanical_press",
-      "name": "Forging - Mechanical press",
-      "description": "Forging on a mechanical press with a transfer between its stations: every stroke finishes one forging, so the time per forging is one stroke at the press's stroke rate. The rate is the press's highest; the reference data's stroke rate by part complexity is not used, because it does not say how the complexity score of a part is found.",
-      "operations": [
-        "Mechanical Press"
-      ],
-      "fields": [
-        {
-          "name": "Stroke Rate",
-          "unit": "1/min",
-          "source": {
-            "machine": "max_stroke_rate"
-          }
-        },
-        {
-          "name": "Cycle Time Adjustment",
-          "unit": null,
-          "source": {
-            "variable": "cycleTimeAdjustmentFactor"
-          }
-        },
-        {
-          "name": "Cycle Time",
-          "unit": "s",
-          "formula": "60 / {Stroke Rate} * {Cycle Time Adjustment}"
-        }
-      ]
-    },
-    {
-      "key": "forging.trim",
-      "name": "Forging - Trim",
-      "description": "Trimming the flash and piercing the slugs on a trim press, and the force it takes: the sheared length x the thickness sheared x the alloy's shear strength (flash: the parting line at the land thickness; slugs: the hole's circumference at the slug thickness). The shear strength is the alloy's value in the reference data, which is not a hot value: the force is on the safe side for a forging trimmed hot.",
-      "operations": [
-        "Trim"
-      ],
-      "fields": [
-        {
-          "name": "Press Cycle Time",
-          "unit": "s",
-          "source": {
-            "machine": "cycle_time_s"
-          }
-        },
-        {
-          "name": "Parting Perimeter",
-          "unit": "mm",
-          "source": {
-            "cad": "parting_perimeter_mm"
-          }
-        },
-        {
-          "name": "Land Thickness",
-          "unit": "mm",
-          "source": {
-            "engine": "land_thickness_mm"
-          }
-        },
-        {
-          "name": "Pierced Circumference",
-          "unit": "mm",
-          "source": {
-            "engine": "pierced_circumference_mm"
-          }
-        },
-        {
-          "name": "Slug Thickness",
-          "unit": "mm",
-          "source": {
-            "engine": "slug_thickness_mm"
-          }
-        },
-        {
-          "name": "Shear Strength",
-          "unit": "MPa",
-          "source": {
-            "material": "shear_strength"
-          }
-        },
-        {
-          "name": "Load Time",
-          "unit": "s",
-          "source": {
-            "lookup": "forging_materialHandling.Load Time (s)"
-          }
-        },
-        {
-          "name": "Unload Time",
-          "unit": "s",
-          "source": {
-            "lookup": "forging_materialHandling.Unload Time (s)"
-          }
-        },
-        {
-          "name": "Cycle Time Adjustment",
-          "unit": null,
-          "source": {
-            "variable": "cycleTimeAdjustmentFactor"
-          }
-        },
-        {
-          "name": "Trim Force",
-          "unit": "kN",
-          "formula": "({Parting Perimeter} * {Land Thickness} + {Pierced Circumference} * {Slug Thickness}) * {Shear Strength} / 1000"
-        },
-        {
-          "name": "Cycle Time",
-          "unit": "s",
-          "formula": "({Press Cycle Time} + {Load Time} + {Unload Time}) * {Cycle Time Adjustment}"
-        }
-      ],
-      "results": [
-        "Trim Force"
-      ]
-    },
-    {
-      "key": "forging.die_tooling",
-      "name": "Forging - Die tooling",
-      "description": "The dies of the route over the parts made in the tool's life. The reference data gives one rule, for the cavity of a die: its CNC setup and its rough machining at the tool shop's machining rate, valid between a lowest and a highest cost for the finishing die and for the blocking impression. That rule covers neither the die block nor finishing and polishing the cavity, so the result is nearly always the lowest valid cost. The trim die and the piercing die have only their lowest and highest valid cost, without a rule: they are taken at the lowest. The tooling is therefore a lower figure, not an estimate of a particular die.",
+      "key": "forging.ring_preform",
+      "name": "Forging - Ring preform",
+      "description": "The preform a ring is rolled from: the mult upset to the ring's height times ringRollingHeightFactor, punched at the least diameter the punch allows (punchedHoleDiameterToDepthRatio) and pierced, losing a slug slugThicknessFactor of its height thick.",
       "operations": [],
       "helper": true,
-      "output": "Cost per Part",
+      "output": "Preform Wall",
       "results": [
-        "Tooling Cost",
-        "Die Sets",
-        "Finish Die Cost",
-        "Blocking Die Cost",
-        "Trim Die Cost",
-        "Pierce Die Cost"
+        "Preform Height",
+        "Punch Diameter",
+        "Slug Volume",
+        "Preform Outside Diameter"
       ],
       "fields": [
+        {
+          "name": "Ring Volume",
+          "unit": "mm³",
+          "source": {
+            "cad": "volume_mm3"
+          }
+        },
+        {
+          "name": "Ring Height",
+          "unit": "mm",
+          "source": {
+            "cad": "die_depth_mm"
+          }
+        },
+        {
+          "name": "Height Factor",
+          "unit": null,
+          "source": {
+            "variable": "ringRollingHeightFactor"
+          }
+        },
+        {
+          "name": "Punch Diameter Ratio",
+          "unit": null,
+          "source": {
+            "variable": "punchedHoleDiameterToDepthRatio"
+          }
+        },
+        {
+          "name": "Slug Thickness Factor",
+          "unit": null,
+          "source": {
+            "variable": "slugThicknessFactor"
+          }
+        },
+        {
+          "name": "Preform Height",
+          "unit": "mm",
+          "formula": "{Ring Height} * {Height Factor}"
+        },
+        {
+          "name": "Punch Diameter",
+          "unit": "mm",
+          "formula": "{Punch Diameter Ratio} * {Preform Height}"
+        },
+        {
+          "name": "Slug Volume",
+          "unit": "mm³",
+          "formula": "pi * {Punch Diameter} ^ 2 / 4 * {Slug Thickness Factor} * {Preform Height}"
+        },
+        {
+          "name": "Preform Outside Diameter",
+          "unit": "mm",
+          "formula": "sqrt(4 * {Ring Volume} / (pi * {Preform Height}) + {Punch Diameter} ^ 2)"
+        },
+        {
+          "name": "Preform Wall",
+          "unit": "mm",
+          "formula": "({Preform Outside Diameter} - {Punch Diameter}) / 2"
+        }
+      ],
+      "migration": 1054
+    },
+    {
+      "key": "forging.ring_rolling",
+      "name": "Forging - Ring rolling",
+      "description": "Rolling the preform out to the ring: calibrating its place on the mill, then the mandrel closing the wall from the preform's to the ring's at the mandrel velocity for the ring's weight (tblMandrelVelocity), and loading and unloading.",
+      "operations": [
+        "Ring Rolling"
+      ],
+      "results": [
+        "Rolling Time"
+      ],
+      "fields": [
+        {
+          "name": "Calibration Time",
+          "unit": "s",
+          "source": {
+            "variable": "ringRollCalibrationTime"
+          }
+        },
+        {
+          "name": "Preform Wall",
+          "unit": "mm",
+          "source": {
+            "engine": "preform_wall_mm"
+          }
+        },
+        {
+          "name": "Ring Wall",
+          "unit": "mm",
+          "source": {
+            "engine": "ring_wall_mm"
+          }
+        },
+        {
+          "name": "Mandrel Velocity",
+          "unit": "mm/s",
+          "source": {
+            "lookup": "forging_tblMandrelVelocity.Mandrel Velocity (mm / s)"
+          }
+        },
+        {
+          "name": "Load Time",
+          "unit": "s",
+          "source": {
+            "engine": "load_s"
+          }
+        },
+        {
+          "name": "Unload Time",
+          "unit": "s",
+          "source": {
+            "engine": "unload_s"
+          }
+        },
+        {
+          "name": "Cycle Time Factor",
+          "unit": null,
+          "source": {
+            "variable": "cycleTimeAdjustmentFactor"
+          }
+        },
+        {
+          "name": "Rolling Time",
+          "unit": "s",
+          "formula": "max({Preform Wall} - {Ring Wall}, 0) / {Mandrel Velocity}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Calibration Time} + {Rolling Time} + {Load Time} + {Unload Time}) * {Cycle Time Factor}"
+        }
+      ],
+      "migration": 1054
+    },
+    {
+      "key": "forging.hammer_energy",
+      "name": "Forging - Hammer energy",
+      "description": "The blow energy a hammer must deliver: the work of deforming the forged volume (the material's flow stress at the hammer's strain rate x volume x the upset strain), times the plant's adjustment (impactEnergyFactorAdjustment). The material enters once, through its own flow law: materialTypeFactor's impact energy factor is the material's flow stress relative to carbon steel (stainless 0.59, aluminium 2.68) and is not applied again.",
+      "operations": [],
+      "helper": true,
+      "output": "Required Energy",
+      "results": [
+        "Flow Stress"
+      ],
+      "fields": [
+        {
+          "name": "Strength Coefficient",
+          "unit": "MPa",
+          "source": {
+            "material": "strength_coefficient"
+          }
+        },
+        {
+          "name": "Strain Rate Sensitivity",
+          "unit": null,
+          "source": {
+            "material": "strain_rate_sensitivity"
+          }
+        },
+        {
+          "name": "Hammer Strain Rate",
+          "unit": "1/s",
+          "source": {
+            "variable": "forgingHammerStrainRate"
+          }
+        },
         {
           "name": "Forged Volume",
           "unit": "mm³",
@@ -883,147 +1262,32 @@
           }
         },
         {
-          "name": "Blocking Impression",
+          "name": "Upset Strain",
           "unit": null,
           "source": {
-            "engine": "block_enabled"
+            "engine": "upset_strain"
           }
         },
         {
-          "name": "Pierced Holes",
+          "name": "Energy Adjustment",
           "unit": null,
           "source": {
-            "engine": "has_pierced_holes"
+            "variable": "impactEnergyFactorAdjustment"
           }
         },
         {
-          "name": "Tool Life",
-          "unit": "parts",
-          "source": {
-            "engine": "tool_life_parts"
-          }
+          "name": "Flow Stress",
+          "unit": "MPa",
+          "formula": "{Strength Coefficient} * {Hammer Strain Rate} ^ {Strain Rate Sensitivity}"
         },
         {
-          "name": "Tool Shop Machining Rate",
-          "unit": "USD/hr",
-          "source": {
-            "engine": "tool_shop_machining_usd_per_hr"
-          }
-        },
-        {
-          "name": "Lifetime Volume",
-          "unit": "parts",
-          "source": {
-            "scenario": "lifetime_volume"
-          }
-        },
-        {
-          "name": "Cavity CNC Setup",
-          "unit": "hr",
-          "source": {
-            "variable": "cavityCNCSetupTime"
-          }
-        },
-        {
-          "name": "Rough Machining Rate",
-          "unit": "hr/in³",
-          "source": {
-            "variable": "roughingCNCRate"
-          }
-        },
-        {
-          "name": "Lowest Finish Die Cost",
-          "unit": "USD",
-          "source": {
-            "variable": "minFinishDieCost"
-          }
-        },
-        {
-          "name": "Highest Finish Die Cost",
-          "unit": "USD",
-          "source": {
-            "variable": "maxFinishDieCost"
-          }
-        },
-        {
-          "name": "Lowest Blocking Die Cost",
-          "unit": "USD",
-          "source": {
-            "variable": "minBlockingDieAddOn"
-          }
-        },
-        {
-          "name": "Highest Blocking Die Cost",
-          "unit": "USD",
-          "source": {
-            "variable": "maxBlockingDieAddOn"
-          }
-        },
-        {
-          "name": "Lowest Trim Die Cost",
-          "unit": "USD",
-          "source": {
-            "variable": "minTrimDieCostWithOutMaterial"
-          }
-        },
-        {
-          "name": "Lowest Pierce Die Cost",
-          "unit": "USD",
-          "source": {
-            "variable": "minPierceDieCostWithOutMaterial"
-          }
-        },
-        {
-          "name": "Cavity Volume",
-          "unit": "in³",
-          "formula": "{Forged Volume} / 16387.064"
-        },
-        {
-          "name": "Cavity Machining Cost",
-          "unit": "USD",
-          "formula": "({Cavity CNC Setup} + {Rough Machining Rate} * {Cavity Volume}) * {Tool Shop Machining Rate}"
-        },
-        {
-          "name": "Finish Die Cost",
-          "unit": "USD",
-          "formula": "min(max({Cavity Machining Cost}, {Lowest Finish Die Cost}), {Highest Finish Die Cost})"
-        },
-        {
-          "name": "Blocking Die Cost",
-          "unit": "USD",
-          "formula": "{Blocking Impression} * min(max({Cavity Machining Cost}, {Lowest Blocking Die Cost}), {Highest Blocking Die Cost})"
-        },
-        {
-          "name": "Trim Die Cost",
-          "unit": "USD",
-          "formula": "{Lowest Trim Die Cost}"
-        },
-        {
-          "name": "Pierce Die Cost",
-          "unit": "USD",
-          "formula": "{Pierced Holes} * {Lowest Pierce Die Cost}"
-        },
-        {
-          "name": "Die Set Cost",
-          "unit": "USD",
-          "formula": "{Finish Die Cost} + {Blocking Die Cost} + {Trim Die Cost} + {Pierce Die Cost}"
-        },
-        {
-          "name": "Die Sets",
-          "unit": null,
-          "formula": "max(1, CEIL({Lifetime Volume} / {Tool Life}))"
-        },
-        {
-          "name": "Tooling Cost",
-          "unit": "USD",
-          "formula": "{Die Sets} * {Die Set Cost}"
-        },
-        {
-          "name": "Cost per Part",
-          "unit": "USD",
-          "formula": "{Tooling Cost} / {Lifetime Volume}"
+          "name": "Required Energy",
+          "unit": "J",
+          "formula": "{Energy Adjustment} * {Flow Stress} * {Forged Volume} * {Upset Strain} / 1000"
         }
-      ]
+      ],
+      "migration": 1057,
+      "version": 2
     }
   ]
 }

@@ -9,7 +9,7 @@ Casting,Casting,51,0,0,26,1,0,0,465,shared casting code only; no process-specifi
 Casting Investment,Casting Investment,47,0,0,24,1,0,0,112,engine: costing/casting/investment
 Composites,Composites,16,0,0,10,1,0,0,87,none found
 Die Casting,Die Casting,64,11,0,0,1,0,11,237,"engine: costing/casting (hpdc-engine, gdc-engine)"
-Forging,Forging,30,0,0,10,2,0,0,202,none found
+Forging,Forging,30,0,0,10,2,0,0,202,engine: costing/forging (closed-die hot forging on a screw press, die hammer or mechanical press; open die; ring rolling; induction or gas furnace heating; machining after forging)
 Heat Treatment,Heat treatment,26,0,0,22,0,0,0,27,engine: costing/heat
 Machining,Machining,142,7,33,0,3,0,102,326,engine: costing/machining
 Multi-Spindle Machining,Multi-Spindle Maching,8,0,0,0,1,0,0,1,none found

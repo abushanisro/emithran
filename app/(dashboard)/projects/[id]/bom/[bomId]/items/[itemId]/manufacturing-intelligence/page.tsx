@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 
 import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
+import { ForgingSection } from '@/components/costing/ForgingSection';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -2607,6 +2608,8 @@ function RouteSelectionDialog({
   const isSandCast = partFamily === 'sand_cast';
   // Investment-cast parts: the investment casting route as quoted, like sand.
   const isInvestmentCast = partFamily === 'investment_cast';
+  // Forged parts: the closed-die forging route as quoted, like sand.
+  const isForged = partFamily === 'forged';
   const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
@@ -3083,7 +3086,7 @@ function RouteSelectionDialog({
     if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     // A die-casting process route: feasible ones only, the same rule apply-route
     // enforces (an infeasible row still says why).
-    if (isDieCast || isSandCast || isInvestmentCast) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
+    if (isDieCast || isSandCast || isInvestmentCast || isForged) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     return false;
   };
 
@@ -3223,6 +3226,9 @@ function RouteSelectionDialog({
               } : isSandCast ? {
                 title: 'Sand casting',
                 description: 'The sand-casting route as quoted: melting, coremaking, moulding on the cheapest capable machine, pouring, shakeout and finishing. The Cost Guide compares the moulding machines.',
+              } : isForged ? {
+                title: 'Forging',
+                description: 'Each forging route of the part: closed-die on a screw press, a die hammer or a mechanical press with transfer; open-die for a flashless shape; ring rolling for a ring. Each saws the bar into mults, heats them by induction (or in a gas furnace when too thick for the coils), forms them on the cheapest capable machine and trims the flash, with the bar and the dies.',
               } : isInvestmentCast ? {
                 title: 'Investment casting',
                 description: 'The investment casting route as quoted: wax pattern, tree, shell dips, de-waxing, burnout, pour, knockout, cut-off and finishing, each on the cheapest capable machine. Steps a tree shares are divided by its patterns.',
@@ -4517,6 +4523,18 @@ function CostGuidePanel({
                   lineLabel="die casting line"
                   override={(item.scenarioOverrides?.cavityCount as number | undefined) ?? null}
                   onChange={(v) => { patchScenarioOverrides.mutate({ id: item.id, patch: { cavityCount: v } }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'forged' && (
+              <Section title="Forging">
+                <ForgingSection
+                  forging={cgpCostSummary.forging}
+                  complexity={typeof item.scenarioOverrides?.forgingComplexity === 'number' ? item.scenarioOverrides.forgingComplexity : null}
+                  route={typeof item.scenarioOverrides?.forgingRoute === 'string' ? item.scenarioOverrides.forgingRoute : null}
+                  currency={cgpCostSummary.currency}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
               </Section>
             )}
@@ -6741,7 +6759,8 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
   const boxes = cost.coreboxTooling;
   const mold = cost.tooling;
   const pattern = cost.patternTooling;
-  if (!die && !boxes && !mold && !pattern) return null;
+  const forgingDies = cost.forgingDies;
+  if (!die && !boxes && !mold && !pattern && !forgingDies) return null;
   const money = (usd: number | null | undefined, d = 2) =>
     usd == null ? 'not priced' : `${currencySymbol}${(usd * conversionRate).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d })}`;
   const perPart = (usd: number | null | undefined) => (usd == null ? 'not amortised' : `${money(usd, 4)}/part`);
@@ -6775,6 +6794,15 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
           </summary>
           <div className="mt-2"><DieToolingSection tooling={die} /></div>
         </details>
+      )}
+      {forgingDies && (
+        <div className="rounded border border-border px-3 py-2">
+          <div className="flex items-baseline justify-between gap-2 text-xs">
+            <span className="font-medium text-foreground">Forging dies × {forgingDies.sets}</span>
+            <span className="tabular-nums">{money(forgingDies.costUsd, 0)} · {perPart(forgingDies.perPartUsd)}</span>
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">{forgingDies.detail}</p>
+        </div>
       )}
       {pattern && (
         <div className="rounded border border-border px-3 py-2">

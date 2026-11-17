@@ -44,7 +44,8 @@ CREATE TABLE public.calculator_fields (
 CREATE TABLE public.process_calculator_mappings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), process_group varchar(255) NOT NULL, process_route varchar(255) NOT NULL, operation varchar(255) NOT NULL,
   calculator_id uuid REFERENCES public.calculators(id) ON DELETE CASCADE, calculator_name varchar(255), is_active boolean DEFAULT true,
-  display_order integer DEFAULT 0, CONSTRAINT unique_process_calculator_mapping UNIQUE (process_group, process_route, operation)
+  display_order integer DEFAULT 0, updated_at timestamptz DEFAULT now(), -- migration 024; 1058 stamps the rows it activates
+  CONSTRAINT unique_process_calculator_mapping UNIQUE (process_group, process_route, operation)
 );
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Sand Casting', n, n, false FROM unnest(ARRAY['Cleaning','CO2 Cured','Cooling','Core Refractory Coat','Degating','Finishing','Horizontal Automatic','Hot Box',
@@ -55,9 +56,9 @@ INSERT INTO public.process_calculator_mappings (process_group, process_route, op
 SELECT 'Casting Investment', n, n, false FROM unnest(ARRAY['Band Saw','Belt Sand','Cooling','Drying','Flash Fire De-Waxing','Knockout','Metal Pouring','Mold Burnout',
   'Mold Preheating','Primary Sand Coating','Primary Slurry Dipping','Robotic Assist','Secondary Sand Coating','Secondary Slurry Dipping','Steam Autoclave De-Waxing',
   'Wax Pattern Molding']) AS n;
--- the forging catalog rows migration 790 seeds: migration 1051 links the forging calculators to them and fails if one is missing
+-- the forging catalog rows migration 790 seeds: migrations 1051, 1053 and 1054 link the forging calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
-SELECT 'Forging', n, n, false FROM unnest(ARRAY['Band Saw','Conveyor Induction Heat','Press','Mechanical Press','Trim']) AS n;
+SELECT 'Forging', n, n, false FROM unnest(ARRAY['Band Saw','Conveyor Induction Heat','Press','Mechanical Press','Trim','Hammer','Open Die Press','Preheat','Ring Rolling']) AS n;
 -- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;

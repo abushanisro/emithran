@@ -1116,6 +1116,18 @@ export interface CostSummaryDto {
   investmentCasting?: { patternsPerTree: number; layers: number; treeHeightMm: number; treeWidthMm: number; treesInBatch: number; primaryDips: number; backupDips: number; gatesPerPattern: number; dryingHoursPerTree: number | null; complete: boolean };
   /** Investment casting: the wax pattern die (USD, separate from the piece cost). */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
+  /** Forging: the quoted route and every other route of the part (mirrors the backend's ForgingBreakdown). */
+  forging?: {
+    route: string; routeLabel: string; complexity: number; barDiameterMm: number; multLengthMm: number; heating: 'induction' | 'furnace'; hits: number;
+    /** A force (kN), or on a hammer a blow energy (J). */
+    forming: { quantity: 'force_kn' | 'energy_j'; value: number };
+    trimForceKn: number | null;
+    flash: { thicknessMm: number; widthMm: number; volumeMm3: number } | null;
+    complete: boolean;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
+  /** Forging: the finishing and trim dies (USD, separate from the piece cost). */
+  forgingDies?: { sets: number; costUsd: number; perPartUsd: number | null; detail: string };
   /** Sand casting: the machining allowance of each machined feature (display only, never costed). */
   machiningAllowance?: MachiningAllowanceSummary;
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */

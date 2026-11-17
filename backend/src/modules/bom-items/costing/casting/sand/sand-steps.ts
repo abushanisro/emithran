@@ -273,6 +273,8 @@ export function selectAndCost(input: {
   criteria: string[];
   /** The process group of the line; sand casting when absent (the other casting routes that cost their steps the same way name their own). */
   processGroup?: string;
+  /** What one part of the route is called in the line's breakdown ("12 s per casting"); a casting when absent, a forging for the forging route. */
+  partName?: string;
 }): CostedStep {
   const processGroup = input.processGroup ?? SAND_PROCESS_GROUP;
   const warnings: string[] = [];
@@ -283,7 +285,7 @@ export function selectAndCost(input: {
     const base = line({
       process: input.process, processGroup, processRoute: input.process, machineClass: input.machineClass,
       machine: asFinishingMachine(m), sec: outcome.sec, batchSize: input.batchSize, costContext: input.costContext, warnings: [], run: outcome.run,
-      breakdown: `${input.process}: ${roundSec(outcome.sec)} s per casting${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
+      breakdown: `${input.process}: ${roundSec(outcome.sec)} s per ${input.partName ?? 'casting'}${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
     });
     // Charged beyond time: the step's energy and material, its own figure on the line (stored and shown), kept below a cent.
     const material = outcome.materialCostUsd ?? 0;

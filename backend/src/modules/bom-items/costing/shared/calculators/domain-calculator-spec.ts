@@ -64,6 +64,11 @@ export interface DomainSpecCalculator {
   version?: number;
   /** The migration that last wrote this calculator (a calculator in use is changed by a new migration, never by editing the one that created it). */
   migration?: number;
+  /**
+   * The migration that replaced this entry. A superseded entry stays in the spec only so the migration that shipped it regenerates byte-identical
+   * (an applied migration never changes); the loaders leave it out, and its replacement is the entry of the same name.
+   */
+  supersededBy?: number;
   /** The calculated field that is the calculator's result. Default "Cycle Time" (seconds), which an operation's calculator must have. */
   output?: string;
   /** Further calculated fields the engine reads besides the output (named in the spec, so the engine does not guess). */

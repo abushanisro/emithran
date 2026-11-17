@@ -11,6 +11,7 @@ import { castingProcessLabel, castingProcessOfFamily } from '../costing/casting/
 import { resolveScenarioDieCastingProcess } from '../costing/casting/die-casting-process-choice';
 import { HPDC_PROCESS } from '../costing/casting/hpdc-engine';
 import { GDC_PROCESS } from '../costing/casting/gdc-engine';
+import { forgedHoleFormability } from '../costing/forging/forging-hole-formability';
 import { evaluateMachiningNeed, type MachiningNeedResult } from '../costing/shared/tolerance/machining-need';
 import { evaluateToleranceDecisions, toleranceProfileOf, type ToleranceDecision, type ToleranceProcessProfile } from '../costing/shared/tolerance/process-profile';
 import { ToleranceReferenceService } from '../costing/shared/tolerance/tolerance-reference.service';
@@ -178,6 +179,31 @@ export class FeatureToleranceService {
     };
   }
 
+  /**
+   * A forged part: each feature judged by what forging holds (its row of the capability table, as a casting is by its process's), and a hole by
+   * whether the dies can make it at all: pierced only along the die direction and at least minForgeableHoleDiameter across (memory/Forging). Any
+   * other hole is drilled after forging.
+   */
+  private async assessForging(
+    item: Awaited<ReturnType<FeatureToleranceService['loadItem']>>, tolerances: FeatureTolerancesView,
+  ): Promise<Omit<MachiningNeedView, 'profile' | 'decisions'>> {
+    const { reference, missing } = await this.toleranceReference.get();
+    if (!reference) return { assessed: false, reason: 'Tolerance reference data not staged.', missing, result: null, instances: [] };
+    const { data } = await this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read')
+      .from('machining_reference_data').select('value')
+      .eq('category', 'variable').eq('source_version', '2026-Forging').eq('key', 'minForgeableHoleDiameter').maybeSingle();
+    const minHole = Number((data as { value?: string } | null)?.value);
+    const die = (item.feature_graph as { summary?: { forgingDieDirection?: unknown } } | null)?.summary?.forgingDieDirection;
+    const dieDir = Array.isArray(die) && die.length === 3 ? (die as number[]).map(Number) : null;
+    const result = evaluateMachiningNeed({
+      primaryProcess: 'Forging',
+      features: tolerances.instances,
+      ...reference,
+      formability: ({ instance }) => forgedHoleFormability(instance, Number.isFinite(minHole) ? minHole : null, dieDir),
+    });
+    return { assessed: true, reason: null, missing: [], result, instances: tolerances.instances.map((i) => i.instance) };
+  }
+
   private async assessNeed(
     item: Awaited<ReturnType<FeatureToleranceService['loadItem']>>, tolerances: FeatureTolerancesView, family: string, accessToken: string, primaryProcessOverride?: string,
   ): Promise<Omit<MachiningNeedView, 'profile' | 'decisions'>> {
@@ -201,6 +227,7 @@ export class FeatureToleranceService {
       });
       return { assessed: true, reason: null, missing: [], result, instances: tolerances.instances.map((i) => i.instance) };
     }
+    if (family === 'forged') return this.assessForging(item, tolerances);
     if (!casting) {
       return { assessed: false, reason: `No primary-process capability assessment for family ${family} yet.`, missing: [], result: null, instances: [] };
     }
@@ -279,6 +306,7 @@ export class FeatureToleranceService {
     return { assessed: true, reason: null, missing: [], result, instances: tolerances.instances.map((i) => i.instance) };
   }
 }
+
 
 export interface MachiningNeedView {
   assessed: boolean;
