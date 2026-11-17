@@ -373,7 +373,7 @@ export interface FaceGraph {
 
 export type MeasurementKey = 'pierce_count' | 'bend_line_length' | 'flat_pattern_area' | 'wall_thickness' | 'part_volume'
   // A part measured along its die or press direction (forging, powder metal): cad-engine forging/feature_extractor.py die_measurements.
-  | 'projected_area' | 'parting_perimeter' | 'die_depth' | 'plan_length' | 'plan_width';
+  | 'projected_area' | 'parting_perimeter' | 'die_depth' | 'plan_length' | 'plan_width' | 'tool_area' | 'trim_length' | 'skin_area' | 'layup_height' | 'footprint_length' | 'footprint_width';
 
 export interface FeatureMeasurement {
   value: number;

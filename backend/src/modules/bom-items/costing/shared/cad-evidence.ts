@@ -23,6 +23,14 @@ export const CAD_EVIDENCE_KEYS = [
   'die_depth',
   'plan_length',
   'plan_width',
+  // A composite laminate (cad-engine composites/feature_extractor.py laminate_measurements): its tool side, trimmed edge, both skins, its
+  // height along the layup direction and its footprint's length and width.
+  'tool_area',
+  'trim_length',
+  'skin_area',
+  'layup_height',
+  'footprint_length',
+  'footprint_width',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];
