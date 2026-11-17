@@ -49,6 +49,26 @@ VERSION = "forging_measurements_v1"
 SIDE_WALL_DEG = 0.3
 
 
+def hole_features(holes: Sequence[Dict[str, Any]], stable_face_ids: Dict[int, str]) -> List[Dict[str, Any]]:
+    """
+    Each hole as a feature_graph_v2 hole feature (SimpleHole, or MultiStepHole for a stepped bore), one occurrence each, with its diameter, depth,
+    axis, angle to the die direction and faces, and the faces' stable ids where every face has one.
+    """
+    out: List[Dict[str, Any]] = []
+    for h in holes:
+        occ: Dict[str, Any] = {
+            "face_ids": list(h["face_ids"]), "diameter_mm": h["diameter_mm"], "depth_mm": h["depth_mm"], "axis": h["axis"],
+            "angle_to_die_deg": h["angle_to_pull_deg"],
+        }
+        if h["feature_type"] == "MultiStepHole":
+            occ["steps"] = [{"diameter_mm": st["diameter_mm"], "depth_mm": st["length_mm"]} for st in h["steps"] if st["kind"] == "cylinder"]
+        stable = [stable_face_ids.get(f) for f in h["face_ids"]]
+        if stable and all(stable):
+            occ["source_face_stable_ids"] = stable
+        out.append({"id": h["id"], "feature_type": h["feature_type"], "variant": h["variant"], "occurrences": [occ]})
+    return out
+
+
 def plan_directions(meshes: Sequence[FaceMesh], die: Vec) -> Dict[str, Any]:
     """
     The part's long and cross directions in the parting plane (the principal directions of its surface, area-weighted, seen along the die direction)
@@ -232,10 +252,12 @@ class ForgingFeatureExtractor:
             "radii": measure_radii(shape, meshes),
             "sharp_edges": _sharp_edges(shape),
             "trapped_volumes": {"count": trapped["core_count"], "volumes": trapped["cores"]},
-            # No forging feature types: the forging reference data has no feature catalog to name them from. The face map is what highlighting needs.
+            # The holes as hole features, in the form every other analysis gives them, so the tolerances on them and the machining after
+            # forging (a hole too small to pierce, or across the die direction, is drilled) are read the same way. The forging reference data has
+            # no feature catalog of its own; the other faces are not features.
             "feature_graph_v2": {
                 "metadata": {"face_map": face_map or [], "stl_tri_total": face_map_tri_total or None, "stable_face_ids": stable_face_ids},
-                "features": [],
+                "features": hole_features(holes["holes"], stable_face_ids),
                 "conditions": [],
             },
         }

@@ -272,16 +272,18 @@ describe('the same feature and tolerance, process by process', () => {
   const records = [diameter('Diameter1@Hole1', 8, 0.01, [1])];
   const of = (family: string, primaryProcess?: string) => run({ records, family, primaryProcess });
 
-  it('14. castings price the operation; machining names it; sheet metal, moulding and an unsupported process review it', () => {
+  it('14. castings and forgings price the operation; machining names it; sheet metal and moulding review it', () => {
     const sand = of('sand_cast', 'Sand Casting');
     const hpdc = of('die_cast', 'High Pressure Die Casting');
+    const forged = of('forged', 'Forging');
     const milled = of('milled');
-    for (const r of [sand, hpdc]) {
+    for (const r of [sand, hpdc, forged]) {
       expect(decision(r, 'SimpleHole:1').decision).toBe('add_operation');
       expect(total(r)).toBeGreaterThan(0);
     }
     expect(decision(sand, 'SimpleHole:1').judgedAs).toBe('Sand Casting');
     expect(decision(hpdc, 'SimpleHole:1').judgedAs).toBe('High Pressure Die Casting');
+    expect(decision(forged, 'SimpleHole:1').judgedAs).toBe('Forging');
 
     // 16. A machined part: the finer operation is named, nothing is priced.
     expect(decision(milled, 'SimpleHole:1')).toMatchObject({ decision: 'needs_review', judgedAs: 'Drilling' });
@@ -289,7 +291,7 @@ describe('the same feature and tolerance, process by process', () => {
     expect(decision(milled, 'SimpleHole:1').reason).toMatch(/not added to the cost yet/);
     expect(price(milled).lines).toEqual([]);
 
-    for (const family of ['sheet_metal', 'plastic_molded', 'forged']) {
+    for (const family of ['sheet_metal', 'plastic_molded']) {
       const r = of(family);
       expect(r.profile.capability).toBe('not_validated');
       expect(decision(r, 'SimpleHole:1')).toMatchObject({ decision: 'needs_review', judgedAs: null, operations: [] });

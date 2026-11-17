@@ -535,6 +535,26 @@ export class AutoFillService {
         // are present when extraction_version >= im_v2_phase2 and fall back to safe
         // defaults (0 / null) so older CAD engine responses keep working unchanged.
         ...imSummary,
+        // Closed-die forging: measured along the die direction (cad-engine forging/feature_extractor.py). The forging cost reads the outline
+        // and its parting line; the rest is shown and judged against the forging reference. null = not measured, never 0.
+        ...(family.family === 'forged' ? {
+          forgingExtractionVersion:   cadMI?.features?.extraction_version ?? null,
+          forgingDieDirection:        cadMI?.features?.die_direction?.vector ?? null,
+          forgingUndercutAreaMm2:     cadMI?.features?.die_direction?.undercut_area_mm2 ?? null,
+          forgingProjectedAreaMm2:    cadMI?.features?.projected_area_mm2 ?? null,
+          forgingPartingPerimeterMm:  cadMI?.features?.parting_perimeter_mm ?? null,
+          forgingPartingFootprintMm:  cadMI?.features?.parting_footprint_mm ?? null,
+          forgingDieDepthMm:          cadMI?.features?.die_depth_mm ?? null,
+          forgingPlanLengthMm:        cadMI?.features?.plan?.length_mm ?? null,
+          forgingPlanWidthMm:         cadMI?.features?.plan?.width_mm ?? null,
+          forgingSectionMinMm:        cadMI?.features?.section_thickness?.min_mm ?? null,
+          forgingSectionMaxMm:        cadMI?.features?.section_thickness?.max_mm ?? null,
+          // The holes, with their angle to the die direction: a bore along it makes a ring; one too small or across it is machined.
+          forgingHoles: ((cadMI?.features?.holes ?? []) as Array<Record<string, unknown>>).map((h) => ({
+            diameterMm: Number(h.diameter_mm), depthMm: h.depth_mm == null ? null : Number(h.depth_mm),
+            angleToDieDeg: h.angle_to_die_deg == null ? null : Number(h.angle_to_die_deg), variant: String(h.variant ?? ''),
+          })).filter((h) => Number.isFinite(h.diameterMm) && h.diameterMm > 0),
+        } : {}),
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
         // (cadMI.features). Detection + highlighting only; process routing and
         // costing are a later phase (see the Die Casting Phase 1 plan).

@@ -1,5 +1,6 @@
 import { deriveAnalysisStatus } from '../../../modules/bom-items/analysis-status';
 import { AnalysisRunService } from '../../../modules/bom-items/services/analysis-run.service';
+import { familiesOfProcessGroup } from '../../../modules/bom-items/costing/shared/core/part-family-process-group';
 
 const V = 4;
 const graph = (family: string, version = V) => ({ classification: { family }, feature_graph_version: version });
@@ -17,6 +18,15 @@ describe('deriveAnalysisStatus: the chosen process against the analysed family',
     const s = deriveAnalysisStatus({ ...base, chosenFamilyHint: 'die_cast' }, 'none', V);
     expect(s.cad).toBe('stale');
     expect(s.missing).toEqual(['cad_features']);
+  });
+
+  // R_M-0230-033 Carriage Mount: analysed as a die casting, its Process then set to Forging. The die-casting features carry no die direction,
+  // projected area or parting line, so the part must be analysed again as a forging before it can be costed.
+  it('a part analysed as a die casting whose Process is now Forging is analysed again as a forging', () => {
+    const hint = familiesOfProcessGroup('Forging')[0]; // AutoFillService.familyHintForProcessGroup
+    expect(hint).toBe('forged');
+    const s = deriveAnalysisStatus({ file3dPath: 'p.stl', featureGraph: graph('die_cast'), chosenFamilyHint: hint }, 'none', V);
+    expect(s).toMatchObject({ cad: 'stale', ready: false, missing: ['cad_features'] });
   });
 
   it('never asks for an analysis of a part with no 3D file', () => {

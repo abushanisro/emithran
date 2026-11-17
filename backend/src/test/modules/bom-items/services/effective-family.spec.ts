@@ -41,10 +41,14 @@ describe('the process a part is costed as', () => {
   });
 
   it('is not costed when the chosen Process has no cost model, and names the processes that have one', () => {
-    const r = resolve({ scenarioOverrides: { processGroup: 'Forging' } }, 'Generic ABS, Fittings', 'milled');
+    const r = resolve({ scenarioOverrides: { processGroup: 'Powder Metal' } }, 'Generic ABS, Fittings', 'milled');
     expect(r.family).toBe('unknown');
     expect(r.familySource).toBe('process');
-    expect(r.warning).toBe('The Process "Forging" has no cost model yet, so this part is not costed. Set its Process to one that has: Casting, Casting Investment, Die Casting, Machining, Plastic Molding, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
+    expect(r.warning).toBe('The Process "Powder Metal" has no cost model yet, so this part is not costed. Set its Process to one that has: Casting, Casting Investment, Die Casting, Forging, Machining, Plastic Molding, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
+  });
+
+  it('a Forging part is a forged part, whatever its material or last analysis', () => {
+    expect(resolve({ scenarioOverrides: { processGroup: 'Forging' } }, 'Steel, AISI 4140, Medium-Carbon', 'die_cast')).toEqual({ family: 'forged', familySource: 'process', warning: null });
   });
 
   // The Back cover part again: Process set to Casting (the generic casting process). It is analysed as a die casting, the casting family whose

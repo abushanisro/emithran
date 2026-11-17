@@ -49,6 +49,7 @@ import {
   type MachineRowForSelection,
 } from '@/lib/processCatalog/hr-rates-process-selection';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
+import { calculatorSwitch, type CalculatorIdentity } from '@/lib/processCatalog/calculator-switch';
 import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
 import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
 import { useDebounce } from '@/lib/hooks/useDebounce';
@@ -1122,7 +1123,7 @@ export function ProcessCostDialog({
   // since selectedCalculatorId itself was already cleared to '' on close.
   useEffect(() => {
     setUserOverrodeCalculator(false);
-  }, [selectedGroup, selectedCategory, calculatorTarget]);
+  }, [selectedGroup, selectedCategory, calculatorTarget, operationChoice]);
 
   // Auto-select the calculator mapped to this operation when opening the Cycle
   // Time calculator — skip only if the engineer explicitly picked a different one.
@@ -1134,20 +1135,24 @@ export function ProcessCostDialog({
     }
   }, [calculatorOpen, calculatorTarget, userOverrodeCalculator, defaultCalculatorForOperation, selectedCalculatorId]);
 
-  // The line moved to another machine class (a different Category): the calculator and inputs of the class it
-  // left do not describe it. The calculator becomes the new class's own (none when it has none), and the inputs
-  // are read again for it. A calculator the engineer picked by hand for this class is kept.
-  const calculatorClassRef = useRef(selectedMachineClass);
+  // The line moved to another machine class (a different Category or machine), or the engineer picked another operation: the
+  // calculator of what it left does not describe it. The calculator becomes the catalog's for the new class and operation (none
+  // when it has none). Its inputs are filled for it by the auto-fill that runs on a calculator change (autoPopulateFromBOM); a
+  // machine change keeping the same calculator is re-derived by the machine effect below, so its inputs are kept here, not
+  // blanked with nothing to refill them. Only the engineer's own operation pick counts: the operation resolving on open is not
+  // a change, so a saved line keeps the calculator it was costed with.
+  const calculatorIdentityRef = useRef<CalculatorIdentity>({ machineClass: selectedMachineClass, operationChoice });
   useEffect(() => {
-    const previous = calculatorClassRef.current;
-    calculatorClassRef.current = selectedMachineClass;
-    if (!previous || !selectedMachineClass || previous === selectedMachineClass) return;
-    setSelectedCalculatorId(defaultCalculatorForOperation ?? '');
+    const previous = calculatorIdentityRef.current;
+    calculatorIdentityRef.current = { machineClass: selectedMachineClass, operationChoice };
+    const next = calculatorSwitch(previous, calculatorIdentityRef.current, defaultCalculatorForOperation, selectedCalculatorIdRef.current);
+    if (next == null) return;
+    setSelectedCalculatorId(next);
     setCalculatorInputs({});
     setCalculatorInputProvenance({});
     setCalculatorResults(null);
     setCalculatorError(null);
-  }, [selectedMachineClass, defaultCalculatorForOperation]);
+  }, [selectedMachineClass, operationChoice, defaultCalculatorForOperation]);
 
   // The saved machine belongs to a different class than the one now in play —
   // which, since Category drives the list, means it is not in the chosen

@@ -5,12 +5,12 @@ import { isCostedProcessGroup, processGroupOptionLabel, processGroupToFamilyHint
 // A Process with no cost model is not costed (the backend's familiesOfProcessGroup), so the Process fields mark it instead of offering it blind:
 // a part whose Process had none was priced as whatever it was last analysed as.
 describe('process groups with a cost model', () => {
-  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting'])('%s is costed', (group) => {
+  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging'])('%s is costed', (group) => {
     expect(isCostedProcessGroup(group)).toBe(true);
     expect(processGroupOptionLabel(group)).toBe(group);
   });
 
-  it.each(['Forging', 'Powder Metal', 'Part Assembly'])('%s is not, and its option says so', (group) => {
+  it.each(['Powder Metal', 'Part Assembly'])('%s is not, and its option says so', (group) => {
     expect(isCostedProcessGroup(group)).toBe(false);
     expect(processGroupOptionLabel(group)).toBe(`${group} (not costed yet)`);
   });
@@ -24,6 +24,7 @@ describe('process groups with a cost model', () => {
     expect(processGroupToFamilyHint('Casting')).toBe('die_cast');
     expect(processGroupToFamilyHint('Sheet Metal - Hydroforming')).toBe('sheet_metal');
     expect(processGroupToFamilyHint('Sand Casting')).toBe('sand_cast');
-    expect(processGroupToFamilyHint('Forging')).toBeUndefined();
+    expect(processGroupToFamilyHint('Forging')).toBe('forged');
+    expect(processGroupToFamilyHint('Powder Metal')).toBeUndefined();
   });
 });

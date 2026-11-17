@@ -9,8 +9,8 @@
 // A process with no validated capability or no validated operation selection never produces a cost: its toleranced features come back needs_review, with what is
 // missing. The same feature with the same tolerance therefore reads differently on a sand casting, a machined part and a moulded part, by design.
 //
-// Not built yet (each its own change): tolerance-dependent cycle time on machined parts, and validated rules for sheet metal, plastic moulding, forging and the
-// other processes.
+// Not built yet (each its own change): tolerance-dependent cycle time on machined parts, and validated rules for sheet metal, plastic moulding and the other
+// processes.
 
 import { isMachiningFamily } from '../../../../../domain/part-family';
 import type { InstanceRequirements, ResolvedRequirement } from './feature-tolerances';
@@ -34,6 +34,10 @@ const PROFILES: Readonly<Record<string, ToleranceProcessProfile>> = {
   investment_cast: {
     process: 'Investment Casting', ...CASTING,
     note: 'Judged by what investment casting holds; a feature it leaves short is machined after casting and priced. Its hole and wall limits are not staged, so whether a hole can be cast at all is left for review.',
+  },
+  forged: {
+    process: 'Forging', ...CASTING,
+    note: 'Judged by what forging holds (its row of the capability table); a feature it leaves short, and a hole too small to pierce or across the die direction, is machined after forging and priced.',
   },
   sheet_metal: {
     process: 'Sheet Metal', capability: 'not_validated', operation: 'none', cost: 'none',

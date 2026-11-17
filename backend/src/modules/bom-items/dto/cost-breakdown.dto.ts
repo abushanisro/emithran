@@ -676,6 +676,10 @@ export interface CostSummaryDto {
   castingMetal?: { partKg: number; chargedKg: number };
   /** Sand casting: how the route was chosen, for the Cost Guide (the user's choices stay unset until made). */
   sandCasting?: SandCastingBreakdown;
+  /** Forging: what the closed-die route decided (complexity, bar, blows, forces, flash). */
+  forging?: ForgingBreakdown;
+  /** The forging dies (finishing and trim), USD: separate from the piece cost, like the die. */
+  forgingDies?: { sets: number; costUsd: number; perPartUsd: number | null; detail: string };
   /** Investment casting: the tree the route built and its shell. */
   investmentCasting?: InvestmentCastingBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
@@ -756,6 +760,28 @@ export interface SandGatingLayout {
   risers: number;
   riserDiameterMm: number;
   riserHeightMm: number;
+}
+
+/** What the forging engine decided: the route it quotes and what each route came to. */
+export interface ForgingBreakdown {
+  /** The quoted route (forging-route.ts FORGING_ROUTES key) and its name. */
+  route: string;
+  routeLabel: string;
+  /** The part complexity score (1 to 12): the Cost Guide's, else the data's least 3D score. */
+  complexity: number;
+  barDiameterMm: number;
+  multLengthMm: number;
+  heating: 'induction' | 'furnace';
+  /** Blows (or, on a mechanical press, stations) of the forming step. */
+  hits: number;
+  /** What the forming step needs: a force (kN) or, on a hammer, a blow energy (J). On an open die press, the force on the press chosen (it depends on its ram speed). */
+  forming: { quantity: 'force_kn' | 'energy_j'; value: number };
+  trimForceKn: number | null;
+  flash: { thicknessMm: number; widthMm: number; volumeMm3: number } | null;
+  /** False while a step no machine can do is a gap. */
+  complete: boolean;
+  /** Every route: its total per part (summary currency, tooling included) when complete, or why it is not a route for the part. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
 }
 
 /** What the investment casting route decided: the wax tree every shared step is divided over, and the shell's dips. */

@@ -9,6 +9,14 @@ export interface DomainMigrationText {
   rootCause: string;
 }
 
+/**
+ * The first migration whose links also mark the catalog row active. process_calculator_mappings.is_active means "a calculator is wired", and the
+ * Process dialog and the process catalog read only active rows: a row linked but left inactive has a calculator nobody can open. The migrations
+ * before this one linked without activating; they are applied and never change, and migration 1056 activates the rows they linked. A row with no
+ * machine class stays inactive (chk_machine_class_required): the dialog finds a calculator by machine class.
+ */
+export const ACTIVATES_LINKED_MAPPINGS_FROM = 1056;
+
 const q = (v: string | number | null | undefined) =>
   v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `$q$${v}$q$`;
 
@@ -67,7 +75,7 @@ BEGIN
 ${rows.map((r) => `    (v_id, ${q(r.field_name)}, ${q(r.display_label)}, ${q(r.field_type)}, ${q(r.unit)}, ${q(r.data_source)}, ${q(r.source_table)}, ${q(r.source_field)}, ${q(r.default_value as string | null)}, ${r.display_order}, ${r.field_type !== 'calculated'})`).join(',\n')};
 ${c.operations.length === 0 ? '' : `
   UPDATE public.process_calculator_mappings
-  SET calculator_id = v_id, calculator_name = ${q(c.name)}
+  SET calculator_id = v_id, calculator_name = ${q(c.name)}${text.number >= ACTIVATES_LINKED_MAPPINGS_FROM ? ', is_active = is_active OR machine_class IS NOT NULL' : ''}
   WHERE process_group = ${q(spec.processGroup)} AND operation IN (${c.operations.map((o) => q(o)).join(', ')});
 `}END
 $calc$;
@@ -87,7 +95,7 @@ BEGIN
   LEFT JOIN public.calculators c ON c.name = e.name AND c.user_id IS NULL AND c.retired_at IS NULL
   WHERE c.id IS NULL
      OR (SELECT count(*) FROM public.calculator_fields f WHERE f.calculator_id = c.id) <> e.field_count
-     OR (SELECT count(*) FROM public.process_calculator_mappings m WHERE m.calculator_id = c.id AND m.process_group = ${q(spec.processGroup)}) <> e.mapping_count;
+     OR (SELECT count(*) FROM public.process_calculator_mappings m WHERE m.calculator_id = c.id AND m.process_group = ${q(spec.processGroup)}${text.number >= ACTIVATES_LINKED_MAPPINGS_FROM ? ' AND (m.is_active OR m.machine_class IS NULL)' : ''}) <> e.mapping_count;
   IF bad IS NOT NULL THEN
     RAISE EXCEPTION 'migration ${text.number}: calculators incomplete: %', bad;
   END IF;

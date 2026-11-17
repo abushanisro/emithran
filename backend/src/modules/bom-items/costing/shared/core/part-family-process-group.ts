@@ -17,6 +17,8 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   // (cad-engine shared/part_family.py CASTING_FAMILY_DOMAIN).
   sand_cast: 'Sand Casting',
   investment_cast: 'Casting Investment',
+  // Closed-die forging: the cad-engine measures the part along its die direction (forging/feature_extractor.py).
+  forged: 'Forging',
 };
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */

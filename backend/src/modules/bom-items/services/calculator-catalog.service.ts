@@ -7,6 +7,7 @@ import type { DomainCalculatorSpec } from '../costing/shared/calculators/domain-
 import { loadHeatTreatmentCalculatorSpec } from '../costing/heat/calculators/heat-treatment-calculator-spec';
 import { loadSandCastingCalculatorSpec } from '../costing/casting/sand/calculators/sand-casting-calculator-spec';
 import { loadInvestmentCastingCalculatorSpec } from '../costing/casting/investment/calculators/investment-casting-calculator-spec';
+import { loadForgingCalculatorSpec } from '../costing/forging/calculators/forging-calculator-spec';
 import { loadPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
 @Injectable()
@@ -178,6 +179,11 @@ export class CalculatorCatalogService {
   }
 
   /** The global, current database calculator of each calculator a domain spec names, with its fields, keyed by name; read once per request. */
+  /** The forging calculators (migration 1050) keyed by their own name, as the sand ones are: one not in the database is absent. */
+  loadForgingCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('forging-calculators', loadForgingCalculatorSpec(), accessToken);
+  }
+
   private loadSpecCalculators(cacheKey: string, spec: DomainCalculatorSpec, accessToken: string): Promise<ReferenceCalculators> {
     return cachedRead(cacheKey, async () => {
       const client = this.databaseService.getClient(accessToken);

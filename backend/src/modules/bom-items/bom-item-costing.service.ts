@@ -127,6 +127,11 @@ import { mouldingMethodOf, type MachiningAllowanceResult } from './costing/casti
 import { SandCostService, type SandCostResult } from './costing/casting/sand/sand-cost.service';
 import { InvestmentCostService, type InvestmentCostResult } from './costing/casting/investment/investment-cost.service';
 import { investmentCastingRoute } from './costing/casting/investment/investment-route-comparison';
+import { ForgingCostService } from './costing/forging/forging-cost.service';
+import type { ForgingHole } from './costing/forging/forging-route';
+import { buildForgingCostSummary } from './costing/forging/forging-cost-summary';
+import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
+import { FORGING_ROUTES } from './costing/forging/forging-route';
 import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
 import { CASTING_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
@@ -177,7 +182,7 @@ function isCastingChoice(item: { scenarioOverrides?: Record<string, unknown> | n
 }
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || castingProcessOfFamily(family) !== null;
 }
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
@@ -257,6 +262,8 @@ export class BomItemCostingService {
     private readonly machiningAllowance?: MachiningAllowanceService,
     /** The investment casting route; optional for the same reason (without it an investment casting is one named, uncosted line). */
     private readonly investmentCostService?: InvestmentCostService,
+    /** The forging route; optional for the same reason (without it a forged part is one named, uncosted line). */
+    private readonly forgingCostService?: ForgingCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -1774,7 +1781,7 @@ export class BomItemCostingService {
     requestedBatchSize: number | undefined,
     requestedLocation: string,
     requestedProductionLifeYears?: number,
-    /** Price a die-cast part on this process (route comparison); else the scenario choice / cheapest feasible. */
+    /** Price the part on this process (route comparison): a die-casting process, or a forging route (forging-route.ts FORGING_ROUTES); else the scenario choice / cheapest feasible. */
     forceDieCastingProcess?: string,
     /** Die casting: filled with the process lines in the factory local currency, before the display conversion (apply-route persists these). */
     localLinesOut?: { lines?: ProcessLineCost[]; localCurrency?: string },
@@ -2385,7 +2392,8 @@ export class BomItemCostingService {
     // auto-fill's casting* summary keys) and memory/Die Casting data price the
     // casting line; see casting-cost-summary.ts for what is and is not charged.
     const castingProcess = castingProcessOfFamily(family);
-    if (castingProcess) {
+    // A forged part shares the casting block's machining after the primary process (a feature forging leaves short, a hole it cannot pierce).
+    if (castingProcess || family === 'forged') {
       const castingWarnings = [...materialWarnings];
       const client = this.databaseService.getClient(accessToken);
       const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
@@ -2417,12 +2425,14 @@ export class BomItemCostingService {
       // need.ts), priced by its cheapest capable operation on a real HR Rates
       // machine (secondary-machining-cost.ts). No feature short = no line. It
       // depends on the casting process (its capabilities and castable holes).
+      // The primary process the part leaves for machining, as the warnings name it: a casting or a forging.
+      const nearNet = family === 'forged' ? 'forging' : 'casting';
       const priceMachiningAfter = async (primaryProcess: string | undefined) => {
         const warnings: string[] = [];
         const need = await this.featureToleranceService.getMachiningNeed(id, accessToken, primaryProcess, forceFamily);
         const neededCount = need.result?.features.filter((f) => f.verdict === 'needs_machining').length ?? 0;
         if (!need.assessed) {
-          warnings.push(`Machining after casting not assessed: ${need.reason}${need.missing.length ? ` (${need.missing.join(', ')})` : ''}`);
+          warnings.push(`Machining after ${nearNet} not assessed: ${need.reason}${need.missing.length ? ` (${need.missing.join(', ')})` : ''}`);
           return { need, warnings, secondaryMachining: null };
         }
         if (machiningChoice === false) {
@@ -2449,8 +2459,8 @@ export class BomItemCostingService {
         const setups = axisReq.principalSetups + axisReq.obliqueSetups;
         const noAxis = machined.filter((i) => !i.toolAxis).map((i) => i.label);
         const accessNotes: string[] = [];
-        if (axisReq.required == null) accessNotes.push(`Machining after casting: ${axisReq.reason} Holes and faces are costed on the 3 axis mill.`);
-        else if (noAxis.length) accessNotes.push(`Machining after casting: ${noAxis.join(', ')} ha${noAxis.length === 1 ? 's' : 've'} no single tool axis (curved or stepped): machined within the ${setups} setup${setups === 1 ? '' : 's'} the other features need.`);
+        if (axisReq.required == null) accessNotes.push(`Machining after ${nearNet}: ${axisReq.reason} Holes and faces are costed on the 3 axis mill.`);
+        else if (noAxis.length) accessNotes.push(`Machining after ${nearNet}: ${noAxis.join(', ')} ha${noAxis.length === 1 ? 's' : 've'} no single tool axis (curved or stepped): machined within the ${setups} setup${setups === 1 ? '' : 's'} the other features need.`);
         // Reorienting the part between setups: memory/Machining componentLoadTime
         // (no lifting equipment), the first row that holds the part weight and size.
         const handling: Record<string, { sec: number; name: string }> = {};
@@ -2462,7 +2472,7 @@ export class BomItemCostingService {
             .sort((a: any, b: any) => Number(a.weight_kg) - Number(b.weight_kg) || Number(a.part_max_dimension_mm) - Number(b.part_max_dimension_mm))[0] : undefined;
           const per = row ? Number(row.reorientation_time_s) : NaN;
           if (row && per > 0) handling[mill.machineClass] = { sec: per * (setups - 1), name: `Reorient ${setups - 1} × ${per} s (componentLoadTime, ≤ ${row.weight_kg} kg, ≤ ${row.part_max_dimension_mm} mm)` };
-          else accessNotes.push(`Machining after casting: part reorientation between the ${setups} setups not costed (componentLoadTime has no row for a ${partKg != null ? Math.round(partKg * 100) / 100 : '?'} kg, ${Math.round(maxDim)} mm part).`);
+          else accessNotes.push(`Machining after ${nearNet}: part reorientation between the ${setups} setups not costed (componentLoadTime has no row for a ${partKg != null ? Math.round(partKg * 100) / 100 : '?'} kg, ${Math.round(maxDim)} mm part).`);
         }
         // Bench work after machining (user decision 2026-10-04): the memory/
         // Machining Bench Operation steps, timed by its reference variables.
@@ -2511,7 +2521,7 @@ export class BomItemCostingService {
           costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
           handling,
           disclosures: [
-            ...(axisReq.required != null ? [`Machining after casting: ${setups} setup${setups === 1 ? '' : 's'} from the machined features' tool axes (${axisReq.reason}) on the ${axisReq.required.replace(/_/g, ' ')}; access is checked by feature direction, not for obstruction by other part geometry.`] : []),
+            ...(axisReq.required != null ? [`Machining after ${nearNet}: ${setups} setup${setups === 1 ? '' : 's'} from the machined features' tool axes (${axisReq.reason}) on the ${axisReq.required.replace(/_/g, ' ')}; access is checked by feature direction, not for obstruction by other part geometry.`] : []),
             ...accessNotes,
           ],
         }) };
@@ -2539,6 +2549,46 @@ export class BomItemCostingService {
         });
         return [];
       };
+
+      // ── Forging ──────────────────────────────────────────────────────────────
+      // The part measured along its die direction (cad-engine forging/feature_extractor.py, via auto-fill's forging* summary keys) and
+      // memory/Forging price every forging route (forging-route.ts); then the machining after forging, as after a casting. A forged part is the
+      // one family in this block with no casting process.
+      if (!castingProcess) {
+        const forging = this.forgingCostService
+          ? await this.forgingCostService.price({
+            client, accessToken, location, grade,
+            measurements: {
+              volumeMm3: ((item.volume ?? 0) as number) || null,
+              projectedAreaMm2: (summary.forgingProjectedAreaMm2 as number | null) ?? null,
+              partingPerimeterMm: (summary.forgingPartingPerimeterMm as number | null) ?? null,
+              dieDepthMm: (summary.forgingDieDepthMm as number | null) ?? null,
+              planLengthMm: (summary.forgingPlanLengthMm as number | null) ?? null,
+              planWidthMm: (summary.forgingPlanWidthMm as number | null) ?? null,
+              holes: Array.isArray(summary.forgingHoles) ? (summary.forgingHoles as ForgingHole[]) : [],
+            },
+            ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+            overrides: item.scenarioOverrides, batchSize, annualVolume: annualVolume ?? null, productionLifeYears: productionLifeYears ?? null,
+            usdToLocal, costContext: zeroCtx,
+          })
+          : { route: null, routes: [], gaps: [], note: null, missing: ['the forging cost service is not available'], warnings: [] };
+        const m = await priceMachiningAfter('Forging');
+        const forgingResult = {
+          ...buildForgingCostSummary({
+            forging, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings, ...m.warnings], ratesSource: RATES_SOURCE_LABEL,
+            secondaryMachining: m.secondaryMachining,
+          }),
+          ...currencyMeta,
+          drawingCadConsistency,
+        };
+        this.overrides.applyCostOverrides(forgingResult, costOverrides);
+        if (costOverrides.size > 0) forgingResult.costOverrides = Object.fromEntries(costOverrides);
+        if (localLinesOut) {
+          localLinesOut.lines = JSON.parse(JSON.stringify(forgingResult.processLines)) as ProcessLineCost[];
+          localLinesOut.localCurrency = locInfo.code;
+        }
+        return { ...this.normalizeCostSummaryToCurrency(forgingResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+      }
 
       let finishing: {
         melting: ProcessLineCost | null; trim: ProcessLineCost | null; grinding: ProcessLineCost | null;
@@ -4162,6 +4212,46 @@ export class BomItemCostingService {
     };
   }
 
+  /**
+   * A forged part's route comparison: every forging route (screw press, hammer, mechanical press, open die, ring rolling), each the full Cost
+   * Summary priced on that route, as the die-casting processes are. The recommended one is the route the quote chose, so they cannot disagree.
+   */
+  private async forgingRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = FORGING_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'forged'),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'forged')),
+    ]);
+    const routes = keys.map((key, i) => forgingRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.forging?.complete ? forgingRouteId(quote!.forging.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No forging route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
   /** A Casting part priced as each casting family; the one to quote, the note on how it was chosen, and its lines in the factory currency. */
   private async priceCastingFamilies(
     id: string, userId: string, accessToken: string,
@@ -4401,6 +4491,10 @@ export class BomItemCostingService {
     if (castingProcessOfFamily(family) === 'investment_casting') {
       return this.singleCastingRouteComparison('investment_cast', investmentCastingRoute, 'The investment casting route could not be fully costed for this part.',
         id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Forging: one complete route per forging route, each the full quote on that route (forging-route-comparison.ts).
+    if (family === 'forged') {
+      return this.forgingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
 
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
