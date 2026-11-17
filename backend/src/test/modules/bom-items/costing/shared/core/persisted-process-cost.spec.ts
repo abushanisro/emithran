@@ -1,5 +1,7 @@
 import {
   PERSISTED_PROCESS_COST_COLUMNS,
+  processCostRowInUsd,
+  processCostRowsInUsd,
   resolvePersistedProcessCost,
   sumPersistedProcessCost,
 } from '../../../../../../modules/bom-items/costing/shared/core/persisted-process-cost';
@@ -134,5 +136,54 @@ describe('sumPersistedProcessCost', () => {
 
   it('returns a clean zero for an empty generation', () => {
     expect(sumPersistedProcessCost([])).toEqual({ total: 0, storedCount: 0, fallbackCount: 0 });
+  });
+});
+
+describe('processCostRowInUsd: a record read in USD whatever currency it was stored in', () => {
+  const toUsd = (amount: number, currency: string) => {
+    if (currency !== 'INR') throw new Error(`no rate for ${currency}`);
+    return amount / 64.3455;
+  };
+  // The India band saw line of a route applied in an India factory (applyRoute writes the factory currency).
+  const indiaBandSaw = {
+    currency: 'INR', organization_id: 'org-1', machine_rate: 162.15, labor_rate: 106.17, direct_rate: 268.32, total_cost_per_part: 0.64,
+    setup_cost_per_part: '0.01', line_hourly_rate: 162.15, other_cost_per_part: null, cycle_time: 10.4, setup_time: 10.2, batch_size: 2500, scrap: 0,
+  };
+
+  it('converts every money column and nothing else: rates, costs; not times, counts or percentages', () => {
+    const r = processCostRowInUsd(indiaBandSaw, toUsd);
+    expect(r.currency).toBe('USD');
+    expect(r.machine_rate).toBeCloseTo(2.52, 2);
+    expect(r.labor_rate).toBeCloseTo(1.65, 2);
+    expect(r.line_hourly_rate).toBeCloseTo(2.52, 2);
+    expect(r.total_cost_per_part).toBeCloseTo(0.00995, 5);
+    expect(r.setup_cost_per_part).toBeCloseTo(0.01 / 64.3455, 8);
+    expect(r.other_cost_per_part).toBeNull();
+    expect([r.cycle_time, r.setup_time, r.batch_size, r.scrap]).toEqual([10.4, 10.2, 2500, 0]);
+  });
+
+  it('a USD row, or one with no currency (the pre-707 default), is returned as it is', () => {
+    const usd = { ...indiaBandSaw, currency: 'USD' };
+    expect(processCostRowInUsd(usd, toUsd)).toBe(usd);
+    const none = { ...indiaBandSaw, currency: null };
+    expect(processCostRowInUsd(none, toUsd)).toBe(none);
+  });
+
+  it('a currency with no rate fails loudly instead of passing a foreign amount on as USD', () => {
+    expect(() => processCostRowInUsd({ ...indiaBandSaw, currency: 'CNY' }, toUsd)).toThrow('no rate for CNY');
+  });
+
+  it('many rows: each with its own organization\'s rates, asked once per organization and not at all when every row is USD', async () => {
+    const asked: Array<string | null> = [];
+    const snapshotOf = async (org: string | null) => { asked.push(org); return { toUsd }; };
+    const rows = [indiaBandSaw, { ...indiaBandSaw, machine_rate: 1190.39 }, { ...indiaBandSaw, currency: 'USD' }, { ...indiaBandSaw, organization_id: null }];
+    const out = await processCostRowsInUsd(rows, snapshotOf);
+    expect(out.map((r) => r.currency)).toEqual(['USD', 'USD', 'USD', 'USD']);
+    expect(out[1]!.machine_rate).toBeCloseTo(18.5, 2);
+    expect(out[2]).toBe(rows[2]);
+    expect(asked).toEqual(['org-1', null]);
+    asked.length = 0;
+    await processCostRowsInUsd([{ ...indiaBandSaw, currency: 'USD' }], snapshotOf);
+    expect(asked).toEqual([]);
   });
 });

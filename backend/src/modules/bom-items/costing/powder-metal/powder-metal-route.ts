@@ -86,7 +86,8 @@ export interface PowderMetalRoute {
   belt: { speedMmPerMin: number; partsAcross: number; partsPerMetre: number } | null;
   /** Route lines in order, costs per part in USD. */
   lines: ProcessLineCost[];
-  material: { partKg: number; powderKg: number; utilizationPct: number; costUsd: number; runs: Record<string, ReferenceCalcRun> };
+  /** The powder bought for one part: its cost (USD, unrounded: a cents-rounded USD cost loses ~1% once converted) and its price per kg. */
+  material: { partKg: number; powderKg: number; utilizationPct: number; costUsd: number; costPerKgUsd: number; runs: Record<string, ReferenceCalcRun> };
   /** Material + process lines per part (USD); null while a line is a gap. */
   totalUsd: number | null;
   complete: boolean;
@@ -223,7 +224,7 @@ export function buildPowderMetalRoute(input: PowderMetalRouteInput): { route: Po
       compactionPressureMpa: r2(mpa), pressForceKn: r2(forceKn), fillHeightMm: r2(fillMm), compressionRatio: r2(fill.run.outputs['Compression Ratio']!),
       belt, lines,
       material: {
-        partKg: r4(partKg), powderKg: r4(powder.run.outputs['Powder Mass']!), utilizationPct: r2(100 * (utilization ?? 1)), costUsd: r2(materialCost),
+        partKg: r4(partKg), powderKg: r4(powder.run.outputs['Powder Mass']!), utilizationPct: r2(100 * (utilization ?? 1)), costUsd: materialCost, costPerKgUsd: materialCost / powder.run.outputs['Powder Mass']!,
         runs: { powder: powder.run, compactionPressure: pressure.run, pressForce: force.run, fillHeight: fill.run },
       },
       totalUsd: complete ? r2(materialCost + lines.reduce((s, l) => s + l.totalCost, 0)) : null, complete, warnings,

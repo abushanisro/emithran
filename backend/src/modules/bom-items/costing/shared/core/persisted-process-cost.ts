@@ -174,3 +174,55 @@ export function sumPersistedProcessCost(rows: readonly PersistedProcessCostRow[]
  * number starts meaning something else.
  */
 export const COST_ENGINE_CONTRACT_VERSION = 'emithran-cost-1';
+
+/** Every money column of a process_cost_records row (rates per hour, costs per part or batch). Times, counts and percentages are not money. */
+export const PROCESS_COST_MONEY_COLUMNS = [
+  'direct_rate', 'indirect_rate', 'fringe_rate', 'machine_rate', 'labor_rate', 'machine_value', 'labour_value', 'overhead_value', 'total_cost',
+  'total_cost_per_part', 'setup_cost_per_part', 'total_cycle_cost_per_part', 'total_cost_before_scrap', 'scrap_adjustment', 'total_batch_cost',
+  'line_hourly_rate', 'line_labour_rate', 'machine_cost_per_part', 'labor_cost_per_part', 'other_cost_per_part',
+] as const;
+
+/**
+ * A process_cost_records row with its money in USD, for the readers that report records in USD (the records API, the cost report).
+ *
+ * A row states its own currency (migration 707): applyRoute writes the factory's currency (cost_currency_basis 'local', P1b-iv-c), every
+ * other writer USD. A reader that took every row as USD showed an India route 64x too dear: INR 162/hr read as USD 162/hr, then converted
+ * to rupees again. `toUsd` is the request's rate snapshot (RateSnapshot.toUsd), the one the engines converted with; it throws for a currency
+ * it has no rate for, rather than passing a foreign amount on as USD. A USD row (or one with no currency, the pre-707 default) is returned
+ * as it is.
+ */
+export function processCostRowInUsd<T extends { currency?: string | null }>(row: T, toUsd: (amount: number, currency: string) => number): T {
+  const currency = row.currency?.trim().toUpperCase();
+  if (!currency || currency === 'USD') return row;
+  const rate = toUsd(1, currency);
+  const out: Record<string, unknown> = { ...row, currency: 'USD' };
+  for (const col of PROCESS_COST_MONEY_COLUMNS) {
+    const v = (row as Record<string, unknown>)[col];
+    if (v == null || v === '') continue;
+    const n = Number(v);
+    if (Number.isFinite(n)) out[col] = n * rate;
+  }
+  return out as T;
+}
+
+/**
+ * processCostRowInUsd over many rows, each with its own organization's rates (its organization_id; null, the global default rates, when it
+ * has none: the rule of exchange-rate.service.ts organizationIdOf, not imported so this module stays free of the service). `snapshotOf` is
+ * asked once per organization, and not at all when every row is already USD.
+ */
+export async function processCostRowsInUsd<T extends { currency?: string | null }>(
+  rows: T[],
+  snapshotOf: (organizationId: string | null) => Promise<{ toUsd: (amount: number, currency: string) => number }>,
+): Promise<T[]> {
+  const isUsd = (r: T) => !r.currency || r.currency.trim().toUpperCase() === 'USD';
+  if (rows.every(isUsd)) return rows;
+  const snapshots = new Map<string | null, Promise<{ toUsd: (amount: number, currency: string) => number }>>();
+  return Promise.all(rows.map(async (r) => {
+    if (isUsd(r)) return r;
+    const id = (r as { organization_id?: unknown }).organization_id;
+    const org = typeof id === 'string' && id !== '' ? id : null;
+    if (!snapshots.has(org)) snapshots.set(org, snapshotOf(org));
+    const rates = await snapshots.get(org)!;
+    return processCostRowInUsd(r, rates.toUsd);
+  }));
+}

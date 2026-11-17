@@ -111,7 +111,8 @@ import {
 import type { MachineRequirement } from './costing/shared/capability/machine-selection/physics';
 import { estimatedToolHeightMm } from './costing/shared/capability/machine-selection/press-checks';
 import { explainCandidate, fetchMachinePool } from './costing/shared/capability/machine-selection/selector';
-import type { CapabilityCheck, MachineCandidate, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
+import type { CapabilityCheck, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
+import { convertSelectionRates } from './costing/shared/capability/machine-selection/rate-from-candidate';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { RateResolutionService } from './services/rate-resolution.service';
@@ -303,29 +304,11 @@ export class BomItemCostingService {
   // never a second FX lookup, never a fabricated/guessed rate. `tooling`/
   // `injectionMolding` money fields (already USD-native, e.g. moldCostUsd) are
   // deliberately untouched — converting them again would double-convert.
-  // machine-selection/selector.ts's pickRate() reads total_machine_hour_rate
-  // straight off mhr_records — local currency, same convention as every other
-  // internal rate here — and that raw number ends up on EVERY MachineCandidate
-  // this attaches to a process line (balanced/cheapest/fastest picks, plus the
-  // alternates list). Confirmed live: normalizeCostSummaryToCurrency only ever
-  // walked the process line's OWN setupCost/runCost/totalCost/hourlyRate, never
-  // this nested machineSelection structure — so for a non-USD location these
-  // candidate rates (and the "swap machine" list built from them) stayed in
-  // local currency while everything else on the same line got converted,
-  // showing e.g. a real ₹2000/hr India CMM as "$2000.00/hr" once the
-  // now-USD-labelled response reached the frontend.
+  // The machine list beside a line (balanced/cheapest/fastest picks, alternates, ranking) carries hour rates too: they are brought into the
+  // factory currency with the line (rate-from-candidate.ts) and converted to the display currency here with the line's own money, or the
+  // "swap machine" list would show a different currency from the line it sits on.
   private convertMachineSelectionCost(ms: MachineSelectionResult | undefined, conv: (v: number) => number): MachineSelectionResult | undefined {
-    if (!ms) return ms;
-    const convCandidate = (c: MachineCandidate): MachineCandidate => ({ ...c, hourlyRate: conv(c.hourlyRate) });
-    const convRecommendation = (r: MachineRecommendation): MachineRecommendation => ({ ...r, candidate: convCandidate(r.candidate) });
-    return {
-      ...ms,
-      balanced: convRecommendation(ms.balanced),
-      cheapest: convRecommendation(ms.cheapest),
-      fastest: convRecommendation(ms.fastest),
-      alternatives: ms.alternatives.map(convCandidate),
-      ...(ms.ranking ? { ranking: ms.ranking.map((r) => ({ ...r, hourlyRate: conv(r.hourlyRate) })) } : {}),
-    };
+    return convertSelectionRates(ms, conv);
   }
 
   // The display currency for a costing response: the scenario's saved FX

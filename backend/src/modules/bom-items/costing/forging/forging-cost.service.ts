@@ -105,7 +105,7 @@ function routeToLocal(route: ForgingRoute, usdToLocal: number): ForgingRoute {
   return {
     ...route,
     lines: route.lines.map((l) => lineToLocal(l, usdToLocal)),
-    material: { ...route.material, costUsd: k(route.material.costUsd) },
+    material: { ...route.material, costUsd: route.material.costUsd * usdToLocal, costPerKgUsd: route.material.costPerKgUsd * usdToLocal },
     totalUsd: route.totalUsd != null ? k(route.totalUsd) : null,
   };
 }

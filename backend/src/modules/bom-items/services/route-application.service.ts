@@ -18,7 +18,6 @@ import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDt
 import type { CalculationTraceStep, PhysicsGap } from '../dto/cost-breakdown.dto';
 import { cyclePhasesOf } from '../costing/shared/cycle-phases';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
-import { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge, persistableCycleSec } from '../costing/shared/core/engine-kernel';
 import { RouteResultDto } from '../dto/route-comparison.dto';
 import { PersistedLineCurrency, resolvePersistedCostCurrencyBasis } from '../costing/shared/core/persisted-currency-contract';
@@ -276,7 +275,7 @@ export class RouteApplicationService {
           `real, active operation in process_calculator_mappings.`,
         );
       }
-      const rate = await this.resolveRealMachineRate(step.machineClass, location, token, rates);
+      const rate = await this.resolveRealMachineRate(step.machineClass, location, token);
       orderedLines.push({
         process: step.process,
         machineClass: step.machineClass,
@@ -292,9 +291,8 @@ export class RouteApplicationService {
     const insertedOps = await this.writeProcessLinesAsRecords(
       id, orderedLines, batchSize, location, user, token, `auto_fill_from_custom_route:${id}`,
       {
-        // resolveRealMachineRate puts every rate through rates.toUsd() before
-        // returning it, so these lines are USD whatever the factory currency
-        // is. This caller was always honest about its denomination -- only
+        // resolveRealMachineRate returns HR Rates' own USD rates, so these
+        // lines are USD whatever the factory currency is. This caller was always honest about its denomination -- only
         // applyRoute above was not.
         lineCurrency:  'USD',
         localCurrency: LOCATION_INFO[location]?.code ?? null,
@@ -323,7 +321,7 @@ export class RouteApplicationService {
   // cheapest real mhr_records row for this location, with that machine's own
   // labour rate, or null when HR Rates has no machine of the class here. No
   // benchmark or other-location substitute.
-  // Returns rate in USD, via rates.toUsd() regardless of factory currency —
+  // Returns rate in USD, as HR Rates stores it for every location —
   // which is why applyCustomRoute declares lineCurrency 'USD' when it calls
   // writeProcessLinesAsRecords (see PersistedLineCurrency).
   //
@@ -337,7 +335,6 @@ export class RouteApplicationService {
     machineClass: string,
     location: string,
     token: string,
-    rates: RateSnapshot,
   ): Promise<{ machineName: string | null; rate: number; labourRate: number | null } | null> {
     const locInfo = LOCATION_INFO[location];
     if (!locInfo) {
@@ -352,12 +349,15 @@ export class RouteApplicationService {
       .order('total_machine_hour_rate', { ascending: true })
       .limit(1);
     if (!ownRows?.length) return null;
-    // Labour is this machine's own usd_lhr_total (already USD, the currency
-    // these lines are written in). No benchmark or process-group substitute.
+    // HR Rates holds the machine hour rate and the labour (usd_lhr_total) in
+    // USD for every location, the currency these lines are written in: no
+    // conversion. Converting the rate "from local" divided an India machine's
+    // USD rate by the rupee rate a second time. No benchmark or process-group
+    // substitute.
     const lhrUsd = Number(ownRows[0].usd_lhr_total ?? 0);
     return {
       machineName: ownRows[0].machine_name ?? null,
-      rate: rates.toUsd(Number(ownRows[0].total_machine_hour_rate ?? 0), locInfo.code),
+      rate: Number(ownRows[0].total_machine_hour_rate ?? 0),
       labourRate: lhrUsd > 0 ? lhrUsd : null,
     };
   }
@@ -429,8 +429,8 @@ export class RouteApplicationService {
      * there. Never assumed -- each caller states it from a real resolved value:
      * applyRoute passes getRouteComparison's own `currency` (the display
      * currency normalizeRouteComparisonToCurrency converted those lines to),
-     * applyCustomRoute passes USD because resolveRealMachineRate puts every
-     * rate through rates.toUsd() regardless of factory.
+     * applyCustomRoute passes USD because resolveRealMachineRate returns HR
+     * Rates' own USD rates regardless of factory.
      *
      * Before migration 707 this function stamped currency:'USD' on every row
      * unconditionally. That was true only on the default path --
