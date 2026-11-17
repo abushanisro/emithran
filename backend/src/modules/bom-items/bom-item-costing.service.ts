@@ -4166,14 +4166,15 @@ export class BomItemCostingService {
   private async priceCastingFamilies(
     id: string, userId: string, accessToken: string,
     requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number, forceDieCastingProcess?: string,
-  ): Promise<{ chosen: CostSummaryResponseDto; note: string; local: { lines?: ProcessLineCost[]; localCurrency?: string } }> {
+  ): Promise<{ family: string; chosen: CostSummaryResponseDto; note: string; local: { lines?: ProcessLineCost[]; localCurrency?: string } }> {
     const families = familiesOfProcessGroup(CASTING_PROCESS_GROUP);
     const locals = families.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
     const summaries = await Promise.all(families.map((family, i) =>
       this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, forceDieCastingProcess, locals[i], family)));
     const { chosen, note } = chooseCastingFamily(families.map((family, i) => castingFamilyOption(family, summaries[i]!)));
     const at = families.indexOf(chosen.family);
-    return { chosen: summaries[at]!, note, local: locals[at]! };
+    // The family that was priced, not the summary's own: a summary that could not be priced at all (no material grade) names no family.
+    return { family: chosen.family, chosen: summaries[at]!, note, local: locals[at]! };
   }
 
   /**
@@ -4194,7 +4195,7 @@ export class BomItemCostingService {
       this.singleCastingRouteComparison('investment_cast', investmentCastingRoute, 'The investment casting route could not be fully costed for this part.', ...args, locals[2]),
     ]);
     const byFamily: Record<string, RouteComparisonResponseDto> = { die_cast: die, sand_cast: sand, investment_cast: investment };
-    const quoted = byFamily[quote.chosen.family]!;
+    const quoted = byFamily[quote.family]!;
     if (localCurrencyOut) {
       localCurrencyOut.routes = locals.flatMap((l) => l.routes ?? []);
       localCurrencyOut.localCurrency = locals.find((l) => l.localCurrency)?.localCurrency;
