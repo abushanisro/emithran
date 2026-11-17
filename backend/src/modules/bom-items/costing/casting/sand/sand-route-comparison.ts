@@ -12,7 +12,8 @@ export function sandCastingRoute(summary: CostSummaryResponseDto): RouteResultDt
   const moulding = summary.sandCasting?.mouldingProcess;
   const feasible = summary.totalCost != null;
   const gaps = findRouteDataGaps(summary.processLines);
-  const why = summary.sandCasting?.complete === false ? 'the sand route is incomplete: a step has no capable machine or data' : 'the part could not be costed';
+  // A route that could not be built at all is one uncosted line that says what kept it from being built.
+  const why = summary.sandCasting?.complete === false ? 'the sand route is incomplete: a step has no capable machine or data' : (!summary.sandCasting && gaps[0]?.reason) || 'the part could not be costed';
   return {
     routeId: SAND_CASTING_ROUTE_ID,
     routeLabel: moulding ? `Sand casting · ${moulding}` : 'Sand casting',

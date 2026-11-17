@@ -15,20 +15,29 @@ export class SandReferenceService {
 
   async get(): Promise<{ reference: SandReference | null; missing: string[] }> {
     if (this.cached) return { reference: this.cached, missing: [] };
-    // Public-read reference data with no user context.
-    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
-    const [variables, lookups] = await Promise.all([
-      db.from('machining_reference_data').select('key, value, unit_type')
-        .eq('category', 'variable').eq('source_version', SAND_CASTING_SOURCE_VERSION),
-      db.from('machining_reference_data').select('key, raw')
-        .eq('category', 'lookup_table').eq('source_version', SAND_CASTING_SOURCE_VERSION),
-    ]);
-    const error = variables.error ?? lookups.error;
-    if (error) return { reference: null, missing: [`Sand casting reference data (${error.message})`] };
-    if (!(variables.data ?? []).length && !(lookups.data ?? []).length) {
-      return { reference: null, missing: [`Sand casting reference data is not staged (source version ${SAND_CASTING_SOURCE_VERSION}, migration 853)`] };
-    }
-    this.cached = resolveSandReference({ variables: variables.data ?? [], lookups: lookups.data ?? [] });
-    return { reference: this.cached, missing: [] };
+    const read = await readStagedReference(this.database, SAND_CASTING_SOURCE_VERSION, 'Sand casting', 853);
+    if (read.reference) this.cached = read.reference;
+    return read;
   }
+}
+
+/**
+ * The staged variables and lookup tables of one reference-data source version, resolved (sand-reference.ts): the read every casting route that
+ * keeps its reference this way shares. A read error or an unstaged version is reported by name, never an empty reference.
+ */
+export async function readStagedReference(database: DatabaseService, sourceVersion: string, label: string, stagedBy: number): Promise<{ reference: SandReference | null; missing: string[] }> {
+  // Public-read reference data with no user context.
+  const db = database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+  const [variables, lookups] = await Promise.all([
+    db.from('machining_reference_data').select('key, value, unit_type')
+      .eq('category', 'variable').eq('source_version', sourceVersion),
+    db.from('machining_reference_data').select('key, raw')
+      .eq('category', 'lookup_table').eq('source_version', sourceVersion),
+  ]);
+  const error = variables.error ?? lookups.error;
+  if (error) return { reference: null, missing: [`${label} reference data (${error.message})`] };
+  if (!(variables.data ?? []).length && !(lookups.data ?? []).length) {
+    return { reference: null, missing: [`${label} reference data is not staged (source version ${sourceVersion}, migration ${stagedBy})`] };
+  }
+  return { reference: resolveSandReference({ variables: variables.data ?? [], lookups: lookups.data ?? [] }), missing: [] };
 }

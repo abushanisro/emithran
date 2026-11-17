@@ -27,9 +27,15 @@ describe('ReferenceTable', () => {
     expect(html).toMatch(/<td class="[^"]*sticky right-0[^"]*">21<\/td>/);
   });
 
-  it('wraps long text cells instead of widening the table', () => {
-    expect(html).toMatch(/<td class="[^"]*max-w-\[22rem\] whitespace-normal[^"]*">A process flag/);
-    expect(html).not.toMatch(/<td class="[^"]*whitespace-nowrap[^"]*">A process flag/);
+  it('fits every column in the panel: the table is laid out to column shares and long text wraps in its own column', () => {
+    expect(html).toContain('<table class="w-full table-fixed');
+    expect(html.match(/<col /g)).toHaveLength(5); // the row number and the four columns
+    expect(html).toMatch(/<td class="[^"]*break-words[^"]*">A process flag/);
+    expect(html).not.toMatch(/whitespace-nowrap/);
+  });
+
+  it('the pinned value cell is opaque on the row in use too, so nothing scrolled under it shows through', () => {
+    expect(html).toMatch(/<td class="[^"]*sticky right-0[^"]*bg-background[^"]*">21<\/td>/);
   });
 
   it('says in one sentence which column is picked and for which input, and marks the row in use', () => {

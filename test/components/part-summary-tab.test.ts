@@ -22,7 +22,7 @@ const BACK_COVER: PartSummary = {
   uncosted: [],
 };
 
-const html = (s: PartSummary, warnings: string[] = []) => renderToStaticMarkup(createElement(PartSummaryView, { summary: s, uncostedWarnings: warnings }));
+const html = (s: PartSummary, operations: string[] = []) => renderToStaticMarkup(createElement(PartSummaryView, { summary: s, uncostedOperations: operations }));
 const text = (markup: string) => markup.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|');
 
 describe('PartSummaryView: the six panels of the Part Summary', () => {
@@ -79,14 +79,21 @@ describe('PartSummaryView: the six panels of the Part Summary', () => {
 });
 
 describe('the banner about what failed to cost', () => {
-  it('is shown, in red and bold, when an operation carries no cost or a warning says it was not costed', () => {
-    const markup = html({ ...BACK_COVER, uncosted: ['Gate trimming'] }, ['⚠ Material Drying required — not costed']);
+  it('is shown, in red and bold, when an applied operation carries no cost or the cost names one it could not cost', () => {
+    const markup = html({ ...BACK_COVER, uncosted: ['Gate Trimming'] }, ['Material Drying']);
     expect(markup).toContain('font-bold text-red-600');
-    expect(text(markup)).toContain('Part has 2 operations that failed to cost. Gate trimming: no cost was applied.');
+    expect(text(markup)).toContain('Part has 2 operations that failed to cost: Gate Trimming, Material Drying.');
   });
 
-  it('says "an operation" for one and names nothing for warnings alone', () => {
-    expect(uncostedBanner(BACK_COVER, ['⚠ Gate Trimming required — not costed'])).toBe('Part has an operation that failed to cost. The Cost tab lists the warning for each.');
+  it('says "an operation" for one, and names it', () => {
+    expect(uncostedBanner(BACK_COVER, ['Gate Trimming'])).toBe('Part has an operation that failed to cost: Gate Trimming. The Cost tab lists the warning for each.');
+  });
+
+  // R_M-0230-032 Lead Nut Housing: every operation of its sand route costed, and the banner said one had failed, because the route's scope note
+  // reads "Patterns, core coating and core gluing are not costed". The banner now counts the operations the cost names, never the warnings' words.
+  it('counts each failed operation once, by name, from both lists', () => {
+    expect(uncostedBanner({ ...BACK_COVER, uncosted: ['Deflashing'] }, ['Gate Trimming', 'Deflashing']))
+      .toBe('Part has 2 operations that failed to cost: Deflashing, Gate Trimming. The Cost tab lists the warning for each.');
   });
 
   it('is not shown when everything costed', () => {

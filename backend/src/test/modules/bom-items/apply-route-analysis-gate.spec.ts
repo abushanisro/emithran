@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 
-import { RouteApplicationService } from '../../../modules/bom-items/services/route-application.service';
+import { RouteApplicationService, whyNoRoute } from '../../../modules/bom-items/services/route-application.service';
 
 /**
  * Applying a route writes cost records from the part's analysis. Until the analyses the part needs are finished and current, the
@@ -114,5 +114,22 @@ describe('a kept route that is no longer a route for the part', () => {
   it('refuses a route chosen by id that the part does not have', async () => {
     await expect(service().applyRoute('i', { routeId: 'sm-laser', location: 'USA' } as never, user, 't'))
       .rejects.toThrow("Route 'sm-laser' not available for this part. Available: sand-casting");
+  });
+});
+
+describe('why no route can be applied', () => {
+  // The Back cover part: Process Die Casting with a plastic left as its material. Both die-casting routes fail for the same reason, said once.
+  const alloy = 'Material "Generic ABS, Fittings" is not a die-casting alloy in Raw Materials (material group Die Casting).';
+  const route = (routeLabel: string, warning: string | null, gap?: { process: string; reason: string }) =>
+    ({ routeLabel, capability: { warnings: warning ? [warning] : [] }, dataGaps: gap ? [{ ...gap, machineClass: 'x' }] : [] }) as never;
+
+  it('names what each route is missing, the same reason once', () => {
+    expect(whyNoRoute([route('High Pressure Die Casting', alloy), route('Gravity Die Casting', alloy)]))
+      .toBe('High Pressure Die Casting, Gravity Die Casting: Material "Generic ABS, Fittings" is not a die-casting alloy in Raw Materials (material group Die Casting). ');
+  });
+
+  it('falls back to the first operation with no costing data, and says nothing when no route says', () => {
+    expect(whyNoRoute([route('Laser', null, { process: 'Bending', reason: 'no press brake holds the part' })])).toBe('Laser: Bending: no press brake holds the part. ');
+    expect(whyNoRoute([route('Laser', null)])).toBe('');
   });
 });

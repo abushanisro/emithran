@@ -69,6 +69,8 @@ export function line(args: {
   return {
     process: args.process, processGroup: args.processGroup, processRoute: args.processRoute, operation: args.process,
     setupCost: roundLineCost(terms.setupCost), runCost: roundLineCost(terms.total - terms.setupCost), totalCost: roundLineCost(terms.total),
+    // The cycle's two parts, kept apart so the saved record and the Part Summary can say what is machine (overhead) and what is labour.
+    machineCostPerPart: roundPerPart(terms.machineCost), laborCostPerPart: roundPerPart(terms.laborCost),
     cycleTimeMin: roundCycleMin(args.sec / 60), setupTimeMin: r3(setup.setupMin), setupTimeSource: setup.source, operators: ops,
     hourlyRate: m.machineRatePerHr!, rateSource: 'mhr_database', machineClass: args.machineClass, machineName: m.name,
     commodityCode: null, labourRate: m.labourRatePerHr, mhrId: m.id,

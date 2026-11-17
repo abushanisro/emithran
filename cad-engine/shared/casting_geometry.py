@@ -188,9 +188,20 @@ def wall_thickness_profile(shape: Any, linear_deflection: float = 0.1) -> Dict[s
             intersector.Perform(gp_Lin(gp_Pnt(*start), gp_Dir(*inward)), 0.0, 1e9)
             if not intersector.IsDone() or intersector.NbPnt() == 0:
                 continue
-            hit = min(intersector.WParameter(i) for i in range(1, intersector.NbPnt() + 1))
-            samples.append((hit + _RAY_START_OFFSET_MM, area))
-            rays.append((hit + _RAY_START_OFFSET_MM, c, inward))
+            hits = sorted(range(1, intersector.NbPnt() + 1), key=intersector.WParameter)
+            # A flat triangle of a concave face (the wall of a bore) lies just outside the metal, by up to the mesh deflection. A ray
+            # cast inward from it first crosses its own face: that crossing is the surface, where the wall starts, not a wall a few
+            # microns thick. The wall is measured from there to the next surface.
+            entry = intersector.WParameter(hits[0])
+            if entry <= 2.0 * linear_deflection and intersector.Face(hits[0]).IsSame(face):
+                hits = hits[1:]
+                if not hits:
+                    continue
+                thickness = intersector.WParameter(hits[0]) - entry
+            else:
+                thickness = entry + _RAY_START_OFFSET_MM
+            samples.append((thickness, area))
+            rays.append((thickness, c, inward))
 
     if not samples:
         return {

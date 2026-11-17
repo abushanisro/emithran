@@ -44,6 +44,11 @@ export interface SecondaryMachine {
   maxLengthMm: number | null;
   maxWorkpieceKg: number | null;
   specs: Record<string, unknown>;
+  /**
+   * Set when the machine has no stored hour rate and the HR Rates engine priced it (the rate the HR Rates screens show for it): the fields the
+   * row lacked and the engine filled with its defaults. The line says so, so the rate does not look measured.
+   */
+  engineRateDefaults?: string[];
 }
 
 interface SecondaryFeature {
@@ -265,6 +270,9 @@ export function costed(
     warnings.push(`${m.name} has no usable good-part yield on file; no yield loss applied.`);
   }
 
+  if (m.engineRateDefaults) {
+    warnings.push(`${m.name} has no machine hour rate on file: ${m.mhrUsd.toFixed(2)} USD/hr is the HR Rates engine's rate for it${m.engineRateDefaults.length ? `, with its defaults for ${m.engineRateDefaults.join(', ')}` : ''}.`);
+  }
   const setupMin = m.setupHr * 60 + (t.batchExtraSec ?? 0) / 60;
   trace.push({ label: 'Machine setup', value: m.setupHr, unit: 'hr', source: `machine ${m.name}` });
   trace.push({ label: 'Machine + crew rate', value: Number(hourlyUsd(m).toFixed(4)), unit: 'USD/hr',
@@ -493,7 +501,7 @@ function hydrostaticLeak(base: { process: string; machineClass: string }, part: 
   const maxT = variable(ref, 'leakTestMaxThickness');
   if ([rate, minSec, maxSec, minT, maxT].some((v) => v == null)) return notCosted(base, 'gap', 'Leak test variables are not staged: run migration 817.');
   if (part.wallThicknessMm == null || part.wallThicknessMm <= 0) {
-    return notCosted(base, 'gap', 'Leak test dwell is set by wall thickness, and no wall thickness is measured for this part (solid parts have none).');
+    return notCosted(base, 'not_applicable', 'A leak test holds pressure against a wall, and this part has no measured wall (a solid part has none to test).');
   }
   const t = part.wallThicknessMm;
   const dwell = t <= minT! ? minSec! : t >= maxT! ? maxSec! : rate! * t;

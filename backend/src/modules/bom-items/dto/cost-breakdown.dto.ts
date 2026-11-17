@@ -563,6 +563,12 @@ export interface CostSummaryDto {
   // Process names with an unresolved physicsGap, when costStatus is
   // 'incomplete' — a quick list for the UI without re-scanning processLines.
   incompleteProcesses?: string[];
+  /**
+   * Every operation of the route that failed to cost, by name: the lines that carry a physics gap (incompleteProcesses) and the routed
+   * operations an engine leaves out of the cost entirely (no line at all). What the Summary banner counts; set by
+   * normalizeCostSummaryToCurrency. A warning that merely mentions "not costed" (a scope note) is not a failed operation.
+   */
+  uncostedOperations?: string[];
 
   // Does the 2D drawing describe the same part as the 3D CAD model? A
   // part-level fact (not per process line) — see
@@ -670,6 +676,10 @@ export interface CostSummaryDto {
   castingMetal?: { partKg: number; chargedKg: number };
   /** Sand casting: how the route was chosen, for the Cost Guide (the user's choices stay unset until made). */
   sandCasting?: SandCastingBreakdown;
+  /** Investment casting: the tree the route built and its shell. */
+  investmentCasting?: InvestmentCastingBreakdown;
+  /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
+  patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
 
   // The die-casting die, amortised over its life (die-tooling.ts). USD, like
   // the injection-molding tooling: separate from the piece cost.
@@ -746,6 +756,23 @@ export interface SandGatingLayout {
   risers: number;
   riserDiameterMm: number;
   riserHeightMm: number;
+}
+
+/** What the investment casting route decided: the wax tree every shared step is divided over, and the shell's dips. */
+export interface InvestmentCastingBreakdown {
+  patternsPerTree: number;
+  layers: number;
+  treeHeightMm: number;
+  treeWidthMm: number;
+  /** Trees the batch needs. */
+  treesInBatch: number;
+  primaryDips: number;
+  backupDips: number;
+  gatesPerPattern: number;
+  /** The shell's drying time per tree (hours): lead time, not a cost line of the route. Null when it could not be calculated. */
+  dryingHoursPerTree: number | null;
+  /** False while a step no machine can do is a gap. */
+  complete: boolean;
 }
 
 /** What the sand route decided: the moulding process and machine, the cavities per mould and the cores. */

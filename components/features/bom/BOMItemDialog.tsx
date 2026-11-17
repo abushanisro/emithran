@@ -54,7 +54,7 @@ import {
 import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem, analyzeForAutoFill, measureForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
 import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
-import { familyToProcessGroupLabel, processGroupOptionsFrom, processGroupToFamilyHint, processesForMaterialGroups } from '@/lib/features/process-group';
+import { familyToProcessGroupLabel, processGroupOptionLabel, processGroupOptionsFrom, processGroupToFamilyHint, processesForMaterialGroups } from '@/lib/features/process-group';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import type { DrawingAnalysisResult } from '@/lib/api/vave';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
@@ -1979,7 +1979,7 @@ export function BOMItemDialog({
                 <SelectTrigger id="processType"><SelectValue placeholder="Select process…" /></SelectTrigger>
                 <SelectContent>
                   {processGroupOptions.map((g) => (
-                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                    <SelectItem key={g} value={g}>{processGroupOptionLabel(g)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

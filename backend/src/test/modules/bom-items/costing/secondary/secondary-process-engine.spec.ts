@@ -145,8 +145,8 @@ describe('secondary processes on the reference data', () => {
     expect(byProcess(block).get('Magnetic Particle Testing')!.status).toBe('gap'); // no material yet
   });
 
-  it('leak test dwell comes from wall thickness; a solid part has none', () => {
-    expect(byProcess(block).get('Hydrostatic Leak Testing')!.status).toBe('gap');
+  it('leak test dwell comes from wall thickness; a solid part has no wall to test, so it does not apply', () => {
+    expect(byProcess(block).get('Hydrostatic Leak Testing')!.status).toBe('not_applicable');
     const shell = byProcess({ ...block, wallThicknessMm: 3 }).get('Hydrostatic Leak Testing')!;
     expect(shell.status).toBe('costed');
     // 3 mm is below leakTestMinThickness (16.7 mm) -> leakTestMinDwellTime.

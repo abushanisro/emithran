@@ -29,6 +29,19 @@ import { PlasticReferenceService } from '../costing/plastic-molding/lookup/plast
  * Writes a route (the engine's recommendation, a chosen route, or a Workflow Builder route) as the part's process cost records. The one place that does
  * it: the route-application endpoints and Apply Scenario both call it. Moved out of the controller unchanged.
  */
+/**
+ * Why no route can be applied, one sentence per route: the reason it is not feasible, else its first operation with no costing data. Empty when no route says (the caller's sentence stands on its own). Routes that miss the same thing are said once.
+ */
+export function whyNoRoute(routes: ReadonlyArray<Pick<RouteResultDto, 'routeLabel' | 'capability' | 'dataGaps'>>): string {
+  const byReason = new Map<string, string[]>();
+  for (const r of routes) {
+    const gap = r.dataGaps?.[0];
+    const reason = r.capability?.warnings?.[0] ?? (gap ? `${gap.process}: ${gap.reason}` : undefined);
+    if (reason) byReason.set(reason, [...(byReason.get(reason) ?? []), r.routeLabel]);
+  }
+  return [...byReason].map(([reason, labels]) => `${labels.join(', ')}: ${reason.replace(/\.+$/, '')}. `).join('');
+}
+
 @Injectable()
 export class RouteApplicationService {
   private readonly logger = new Logger(RouteApplicationService.name);
@@ -103,7 +116,7 @@ export class RouteApplicationService {
     if (!routeId) {
       throw new BadRequestException(
         'No route is both feasible and fully costed for this part, so none can be applied automatically. ' +
-        'Choose a route manually; the route comparison lists what each one is missing.',
+        `${whyNoRoute(comparison.routes)}Choose a route manually; the route comparison lists what each one is missing.`,
       );
     }
 

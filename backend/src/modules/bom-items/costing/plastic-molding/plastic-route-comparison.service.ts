@@ -222,7 +222,7 @@ export class PlasticRouteComparisonService {
       // With a material gap, the press-level "not derivable" reasons are that same gap repeated: the note carries it.
       const repeatsMaterialGap = (r: string) => materialNote != null && /^(Clamp force|Shot size) not derivable/.test(r);
       const tierReasons = ev.blockReasons.filter((r) => !repeatsMaterialGap(r));
-      if (!ev.capable) cost.warnings.push(...tierReasons.map((r) => `⚠ ${r}`));
+      if (!ev.capable) cost.warnings.push(...tierReasons);
 
       const capable = ev.capable;
       const routeLabel = `${tier.tierLabel} — ${cand.machineName}`;

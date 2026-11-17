@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { type DesignGuidance, type DesignGuidanceItem, type DesignGuidanceRange, useDesignGuidance } from '@/lib/api/hooks/useBOMItems';
 import type { FeatureNodeV2 } from '@/lib/types/manufacturing';
 
-// The Design Guidance tab: what in the part's design drives its cost, panel by panel (cost drivers, material, thickness, special mold tooling, machining, tolerances,
+// The Validation tab (Design Guidance): what in the part's design drives its cost, panel by panel (cost drivers, material, thickness, special mold tooling, machining, tolerances,
 // setups, holes and fillets, slow operations). Every number is the backend's projection of the CAD analysis, the staged reference data and the applied cost; a value
 // none of them holds shows a dash and says why on hover. Review opens the instances behind a number, and choosing one lights it on the model.
 

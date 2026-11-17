@@ -108,3 +108,14 @@ def test_parting_perimeter_is_the_outer_silhouette_boundary():
     hole = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(25, 20, -1), gp_Dir(0, 0, 1)), 5.0, 22.0).Shape()
     holed = BRepAlgoAPI_Cut(box, hole).Shape()
     assert parting_plane_silhouette(holed, [0, 0, 1])["parting_perimeter_mm"] == pytest.approx(180.0, abs=1e-6)
+
+
+def test_hole_wall_is_not_read_as_a_paper_thin_wall():
+    # A 40 x 40 x 10 plate with a 6 mm hole through it. The flat triangles of the meshed hole wall sit just outside the metal (inside
+    # the bore), so a ray cast inward from one crosses the hole's own surface at once: that crossing is where the wall starts, not a wall
+    # a few microns thick (Cannula Holder bottom read 0.001 mm). The thinnest metal here is the plate itself, 10 mm.
+    plate = BRepPrimAPI_MakeBox(40.0, 40.0, 10.0).Shape()
+    part = BRepAlgoAPI_Cut(plate, BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(20, 20, -1), gp_Dir(0, 0, 1)), 3.0, 12.0).Shape()).Shape()
+    prof = wall_thickness_profile(part)
+    assert prof["wall_thickness_min_mm"] == pytest.approx(10.0, abs=0.05)
+    assert prof["wall_thickness_nominal_mm"] == pytest.approx(10.0, abs=0.05)

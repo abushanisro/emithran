@@ -1057,6 +1057,8 @@ export interface CostSummaryDto {
   costStatus?: CostStatus;
   /** Process names with an unresolved physicsGap, when costStatus is 'incomplete'. */
   incompleteProcesses?: string[];
+  /** Every operation of the route that failed to cost, by name (backend CostSummaryDto.uncostedOperations): what the Summary banner counts. */
+  uncostedOperations?: string[];
   /** Part-level 2D-drawing-vs-3D-CAD fact agreement — see FactMismatch above. */
   drawingCadConsistency?: FactMismatch[];
   materialCost: number;
@@ -1110,6 +1112,10 @@ export interface CostSummaryDto {
   dieCasting?: DieCastingBreakdown;
   /** Sand casting: what the route decided (mirrors the backend's SandCastingBreakdown). */
   sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine'; gating: SandGatingLayout; flask: { lengthMm: number; widthMm: number; heightMm: number } };
+  /** Investment casting: the wax tree the route built and its shell (mirrors the backend's InvestmentCastingBreakdown). */
+  investmentCasting?: { patternsPerTree: number; layers: number; treeHeightMm: number; treeWidthMm: number; treesInBatch: number; primaryDips: number; backupDips: number; gatesPerPattern: number; dryingHoursPerTree: number | null; complete: boolean };
+  /** Investment casting: the wax pattern die (USD, separate from the piece cost). */
+  patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
   /** Sand casting: the machining allowance of each machined feature (display only, never costed). */
   machiningAllowance?: MachiningAllowanceSummary;
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */

@@ -125,6 +125,10 @@ import { MachiningAllowanceService } from './costing/casting/machining-allowance
 import { CalculatorFieldOverridesService, overridesByCalculator } from './services/calculator-field-overrides.service';
 import { mouldingMethodOf, type MachiningAllowanceResult } from './costing/casting/machining-allowance';
 import { SandCostService, type SandCostResult } from './costing/casting/sand/sand-cost.service';
+import { InvestmentCostService, type InvestmentCostResult } from './costing/casting/investment/investment-cost.service';
+import { investmentCastingRoute } from './costing/casting/investment/investment-route-comparison';
+import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
+import { CASTING_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
@@ -167,6 +171,11 @@ export function hasMeasuredGeometry(item: { volume?: number | null; maxLength?: 
   return [item.volume, item.maxLength, item.maxWidth, item.maxHeight].every((v) => Number(v) > 0);
 }
 
+/** The part's Process is the generic Casting (and no family override pins it): it is priced by every casting process. */
+function isCastingChoice(item: { scenarioOverrides?: Record<string, unknown> | null; manufacturingFamilyOverride?: string | null }): boolean {
+  return item.scenarioOverrides?.['processGroup'] === CASTING_PROCESS_GROUP && !(item.manufacturingFamilyOverride ?? '').trim();
+}
+
 export function hasCostModel(family: string): boolean {
   return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || castingProcessOfFamily(family) !== null;
 }
@@ -184,6 +193,7 @@ function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[])
     totalCost: dto.totalCost + extra,
     cycleTimes: { ...dto.cycleTimes, totalMin: dto.cycleTimes.totalMin + lines.reduce((t, l) => t + l.cycleTimeMin, 0) },
     ...(incomplete.length ? { incompleteProcesses: incomplete, costStatus: 'incomplete' as const } : {}),
+    ...(gaps.length ? { uncostedOperations: [...new Set([...(dto.uncostedOperations ?? []), ...gaps])] } : {}),
   };
 }
 
@@ -245,6 +255,8 @@ export class BomItemCostingService {
     private readonly sandCatalogOperations?: SandCatalogOperationsService,
     /** The machining allowance of a sand casting (display only); optional for the same reason. */
     private readonly machiningAllowance?: MachiningAllowanceService,
+    /** The investment casting route; optional for the same reason (without it an investment casting is one named, uncosted line). */
+    private readonly investmentCostService?: InvestmentCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -342,18 +354,20 @@ export class BomItemCostingService {
     // computed before either return branch below.
     const incompleteProcesses = dto.processLines.filter((l) => !!l.physicsGap).map((l) => l.process);
     const costStatus: CostStatus = incompleteProcesses.length > 0 ? 'incomplete' : 'complete';
+    const uncostedOperations = [...new Set([...incompleteProcesses, ...(dto.uncostedOperations ?? [])])];
+    const failed = { uncostedOperations: uncostedOperations.length ? uncostedOperations : undefined };
     const { currency, currencySymbol, rate, usdToDisplayRate } = this.resolveDisplayCurrency(scenarioOverrides, localCurrencyCode, rates);
     if (currency === localCurrencyCode) {
       return {
         ...dto, currency, currencySymbol, toUsdRate: 1, usdToDisplayRate,
-        costStatus, incompleteProcesses: incompleteProcesses.length ? incompleteProcesses : undefined,
+        costStatus, incompleteProcesses: incompleteProcesses.length ? incompleteProcesses : undefined, ...failed,
       };
     }
     const conv = (v: number) => v * rate;
     return {
       ...dto,
       costStatus,
-      incompleteProcesses: incompleteProcesses.length ? incompleteProcesses : undefined,
+      incompleteProcesses: incompleteProcesses.length ? incompleteProcesses : undefined, ...failed,
       materialCost: conv(dto.materialCost),
       materialCostPerKg: conv(dto.materialCostPerKg),
       processLines: dto.processLines.map((l) => ({
@@ -1764,8 +1778,16 @@ export class BomItemCostingService {
     forceDieCastingProcess?: string,
     /** Die casting: filled with the process lines in the factory local currency, before the display conversion (apply-route persists these). */
     localLinesOut?: { lines?: ProcessLineCost[]; localCurrency?: string },
+    /** Price the part as this family (a Casting part is priced as each casting family); else the family the part resolves to. */
+    forceFamily?: string,
   ): Promise<CostSummaryResponseDto> {
     const item = await this.items.findOne(id, userId, accessToken);
+    // The generic Casting process: priced by every casting process, the cheapest fully costed one quoted (casting-process-choice.ts).
+    if (!forceFamily && isCastingChoice(item)) {
+      const { chosen, note, local } = await this.priceCastingFamilies(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, forceDieCastingProcess);
+      if (localLinesOut) Object.assign(localLinesOut, local);
+      return { ...chosen, warnings: [note, ...chosen.warnings] };
+    }
 
     // ── Canonical costing inputs ──────────────────────────────────────────────
     // Resolved ONCE, here, from the request + the persisted scenario + the
@@ -1856,12 +1878,14 @@ export class BomItemCostingService {
     // Override > material > geometry — one precedence chain for both costing
     // endpoints (see resolveEffectiveFamily).
     const familyResolution = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
-    const family = familyResolution.family;
+    const family = forceFamily ?? familyResolution.family;
     // A family with no cost model is not priced as sheet metal (the path below) with zeros for its geometry: it says what is missing.
     if (!hasCostModel(family)) {
       return this.unpricedSummary({
         costingInputs, batchSize, family, missingInputs: ['partFamily'],
-        warnings: [`No cost model for part family "${family}": press Apply Scenario (it extracts the CAD features first).`],
+        warnings: [familyResolution.familySource === 'process' && familyResolution.warning
+          ? familyResolution.warning
+          : `No cost model for part family "${family}": press Apply Scenario (it extracts the CAD features first).`],
       });
     }
 
@@ -2395,7 +2419,7 @@ export class BomItemCostingService {
       // depends on the casting process (its capabilities and castable holes).
       const priceMachiningAfter = async (primaryProcess: string | undefined) => {
         const warnings: string[] = [];
-        const need = await this.featureToleranceService.getMachiningNeed(id, accessToken, primaryProcess);
+        const need = await this.featureToleranceService.getMachiningNeed(id, accessToken, primaryProcess, forceFamily);
         const neededCount = need.result?.features.filter((f) => f.verdict === 'needs_machining').length ?? 0;
         if (!need.assessed) {
           warnings.push(`Machining after casting not assessed: ${need.reason}${need.missing.length ? ` (${need.missing.join(', ')})` : ''}`);
@@ -2527,6 +2551,8 @@ export class BomItemCostingService {
       let processChoice: DieCastingProcessChoiceDto | null = null;
       // Sand casting: the route (sand-cost.service.ts), or what keeps it from being built.
       let sandResult: SandCostResult | null = null;
+      // Investment casting: the route (investment-cost.service.ts), or what keeps it from being built.
+      let investmentResult: InvestmentCostResult | null = null;
       // Sand casting: the stock left on each machined feature (machining-allowance.ts), shown and never costed.
       let machiningAllowance: MachiningAllowanceResult | null = null;
       // Die casting: what the metal calculators of the summary need.
@@ -2804,10 +2830,23 @@ export class BomItemCostingService {
           route.warnings.push(...allowance.warnings);
         }
       } else {
-        // Investment casting: no casting engine yet (a named, uncosted
-        // line); machining after casting is still assessed for the process.
+        // Investment casting: the lost wax route from the investment reference data, the HR Rates machines and the investment calculators
+        // (investment-cost.service.ts); machining after casting is assessed for the process as for the others.
         const m = await priceMachiningAfter(undefined);
-        route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: m.warnings };
+        if (this.investmentCostService) investmentResult = await this.investmentCostService.price({
+          client, accessToken, location, grade,
+          measurements: {
+            volumeMm3: ((item.volume ?? 0) as number) || null,
+            surfaceAreaMm2: Number((item as any).surfaceArea ?? (item as any).surface_area ?? 0) || null,
+            bboxMm: [(item as any).maxLength, (item as any).maxWidth, (item as any).maxHeight].map((v) => Number(v ?? 0)),
+            wallMaxMm: geometry.wallMaxMm, wallNominalMm: geometry.wallNominalMm,
+            slides: count('castingSlideBundleCount'),
+          },
+          overrides: item.scenarioOverrides, batchSize, annualVolume: annualVolume ?? null, productionLifeYears: productionLifeYears ?? null,
+          usdToLocal, costContext: zeroCtx,
+          toUsd: (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } },
+        });
+        route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...(investmentResult?.warnings ?? [])] };
       }
 
       const castingResult = {
@@ -2829,6 +2868,7 @@ export class BomItemCostingService {
           cores: route.cores,
           processChoice,
           sand: sandResult,
+          investment: investmentResult,
           ...(metal ? { calculators: metal.calculators, alloy: metal.alloy, meltedKg: metal.meltedKg, calculatorRuns: metal.calculatorRuns } : {}),
         }),
         ...currencyMeta,
@@ -4065,7 +4105,7 @@ export class BomItemCostingService {
     const processes = [...DIE_CASTING_PROCESSES];
     const local = processes.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
     const summaries = await Promise.all(processes.map((p, i) =>
-      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, p, local[i])));
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, p, local[i], 'die_cast')));
     const choice = summaries[0]!.dieCastingProcess;
     const auto = choice ? chooseDieCastingProcess(choice.options, null) : null;
     const routes: RouteResultDto[] = processes.map((p, i) => {
@@ -4122,15 +4162,66 @@ export class BomItemCostingService {
     };
   }
 
-  /** A sand-cast part's route comparison: its one route, the cost summary as quoted; the local-currency lines are what Apply saves. */
-  private async sandCastingRouteComparison(
+  /** A Casting part priced as each casting family; the one to quote, the note on how it was chosen, and its lines in the factory currency. */
+  private async priceCastingFamilies(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number, forceDieCastingProcess?: string,
+  ): Promise<{ chosen: CostSummaryResponseDto; note: string; local: { lines?: ProcessLineCost[]; localCurrency?: string } }> {
+    const families = familiesOfProcessGroup(CASTING_PROCESS_GROUP);
+    const locals = families.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const summaries = await Promise.all(families.map((family, i) =>
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, forceDieCastingProcess, locals[i], family)));
+    const { chosen, note } = chooseCastingFamily(families.map((family, i) => castingFamilyOption(family, summaries[i]!)));
+    const at = families.indexOf(chosen.family);
+    return { chosen: summaries[at]!, note, local: locals[at]! };
+  }
+
+  /**
+   * A Casting part's route comparison: the routes of every casting process (both die-casting processes, sand, investment), each the full quote on
+   * that process. The recommended one is the route of the family the quote chose, so the comparison and the quote cannot disagree.
+   */
+  private async castingRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const args = [id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears] as const;
+    const locals = [0, 1, 2].map(() => ({} as { routes?: RouteResultDto[]; localCurrency?: string }));
+    const [quote, die, sand, investment] = await Promise.all([
+      this.priceCastingFamilies(...args),
+      this.dieCastingRouteComparison(...args, locals[0]),
+      this.singleCastingRouteComparison('sand_cast', sandCastingRoute, 'The sand-casting route could not be fully costed for this part.', ...args, locals[1]),
+      this.singleCastingRouteComparison('investment_cast', investmentCastingRoute, 'The investment casting route could not be fully costed for this part.', ...args, locals[2]),
+    ]);
+    const byFamily: Record<string, RouteComparisonResponseDto> = { die_cast: die, sand_cast: sand, investment_cast: investment };
+    const quoted = byFamily[quote.chosen.family]!;
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = locals.flatMap((l) => l.routes ?? []);
+      localCurrencyOut.localCurrency = locals.find((l) => l.localCurrency)?.localCurrency;
+    }
+    const routes = [...die.routes, ...sand.routes, ...investment.routes];
+    return {
+      ...quoted,
+      recommendedRouteId: quoted.recommendedRouteId,
+      // One route is the cheapest of them all, not one per casting process.
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === quoted.recommendedRouteId } })),
+      comparisonWarnings: [quote.note, ...(quoted.recommendedRouteId ? [] : ['No casting route is both feasible and fully costed for this part.'])],
+    };
+  }
+
+  /**
+   * The route comparison of a casting with one route (sand, investment): the cost summary as quoted, as that route; the local-currency lines are
+   * what Apply saves.
+   */
+  private async singleCastingRouteComparison(
+    family: string, routeOf: (summary: CostSummaryResponseDto) => RouteResultDto, incomplete: string,
     id: string, userId: string, accessToken: string,
     requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
     localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
   ): Promise<RouteComparisonResponseDto> {
     const local: { lines?: ProcessLineCost[]; localCurrency?: string } = {};
-    const summary = await this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, local);
-    const route = sandCastingRoute(summary);
+    const summary = await this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, local, family);
+    const route = routeOf(summary);
     if (localCurrencyOut) {
       localCurrencyOut.routes = [{ ...route, processLines: local.lines ?? [] }];
       localCurrencyOut.localCurrency = local.localCurrency;
@@ -4145,7 +4236,7 @@ export class BomItemCostingService {
       materialCostPerKg: summary.materialCostPerKg,
       materialSource: summary.materialSource,
       routes: [route],
-      comparisonWarnings: route.isFeasible ? [] : ['The sand-casting route could not be fully costed for this part.'],
+      comparisonWarnings: route.isFeasible ? [] : [incomplete],
       currency: summary.currency ?? 'USD',
       currencySymbol: summary.currencySymbol ?? '$',
       ...(summary.toUsdRate != null ? { toUsdRate: summary.toUsdRate } : {}),
@@ -4287,16 +4378,28 @@ export class BomItemCostingService {
     // construction (summary ≡ route invariant).
     const familyResolutionRC = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
     const family = familyResolutionRC.family;
+    // A chosen Process with no cost model has no route to compare or apply: say so, instead of listing sheet-metal routes for it.
+    if (familyResolutionRC.familySource === 'process' && !hasCostModel(family)) throw new BadRequestException(familyResolutionRC.warning!);
 
     // Die casting: one complete route per die-casting process, each the full
     // Cost Summary priced on that process (the same engines and the same code
     // path as the quote, so the comparison can never disagree with it).
+    // The generic Casting process: the routes of every casting process, the one the quote chose recommended.
+    if (isCastingChoice(item)) {
+      return this.castingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
     if (castingProcessOfFamily(family) === 'die_casting') {
       return this.dieCastingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     // Sand casting: one route, the cost summary as quoted (sand-route-comparison.ts).
     if (castingProcessOfFamily(family) === 'sand_casting') {
-      return this.sandCastingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+      return this.singleCastingRouteComparison('sand_cast', sandCastingRoute, 'The sand-casting route could not be fully costed for this part.',
+        id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Investment casting: one route, the cost summary as quoted (investment-route-comparison.ts).
+    if (castingProcessOfFamily(family) === 'investment_casting') {
+      return this.singleCastingRouteComparison('investment_cast', investmentCastingRoute, 'The investment casting route could not be fully costed for this part.',
+        id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
 
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;

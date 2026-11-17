@@ -19,6 +19,42 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   investment_cast: 'Casting Investment',
 };
 
+/** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
+export const CASTING_PROCESS_GROUP = 'Casting';
+
+/**
+ * Process groups with no CAD family of their own, and the families they are costed as. A hydroformed part is a sheet-metal part. A Casting part
+ * is priced as each casting family (casting-process-choice.ts); the first is the one its CAD analysis runs as, die casting, whose feature
+ * catalog holds every feature type the sand catalog has, and slides.
+ */
+const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
+  'Sheet Metal - Hydroforming': ['sheet_metal'],
+  [CASTING_PROCESS_GROUP]: ['die_cast', 'sand_cast', 'investment_cast'],
+};
+
+/**
+ * The CAD families a process group is costed as, the general one first (Machining: milled); empty when the group has no cost model (Forging,
+ * Powder Metal, ...): a part whose Process is one of those is not costed, never priced as another process.
+ */
+export function familiesOfProcessGroup(processGroup: string): string[] {
+  const own = Object.keys(CAD_FAMILY_TO_PROCESS_GROUP).filter((family) => CAD_FAMILY_TO_PROCESS_GROUP[family] === processGroup);
+  return own.length > 0 ? own : [...(COSTED_AS_FAMILIES[processGroup] ?? [])];
+}
+
+/**
+ * The casting family a Casting part was applied as: the family of the process group its saved operations are in (Sand Casting, Die Casting,
+ * Casting Investment); null when none is. A Casting part is analysed as a die casting and quoted on the cheapest casting process, so what the
+ * part is made by is known only from what was applied.
+ */
+export function appliedCastingFamily(appliedGroups: readonly string[]): string | null {
+  return (COSTED_AS_FAMILIES[CASTING_PROCESS_GROUP] ?? []).find((family) => appliedGroups.includes(CAD_FAMILY_TO_PROCESS_GROUP[family]!)) ?? null;
+}
+
+/** The process groups that have a cost model, as the Process field names them. */
+export function costedProcessGroups(): string[] {
+  return [...new Set([...Object.values(CAD_FAMILY_TO_PROCESS_GROUP), ...Object.keys(COSTED_AS_FAMILIES)])].sort();
+}
+
 /**
  * When the process the user chose and the part's geometry disagree (cad-engine reports both: the family it analysed the
  * part as, and `geometric_family`, what the shape alone reads as), the sentence to tell them, naming the Process to set.

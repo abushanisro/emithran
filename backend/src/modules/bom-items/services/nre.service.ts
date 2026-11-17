@@ -204,6 +204,11 @@ export class NreService {
       items.push({ item: 'Coreboxes', status: 'costed', usd: boxes.costUsd, detail: `${boxes.boxes} corebox(es): ${boxes.detail}`, source: 'memory/Die Casting (coremaking) + tool shop rates' });
     }
 
+    const pattern = cost.patternTooling;
+    if (pattern) {
+      items.push({ item: 'Wax pattern die', status: 'costed', usd: pattern.costUsd, detail: pattern.detail, source: 'memory/Casting Investment (wax pattern tooling regression)' });
+    }
+
     items.push({
       item: 'Cutting tools, gauges',
       status: 'gap',

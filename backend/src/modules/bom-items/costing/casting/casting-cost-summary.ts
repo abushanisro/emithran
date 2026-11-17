@@ -8,12 +8,14 @@
 // the charged metal; overflow, runner and gating metal is remelted in-house
 // (shown as melted, not charged) and biscuit metal is a named gap.
 //
-// Process: one line per casting process. Die casting is priced by the HPDC
-// engine; any other casting process (gravity die, sand, investment) has no
-// engine yet and is a named, uncosted line -- never priced as something else.
+// Process: the lines of the process's own route. Die casting (pressure and
+// gravity) is priced by the HPDC and GDC engines, sand casting by the sand
+// route, investment casting by the investment route; a route that cannot be
+// built is one named, uncosted line -- never priced as something else.
 
 import type { CalculatorRunDto, CostSummaryDto, DieCastingProcessChoiceDto, DieToolingDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import type { SandRoute } from './sand/sand-route';
+import { METAL_PER_CASTING, MATERIAL_COST, PATTERN_TOOLING, TREE, type InvestmentRoute } from './investment/investment-route';
 import { gatingLayout, GATING_CALCULATOR, RISERS_CALCULATOR } from './sand/sand-gating';
 import { CORE_BOX, CORE_SAND } from './sand/sand-cores';
 import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
@@ -101,6 +103,8 @@ export function buildCastingCostSummary(input: {
   calculatorRuns?: Record<string, CalculatorRunDto>;
   /** Sand casting (sand-cost.service.ts): the route in the location's currency, or what keeps it from being built. */
   sand?: { route: SandRoute | null; missing: string[]; measuredBy?: 'casting analysis' | 'cad-engine' } | null;
+  /** Investment casting (investment-cost.service.ts): the route in the location's currency, or what keeps it from being built. */
+  investment?: { route: InvestmentRoute | null; missing: string[] } | null;
 }): CostSummaryDto {
   const warnings = [...input.warnings];
   const calculatorRuns: Record<string, CalculatorRunDto> = { ...(input.hpdc?.calculatorRuns ?? {}), ...(input.calculatorRuns ?? {}) };
@@ -150,9 +154,22 @@ export function buildCastingCostSummary(input: {
     warnings.push(`${isHpdc ? 'Overflow and runner' : 'Gating and riser'} metal (${r3(meltedKg - netKg)} kg per part) returns to the furnace and is remelted in-house: not charged.`);
   }
   if (isHpdc) warnings.push('Biscuit metal not in the shot: memory/Die Casting gives the plunger diameter but no biscuit thickness.');
-  const materialCost = sand ? sand.material.costUsd ?? 0 : chargedKg * input.materialCostPerKg;
-  const grossKg = sand ? sand.material.pouredKg : meltedKg ?? netKg;
+  const investment = input.process === 'investment_casting' ? input.investment?.route ?? null : null;
+  // A sand or investment route prices its own metal (bought weight x the alloy's price); with no route the metal is the part's weight at the material's price.
+  const routed = sand ?? investment;
+  const materialCost = routed ? routed.material.costUsd ?? 0 : chargedKg * input.materialCostPerKg;
+  const grossKg = routed ? routed.material.pouredKg : meltedKg ?? netKg;
   if (sand && sand.material.costUsd == null) warnings.push('The metal is not costed: a furnace loss factor or a calculator input is missing.');
+  if (investment) {
+    netKg = investment.material.netKg;
+    if (investment.material.costUsd == null) warnings.push('The metal is not costed: no pouring furnace could be chosen, or a calculator input is missing.');
+    const [metalRun, costRun] = investment.material.runs;
+    calculatorRuns['Investment tree'] = runView(TREE, 'Patterns per Tree', investment.treeRun);
+    if (metalRun) calculatorRuns['Investment metal per casting'] = runView(METAL_PER_CASTING, 'Poured Weight', metalRun);
+    if (costRun) calculatorRuns['Investment material cost'] = runView(MATERIAL_COST, 'Material Cost', costRun);
+    if (investment.drying) calculatorRuns['Investment shell drying'] = runView('Investment Casting - Drying', 'Cycle Time', investment.drying.run);
+    if (investment.tooling) calculatorRuns['Investment wax pattern tooling'] = runView(PATTERN_TOOLING, 'Cost per Part', investment.tooling.run);
+  }
   if (sand) {
     const [metalRun, costRun] = sand.material.runs;
     if (metalRun) calculatorRuns['Sand metal per casting'] = runView('Sand Casting - Metal per casting', 'Poured Weight', metalRun);
@@ -177,6 +194,15 @@ export function buildCastingCostSummary(input: {
       const why = input.sand.missing.length ? input.sand.missing.join('; ') : 'the sand route could not be built';
       processLines = [unmodelledCastingLine(input.process, `Sand Casting cannot be costed: ${why}`)];
       warnings.push(`Sand Casting cannot be costed: ${why}`);
+    }
+  } else if (input.process === 'investment_casting' && input.investment) {
+    if (investment) {
+      processLines = investment.lines;
+      if (!investment.complete) warnings.push('The investment casting route is incomplete: a step no machine can do is shown as a named gap, and the total excludes it.');
+    } else {
+      const why = input.investment.missing.length ? input.investment.missing.join('; ') : 'the investment casting route could not be built';
+      processLines = [unmodelledCastingLine(input.process, `Investment Casting cannot be costed: ${why}`)];
+      warnings.push(`Investment Casting cannot be costed: ${why}`);
     }
   } else {
     processLines = [unmodelledCastingLine(input.process)];
@@ -226,7 +252,7 @@ export function buildCastingCostSummary(input: {
     ...(input.processChoice ? { dieCastingProcess: input.processChoice } : {}),
     ...(Object.keys(calculatorRuns).length ? { calculatorRuns } : {}),
     // The metal the part is charged with, whatever the casting process: the material record is written from this one figure.
-    ...(sand ? (sand.material.boughtKg != null ? { castingMetal: { partKg: netKg, chargedKg: sand.material.boughtKg } } : {})
+    ...(routed ? (routed.material.boughtKg != null ? { castingMetal: { partKg: netKg, chargedKg: routed.material.boughtKg } } : {})
       // Not rounded to the gram: the material record is written from these, and a gram is 2-3 % of a 15 g casting (the record then disagreed with the
       // calculators it is the result of). The record's own columns keep four decimals.
       : dc && netKg > 0 ? { castingMetal: { partKg: netKg, chargedKg } } : {}),
@@ -244,6 +270,19 @@ export function buildCastingCostSummary(input: {
         detail: sand.tooling.items.map((t, i) => `core ${i + 1}: ${t.material}, ${t.boxes} box${t.boxes > 1 ? 'es' : ''}`).join('; '),
         costUsd: Math.round(sand.tooling.items.reduce((c, t) => c + t.toolingCostUsd, 0) * 100) / 100,
         perPartUsd: sand.tooling.perPartUsd,
+      },
+    } : {}),
+    ...(investment ? {
+      investmentCasting: {
+        patternsPerTree: investment.tree.patternsPerTree, layers: investment.tree.layers, treeHeightMm: investment.tree.heightMm, treeWidthMm: investment.tree.widthMm,
+        treesInBatch: investment.tree.treesInBatch, primaryDips: investment.tree.primaryDips, backupDips: investment.tree.backupDips,
+        gatesPerPattern: investment.tree.gatesPerPattern, dryingHoursPerTree: investment.drying?.hoursPerTree ?? null, complete: investment.complete,
+      },
+    } : {}),
+    ...(investment?.tooling ? {
+      patternTooling: {
+        tools: investment.tooling.tools, costUsd: investment.tooling.toolingCostUsd, perPartUsd: investment.tooling.perPartUsd,
+        detail: `wax pattern die: ${investment.tooling.tools} x ${investment.tooling.toolCostUsd}`,
       },
     } : {}),
     ...(cav ? {
