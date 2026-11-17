@@ -44,11 +44,15 @@ describe('the process a part is costed as', () => {
     const r = resolve({ scenarioOverrides: { processGroup: 'Additive Manufacturing' } }, 'Generic ABS, Fittings', 'milled');
     expect(r.family).toBe('unknown');
     expect(r.familySource).toBe('process');
-    expect(r.warning).toBe('The Process "Additive Manufacturing" has no cost model yet, so this part is not costed. Set its Process to one that has: Casting, Casting Investment, Die Casting, Forging, Machining, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
+    expect(r.warning).toBe('The Process "Additive Manufacturing" has no cost model yet, so this part is not costed. Set its Process to one that has: Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
   });
 
   it('a Powder Metal part is a powder metal part, whatever its material or last analysis', () => {
     expect(resolve({ scenarioOverrides: { processGroup: 'Powder Metal' } }, 'F-0005', 'milled')).toEqual({ family: 'powder_metal', familySource: 'process', warning: null });
+  });
+
+  it('a Composites part is a composite laminate, whatever its material or last analysis', () => {
+    expect(resolve({ scenarioOverrides: { processGroup: 'Composites' } }, 'Generic Ply Material', 'milled')).toEqual({ family: 'composite', familySource: 'process', warning: null });
   });
 
   it('a Forging part is a forged part, whatever its material or last analysis', () => {

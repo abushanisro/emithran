@@ -27,6 +27,7 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   investment_cast: 'Casting Investment',
   forged: 'Forging',
   powder_metal: 'Powder Metal',
+  composite: 'Composites',
 };
 
 export function familyToProcessGroupLabel(family: string | null | undefined): string | null {

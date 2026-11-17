@@ -21,6 +21,8 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   forged: 'Forging',
   // Press and sinter: measured along its press direction by the same die-direction measurements as a forging.
   powder_metal: 'Powder Metal',
+  // A laid-up composite: the cad-engine measures it as a laminate on its tool (composites/feature_extractor.py).
+  composite: 'Composites',
 };
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */

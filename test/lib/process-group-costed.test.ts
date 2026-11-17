@@ -26,6 +26,7 @@ describe('process groups with a cost model', () => {
     expect(processGroupToFamilyHint('Sand Casting')).toBe('sand_cast');
     expect(processGroupToFamilyHint('Forging')).toBe('forged');
     expect(processGroupToFamilyHint('Powder Metal')).toBe('powder_metal');
+    expect(processGroupToFamilyHint('Composites')).toBe('composite');
     expect(processGroupToFamilyHint('Additive Manufacturing')).toBeUndefined();
   });
 });

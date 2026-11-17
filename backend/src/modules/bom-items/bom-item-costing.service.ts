@@ -131,6 +131,10 @@ import { InvestmentCostService, type InvestmentCostResult } from './costing/cast
 import { investmentCastingRoute } from './costing/casting/investment/investment-route-comparison';
 import { ForgingCostService } from './costing/forging/forging-cost.service';
 import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost.service';
+import { CompositesCostService, type CompositeLaminateSummary } from './costing/composites/composites-cost.service';
+import { buildCompositesCostSummary } from './costing/composites/composites-cost-summary';
+import { COMPOSITES_ROUTES } from './costing/composites/composites-route';
+import { compositesRouteFor, compositesRouteId } from './costing/composites/composites-route-comparison';
 import { buildPowderMetalCostSummary } from './costing/powder-metal/powder-metal-cost-summary';
 import { powderMetalRoute } from './costing/powder-metal/powder-metal-route-comparison';
 import type { ForgingHole } from './costing/forging/forging-route';
@@ -212,7 +216,7 @@ export function holeGroupsOfGraph(features: unknown): Array<{ diameter_mm: numbe
 
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || castingProcessOfFamily(family) !== null;
 }
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
@@ -296,6 +300,8 @@ export class BomItemCostingService {
     private readonly forgingCostService?: ForgingCostService,
     /** The powder metal route; optional for the same reason (without it a powder metal part is one named, uncosted line). */
     private readonly powderMetalCostService?: PowderMetalCostService,
+    /** The composites routes; optional for the same reason (without it a composite part is one named, uncosted line). */
+    private readonly compositesCostService?: CompositesCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -2401,6 +2407,37 @@ export class BomItemCostingService {
       };
     }
 
+    // ── Composites ──────────────────────────────────────────────────────────
+    // The laminate measured on its tool (cad-engine composites/feature_extractor.py, via auto-fill's compositeLaminate) and memory/Composites
+    // price every layup route (composites-route.ts): hand layup, tape layup, fiber placement, each with its tool clean, mold preparation, ply
+    // cutting, bagging, autoclave cure and bench work.
+    if (family === 'composite') {
+      const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+      const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const composites = this.compositesCostService
+        ? await this.compositesCostService.price({
+          client: this.databaseService.getClient(accessToken), accessToken, location, grade,
+          laminate: (summary.compositeLaminate ?? null) as CompositeLaminateSummary | null,
+          ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+          overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+        })
+        : { route: null, routes: [], gaps: [], note: null, missing: ['the composites cost service is not available'], warnings: [] };
+      const compositesResult = {
+        ...buildCompositesCostSummary({
+          composites, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
+        }),
+        ...currencyMeta,
+        drawingCadConsistency,
+      };
+      this.overrides.applyCostOverrides(compositesResult, costOverrides);
+      if (costOverrides.size > 0) compositesResult.costOverrides = Object.fromEntries(costOverrides);
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(compositesResult.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
+      return { ...this.normalizeCostSummaryToCurrency(compositesResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+    }
+
     // ── Casting (die / sand / investment) ────────────────────────────────────
     // The part's measured casting geometry (cad-engine casting extractor, via
     // auto-fill's casting* summary keys) and memory/Die Casting data price the
@@ -4306,6 +4343,46 @@ export class BomItemCostingService {
     };
   }
 
+  /**
+   * A composite part's route comparison: every layup route (hand layup, tape layup, fiber placement), each the full Cost Summary priced on
+   * that route, as the forging routes are. The recommended one is the route the quote chose, so they cannot disagree.
+   */
+  private async compositesRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = COMPOSITES_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'composite'),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'composite')),
+    ]);
+    const routes = keys.map((key, i) => compositesRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.composites?.complete ? compositesRouteId(quote!.composites.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No layup route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
   /** A Casting part priced as each casting family; the one to quote, the note on how it was chosen, and its lines in the factory currency. */
   private async priceCastingFamilies(
     id: string, userId: string, accessToken: string,
@@ -4550,6 +4627,10 @@ export class BomItemCostingService {
     if (family === 'powder_metal') {
       return this.singleCastingRouteComparison('powder_metal', powderMetalRoute, 'The powder metal route could not be fully costed for this part.',
         id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Composites: one complete route per layup route, each the full quote on that route (composites-route-comparison.ts).
+    if (family === 'composite') {
+      return this.compositesRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     // Forging: one complete route per forging route, each the full quote on that route (forging-route-comparison.ts).
     if (family === 'forged') {
