@@ -307,6 +307,21 @@ export function RawMaterialDialog({
     setGrossUsageOverridden(false);
     setGrossUsageOverrideReason('');
   };
+  // The calculator buttons beside Net and Gross Usage, for a part whose usage the engine calculates: the fields take the calculated figures and the
+  // dialog shows where they come from. The working is the panel under the fields, which may be scrolled out of sight (and when the fields already
+  // hold the calculated figures nothing else changes), so the button brings it into view and marks it for a moment.
+  const usageCalculationRef = useRef<HTMLDivElement>(null);
+  const [usageCalculationMarked, setUsageCalculationMarked] = useState(false);
+  const showUsageCalculation = (usage: MaterialUsageExplanation) => {
+    applyCalculatedUsage(usage);
+    usageCalculationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setUsageCalculationMarked(true);
+  };
+  useEffect(() => {
+    if (!usageCalculationMarked) return;
+    const timer = setTimeout(() => setUsageCalculationMarked(false), 1800);
+    return () => clearTimeout(timer);
+  }, [usageCalculationMarked]);
   // A new record starts from the calculated usage once a material is chosen, instead of from empty fields. Once per open: it never overwrites typing.
   const usageAutoFilledRef = useRef(false);
   useEffect(() => { if (!open) usageAutoFilledRef.current = false; }, [open]);
@@ -1530,7 +1545,7 @@ export function RawMaterialDialog({
                     onClick={(e) => {
                       e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
                       // Every family but sheet metal (which has its own reference calculators here): the button fills the fields from the engine's calculation.
-                      if (!isSheetMetalItem && usageIsCalculated) { applyCalculatedUsage(materialUsage); return; }
+                      if (!isSheetMetalItem && usageIsCalculated) { showUsageCalculation(materialUsage); return; }
                       setCalculatorTarget('netUsage');
                       setCalculatorResults(null);
                       setCalculatorWarnings([]);
@@ -1543,7 +1558,7 @@ export function RawMaterialDialog({
                     }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    title={!isSheetMetalItem && usageIsCalculated ? 'Fill Net, Gross and Scrap from the calculation below' : 'Use DB Calculator'}
+                    title={!isSheetMetalItem && usageIsCalculated ? 'Show how the usage is calculated, and fill Net, Gross and Scrap from it' : 'Use DB Calculator'}
                     disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
@@ -1595,7 +1610,7 @@ export function RawMaterialDialog({
                     type="button" variant="outline" size="icon"
                     onClick={(e) => {
                       e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
-                      if (!isSheetMetalItem && usageIsCalculated) { applyCalculatedUsage(materialUsage); return; }
+                      if (!isSheetMetalItem && usageIsCalculated) { showUsageCalculation(materialUsage); return; }
                       setCalculatorTarget('grossUsage');
                       setCalculatorResults(null);
                       setCalculatorWarnings([]);
@@ -1608,7 +1623,7 @@ export function RawMaterialDialog({
                     }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    title={isSheetMetalItem && grossUsageCalculator ? 'View calculation & override' : usageIsCalculated ? 'Fill Net, Gross and Scrap from the calculation below' : 'Use DB Calculator'}
+                    title={isSheetMetalItem && grossUsageCalculator ? 'View calculation & override' : usageIsCalculated ? 'Show how the usage is calculated, and fill Net, Gross and Scrap from it' : 'Use DB Calculator'}
                     disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
@@ -1747,12 +1762,14 @@ export function RawMaterialDialog({
               </div>
             </div>
 
-            <MaterialUsageJustification
-              usage={materialUsage}
-              loading={materialUsageLoading}
-              fields={{ net: netUsage, gross: grossUsage }}
-              onUse={applyCalculatedUsage}
-            />
+            <div ref={usageCalculationRef} className={`rounded-lg transition-shadow duration-300 ${usageCalculationMarked ? 'ring-2 ring-primary' : ''}`}>
+              <MaterialUsageJustification
+                usage={materialUsage}
+                loading={materialUsageLoading}
+                fields={{ net: netUsage, gross: grossUsage }}
+                onUse={applyCalculatedUsage}
+              />
+            </div>
 
             {/* Scrap, Reclaim Rate, Overhead */}
             <div className="grid grid-cols-3 gap-4">
