@@ -15,7 +15,7 @@ Columns: files staged in the memory folder; the ledger's status counts per proce
 
 | Engine code found | Domains |
 |---|---|
-| Yes | Sheet Metal, Machining, Plastic Molding, Die Casting, Sand Casting, Casting Investment, Forging (closed die on press, hammer or mechanical press; open die; ring rolling), Heat Treatment, Surface Treatment, Other Secondary (and chemical milling), Sheet Metal - Hydroforming; PCB (separate module `electronics-costing`, outside the process ledger) |
+| Yes | Sheet Metal, Machining, Plastic Molding, Die Casting, Sand Casting, Casting Investment, Forging (closed die on press, hammer or mechanical press; open die; ring rolling), Powder Metal (press and sinter), Heat Treatment, Surface Treatment, Other Secondary (and chemical milling), Sheet Metal - Hydroforming; PCB (separate module `electronics-costing`, outside the process ledger) |
 | Shared code, no process-specific engine | Casting, Stock Machining (covered by the machining engine's stock pricing) |
 | None found | Additive Manufacturing, Assembly, Assembly Molding, Assembly Plastic Molding, Part Assembly, Bar and Tube Fabrication, Composites, Powder Metal, Rapid Prototyping, Roto & Blow Molding, Sheet Plastic, Sheet Metal Roll Forming, Stretch Forming, Transfer Die, 2 Mold Molding, Multi-Spindle Machining |
 

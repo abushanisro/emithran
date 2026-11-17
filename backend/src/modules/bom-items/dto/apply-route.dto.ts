@@ -1,3 +1,6 @@
+import { SAND_CASTING_ROUTE_ID } from '../costing/casting/sand/sand-route-comparison';
+import { INVESTMENT_CASTING_ROUTE_ID } from '../costing/casting/investment/investment-route-comparison';
+import { POWDER_METAL_ROUTE_ID } from '../costing/powder-metal/powder-metal-route-comparison';
 import { OTHER_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/molding-route-projection';
 import { IsString, IsOptional, IsInt, Min, IsIn, IsArray, ArrayMinSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -28,6 +31,8 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...DIE_CASTING_PROCESSES.map(dieCastingRouteId),
   // Each forging route, priced by the forging engine (forging-route-comparison.ts).
   ...FORGING_ROUTE_IDS,
+  // The one-route processes: the cost summary as quoted, as one route (the Workflow Builder sets them like any complete route).
+  SAND_CASTING_ROUTE_ID, INVESTMENT_CASTING_ROUTE_ID, POWDER_METAL_ROUTE_ID,
 ];
 
 /**

@@ -6,7 +6,7 @@ import { groupFeaturesByType } from '@/lib/features/machining-feature-tree';
 import {
   familyToProcessGroupLabel,
 } from '@/lib/features/process-group';
-import { firstStepHoldsUnclaimedFeatures, isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows } from '@/lib/features/process-tree-family';
+import { firstStepHoldsUnclaimedFeatures, isMachiningTreeFamily, showsCatalogOperations, showsStepTextRows, wholePartLabel } from '@/lib/features/process-tree-family';
 import { sheetMetalOperationNodes, type OperationTreeNode } from '@/lib/features/sheet-metal-operation-nodes';
 import type { FeatureGraph, FeatureGraphSummary, FeatureNodeV2 } from '@/lib/types/manufacturing';
 
@@ -297,6 +297,12 @@ export function buildProcessTree(
       featureNodes.push(...gdtCalloutNodes(`gdt_${opIdx}`, matchedCostLine.gdtCallouts).map((n) => ({ ...n, factory, machine })));
     }
 
+    // A step that forms the part's shape (a forging's press or hammer, a powder metal compaction): every feature of the part's analysis, grouped
+    // by type, each highlighting its faces.
+    if (matchedCostLine?.formsPartFeatures && featureNodes.length === 0) {
+      featureNodes.push(...typeGroupNodes(`formed_${opIdx}`, v2All, machine));
+    }
+
     // Sheet metal steps show only the catalog operations above (the backend attaches them to every
     // line, live or applied). The earlier grouped-by-diameter hole and grouped-by-radius bend rows were a
     // second representation of the same CAD features and are gone.
@@ -420,7 +426,7 @@ export function buildProcessTree(
 
     // A step that acts on the whole part (a sand casting's melting, pouring, cooling, ...): the part is its feature, highlighted whole.
     if (featureNodes.length === 0 && matchedCostLine?.actsOnWholePart) {
-      featureNodes.push({ id: `whole_part_${opIdx}`, kind: 'feature', label: 'Whole casting', factory, machine, wholePart: true });
+      featureNodes.push({ id: `whole_part_${opIdx}`, kind: 'feature', label: wholePartLabel(family), factory, machine, wholePart: true });
     }
 
     // A secondary process (CMM, cleaning, NDT, packaging): what it acts on, from

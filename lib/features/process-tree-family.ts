@@ -19,7 +19,18 @@ export function isMachiningTreeFamily(family: string): boolean {
  * on all of it); its time is on the cost tab.
  */
 export function showsStepTextRows(family: string): boolean {
-  return family !== 'sand_cast'
+  return !FEATURE_ONLY_FAMILIES.has(family)
+}
+
+/**
+ * Families whose steps list features only, never their cost line's text ("Band Saw: 10.46 s per casting"): every step either forms the part's
+ * features or acts on the whole part, and its time is on the Cost tab.
+ */
+const FEATURE_ONLY_FAMILIES: ReadonlySet<string> = new Set(['sand_cast', 'forged', 'powder_metal'])
+
+/** What a step that acts on the whole part shows as its feature: the casting, or the part. */
+export function wholePartLabel(family: string): string {
+  return family === 'sand_cast' || family === 'die_cast' || family === 'investment_cast' ? 'Whole casting' : 'Whole part'
 }
 
 /** Families made by machining alone: their first step is the one that machines the part. */

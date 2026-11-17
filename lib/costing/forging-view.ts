@@ -8,18 +8,25 @@ export function formatForming(forming: ForgingSummary['forming']): string {
   return forming.value < 1000 ? `${Math.round(forming.value)} J` : `${(forming.value / 1000).toFixed(1)} kJ`;
 }
 
-/** The kind of route an option is ("Closed-die forging") and the machine it is on ("screw press"), from its label "kind · machine". */
-export function splitRouteLabel(label: string): { kind: string; machine: string | null } {
-  const at = label.indexOf(' · ');
-  return at < 0 ? { kind: label, machine: null } : { kind: label.slice(0, at), machine: label.slice(at + 3) };
+/** The scenario keys of the forging settings set over the engine's (backend forging-cost.service.ts FORGING_OVERRIDE_KEYS). */
+export const FORGING_SCENARIO_KEYS = {
+  complexity: 'forgingComplexity',
+  barDiameterMm: 'forgingBarDiameterMm',
+  heating: 'forgingHeating',
+  hits: 'forgingHits',
+  flashThicknessMm: 'forgingFlashThicknessMm',
+  flashWidthMm: 'forgingFlashWidthMm',
+} as const;
+
+/** How many of the forging settings the engineer set (complexity included). */
+export function forgingOverrideCount(overrides: Record<string, unknown> | null | undefined): number {
+  return Object.values(FORGING_SCENARIO_KEYS).filter((k) => overrides?.[k] != null).length;
 }
 
-/**
- * A route's reason for not being a route for this part, shortened for one line of the list: the clause before the first colon, without the
- * reference data's own key in parentheses ("complexity 7 carries flash"). The full sentence stays the row's tooltip.
- */
-export function shortReason(reason: string | null): string | null {
-  if (!reason) return null;
-  const clause = reason.split(':')[0]!.replace(/\s*\([^)]*\)/g, '').trim();
-  return clause.length > 60 ? `${clause.slice(0, 57).trimEnd()}...` : clause;
+/** A whole, positive number of blows, or an empty field (the data's). */
+export function parseBlows(text: string): number | null | 'invalid' {
+  const t = text.trim();
+  if (t === '') return null;
+  const n = Number(t);
+  return Number.isInteger(n) && n > 0 ? n : 'invalid';
 }

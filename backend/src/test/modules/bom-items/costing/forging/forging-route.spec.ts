@@ -1,6 +1,6 @@
 import { buildForgingRoutes, chooseForgingRoute, ringOf, type ForgingPart, type ForgingRoute, type ForgingRouteInput, type ForgingRouteKey } from '../../../../../modules/bom-items/costing/forging/forging-route';
 import { forgingCalculatorsByName, loadForgingCalculatorSpec } from '../../../../../modules/bom-items/costing/forging/calculators/forging-calculator-spec';
-import { forgingPart } from '../../../../../modules/bom-items/costing/forging/forging-cost.service';
+import { forgingOverridesOf, forgingPart } from '../../../../../modules/bom-items/costing/forging/forging-cost.service';
 import { buildForgingCostSummary } from '../../../../../modules/bom-items/costing/forging/forging-cost-summary';
 import { forgingRouteFor } from '../../../../../modules/bom-items/costing/forging/forging-route-comparison';
 import { routeToolingItems } from '../../../../../modules/bom-items/costing/shared/route-tooling';
@@ -203,6 +203,48 @@ describe('ring rolling', () => {
   });
 });
 
+describe("the engineer's settings over the engine's (Cost Guide)", () => {
+  const set = (overrides: NonNullable<ForgingRouteInput['scenario']['overrides']>) => ({ scenario: { ...input().scenario, overrides } });
+
+  it('a bar set by the engineer is sawn into mults of its own length, and a bar outside the billet ratio is said so', () => {
+    const auto = routeOf('closed_die_press');
+    const route = routeOf('closed_die_press', set({ barDiameterMm: 80 }));
+    expect(route.barDiameterMm).toBe(80);
+    // An 80 mm mult is too short for an induction coil (inductionHeatMinMultRatio): it is furnace heated, with the furnace's larger scale loss.
+    expect(route.heating).toBe('furnace');
+    const multVolume = route.multLengthMm * (Math.PI * 80 ** 2 / 4);
+    expect(multVolume).toBeGreaterThan(183_315);
+    expect(multVolume).toBeLessThan(181_500 * 1.05);
+    expect(route.multLengthMm).toBeLessThan(auto.multLengthMm);
+    expect(route.warnings.join(' ')).toMatch(/The bar is 80 mm as set in the Cost Guide\./); // 0.46 diameters: within 0.3 to 3.5
+    const stubby = routeOf('closed_die_press', set({ barDiameterMm: 120 }));
+    expect(stubby.warnings.join(' ')).toMatch(/set in the Cost Guide: its mult is 0\.1\d diameters long, outside the billet ratio range 0\.3 to 3\.5/);
+  });
+
+  it('heating set to a gas furnace heats in the furnace, with its scale loss', () => {
+    const route = routeOf('closed_die_press', set({ heating: 'furnace' }));
+    expect(route.heating).toBe('furnace');
+    expect(processes(route)).toContain('Preheat');
+    expect(route.warnings.join(' ')).toMatch(/heated in a gas furnace, as set in the Cost Guide/);
+  });
+
+  it('a flash land set by the engineer drives the press force (its width) and the trim force (its thickness)', () => {
+    const auto = routeOf('closed_die_press');
+    const route = routeOf('closed_die_press', set({ flashThicknessMm: 3, flashWidthMm: 12 }));
+    expect(route.flash).toMatchObject({ thicknessMm: 3, widthMm: 12 });
+    const flow = 41.28 * 10 ** 0.25;
+    expect(route.forming.value).toBeCloseTo((10 * flow * (6000 + 320 * 12)) / 1000, 0);
+    expect(route.trimForceKn).toBeCloseTo((491 * 320 * 3) / 1000, 0);
+    expect(route.forming.value).toBeGreaterThan(auto.forming.value);
+  });
+
+  it('blows set by the engineer are the screw press and hammer blows; the mechanical press keeps one per station', () => {
+    expect(routeOf('closed_die_press', set({ hits: 5 })).hits).toBe(5);
+    expect(routeOf('closed_die_hammer', set({ hits: 5 })).hits).toBe(5);
+    expect(routeOf('closed_die_mechanical_press', set({ hits: 5 })).hits).toBe(3);
+  });
+});
+
 describe('choosing the route to quote', () => {
   it('quotes the cheapest complete route and names what the others came to', () => {
     const { routes, gaps } = routesOf();
@@ -220,6 +262,13 @@ describe('choosing the route to quote', () => {
 });
 
 describe('forging: what it refuses, the part and the summary', () => {
+  it('reads only usable settings from the scenario', () => {
+    expect(forgingOverridesOf({ forgingBarDiameterMm: 40, forgingHeating: 'furnace', forgingHits: 2, forgingFlashThicknessMm: 1.5, forgingFlashWidthMm: 6 }))
+      .toEqual({ barDiameterMm: 40, heating: 'furnace', hits: 2, flashThicknessMm: 1.5, flashWidthMm: 6 });
+    expect(forgingOverridesOf({ forgingBarDiameterMm: -1, forgingHeating: 'laser', forgingHits: 2.5, forgingFlashThicknessMm: '3' }))
+      .toEqual({ barDiameterMm: null, heating: null, hits: null, flashThicknessMm: null, flashWidthMm: null });
+  });
+
   it('names a missing density, and a part not measured as a forging', () => {
     expect(routesOf({ material: { ...forgingMaterial('Steel, AISI 4140, Medium-Carbon'), columns: {} } }).missing).toEqual(['Steel, AISI 4140, Medium-Carbon: density_kg_m3']);
     expect(forgingPart({ volumeMm3: 1000, projectedAreaMm2: null, partingPerimeterMm: 100, dieDepthMm: null, planLengthMm: null, planWidthMm: null, holes: [] }).missing.join(' ')).toMatch(/Refresh analysis/);

@@ -7,6 +7,7 @@ import type { DomainCalculatorSpec } from '../costing/shared/calculators/domain-
 import { loadHeatTreatmentCalculatorSpec } from '../costing/heat/calculators/heat-treatment-calculator-spec';
 import { loadSandCastingCalculatorSpec } from '../costing/casting/sand/calculators/sand-casting-calculator-spec';
 import { loadInvestmentCastingCalculatorSpec } from '../costing/casting/investment/calculators/investment-casting-calculator-spec';
+import { loadPowderMetalCalculatorSpec } from '../costing/powder-metal/calculators/powder-metal-calculator-spec';
 import { loadForgingCalculatorSpec } from '../costing/forging/calculators/forging-calculator-spec';
 import { loadPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
@@ -182,6 +183,10 @@ export class CalculatorCatalogService {
   /** The forging calculators (migration 1050) keyed by their own name, as the sand ones are: one not in the database is absent. */
   loadForgingCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('forging-calculators', loadForgingCalculatorSpec(), accessToken);
+  }
+
+  loadPowderMetalCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('powder-metal-calculators', loadPowderMetalCalculatorSpec(), accessToken);
   }
 
   private loadSpecCalculators(cacheKey: string, spec: DomainCalculatorSpec, accessToken: string): Promise<ReferenceCalculators> {

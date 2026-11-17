@@ -1,4 +1,5 @@
 import { evaluateMachiningDfm, type MachiningDfmPart, type MachiningDfmReference } from '../../../../../../modules/bom-items/costing/machining/dfm/machining-dfm';
+import { unmeasuredReasonOf } from '../../../../../../modules/bom-items/costing/machining/dfm/machining-dfm.service';
 
 // The limits as the machining reference stages them (tblOperationSizeRanges, variables.csv, tblDrillSizeChart).
 const REF: MachiningDfmReference = {
@@ -132,5 +133,20 @@ describe('evaluateMachiningDfm', () => {
     const angled = run([along([0, 0, 1], 3, 'top', 500), along([0, 0.6428, 0.766], 1, 'angled', 520)]);
     expect(angled.findings.find((f) => f.rule === 'ToolAccess')).toMatchObject({ severity: 'major', featureIds: ['angled'], faces: [520] });
     expect(checkOf(angled, 'ToolAccess').status).toBe('failed');
+  });
+});
+
+// Parts analysed for forging or powder metal showed "This analysis is from before the measurement: use Refresh analysis" on the
+// corner, wall and tool-access checks; refreshing ran the same analysis and the message came back. Those analyses never measure them.
+describe('why tool access, corners and walls are not measured', () => {
+  it("another process's analysis never measures them: it says so, not Refresh analysis", () => {
+    expect(unmeasuredReasonOf('forged')).toMatch(/^Not measured: the forging analysis does not measure tool access/);
+    expect(unmeasuredReasonOf('powder_metal')).toMatch(/the powder metal analysis/);
+    expect(unmeasuredReasonOf('sand_cast')).toMatch(/the casting analysis/);
+  });
+
+  it('a machining analysis without them is older than the measurement: Refresh analysis', () => {
+    expect(unmeasuredReasonOf('milled')).toBe('This analysis is from before the measurement: use Refresh analysis.');
+    expect(unmeasuredReasonOf(undefined)).toMatch(/use Refresh analysis/);
   });
 });

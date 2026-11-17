@@ -128,6 +128,9 @@ import { SandCostService, type SandCostResult } from './costing/casting/sand/san
 import { InvestmentCostService, type InvestmentCostResult } from './costing/casting/investment/investment-cost.service';
 import { investmentCastingRoute } from './costing/casting/investment/investment-route-comparison';
 import { ForgingCostService } from './costing/forging/forging-cost.service';
+import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost.service';
+import { buildPowderMetalCostSummary } from './costing/powder-metal/powder-metal-cost-summary';
+import { powderMetalRoute } from './costing/powder-metal/powder-metal-route-comparison';
 import type { ForgingHole } from './costing/forging/forging-route';
 import { buildForgingCostSummary } from './costing/forging/forging-cost-summary';
 import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
@@ -205,8 +208,9 @@ export function holeGroupsOfGraph(features: unknown): Array<{ diameter_mm: numbe
   return [...groups.values()];
 }
 
+
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || castingProcessOfFamily(family) !== null;
 }
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
@@ -288,6 +292,8 @@ export class BomItemCostingService {
     private readonly investmentCostService?: InvestmentCostService,
     /** The forging route; optional for the same reason (without it a forged part is one named, uncosted line). */
     private readonly forgingCostService?: ForgingCostService,
+    /** The powder metal route; optional for the same reason (without it a powder metal part is one named, uncosted line). */
+    private readonly powderMetalCostService?: PowderMetalCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -2417,7 +2423,8 @@ export class BomItemCostingService {
     // casting line; see casting-cost-summary.ts for what is and is not charged.
     const castingProcess = castingProcessOfFamily(family);
     // A forged part shares the casting block's machining after the primary process (a feature forging leaves short, a hole it cannot pierce).
-    if (castingProcess || family === 'forged') {
+    // A powder metal part too: machining after pressing (a hole across the press direction, a tolerance pressing does not hold).
+    if (castingProcess || family === 'forged' || family === 'powder_metal') {
       const castingWarnings = [...materialWarnings];
       const client = this.databaseService.getClient(accessToken);
       const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
@@ -2450,7 +2457,7 @@ export class BomItemCostingService {
       // machine (secondary-machining-cost.ts). No feature short = no line. It
       // depends on the casting process (its capabilities and castable holes).
       // The primary process the part leaves for machining, as the warnings name it: a casting or a forging.
-      const nearNet = family === 'forged' ? 'forging' : 'casting';
+      const nearNet = family === 'forged' ? 'forging' : family === 'powder_metal' ? 'pressing' : 'casting';
       const priceMachiningAfter = async (primaryProcess: string | undefined) => {
         const warnings: string[] = [];
         const need = await this.featureToleranceService.getMachiningNeed(id, accessToken, primaryProcess, forceFamily);
@@ -2573,6 +2580,42 @@ export class BomItemCostingService {
         });
         return [];
       };
+
+      // ── Powder metal ─────────────────────────────────────────────────────────
+      // The part measured along its press direction (the same die-direction measurements as a forging, auto-fill's forging* summary keys) and
+      // memory/Powder metal price the press-and-sinter route (powder-metal-route.ts); then the machining after pressing, as after a casting.
+      if (!castingProcess && family === 'powder_metal') {
+        const pm = this.powderMetalCostService
+          ? await this.powderMetalCostService.price({
+            client, accessToken, location, grade,
+            measurements: {
+              volumeMm3: ((item.volume ?? 0) as number) || null,
+              projectedAreaMm2: (summary.forgingProjectedAreaMm2 as number | null) ?? null,
+              dieDepthMm: (summary.forgingDieDepthMm as number | null) ?? null,
+              planLengthMm: (summary.forgingPlanLengthMm as number | null) ?? null,
+              planWidthMm: (summary.forgingPlanWidthMm as number | null) ?? null,
+              holes: Array.isArray(summary.forgingHoles) ? (summary.forgingHoles as ForgingHole[]) : [],
+            },
+            overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+          })
+          : { route: null, missing: ['the powder metal cost service is not available'], warnings: [] };
+        const m = await priceMachiningAfter('Powder Metal');
+        const pmResult = {
+          ...buildPowderMetalCostSummary({
+            powderMetal: pm, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings, ...m.warnings], ratesSource: RATES_SOURCE_LABEL,
+            secondaryMachining: m.secondaryMachining,
+          }),
+          ...currencyMeta,
+          drawingCadConsistency,
+        };
+        this.overrides.applyCostOverrides(pmResult, costOverrides);
+        if (costOverrides.size > 0) pmResult.costOverrides = Object.fromEntries(costOverrides);
+        if (localLinesOut) {
+          localLinesOut.lines = JSON.parse(JSON.stringify(pmResult.processLines)) as ProcessLineCost[];
+          localLinesOut.localCurrency = locInfo.code;
+        }
+        return { ...this.normalizeCostSummaryToCurrency(pmResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+      }
 
       // ── Forging ──────────────────────────────────────────────────────────────
       // The part measured along its die direction (cad-engine forging/feature_extractor.py, via auto-fill's forging* summary keys) and
@@ -4514,6 +4557,11 @@ export class BomItemCostingService {
     // Investment casting: one route, the cost summary as quoted (investment-route-comparison.ts).
     if (castingProcessOfFamily(family) === 'investment_casting') {
       return this.singleCastingRouteComparison('investment_cast', investmentCastingRoute, 'The investment casting route could not be fully costed for this part.',
+        id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Powder metal: one route, the cost summary as quoted (powder-metal-route-comparison.ts).
+    if (family === 'powder_metal') {
+      return this.singleCastingRouteComparison('powder_metal', powderMetalRoute, 'The powder metal route could not be fully costed for this part.',
         id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     // Forging: one complete route per forging route, each the full quote on that route (forging-route-comparison.ts).

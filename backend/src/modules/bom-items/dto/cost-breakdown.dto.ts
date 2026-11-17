@@ -377,6 +377,9 @@ export interface ProcessLineCost {
   // The step acts on the whole part (a sand casting's melting, pouring, cooling, shakeout, cleaning, finishing and inspection): the process
   // tree shows the part as the step's feature and highlights all of it. Display only.
   actsOnWholePart?: boolean;
+  // The step forms the part's shape (a forging's press or hammer, a powder metal part's compaction): the process tree lists every feature of the
+  // part's analysis under it, each highlighting its faces. Display only.
+  formsPartFeatures?: boolean;
   // The real GD&T callouts this line (Inspection) covers — see gdt-callouts.ts.
   // Only the STEP-model source can carry a real faceIds link (drawing-sourced
   // callouts are always faceIds: []) — highlight only when faceIds is non-empty.
@@ -682,6 +685,8 @@ export interface CostSummaryDto {
   forgingDies?: { sets: number; costUsd: number; perPartUsd: number | null; detail: string };
   /** Investment casting: the tree the route built and its shell. */
   investmentCasting?: InvestmentCastingBreakdown;
+  /** Powder metal: what the press-and-sinter route decided (green density, compaction, fill, sintering belt). */
+  powderMetal?: PowderMetalBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
 
@@ -782,6 +787,22 @@ export interface ForgingBreakdown {
   complete: boolean;
   /** Every route: its total per part (summary currency, tooling included) when complete, or why it is not a route for the part. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
+/** What the powder metal route decided: the green density the part is pressed to, the compaction, the fill and the sintering belt. */
+export interface PowderMetalBreakdown {
+  routeLabel: string;
+  greenDensityKgM3: number;
+  /** The powder's own green density, or the Cost Guide's. */
+  greenDensitySource: 'material' | 'scenario';
+  compactionPressureMpa: number;
+  pressForceKn: number;
+  fillHeightMm: number;
+  compressionRatio: number;
+  /** The sintering belt of the furnace chosen; null when no furnace takes the part. */
+  belt: { speedMmPerMin: number; partsAcross: number; partsPerMetre: number } | null;
+  /** False while a step no machine can do is a gap. */
+  complete: boolean;
 }
 
 /** What the investment casting route decided: the wax tree every shared step is divided over, and the shell's dips. */

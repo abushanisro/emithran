@@ -47,6 +47,9 @@ export const FORGING_ROUTES = [
 export type ForgingRouteKey = (typeof FORGING_ROUTES)[number]['key'];
 const labelOf = (key: ForgingRouteKey) => FORGING_ROUTES.find((r) => r.key === key)!.label;
 
+/** The steps that form the part's shape (the others saw, heat or trim it). */
+const FORMING_PROCESSES: ReadonlySet<string> = new Set(['Press', 'Hammer', 'Mechanical Press', 'Open Die Press', 'Ring Rolling']);
+
 const CALC = (name: string) => `Forging - ${name}`;
 export const FORGED_VOLUME = CALC('Forged volume');
 export const FLASH_LAND = CALC('Flash land');
@@ -91,6 +94,20 @@ export interface ForgingScenario {
   route: ForgingRouteKey | null;
   /** Parts made over the dies' life; null: the dies are not costed (and said so), never spread over an assumed volume. */
   lifetimeVolume: number | null;
+  /** What the engineer set in the Cost Guide in place of the engine's choice; absent or null: the engine decides. */
+  overrides?: ForgingOverrides;
+}
+
+/** The forging settings an engineer can set over the engine's (Cost Guide). Each null is the engine's own. */
+export interface ForgingOverrides {
+  /** The round bar the mults are sawn from (mm); the mult length follows. */
+  barDiameterMm?: number | null;
+  heating?: 'induction' | 'furnace' | null;
+  /** Blows of the screw press and the hammer (the mechanical press strikes once per station). */
+  hits?: number | null;
+  /** The flash land (mm): its width adds to the area the press force acts on, its thickness is what the trim shears. */
+  flashThicknessMm?: number | null;
+  flashWidthMm?: number | null;
 }
 
 export interface ForgingRouteInput {
@@ -165,6 +182,7 @@ export function ringOf(part: ForgingPart, minHoleMm: number): { outsideMm: numbe
 /** The routes of the part (each complete or with its gaps), the routes that could not be built and why, and what keeps every route from being built. */
 export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingRoute[]; gaps: ForgingRouteGap[]; missing: string[] } {
   const { ref, part, scenario, material } = input;
+  const overrides: ForgingOverrides = scenario.overrides ?? {};
   const none = (...missing: string[]) => ({ routes: [], gaps: [], missing });
   const num = (name: string) => ref.number(name);
   const table = (name: string) => ref.table(`forging_${name}`);
@@ -262,18 +280,28 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
    */
   const multOf = (metal: (scale: number) => { volumeMm3: number; run: ReferenceCalcRun } | { reasons: string[] }) => {
     // The thinnest bar that keeps the mult within the billet ratio range; induction heating when that bar and mult suit a coil.
-    const pickBar = (v: number) => bars.find((d) => { const ratio = (4 * v) / (Math.PI * d ** 3); return ratio <= maxRatio! && ratio >= minRatio!; });
-    let m = metal(scaleInduction!);
+    // The engineer's bar and heating (Cost Guide) stand in for these choices; the machines still have to take them.
+    const pickBar = (v: number) => overrides.barDiameterMm ?? bars.find((d) => { const ratio = (4 * v) / (Math.PI * d ** 3); return ratio <= maxRatio! && ratio >= minRatio!; });
+    const forced = overrides.heating ?? null;
+    let m = metal(forced === 'furnace' ? scaleFurnace! : scaleInduction!);
     if ('reasons' in m) return m;
     let bar = pickBar(m.volumeMm3);
-    const induction = bar != null && bar <= maxInductionWidth! && (4 * m.volumeMm3) / (Math.PI * bar ** 3) >= minInductionRatio!;
-    if (!induction) {
+    const induction = forced != null ? forced === 'induction'
+      : bar != null && bar <= maxInductionWidth! && (4 * m.volumeMm3) / (Math.PI * bar ** 3) >= minInductionRatio!;
+    if (!induction && forced == null) {
       m = metal(scaleFurnace!);
       if ('reasons' in m) return m;
       bar = pickBar(m.volumeMm3);
     }
     if (bar == null) return { reasons: [`no round bar of roundBarSizes gives a mult between ${minRatio} and ${maxRatio} times its diameter long (minBilletRatio, maxBilletRatio)`] };
-    const barSeed: CalcSeed = { value: bar, source: `round bar ${bar} mm (roundBarSizes: the thinnest that keeps the mult within the billet ratio range)` };
+    const ratio = (4 * m.volumeMm3) / (Math.PI * bar ** 3);
+    const barSeed: CalcSeed = overrides.barDiameterMm != null
+      ? { value: bar, source: `round bar ${bar} mm, set in the Cost Guide` }
+      : { value: bar, source: `round bar ${bar} mm (roundBarSizes: the thinnest that keeps the mult within the billet ratio range)` };
+    const setNotes = [
+      ...(overrides.barDiameterMm != null ? [`The bar is ${bar} mm as set in the Cost Guide${ratio > maxRatio! || ratio < minRatio! ? `: its mult is ${r2(ratio)} diameters long, outside the billet ratio range ${minRatio} to ${maxRatio} (minBilletRatio, maxBilletRatio)` : ''}.`] : []),
+      ...(forced != null ? [`The mult is heated ${forced === 'induction' ? 'by induction' : 'in a gas furnace'}, as set in the Cost Guide.`] : []),
+    ];
     const stock = run(STOCK, null, { mult_volume_mm3: { value: m.volumeMm3, source: 'mult volume' }, bar_diameter_mm: barSeed }, 'Material Cost');
     if ('reasons' in stock) return stock;
     const multLength = stock.run.outputs['Mult Length']!;
@@ -321,7 +349,7 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
           mults_per_load: { value: Math.min(perLoad, scenario.batchSize), source: `mults standing on the oven floor at ${r2(pitch)} mm pitch (ovenPartSpacingFactor), at most the batch` },
         });
       }, ['It reaches the forging temperature plus ovenTemperatureOffset', 'The oven takes the mult standing'], input.machinesByClass[FORGING_CLASS.furnace] ?? []);
-    const notes = induction ? [] : ['The mult is heated in a gas furnace (too thick or short for an induction coil): its time is the heat the load takes at the furnace\'s rated power, a lower bound, as the reference gives no furnace efficiency.'];
+    const notes = [...setNotes, ...(induction || forced != null ? [] : ['The mult is heated in a gas furnace (too thick or short for an induction coil): its time is the heat the load takes at the furnace\'s rated power, a lower bound, as the reference gives no furnace efficiency.'])];
     return { bar, barSeed, multLength, multKg, induction, volumeMm3: m.volumeMm3, metalRun: m.run, stock, saw, heat, notes };
   };
 
@@ -359,7 +387,8 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
         } else warnings.push(`The forging dies are not costed: ${t.reasons.join('; ')}`);
       }
     } else warnings.push('No part-specific dies: the route forges between the press\'s flat dies and tools.');
-    const lines = args.steps.map((s) => s.line);
+    // The process tree: the forming steps list the part's features, the others (saw, heat, trim) act on the whole part.
+    const lines = args.steps.map((s) => (FORMING_PROCESSES.has(s.line.process) ? { ...s.line, formsPartFeatures: true } : { ...s.line, actsOnWholePart: true }));
     const toolingPerPart = tooling && ref.text('disableInvestmentAmortization') !== 'true' ? tooling.perPartUsd : 0;
     const materialCost = args.mult.stock.run.value!;
     const complete = !lines.some(isGap);
@@ -384,24 +413,30 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
   const forgedKg = forgedVolume * 1e-9 * density;
   const flash = run(FLASH_LAND, null, { forged_kg: { value: forgedKg, source: 'forged mass: forged volume x density' } }, 'Flash Thickness');
   if ('reasons' in flash) return none(...flash.reasons);
-  const flashThickness = flash.run.value!;
-  const flashWidth = flash.run.outputs['Flash Width']!;
+  // Vieregge's flash land, unless the engineer set it (Cost Guide): the width spreads the press force, the thickness is what the trim shears.
+  const flashThickness = overrides.flashThicknessMm ?? flash.run.value!;
+  const flashWidth = overrides.flashWidthMm ?? flash.run.outputs['Flash Width']!;
+  const flashSource = (what: 'thickness' | 'width') => ((what === 'thickness' ? overrides.flashThicknessMm : overrides.flashWidthMm) != null
+    ? `flash land ${what}, set in the Cost Guide` : `flash land ${what} (Flash land)`);
   const factorName = flashPct === 0 ? 'forgingPressureFactorNoFlash' : minComplex != null && complexity >= minComplex ? 'forgingPressureFactorComplex' : 'forgingPressureFactorFlash';
   const pressureFactor = num(factorName);
   if (pressureFactor == null) return none(`forging variable ${factorName}`);
   const pressForce = run(PRESS_FORCE, null, {
     pressure_factor: { value: pressureFactor, source: `Forging variable ${factorName} (complexity ${complexity})`, ref: { kind: 'variable', domain: FORGING_DOMAIN, name: factorName } },
-    flash_width_mm: { value: flashWidth, source: 'flash land width (Flash land)' },
+    flash_width_mm: { value: flashWidth, source: flashSource('width') },
   }, 'Required Force');
   if ('reasons' in pressForce) return none(...pressForce.reasons);
-  const trimForce = run(TRIM_FORCE, null, { flash_thickness_mm: { value: flashThickness, source: 'flash land thickness (Flash land)' } }, 'Required Force');
+  const trimForce = run(TRIM_FORCE, null, { flash_thickness_mm: { value: flashThickness, source: flashSource('thickness') } }, 'Required Force');
   if ('reasons' in trimForce) return none(...trimForce.reasons);
   const pressKn = pressForce.run.value!;
   const trimKn = trimForce.run.value!;
   const flashFacts = { thicknessMm: r2(flashThickness), widthMm: r2(flashWidth), volumeMm3: r2(closedMult.metalRun.outputs['Flash Volume']!) };
   const baseHits = num('baseNumberOfHits');
-  const hits = baseHits == null ? 1 : Math.max(1, baseHits - (enabled('enableUpset') ? 0 : 1) - (enabled('enableBlock') ? 0 : 1));
-  const hitsSeed: CalcSeed = { value: hits, source: `baseNumberOfHits ${baseHits}, less the upset or blocking blow the plant disables (enableUpset, enableBlock)` };
+  const dataHits = baseHits == null ? 1 : Math.max(1, baseHits - (enabled('enableUpset') ? 0 : 1) - (enabled('enableBlock') ? 0 : 1));
+  const hits = overrides.hits ?? dataHits;
+  const hitsSeed: CalcSeed = overrides.hits != null
+    ? { value: hits, source: 'blows, set in the Cost Guide' }
+    : { value: hits, source: `baseNumberOfHits ${baseHits}, less the upset or blocking blow the plant disables (enableUpset, enableBlock)` };
   const load = handling('materialHandling', forgedKg, 'Load Time (s)');
   const unload = handling('materialHandling', forgedKg, 'Unload Time (s)');
   const trim = step('Trim', FORGING_CLASS.trim, (m) => {
@@ -414,6 +449,8 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
   const trimSteps = flashPct > 0 ? [trim] : [];
   const closedRuns = { forgedVolume: closedMult.metalRun, flashLand: flash.run, pressForce: pressForce.run, trimForce: trimForce.run };
   const closedNotes = [
+    ...(overrides.flashThicknessMm != null || overrides.flashWidthMm != null ? [`The flash land is ${r2(flashThickness)} x ${r2(flashWidth)} mm as set in the Cost Guide (Vieregge's rule gives ${r2(flash.run.value!)} x ${r2(flash.run.outputs['Flash Width']!)} mm).`] : []),
+    ...(overrides.hits != null ? [`The screw press and the hammer strike ${hits} blow${hits === 1 ? '' : 's'}, as set in the Cost Guide (the data gives ${dataHits}).`] : []),
     `The finishing blow needs ${r2(pressKn)} kN: the hot flow stress (strength coefficient x strain rate ^ sensitivity) over the part and its flash land, times the pressure-multiplying factor of complexity ${complexity}.`,
     ...(flashPct === 0 ? [`Complexity ${complexity} forges without flash (partComplexityBasedData): no trim step.`] : []),
   ];

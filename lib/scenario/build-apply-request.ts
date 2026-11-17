@@ -13,6 +13,8 @@ export interface StagedManualRoute {
   /** A route applied as it is. */
   directApplyRouteId?: string;
   dieCastingProcess?: string;
+  /** A forging route picked in the Workflow Builder (forging-route.ts FORGING_ROUTES key, e.g. "closed_die_hammer"). */
+  forgingRoute?: string;
   machineOverrides?: { processKey: string; mhrRecordId: string }[];
 }
 
@@ -31,6 +33,7 @@ export interface StagedScenario {
   processRouting: 'auto' | 'manual';
   manualRoute: StagedManualRoute | null;
   isDieCast: boolean;
+  isForged: boolean;
   /** Currency and ask price, already resolved by the form. */
   scenarioPatch?: Record<string, unknown>;
   /** The revision of the applied scenario the page read: another apply since then is refused, not overwritten. */
@@ -94,6 +97,8 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
         processRouting: s.processRouting,
         // Die casting: Manual is the process picked in the Workflow Builder; Auto clears it, so the cheapest feasible process is quoted.
         ...(s.isDieCast ? { dieCastingProcess: manual?.dieCastingProcess ?? null } : {}),
+        // Forging the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
+        ...(s.isForged ? { forgingRoute: manual?.forgingRoute ?? null } : {}),
         ...(s.scenarioPatch ?? {}),
       },
       route,

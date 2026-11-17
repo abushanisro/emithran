@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { ForgingSection } from '@/components/costing/ForgingSection';
+import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
+import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -2610,6 +2612,7 @@ function RouteSelectionDialog({
   const isInvestmentCast = partFamily === 'investment_cast';
   // Forged parts: the closed-die forging route as quoted, like sand.
   const isForged = partFamily === 'forged';
+  const isPowderMetal = partFamily === 'powder_metal';
   const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
@@ -2877,6 +2880,17 @@ function RouteSelectionDialog({
       processRoute: m.processRoute,
       machineClass: m.machineClass ?? null,
     }));
+  // A complete-route family (casting, forging, molding, machining) opens on a route, never an empty pane: the one picked here while it is
+  // still priced, else the quoted one (the backend's recommendedRouteId), else the first feasible.
+  useEffect(() => {
+    if (!open || !isCompleteRouteFamily || allRoutesForTree.length === 0) return;
+    if (cuttingRouteId && allRoutesForTree.some((r) => r.routeId === cuttingRouteId)) return;
+    const quoted = comparison.data?.recommendedRouteId;
+    const pick = (quoted && allRoutesForTree.some((r) => r.routeId === quoted) ? quoted : null)
+      ?? allRoutesForTree.find((r) => r.isFeasible)?.routeId ?? allRoutesForTree[0]!.routeId;
+    setCuttingRouteId(pick);
+  }, [open, isCompleteRouteFamily, allRoutesForTree, cuttingRouteId, comparison.data?.recommendedRouteId]);
+
   useEffect(() => {
     if (!isSheetMetal) return;
     const justOpened = open && !wasOpenRef.current;
@@ -3086,7 +3100,7 @@ function RouteSelectionDialog({
     if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     // A die-casting process route: feasible ones only, the same rule apply-route
     // enforces (an infeasible row still says why).
-    if (isDieCast || isSandCast || isInvestmentCast || isForged) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
+    if (isDieCast || isSandCast || isInvestmentCast || isForged || isPowderMetal) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
     return false;
   };
 
@@ -3102,6 +3116,7 @@ function RouteSelectionDialog({
       rationale: `${selected.routeLabel} route — selected in Workflow Builder`,
       directApplyRouteId: selected.routeId,
       ...(isDieCast ? { dieCastingProcess: selected.routeLabel } : {}),
+      ...(() => { const key = isForged ? forgingRouteKeyOf(selected.routeId) : undefined; return key ? { forgingRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -3133,7 +3148,9 @@ function RouteSelectionDialog({
                 ? 'Compare every real molding route priced for this part, then set one as the applied route.'
                 : isMachining
                   ? 'Compare every machine route priced for this part, then set one as the applied route.'
-                  : 'No priced routes are available for this part family yet.'}
+                  : isCompleteRouteFamily
+                    ? 'Compare every route priced for this part, then set one as the applied route. The quoted route is selected.'
+                    : 'No priced routes are available for this part family yet.'}
           </p>
         </DialogHeader>
 
@@ -3226,6 +3243,9 @@ function RouteSelectionDialog({
               } : isSandCast ? {
                 title: 'Sand casting',
                 description: 'The sand-casting route as quoted: melting, coremaking, moulding on the cheapest capable machine, pouring, shakeout and finishing. The Cost Guide compares the moulding machines.',
+              } : isPowderMetal ? {
+                title: 'Powder metal',
+                description: 'The press-and-sinter route as quoted: the powder compacted to its green density on the cheapest press that delivers the force, takes the fill and fits the part, then sintered on the mesh belt furnace that carries it, with the powder. The Cost Guide sets the green density.',
               } : isForged ? {
                 title: 'Forging',
                 description: 'Each forging route of the part: closed-die on a screw press, a die hammer or a mechanical press with transfer; open-die for a flashless shape; ring rolling for a ring. Each saws the bar into mults, heats them by induction (or in a gas furnace when too thick for the coils), forms them on the cheapest capable machine and trims the flash, with the bar and the dies.',
@@ -4134,7 +4154,8 @@ function CostGuidePanel({
                   </p>
                 )}
 
-                {isCastingProcess && (
+                {/* A casting or a forging: machining after it, from the features its process cannot hold or make. */}
+                {(isCastingProcess || selectedProcessGroup === 'Forging' || selectedProcessGroup === 'Powder Metal') && (
                   <MachiningRequiredChoice
                     itemId={item.id}
                     choice={typeof item.scenarioOverrides?.requiresSecondaryMachining === 'boolean'
@@ -4527,13 +4548,21 @@ function CostGuidePanel({
               </Section>
             )}
 
+            {cgpCostSummary?.family === 'powder_metal' && (
+              <Section title="Powder Metal">
+                <PowderMetalSection
+                  powderMetal={cgpCostSummary.powderMetal}
+                  greenDensity={typeof item.scenarioOverrides?.powderMetalGreenDensity === 'number' ? item.scenarioOverrides.powderMetalGreenDensity : null}
+                  onChange={(v) => { patchScenarioOverrides.mutate({ id: item.id, patch: { powderMetalGreenDensity: v } }); }}
+                />
+              </Section>
+            )}
+
             {cgpCostSummary?.family === 'forged' && (
               <Section title="Forging">
                 <ForgingSection
                   forging={cgpCostSummary.forging}
-                  complexity={typeof item.scenarioOverrides?.forgingComplexity === 'number' ? item.scenarioOverrides.forgingComplexity : null}
-                  route={typeof item.scenarioOverrides?.forgingRoute === 'string' ? item.scenarioOverrides.forgingRoute : null}
-                  currency={cgpCostSummary.currency}
+                  overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
               </Section>
@@ -7970,6 +7999,7 @@ export default function ManufacturingIntelligencePage() {
       processRouting,
       manualRoute: selectedManualRoute,
       isDieCast: (item.familyClassification ?? fg?.classification?.family) === 'die_cast',
+      isForged: (item.familyClassification ?? fg?.classification?.family) === 'forged',
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });

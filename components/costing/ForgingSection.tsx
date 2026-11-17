@@ -1,107 +1,124 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { useState } from 'react';
 
-import { formatForming, shortReason, splitRouteLabel, type ForgingSummary } from '@/lib/costing/forging-view';
+import { NumberField } from '@/components/costing/NumberField';
+import { FORGING_SCENARIO_KEYS, forgingOverrideCount, formatForming, parseBlows, type ForgingSummary } from '@/lib/costing/forging-view';
+import { parsePositive } from '@/lib/costing/sand-scenario';
 
 interface Props {
   forging: ForgingSummary | null | undefined;
-  /** The part's own choices (unset: the data's default complexity, the cheapest complete route). */
-  complexity: number | null;
-  route: string | null;
-  currency: string | null | undefined;
+  /** The part's scenario overrides (unset keys: the engine decides). */
+  overrides: Record<string, unknown> | null | undefined;
   /** Writes one scenario key; null clears it. */
   onChange: (patch: Record<string, string | number | null>) => void;
 }
 
-const money = (v: number, currency: string | null | undefined) => `${v.toFixed(2)}${currency ? ` ${currency}` : ''}`;
+const rowClass = 'flex items-center gap-2 py-0.5';
+const labelClass = 'text-xs text-muted-foreground w-24 shrink-0';
+const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
 
 /**
- * The Cost Guide's forging settings: the part complexity, the route as a list (each route its price, or why it is not a route for this part),
- * and what the quoted route makes of the part.
+ * The Cost Guide's forging settings. Every one is the engine's until set: complexity, the bar, the heating, the blows and the flash land, each
+ * field showing the engine's value as its placeholder. The mult length and the forming force are results, shown, not set. The routes are
+ * compared and picked in the Workflow Builder (Process Routing: Manual).
  */
-export function ForgingSection({ forging, complexity, route, currency, onChange }: Props) {
-  const routes = forging?.options ?? [];
-  const pick = (value: string | null) => { if (value !== route) onChange({ forgingRoute: value }); };
+export function ForgingSection({ forging, overrides, onChange }: Props) {
+  const number = (key: string) => (typeof overrides?.[key] === 'number' ? overrides[key] : null);
+  const text = (key: string) => (typeof overrides?.[key] === 'string' ? overrides[key] : '');
+  const set = (key: string) => (v: string | number | null) => { onChange({ [key]: v }); };
+  const overridden = forgingOverrideCount(overrides);
+  const [open, setOpen] = useState(overridden > 0);
+  const complexity = number(FORGING_SCENARIO_KEYS.complexity);
   return (
-    <div className="space-y-3 text-xs">
+    <div className="space-y-1 text-xs">
       {/* The part complexity score sets the flash the forging carries and the pressure its finishing blow needs (memory/Forging
           partComplexityBasedData). Unset, the data's least score for a 3D part is used and the Cost tab says so. */}
-      <label className="flex items-center justify-between gap-2">
-        <span className="text-muted-foreground">Part complexity <span className="text-muted-foreground/70">(1 simple, 12 complex)</span></span>
+      <div className={rowClass}>
+        <span className={labelClass}>Complexity</span>
         <select
+          className={`${controlClass} cursor-pointer`}
           value={complexity != null ? String(complexity) : ''}
-          onChange={(e) => onChange({ forgingComplexity: e.target.value ? Number(e.target.value) : null })}
-          className="w-28 border border-border rounded px-2 py-1 bg-background"
+          onChange={(e) => { set(FORGING_SCENARIO_KEYS.complexity)(e.target.value ? Number(e.target.value) : null); }}
+          title="1 simple to 12 complex: the flash the forging carries and the pressure of its finishing blow (partComplexityBasedData)."
         >
           <option value="">{`Default (${forging?.complexity ?? 7})`}</option>
           {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
-      </label>
+      </div>
 
       {forging && (
-        <div>
-          <div className="text-muted-foreground mb-1">Route</div>
-          <div role="radiogroup" aria-label="Forging route" className="rounded border border-border divide-y divide-border overflow-hidden">
-            <RouteRow selected={route == null} onSelect={() => pick(null)} title="The cheapest route that is fully costed is quoted.">
-              <span className="font-medium text-foreground">Cheapest complete route</span>
-              <span className="ml-auto text-muted-foreground">auto</span>
-            </RouteRow>
-            {routes.map((o) => {
-              const { kind, machine } = splitRouteLabel(o.label);
-              const priced = o.complete && o.totalCost != null;
-              return (
-                <RouteRow
-                  key={o.route}
-                  selected={route === o.route}
-                  disabled={!priced}
-                  onSelect={() => pick(o.route)}
-                  title={priced ? `${o.label}: ${money(o.totalCost!, currency)} per part` : `${o.label}: ${o.reason ?? 'not fully costed'}`}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className={priced ? 'text-foreground' : 'text-muted-foreground'}>{machine ?? kind}</span>
-                    {machine && <span className="block text-[10px] text-muted-foreground truncate">{kind}</span>}
-                    {!priced && <span className="block text-[10px] text-muted-foreground/80 truncate">{shortReason(o.reason) ?? 'not fully costed'}</span>}
-                  </span>
-                  <span className="shrink-0 tabular-nums">
-                    {priced ? money(o.totalCost!, currency) : <span className="text-muted-foreground">not possible</span>}
-                  </span>
-                </RouteRow>
-              );
-            })}
+        <>
+          <div className={rowClass}>
+            <span className={labelClass}>Quoted</span>
+            <span className="flex-1 min-w-0 text-foreground">{forging.routeLabel}</span>
           </div>
-        </div>
-      )}
-
-      {forging && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
-          <dt className="text-muted-foreground">Quoted</dt><dd className="text-foreground">{forging.routeLabel}</dd>
-          <dt className="text-muted-foreground">Bar</dt><dd className="tabular-nums">Ø{forging.barDiameterMm} mm, {forging.multLengthMm} mm mults</dd>
-          <dt className="text-muted-foreground">Heating</dt><dd>{forging.heating === 'induction' ? 'Induction' : 'Gas furnace'}</dd>
-          <dt className="text-muted-foreground">Forming</dt><dd className="tabular-nums">{forging.hits} {forging.hits === 1 ? 'blow' : 'blows'}, {formatForming(forging.forming)}</dd>
-          {forging.flash && <><dt className="text-muted-foreground">Flash land</dt><dd className="tabular-nums">{forging.flash.thicknessMm} × {forging.flash.widthMm} mm</dd></>}
-        </dl>
+          <details open={open} onToggle={(e) => { setOpen(e.currentTarget.open); }}>
+            <summary className="cursor-pointer select-none text-[11px] text-muted-foreground" title="Each setting is the engine's until you set it; empty a field to give it back to the engine.">
+              Forging settings: {overridden > 0 ? `${overridden} overridden` : 'automatic'} · <span className="font-medium text-brand-500 hover:text-brand-400">Override</span>
+            </summary>
+            <div className="space-y-1 pt-1">
+              <NumberField
+                label="Bar Ø, mm"
+                value={number(FORGING_SCENARIO_KEYS.barDiameterMm)}
+                placeholder={String(forging.barDiameterMm)}
+                parse={parsePositive}
+                onCommit={set(FORGING_SCENARIO_KEYS.barDiameterMm)}
+                title="The round bar the mults are sawn from. Empty: the thinnest bar that keeps the mult within the billet ratio range (roundBarSizes)."
+              />
+              <div className={rowClass} title="The mult's length follows from the bar and the metal it carries.">
+                <span className={labelClass}>Mult length</span>
+                <span className="flex-1 tabular-nums">{forging.multLengthMm} mm</span>
+              </div>
+              <div className={rowClass}>
+                <span className={labelClass}>Heating</span>
+                <select
+                  className={`${controlClass} cursor-pointer`}
+                  value={text(FORGING_SCENARIO_KEYS.heating)}
+                  onChange={(e) => { set(FORGING_SCENARIO_KEYS.heating)(e.target.value || null); }}
+                  title="Empty: induction when the bar and mult suit a coil, else a gas furnace."
+                >
+                  <option value="">{`Auto (${forging.heating === 'induction' ? 'induction' : 'gas furnace'})`}</option>
+                  <option value="induction">Induction</option>
+                  <option value="furnace">Gas furnace</option>
+                </select>
+              </div>
+              <NumberField
+                label="Blows"
+                value={number(FORGING_SCENARIO_KEYS.hits)}
+                placeholder={String(forging.hits)}
+                parse={parseBlows}
+                onCommit={set(FORGING_SCENARIO_KEYS.hits)}
+                title="Blows of the screw press and the hammer. Empty: the data's (baseNumberOfHits, less the stages the plant disables). A mechanical press strikes once per station."
+              />
+              <div className={rowClass} title="The force (or, on a hammer, the blow energy) the forming step needs, from the settings above.">
+                <span className={labelClass}>Forming</span>
+                <span className="flex-1 tabular-nums">{formatForming(forging.forming)}</span>
+              </div>
+              {forging.flash && (
+                <>
+                  <NumberField
+                    label="Flash thick, mm"
+                    value={number(FORGING_SCENARIO_KEYS.flashThicknessMm)}
+                    placeholder={String(forging.flash.thicknessMm)}
+                    parse={parsePositive}
+                    onCommit={set(FORGING_SCENARIO_KEYS.flashThicknessMm)}
+                    title="The flash land thickness: what the trim shears. Empty: Vieregge's rule for the forged mass."
+                  />
+                  <NumberField
+                    label="Flash width, mm"
+                    value={number(FORGING_SCENARIO_KEYS.flashWidthMm)}
+                    placeholder={String(forging.flash.widthMm)}
+                    parse={parsePositive}
+                    onCommit={set(FORGING_SCENARIO_KEYS.flashWidthMm)}
+                    title="The flash land width: it adds to the area the finishing force acts on. Empty: Vieregge's rule for the forged mass."
+                  />
+                </>
+              )}
+            </div>
+          </details>
+        </>
       )}
     </div>
-  );
-}
-
-function RouteRow({ selected, disabled, onSelect, title, children }: {
-  selected: boolean; disabled?: boolean; onSelect: () => void; title: string; children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-disabled={disabled}
-      disabled={disabled}
-      onClick={onSelect}
-      title={title}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 text-left ${selected ? 'bg-brand-500/10' : 'hover:bg-muted/40'} ${disabled ? 'cursor-not-allowed opacity-70 hover:bg-transparent' : ''}`}
-    >
-      <span className="w-3 shrink-0">{selected && <Check className="h-3 w-3 text-brand-500" />}</span>
-      {children}
-    </button>
   );
 }

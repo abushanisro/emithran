@@ -933,6 +933,8 @@ export interface ProcessLineCost {
   catalogOperations?: CatalogOperation[];
   /** The step acts on the whole part (a sand casting's melting, pouring, cooling, ...): the process tree highlights all of it. */
   actsOnWholePart?: boolean;
+  /** The step forms the part's shape (a forging's press or hammer, a powder metal compaction): the tree lists every feature under it. */
+  formsPartFeatures?: boolean;
   /** GD&T callouts this line (Inspection) covers — see GdtCallout above. */
   gdtCallouts?: GdtCallout[];
   /** Full end-to-end audit trail (real inputs + provenance, then calculated
@@ -1127,6 +1129,13 @@ export interface CostSummaryDto {
   investmentCasting?: { patternsPerTree: number; layers: number; treeHeightMm: number; treeWidthMm: number; treesInBatch: number; primaryDips: number; backupDips: number; gatesPerPattern: number; dryingHoursPerTree: number | null; complete: boolean };
   /** Investment casting: the wax pattern die (USD, separate from the piece cost). */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
+  /** Powder metal: what the press-and-sinter route decided (mirrors the backend's PowderMetalBreakdown). */
+  powderMetal?: {
+    routeLabel: string; greenDensityKgM3: number; greenDensitySource: 'material' | 'scenario';
+    compactionPressureMpa: number; pressForceKn: number; fillHeightMm: number; compressionRatio: number;
+    belt: { speedMmPerMin: number; partsAcross: number; partsPerMetre: number } | null;
+    complete: boolean;
+  };
   /** Forging: the quoted route and every other route of the part (mirrors the backend's ForgingBreakdown). */
   forging?: {
     route: string; routeLabel: string; complexity: number; barDiameterMm: number; multLengthMm: number; heating: 'induction' | 'furnace'; hits: number;
