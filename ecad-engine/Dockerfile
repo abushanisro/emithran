@@ -8,7 +8,11 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PORT=5100
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# pip and setuptools are only needed to install: removed afterwards, so the copies of msgpack, urllib3 and others they carry inside
+# themselves (which nothing in the service imports, and which lag behind their fixed releases) are not in the image that runs.
+RUN pip install --no-cache-dir -r requirements.txt \
+    && (pip uninstall -y setuptools || true) \
+    && pip uninstall -y pip
 
 # Only the service code. Test data (customer board files) and tests are not shipped.
 COPY main.py config.py telemetry.py ./
