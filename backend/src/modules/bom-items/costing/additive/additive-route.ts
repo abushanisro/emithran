@@ -186,9 +186,14 @@ export function buildAdditiveRoutes(input: AdditiveRouteInput): { routes: Additi
     const value = num(name);
     return value == null ? null : { value, source: `Additive variable ${name}${ref.unit(name) ? ` (${ref.unit(name)})` : ''}`, ref: { kind: 'variable', domain: ADDITIVE_DOMAIN, name } };
   };
-  const materialProvider: SeedProvider = (key) => {
-    const value = key === 'density_kg_m3' ? material.densityKgM3 : key === 'cost' ? material.costPerKgUsd : null;
-    return value == null ? null : { value, source: `${material.name}: ${key === 'cost' ? 'price (USD/kg)' : 'density (kg/m³)'}`, ref: { kind: 'material', materialId: material.id, materialName: material.name, column: key } };
+  // The material inputs the calculators name (additive-calculators.json): its density and its price.
+  const materialValues: Readonly<Record<string, { value: number | null; label: string }>> = {
+    density_kg_m3: { value: material.densityKgM3, label: 'density (kg/m³)' },
+    cost: { value: material.costPerKgUsd, label: 'price (USD/kg)' },
+  };
+  const materialProvider: SeedProvider = (column) => {
+    const v = materialValues[column];
+    return v?.value == null ? null : { value: v.value, source: `${material.name}: ${v.label}`, ref: { kind: 'material', materialId: material.id, materialName: material.name, column } };
   };
   type Run = { run: ReferenceCalcRun } | { reasons: string[] };
   const run = (calculator: string, machine: SandMachine | null, engine: Record<string, CalcSeed | undefined>, lookups: Record<string, CalcSeed | undefined> = {}): Run => {

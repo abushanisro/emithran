@@ -11,3 +11,5 @@ a136d9198c87926c84bfe6479a7b87d70e5a8d43:backend/src/test/modules/bom-items/cost
 # The two comments above, in the commit that added them, quoted those fixtures and were read as keys themselves. Comments here never quote a value.
 a2a40c76ef168f85feee03271871777b22aaf251:.gitleaksignore:generic-api-key:6
 a2a40c76ef168f85feee03271871777b22aaf251:.gitleaksignore:generic-api-key:8
+# The additive route's material provider compared a calculator input name (the density column) to a literal; read as a key by the generic rule. The code now looks it up in a map.
+114e98c167b56283f714466207d69292ffc10045:backend/src/modules/bom-items/costing/additive/additive-route.ts:generic-api-key:189
