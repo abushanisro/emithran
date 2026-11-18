@@ -216,6 +216,18 @@ export class BOMItemsService {
     return BOMItemResponseDto.fromDatabase(row);
   }
 
+  /** The direct children of a BOM item (an assembly's parts), read as the caller, in BOM order. */
+  async findChildren(parentId: string, accessToken?: string): Promise<BOMItemResponseDto[]> {
+    const { data, error } = await this.databaseService.getUserClient(accessToken)
+      .from('bom_items')
+      .select(BOM_ITEM_DTO_COLUMNS)
+      .eq('parent_item_id', parentId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw new InternalServerErrorException(`Failed to fetch the children of BOM item ${parentId}: ${error.message}`);
+    return (data ?? []).map((row) => BOMItemResponseDto.fromDatabase(row));
+  }
+
   /**
    * The organization a BOM item belongs to (null when it has none), read as the caller: the costing of a part converts with
    * that organization's budget exchange rates (ExchangeRateService.getSnapshot).

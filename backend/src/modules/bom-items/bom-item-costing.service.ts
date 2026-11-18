@@ -136,6 +136,10 @@ import { AdditiveCostService, type AdditiveBuildSummary } from './costing/additi
 import { buildAdditiveCostSummary } from './costing/additive/additive-cost-summary';
 import { ADDITIVE_ROUTES } from './costing/additive/additive-route';
 import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
+import { AssemblyCostService, type AssemblyCostResult } from './costing/assembly/assembly-cost.service';
+import { buildAssemblyCostSummary } from './costing/assembly/assembly-cost-summary';
+import { ASSEMBLY_ROUTES } from './costing/assembly/assembly-route';
+import { assemblyRouteFor, assemblyRouteId } from './costing/assembly/assembly-route-comparison';
 import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, isMachiningLine, BLANK_FAMILY, BLANK_PROCESS, type DerivedBlankOut } from './costing/two-model/derived-blank';
 import { twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, TWO_MODEL_SOURCE_VERSION } from './costing/two-model/two-model-cost';
 import { twoModelRoute } from './costing/two-model/two-model-route-comparison';
@@ -149,7 +153,7 @@ import { buildForgingCostSummary } from './costing/forging/forging-cost-summary'
 import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
 import { FORGING_ROUTES } from './costing/forging/forging-route';
 import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
-import { CASTING_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
+import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
@@ -223,7 +227,7 @@ export function holeGroupsOfGraph(features: unknown): Array<{ diameter_mm: numbe
 
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
@@ -311,6 +315,8 @@ export class BomItemCostingService {
     private readonly compositesCostService?: CompositesCostService,
     /** The additive manufacturing routes; optional for the same reason (without it an additive part is one named, uncosted line). */
     private readonly additiveCostService?: AdditiveCostService,
+    /** An assembly's own work; optional for the same reason (without it an assembly is one named, uncosted line). */
+    private readonly assemblyCostService?: AssemblyCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -1927,6 +1933,13 @@ export class BomItemCostingService {
     // "DRAWING" badge + Apply button) — applying it is itself an explicit
     // selection and lands here the same way any other pick does.
     const grade = item.materialGrade ?? (item as any).material ?? null;
+
+    // ── Assembly ────────────────────────────────────────────────────────────
+    // An assembly's own work: its BOM children loaded and joined (costing/assembly). It has no material or model of its own, so it is priced
+    // before the material gate; each child's own cost is added to it by the BOM roll-up, never here.
+    if ((forceFamily ?? this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm }).family) === ASSEMBLY_FAMILY) {
+      return this.assemblyCostSummary(item, costingInputs, location, accessToken, forceDieCastingProcess, localLinesOut);
+    }
 
     // Scenario gate: refuse to cost without a material grade. Silently defaulting to
     // mild steel produces numbers the engineer might quote; a blocked state forces the
@@ -4519,6 +4532,83 @@ export class BomItemCostingService {
   }
 
   /**
+   * An assembly's Cost Summary: its own work, priced by the assembly engine on its children (assembly-cost.service.ts), in the location's
+   * currency and then the display currency, with the Cost Guide's cost overrides applied like any quote.
+   */
+  private async assemblyCostSummary(
+    item: BOMItemResponseDto, costingInputs: ReturnType<typeof resolveCostingInputs>, location: string, accessToken: string,
+    forceRoute?: string, localLinesOut?: { lines?: ProcessLineCost[]; localCurrency?: string },
+  ): Promise<CostSummaryResponseDto> {
+    const { batchSize } = costingInputs;
+    const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['Other'];
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, await this.items.organizationOfItem(item.id, accessToken));
+    const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+    const [costOverrides, children] = await Promise.all([
+      this.overrides.fetchCostOverrides(item.id, accessToken, location),
+      this.items.findChildren(item.id, accessToken),
+    ]);
+    const assembly: AssemblyCostResult = this.assemblyCostService
+      ? await this.assemblyCostService.price({
+        client: this.databaseService.getClient(accessToken), accessToken, location, item, children,
+        ...(forceRoute ? { forceRoute } : {}),
+        overrides: item.scenarioOverrides, batchSize, usdToLocal,
+        costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
+      })
+      : { route: null, routes: [], gaps: [], components: [], joints: [], note: null, missing: ['the assembly cost service is not available'], warnings: [] };
+    const result = {
+      ...buildAssemblyCostSummary({ assembly, batchSize, warnings: [], ratesSource: RATES_SOURCE_LABEL }),
+      currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate: 1,
+    } as CostSummaryDto & { costOverrides?: Record<string, unknown> };
+    this.overrides.applyCostOverrides(result, costOverrides);
+    if (costOverrides.size > 0) result.costOverrides = Object.fromEntries(costOverrides);
+    if (localLinesOut) {
+      localLinesOut.lines = JSON.parse(JSON.stringify(result.processLines)) as ProcessLineCost[];
+      localLinesOut.localCurrency = locInfo.code;
+    }
+    return { ...this.normalizeCostSummaryToCurrency(result, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+  }
+
+  /**
+   * An assembly's route comparison: each route (manual, robotic welding) the full Cost Summary priced on that route, as the additive routes
+   * are. The recommended one is the route the quote chose.
+   */
+  private async assemblyRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = ASSEMBLY_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, ASSEMBLY_FAMILY),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], ASSEMBLY_FAMILY)),
+    ]);
+    const routes = keys.map((key, i) => assemblyRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.assembly?.complete && quote!.assembly.route ? assemblyRouteId(quote!.assembly.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: 0,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: 0,
+      materialCostPerKg: 0,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No assembly route is both feasible and fully costed.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
+  /**
    * An additive part's route comparison: every build route (metal sintering, laser sintering, material jetting, stereolithography), each the
    * full Cost Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
    */
@@ -4810,6 +4900,10 @@ export class BomItemCostingService {
     }
     // Composites: one complete route per layup route, each the full quote on that route (composites-route-comparison.ts).
     // Additive Manufacturing: one route per build process, each the full quote on that route (additive-route-comparison.ts).
+    // Assembly: the manual and robotic welding routes, each the full quote on that route (assembly-route-comparison.ts).
+    if (family === ASSEMBLY_FAMILY) {
+      return this.assemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
     if (family === 'additive') {
       return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }

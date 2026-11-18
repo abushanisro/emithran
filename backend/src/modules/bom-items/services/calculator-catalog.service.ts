@@ -10,6 +10,7 @@ import { loadInvestmentCastingCalculatorSpec } from '../costing/casting/investme
 import { loadPowderMetalCalculatorSpec } from '../costing/powder-metal/calculators/powder-metal-calculator-spec';
 import { loadCompositesCalculatorSpec } from '../costing/composites/calculators/composites-calculator-spec';
 import { loadAdditiveCalculatorSpec } from '../costing/additive/calculators/additive-calculator-spec';
+import { loadAssemblyCalculatorSpec } from '../costing/assembly/calculators/assembly-calculator-spec';
 import { loadForgingCalculatorSpec } from '../costing/forging/calculators/forging-calculator-spec';
 import { loadPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
@@ -194,6 +195,11 @@ export class CalculatorCatalogService {
   /** The composites calculators (migration 1065) keyed by their own name: one not in the database is absent. */
   loadCompositesCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('composites-calculators', loadCompositesCalculatorSpec(), accessToken);
+  }
+
+  /** The assembly calculators (migration 1078), from the database. */
+  loadAssemblyCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('assembly-calculators', loadAssemblyCalculatorSpec(), accessToken);
   }
 
   /** The additive manufacturing calculators (migration 1073), from the database. */

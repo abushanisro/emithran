@@ -705,6 +705,8 @@ export interface CostSummaryDto {
   composites?: CompositesBreakdown;
   /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route. */
   additive?: AdditiveBreakdown;
+  /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
+  assembly?: AssemblyBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
 
@@ -808,6 +810,29 @@ export interface ForgingBreakdown {
 }
 
 /** What the composites route decided: the plies read from the laminate's thickness, the core, the autoclave load and the layup route. */
+/** What the assembly route decided: the components loaded, every joint (derived from the children or set in the Cost Guide) and the route. */
+export interface AssemblyBreakdown {
+  /** The quoted route (assembly-route.ts ASSEMBLY_ROUTES key) and its name; null when none could be built. */
+  route: string | null;
+  routeLabel: string | null;
+  complete: boolean;
+  /** Each BOM child, loaded by Pick and Place: its instances, one instance's mass and largest dimension, and the threaded holes it takes screws in. */
+  components: Array<{ id: string; name: string; quantity: number; massKg: number | null; maxDimensionMm: number | null; threadedHoles: number }>;
+  /** Every joint, with what it came to on the quoted route (its line's process, cycle and consumables) or why it is not costed. */
+  joints: Array<{
+    id: string; process: string; routeProcess: string | null; operation: string | null; label: string; count: number;
+    source: 'derived' | 'engineer'; enabled: boolean; componentId: string | null; featureIds: string[];
+    lengthMm: number | null; throatMm: number | null; depthMm: number | null; areaMm2: number | null;
+    weldMaterial: string | null; gas: string | null; position: string | null; wireDiameterMm: number | null; timeS: number | null;
+    prep: boolean; cleanUp: boolean; cycleSec: number | null; consumablesCost: number | null; reason: string | null;
+  }>;
+  /** The weld consumables on the weld lines (summary currency), and the adhesive the bonds take (kg, reported: memory/Assembly gives no price). */
+  consumablesCost: number;
+  adhesiveKg: number;
+  /** Every route: its total per assembly (summary currency) when complete, or why it is not a route for the assembly. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
 export interface AdditiveBreakdown {
   /** The quoted route (additive-route.ts ADDITIVE_ROUTES key) and its name. */
   route: string;

@@ -30,7 +30,12 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   composite: 'Composites',
   two_model: '2-Model Machining',
   additive: 'Additive Manufacturing',
+  // An assembly's own work, costed from its BOM children (backend costing/assembly): a costed group with no CAD extractor.
+  assembly: 'Assembly',
 };
+
+/** Families the cad-engine has no extractor for: an assembly is costed from its children, it has no model of its own to analyse. */
+const NO_CAD_EXTRACTOR: ReadonlySet<string> = new Set(['assembly'])
 
 export function familyToProcessGroupLabel(family: string | null | undefined): string | null {
   return (family && FAMILY_HINT_TO_PROCESS_GROUP[family]) || null;
@@ -44,7 +49,7 @@ export function familyToProcessGroupLabel(family: string | null | undefined): st
  */
 export function processGroupToFamilyHint(group: string | null | undefined): string | undefined {
   if (!group) return undefined;
-  return Object.entries(FAMILY_HINT_TO_PROCESS_GROUP).find(([, g]) => g === group)?.[0] ?? COSTED_AS_FAMILY[group];
+  return Object.entries(FAMILY_HINT_TO_PROCESS_GROUP).find(([f, g]) => g === group && !NO_CAD_EXTRACTOR.has(f))?.[0] ?? COSTED_AS_FAMILY[group];
 }
 
 /**
