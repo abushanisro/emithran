@@ -20,7 +20,7 @@ export const BOM_ITEM_DTO_COLUMNS =
   'flat_pattern_area_mm2,heat_treatment,hole_count,id,item_type,make_buy,' +
   'manufacturing_family_override,material,material_confidence,material_grade,material_source,' +
   'max_height,max_length,max_width,name,parent_item_id,part_number,pierce_count,quantity,' +
-  'scenario_overrides,sheet_thickness_mm,sort_order,surface_area,surface_finish_confidence,' +
+  'scenario_overrides,sheet_thickness_mm,sort_order,source_item_id,surface_area,surface_finish_confidence,' +
   'surface_finish_ra,thumbnail_url,tightest_tolerance_mm,tolerance_confidence,unit,unit_cost,' +
   'updated_at,volume,weight';
 
@@ -45,6 +45,10 @@ export class BOMItemResponseDto {
 
   @ApiPropertyOptional({ example: 'uuid' })
   parentItemId?: string;
+
+  /** 2-Model Machining: the item of the same BOM this part is machined from (its source component); null when none (migration 1066). */
+  @ApiPropertyOptional({ example: 'uuid', nullable: true, type: String })
+  sourceItemId?: string | null;
 
   @ApiProperty({ example: 2 })
   quantity: number;
@@ -215,6 +219,7 @@ export class BOMItemResponseDto {
     dto.description = row.description || undefined;
     dto.itemType = row.item_type;
     dto.parentItemId = row.parent_item_id || undefined;
+    dto.sourceItemId = row.source_item_id ?? null;
     dto.quantity = Number(row.quantity);
     // NULL stays null. `Number(null)` is 0, which would present a part with no
     // volume on file as a part someone said makes zero units a year.

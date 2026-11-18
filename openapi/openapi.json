@@ -281,6 +281,11 @@
             "example": 0,
             "type": "number"
           },
+          "sourceItemId": {
+            "example": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
           "surfaceArea": {
             "example": 5000,
             "type": "number"
@@ -15393,6 +15398,35 @@
           }
         ],
         "summary": "Every secondary process (inspection, NDT, cleaning, packaging) for this part: applicability, machine, cycle time and cost from the reference data and CAD facts",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-items/{id}/source-item": {
+      "put": {
+        "operationId": "BOMItemsController_setSourceItem_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "2-Model Machining: set the item of the same BOM this part is machined from (its source component), or clear it with null",
         "tags": [
           "BOM Items"
         ]
