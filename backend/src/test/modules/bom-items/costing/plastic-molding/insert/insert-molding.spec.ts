@@ -80,8 +80,10 @@ describe('the loading, on the cheapest loader of the method that carries the ins
   });
 
   it('names what it cannot do: no inserts, an insert with no weight, an insert no robot of the method carries', () => {
-    expect(gapOf(load('manual', []).step.line)).toContain('the part has no inserts');
-    expect(gapOf(load('manual', [insert(1, null)]).step.line)).toContain('the weight of M4 brass insert');
+    // What the part lacks is said once, plainly, not as every loader failing ("no Insert Pick and Place machine fits (Manual: ...)").
+    expect(gapOf(load('manual', []).step.line)).toBe('The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.');
+    expect(gapOf(load('3_axis', []).step.line)).not.toContain('machine fits');
+    expect(gapOf(load('manual', [insert(1, null)]).step.line)).toContain('The weight of M4 brass insert is not known');
     expect(gapOf(load('3_axis', [insert(1, 25)]).step.line)).toContain('payload does not carry the 25 kg insert');
   });
 });

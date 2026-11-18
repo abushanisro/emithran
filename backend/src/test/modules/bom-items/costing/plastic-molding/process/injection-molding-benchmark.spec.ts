@@ -132,7 +132,8 @@ describe('computeInjectionMoldedCostSummary', () => {
       const g = r.processLines.find((l) => l.process === 'Injection Molding')!.physicsGap;
       return g?.gapType === 'unsupported_operation' ? g.reason : null;
     };
-    expect(reason(noClamp)).toMatch(/Clamp force not derivable/);
+    // No injection pressure / flow length: the material cannot be sized, and the gap names the material and what it lacks.
+    expect(reason(noClamp)).toMatch(/No injection-molding reference data is on file for "PP": missing injection pressure, flow length ratio/);
     expect(reason(noTiming)).toMatch(/press injection rate/);
     expect(reason(noWall)).toMatch(/nominal wall thickness/);
   });

@@ -10,6 +10,7 @@
 // One route per load method; the cheapest complete one is quoted unless the Cost Guide (or the Workflow Builder) names one.
 import { machineText, machineValue, type SandMachine } from '../../casting/sand/sand-machines';
 import { seedsFor, type SeedProvider } from '../../casting/sand/sand-seeds';
+import { gap } from '../../casting/casting-finishing';
 import { selectAndCost, type CostedStep } from '../../casting/sand/sand-steps';
 import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
 import { INSERT_MOLDING_PROCESS_GROUP } from '../../shared/core/part-family-process-group';
@@ -111,6 +112,15 @@ export function insertLoading(input: {
     lookup: true,
     ...(rows[0]?.row ? { ref: { kind: 'lookup' as const, domain: INSERT_MOLDING_DOMAIN, table: 'componentLoadTime', column: 'Load Time (s)', row: { 'Load Method': route.method, 'Weight (kg)': num(rows[0].row['Weight (kg)'])! } } } : {}),
   };
+  // What the part lacks is not a machine's limit: it is said once, plainly, instead of as every loader failing ("no loader fits (X: ...)").
+  const missingRow = rows.find((x) => !x.row);
+  const partGap = inserts.length === 0 ? 'The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.'
+    : unweighed.length ? `The weight of ${unweighed.join(', ')} is not known: set it (or its material) in the BOM, or in the Cost Guide.`
+    : missingRow ? `componentLoadTime has no ${route.method} row for ${missingRow.insert.name} at ${String(missingRow.insert.massKg)} kg.`
+    : null;
+  if (partGap) {
+    return { step: { line: gap('Insert Pick and Place', INSERT_MOLDING_PROCESS_GROUP, INSERT_LOADER_CLASS, partGap), machine: null, outcome: null, warnings: [] }, secPerPart: null };
+  }
   const calc = input.spec.calculators.find((c) => c.name === INSERT_LOADING_CALC)!;
   const step = selectAndCost({
     process: 'Insert Pick and Place', machineClass: INSERT_LOADER_CLASS,
@@ -118,10 +128,6 @@ export function insertLoading(input: {
     criteria: [`A ${route.loading} loader`, 'Its payload carries the heaviest insert (a manual station has no limit)'],
     batchSize: input.batchSize, costContext: input.costContext, ref, partName: 'part', processGroup: INSERT_MOLDING_PROCESS_GROUP,
     evaluate: (m) => {
-      if (inserts.length === 0) return { ok: false, reasons: ['the part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide'] };
-      if (unweighed.length) return { ok: false, reasons: [`the weight of ${unweighed.join(', ')}: set it (or its material) in the BOM, or in the Cost Guide`] };
-      const missingRow = rows.find((x) => !x.row);
-      if (missingRow) return { ok: false, reasons: [`componentLoadTime has no ${route.method} row for ${missingRow.insert.name} at ${String(missingRow.insert.massKg)} kg`] };
       const payload = machineValue(m, 'max_payload') ?? 0;
       if (route.loading !== 'manual' && payload < heaviest) return { ok: false, reasons: [`its ${payload} kg payload does not carry the ${heaviest} kg insert`] };
       const { seeds, missing } = seedsFor(calc, {

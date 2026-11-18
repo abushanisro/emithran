@@ -71,15 +71,32 @@ describe('computeInjectionMoldedCostSummary: materials that are molding feedstoc
     expect(r.warnings.join('\n')).not.toContain('3D-printing feedstock');
   });
 
-  it('a granule grade that lacks reference data keeps the specific warnings that name what is missing', () => {
+  it('a grade with no injection pressure or flow length on file says so once, naming what is missing (it cannot be sized at all)', () => {
     const r = computeInjectionMoldedCostSummary(base({
       materialGrade: 'Generic Nylon, Type 12 30% GF', materialType: 'Nylon', materialStockForm: 'Granules', materialMatlState: 'Semi-Crystalline',
       materialClamp: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null },
       realResinInputs: { ...realResinInputs('ABS'), densityOfMeltKgM3: null },
     }));
-    const text = r.warnings.join('\n');
-    expect(text).toContain('Clamp force not derivable');
-    expect(text).not.toContain('3D-printing feedstock');
+    expect(r.warnings).toEqual([
+      'No injection-molding reference data is on file for "Generic Nylon, Type 12 30% GF": missing injection pressure, flow length ratio, melt density. Add it in Raw Materials or choose a grade that has it.',
+    ]);
+    expect(r.processLines.find((l) => l.process === 'Injection Molding')!.physicsGap).toMatchObject({ requiredCapability: 'An injection-molding material' });
+  });
+
+  it('the case the user hit: "Accura 60" from a catalog row with no form and no molding data reads as the material, not as clamp force', () => {
+    const r = computeInjectionMoldedCostSummary(base({
+      materialGrade: 'Accura 60', materialType: 'Accura', materialStockForm: null, materialMatlState: null,
+      materialClamp: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null },
+      realResinInputs: { meltingTempC: 0, moldTempC: 0, ejectionTempC: 50, specificHeatMeltJgC: 1.25, thermalConductivityMeltWMK: 0.18, densityOfMeltKgM3: null },
+    }));
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toContain('No injection-molding reference data is on file for "Accura 60"');
+    expect(r.warnings[0]).not.toContain('migration');
+  });
+
+  it('a grade missing only thermal data keeps the specific warnings that name the step it stops', () => {
+    const r = computeInjectionMoldedCostSummary(base({ realResinInputs: { ...realResinInputs('ABS'), meltingTempC: 0 } }));
+    expect(r.warnings.join('\n')).not.toContain('No injection-molding reference data');
   });
 
   it('a caller that does not pass the form is not judged by form (the data decides, as before)', () => {
