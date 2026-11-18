@@ -17,7 +17,7 @@ import { CopilotPanel } from '@/components/features/manufacturing-intelligence/C
 import { CompositesSection } from '@/components/costing/CompositesSection';
 import { AdditiveSection } from '@/components/costing/AdditiveSection';
 import { AssemblySection } from '@/components/costing/AssemblySection';
-import { InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
+import { InsertMoldingCycle, InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
 import { ConciseNote } from '@/components/ui/concise-note';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
@@ -920,6 +920,14 @@ function CostSummaryTab({
           }}
         />
       </div>
+
+      {/* An insert-molded part: the press the engine chose and the shot it times (the inserts are entered in the Cost Guide). */}
+      {cost.insertMolding && (
+        <>
+          <SectionHeader label="Insert Molding Cycle" />
+          <div className="pb-2"><InsertMoldingCycle insertMolding={cost.insertMolding} /></div>
+        </>
+      )}
 
       {/* ── DIRECT PROCESS COSTS ── engine rows shown only when no stored records exist ── */}
       <SectionHeader label="Direct Process Costs" />
