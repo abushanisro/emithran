@@ -4,10 +4,11 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { resolveUtsMpa, isSheetFormableMaterial } from '../costing/shared/core/default-rates.constants';
-import { CAD_FAMILY_TO_PROCESS_GROUP, costedProcessGroups, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
+import { ASSEMBLY_FAMILY, CAD_FAMILY_TO_PROCESS_GROUP, costedProcessGroups, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
 import { isPlasticGrade } from '../costing/plastic-molding/process/process-tree';
 import { isDiscouragedShapeForFamily } from '../../raw-materials/constants/material-shape-ranking';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
+import { BOMItemType } from '../dto/bom-items.dto';
 import {
   rankMaterialMatches,
   pickUnambiguousBest,
@@ -185,6 +186,11 @@ export class MaterialResolutionService {
       // Machining holds several families (milled / turned / mill-turn): the geometry picks among them.
       const family = chosenFamilies.includes(geoFamily) ? geoFamily : chosenFamilies[0];
       return { family, familySource: 'process', warning: null };
+    }
+
+    // An assembly or sub-assembly with no Process of its own is costed as its assembly work (costing/assembly): its parts are its children.
+    if (input.item.itemType === BOMItemType.ASSEMBLY || input.item.itemType === BOMItemType.SUB_ASSEMBLY) {
+      return { family: ASSEMBLY_FAMILY, familySource: 'process', warning: null };
     }
 
     if (isPlasticGrade(input.grade) && geoFamily !== 'plastic_molded') {

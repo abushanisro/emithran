@@ -28,7 +28,12 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   two_model: '2-Model Machining',
   // Built layer by layer (DMLS, SLS, material jetting, SLA): measured for its build (cad-engine additive/feature_extractor.py).
   additive: 'Additive Manufacturing',
+  // An assembly's own work: its BOM children loaded and joined (costing/assembly). An assembly has no model of its own to analyse.
+  assembly: 'Assembly',
 };
+
+/** An assembly's family: its own work (loading and joining its BOM children), costed by costing/assembly. */
+export const ASSEMBLY_FAMILY = 'assembly';
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
 /**

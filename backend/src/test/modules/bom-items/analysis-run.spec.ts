@@ -1,6 +1,7 @@
 import { deriveAnalysisStatus } from '../../../modules/bom-items/analysis-status';
 import { AnalysisRunService } from '../../../modules/bom-items/services/analysis-run.service';
 import { familiesOfProcessGroup } from '../../../modules/bom-items/costing/shared/core/part-family-process-group';
+import { AutoFillService } from '../../../modules/bom-items/services/auto-fill.service';
 
 const V = 4;
 const graph = (family: string, version = V) => ({ classification: { family }, feature_graph_version: version });
@@ -31,6 +32,20 @@ describe('deriveAnalysisStatus: the chosen process against the analysed family',
 
   it('never asks for an analysis of a part with no 3D file', () => {
     expect(deriveAnalysisStatus({ file3dPath: null, featureGraph: null, chosenFamilyHint: 'die_cast' }, 'none', V).ready).toBe(true);
+  });
+});
+
+describe('the family hint a chosen Process sends the cad-engine', () => {
+  const hint = (group: string) => AutoFillService.prototype.familyHintForProcessGroup.call(null, group);
+
+  it('is the first family the Process is costed as; none for a Process with no cost model', () => {
+    expect(hint('Forging')).toBe('forged');
+    expect(hint('Part Assembly')).toBeUndefined();
+  });
+
+  it('is none for Assembly: an assembly is costed from its children, and the cad-engine has no extractor to force for it', () => {
+    expect(familiesOfProcessGroup('Assembly')).toEqual(['assembly']);
+    expect(hint('Assembly')).toBeUndefined();
   });
 });
 

@@ -292,7 +292,7 @@ export function selectAndCost(input: {
     const other = outcome.energyCostUsd + material;
     const detail = [outcome.energyCostUsd ? `energy ${roundPerPart(outcome.energyCostUsd)}` : '', material ? `material ${roundPerPart(material)}` : ''].filter(Boolean).join(' + ');
     const costed: ProcessLineCost = other
-      ? { ...base, runCost: roundLineCost(base.runCost + other), totalCost: roundLineCost(base.totalCost + other), otherCostPerPartUsd: roundPerPart(other), otherCostDetail: `${detail} USD per casting${outcome.energyBasis ? ` at ${outcome.energyBasis}` : ''}` }
+      ? { ...base, runCost: roundLineCost(base.runCost + other), totalCost: roundLineCost(base.totalCost + other), otherCostPerPartUsd: roundPerPart(other), otherCostDetail: `${detail} USD per ${input.partName ?? 'casting'}${outcome.energyBasis ? ` at ${outcome.energyBasis}` : ''}` }
       : base;
     return { m, outcome, costed };
   });
