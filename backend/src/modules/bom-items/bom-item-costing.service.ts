@@ -3297,6 +3297,11 @@ export class BomItemCostingService {
       this.rates.appendRateWarnings(imResult, location);
       this.overrides.applyCostOverrides(imResult, costOverrides);
       if (costOverrides.size > 0) imResult.costOverrides = Object.fromEntries(costOverrides);
+      // The lines in the factory currency, before the display conversion: Apply persists these (an insert molding route is the quote priced on it).
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(imResult.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
       return {
         ...this.normalizeCostSummaryToCurrency(imResult, rates, locInfo.code, item.scenarioOverrides),
         resolvedInputs: costingInputs,
