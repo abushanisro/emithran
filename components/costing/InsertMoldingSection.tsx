@@ -75,9 +75,8 @@ function InsertEntryForm({ saved, start, onSave, onCancel }: {
 }
 
 /**
- * The Cost Guide's insert molding inputs and what the engine decided. The part is molded on an insert press with its inserts loaded every
- * shot; the inserts are its BOM children, or a count and weight entered here. The load method (manual, 3-axis or 6-axis robot) is a route:
- * the Workflow Builder lists and prices them, so this panel does not repeat them.
+ * The Cost Guide's insert molding input: the inserts loaded every shot (its BOM children, or a count and weight entered here). What the
+ * engine decided (press and cycle) is in the Cost tab (InsertMoldingCycle); the load-method routes are in the Workflow Builder.
  */
 export function InsertMoldingSection({ insertMolding: im, overrides, onChange, hrefOf }: Props) {
   const [editing, setEditing] = useState(false);
@@ -86,7 +85,6 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
   const fromBom = im.inserts.some((i) => i.source === 'bom');
   const entered = insertEntryOf(overrides);
   const showEntered = !fromBom && entered.count != null && !editing;
-  const shot = shotCycleOf(im);
   const cad = im.cadInsertCandidates != null && im.cadInsertCandidates > 0 ? im.cadInsertCandidates : null;
 
   return (
@@ -127,29 +125,36 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
           </>
         )}
       </section>
-
-      <section className="space-y-1.5">
-        <h4 className={headClass}>Cycle</h4>
-        {im.press.name ? (
-          <ul className={boxClass}>
-            <Row label="Press">
-              <span className="text-foreground">{im.press.name}</span>
-              <span className="block text-muted-foreground">{im.press.tableConfiguration ? `${im.press.tableConfiguration} table` : 'No rotary or shuttle table'}</span>
-            </Row>
-            <Row label={<>Insert loading{im.loaderName && <span className="block">{im.loaderName}</span>}</>}>{seconds(im.loadSecPerPart)}</Row>
-            <Row label="Molding">{seconds(im.moldingCycleSec)}</Row>
-            <Row label={<span className="font-medium text-foreground">Shot cycle</span>} title={shot.explanation}>
-              <span className="font-medium text-foreground">{seconds(im.shotSec)}</span>
-              {im.shotSec != null && <span className="block text-muted-foreground">{shot.rule}</span>}
-            </Row>
-          </ul>
-        ) : (
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-            {im.press.reasons[0] ?? 'No insert press takes this part.'}
-          </p>
-        )}
-        {im.toolingNote && <p className="text-muted-foreground">{im.toolingNote}</p>}
-      </section>
     </div>
+  );
+}
+
+/** The Cost tab's insert molding cycle: the press the engine chose, the insert loading, the molding and the shot they make. */
+export function InsertMoldingCycle({ insertMolding: im }: { insertMolding: InsertMoldingSummary }) {
+  if (!im.press.name) {
+    return <p className="text-xs text-amber-600">{im.press.reasons[0] ?? 'No insert press takes this part.'}</p>;
+  }
+  const shot = shotCycleOf(im);
+  return (
+    <ul className={`${boxClass} text-xs`}>
+      <Row label="Press">
+        <span className="text-foreground">{im.press.name}</span>
+        <span className="block text-muted-foreground">{im.press.tablePress && im.press.tableConfiguration ? `${im.press.tableConfiguration} table` : 'No rotary or shuttle table'}</span>
+      </Row>
+      {im.shotSec == null ? (
+        <li className={`${rowClass} text-amber-600`}>
+          Not timed yet: {im.inserts.length === 0 ? 'enter the inserts in the Cost Guide.' : 'see Insert Pick and Place below.'}
+        </li>
+      ) : (
+        <>
+          <Row label={<>Insert loading{im.loaderName && <span className="block">{im.loaderName}</span>}</>}>{seconds(im.loadSecPerPart)}</Row>
+          <Row label="Molding">{seconds(im.moldingCycleSec)}</Row>
+          <Row label={<span className="font-medium text-foreground">Shot cycle</span>} title={shot.explanation}>
+            <span className="font-medium text-foreground">{seconds(im.shotSec)}</span>
+            <span className="block text-muted-foreground">{shot.rule}</span>
+          </Row>
+        </>
+      )}
+    </ul>
   );
 }
