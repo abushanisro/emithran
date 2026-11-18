@@ -70,6 +70,10 @@ SELECT 'Composites', n, n, false FROM unnest(ARRAY['Tool Clean','Mold Preparatio
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Additive Manufacturing', n, n, false FROM unnest(ARRAY['Breakoff','Cleaning','Laser Sintering','Manual Tool Base Removal','Metal Sintering',
   'Part Curing','Powder Loading','Power Tool Base Removal','Printing','Resin Curing','Sieving']) AS n;
+-- the assembly molding catalog rows migration 862 seeds: migration 1080 links Insert Injection Molding to the injection calculator, and 1081
+-- links the insert loading calculator to Insert Pick and Place and fails if its row is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Assembly Molding', n, n, false FROM unnest(ARRAY['Insert Injection Molding','Insert Pick and Place']) AS n;
 -- the assembly catalog rows migration 790 seeds: migrations 1076 and 1078 give them a machine class and link the assembly calculators to them and fails if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Assembly', n, n, false FROM unnest(ARRAY['Pick and Place','Mechanical Assembly','Threaded Insert','Lock Bolt','Rivet','Manual MIG Welding',
@@ -110,6 +114,9 @@ ALTER TABLE public.mhr_records ADD COLUMN process_group varchar, ADD COLUMN land
   ADD COLUMN machine_power_kw numeric, ADD COLUMN machine_uptime_pct numeric, ADD COLUMN annual_maintenance_factor_pct numeric,
   ADD COLUMN footprint_allowance_factor numeric, ADD COLUMN installation_factor_pct numeric, ADD COLUMN supplies_cost_per_year numeric,
   ADD COLUMN salvage_value_factor_pct numeric, ADD COLUMN work_center_labor_rate_factor numeric, ADD COLUMN specs jsonb;
+-- the press columns as the real database has them (migration 633): migration 1080 fills them for the insert molding presses from their specs
+ALTER TABLE public.mhr_records ADD COLUMN max_tonnage numeric, ADD COLUMN shot_capacity_grams integer, ADD COLUMN press_cycle_time_s numeric,
+  ADD COLUMN min_mold_height_mm integer, ADD COLUMN max_mold_height_mm integer, ADD COLUMN tie_bar_x_mm integer, ADD COLUMN tie_bar_y_mm integer;
 -- the material cost record table as the real database has it (migration 040): migration 1041 adds the stock label to it
 CREATE TABLE public.raw_material_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid NOT NULL, user_id uuid NOT NULL, is_active boolean DEFAULT true);
 -- the machining reference table as the real database has it (migration 638): migration 1026 completes its tblTapping row from its tblReaming row
