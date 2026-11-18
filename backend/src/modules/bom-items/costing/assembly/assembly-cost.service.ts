@@ -28,9 +28,11 @@ export interface AssemblyCostRequest {
   accessToken: string;
   location: string;
   /** The assembly's BOM row: its own size, when the BOM gives one, is what the finished assembly is unloaded by. */
-  item: Pick<BOMItemResponseDto, 'id' | 'name' | 'maxLength' | 'maxWidth' | 'maxHeight' | 'weight'>;
+  item: Pick<BOMItemResponseDto, 'id' | 'name' | 'maxLength' | 'maxWidth' | 'maxHeight' | 'weight' | 'volume' | 'materialGrade' | 'featureGraph'>;
   /** Its direct children in the BOM. */
   children: readonly BOMItemResponseDto[];
+  /** A material's density (kg/m³), or null: a component with no weight is weighed by its volume at it. */
+  densityOf?: (grade: string) => Promise<number | null>;
   /** A route to price instead of the chosen one (the route comparison prices each). */
   forceRoute?: string;
   overrides: Record<string, unknown> | null | undefined;
@@ -97,9 +99,16 @@ export class AssemblyCostService {
 
   async price(req: AssemblyCostRequest): Promise<AssemblyCostResult> {
     const o = req.overrides ?? {};
-    const components = req.children.map((c) => componentOf(c));
+    // A part set to Assembly with no parts under it in the BOM is the one component: it is loaded, and its own threaded holes are screwed.
+    const self = req.children.length === 0;
+    const parts = self ? [{ ...req.item, quantity: 1 }] : req.children;
+    const density = new Map<string, number | null>();
+    for (const g of new Set(parts.filter((p) => !(Number(p.weight) > 0) && Number(p.volume) > 0 && p.materialGrade).map((p) => p.materialGrade!))) {
+      density.set(g, req.densityOf ? await req.densityOf(g) : null);
+    }
+    const components = parts.map((p) => componentOf(p, p.materialGrade ? density.get(p.materialGrade) ?? null : null));
     const { joints, ignored } = mergeJoints(deriveJoints(components), o[ASSEMBLY_JOINTS_KEY]);
-    const warnings = [...ignored];
+    const warnings = [...ignored, ...(self ? [`${req.item.name} has no parts under it in the BOM: it is costed as the one component, loaded and screwed into its own threaded holes.`] : [])];
     const none = (...missing: string[]): AssemblyCostResult => ({ route: null, routes: [], gaps: [], components, joints, note: null, missing, warnings });
     const [{ reference, missing: refMissing }, calculators, machines] = await Promise.all([
       this.reference(),

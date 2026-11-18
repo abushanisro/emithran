@@ -4568,6 +4568,11 @@ export class BomItemCostingService {
     const assembly: AssemblyCostResult = this.assemblyCostService
       ? await this.assemblyCostService.price({
         client: this.databaseService.getClient(accessToken), accessToken, location, item, children,
+        // The density the rest of costing weighs a part by (material_density_lookup, then the caller's raw materials), g/cm³ to kg/m³.
+        densityOf: async (grade) => {
+          const d = await this.items.materialDensity(grade, accessToken);
+          return d.density_g_cm3 != null && d.density_g_cm3 > 0 ? d.density_g_cm3 * 1000 : null;
+        },
         ...(forceRoute ? { forceRoute } : {}),
         overrides: item.scenarioOverrides, batchSize, usdToLocal,
         costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },

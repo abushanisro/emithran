@@ -817,7 +817,7 @@ export interface AssemblyBreakdown {
   routeLabel: string | null;
   complete: boolean;
   /** Each BOM child, loaded by Pick and Place: its instances, one instance's mass and largest dimension, and the threaded holes it takes screws in. */
-  components: Array<{ id: string; name: string; quantity: number; massKg: number | null; maxDimensionMm: number | null; threadedHoles: number }>;
+  components: Array<{ id: string; name: string; quantity: number; massKg: number | null; massSource: 'weight' | 'volume' | null; maxDimensionMm: number | null; threadedHoles: number }>;
   /** Every joint, with what it came to on the quoted route (its line's process, cycle and consumables) or why it is not costed. */
   joints: Array<{
     id: string; process: string; routeProcess: string | null; operation: string | null; label: string; count: number;

@@ -42,7 +42,7 @@ export function buildAssemblyCostSummary(input: {
   const byJoint = new Map((route?.joints ?? []).map((j) => [j.jointId, j]));
   const assembly: AssemblyBreakdown = {
     route: route?.key ?? null, routeLabel: route?.label ?? null, complete: route?.complete ?? false,
-    components: components.map((c) => ({ id: c.id, name: c.name, quantity: c.quantity, massKg: c.massKg, maxDimensionMm: c.maxDimensionMm, threadedHoles: c.threadedHoles.reduce((s, h) => s + h.occurrences, 0) })),
+    components: components.map((c) => ({ id: c.id, name: c.name, quantity: c.quantity, massKg: c.massKg, massSource: c.massSource, maxDimensionMm: c.maxDimensionMm, threadedHoles: c.threadedHoles.reduce((s, h) => s + h.occurrences, 0) })),
     joints: joints.map((j) => {
       const r = byJoint.get(j.id);
       return {

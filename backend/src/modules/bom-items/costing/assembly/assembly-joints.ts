@@ -61,8 +61,13 @@ export interface AssemblyComponent {
   name: string;
   /** Instances in one assembly (the BOM quantity). */
   quantity: number;
-  /** One instance's mass (kg): the BOM weight; null when unknown. */
+  /** One instance's mass (kg): the BOM weight, else its volume at its material's density; null when neither is known. */
   massKg: number | null;
+  /** Where the mass came from; with none, what would give it. */
+  massSource: 'weight' | 'volume' | null;
+  /** Its volume (mm³) and material, for the trace and for what to set when there is no mass. */
+  volumeMm3: number | null;
+  material: string | null;
   /** Its largest dimension (mm), from its bounding box; null when unknown. */
   maxDimensionMm: number | null;
   /** Its threaded holes (feature_graph_v2), each with its occurrences: the screws it takes. */
@@ -91,13 +96,23 @@ export function threadedHolesOf(featureGraph: unknown): AssemblyComponent['threa
 }
 
 /** A BOM child as a component: its quantity, mass (BOM weight) and largest dimension (bounding box). */
+/**
+ * A BOM child as a component: its quantity, its mass (the BOM weight; else its volume at its material's density, `densityKgM3`, which the
+ * caller resolves from the material) and its largest dimension (bounding box).
+ */
 export function componentOf(child: {
-  id: string; name: string; quantity?: number | null; weight?: number | null;
+  id: string; name: string; quantity?: number | null; weight?: number | null; volume?: number | null; materialGrade?: string | null;
   maxLength?: number | null; maxWidth?: number | null; maxHeight?: number | null; featureGraph?: unknown;
-}): AssemblyComponent {
+}, densityKgM3: number | null = null): AssemblyComponent {
   const dims = [child.maxLength, child.maxWidth, child.maxHeight].map(positive).filter((d): d is number => d != null);
+  const weight = positive(child.weight);
+  const volume = positive(child.volume);
+  const fromVolume = weight == null && volume != null && densityKgM3 != null && densityKgM3 > 0 ? (volume * densityKgM3) / 1e9 : null;
   return {
-    id: child.id, name: child.name, quantity: positive(child.quantity) ?? 1, massKg: positive(child.weight),
+    id: child.id, name: child.name, quantity: positive(child.quantity) ?? 1,
+    massKg: weight ?? (fromVolume != null ? Math.round(fromVolume * 1e6) / 1e6 : null),
+    massSource: weight != null ? 'weight' : fromVolume != null ? 'volume' : null,
+    volumeMm3: volume, material: text(child.materialGrade),
     maxDimensionMm: dims.length ? Math.max(...dims) : null, threadedHoles: threadedHolesOf(child.featureGraph),
   };
 }

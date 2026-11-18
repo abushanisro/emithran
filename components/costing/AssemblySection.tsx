@@ -142,7 +142,9 @@ export function AssemblySection({ assembly: a, overrides, onChange, hrefOf }: Pr
                 <span key={c.id} className="block tabular-nums">
                   {hrefOf ? <a className="text-brand-600 hover:underline" href={hrefOf(c.id)}>{c.name}</a> : c.name}
                   {` x ${c.quantity} · `}
-                  {c.massKg != null ? `${c.massKg} kg` : <span className="text-amber-600" title="Its load time is read by weight: set the part's weight in the BOM, or analyse its model.">no weight</span>}
+                  {c.massKg != null
+                    ? <span title={c.massSource === 'volume' ? 'No weight in the BOM: its volume at its material\'s density.' : 'Its weight in the BOM.'}>{c.massKg} kg{c.massSource === 'volume' ? ' (volume x density)' : ''}</span>
+                    : <span className="text-amber-600" title="Its load time is read by weight: set the part's material (its volume then gives the weight) or its weight in the BOM.">no weight: set its material or weight</span>}
                   {c.maxDimensionMm != null ? ` · ${Math.round(c.maxDimensionMm)} mm` : ''}
                   {c.threadedHoles > 0 ? ` · ${c.threadedHoles} threaded hole${c.threadedHoles > 1 ? 's' : ''}` : ''}
                 </span>
