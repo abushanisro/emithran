@@ -8,18 +8,6 @@ export const AS_SUPPLIED_STEP = 'Source Component: As Supplied';
 
 export type SourceComponentSummary = NonNullable<CostSummaryDto['sourceComponent']>;
 
-/** The Cost Guide key of the process the blank is made by (backend derived-blank.ts TWO_MODEL_BLANK_PROCESS_KEY), and its default. */
-export const BLANK_PROCESS_KEY = 'twoModelBlankProcess';
-export const DEFAULT_BLANK_PROCESS = 'Sand Casting';
-/** The processes a blank can be derived for from the part's machined analysis (backend DERIVABLE_BLANK_FAMILY). */
-export const DERIVABLE_BLANK_PROCESSES: readonly string[] = ['Sand Casting', 'Casting Investment'];
-
-/** The blank process chosen in the Cost Guide, else the default. */
-export function blankProcessOf(overrides: Record<string, unknown> | null | undefined): string {
-  const v = overrides?.[BLANK_PROCESS_KEY];
-  return typeof v === 'string' && v ? v : DEFAULT_BLANK_PROCESS;
-}
-
 /** The faces the part keeps as its derived blank made them: the features the blank's casting holds (the cost's machining need). */
 export function asSuppliedFaceIdsOf(cost: Pick<CostSummaryDto, 'sourceComponent'> | null | undefined): number[] {
   return cost?.sourceComponent?.asSuppliedFaceIds ?? [];

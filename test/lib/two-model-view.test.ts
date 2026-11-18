@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BOMItem, CostSummaryDto } from '@/lib/api/hooks/useBOMItems';
-import { asSuppliedFaceIdsOf, asSuppliedOccurrences, blankProcessOf, isTwoModelPart, AS_SUPPLIED_STEP } from '@/lib/costing/two-model-view';
+import { asSuppliedFaceIdsOf, asSuppliedOccurrences, isTwoModelPart, AS_SUPPLIED_STEP } from '@/lib/costing/two-model-view';
 import { buildProcessTree } from '@/lib/features/process-tree';
 import type { FeatureGraph, FeatureGraphSummary } from '@/lib/types/manufacturing';
 
@@ -26,11 +26,6 @@ describe('2-Model Machining', () => {
     expect(isTwoModelPart({ scenarioOverrides: { processGroup: '2-Model Machining' } }, null)).toBe(true);
     expect(isTwoModelPart({}, { family: 'two_model' })).toBe(true);
     expect(isTwoModelPart({ scenarioOverrides: { processGroup: 'Machining' } }, { family: 'milled' })).toBe(false);
-  });
-
-  it('derives a sand casting blank unless the Cost Guide says otherwise', () => {
-    expect(blankProcessOf(undefined)).toBe('Sand Casting');
-    expect(blankProcessOf({ twoModelBlankProcess: 'Casting Investment' })).toBe('Casting Investment');
   });
 
   it('leaves an occurrence as supplied only when every face of it is one the blank holds', () => {

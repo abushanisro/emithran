@@ -1,4 +1,4 @@
-import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, DERIVABLE_BLANK_FAMILY } from '../../../../../modules/bom-items/costing/two-model/derived-blank';
+import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, BLANK_FAMILY, BLANK_PROCESS } from '../../../../../modules/bom-items/costing/two-model/derived-blank';
 import { withSourceComponent } from '../../../../../modules/bom-items/costing/two-model/two-model-cost';
 import type { MachiningAllowanceResult } from '../../../../../modules/bom-items/costing/casting/machining-allowance';
 import type { CostSummaryResponseDto } from '../../../../../modules/bom-items/dto/cost-breakdown.dto';
@@ -13,8 +13,8 @@ const fg = { feature_graph_v2: { features: [
 ] } };
 
 describe('a derived 2-Model blank', () => {
-  it('is derivable as a sand or investment casting only: a die casting or forging needs its own analysis', () => {
-    expect(Object.keys(DERIVABLE_BLANK_FAMILY)).toEqual(['Sand Casting', 'Casting Investment']);
+  it('is a sand casting: priced from the machined part\'s own analysis, with its machining allowance', () => {
+    expect([BLANK_PROCESS, BLANK_FAMILY]).toEqual(['Sand Casting', 'sand_cast']);
   });
 
   it('adds the allowance metal: a face by its area, a hole by its wall (π d depth), times the sides', () => {
