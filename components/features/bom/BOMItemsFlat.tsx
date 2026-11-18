@@ -23,7 +23,6 @@ import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertica
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 import { toast } from 'sonner';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
-import { consumersOf } from '@/lib/costing/two-model-view';
 import { useQueryClient } from '@tanstack/react-query';
 import { BOMItemType } from '@/lib/types/bom.types';
 
@@ -513,17 +512,6 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                   </h3>
 
                   {getItemTypeBadge(item.itemType)}
-
-                  {/* 2-Model Machining: this item is the source component of a part machined from it, so its cost is counted there. */}
-                  {consumersOf(items, item.id).length > 0 && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs"
-                      title="Its cost is this part's material (2-Model Machining), counted once in the BOM total, inside that part."
-                    >
-                      Source of {consumersOf(items, item.id).map((c) => c.name).join(', ')}
-                    </Badge>
-                  )}
 
                   {isDragging && !isBeingDragged && draggedItem && (
                     <Badge variant="outline" className="text-xs bg-brand-50 dark:bg-brand-950/20 border-brand-300">

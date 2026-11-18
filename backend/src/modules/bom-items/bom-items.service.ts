@@ -392,38 +392,6 @@ export class BOMItemsService {
     return BOMItemResponseDto.fromDatabase(row);
   }
 
-  /**
-   * 2-Model Machining: links the item to the item of the same BOM it is machined from (its source component), or clears the link (null).
-   * The source must be another item of the same BOM with a STEP model (its CAD is compared with this part's); migration 1066 enforces
-   * the same rules, and no cycle, in the database.
-   */
-  async setSourceItem(id: string, sourceItemId: string | null, accessToken?: string): Promise<BOMItemResponseDto> {
-    const client = this.databaseService.getUserClient(accessToken);
-    if (sourceItemId != null) {
-      if (sourceItemId === id) throw new BadRequestException('A part cannot be its own source component.');
-      const { data: rows, error: readError } = await client.from('bom_items')
-        .select('id, bom_id, name, file_step_path').in('id', [id, sourceItemId]);
-      if (readError) throw new InternalServerErrorException(`Failed to read the BOM items: ${readError.message}`);
-      const target = (rows ?? []).find((r) => r.id === id);
-      const source = (rows ?? []).find((r) => r.id === sourceItemId);
-      if (!target) throw new NotFoundException(`BOM item with ID ${id} not found`);
-      if (!source) throw new BadRequestException('The source component is not an item you can read.');
-      if (source.bom_id !== target.bom_id) throw new BadRequestException('The source component must be an item of the same BOM.');
-      if (!source.file_step_path) throw new BadRequestException(`"${source.name}" has no STEP model: its CAD cannot be compared with this part's. Upload its STEP file first.`);
-    }
-    const { data, error } = await client.from('bom_items')
-      .update({ source_item_id: sourceItemId, updated_at: new Date().toISOString() })
-      .eq('id', id).select('*').limit(1);
-    if (error) {
-      // The database's own rules (migration 1066): a cycle, or a source outside the BOM.
-      if (error.code === '23514') throw new BadRequestException(error.message);
-      throw new InternalServerErrorException(`Failed to set the source component: ${error.message}`);
-    }
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row) throw new NotFoundException(`BOM item with ID ${id} not found`);
-    return BOMItemResponseDto.fromDatabase(row);
-  }
-
   async updateThumbnailUrl(
     id: string,
     thumbnailUrl: string,

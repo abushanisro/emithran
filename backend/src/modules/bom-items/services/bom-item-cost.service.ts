@@ -174,19 +174,11 @@ export class BomItemCostService {
     const costRecord = await this.getOrCreateCost(bomItemId, userId, accessToken, organizationId);
 
     // Get all children and their costs
-    const { data: allChildren, error: childrenError} = await this.databaseService
+    const { data: children, error: childrenError} = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id, quantity')
       .eq('parent_item_id', bomItemId);
-    // A child that is some part's source component (2-Model Machining, migration 1066) is priced inside that part: counted there, not
-    // again here (the BOM total applies the same rule, boms/bom-total.ts).
-    const childIds = (allChildren ?? []).map((c) => c.id as string);
-    const { data: consumers } = childIds.length
-      ? await this.databaseService.getClient(accessToken).from('bom_items').select('source_item_id').in('source_item_id', childIds)
-      : { data: [] as Array<{ source_item_id: string }> };
-    const consumed = new Set(((consumers ?? []) as Array<{ source_item_id: string | null }>).map((c) => c.source_item_id).filter(Boolean));
-    const children = (allChildren ?? []).filter((c) => !consumed.has(c.id as string));
 
     // ── P1b-iii: the one currency-aware rollup ───────────────────────────────
     //

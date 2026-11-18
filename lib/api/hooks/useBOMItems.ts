@@ -11,26 +11,6 @@ import type { MachiningAllowanceSummary } from './useMachiningAllowance';
 
 export type { OccurrenceScore };
 
-/** The cad-engine's comparison of a finished part with its source component (backend two-model.service.ts). */
-export interface StoredTwoModelComparison {
-  sourceItemId: string;
-  targetFile: string;
-  sourceFile: string;
-  comparedAt: string;
-  result: {
-    comparison_version: string;
-    aligned: boolean;
-    misalignment: string | null;
-    target_volume_mm3: number;
-    source_volume_mm3: number;
-    outside_fraction?: number;
-    allowed_outside_fraction?: number;
-    as_supplied_face_ids?: number[];
-    machined_face_ids?: number[];
-    removed_volume_mm3?: number;
-  };
-}
-
 export interface BOMItem {
   id: string;
   bomId: string;
@@ -53,12 +33,8 @@ export interface BOMItem {
   file3dPath?: string;
   file2dPath?: string;
   fileDxfPath?: string;
-  /** The STEP model the CAD analysis and the 2-Model comparison read. */
+  /** The STEP model the CAD analysis reads. */
   fileStepPath?: string;
-  /** 2-Model Machining (migration 1066): the item of the same BOM this part is machined from, its source component. */
-  sourceItemId?: string | null;
-  /** 2-Model Machining (migration 1068): the comparison of this part's STEP with its source's, keyed by both files. */
-  twoModelComparison?: StoredTwoModelComparison | null;
   createdAt: string;
   updatedAt: string;
   weight?: number;
@@ -350,72 +326,6 @@ export function useUpdateBOMItem() {
       } else {
         toast.error('Unable to update BOM item. Please try again or contact support.');
       }
-    },
-  });
-}
-
-/**
- * 2-Model Machining: links the part to the item of its BOM it is machined from (PUT /bom-items/:id/source-item), or clears the link with
- * null. The backend compares the two STEP models right after, so the response carries the comparison the cost reads.
- */
-export function useSetSourceItem() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, sourceItemId }: { id: string; sourceItemId: string | null }) =>
-      apiClient.put<BOMItem>(`/bom-items/${id}/source-item`, { sourceItemId }, { timeout: 200_000 }),
-    onSuccess: (data) => {
-      if (data) invalidateBOMItemUpdateQueries(queryClient, data);
-    },
-    onError: (error: unknown) => {
-      toast.error(error instanceof ApiError ? error.getUserMessage() : 'Could not link the source component');
-    },
-  });
-}
-
-/** The processes a source component (the blank a 2-Model part is machined from) is made by: the cast and forged process groups. */
-export const SOURCE_COMPONENT_PROCESSES = ['Casting', 'Sand Casting', 'Die Casting', 'Casting Investment', 'Forging'] as const;
-
-/**
- * 2-Model Machining: adds the blank a part is machined from as a new item of the part's BOM (beside it, same quantity, volume and grade),
- * with its process and 3D model, and links it as the part's source. The link and the comparison are the backend's (PUT :id/source-item),
- * so the rules hold as for a picked item: same BOM, counted once in the total. A step that fails deletes the half-made item.
- */
-/** The steps of useAddSourceComponent: create the blank's item, set its process, upload its model, link it; delete it if a step fails. */
-export async function addSourceComponent({ part, file, processGroup }: { part: BOMItem; file: File; processGroup: (typeof SOURCE_COMPONENT_PROCESSES)[number] }): Promise<BOMItem> {
-  const source = await createBOMItem({
-    bomId: part.bomId,
-    name: `${part.name} (source)`,
-    partNumber: `${part.partNumber?.trim() ? part.partNumber : part.name}-SRC`,
-    description: `The ${processGroup.toLowerCase()} blank ${part.name} is machined from (2-Model Machining).`,
-    itemType: 'child_part',
-    quantity: part.quantity,
-    ...(part.annualVolume != null ? { annualVolume: part.annualVolume } : {}),
-    ...(part.material ? { material: part.material } : {}),
-    ...(part.materialGrade ? { materialGrade: part.materialGrade } : {}),
-    ...(part.parentItemId ? { parentItemId: part.parentItemId } : {}),
-  });
-  try {
-    await apiClient.patch(`/bom-items/${source.id}/scenario-overrides`, { processGroup });
-    const form = new FormData();
-    form.append('file3d', file);
-    await apiClient.uploadFiles<BOMItem>(`/bom-items/${source.id}/files`, form, { timeout: 300_000 });
-    return await apiClient.put<BOMItem>(`/bom-items/${part.id}/source-item`, { sourceItemId: source.id }, { timeout: 200_000 });
-  } catch (e) {
-    await deleteBOMItem(source.id).catch(() => undefined);
-    throw e;
-  }
-}
-
-export function useAddSourceComponent() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: addSourceComponent,
-    onSuccess: (data) => {
-      invalidateBOMItemUpdateQueries(queryClient, data);
-      toast.success('Source component added and linked');
-    },
-    onError: (error: unknown) => {
-      toast.error(error instanceof ApiError ? error.getUserMessage() : 'Could not add the source component');
     },
   });
 }
@@ -1247,7 +1157,7 @@ export interface CostSummaryDto {
     asSuppliedFeatures: number; removedVolumeMm3: number | null;
     /** No blank model linked: the blank is derived from the part (backend two-model/derived-blank.ts), made by blankProcess, with its allowance metal. */
     derived?: boolean; blankProcess?: string; allowanceVolumeMm3?: number;
-    /** The derived blank's faces left as supplied (a linked blank's are in the item's twoModelComparison). */
+    /** The derived blank's faces left as supplied: the features its casting holds. */
     asSuppliedFaceIds?: number[];
   };
   /** Composites: the ply stack read from the laminate, the core and the layup route quoted (mirrors the backend's CompositesBreakdown). */

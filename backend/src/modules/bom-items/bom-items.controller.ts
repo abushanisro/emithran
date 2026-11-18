@@ -1,4 +1,3 @@
-import { TwoModelService } from './services/two-model.service';
 import { Throttle } from '@nestjs/throttler';
 import { AuditService } from '../../common/audit/audit.service';
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
@@ -114,7 +113,6 @@ export class BOMItemsController {
 
   constructor(
     private readonly bomItemsService: BOMItemsService,
-    private readonly twoModelService: TwoModelService,
     private readonly costing: BomItemCostingService,
     private readonly nesting: NestingCostService,
     private readonly gdt: GdtAnalysisService,
@@ -510,19 +508,6 @@ export class BOMItemsController {
   @ApiOperation({ summary: "Design-for-casting checks of the item's sand casting analysis (severity, measured value, threshold, the rule's note, the faces); rules the analysis cannot measure are listed as not evaluated" })
   async getSandDfm(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.costing.getSandDfm(id, user.id, token);
-  }
-
-  @Put(':id/source-item')
-  @ApiOperation({ summary: '2-Model Machining: set the item of the same BOM this part is machined from (its source component), or clear it with null' })
-  async setSourceItem(@Param('id') id: string, @Body('sourceItemId') sourceItemId: string | null | undefined, @AccessToken() token: string) {
-    if (sourceItemId !== null && (typeof sourceItemId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sourceItemId))) {
-      throw new BadRequestException('sourceItemId must be a BOM item id, or null to clear the link');
-    }
-    const linked = await this.bomItemsService.setSourceItem(id, sourceItemId, token);
-    // Compare the two models now (cad-engine /analyze/two-model), so the cost has the faces left as supplied; a failure leaves the link and
-    // the cost says what is missing.
-    const compared = await this.twoModelService.compare(id, token);
-    return compared.comparison ? { ...linked, twoModelComparison: compared.comparison } : linked;
   }
 
   @Put(':id/tolerance-policy')

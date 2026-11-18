@@ -133,8 +133,7 @@ import { ForgingCostService } from './costing/forging/forging-cost.service';
 import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost.service';
 import { CompositesCostService, type CompositeLaminateSummary } from './costing/composites/composites-cost.service';
 import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, isMachiningLine, DERIVABLE_BLANK_FAMILY, DEFAULT_BLANK_PROCESS, TWO_MODEL_BLANK_PROCESS_KEY, type DerivedBlankOut } from './costing/two-model/derived-blank';
-import { machinedOnlyFeatureGraph, sourceComponentCost, twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, type SourceComponentCost } from './costing/two-model/two-model-cost';
-import { currentComparison, TWO_MODEL_SOURCE_VERSION } from './services/two-model.service';
+import { twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, TWO_MODEL_SOURCE_VERSION } from './costing/two-model/two-model-cost';
 import { twoModelRoute } from './costing/two-model/two-model-route-comparison';
 import { buildCompositesCostSummary } from './costing/composites/composites-cost-summary';
 import { COMPOSITES_ROUTES } from './costing/composites/composites-route';
@@ -1975,41 +1974,14 @@ export class BomItemCostingService {
     // endpoints (see resolveEffectiveFamily).
     const familyResolution = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
     let family = forceFamily ?? familyResolution.family;
-    // 2-Model Machining: the part is priced as the machined part it was analysed as (milled, turned, mill-turn), on its machined features
-    // only: what lies on its source component is as supplied (two-model-cost.ts). The source's cost is read once the rates are known.
-    let twoModel: { sourceItemId: string; sourceName: string; asSupplied: number; removedVolumeMm3: number | null; gap: string | null } | null = null;
+    // 2-Model Machining (user decision 2026-11-18): priced from the part's own model, its blank derived from it (two-model/derived-blank.ts).
+    // A blank that cannot be derived or costed is a named gap, said once the rates are known; never priced from bar stock instead.
+    let twoModelGap: string | null = null;
     if (family === TWO_MODEL_FAMILY) {
-      const analysed = isMachiningFamily(item.familyClassification) ? item.familyClassification! : 'milled';
-      const sourceId = item.sourceItemId ?? null;
-      // No blank model linked: the blank is derived from the part (user decision 2026-11-18), else the gap says why it cannot be.
-      let derivedGap: string | null = null;
-      if (!sourceId) {
-        const derived = await this.derivedTwoModelSummary(item, id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localLinesOut);
-        if ('summary' in derived) return derived.summary;
-        derivedGap = derived.gap;
-      }
-      const source = sourceId ? await this.items.findOne(sourceId, userId, accessToken).catch(() => null) : null;
-      const current = currentComparison(
-        { sourceItemId: sourceId, fileStepPath: item.fileStepPath ?? null, twoModelComparison: item.twoModelComparison ?? null },
-        source?.fileStepPath ?? null,
-      );
-      let gap: string | null = derivedGap ?? (sourceId && !source ? 'the source component is not an item you can read' : null);
-      let asSupplied = 0;
-      if (!gap && 'missing' in current) gap = current.missing;
-      else if (!gap && 'comparison' in current) {
-        const r = current.comparison.result;
-        if (!r.aligned) gap = r.misalignment ?? 'the part and its source component are not in one coordinate frame';
-        else {
-          const filtered = machinedOnlyFeatureGraph(fg, r.as_supplied_face_ids ?? []);
-          fg = filtered.fg;
-          asSupplied = filtered.asSupplied.length;
-        }
-      }
-      twoModel = {
-        sourceItemId: sourceId ?? '', sourceName: source?.name ?? '', asSupplied,
-        removedVolumeMm3: 'comparison' in current ? current.comparison.result.removed_volume_mm3 ?? null : null, gap,
-      };
-      family = analysed;
+      const derived = await this.derivedTwoModelSummary(item, id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localLinesOut);
+      if ('summary' in derived) return derived.summary;
+      twoModelGap = derived.gap;
+      family = isMachiningFamily(item.familyClassification) ? item.familyClassification! : 'milled';
     }
     // A family with no cost model is not priced as sheet metal (the path below) with zeros for its geometry: it says what is missing.
     if (!hasCostModel(family)) {
@@ -2143,28 +2115,13 @@ export class BomItemCostingService {
           overrides: await this.overrides.fetchMachineOverrides(id, accessToken, location),
         };
 
-    // 2-Model Machining: a part that cannot be machined from its source says why, and is never priced from bar stock instead. Else the
-    // source component's own Cost Summary (same location and batch) is its material.
-    let twoModelSource: SourceComponentCost | null = null;
-    if (twoModel) {
-      const variables = await this.twoModelVariables(accessToken);
-      const sourceSummary = twoModel.gap ? null
-        : await this.computeCostSummary(twoModel.sourceItemId, userId, accessToken, batchSize, location, requestedProductionLifeYears).catch((e: Error) => { twoModel!.gap = `the source component could not be costed: ${e.message}`; return null; });
-      if (!twoModel.gap && sourceSummary && (sourceSummary.costStatus === 'incomplete' || sourceSummary.processLines.some((l) => l.physicsGap))) {
-        twoModel.gap = `the source component "${twoModel.sourceName}" is not fully costed: ${sourceSummary.warnings[0] ?? 'a step of it has no price'}`;
-      }
-      if (twoModel.gap || !sourceSummary) {
-        return {
-          ...this.normalizeCostSummaryToCurrency(
-            { ...twoModelGapSummary(twoModel.gap ?? 'the source component could not be costed', { materialGrade: grade, batchSize, ratesSource: RATES_SOURCE_LABEL }), ...currencyMeta },
-            rates, locInfo.code, item.scenarioOverrides),
-          resolvedInputs: costingInputs,
-        };
-      }
-      twoModelSource = sourceComponentCost({
-        itemId: twoModel.sourceItemId, name: twoModel.sourceName, summary: sourceSummary,
-        fullyBurdened: variables.fullyBurdened, usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
-      });
+    if (twoModelGap) {
+      return {
+        ...this.normalizeCostSummaryToCurrency(
+          { ...twoModelGapSummary(twoModelGap, { materialGrade: grade, batchSize, ratesSource: RATES_SOURCE_LABEL }), ...currencyMeta },
+          rates, locInfo.code, item.scenarioOverrides),
+        resolvedInputs: costingInputs,
+      };
     }
 
     const mhrRates = await this.rates.resolveMHRRates(accessToken, location, physics, rates);
@@ -2532,10 +2489,7 @@ export class BomItemCostingService {
       }
       return {
         ...this.normalizeCostSummaryToCurrency(
-          // 2-Model Machining: the source component is the material (no bar stock); its features left as supplied cost nothing.
-          twoModel && twoModelSource
-            ? withSourceComponent(cncResult, twoModelSource, { asSuppliedCount: twoModel.asSupplied, removedVolumeMm3: twoModel.removedVolumeMm3, warnings: [] })
-            : cncResult,
+          cncResult,
           rates, locInfo.code, item.scenarioOverrides),
         resolvedInputs: costingInputs,
       };
