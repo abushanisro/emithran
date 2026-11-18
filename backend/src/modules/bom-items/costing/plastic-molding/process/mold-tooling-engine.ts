@@ -60,7 +60,8 @@ import { componentNameKey, type MoldToolingTables } from '../plastic-reference';
 // requiring one. Every other component is fixed baseline hardware present on
 // every mold regardless of feature count (same "fixed baseline" pattern as
 // progressive-die-tooling-engine.ts's guidePinAssy/stripperGuidePinAssy).
-const SIDE_ACTION_ONLY_COMPONENTS = new Set(['Hydraulic Cylinder', 'Side Lock'].map(componentNameKey));
+// Side locks are on every injection mold (sideLocksTotal: "total number of side locks on mold tool"); only the cylinder is for a slide.
+const SIDE_ACTION_ONLY_COMPONENTS = new Set(['Hydraulic Cylinder'].map(componentNameKey));
 
 interface MoldToolingInput {
   /** Real required mold-window area (projected area x cavity count), mm^2. */
@@ -173,7 +174,7 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   const warnings = [toolingScopeWarning(input.scope)];
   if (input.slideBundles != null && input.slideBundles === 0 && input.slideOrLifterBundles > 0) {
     warnings.push(
-      `Slide hardware (hydraulic cylinder, side lock) is not priced: ${input.slideOrLifterBundles} side-action bundle${input.slideOrLifterBundles === 1 ? '' : 's'} could be lifters or slides, `
+      `Slide hardware (hydraulic cylinder) is not priced: ${input.slideOrLifterBundles} side-action bundle${input.slideOrLifterBundles === 1 ? '' : 's'} could be lifters or slides, `
       + 'which depends on the clearance beside the part in the tool and is not assessed. No lifter hardware cost is on file.',
     );
   }
@@ -186,7 +187,7 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
     warnings.push(`Real components with no derivable quantity on file, so not included: ${missingComponents.join(', ')}.`);
   }
   if (noAssemblyTime.length > 0) {
-    warnings.push(`No assembly time on file (cmToolAssemblyTimes) for: ${noAssemblyTime.join(', ')}; not counted in assembly hours.`);
+    warnings.push(`No assembly time on file for: ${noAssemblyTime.join(', ')}; not counted in assembly hours.`);
   }
   return {
     items, bomSubtotalUsd, missingComponents,

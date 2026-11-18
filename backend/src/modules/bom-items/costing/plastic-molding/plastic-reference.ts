@@ -18,8 +18,10 @@
 //                                       (230 C) is the GPPS identity; its melt density
 //                                       converts a press's GPPS grams to melt volume.
 //   tblSpiType                          SPI mold classes 101-105 (Num Annual Mold Cycles)
-//   cmStandardToolingComponents         purchased mold components: unit cost, quantity
-//   cmToolAssemblyTimes                 assembly hours per component
+//   injection mold components           memory/Assembly plastic molding variables (INJECTION_MOLD_COMPONENTS):
+//                                       leader / return / ejector guide pins and bushings, side locks
+//   cmStandardToolingComponents         purchased mold components the injection list does not cover
+//   cmToolAssemblyTimes                 their assembly hours
 //   cmToolAssemblyNumOperators          operators by mold-base area (m2, bracket upper bound)
 //   cmMoldBaseDesignHours               design hours by mold-base area (mm2, bracket upper bound)
 //   cmToolMachiningRates                "Cavity Core Plate General Machining" rate (m2/hr)
@@ -82,6 +84,23 @@ export const SECONDARY_PROCESS_DOMAIN = 'secondary_process';
 export const SECONDARY_PROCESS_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === SECONDARY_PROCESS_DOMAIN)!.sourceVersion;
 export const SECONDARY_VARIABLE_KEYS = ['visualInspectTimeStandard', 'defaultPercentToBeTested'] as const;
 
+/**
+ * The injection mold's standard components, from memory/Assembly plastic molding (source_version 2026-AssyPlastic): each one's unit cost, quantity
+ * per tool and assembly hours. They replace the compression-molding rows (cmStandardToolingComponents, cmToolAssemblyTimes) of the same part; the
+ * compression rows stay only for what this list does not cover (air poppets, limit switches, the hydraulic cylinder).
+ */
+export const MOLD_COMPONENT_DOMAIN = 'assembly_plastic_molding';
+export const MOLD_COMPONENT_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === MOLD_COMPONENT_DOMAIN)!.sourceVersion;
+export const INJECTION_MOLD_COMPONENTS = [
+  { name: 'Leader Pins And Shoulder Bushings', cost: 'leaderPinsShoulderBushingsCost', quantity: 'leaderPinsAndShoulderBushings', hours: 'assemblyTimeHrsLeaderPinsAndShoulderBushings', replaces: ['Guide Pin', 'Guide Bush', 'Leader Pins And Shoulder Bushings'] },
+  { name: 'Return Pins And Shoulder Bushings', cost: 'returnPinsShoulderBushingsCost', quantity: 'returnPinsAndShoulderBushings', hours: 'assemblyTimeHrsReturnPinsAndShoulderBushings', replaces: ['Return Pin And Shoulder Bushing'] },
+  { name: 'Ejector Guide Pins And Bushings', cost: 'ejectorGuidePinsBushingsCost', quantity: 'ejectorGuidePinsAndBushings', hours: 'assemblyTimeHrsEjectorGuidePinsAndBushings', replaces: ['Ejector Guide Pin Bushing'] },
+  { name: 'Side Locks', cost: 'sideLocksCost', quantity: 'sideLocksTotal', hours: 'assemblyTimeHrsSideLocks', replaces: ['Side Lock'] },
+] as const;
+/** Assembly hours the injection data holds for a component it has no price for: the price stays the compression row's, the hours are the injection mold's. */
+export const INJECTION_ASSEMBLY_HOURS = [{ name: 'Hydraulic Cylinder', hours: 'assemblyTimeHrsHydraulicCylinder' }] as const;
+export const MOLD_COMPONENT_VARIABLE_KEYS = [...INJECTION_MOLD_COMPONENTS.flatMap((c) => [c.cost, c.quantity, c.hours]), ...INJECTION_ASSEMBLY_HOURS.map((a) => a.hours)];
+
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
   'cmStandardToolingComponents',
@@ -105,7 +124,8 @@ export const GPPS_REFERENCE_MATERIAL = 'Polystyrene';
 export type MoldClass = 'Class101' | 'Class102' | 'Class103' | 'Class104' | 'Class105';
 
 export interface MoldToolingTables {
-  components: Array<{ name: string; unitCostUsd: number | null; quantity: number | null }>;
+  /** Where each component's price is from: the injection mold's variables, or the compression-molding table for what they do not cover. */
+  components: Array<{ name: string; unitCostUsd: number | null; quantity: number | null; source?: 'injection' | 'compression' }>;
   assemblyTimes: Array<{ name: string; hours: number }>;
   operatorsByArea: Array<{ areaM2: number; operators: number }>;
   designHoursByArea: Array<{ areaMm2: number; hours: number }>;
@@ -362,10 +382,24 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
   }));
   if (spiClasses.some((c) => c.cycleRating == null)) missing.push('tblSpiType: Num Annual Mold Cycles');
 
-  const components = table('cmStandardToolingComponents').map((r) => ({
-    name: String(r['name']), unitCostUsd: num(r['unit_cost_usd']), quantity: num(r['quantity']),
-  }));
-  const assemblyTimes = table('cmToolAssemblyTimes').map((r) => ({ name: String(r['name']), hours: num(r['assembly_time_hr']) ?? NaN }));
+  // The injection mold's own components first; the compression rows only for the parts they do not cover.
+  const injection = INJECTION_MOLD_COMPONENTS.map((c) => ({ name: c.name, unitCostUsd: variable(c.cost), quantity: variable(c.quantity), hours: variable(c.hours) }));
+  const replaced = new Set(INJECTION_MOLD_COMPONENTS.flatMap((c) => c.replaces.map(componentNameKey)));
+  const notReplaced = (r: Record<string, unknown>) => !replaced.has(componentNameKey(String(r['name'])));
+  const components = [
+    ...injection.map(({ name, unitCostUsd, quantity }) => ({ name, unitCostUsd, quantity, source: 'injection' as const })),
+    ...table('cmStandardToolingComponents').filter(notReplaced).map((r) => ({
+      name: String(r['name']), unitCostUsd: num(r['unit_cost_usd']), quantity: num(r['quantity']), source: 'compression' as const,
+    })),
+  ];
+  const injectionHours = INJECTION_ASSEMBLY_HOURS.map((a) => ({ name: a.name, hours: variable(a.hours) }));
+  const hoursReplaced = new Set(injectionHours.map((a) => componentNameKey(a.name)));
+  const assemblyTimes = [
+    ...injection.map(({ name, hours }) => ({ name, hours })),
+    ...injectionHours,
+    ...table('cmToolAssemblyTimes').filter((r) => notReplaced(r) && !hoursReplaced.has(componentNameKey(String(r['name']))))
+      .map((r) => ({ name: String(r['name']), hours: num(r['assembly_time_hr']) ?? NaN })),
+  ];
   const operatorsByArea = table('cmToolAssemblyNumOperators')
     .map((r) => ({ areaM2: num(r['mold_base_area_m2']) ?? NaN, operators: num(r['num_operators_required']) ?? NaN }))
     .sort((a, b) => a.areaM2 - b.areaM2);

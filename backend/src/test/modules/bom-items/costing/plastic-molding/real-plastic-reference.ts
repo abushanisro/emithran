@@ -7,6 +7,7 @@ import {
   type PlasticReference,
   type PlasticReferenceRows,
   SECONDARY_VARIABLE_KEYS,
+  MOLD_COMPONENT_VARIABLE_KEYS,
 } from '../../../../../modules/bom-items/costing/plastic-molding/plastic-reference';
 import type { MaterialClampProperties } from '../../../../../modules/bom-items/costing/plastic-molding/clamp-force';
 import type { RealResinInputs } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
@@ -55,7 +56,11 @@ export function realReferenceRows(): PlasticReferenceRows {
   const secondary = parseCsv(readFileSync(join(memoryFolder('secondary process'), 'variables_inherited.csv'), 'utf-8').replace(/^\uFEFF/, ''))
     .filter((r) => (SECONDARY_VARIABLE_KEYS as readonly string[]).includes(r['Variable Name']!))
     .map((r) => ({ key: r['Variable Name']!, value: r['String Value'] ?? null }));
-  const variables = [...read('variables/digital_factory_variables.csv').map((r) => ({ key: r['variableName']!, value: r['stringValue'] ?? null })), ...secondary];
+  // memory/Assembly plastic molding (2026-AssyPlastic): the injection mold's standard components (MOLD_COMPONENT_VARIABLE_KEYS).
+  const components = parseCsv(readFileSync(join(memoryFolder('Assembly plastic molding'), 'plastic_molding_variables.csv'), 'utf-8').replace(/^\uFEFF/, ''))
+    .filter((r) => (MOLD_COMPONENT_VARIABLE_KEYS as readonly string[]).includes(r['Variable Name']!))
+    .map((r) => ({ key: r['Variable Name']!, value: r['String Value'] ?? null }));
+  const variables = [...read('variables/digital_factory_variables.csv').map((r) => ({ key: r['variableName']!, value: r['stringValue'] ?? null })), ...secondary, ...components];
   // Same file for each key that migration 823 stages under it (split tables in
   // lookup/ as X__records.csv, the settings export in process/).
   const fileOf = (k: string) => (k.startsWith('digital_factory_') ? `process/${k}.csv` : `lookup/${k}__records.csv`);
