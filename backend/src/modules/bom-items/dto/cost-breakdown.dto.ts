@@ -707,6 +707,8 @@ export interface CostSummaryDto {
   additive?: AdditiveBreakdown;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
   assembly?: AssemblyBreakdown;
+  /** Assembly Molding (insert molding): the inserts, how they are loaded, the press and its shot, the route quoted and every route. */
+  insertMolding?: InsertMoldingBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
 
@@ -811,6 +813,26 @@ export interface ForgingBreakdown {
 
 /** What the composites route decided: the plies read from the laminate's thickness, the core, the autoclave load and the layup route. */
 /** What the assembly route decided: the components loaded, every joint (derived from the children or set in the Cost Guide) and the route. */
+/** What the insert molding route decided: the inserts loaded every shot, the loader, the insert press and its shot (overlapped on a table). */
+export interface InsertMoldingBreakdown {
+  /** The quoted route (insert-molding.ts INSERT_MOLDING_ROUTES key) and its name. */
+  route: string;
+  routeLabel: string;
+  complete: boolean;
+  /** The inserts: the part's BOM children, or the Cost Guide's count and weight. */
+  inserts: Array<{ id: string | null; name: string; perPart: number; massKg: number | null; source: 'bom' | 'cost_guide' }>;
+  loaderName: string | null;
+  loadSecPerPart: number | null;
+  press: { name: string | null; tableConfiguration: string | null; tablePress: boolean; reasons: string[] };
+  /** The injection cycle of a shot and the shot itself (the longer of molding and loading on a table press, their sum without one). */
+  moldingCycleSec: number | null;
+  shotSec: number | null;
+  /** A table press holds a second lower mold half; the tooling model has no separate core half, so it is named here, not priced. */
+  toolingNote: string | null;
+  /** Every route: its total per part (summary currency) when complete, or what keeps it from being one. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
 export interface AssemblyBreakdown {
   /** The quoted route (assembly-route.ts ASSEMBLY_ROUTES key) and its name; null when none could be built. */
   route: string | null;

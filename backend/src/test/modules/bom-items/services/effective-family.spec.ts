@@ -44,7 +44,7 @@ describe('the process a part is costed as', () => {
     const r = resolve({ scenarioOverrides: { processGroup: 'Rapid Prototyping' } }, 'Generic ABS, Fittings', 'milled');
     expect(r.family).toBe('unknown');
     expect(r.familySource).toBe('process');
-    expect(r.warning).toBe('The Process "Rapid Prototyping" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
+    expect(r.warning).toBe('The Process "Rapid Prototyping" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Assembly Molding, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
   });
 
   it('a Powder Metal part is a powder metal part, whatever its material or last analysis', () => {
@@ -62,6 +62,10 @@ describe('the process a part is costed as', () => {
     // A Process the engineer chose wins: an assembly set to the uncosted Part Assembly says so rather than being priced as another process.
     expect(resolve({ itemType: 'assembly' as never, scenarioOverrides: { processGroup: 'Part Assembly' } }, null).family).toBe('unknown');
     expect(resolve({ itemType: 'child_part' as never }, null, 'milled').family).toBe('milled');
+  });
+
+  it('an Assembly Molding part is a molded plastic part (insert molding on the insert presses), whatever its last analysis', () => {
+    expect(resolve({ scenarioOverrides: { processGroup: 'Assembly Molding' } }, 'Generic ABS, Fittings', 'milled')).toEqual({ family: 'plastic_molded', familySource: 'process', warning: null });
   });
 
   it('an Additive Manufacturing part is a printed part, whatever its material or last analysis', () => {

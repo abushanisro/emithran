@@ -1148,6 +1148,9 @@ export const MACHINE_REGISTRY = {
   // low-pressure with a blowing agent) — reuses computeInjectionMoldedCostSummary
   // unchanged, only the machine pool/rate differs from injection_molding.
   structural_foam_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding'], machineClassKeywords: ['Structural Foam', 'Foam Molder', 'Foam Molding'] },
+  // Insert molding presses (memory/Assembly molding, migrations 862, 1079, 1080): injection physics on vertical presses that load inserts every shot,
+  // priced by computeInjectionMoldedCostSummary like Structural Foam; only the pool, the rate and the shot (insert loading) differ.
+  assembly_molding_insert_injection_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Assembly Molding'], machineClassKeywords: ['Insert Injection Molding'] },
   // Real, distinct machine class (2026-09-02). Real machine pool:
   // memory/Injection/machine/compression_molding_machines.json (23 machines,
   // e.g. "Accurl Hydraulic Press HBP-40"). Compression molding is NOT

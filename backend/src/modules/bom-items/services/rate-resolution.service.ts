@@ -40,7 +40,7 @@ export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
   // cnc_lathe_live/cnc_mill_turn buckets (Machining Engine Re-Architecture).
   '3_axis_mill', '4_axis_mill', '5_axis_mill',
   '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
-  'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
+  'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'assembly_molding_insert_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
   'gun_drill', 'deep_bore_machine', 'manual_deburr', 'manual_bench_cell', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn', 'wire_edm', 'hob_machine', 'simultaneous_turning',
   'machining_inspection', 'special_inspection',
 ];
@@ -189,6 +189,8 @@ export class RateResolutionService {
     compressionMolding: MHRRateInput;
     structuralFoamMolding: MHRRateInput;
     reactionInjectionMolding: MHRRateInput;
+    /** The insert molding press (Assembly Molding): the injection engine on an insert press. */
+    insertInjectionMolding: MHRRateInput;
     /**
      * The blanket labour rate for lines whose machine carries none. Always
      * null: labour is each machine's own memory/ LHR (see get() below), and no
@@ -298,6 +300,7 @@ export class RateResolutionService {
       compressionMolding: get('compression_molding'),
       structuralFoamMolding: get('structural_foam_molding'),
       reactionInjectionMolding: get('reaction_injection_molding'),
+      insertInjectionMolding: get('assembly_molding_insert_injection_molding'),
       directLaborRate: null,
       qaInspectorRate: inspection.labourRate ?? null,
     };

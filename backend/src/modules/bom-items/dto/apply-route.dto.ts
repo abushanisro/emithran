@@ -13,6 +13,7 @@ import { FORGING_ROUTE_IDS } from '../costing/forging/forging-route-comparison';
 import { COMPOSITES_ROUTE_IDS } from '../costing/composites/composites-route-comparison';
 import { ADDITIVE_ROUTE_IDS } from '../costing/additive/additive-route-comparison';
 import { ASSEMBLY_ROUTE_IDS } from '../costing/assembly/assembly-route-comparison';
+import { INSERT_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/insert/insert-molding';
 
 // The locations this system holds real rate and material-cost data for, taken
 // from LOCATION_INFO itself so the validator can never drift from the table
@@ -40,6 +41,8 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...ADDITIVE_ROUTE_IDS,
   // An assembly's routes (manual, robotic welding), priced by the assembly engine (assembly-route-comparison.ts).
   ...ASSEMBLY_ROUTE_IDS,
+  // An insert-molded part's load methods (manual, 3-axis, 6-axis), priced by the insert molding engine.
+  ...INSERT_MOLDING_ROUTE_IDS,
   // The one-route processes: the cost summary as quoted, as one route (the Workflow Builder sets them like any complete route).
   SAND_CASTING_ROUTE_ID, INVESTMENT_CASTING_ROUTE_ID, POWDER_METAL_ROUTE_ID, TWO_MODEL_ROUTE_ID,
 ];

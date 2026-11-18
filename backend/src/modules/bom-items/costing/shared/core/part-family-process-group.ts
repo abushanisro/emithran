@@ -35,6 +35,9 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
 /** An assembly's family: its own work (loading and joining its BOM children), costed by costing/assembly. */
 export const ASSEMBLY_FAMILY = 'assembly';
 
+/** Insert molding (memory/Assembly molding): costed as a plastic molded part on the insert presses. */
+export const INSERT_MOLDING_PROCESS_GROUP = 'Assembly Molding';
+
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
 /**
  * The families a CAD analysis run with a family hint may store. A hint names an extractor, and the analysis stores that family, except a
@@ -55,6 +58,8 @@ export const CASTING_PROCESS_GROUP = 'Casting';
 const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
   'Sheet Metal - Hydroforming': ['sheet_metal'],
   [CASTING_PROCESS_GROUP]: ['die_cast', 'sand_cast', 'investment_cast'],
+  // Insert molding: a molded plastic part, analysed and priced as one, on the insert presses with its inserts loaded (plastic-molding/insert).
+  [INSERT_MOLDING_PROCESS_GROUP]: ['plastic_molded'],
 };
 
 /**

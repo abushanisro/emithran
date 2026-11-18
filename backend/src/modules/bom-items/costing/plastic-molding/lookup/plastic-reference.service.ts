@@ -31,6 +31,8 @@ interface PressRecord {
   dryCycleTimeS: number | null;
   /** good_part_yield (migration 633): share of shots that are good parts. */
   goodPartYield: number | null;
+  /** specs.table_configuration (insert presses: Rotary, Shuttle or No table); null for a press that names none. */
+  tableConfiguration: string | null;
   /** The record itself (id, name, class, location): a calculator input read from it opens it. */
   record: MachineRecord;
 }
@@ -145,6 +147,8 @@ export class PlasticReferenceService {
       injectionRateMm3PerS: num(r.specs?.injection_rate_mm3_per_s),
       dryCycleTimeS: num(r.press_cycle_time_s),
       goodPartYield: num(r.good_part_yield),
+      // An insert press loads while it molds when it has a rotary or shuttle table (specs.table_configuration, memory/Assembly molding).
+      tableConfiguration: typeof r.specs?.table_configuration === 'string' ? r.specs.table_configuration : null,
       record: { id: String(r.id), name: String(r.machine_name ?? ''), machineClass: String(r.machine_class ?? ''), location: r.location == null ? null : String(r.location) },
     }]));
   }

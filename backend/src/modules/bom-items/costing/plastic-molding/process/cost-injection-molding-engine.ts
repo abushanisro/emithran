@@ -27,6 +27,7 @@ import { RATES_SOURCE_LABEL } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import { computeSustainability } from '../../shared/core/cost-engine';
 import type {
+  CalculationTraceStep,
   CostSummaryDto,
   ProcessLineCost,
   InjectionMoldingBreakdown,
@@ -235,6 +236,11 @@ export interface InjectionMoldingCostInput {
    * calculator, as for heat treatment and machining. Absent = no calculator, so the cycle is a named gap, never a number. Not part of a saved calculation's inputs.
    */
   calculators?: ReferenceCalculators | null;
+  /**
+   * Insert molding (insert/insert-molding.ts shotCycle): the shot's time from the injection cycle and the cavities, when the press also loads
+   * inserts every shot (overlapped on a rotary or shuttle table). Absent: the shot is the injection cycle.
+   */
+  shotCycle?: ((moldingCycleSec: number, cavities: number) => { sec: number; trace: CalculationTraceStep[] } | null) | null;
   /** The part's own values for calculator fields (calculator_field_overrides, migration 1011), laid over the calculators for this calculation. */
   calculatorOverrides?: CalculatorFieldOverrides | null;
   goodPartYield?: number | null;
@@ -550,9 +556,13 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   const MOLDING_PROCESS_LABEL: Record<string, string> = {
     injection_molding: 'Injection Molding',
     structural_foam_molding: 'Structural Foam Molding',
+    assembly_molding_insert_injection_molding: 'Insert Injection Molding',
   };
   const processLabel = MOLDING_PROCESS_LABEL[mhrRate.machineClass] ?? 'Injection Molding';
-  const inCycleMin = cycle.derivable ? (cycle.totalCycleSec / cavityCount / perGood) / 60 : 0;
+  // An insert press's shot also loads the inserts (overlapped on a table press): its time is the shot's, its trace follows the cycle's.
+  const shot = cycle.derivable && input.shotCycle ? input.shotCycle(cycle.totalCycleSec, cavityCount) : null;
+  const shotSec = shot?.sec ?? (cycle.derivable ? cycle.totalCycleSec : 0);
+  const inCycleMin = cycle.derivable ? (shotSec / cavityCount / perGood) / 60 : 0;
   moldingMin += inCycleMin;
   const line = makeLine(processLabel, pressSetupMin, batchSize, inCycleMin, mhrRate);
   if (pressSetupMin !== null) { line.setupTimeMin = pressSetupMin; line.setupTimeSource = 'machine'; }
@@ -570,7 +580,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     };
   }
   if (cycle.derivable) {
-    line.calculationTrace = cycle.trace;
+    line.calculationTrace = shot ? [...cycle.trace, ...shot.trace] : cycle.trace;
     if (Object.keys(cycle.lookups).length > 0) line.lookupMatches = cycle.lookups;
     // The stored calculator behind this line: the cost dialog opens it, filled with the inputs above, and runs the same formulas.
     if (cycle.calculator.id) line.calculatorId = cycle.calculator.id;
