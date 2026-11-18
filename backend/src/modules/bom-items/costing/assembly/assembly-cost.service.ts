@@ -124,7 +124,7 @@ export class AssemblyCostService {
     const keyOf = (v: unknown): AssemblyRouteKey | null => ASSEMBLY_ROUTES.find((r) => r.key === v)?.key ?? null;
     const chosen = keyOf(req.forceRoute) ?? keyOf(o[ASSEMBLY_ROUTE_KEY]);
     const { routes, gaps, missing } = buildAssemblyRoutes({
-      ref: reference, spec, calculators, components, joints, assembly: finishedAssembly(req.item, components),
+      ref: reference, spec, calculators, components, joints, assembly: finishedAssembly(req.item, components), selfId: self ? req.item.id : null,
       machinesByClass: machines, batchSize: req.batchSize, costContext: req.costContext,
     });
     if (missing.length) return none(...missing);

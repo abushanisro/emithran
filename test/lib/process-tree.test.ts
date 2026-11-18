@@ -111,13 +111,24 @@ describe('buildProcessTree: steps that share a name', () => {
     line('Mechanical Assembly', ['Housing: 5 x M4 screwed']), line('Mechanical Assembly', ['Housing: 3 x M3 screwed']),
   ] } as unknown as CostSummaryDto;
   const stepsOf = (tree: ProcessTreeNode) => (tree.children ?? []).flatMap((g) => g.children ?? []).map((o) => `${o.label}: ${(o.children ?? []).map((f) => f.label).join(', ')}`);
+  // Each step lists its own line's features, and steps of one process on one machine are one step with all of them, not the step repeated.
   const expected = [
-    'Pick and Place: Housing x 1, Bracket x 2', 'Pick and Place: The finished assembly unloaded',
-    'Mechanical Assembly: Housing: 5 x M4 screwed', 'Mechanical Assembly: Housing: 3 x M3 screwed',
+    'Pick and Place: Housing x 1, Bracket x 2, The finished assembly unloaded',
+    'Mechanical Assembly: Housing: 5 x M4 screwed, Housing: 3 x M3 screwed',
   ];
 
-  it('each costed step lists its own line\'s features, not the first line of its name again', () => {
+  it('each costed line\'s features are listed once, under one step per process and machine', () => {
     expect(stepsOf(buildProcessTree(assembly, null, summary, 'USA', undefined, cost))).toEqual(expected);
+  });
+
+  it('the part handled whole by two lines (loaded, then unloaded) is listed once', () => {
+    const whole = { processLines: [{ ...line('Pick and Place', ['Part ×1']), actsOnWholePart: true }, { ...line('Pick and Place', ['Finished assembly ×1']), actsOnWholePart: true }] } as unknown as CostSummaryDto;
+    expect(stepsOf(buildProcessTree(assembly, null, summary, 'USA', undefined, whole))).toEqual(['Pick and Place: Whole part']);
+  });
+
+  it('steps of one process on different machines stay apart', () => {
+    const two = { processLines: [line('Pick and Place', ['A x 1']), { ...line('Pick and Place', ['B x 1']), machineName: 'Robot cell' }] } as unknown as CostSummaryDto;
+    expect(stepsOf(buildProcessTree(assembly, null, summary, 'USA', undefined, two))).toEqual(['Pick and Place: A x 1', 'Pick and Place: B x 1']);
   });
 
   it('the applied rows pair with the lines of their name in operation order', () => {

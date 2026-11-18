@@ -125,7 +125,8 @@ const blank = (id: string, process: JointProcess, label: string, source: Assembl
 /** The joints the children's own analyses give: a screw in every threaded hole, per instance of the child. */
 export function deriveJoints(components: readonly AssemblyComponent[]): AssemblyJoint[] {
   return components.flatMap((c) => c.threadedHoles.map((h) => ({
-    ...blank(`screw:${c.id}:${h.featureId}`, 'Mechanical Assembly', `${c.name}: ${h.occurrences * c.quantity} x ${h.spec ?? 'threaded hole'} screwed`, 'derived'),
+    // Named as the feature it is: "M4×0.7 screws ×5"; the part it is on is its componentId.
+    ...blank(`screw:${c.id}:${h.featureId}`, 'Mechanical Assembly', `${h.spec ?? 'Threaded hole'} screws ×${h.occurrences * c.quantity}`, 'derived'),
     operation: 'Screw Tighten - Manual', count: h.occurrences * c.quantity, componentId: c.id, featureIds: [h.featureId],
   })));
 }

@@ -633,6 +633,20 @@ export function buildProcessTree(
     });
   }
 
+  // A step that follows a step of the same process on the same machine is one more set of its features, not another step (an assembly
+  // loads its part and unloads it, screws in three sizes on one bench): its features join the step before.
+  const place = (container: ProcessTreeNode[], op: ProcessTreeNode) => {
+    const last = container[container.length - 1];
+    if (last && last.kind === 'operation' && op.kind === 'operation' && last.id.startsWith('op_') && op.id.startsWith('op_')
+      && last.label === op.label && last.machine === op.machine) {
+      // The whole part is listed once, however many of the merged lines act on it.
+      const hasWhole = (last.children ?? []).some((c) => c.wholePart);
+      last.children = [...(last.children ?? []), ...(op.children ?? []).filter((c) => !(hasWhole && c.wholePart))];
+      return;
+    }
+    container.push(op);
+  };
+
   // One group per process group, in route order; steps appended after the
   // route (threads, unresolved lines) stay in the part's group.
   const groups: ProcessTreeNode[] = [];
@@ -654,10 +668,10 @@ export function buildProcessTree(
         parent = { id: `route_${g.id}_${route}`, kind: 'operation', label: route, factory, machine: op.machine ?? '—', children: [] };
         g.children!.push(parent);
       }
-      parent.children!.push(op);
+      place(parent.children!, op);
       return;
     }
-    g.children!.push(op);
+    place(g.children!, op);
   });
   return { id: 'root', kind: 'part', label: item.name, factory, children: groups };
 }

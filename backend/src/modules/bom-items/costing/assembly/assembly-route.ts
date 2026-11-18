@@ -71,6 +71,11 @@ export interface AssemblyRouteInput {
   machinesByClass: Readonly<Record<string, readonly SandMachine[]>>;
   batchSize: number;
   costContext: CostContext;
+  /**
+   * The component whose model the page shows (a part set to Assembly with no parts under it is its own one component): its features and
+   * faces can be highlighted, so its load, unload and joints point at them. Null when the components are other parts.
+   */
+  selfId?: string | null;
 }
 
 /** What one joint came to on a route: its line's process and cost, or why it could not be made. */
@@ -194,10 +199,17 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
     };
     const lines: ProcessLineCost[] = [];
     const jointResults: AssemblyJointResult[] = [];
-    const add = (s: CostedStep, ops: FeatureOp[]) => {
+    const add = (s: CostedStep, ops: FeatureOp[], wholePart = false) => {
       warnings.push(...s.warnings);
-      lines.push({ ...s.line, featureBreakdown: ops.map((o) => ({ ...o, timeSec: o.timeSec || r2((s.line.cycleTimeMin ?? 0) * 60) })) });
+      lines.push({
+        ...s.line, featureBreakdown: ops.map((o) => ({ ...o, timeSec: o.timeSec || r2((s.line.cycleTimeMin ?? 0) * 60) })),
+        // The part on the page is the one handled: the tree shows it whole and highlights it.
+        ...(wholePart ? { actsOnWholePart: true } : {}),
+      });
     };
+    const isSelf = (componentId: string | null) => componentId != null && componentId === inp.selfId;
+    // Where a count came from on the part on the page: exactly those features, so the calculator's eye highlights them.
+    const featureRef = (label: string, featureIds: readonly string[]) => ({ kind: 'features' as const, label, features: featureIds.map((featureId) => ({ featureId })) });
 
     // ── Pick and Place: each component loaded, by the componentLoadTimes row its weight and size fall in ─────────────────────────────────
     const bands = new Map<Row, AssemblyComponent[]>();
@@ -207,17 +219,22 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
       if (!row) unloadable.push(c);
       else bands.set(row, [...(bands.get(row) ?? []), c]);
     }
-    const massNote = (c: AssemblyComponent) => (c.massSource === 'volume' ? ` (${c.massKg} kg: its volume at the density of ${c.material ?? 'its material'})` : '');
-    const componentOp = (c: AssemblyComponent, sec = 0): FeatureOp => ({ name: `${c.name} x ${c.quantity}${massNote(c)}`, featureType: 'AssemblyComponent', timeSec: sec, count: c.quantity, featureIds: [c.id] });
+    // Feature names stay short (the tree lists features); the mass and where it came from are on the panel and in the trace.
+    const componentOp = (c: AssemblyComponent, sec = 0): FeatureOp => ({ name: `${c.name} ×${c.quantity}`, featureType: 'AssemblyComponent', timeSec: sec, count: c.quantity, featureIds: [c.id] });
     for (const [row, group] of bands) {
       const quantity = group.reduce((s, c) => s + c.quantity, 0);
       const loadSeed = lookupSeed('componentLoadTimes', row, 'Load Time (s)', ['Equipment', 'Weight (kg)', 'Part Max Dimension (mm)']);
       const s = step('Pick and Place', (m) => timed('Pick and Place', m, {
-        quantity: seed(quantity, `${quantity} component instance(s) up to ${String(row['Weight (kg)'])} kg and ${String(row['Part Max Dimension (mm)'])} mm`),
+        quantity: {
+          value: quantity,
+          source: `${quantity} component instance(s) up to ${String(row['Weight (kg)'])} kg and ${String(row['Part Max Dimension (mm)'])} mm (${group.map((c) => `${c.name}: ${c.massKg} kg${c.massSource === 'volume' ? `, its volume at the density of ${c.material ?? 'its material'}` : ''}`).join('; ')})`,
+          // The part on the page, loaded: its whole solid is what is handled.
+          ...(group.length === 1 && isSelf(group[0]!.id) ? { ref: { kind: 'cad' as const, evidence: 'part_volume' as const } } : {}),
+        },
         unload_time_s: seed(0, 'components are loaded; the finished assembly is unloaded on its own line'),
       }, { 'componentLoadTimes.Load Time (s)': loadSeed }), ['Any pick and place station']);
       const each = (n(row, 'Load Time (s)') ?? 0) * (ref.number('handlingMultiplier') ?? 1) * (ref.number('cycleTimeAdjustmentFactor') ?? 1);
-      add(s, group.map((c) => componentOp(c, r2(each * c.quantity))));
+      add(s, group.map((c) => componentOp(c, r2(each * c.quantity))), group.length === 1 && isSelf(group[0]!.id));
     }
     if (unloadable.length) {
       const noMass = (c: AssemblyComponent) => (c.volumeMm3 != null
@@ -230,15 +247,18 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
     if (components.length) {
       const a = inp.assembly;
       const row = a.massKg != null && a.maxDimensionMm != null ? loadRow(ref, a.massKg, a.maxDimensionMm) : null;
-      const unloadOp: FeatureOp = { name: 'The finished assembly unloaded', featureType: 'Assembly', timeSec: 0, count: 1 };
+      const unloadOp: FeatureOp = { name: 'Finished assembly ×1', featureType: 'Assembly', timeSec: 0, count: 1 };
       if (!row) {
         lines.push({ ...gap('Pick and Place', ASSEMBLY_PROCESS_GROUP, ASSEMBLY_PROCESS_CLASS['Pick and Place'], a.massKg == null ? 'the unload time of the finished assembly: a component has no weight' : `the unload time of the ${r3(a.massKg)} kg, ${r2(a.maxDimensionMm ?? 0)} mm assembly: componentLoadTimes has no row for it`), featureBreakdown: [unloadOp] });
       } else {
         const s = step('Pick and Place', (m) => timed('Pick and Place', m, {
           quantity: seed(0, 'the finished assembly: nothing loaded'),
-          unload_time_s: lookupSeed('componentLoadTimes', row, 'Unload Time (s)', ['Equipment', 'Weight (kg)', 'Part Max Dimension (mm)']),
+          unload_time_s: (() => {
+            const u = lookupSeed('componentLoadTimes', row, 'Unload Time (s)', ['Equipment', 'Weight (kg)', 'Part Max Dimension (mm)']);
+            return u && { ...u, source: `${u.source}, for the finished assembly: ${r3(a.massKg!)} kg, ${a.sizeSource}` };
+          })(),
         }, { 'componentLoadTimes.Load Time (s)': lookupSeed('componentLoadTimes', row, 'Load Time (s)', ['Equipment', 'Weight (kg)', 'Part Max Dimension (mm)']) }), ['Any pick and place station']);
-        add(s, [{ ...unloadOp, name: `The finished assembly unloaded (${r3(a.massKg!)} kg; ${a.sizeSource})` }]);
+        add(s, [unloadOp], components.length === 1 && isSelf(components[0]!.id));
       }
     }
 
@@ -250,7 +270,10 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
     for (const j of enabled) {
       const process = ARC_WELDS[j.process]?.[route.key] ?? j.process;
       const jointOp: FeatureOp = { name: j.label, featureType: j.source === 'derived' ? 'AssemblyJointDerived' : 'AssemblyJoint', timeSec: 0, count: j.count, featureIds: j.featureIds };
-      const count = seed(j.count, `${j.count} on the joint (${j.source === 'derived' ? 'from the threaded holes of its part' : 'the joint table'})`);
+      const countSource = `${j.count} on the joint (${j.source === 'derived' ? 'from the threaded holes of its part' : 'the joint table'})`;
+      const count: CalcSeed = isSelf(j.componentId) && j.featureIds.length > 0
+        ? { value: j.count, source: countSource, ref: featureRef(j.label, j.featureIds) }
+        : seed(j.count, countSource);
       const problems: string[] = [];
       const need = (what: string, v: number | null): boolean => {
         if (v != null && v > 0) return true;
