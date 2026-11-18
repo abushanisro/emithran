@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { CompositesSection } from '@/components/costing/CompositesSection';
+import { TwoModelSection } from '@/components/costing/TwoModelSection';
+import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
 import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
 import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
@@ -96,7 +98,7 @@ import { PlasticDfmFindings } from '@/components/features/manufacturing-intellig
 import { isSupersededPlasticCheck, isSupersededPlasticWarning } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
-import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, usePlasticDfm, useMachiningDfm, useForgingDfm } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, usePlasticDfm, useMachiningDfm, useForgingDfm, useBOMItems, useSetSourceItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
@@ -4011,6 +4013,11 @@ function CostGuidePanel({
   };
   const updateBOMItem = useUpdateBOMItem();
   const patchScenarioOverrides = usePatchScenarioOverrides();
+  // 2-Model Machining: the source component is picked among the items of the part's BOM.
+  const isTwoModel = isTwoModelPart(item, cgpCostSummary);
+  const { data: twoModelBom } = useBOMItems(isTwoModel ? item.bomId : undefined);
+  const setSourceItem = useSetSourceItem();
+  const routeParams = useParams();
   const isSandCast = cgpCostSummary?.family === 'sand_cast';
   const isCastingProcess = isCastingProcessGroup(selectedProcessGroup);
   // limit 1000 is the key the Edit Process Cost dialog reads: one shared request, not nine pages.
@@ -4578,6 +4585,19 @@ function CostGuidePanel({
                   composites={cgpCostSummary.composites}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {isTwoModel && (
+              <Section title="2-Model Machining">
+                <TwoModelSection
+                  item={item}
+                  bomItems={twoModelBom?.items ?? []}
+                  source={cgpCostSummary?.sourceComponent}
+                  onLink={(sourceItemId) => { setSourceItem.mutate({ id: item.id, sourceItemId }); }}
+                  linking={setSourceItem.isPending}
+                  hrefOf={(id) => `/projects/${String(routeParams.id)}/bom/${item.bomId}/items/${id}/manufacturing-intelligence`}
                 />
               </Section>
             )}
