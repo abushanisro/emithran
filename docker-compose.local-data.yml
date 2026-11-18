@@ -25,6 +25,10 @@ services:
     image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
     profiles: [api]
     restart: unless-stopped
+    # PostgREST is the container's PID 1, which ignores the stop signal: Docker had to kill it, and when Docker itself shut down first (the
+    # Mac restarting) it was left exited 255 and was not restarted, so the backend's every request failed with "fetch failed". An init
+    # process passes the stop signal on: it exits cleanly like the database beside it, and comes back with Docker.
+    init: true
     depends_on:
       postgres: { condition: service_healthy }
     environment:
