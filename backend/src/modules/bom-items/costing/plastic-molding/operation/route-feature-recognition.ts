@@ -13,9 +13,9 @@
 import { catalogPairs, type CatalogOperation } from '../../sheet-metal/operation/catalog-operation-resolver';
 import type { PlasticFeature } from './plastic-catalog-operation-resolver';
 
-/** The four molding processes of the reference (the first segment of their catalog rows). */
+/** The molding processes of the reference (the first segment of their catalog rows): the four of Plastic Molding and Assembly Molding's insert molding. */
 export const MOLDING_PROCESSES: ReadonlySet<string> = new Set([
-  'Injection Molding', 'Reaction Injection Molding', 'Structural Foam Molding', 'Compression Molding',
+  'Injection Molding', 'Reaction Injection Molding', 'Structural Foam Molding', 'Compression Molding', 'Insert Injection Molding',
 ]);
 
 /**

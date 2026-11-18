@@ -143,6 +143,14 @@ describe('the routes', () => {
     expect(manual.summary.processLines.map((l) => l.process)).toEqual(['Insert Injection Molding', 'Insert Pick and Place']);
   });
 
+  it('the loader line lists its catalog operation for each insert: Manual Load by hand, Robotic Load by robot', () => {
+    const routes = price([insert(2, 0.1)]);
+    const loads = (key: string) => routes.find((r) => r.key === key)!.summary.processLines.at(-1)!.catalogOperations;
+    expect(loads('manual')).toEqual([expect.objectContaining({ operations: ['Manual Load'], featureType: 'AssemblyComponentGcd', variant: 'M4 brass insert', count: 2, status: 'resolved' })]);
+    expect(loads('6_axis')![0]!.operations).toEqual(['Robotic Load']);
+    expect(price([])[0]!.summary.processLines.at(-1)!.catalogOperations).toBeUndefined();
+  });
+
   it('quotes the cheapest complete route, or the one set; ids round-trip', () => {
     const routes = price([insert(2, 0.1)]);
     const cheapest = [...routes].sort((a, b) => a.summary.totalCost - b.summary.totalCost)[0];
