@@ -635,6 +635,51 @@ def analyze_geometry_advanced(
         cleanup_files(step_path)
 
 
+@app.post("/analyze/two-model")
+@limiter.limit(f"{config.rate_limit_per_minute}/minute")
+def analyze_two_model(
+    request: Request,
+    target: UploadFile = File(...),
+    source: UploadFile = File(...),
+    sensitivity: float = Form(82.0),
+    _auth: None = Security(require_api_key),
+    _slot: None = Depends(analysis_slot),
+) -> Dict[str, Any]:
+    """
+    2-Model Machining: compares a finished part (`target`) with the source component it is machined from (`source`, e.g. the casting),
+    both STEP files in one coordinate frame. Returns whether they are aligned (the target inside the source, within the factory's
+    cadModelMisalignmentSensitivity, 0-100), the target's faces left as supplied and those machined, and the volume machined off
+    (two_model/compare.py). Two models that are not aligned are reported, never aligned by guess.
+    """
+    from two_model.compare import compare_models  # type: ignore
+
+    file_validator: FileValidator = request.app.state.file_validator
+    paths: List[str] = []
+    try:
+        shapes = []
+        for upload in (target, source):
+            file_ext, content = read_checked_upload(upload, file_validator)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
+                paths.append(temp_step.name)
+                temp_step.write(content)
+            try:
+                file_validator.validate_file(paths[-1], upload.filename)
+            except FileValidationError as e:
+                raise HTTPException(status_code=400, detail=f"{upload.filename}: {e}")
+            if file_ext == '.sldprt':
+                raise HTTPException(status_code=422, detail=f"{upload.filename}: send the STEP file of each model")
+            try:
+                shapes.append(StepReader().read(paths[-1]))
+            except Exception:
+                raise _internal_error(f"Reading {upload.filename}", status_code=422)
+        try:
+            return compare_models(shapes[0], shapes[1], sensitivity)
+        except Exception:
+            raise _internal_error("Comparing the two models")
+    finally:
+        cleanup_files(*paths)
+
+
 def _pull_axis_vector(axis: str) -> Optional[Tuple[float, float, float]]:
     """The mold-opening axis the engineer fixed ('x' | 'y' | 'z'), as a unit vector; None for the automatic choice. Anything else is refused, never guessed."""
     a = (axis or "").strip().lower()
