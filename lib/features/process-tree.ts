@@ -1,6 +1,6 @@
 import { type CostSummaryDto, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { type SecondaryProcessLine } from '@/lib/api/hooks/useSecondaryProcesses';
-import { AS_SUPPLIED_STEP, asSuppliedOccurrences } from '@/lib/costing/two-model-view';
+import { AS_SUPPLIED_STEP, asSuppliedFaceIdsOf, asSuppliedOccurrences } from '@/lib/costing/two-model-view';
 import { fmt, fmtInt, formatEstCycleTime } from '@/lib/features/display-format';
 import { gdtCalloutNodes } from '@/lib/features/gdt-callout-nodes';
 import { groupFeaturesByType } from '@/lib/features/machining-feature-tree';
@@ -208,7 +208,7 @@ export function buildProcessTree(
   const isMachiningFamily = isMachiningTreeFamily(family);
   // 2-Model Machining: the occurrences left as the source component made them are not machined (the backend costs only the rest). A
   // feature all of whose occurrences are as supplied leaves the machining steps; they are listed under their own step below.
-  const asSupplied = cost?.sourceComponent ? asSuppliedOccurrences(fg, item.twoModelComparison?.result.as_supplied_face_ids) : [];
+  const asSupplied = cost?.sourceComponent ? asSuppliedOccurrences(fg, asSuppliedFaceIdsOf(cost, item.twoModelComparison)) : [];
   const suppliedCount = new Map<string, number>();
   for (const o of asSupplied) suppliedCount.set(o.featureId, (suppliedCount.get(o.featureId) ?? 0) + 1);
   const v2All = (fg?.feature_graph_v2?.features ?? []).filter((f) => (suppliedCount.get(f.id) ?? 0) < f.occurrences.length);

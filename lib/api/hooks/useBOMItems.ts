@@ -1245,6 +1245,10 @@ export interface CostSummaryDto {
     itemId: string; name: string; basis: 'fully_burdened' | 'piece_part';
     materialCost: number; processCost: number; toolingCost: number; totalCost: number;
     asSuppliedFeatures: number; removedVolumeMm3: number | null;
+    /** No blank model linked: the blank is derived from the part (backend two-model/derived-blank.ts), made by blankProcess, with its allowance metal. */
+    derived?: boolean; blankProcess?: string; allowanceVolumeMm3?: number;
+    /** The derived blank's faces left as supplied (a linked blank's are in the item's twoModelComparison). */
+    asSuppliedFaceIds?: number[];
   };
   /** Composites: the ply stack read from the laminate, the core and the layup route quoted (mirrors the backend's CompositesBreakdown). */
   composites?: {

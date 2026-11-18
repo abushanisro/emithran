@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 
 import { SOURCE_COMPONENT_PROCESSES, type BOMItem } from '@/lib/api/hooks/useBOMItems';
-import { comparisonState, currentComparison, sourceCandidates, type SourceComponentSummary } from '@/lib/costing/two-model-view';
+import { blankProcessOf, comparisonState, currentComparison, DERIVABLE_BLANK_PROCESSES, sourceCandidates, type SourceComponentSummary } from '@/lib/costing/two-model-view';
 
 interface Props {
   item: BOMItem;
@@ -20,6 +20,8 @@ interface Props {
   /** Adds the blank as a new item of this BOM from its 3D model, and links it. */
   onAddSource: (file: File, processGroup: (typeof SOURCE_COMPONENT_PROCESSES)[number]) => void;
   adding: boolean;
+  /** Saves the process the blank is made by (scenario key twoModelBlankProcess): the derived blank is priced as it, an uploaded one is made by it. */
+  onBlankProcess: (process: string) => void;
 }
 
 const rowClass = 'flex items-start gap-2 py-0.5';
@@ -32,8 +34,9 @@ const mm3 = (v: number) => `${Math.round(v).toLocaleString('en-US')} mm³`;
  * The Cost Guide's 2-Model Machining settings: the source component the part is machined from (another item of its BOM), whether the two
  * models line up, and what the source costs this part. Only the faces not on the source are machined; the source's cost is the material.
  */
-export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefOf, onAddSource, adding }: Props) {
-  const [process, setProcess] = useState<(typeof SOURCE_COMPONENT_PROCESSES)[number]>('Casting');
+export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefOf, onAddSource, adding, onBlankProcess }: Props) {
+  const process = blankProcessOf(item.scenarioOverrides) as (typeof SOURCE_COMPONENT_PROCESSES)[number];
+  const derivable = DERIVABLE_BLANK_PROCESSES.includes(process);
   const fileRef = useRef<HTMLInputElement>(null);
   const candidates = sourceCandidates(bomItems, item);
   const linked = bomItems.find((i) => i.id === item.sourceItemId) ?? null;
@@ -56,17 +59,20 @@ export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefO
       </div>
       {!item.fileStepPath && <p className="text-amber-600 dark:text-amber-400">This part has no STEP model to compare with its source.</p>}
       {!item.sourceItemId && (
-        <div className="rounded border border-dashed border-border p-2 space-y-1" title="The blank is added to this BOM beside the part, with its own process and cost, and counted once in the BOM total (inside this part).">
-          <p className="text-muted-foreground">
-            {candidates.length === 0 ? 'No other item of this BOM has a 3D model to be the source. ' : 'Or, if the blank is not in this BOM yet: '}
-            add the casting or forging blank from its STEP model (exported from the same assembly as this part, so the two line up).
-          </p>
+        <div className="rounded border border-dashed border-border p-2 space-y-1" title="An uploaded blank is added to this BOM beside the part, with its own process and cost, and counted once in the BOM total (inside this part).">
           <div className={rowClass}>
             <span className={labelClass}>Blank made by</span>
-            <select className={`${controlClass} cursor-pointer`} value={process} disabled={adding} onChange={(e) => { setProcess(e.target.value as typeof process); }}>
-              {SOURCE_COMPONENT_PROCESSES.map((p) => <option key={p} value={p}>{p}</option>)}
+            <select className={`${controlClass} cursor-pointer`} value={process} disabled={adding} onChange={(e) => { onBlankProcess(e.target.value); }}>
+              {SOURCE_COMPONENT_PROCESSES.map((p) => <option key={p} value={p}>{p}{DERIVABLE_BLANK_PROCESSES.includes(p) ? '' : ' (upload its model)'}</option>)}
             </select>
           </div>
+          <p className="text-muted-foreground">
+            {derivable
+              ? `No blank model: the blank is derived from this part, as a ${process.toLowerCase()} with its machining allowance, and only what the casting cannot hold is machined. `
+              : `A ${process.toLowerCase()} blank cannot be derived from this part's analysis: upload its model. `}
+            {candidates.length > 0 ? 'Pick the real blank above, or ' : 'For the real blank, '}
+            upload its STEP model (exported from the same assembly as this part, so the two line up).
+          </p>
           <input
             ref={fileRef}
             type="file"
@@ -110,7 +116,9 @@ export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefO
         <div className="mt-2 rounded border border-border p-2 space-y-0.5" title="The source component's cost is this part's material (useSourceModelFBCAsMaterialCost), shown in its own categories.">
           <div className="flex items-center justify-between">
             <span className="font-medium text-foreground">Source component</span>
-            <Link className="text-brand-600 hover:underline" href={hrefOf(source.itemId)}>{source.name}</Link>
+            {source.derived
+              ? <span className="text-muted-foreground">{source.name}</span>
+              : <Link className="text-brand-600 hover:underline" href={hrefOf(source.itemId)}>{source.name}</Link>}
           </div>
           <div className={rowClass}><span className={labelClass}>Material</span><span className="flex-1 tabular-nums">{money(source.materialCost)}</span></div>
           <div className={rowClass}><span className={labelClass}>Process</span><span className="flex-1 tabular-nums">{money(source.processCost)}</span></div>
@@ -123,6 +131,12 @@ export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefO
               {money(source.totalCost)} <span className="font-normal text-muted-foreground">{source.basis === 'fully_burdened' ? 'fully burdened' : 'piece part'}</span>
             </span>
           </div>
+          {source.derived && (
+            <div className={rowClass} title="The metal the casting carries on its machined faces (the sand machining allowance × the faces' area), machined off.">
+              <span className={labelClass}>Allowance</span>
+              <span className="flex-1 tabular-nums">{mm3(source.allowanceVolumeMm3 ?? 0)} on the machined faces</span>
+            </div>
+          )}
           <div className={rowClass}>
             <span className={labelClass}>As supplied</span>
             <span className="flex-1 tabular-nums">{source.asSuppliedFeatures} feature{source.asSuppliedFeatures === 1 ? '' : 's'}, not machined</span>
