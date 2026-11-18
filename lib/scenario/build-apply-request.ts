@@ -19,6 +19,8 @@ export interface StagedManualRoute {
   additiveRoute?: string;
   /** An assembly route picked in the Workflow Builder (assembly-route.ts ASSEMBLY_ROUTES key, "manual" or "robotic"). */
   assemblyRoute?: string;
+  /** An insert molding route picked in the Workflow Builder (insert-molding.ts INSERT_MOLDING_ROUTES key: manual, 3_axis, 6_axis). */
+  insertMoldingRoute?: string;
   machineOverrides?: { processKey: string; mhrRecordId: string }[];
 }
 
@@ -40,6 +42,7 @@ export interface StagedScenario {
   isForged: boolean;
   isAdditive?: boolean;
   isAssembly?: boolean;
+  isInsertMolding?: boolean;
   /** Currency and ask price, already resolved by the form. */
   scenarioPatch?: Record<string, unknown>;
   /** The revision of the applied scenario the page read: another apply since then is refused, not overwritten. */
@@ -109,6 +112,8 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
         ...(s.isAdditive ? { additiveRoute: manual?.additiveRoute ?? null } : {}),
         // Assembly the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
         ...(s.isAssembly ? { assemblyRoute: manual?.assemblyRoute ?? null } : {}),
+        // Insert molding the same: Manual quotes the load method picked; Auto clears it, so the cheapest complete one is quoted.
+        ...(s.isInsertMolding ? { insertMoldingRoute: manual?.insertMoldingRoute ?? null } : {}),
         ...(s.scenarioPatch ?? {}),
       },
       route,

@@ -17,6 +17,7 @@ import { CopilotPanel } from '@/components/features/manufacturing-intelligence/C
 import { CompositesSection } from '@/components/costing/CompositesSection';
 import { AdditiveSection } from '@/components/costing/AdditiveSection';
 import { AssemblySection } from '@/components/costing/AssemblySection';
+import { InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
@@ -25,6 +26,8 @@ import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
 import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
 import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
 import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
+import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
+import { isInsertMoldingItem } from '@/lib/costing/insert-molding-view';
 import { isAssemblyItem } from '@/lib/costing/assembly-view';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
@@ -3133,6 +3136,8 @@ function RouteSelectionDialog({
       ...(() => { const key = partFamily === 'additive' ? additiveRouteKeyOf(selected.routeId) : undefined; return key ? { additiveRoute: key } : {}; })(),
       // An assembly's route ids are its own ("assembly-<key>"): the key is committed as the scenario's assemblyRoute.
       ...(() => { const key = assemblyRouteKeyOf(selected.routeId); return key ? { assemblyRoute: key } : {}; })(),
+      // An insert molding route ("im-insert-<method>"): its load method is committed as the scenario's insertMoldingRoute.
+      ...(() => { const key = insertMoldingRouteKeyOf(selected.routeId); return key ? { insertMoldingRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -4584,6 +4589,17 @@ function CostGuidePanel({
                   forging={cgpCostSummary.forging}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.insertMolding && (
+              <Section title="Insert molding">
+                <InsertMoldingSection
+                  insertMolding={cgpCostSummary.insertMolding}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                  hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
                 />
               </Section>
             )}
@@ -8064,6 +8080,7 @@ export default function ManufacturingIntelligencePage() {
       isForged: (item.familyClassification ?? fg?.classification?.family) === 'forged',
       isAdditive: (item.familyClassification ?? fg?.classification?.family) === 'additive',
       isAssembly: isAssemblyItem(item),
+      isInsertMolding: isInsertMoldingItem(item),
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });

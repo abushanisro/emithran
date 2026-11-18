@@ -8,8 +8,11 @@ const route = (over: Partial<RouteResultDto> = {}) => ({
 }) as unknown as RouteResultDto;
 
 describe('which molding routes can be set manually', () => {
-  it('accepts every molding process the apply endpoint accepts: the three injection tiers, Structural Foam, Compression and Reaction Injection', () => {
-    expect([...MOLDING_APPLY_ROUTE_IDS].sort()).toEqual(['im-compression-molding', 'im-large-500t', 'im-reaction-injection-molding', 'im-small-50t', 'im-standard-200t', 'im-structural-foam-molding']);
+  it('accepts every molding process the apply endpoint accepts: the three injection tiers, Structural Foam, Compression, Reaction Injection, and insert molding by its three load methods', () => {
+    expect([...MOLDING_APPLY_ROUTE_IDS].sort()).toEqual([
+      'im-compression-molding', 'im-insert-3-axis', 'im-insert-6-axis', 'im-insert-manual', 'im-large-500t', 'im-reaction-injection-molding',
+      'im-small-50t', 'im-standard-200t', 'im-structural-foam-molding',
+    ]);
   });
 
   it('an injection tier that is priced can be set, with nothing to add', () => {

@@ -1165,6 +1165,15 @@ export interface CostSummaryDto {
    * Assembly: the components loaded (each BOM child) and every joint (derived from the children's threaded holes or set in the Cost Guide),
    * the route quoted and every route (backend AssemblyBreakdown). The summary is the assembly's own work; its children are added by the roll-up.
    */
+  /** Assembly Molding (insert molding): the inserts, their loading, the insert press and its shot, every route (backend InsertMoldingBreakdown). */
+  insertMolding?: {
+    route: string; routeLabel: string; complete: boolean;
+    inserts: Array<{ id: string | null; name: string; perPart: number; massKg: number | null; source: 'bom' | 'cost_guide' }>;
+    loaderName: string | null; loadSecPerPart: number | null;
+    press: { name: string | null; tableConfiguration: string | null; tablePress: boolean; reasons: string[] };
+    moldingCycleSec: number | null; shotSec: number | null; toolingNote: string | null;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
   assembly?: {
     route: string | null; routeLabel: string | null; complete: boolean;
     components: Array<{ id: string; name: string; quantity: number; massKg: number | null; massSource: 'weight' | 'volume' | null; maxDimensionMm: number | null; threadedHoles: number }>;

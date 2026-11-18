@@ -8,6 +8,8 @@ import type { RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 export const MOLDING_APPLY_ROUTE_IDS: ReadonlySet<string> = new Set([
   'im-small-50t', 'im-standard-200t', 'im-large-500t',
   'im-structural-foam-molding', 'im-compression-molding', 'im-reaction-injection-molding',
+  // Insert molding (Assembly Molding): one route per insert load method (backend insert-molding.ts INSERT_MOLDING_ROUTE_IDS).
+  'im-insert-manual', 'im-insert-3-axis', 'im-insert-6-axis',
 ]);
 
 /** The injection tonnage tiers: one process, three presses. Every other molding route is a different process. */
@@ -36,6 +38,8 @@ export function moldingRouteSelectability(route: RouteForSelection): MoldingRout
   }
   return {
     selectable: true,
-    note: INJECTION_TIERS.has(route.routeId) ? null : 'A different manufacturing process: priced by its own engine, and the Cost tab prices the part in it once it is applied.',
+    note: INJECTION_TIERS.has(route.routeId) ? null
+      : route.routeId.startsWith('im-insert-') ? 'Insert molding with this load method: the Cost tab quotes it once it is applied.'
+      : 'A different manufacturing process: priced by its own engine, and the Cost tab prices the part in it once it is applied.',
   };
 }

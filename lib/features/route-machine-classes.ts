@@ -3,7 +3,7 @@ import { type RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 // The 4 real Plastic Molding machine_class slugs (migration 633/645/734) —
 // used to scope the Tonnage/Clamp Force panel to rows actually costed on one
 // of these real machines, never on an Inspection/manual-rate row.
-export const IM_MACHINE_CLASSES = new Set(['injection_molding', 'compression_molding', 'reaction_injection_molding', 'structural_foam_molding']);
+export const IM_MACHINE_CLASSES = new Set(['injection_molding', 'compression_molding', 'reaction_injection_molding', 'structural_foam_molding', 'assembly_molding_insert_injection_molding']);
 
 // Every route getRouteComparison returns shares identical non-cutting lines
 // (deburr/press-brake/tapping/burring — computed once, reused across all

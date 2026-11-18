@@ -91,4 +91,10 @@ describe("buildApplyScenarioRequest", () => {
     expect(built({ isAssembly: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", assemblyRoute: "robotic" });
     expect(built({ isAssembly: true }).scenarioPatch).toEqual({ processRouting: "auto", assemblyRoute: null });
   });
+
+  it("an insert molding load method picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
+    const manual = { label: "Insert molding · 3-axis robot", directApplyRouteId: "im-insert-3-axis", insertMoldingRoute: "3_axis" };
+    expect(built({ isInsertMolding: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", insertMoldingRoute: "3_axis" });
+    expect(built({ isInsertMolding: true }).scenarioPatch).toEqual({ processRouting: "auto", insertMoldingRoute: null });
+  });
 });
