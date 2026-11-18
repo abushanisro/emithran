@@ -207,7 +207,8 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
       if (!row) unloadable.push(c);
       else bands.set(row, [...(bands.get(row) ?? []), c]);
     }
-    const componentOp = (c: AssemblyComponent, sec = 0): FeatureOp => ({ name: `${c.name} x ${c.quantity}`, featureType: 'AssemblyComponent', timeSec: sec, count: c.quantity, featureIds: [c.id] });
+    const massNote = (c: AssemblyComponent) => (c.massSource === 'volume' ? ` (${c.massKg} kg: its volume at the density of ${c.material ?? 'its material'})` : '');
+    const componentOp = (c: AssemblyComponent, sec = 0): FeatureOp => ({ name: `${c.name} x ${c.quantity}${massNote(c)}`, featureType: 'AssemblyComponent', timeSec: sec, count: c.quantity, featureIds: [c.id] });
     for (const [row, group] of bands) {
       const quantity = group.reduce((s, c) => s + c.quantity, 0);
       const loadSeed = lookupSeed('componentLoadTimes', row, 'Load Time (s)', ['Equipment', 'Weight (kg)', 'Part Max Dimension (mm)']);
@@ -219,7 +220,10 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
       add(s, group.map((c) => componentOp(c, r2(each * c.quantity))));
     }
     if (unloadable.length) {
-      const why = unloadable.map((c) => `${c.name}: ${c.massKg == null ? 'its weight (set it in the BOM or analyse its model)' : c.maxDimensionMm == null ? 'its size (its bounding box)' : `${c.massKg} kg and ${c.maxDimensionMm} mm are beyond componentLoadTimes`}`);
+      const noMass = (c: AssemblyComponent) => (c.volumeMm3 != null
+        ? `its weight: set its material (its ${Math.round(c.volumeMm3).toLocaleString('en-US')} mm³ at the material's density gives it) or its weight in the BOM`
+        : 'its weight: set it in the BOM, or its material and analyse its model');
+      const why = unloadable.map((c) => `${c.name}: ${c.massKg == null ? noMass(c) : c.maxDimensionMm == null ? 'its size (its bounding box)' : `${c.massKg} kg and ${c.maxDimensionMm} mm are beyond componentLoadTimes`}`);
       lines.push({ ...gap('Pick and Place', ASSEMBLY_PROCESS_GROUP, ASSEMBLY_PROCESS_CLASS['Pick and Place'], `the load time of ${why.join('; ')}`), featureBreakdown: unloadable.map((c) => componentOp(c)) });
     }
     // The finished assembly, unloaded once.

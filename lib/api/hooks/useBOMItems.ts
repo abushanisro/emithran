@@ -1167,7 +1167,7 @@ export interface CostSummaryDto {
    */
   assembly?: {
     route: string | null; routeLabel: string | null; complete: boolean;
-    components: Array<{ id: string; name: string; quantity: number; massKg: number | null; maxDimensionMm: number | null; threadedHoles: number }>;
+    components: Array<{ id: string; name: string; quantity: number; massKg: number | null; massSource: 'weight' | 'volume' | null; maxDimensionMm: number | null; threadedHoles: number }>;
     joints: Array<{
       id: string; process: string; routeProcess: string | null; operation: string | null; label: string; count: number;
       source: 'derived' | 'engineer'; enabled: boolean; componentId: string | null; featureIds: string[];
