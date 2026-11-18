@@ -517,14 +517,8 @@ export function ProcessCostDialog({
   const savedMHRId = editData?.mhrId || editData?.machineId || '';
   const { data: savedMHRRecord } = useMHRRecord(savedMHRId, { enabled: !!savedMHRId && open });
 
-  // limit:100 — the max the backend allows/clamps to (QueryCalculatorDto's
-  // @Max(200), further clamped server-side to 100 by findAll's
-  // `Math.min(query.limit || 10, 100)`). Without this, the backend instead
-  // defaults to 10 per page ordered by created_at desc, so the dropdown
-  // silently only ever shows the 10 most-recently-created calculators — an
-  // auto-selected (or any older) calculator has no matching <SelectItem> to
-  // render a label for (it still works — fields populate via the direct
-  // by-id useCalculator fetch below — but LOOKS unselected in the UI).
+  // Every calculator: useCalculators pages through the whole list (the backend serves at most 100 a page, newest first), so a line's
+  // calculator is an option however old it is. The selected one is also fetched by id, which fills the inputs.
   const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators(PROCESS_DIALOG_CALCULATOR_QUERY, { enabled: open });
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const selectedCalculatorIdRef = useRef(selectedCalculatorId);
@@ -872,8 +866,11 @@ export function ProcessCostDialog({
     const fromMachine = (selectedMHR)?.machineClass;
     if (fromMachine) return String(fromMachine);
     if (categoryMachineClasses.size === 1) return [...categoryMachineClasses][0]!;
+    // A line priced on a resource HR Rates does not hold (the molding engine's bench scale, dryer, inspection operator) has no machine and
+    // no HR Rates category of its class: its own saved class still names its catalog row, and with it the calculator that costed it.
+    if (!savedMHRId && categoryMachineClasses.size === 0 && editData?.machineClass) return String(editData.machineClass);
     return '';
-  }, [selectedMHR, categoryMachineClasses]);
+  }, [selectedMHR, categoryMachineClasses, savedMHRId, editData]);
 
   // The catalog rows for this machine's class — the ONE thing still read from
   // process_calculator_mappings, joined on machine_class (a real column on both
@@ -974,9 +971,10 @@ export function ProcessCostDialog({
 
   const calculatorsForDropdown = useMemo(() => {
     const all = calculatorsData?.calculators ?? [];
-    if (!calculatorIdsForGroup || calculatorIdsForGroup.size === 0) return all;
-    return all.filter((c: any) => calculatorIdsForGroup.has(c.id));
-  }, [calculatorsData, calculatorIdsForGroup]);
+    const scoped = !calculatorIdsForGroup || calculatorIdsForGroup.size === 0 ? all : all.filter((c: any) => calculatorIdsForGroup.has(c.id));
+    // The calculator in use is always an option, so the pick never shows blank.
+    return selectedCalculator && !scoped.some((c) => c.id === selectedCalculator.id) ? [...scoped, selectedCalculator] : scoped;
+  }, [calculatorsData, calculatorIdsForGroup, selectedCalculator]);
 
   const resolveCalculatorId = useCallback((mapping: any): string | null => {
     if (!mapping) return null;
@@ -1075,11 +1073,17 @@ export function ProcessCostDialog({
     } else {
       if (isLoadingMHR) return;
       derived = hrRatesIndex.selectionForMachineClass(editData.machineClass ?? '', selectedGroup);
+      // HR Rates has no machine of this class (a reference resource): the catalog row of the class names the step, so it is the category.
+      if (!derived.category && editData.machineClass) {
+        if (!catalogData) return; // the catalog is still loading: fill once it has
+        const row = activeMappings.find((m) => m.machineClass === editData.machineClass && (!selectedGroup || m.processGroup === selectedGroup));
+        if (row) derived = { processGroup: row.processGroup, category: row.processRoute || row.operation };
+      }
     }
     if (!selectedGroup && derived.processGroup) setSelectedGroup(derived.processGroup);
     if (!selectedCategory && derived.category) setSelectedCategory(derived.category);
     backfilledFromMachineRef.current = true;
-  }, [open, editData, editDataApplied, savedMHRId, savedMHRRecord, isLoadingMHR, hrRatesIndex, selectedGroup, selectedCategory]);
+  }, [open, editData, editDataApplied, savedMHRId, savedMHRRecord, isLoadingMHR, hrRatesIndex, catalogData, activeMappings, selectedGroup, selectedCategory]);
 
   // Auto-select the machine the COST ENGINE selected for this category's live
   // line (machineSelection.balanced) — never simply the first row of the list,
@@ -2684,6 +2688,11 @@ export function ProcessCostDialog({
   // else the line's saved one. No manual entry and no stale saved-rate
   // snapshot — with no machine the rate is 0 and the field says it is not
   // costed. Non-machine operations never carry a machine cost.
+  // A line costed on a resource HR Rates does not hold (the molding engine's reference bench scale or dryer, an inspection operator): its
+  // saved name and the rate the engine costed it at. Without it the dialog took the rate as 0 and warned that nothing could be costed.
+  const referenceResource = !selectedMHR && !savedMHRId && editData?.machineName && Number.isFinite(Number(editData?.machineRate)) && Number(editData?.machineRate) >= 0
+    ? { name: String(editData.machineName), rate: Number(editData.machineRate) }
+    : null;
   const effectiveMachineRate = isNonMachineOperation
     ? 0
     : selectedMHR
@@ -2702,7 +2711,7 @@ export function ProcessCostDialog({
         // on older rows) is exactly what produced "MHR = $0.00/hr" for a
         // machine that actually has a valid rate on file.
         ? resolveMhrUsdRate(savedMHRRecord)
-        : 0;
+        : referenceResource?.rate ?? 0;
   // The selected machine's own labour rate; a line with no machine (Inspection: labour, no equipment)
   // keeps the labour rate the cost engine costed it with, which the page passes in.
   const lineOnlyLabourRate = !selectedMHR && Number(editData?.liveLabourRate) > 0 ? Number(editData.liveLabourRate) : null;
@@ -3234,7 +3243,11 @@ export function ProcessCostDialog({
                               total is silently understated. Lives on the field that owns the
                               rate rather than in a separate summary card, so the warning sits
                               where the fix is. */}
-                          {effectiveMachineRate <= 0 && (
+                          {referenceResource ? (
+                            <p className="text-xs text-muted-foreground">
+                              Costed on {referenceResource.name} at ${referenceResource.rate.toFixed(2)}/hr: the cost engine&apos;s reference resource, not a machine in HR Rates. Pick a machine above to use its rate instead.
+                            </p>
+                          ) : effectiveMachineRate <= 0 && (
                             <p className="text-xs text-amber-600 dark:text-amber-500">
                               ⚠ No machine rate applied — cost cannot be calculated from machine time.
                             </p>
