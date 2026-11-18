@@ -9,7 +9,7 @@ describe('which part families have a cost model', () => {
     expect(hasCostModel(family)).toBe(true);
   });
 
-  it.each(['unknown', '', 'additive', 'anything the engineer typed'])('%p has none', (family) => {
+  it.each(['unknown', '', 'rapid_prototyping', 'anything the engineer typed'])('%p has none', (family) => {
     expect(hasCostModel(family)).toBe(false);
   });
 });

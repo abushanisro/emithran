@@ -26,6 +26,8 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   // A finished part machined from a cast blank derived from its own model (memory/"2 Mold Molding"): analysed as a machined part
   // (cad-engine family_hint two_model).
   two_model: '2-Model Machining',
+  // Built layer by layer (DMLS, SLS, material jetting, SLA): measured for its build (cad-engine additive/feature_extractor.py).
+  additive: 'Additive Manufacturing',
 };
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
