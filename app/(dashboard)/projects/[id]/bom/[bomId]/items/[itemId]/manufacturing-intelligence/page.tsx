@@ -15,12 +15,14 @@ import { toast } from 'sonner';
 import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { CompositesSection } from '@/components/costing/CompositesSection';
+import { AdditiveSection } from '@/components/costing/AdditiveSection';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
 import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
 import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
 import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
+import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -3123,6 +3125,7 @@ function RouteSelectionDialog({
       ...(isDieCast ? { dieCastingProcess: selected.routeLabel } : {}),
       ...(() => { const key = isForged ? forgingRouteKeyOf(selected.routeId) : undefined; return key ? { forgingRoute: key } : {}; })(),
       ...(() => { const key = isComposite ? compositesRouteKeyOf(selected.routeId) : undefined; return key ? { compositesRoute: key } : {}; })(),
+      ...(() => { const key = partFamily === 'additive' ? additiveRouteKeyOf(selected.routeId) : undefined; return key ? { additiveRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -4570,6 +4573,16 @@ function CostGuidePanel({
               <Section title="Forging">
                 <ForgingSection
                   forging={cgpCostSummary.forging}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'additive' && (
+              <Section title="Additive Manufacturing">
+                <AdditiveSection
+                  additive={cgpCostSummary.additive}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
@@ -8026,6 +8039,7 @@ export default function ManufacturingIntelligencePage() {
       manualRoute: selectedManualRoute,
       isDieCast: (item.familyClassification ?? fg?.classification?.family) === 'die_cast',
       isForged: (item.familyClassification ?? fg?.classification?.family) === 'forged',
+      isAdditive: (item.familyClassification ?? fg?.classification?.family) === 'additive',
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });
