@@ -4601,7 +4601,7 @@ export class BomItemCostingService {
     const inserts = insertsOf(await componentsOf(await this.items.findChildren(a.id, a.accessToken), async (grade) => {
       const d = await this.items.materialDensity(grade, a.accessToken);
       return d.density_g_cm3 != null && d.density_g_cm3 > 0 ? d.density_g_cm3 * 1000 : null;
-    }), a.item.scenarioOverrides);
+    }), a.item.scenarioOverrides, a.imInput.signals?.insertCount ?? null);
     const inputs = this.insertMoldingService
       ? await this.insertMoldingService.inputs(client, a.accessToken, a.location)
       : { ok: false as const, missing: ['the insert molding service is not available'] };

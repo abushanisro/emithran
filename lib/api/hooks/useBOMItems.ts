@@ -1168,7 +1168,7 @@ export interface CostSummaryDto {
   /** Assembly Molding (insert molding): the inserts, their loading, the insert press and its shot, every route (backend InsertMoldingBreakdown). */
   insertMolding?: {
     route: string; routeLabel: string; complete: boolean;
-    inserts: Array<{ id: string | null; name: string; perPart: number; massKg: number | null; source: 'bom' | 'cost_guide' }>;
+    inserts: Array<{ id: string | null; name: string; perPart: number; massKg: number | null; source: 'bom' | 'cost_guide' | 'cad' }>;
     /** The insert candidates the CAD recognised: a starting count to offer. */
     cadInsertCandidates: number | null;
     loaderName: string | null; loadSecPerPart: number | null;

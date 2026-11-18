@@ -93,6 +93,19 @@ export function familyLabel(f: string): string {
   return m[f] ?? f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * The header badge of a part: the process it is costed as when one is chosen (Process Group), else the CAD classifier's family with its
+ * confidence. The classifier only reads geometry: an insert-molded part looks injection molded, so its guess must not stand for the chosen process.
+ */
+export function partProcessBadge(
+  cls: { family: string; confidence?: number | null } | null | undefined, processGroup: string | null | undefined,
+): { label: string; confidence: number | null; title: string } | null {
+  const cad = cls ? `${familyLabel(cls.family)}${cls.confidence != null ? ` (${String(Math.round(cls.confidence * 100))}%)` : ''}` : null;
+  if (processGroup) return { label: processGroup, confidence: null, title: cad ? `Chosen process. The CAD reads the geometry as ${cad}.` : 'Chosen process.' };
+  if (!cls) return null;
+  return { label: `${familyLabel(cls.family)}${cls.confidence != null ? ` · ${String(Math.round(cls.confidence * 100))}%` : ''}`, confidence: cls.confidence ?? null, title: 'CAD classification' };
+}
+
 export function confidenceCls(c: number): string {
   if (c >= 0.85) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
   if (c >= 0.65) return 'text-amber-700 bg-amber-50 border-amber-200';

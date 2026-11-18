@@ -90,6 +90,8 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
   const fromBom = im.inserts.some((i) => i.source === 'bom');
   const entered = insertEntryOf(overrides);
   const saved = local === 'deleted' ? null : local ?? (entered.count != null ? entered : null);
+  // Nothing entered: the engine loads the CAD's insert candidates; shown as such, and Edit confirms or corrects them.
+  const fromCad = !fromBom && !saved ? im.inserts.find((i) => i.source === 'cad') ?? null : null;
   const cad = im.cadInsertCandidates != null && im.cadInsertCandidates > 0 ? im.cadInsertCandidates : null;
   const save = (e: InsertEntry) => { onChange(insertEntryPatch(e)); setLocal(e.count == null ? 'deleted' : e); setEditing(false); };
   const remove = () => { onChange(insertEntryPatch({ count: null, weightKg: null, name: '' })); setLocal('deleted'); setEditing(false); };
@@ -102,7 +104,7 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
           <h4 className={headClass}>Inserts</h4>
           {!fromBom && !editing && (
             <span className="flex gap-3">
-              <button type="button" className={action} onClick={() => { setEditing(true); }}>{saved ? 'Edit' : 'Add'}</button>
+              <button type="button" className={action} onClick={() => { setEditing(true); }}>{saved || fromCad ? 'Edit' : 'Add'}</button>
               {saved && <button type="button" className="text-red-600 hover:underline" onClick={remove}>Delete</button>}
             </span>
           )}
@@ -125,6 +127,12 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
             onSave={save}
             onCancel={() => { setEditing(false); }}
           />
+        ) : fromCad ? (
+          <ul className={boxClass}>
+            <Row label={<><span className="text-foreground">Insert candidates from CAD</span> × {fromCad.perPart}</>}>
+              <span className="text-muted-foreground" title={NO_WEIGHT_NOTE}>weight not given</span>
+            </Row>
+          </ul>
         ) : saved ? (
           <ul className={boxClass}>
             <Row label={<><span className="text-foreground">{saved.name || 'Insert'}</span> × {saved.count}</>}>
