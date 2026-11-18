@@ -381,6 +381,8 @@ services:
   postgrest:
     <<: *hardened
     image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
+    # PID 1 ignores the stop signal: without an init process a Docker shutdown left it exited 255 and not restarted (stage, 2026-11-17).
+    init: true
     user: "10004:10004"
     environment:
       PGRST_DB_URI: ${POSTGREST_DB_URI:?set POSTGREST_DB_URI in the env file}
