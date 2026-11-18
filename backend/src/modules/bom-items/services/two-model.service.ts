@@ -43,7 +43,7 @@ export function currentComparison(
   item: { sourceItemId: string | null; fileStepPath: string | null; twoModelComparison: StoredTwoModelComparison | null },
   sourceFileStepPath: string | null,
 ): { comparison: StoredTwoModelComparison } | { missing: string } {
-  if (!item.sourceItemId) return { missing: 'no source component: link the item this part is machined from (Process 2-Model Machining)' };
+  if (!item.sourceItemId) return { missing: 'no source component: pick the casting or forging this part is machined from in Cost Guide > 2-Model Machining > Source (an item of this BOM with a STEP model)' };
   if (!item.fileStepPath) return { missing: 'the part has no STEP model to compare with its source' };
   if (!sourceFileStepPath) return { missing: 'the source component has no STEP model' };
   const c = item.twoModelComparison;

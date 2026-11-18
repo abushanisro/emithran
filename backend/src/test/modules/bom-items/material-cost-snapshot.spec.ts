@@ -108,4 +108,41 @@ describe('MaterialCostSnapshotService.explain', () => {
     const recorded = await svc.ensure(input(s));
     expect(recorded.usage).toMatchObject({ netUsage: explained.netUsage, grossUsage: explained.grossUsage, scrapPct: explained.scrapPct, source: explained.source });
   });
+
+  describe('a 2-Model Machining part', () => {
+    const source = { itemId: 's1', name: 'Housing casting', basis: 'fully_burdened', materialCost: 166, processCost: 83, toolingCost: 41.5, totalCost: 290.5, asSuppliedFeatures: 4, removedVolumeMm3: 900 };
+    // The summary as the engine returns it: the source's mass as the weights (castingMetal), money in the display currency (INR at 83).
+    const twoModel = (over: Record<string, unknown> = {}) => summary({ family: 'two_model', grossWeightKg: 2, blankSpec: undefined, castingMetal: { partKg: 1.6, chargedKg: 2 }, materialCostPerKg: 145.25, usdToDisplayRate: 83, sourceComponent: source, ...over });
+
+    it('records the source component as one piece at its cost in USD, not the grade\'s stock by the kg', async () => {
+      const { svc, costRecords } = build([record({ materialName: 'Aluminum, A356' })], { id: 'new', unitCost: 3.5 });
+      const r = await svc.ensure(input(twoModel()));
+      expect(r).toEqual({ action: 'replaced', recordId: 'new', usage: null });
+      expect(costRecords.update).toHaveBeenCalledWith('r1', { isActive: false }, 'u', 't');
+      expect(costRecords.create.mock.calls[0]![0]).toMatchObject({
+        materialName: 'Source component: Housing casting', uom: 'PC', grossUsage: 1, netUsage: 1, scrap: 0, overhead: 0, reclaimRate: 0, unitCost: 3.5, country: 'USA',
+      });
+      expect(costRecords.create.mock.calls[0]![0]).not.toHaveProperty('materialId');
+    });
+
+    it('keeps the record while it is this source at this cost and location', async () => {
+      const { svc, costRecords } = build([record({ materialName: 'Source component: Housing casting', totalCost: 3.5 })]);
+      expect((await svc.ensure(input(twoModel())))).toEqual({ action: 'kept', recordId: 'r1', usage: null });
+      expect(costRecords.create).not.toHaveBeenCalled();
+    });
+
+    it('rewrites it when the source\'s cost moved', async () => {
+      const { svc, costRecords } = build([record({ materialName: 'Source component: Housing casting', totalCost: 3.0 })]);
+      expect((await svc.ensure(input(twoModel()))).action).toBe('replaced');
+      expect(costRecords.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes no stock record for a 2-Model part with no source linked', async () => {
+      const { svc, costRecords } = build([record()]);
+      expect(await svc.ensure(input(twoModel({ sourceComponent: undefined })))).toEqual({ action: 'kept', recordId: null, usage: null });
+      expect(costRecords.create).not.toHaveBeenCalled();
+      expect(costRecords.update).not.toHaveBeenCalled();
+    });
+  });
 });
+
