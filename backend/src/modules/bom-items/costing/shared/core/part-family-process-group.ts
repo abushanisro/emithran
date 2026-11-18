@@ -29,6 +29,15 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
 };
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
+/**
+ * The families a CAD analysis run with a family hint may store. A hint names an extractor, and the analysis stores that family, except a
+ * 2-Model Machining part: the cad-engine analyses it as the machined part it is (milled, turned or mill-turn; memory_optimizer.py), so
+ * its features are machining features under a machining family.
+ */
+export function familiesAnalysedForHint(hint: string): readonly string[] {
+  return hint === 'two_model' ? ['milled', 'turned', 'mill_turn'] : [hint];
+}
+
 export const CASTING_PROCESS_GROUP = 'Casting';
 
 /**

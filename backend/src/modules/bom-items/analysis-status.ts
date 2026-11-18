@@ -1,4 +1,5 @@
 import { castingProcessOfFamily } from './costing/casting/casting-cost-summary';
+import { familiesAnalysedForHint } from './costing/shared/core/part-family-process-group';
 
 // The one place that says whether a BOM item has been analysed well enough to cost. It is derived from what is already stored
 // (the feature graph, the drawing, the casting-analysis rows), never kept in a column of its own, so it cannot drift from them.
@@ -87,7 +88,8 @@ export function deriveAnalysisStatus(
     // The chosen process has its own CAD extractor but the stored features came from another one (Die Casting chosen, machining features stored):
     // they are not this process's features. This rule used to live in the page; the status is the one place that says whether to analyse.
     const analysedFamily = item.featureGraph?.classification?.family;
-    if (cad === 'ready' && item.chosenFamilyHint && analysedFamily && item.chosenFamilyHint !== analysedFamily) cad = 'stale';
+    // A 2-Model Machining part (hint two_model) is stored as the machining family it was analysed as: that is its own analysis, not another's.
+    if (cad === 'ready' && item.chosenFamilyHint && analysedFamily && !familiesAnalysedForHint(item.chosenFamilyHint).includes(analysedFamily)) cad = 'stale';
   }
 
   const needsCasting = castingWorker && hasModel && !!family && castingProcessOfFamily(family) === 'sand_casting';
