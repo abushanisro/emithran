@@ -510,6 +510,15 @@ export class BOMItemsController {
     return this.costing.getSandDfm(id, user.id, token);
   }
 
+  @Put(':id/source-item')
+  @ApiOperation({ summary: '2-Model Machining: set the item of the same BOM this part is machined from (its source component), or clear it with null' })
+  async setSourceItem(@Param('id') id: string, @Body('sourceItemId') sourceItemId: string | null | undefined, @AccessToken() token: string) {
+    if (sourceItemId !== null && (typeof sourceItemId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sourceItemId))) {
+      throw new BadRequestException('sourceItemId must be a BOM item id, or null to clear the link');
+    }
+    return this.bomItemsService.setSourceItem(id, sourceItemId, token);
+  }
+
   @Put(':id/tolerance-policy')
   @ApiOperation({ summary: 'Set the Tolerance Policy for Auto categories: assume_achieved | uniform {values} | cad {replaceBelow}' })
   async setTolerancePolicy(@Param('id') id: string, @Body() policy: unknown, @AccessToken() token: string) {
