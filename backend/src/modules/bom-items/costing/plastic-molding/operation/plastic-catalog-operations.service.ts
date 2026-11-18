@@ -64,6 +64,9 @@ export class PlasticCatalogOperationsService {
 
     let featureRecognition: RouteFeatureRecognition | null = null;
     for (const line of lines) {
+      // A line whose engine already names its operations keeps them: insert loading lists the Manual or Robotic Load of each insert, which are
+      // BOM components, not features of this part's CAD.
+      if (line.catalogOperations?.length) continue;
       const canonicalId = identities[classOf(line)]?.canonicalProcessId;
       const catalogRaw = canonicalId ? catalog.get(canonicalId) : undefined;
       if (!catalogRaw?.length) continue;

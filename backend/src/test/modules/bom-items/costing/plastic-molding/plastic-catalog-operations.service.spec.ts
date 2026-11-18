@@ -7,9 +7,13 @@ const CATALOG: Record<string, string[]> = {
   rim: ['Reaction Injection Molding:As Molded//SimpleHole', 'Reaction Injection Molding:HoleSideCore//SimpleHole', 'Reaction Injection Molding:HoleNoCore//SimpleHole', 'Reaction Injection Molding:As Molded//PlanarFace'],
   sfm: ['Structural Foam Molding:As Molded//SimpleHole', 'Structural Foam Molding:HoleSideCore//SimpleHole', 'Structural Foam Molding:HoleNoCore//SimpleHole', 'Structural Foam Molding:As Molded//PlanarFace'],
   cm: ['Compression Molding:As Molded//SimpleHole', 'Compression Molding:As Molded//PlanarFace'],
+  // memory/Assembly molding/Processes/operations.csv (migration 862): insert molding's own rows.
+  iim: ['Insert Injection Molding:As Molded//SimpleHole', 'Insert Injection Molding:HoleUnscrewMandrel//SimpleHole', 'Insert Injection Molding:As Molded//PlanarFace', 'Insert Injection Molding:Slides//SlideBundle'],
+  ipp: ['Insert Pick and Place:Manual Load//AssemblyComponentGcd', 'Insert Pick and Place:Robotic Load//AssemblyComponentGcd', 'Insert Pick and Place:Insert Slides//SlideBundle'],
 };
 const CLASS_TO_CANONICAL: Record<string, string> = {
   injection_molding: 'inj', reaction_injection_molding: 'rim', structural_foam_molding: 'sfm', compression_molding: 'cm',
+  assembly_molding_insert_injection_molding: 'iim', assembly_molding_insert_pick_and_place: 'ipp',
 };
 
 const graph: PlasticFeatureGraph = {
@@ -59,6 +63,19 @@ describe('PlasticCatalogOperationsService', () => {
     // compression has no core of any kind: the obscured hole cannot be made, and it says so
     expect(hole(lines[3])).toMatchObject({ status: 'infeasible', operations: [] });
     for (const l of lines) expect(l.catalogOperations?.find((o) => o.featureType === 'PlanarFace')).toMatchObject({ status: 'resolved', operations: ['As Molded'] });
+  });
+
+  it('insert molding: the press line lists its own catalog\'s operations on the part\'s features, and is the route\'s recognition', async () => {
+    const press = line('assembly_molding_insert_injection_molding');
+    const { featureRecognition } = await service().attach({ lines: [press], graph, rules, family: 'plastic_molded', accessToken: 't' });
+    expect(press.catalogOperations?.find((o) => o.featureType === 'PlanarFace')).toMatchObject({ status: 'resolved', operations: ['As Molded'] });
+    expect(featureRecognition?.process).toBe('Insert Injection Molding');
+  });
+
+  it('keeps the operations an engine already named on its line: insert loading\'s Manual Load of each insert is not re-read from the CAD', async () => {
+    const loader = { ...line('assembly_molding_insert_pick_and_place'), catalogOperations: [{ operations: ['Manual Load'], featureType: 'AssemblyComponentGcd', variant: 'M4 insert', diameterMm: null, count: 2, featureIds: [], status: 'resolved', children: [] }] } as unknown as ProcessLineCost;
+    await service().attach({ lines: [line('assembly_molding_insert_injection_molding'), loader], graph, rules, family: 'plastic_molded', accessToken: 't' });
+    expect(loader.catalogOperations).toEqual([expect.objectContaining({ operations: ['Manual Load'], featureType: 'AssemblyComponentGcd', count: 2 })]);
   });
 
   it('names what is not assessed yet, and attaches nothing without the graph', async () => {

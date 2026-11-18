@@ -207,7 +207,19 @@ export function priceInsertRoutes(input: {
       seen.shotSec = out?.sec ?? null;
       return out;
     } : null;
-    const summary = input.appendLines(input.runEngine(recorded), [input.toLocal(loading.step.line)]);
+    // The loader's catalog operations (memory/Assembly molding operations.csv: Insert Pick and Place:Manual Load // AssemblyComponentGcd, Robotic Load):
+    // one per insert, loaded the route's way.
+    const loadOperation = route.method === 'Manual' ? 'Manual Load' : 'Robotic Load';
+    const loaderLine: ProcessLineCost = {
+      ...input.toLocal(loading.step.line),
+      ...(input.inserts.length ? {
+        catalogOperations: input.inserts.map((i) => ({
+          operations: [loadOperation], featureType: 'AssemblyComponentGcd', variant: i.name, diameterMm: null, count: i.perPart,
+          featureIds: [], status: 'resolved' as const, children: [],
+        })),
+      } : {}),
+    };
+    const summary = input.appendLines(input.runEngine(recorded), [loaderLine]);
     return {
       key: route.key, label: route.label, summary, complete: !summary.processLines.some(isGapLine),
       loaderName: loading.step.machine?.name ?? null, loadSecPerPart: loading.secPerPart != null ? r2(loading.secPerPart) : null,
