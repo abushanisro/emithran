@@ -38,7 +38,7 @@ from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
 from OCC.Core.Standard import Standard_Failure  # type: ignore
 
 from shared.error_reporting import report_failure
-from shared.part_family import ALL_FAMILIES, CASTING_FAMILY_DOMAIN, COMPOSITE, MACHINING_FAMILIES, TWO_MODEL_HINT, DIE_DIRECTION_FAMILIES, MILLED, PLASTIC_MOLDED, SHEET_METAL
+from shared.part_family import ADDITIVE, ALL_FAMILIES, CASTING_FAMILY_DOMAIN, COMPOSITE, MACHINING_FAMILIES, TWO_MODEL_HINT, DIE_DIRECTION_FAMILIES, MILLED, PLASTIC_MOLDED, SHEET_METAL
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v71"  # bumped 2026-11-17: (47) a composite laminate records the faces behind the tool area, trim length, skins, height and footprint (feature_graph_v2.measurements) for the calculator eye. Prior: geo_v70 bumped 2026-11-17: (45) forging, powder metal and casting analyses record the faces behind the projected area, parting line, depth, plan and volume (feature_graph_v2.measurements) for the calculator eye. Prior: geo_v69 bumped 2026-11-17: (46) a forging (and powder metal) analysis names a stepped bore MultiStepHole "stepped", the catalog variant the machining and die casting analyses emit (forging.feature_extractor.hole_features), so machining after forging prices it. Prior: geo_v67 bumped 2026-11-17: (44) a forging (and powder metal) analysis lists every face as a feature (forging.feature_extractor.face_features: voids, planar faces, curved walls and surfaces, sharp edges) for the process tree and the 3D highlight. Prior: geo_v66 bumped 2026-11-17: (43) a powder metal part (family_hint powder_metal) is measured along its press direction by the forging measurements. Prior: geo_v65 bumped 2026-11-17: (42) a forging analysis lists its holes as hole features (forging.feature_extractor.hole_features), so the tolerances on them and the machining after forging are read as for every other process. Prior: geo_v64 bumped 2026-11-16: (41) a casting's wall is measured from where the ray enters the metal (shared.casting_geometry.wall_thickness_profile): a ray cast from the meshed wall of a bore crossed the bore's own surface first and read as a wall a few microns thick (Cannula Holder bottom, wall_thickness_min_mm 0.001). Prior: geo_v63 bumped 2026-11-16: (40) axial bores carry distance_from_axis_mm (as cross holes do), for the backend's live-tooling check. Prior: geo_v62 bumped 2026-11-16: (39) detect_part_family() needs a turned outer diameter (turned_od_count, shared.machining_geometry.turned_diameter_count) for turned / mill_turn: a block whose holes share one axis (R_M-0230-032 lead nut housing) was mill_turn, now milled. Prior: geo_v61 bumped 2026-11-14: (38) a machining pocket / slot / keyway is a floor with a wall rising
+    CACHE_VERSION = "geo_v72"  # bumped 2026-11-18: (48) an additive part (family_hint additive) is measured for its build: the build direction of least support, its height, footprint, overhang, support volume and plate contact (additive/feature_extractor.py). Prior: geo_v71 bumped 2026-11-17: (47) a composite laminate records the faces behind the tool area, trim length, skins, height and footprint (feature_graph_v2.measurements) for the calculator eye. Prior: geo_v70 bumped 2026-11-17: (45) forging, powder metal and casting analyses record the faces behind the projected area, parting line, depth, plan and volume (feature_graph_v2.measurements) for the calculator eye. Prior: geo_v69 bumped 2026-11-17: (46) a forging (and powder metal) analysis names a stepped bore MultiStepHole "stepped", the catalog variant the machining and die casting analyses emit (forging.feature_extractor.hole_features), so machining after forging prices it. Prior: geo_v67 bumped 2026-11-17: (44) a forging (and powder metal) analysis lists every face as a feature (forging.feature_extractor.face_features: voids, planar faces, curved walls and surfaces, sharp edges) for the process tree and the 3D highlight. Prior: geo_v66 bumped 2026-11-17: (43) a powder metal part (family_hint powder_metal) is measured along its press direction by the forging measurements. Prior: geo_v65 bumped 2026-11-17: (42) a forging analysis lists its holes as hole features (forging.feature_extractor.hole_features), so the tolerances on them and the machining after forging are read as for every other process. Prior: geo_v64 bumped 2026-11-16: (41) a casting's wall is measured from where the ray enters the metal (shared.casting_geometry.wall_thickness_profile): a ray cast from the meshed wall of a bore crossed the bore's own surface first and read as a wall a few microns thick (Cannula Holder bottom, wall_thickness_min_mm 0.001). Prior: geo_v63 bumped 2026-11-16: (40) axial bores carry distance_from_axis_mm (as cross holes do), for the backend's live-tooling check. Prior: geo_v62 bumped 2026-11-16: (39) detect_part_family() needs a turned outer diameter (turned_od_count, shared.machining_geometry.turned_diameter_count) for turned / mill_turn: a block whose holes share one axis (R_M-0230-032 lead nut housing) was mill_turn, now milled. Prior: geo_v61 bumped 2026-11-14: (38) a machining pocket / slot / keyway is a floor with a wall rising
     # from it (machining/recessed_floor.py): rib tops, boss tops and hole bottoms are no longer pockets; its occurrence
     # carries the measured depth_mm, walled_fraction and width_confined, and material_removed_mm3 is floor area x depth.
     # Previous: geo_v60, 2026-11-14: (37) machining feature_graph_v2 occurrences carry tool_axis /
@@ -826,6 +826,15 @@ class AdvancedCADMemoryOptimizer:
                     face_map=holes.get('face_map', []),
                     face_map_tri_total=holes.get('face_map_tri_total', 0),
                     layup_direction_override=pull_direction,
+                )
+            elif detected_family == ADDITIVE:
+                # A part built layer by layer: its build direction, height, footprint, overhang, supports and plate contact.
+                from additive.feature_extractor import AdditiveFeatureExtractor  # type: ignore
+                manufacturing_intelligence['features'] = AdditiveFeatureExtractor().extract(
+                    shape, dims_list,
+                    face_map=holes.get('face_map', []),
+                    face_map_tri_total=holes.get('face_map_tri_total', 0),
+                    build_direction_override=pull_direction,
                 )
             # holes= here is the coarse _detect_holes_real count (a classification
             # signal only — may include bend-radius cylinder faces; see that
