@@ -94,12 +94,24 @@ export function sourceComponentCost(input: {
  * The machined part's summary with the source component as its material: no bar stock (its blank and waste are gone), the source's cost in
  * its own categories, and the total from them. The machining lines are the engine's, for the machined features only.
  */
-export function withSourceComponent(summary: CostSummaryDto, source: SourceComponentCost, extra: { asSuppliedCount: number; removedVolumeMm3: number | null; warnings: string[] }): CostSummaryDto {
-  const { blankSpec: _blank, ...rest } = summary as CostSummaryDto & { blankSpec?: unknown };
+export function withSourceComponent<T extends CostSummaryDto>(
+  summary: T, source: SourceComponentCost,
+  extra: {
+    asSuppliedCount: number; removedVolumeMm3: number | null; warnings: string[];
+    /** The part's machining when it is not the summary's own lines (a derived blank: its machining-after-casting lines). */
+    lines?: ProcessLineCost[];
+    derived?: { blankProcess: string; allowanceVolumeMm3: number; asSuppliedFaceIds: number[] };
+  },
+): T {
+  const { blankSpec: _blank, ...rest } = summary as T & { blankSpec?: unknown };
+  const processLines = extra.lines ?? summary.processLines;
+  const totalProcessCost = extra.lines ? extra.lines.reduce((s, l) => s + l.totalCost, 0) : summary.totalProcessCost;
   const materialCost = source.totalCost;
-  const total = materialCost + summary.totalProcessCost;
+  const total = materialCost + totalProcessCost;
   return {
     ...rest,
+    processLines,
+    totalProcessCost: r2(totalProcessCost),
     family: 'two_model',
     materialCost: r2(materialCost),
     materialCostPerKg: source.massKg ? materialCost / source.massKg : summary.materialCostPerKg,
@@ -110,13 +122,14 @@ export function withSourceComponent(summary: CostSummaryDto, source: SourceCompo
       itemId: source.itemId, name: source.name, basis: source.basis,
       materialCost: r2(source.materialCost), processCost: r2(source.processCost), toolingCost: r2(source.toolingCost), totalCost: r2(source.totalCost),
       asSuppliedFeatures: extra.asSuppliedCount, removedVolumeMm3: extra.removedVolumeMm3,
+      ...(extra.derived ? { derived: true, blankProcess: extra.derived.blankProcess, allowanceVolumeMm3: Math.round(extra.derived.allowanceVolumeMm3), asSuppliedFaceIds: extra.derived.asSuppliedFaceIds } : {}),
     },
     warnings: [
       `2-Model Machining: machined from ${source.name}, its ${source.basis === 'fully_burdened' ? 'fully burdened cost (material, process and tooling per part, useSourceModelFBCAsMaterialCost)' : 'piece part cost (material and process)'} is the material; ${extra.asSuppliedCount} feature${extra.asSuppliedCount === 1 ? '' : 's'} left as supplied cost nothing.`,
       ...extra.warnings,
       ...summary.warnings.filter((w) => !/billet|bar stock|stock allowance/i.test(w)),
     ],
-  };
+  } as T;
 }
 
 /** A 2-Model part that cannot be costed: one named, uncosted line saying what is missing; never priced from bar stock instead. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BOMItem, CostSummaryDto, StoredTwoModelComparison } from '@/lib/api/hooks/useBOMItems';
-import { asSuppliedOccurrences, comparisonState, consumersOf, currentComparison, isTwoModelPart, sourceCandidates, AS_SUPPLIED_STEP } from '@/lib/costing/two-model-view';
+import { asSuppliedFaceIdsOf, asSuppliedOccurrences, blankProcessOf, comparisonState, consumersOf, currentComparison, isTwoModelPart, sourceCandidates, AS_SUPPLIED_STEP } from '@/lib/costing/two-model-view';
 import { buildProcessTree } from '@/lib/features/process-tree';
 import type { FeatureGraph, FeatureGraphSummary } from '@/lib/types/manufacturing';
 
@@ -65,4 +65,27 @@ describe('2-Model Machining', () => {
     expect(machinedIds).toContain('hole');
     expect(machinedIds).not.toContain('face');
   });
+
+  it('derives a sand casting blank unless the Cost Guide says otherwise', () => {
+    expect(blankProcessOf(undefined)).toBe('Sand Casting');
+    expect(blankProcessOf({ twoModelBlankProcess: 'Casting Investment' })).toBe('Casting Investment');
+  });
+
+  it('takes a derived blank\'s as-supplied faces from the cost, a linked blank\'s from the comparison', () => {
+    const derivedCost = { sourceComponent: { derived: true, asSuppliedFaceIds: [7] } } as unknown as CostSummaryDto;
+    expect(asSuppliedFaceIdsOf(derivedCost, stored({ as_supplied_face_ids: [1] }))).toEqual([7]);
+    expect(asSuppliedFaceIdsOf({ sourceComponent: { derived: false } } as unknown as CostSummaryDto, stored({ as_supplied_face_ids: [1] }))).toEqual([1]);
+  });
+
+  it('lists a derived blank\'s as-supplied occurrences in the tree, with no comparison stored', () => {
+    const item = { id: 'part', name: 'Back cover', scenarioOverrides: { processGroup: '2-Model Machining' } } as unknown as BOMItem;
+    const cost = {
+      family: 'two_model', processLines: [{ process: 'Tapping', cycleTimeMin: 1, machineName: 'VMC' }],
+      sourceComponent: { itemId: '', name: 'Back cover (derived sand casting blank)', derived: true, asSuppliedFaceIds: [1, 2], basis: 'fully_burdened', materialCost: 1, processCost: 1, toolingCost: 0, totalCost: 2, asSuppliedFeatures: 2, removedVolumeMm3: 0 },
+    } as unknown as CostSummaryDto;
+    const ops = (buildProcessTree(item, fg, {} as FeatureGraphSummary, 'Plant A', undefined, cost).children ?? []).flatMap((g) => g.children ?? []);
+    expect(ops[0]?.label).toBe(AS_SUPPLIED_STEP);
+    expect(ops[0]?.machine).toBe('Back cover (derived sand casting blank)');
+  });
 });
+

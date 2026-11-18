@@ -132,6 +132,7 @@ import { investmentCastingRoute } from './costing/casting/investment/investment-
 import { ForgingCostService } from './costing/forging/forging-cost.service';
 import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost.service';
 import { CompositesCostService, type CompositeLaminateSummary } from './costing/composites/composites-cost.service';
+import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, isMachiningLine, DERIVABLE_BLANK_FAMILY, DEFAULT_BLANK_PROCESS, TWO_MODEL_BLANK_PROCESS_KEY, type DerivedBlankOut } from './costing/two-model/derived-blank';
 import { machinedOnlyFeatureGraph, sourceComponentCost, twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, type SourceComponentCost } from './costing/two-model/two-model-cost';
 import { currentComparison, TWO_MODEL_SOURCE_VERSION } from './services/two-model.service';
 import { twoModelRoute } from './costing/two-model/two-model-route-comparison';
@@ -1172,6 +1173,59 @@ export class BomItemCostingService {
   }
 
   /** The 2-Model Machining variables (memory/"2 Mold Molding", staged 2026-2MoldMolding): the source's cost basis. */
+  /**
+   * A 2-Model Machining part with no blank model, priced from a blank derived from the part: the part priced as the blank's casting family
+   * (its machining allowance metal added), whose material, casting steps and tooling per part are the source component and whose machining
+   * after casting is the part's machining. A blank process that cannot be derived from a machined analysis (die casting, forging), or a
+   * blank that cannot be fully costed, is a gap with its reason.
+   */
+  private async derivedTwoModelSummary(
+    item: BOMItemResponseDto, id: string, userId: string, accessToken: string,
+    batchSize: number | undefined, location: string, productionLifeYears: number | undefined,
+    /** Filled with the part's machining lines in the factory local currency (apply-route persists these). */
+    localLinesOut?: { lines?: ProcessLineCost[]; localCurrency?: string },
+  ): Promise<{ summary: CostSummaryResponseDto } | { gap: string }> {
+    const chosen = item.scenarioOverrides?.[TWO_MODEL_BLANK_PROCESS_KEY];
+    const blankProcess = typeof chosen === 'string' && chosen ? chosen : DEFAULT_BLANK_PROCESS;
+    const blankFamily = DERIVABLE_BLANK_FAMILY[blankProcess];
+    if (!blankFamily) {
+      return { gap: `a ${blankProcess.toLowerCase()} blank cannot be derived from the machined part (it needs its own parting line and projected area): upload the blank's STEP model in Cost Guide > 2-Model Machining, or make the blank by Sand Casting or Casting Investment` };
+    }
+    const out: DerivedBlankOut = {};
+    const blankLocal: { lines?: ProcessLineCost[]; localCurrency?: string } = {};
+    let blank: CostSummaryResponseDto;
+    try {
+      blank = await this.computeCostSummary(id, userId, accessToken, batchSize, location, productionLifeYears, undefined, blankLocal, blankFamily, out);
+    } catch (e: unknown) {
+      return { gap: `the derived ${blankProcess.toLowerCase()} blank could not be costed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    const castingGap = blank.processLines.find((l) => l.physicsGap && !isMachiningLine(l));
+    if (blank.costStatus === 'incomplete' || castingGap) {
+      const reason = castingGap?.physicsGap && 'reason' in castingGap.physicsGap ? castingGap.physicsGap.reason : blank.warnings[0] ?? 'a step of it has no price';
+      return { gap: `the derived ${blankProcess.toLowerCase()} blank could not be costed: ${reason}` };
+    }
+    const { fullyBurdened } = await this.twoModelVariables(accessToken);
+    const { source, machiningLines } = deriveBlankSource(blank, { partName: item.name, blankProcess, fullyBurdened });
+    // Fully burdened, the blank's tooling is inside its cost (the material): it is not the part's tooling as well.
+    const base: CostSummaryResponseDto = fullyBurdened
+      ? { ...blank, dieTooling: undefined, coreboxTooling: undefined, patternTooling: undefined, forgingDies: undefined, tooling: undefined }
+      : blank;
+    if (localLinesOut) {
+      localLinesOut.lines = (blankLocal.lines ?? []).filter(isMachiningLine);
+      localLinesOut.localCurrency = blankLocal.localCurrency;
+    }
+    const allowance = out.allowanceVolumeMm3 ?? 0;
+    const summary = withSourceComponent(base, source, {
+      asSuppliedCount: out.asSuppliedFeatures ?? 0, removedVolumeMm3: allowance, lines: machiningLines,
+      derived: { blankProcess, allowanceVolumeMm3: allowance, asSuppliedFaceIds: out.asSuppliedFaceIds ?? [] },
+      warnings: [
+        `No blank model is linked: the blank is derived from this part, as a ${blankProcess.toLowerCase()} with ${Math.round(allowance).toLocaleString('en-US')} mm³ of machining allowance; upload or pick the real blank in Cost Guide > 2-Model Machining to replace it.`,
+        ...(out.allowanceNotes ?? []),
+      ],
+    });
+    return { summary };
+  }
+
   private async twoModelVariables(accessToken: string): Promise<{ fullyBurdened: boolean }> {
     const { data } = await this.databaseService.getClient(accessToken).from('machining_reference_data').select('key, value')
       .eq('category', 'variable').eq('source_version', TWO_MODEL_SOURCE_VERSION).eq('key', 'useSourceModelFBCAsMaterialCost');
@@ -1819,6 +1873,9 @@ export class BomItemCostingService {
     localLinesOut?: { lines?: ProcessLineCost[]; localCurrency?: string },
     /** Price the part as this family (a Casting part is priced as each casting family); else the family the part resolves to. */
     forceFamily?: string,
+    /** 2-Model Machining with no blank model: the part priced as its own blank (two-model/derived-blank.ts). The casting adds its machining
+     *  allowance metal, and reports it and the faces it holds as cast here. */
+    derivedBlank?: DerivedBlankOut,
   ): Promise<CostSummaryResponseDto> {
     const item = await this.items.findOne(id, userId, accessToken);
     // The generic Casting process: priced by every casting process, the cheapest fully costed one quoted (casting-process-choice.ts).
@@ -1924,12 +1981,19 @@ export class BomItemCostingService {
     if (family === TWO_MODEL_FAMILY) {
       const analysed = isMachiningFamily(item.familyClassification) ? item.familyClassification! : 'milled';
       const sourceId = item.sourceItemId ?? null;
+      // No blank model linked: the blank is derived from the part (user decision 2026-11-18), else the gap says why it cannot be.
+      let derivedGap: string | null = null;
+      if (!sourceId) {
+        const derived = await this.derivedTwoModelSummary(item, id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localLinesOut);
+        if ('summary' in derived) return derived.summary;
+        derivedGap = derived.gap;
+      }
       const source = sourceId ? await this.items.findOne(sourceId, userId, accessToken).catch(() => null) : null;
       const current = currentComparison(
         { sourceItemId: sourceId, fileStepPath: item.fileStepPath ?? null, twoModelComparison: item.twoModelComparison ?? null },
         source?.fileStepPath ?? null,
       );
-      let gap: string | null = sourceId && !source ? 'the source component is not an item you can read' : null;
+      let gap: string | null = derivedGap ?? (sourceId && !source ? 'the source component is not an item you can read' : null);
       let asSupplied = 0;
       if (!gap && 'missing' in current) gap = current.missing;
       else if (!gap && 'comparison' in current) {
@@ -3009,7 +3073,7 @@ export class BomItemCostingService {
         // assessed for the process as for the others.
         const m = await priceMachiningAfter(undefined);
         const bbox = [(item as any).maxLength, (item as any).maxWidth, (item as any).maxHeight].map((v) => Number(v ?? 0));
-        sandResult = await this.sandCostService.price({
+        const sandInput: Parameters<SandCostService['price']>[0] = {
           client, accessToken, location, grade,
           bomItemId: id, sourcePath: castingSourcePath({ file_3d_path: (item as any).file3dPath ?? (item as any).file_3d_path, file_step_path: (item as any).fileStepPath ?? (item as any).file_step_path }),
           stableFaceIds: (fg?.feature_graph_v2?.metadata?.stable_face_ids as Record<string, string> | undefined) ?? null,
@@ -3026,7 +3090,9 @@ export class BomItemCostingService {
           overrides: item.scenarioOverrides, batchSize, annualVolume: annualVolume ?? null, productionLifeYears: productionLifeYears ?? null,
           usdToLocal, costContext: zeroCtx,
           toUsd: (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } },
-        });
+        };
+        sandResult = await this.sandCostService.price(sandInput);
+        const allowanceWarnings: string[] = [];
         route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...sandResult.warnings] };
         if (this.machiningAllowance) {
           const rmag = item.scenarioOverrides?.['machiningAllowanceRmag'];
@@ -3039,6 +3105,18 @@ export class BomItemCostingService {
           });
           machiningAllowance = allowance.result;
           route.warnings.push(...allowance.warnings);
+          allowanceWarnings.push(...allowance.warnings);
+        }
+        if (derivedBlank) {
+          // A derived 2-Model blank carries the metal its machining takes off: priced again on the part's volume plus the allowance.
+          const extra = allowanceVolume(machiningAllowance, fg);
+          derivedBlank.allowanceVolumeMm3 = extra.volumeMm3;
+          derivedBlank.allowanceNotes = extra.notes;
+          { const held = asPrimaryFaceIds(m.need.result); derivedBlank.asSuppliedFaceIds = held.faceIds; derivedBlank.asSuppliedFeatures = held.count; }
+          if (extra.volumeMm3 > 0) {
+            sandResult = await this.sandCostService.price({ ...sandInput, measurements: { ...sandInput.measurements, volumeMm3: (sandInput.measurements.volumeMm3 ?? 0) + extra.volumeMm3 } });
+            route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...sandResult.warnings, ...allowanceWarnings] };
+          }
         }
       } else {
         // Investment casting: the lost wax route from the investment reference data, the HR Rates machines and the investment calculators
@@ -3058,6 +3136,11 @@ export class BomItemCostingService {
           toUsd: (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } },
         });
         route = { line: null, secondaryMachining: m.secondaryMachining, dieTooling: null, cores: null, warnings: [...m.warnings, ...(investmentResult?.warnings ?? [])] };
+        if (derivedBlank) {
+          derivedBlank.allowanceVolumeMm3 = 0;
+          derivedBlank.allowanceNotes = ['Investment casting has no machining allowance data: the blank is the part as cast.'];
+          { const held = asPrimaryFaceIds(m.need.result); derivedBlank.asSuppliedFaceIds = held.faceIds; derivedBlank.asSuppliedFeatures = held.count; }
+        }
       }
 
       const castingResult = {

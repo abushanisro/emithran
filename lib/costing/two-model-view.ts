@@ -8,6 +8,27 @@ export const AS_SUPPLIED_STEP = 'Source Component: As Supplied';
 
 export type SourceComponentSummary = NonNullable<CostSummaryDto['sourceComponent']>;
 
+/** The Cost Guide key of the process the blank is made by (backend derived-blank.ts TWO_MODEL_BLANK_PROCESS_KEY), and its default. */
+export const BLANK_PROCESS_KEY = 'twoModelBlankProcess';
+export const DEFAULT_BLANK_PROCESS = 'Sand Casting';
+/** The blank processes a blank can be derived for from the part's machined analysis (backend DERIVABLE_BLANK_FAMILY). */
+export const DERIVABLE_BLANK_PROCESSES: readonly string[] = ['Sand Casting', 'Casting Investment'];
+
+/** The blank process chosen in the Cost Guide, else the default. */
+export function blankProcessOf(overrides: Record<string, unknown> | null | undefined): string {
+  const v = overrides?.[BLANK_PROCESS_KEY];
+  return typeof v === 'string' && v ? v : DEFAULT_BLANK_PROCESS;
+}
+
+/**
+ * The faces the part keeps as its blank made them: a derived blank's from the cost (the casting's machining need), a linked blank's from
+ * the stored comparison.
+ */
+export function asSuppliedFaceIdsOf(cost: Pick<CostSummaryDto, 'sourceComponent'> | null | undefined, comparison: StoredTwoModelComparison | null | undefined): number[] {
+  if (cost?.sourceComponent?.derived) return cost.sourceComponent.asSuppliedFaceIds ?? [];
+  return comparison?.result.as_supplied_face_ids ?? [];
+}
+
 /** Whether the part is costed as 2-Model Machining: its Process, or the cost the engine returned. */
 export function isTwoModelPart(item: Pick<BOMItem, 'scenarioOverrides'>, cost: Pick<CostSummaryDto, 'family'> | null | undefined): boolean {
   return item.scenarioOverrides?.processGroup === TWO_MODEL_PROCESS_GROUP || cost?.family === 'two_model';

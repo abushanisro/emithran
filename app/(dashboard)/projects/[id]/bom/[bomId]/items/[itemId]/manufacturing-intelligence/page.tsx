@@ -4601,6 +4601,7 @@ function CostGuidePanel({
                   hrefOf={(id) => `/projects/${String(routeParams.id)}/bom/${item.bomId}/items/${id}/manufacturing-intelligence`}
                   onAddSource={(file, processGroup) => { addSourceComponent.mutate({ part: item, file, processGroup }); }}
                   adding={addSourceComponent.isPending}
+                  onBlankProcess={(process) => { patchScenarioOverrides.mutate({ id: item.id, patch: { twoModelBlankProcess: process } }); }}
                 />
               </Section>
             )}
