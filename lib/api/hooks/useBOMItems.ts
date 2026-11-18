@@ -372,6 +372,54 @@ export function useSetSourceItem() {
   });
 }
 
+/** The processes a source component (the blank a 2-Model part is machined from) is made by: the cast and forged process groups. */
+export const SOURCE_COMPONENT_PROCESSES = ['Casting', 'Sand Casting', 'Die Casting', 'Casting Investment', 'Forging'] as const;
+
+/**
+ * 2-Model Machining: adds the blank a part is machined from as a new item of the part's BOM (beside it, same quantity, volume and grade),
+ * with its process and 3D model, and links it as the part's source. The link and the comparison are the backend's (PUT :id/source-item),
+ * so the rules hold as for a picked item: same BOM, counted once in the total. A step that fails deletes the half-made item.
+ */
+/** The steps of useAddSourceComponent: create the blank's item, set its process, upload its model, link it; delete it if a step fails. */
+export async function addSourceComponent({ part, file, processGroup }: { part: BOMItem; file: File; processGroup: (typeof SOURCE_COMPONENT_PROCESSES)[number] }): Promise<BOMItem> {
+  const source = await createBOMItem({
+    bomId: part.bomId,
+    name: `${part.name} (source)`,
+    partNumber: `${part.partNumber?.trim() ? part.partNumber : part.name}-SRC`,
+    description: `The ${processGroup.toLowerCase()} blank ${part.name} is machined from (2-Model Machining).`,
+    itemType: 'child_part',
+    quantity: part.quantity,
+    ...(part.annualVolume != null ? { annualVolume: part.annualVolume } : {}),
+    ...(part.material ? { material: part.material } : {}),
+    ...(part.materialGrade ? { materialGrade: part.materialGrade } : {}),
+    ...(part.parentItemId ? { parentItemId: part.parentItemId } : {}),
+  });
+  try {
+    await apiClient.patch(`/bom-items/${source.id}/scenario-overrides`, { processGroup });
+    const form = new FormData();
+    form.append('file3d', file);
+    await apiClient.uploadFiles<BOMItem>(`/bom-items/${source.id}/files`, form, { timeout: 300_000 });
+    return await apiClient.put<BOMItem>(`/bom-items/${part.id}/source-item`, { sourceItemId: source.id }, { timeout: 200_000 });
+  } catch (e) {
+    await deleteBOMItem(source.id).catch(() => undefined);
+    throw e;
+  }
+}
+
+export function useAddSourceComponent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: addSourceComponent,
+    onSuccess: (data) => {
+      invalidateBOMItemUpdateQueries(queryClient, data);
+      toast.success('Source component added and linked');
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof ApiError ? error.getUserMessage() : 'Could not add the source component');
+    },
+  });
+}
+
 /**
  * Merges a partial patch into a BOM item's Cost Guide manual-override bag
  * (bom_items.scenario_overrides). Pass `null` for a key to clear that
