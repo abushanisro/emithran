@@ -121,7 +121,8 @@ export interface AdditiveRoute {
   label: string;
   build: AdditiveBuild;
   lines: ProcessLineCost[];
-  material: { costUsd: number; massKg: number; supportVolumeMm3: number; runs: Record<string, ReferenceCalcRun> };
+  /** The material bought per part (massKg: the part, its supports and the powder spent) and the part's own mass. */
+  material: { costUsd: number; massKg: number; partKg: number; supportVolumeMm3: number; runs: Record<string, ReferenceCalcRun> };
   partsPerBuild: number | null;
   layers: number | null;
   totalUsd: number | null;
@@ -379,7 +380,7 @@ export function buildAdditiveRoutes(input: AdditiveRouteInput): { routes: Additi
     const massKg = materialRun ? (materialRun.outputs['Powder Mass'] ?? ((materialRun.outputs['Part Mass'] ?? 0) + (materialRun.outputs['Spent Powder Mass'] ?? 0) + (materialRun.outputs['Support Mass'] ?? 0))) : 0;
     routes.push({
       key: r.key, label: r.label, build, lines,
-      material: { costUsd: materialCost, massKg: r3(massKg), supportVolumeMm3: r2(supportVolume), runs: materialRun ? { material: materialRun } : {} },
+      material: { costUsd: materialCost, massKg: r3(massKg), partKg: r3((part.partVolumeMm3 * material.densityKgM3!) / 1e9), supportVolumeMm3: r2(supportVolume), runs: materialRun ? { material: materialRun } : {} },
       partsPerBuild, layers, totalUsd: complete ? r2(materialCost + lines.reduce((s, l) => s + l.totalCost, 0)) : null, complete,
       warnings: [...warnings, ...steps.flatMap(({ s }) => s.warnings), ...(materialRun ? [] : [`${r.label}: the material is not costed (the build step has no machine).`])],
     });

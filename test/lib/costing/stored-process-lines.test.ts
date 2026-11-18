@@ -53,6 +53,14 @@ describe('resolveStoredProcessLines — arithmetic preserved from the Cost Guide
     expect(line!.totalPerPart).toBeCloseTo(line!.setupPerPart + line!.cyclePerPart, 12);
   });
 
+  it('a machine that runs unattended (no crew, a printer or an oven) charges no labour; a row stating no crew is one operator', () => {
+    const [unattended] = resolveStoredProcessLines([row({ heads: 0, setupManning: 0 })], [], EFFECTIVE);
+    expect(unattended!.cyclePerPart).toBeCloseTo((10 / 3600) * 19.83, 12);
+    expect(unattended!.setupPerPart).toBeCloseTo((45 / 60) * 19.83 / 100_000, 12);
+    const [unstated] = resolveStoredProcessLines([row({ heads: null, setupManning: null })], [], EFFECTIVE);
+    expect(unstated!.cyclePerPart).toBeCloseTo((10 / 3600) * (19.83 + 47), 12);
+  });
+
   it('applies scrap as a multiplier on the combined per-part cost', () => {
     const [line] = resolveStoredProcessLines([row({ scrap: 10 })], [], EFFECTIVE);
     expect(line!.totalPerPart).toBeCloseTo((line!.setupPerPart + line!.cyclePerPart) * 1.1, 12);

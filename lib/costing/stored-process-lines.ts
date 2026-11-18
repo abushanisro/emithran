@@ -251,9 +251,11 @@ export function resolveStoredProcessLines<
       : (liveCandidate ? num(liveCandidate.hourlyRate) : num(row.machineRate));
     const laborRate = num(row.laborRate);
     const setupMin = num(row.setupTime);
-    const setupManning = Math.max(num(row.setupManning, 1), 1);
+    // 0 is a real crew: a machine that runs unattended (a printer, an oven) charges no labour. A row that states none is one operator.
+    const crew = (v: unknown) => (v == null || v === '' ? 1 : Math.max(num(v, 1), 0));
+    const setupManning = crew(row.setupManning);
     const cycleSec = liveCycleSec ?? num(row.cycleTime);
-    const heads = Math.max(num(row.heads, 1), 1);
+    const heads = crew(row.heads);
     const partsPerCycle = Math.max(num(row.partsPerCycle, 1), 1);
     const scrap = num(row.scrap);
 

@@ -181,6 +181,11 @@ describe('the writer sends the costed-operation provenance', () => {
     expect(code).not.toMatch(/line_labour_rate:\s*lhr\.lhr/);
   });
 
+  it('stores the crew the engine costed the cycle with, never a literal operator (an unattended printer has none)', () => {
+    expect(code).toMatch(/heads:\s*line\.operators \?\? 1/);
+    expect(code).not.toMatch(/heads:\s*1,/);
+  });
+
   it('stamps the contract version so a reader can tell who wrote the row', () => {
     expect(code).toMatch(/engine_version:\s*COST_ENGINE_CONTRACT_VERSION/);
   });

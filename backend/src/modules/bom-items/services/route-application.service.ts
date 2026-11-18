@@ -707,7 +707,10 @@ export class RouteApplicationService {
         // setup and no cycle, its money is total_cost_per_part (migration 890).
         setup_time:     perPart ? 0 : line.setupTimeMin!,
         batch_size:     batchSize,
-        heads:          1,
+        // The crew the engine costed the cycle with: the selected machine's operators (0 for a machine that runs unattended, a printer or
+        // an oven), as setup_manning above. This was the literal 1, so a line the quote charged no labour for was re-costed with one
+        // operator by every reader that derives the cost from the row (the Cost tab, the legacy fallback).
+        heads:          line.operators ?? 1,
         cycle_time:     perPart ? null : cycleTimeSec,
         charge_basis:   perPart ? 'per_part' : 'time',
         parts_per_cycle: 1,
