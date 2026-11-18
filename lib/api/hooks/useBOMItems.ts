@@ -600,6 +600,8 @@ export interface MachiningDfmFinding {
   featureIds: string[];
   occurrences: { featureId: string; occurrenceIndex: number }[];
   faces: number[];
+  /** The check that raised it, when its rule has several (a forging's draft on walls and in forged holes). */
+  check?: string;
 }
 export interface MachiningDfmCheck {
   rule: string;

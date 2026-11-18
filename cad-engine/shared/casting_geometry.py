@@ -115,14 +115,24 @@ def _plane_basis(axis: Sequence[float]) -> Tuple[Tuple[float, float, float], Tup
     return u, v  # type: ignore[return-value]
 
 
-def parting_plane_silhouette(shape: Any, pull_axis: Sequence[float], linear_deflection: float = 0.1) -> Dict[str, Any]:
+def _tri_normal(t: Sequence[Sequence[float]]) -> Tuple[float, float, float]:
+    """The normal of a mesh triangle by its winding (out of the material, as the face's triangles are oriented)."""
+    a, b, c = t[0], t[1], t[2]
+    e1 = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+    e2 = (c[0] - a[0], c[1] - a[1], c[2] - a[2])
+    return (e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0])
+
+
+def parting_plane_silhouette(shape: Any, pull_axis: Sequence[float], linear_deflection: float = 0.1, with_faces: bool = False) -> Dict[str, Any]:
     """The part's silhouette on the plane normal to pull_axis: its exact area
     (mm^2), the extents of that silhouette along the plane's two in-plane
     axes (mm) -- the footprint a die has to straddle between the tie bars --
     and the part's extent along the pull axis itself (mm), the depth the die
     halves have to enclose. parting_perimeter_mm is the length of the
     silhouette's outer boundary: the parting line, where flash forms between
-    the die halves (inner boundaries -- through-openings -- are not counted)."""
+    the die halves (inner boundaries -- through-openings -- are not counted).
+    with_faces adds the faces behind those numbers, for the 3D highlight of a calculator input: silhouette_face_ids, the faces seen along
+    +pull_axis whose projection makes up the silhouette, and parting_face_ids, the faces that reach its outer boundary."""
     from shapely.geometry import Polygon  # type: ignore
     from shapely.ops import unary_union  # type: ignore
 
@@ -133,7 +143,10 @@ def parting_plane_silhouette(shape: Any, pull_axis: Sequence[float], linear_defl
     n = (n[0] / n_len, n[1] / n_len, n[2] / n_len)
     polys = []
     depth_lo, depth_hi = math.inf, -math.inf
-    for face in _faces(shape):
+    face_points: List[Tuple[int, List[Tuple[float, float]]]] = []
+    seen_from_pull: set = set()
+    for index, face in enumerate(_faces(shape)):
+        pts_of_face: List[Tuple[float, float]] = []
         for t in _face_triangles(face):
             for p in t:
                 d = _dot(p, n)
@@ -143,18 +156,30 @@ def parting_plane_silhouette(shape: Any, pull_axis: Sequence[float], linear_defl
             # Triangles edge-on to the projection plane have no area to add.
             if poly.area > 1e-9:
                 polys.append(poly)
+                if with_faces and _dot(_tri_normal(t), n) > 0:
+                    seen_from_pull.add(index)
+            pts_of_face.extend(pts2)
+        if with_faces:
+            face_points.append((index, pts_of_face))
     if not polys:
         return {"area_mm2": 0.0, "footprint_mm": [0.0, 0.0], "pull_extent_mm": 0.0, "parting_perimeter_mm": 0.0}
     union = unary_union(polys)
     minx, miny, maxx, maxy = union.bounds
     parts = list(union.geoms) if hasattr(union, "geoms") else [union]
     perimeter = sum(p.exterior.length for p in parts if hasattr(p, "exterior"))
-    return {
+    out = {
         "area_mm2": float(union.area),
         "footprint_mm": [float(maxx - minx), float(maxy - miny)],
         "pull_extent_mm": float(depth_hi - depth_lo),
         "parting_perimeter_mm": float(perimeter),
     }
+    if with_faces:
+        from shapely.geometry import Point  # type: ignore
+        outline = unary_union([p.exterior for p in parts if hasattr(p, "exterior")])
+        tol = max(linear_deflection * 2.0, 1e-3)
+        out["silhouette_face_ids"] = sorted(seen_from_pull)
+        out["parting_face_ids"] = [i for i, pts in face_points if any(outline.distance(Point(q)) <= tol for q in pts)]
+    return out
 
 
 def projected_area_mm2(shape: Any, pull_axis: Sequence[float], linear_deflection: float = 0.1) -> float:

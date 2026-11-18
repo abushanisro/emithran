@@ -362,7 +362,7 @@ export function computeDieTooling(input: DieToolingInput): DieToolingResult {
     'Layout Width': castingSeed.engine(layoutB, `${layout} (shorter side, mm)`),
     'Edge Border X': b.x, 'Edge Border Y': b.y,
     'Cavity Half Depth Border': b.cavityDepth, 'Core Half Depth Border': b.coreDepth,
-    'Pull Extent': castingSeed.cad(input.pullExtentMm, 'part depth along the pull axis (mm)'),
+    'Pull Extent': castingSeed.cad(input.pullExtentMm, 'part depth along the pull axis (mm)', 'die_depth'),
     'H13 Density': castingSeed.variable('densityH13', v.densityH13),
   });
   if (size.value == null) return fail(size.missing.join('; '));
@@ -429,7 +429,7 @@ export function computeDieTooling(input: DieToolingInput): DieToolingResult {
     'Surface Area': castingSeed.cad(input.surfaceAreaMm2, 'part surface area (mm²)', 'part_surface'),
     'Cavities': castingSeed.engine(n, `${n} cavit${n === 1 ? 'y' : 'ies'} per die`),
     'H13 Machinability': vs('machinabilityMultiplierH13ToolSteel'),
-    'Projected Area': castingSeed.cad(input.projectedAreaMm2, 'projected area on the parting plane (mm²)'),
+    'Projected Area': castingSeed.cad(input.projectedAreaMm2, 'projected area on the parting plane (mm²)', 'projected_area'),
     'Projected Area per Ejector Pin': vs('projAreaPerEjectorPin'),
     'Ejector Pin Cost': vs('ejectorPinsCost'),
     'Ejector Pin Assembly Time': vs('ejPinsAssTimePerTool'),

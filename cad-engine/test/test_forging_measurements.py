@@ -191,3 +191,33 @@ def test_family_hint_powder_metal_measures_the_part_along_its_press_direction():
     assert mi["features"]["die_direction"]["axis"] == "z"
     assert mi["features"]["projected_area_mm2"] == pytest.approx(math.pi * (225.0 - 56.25), rel=0.01)
     assert mi["features"]["die_depth_mm"] == pytest.approx(20.0, abs=0.01)
+
+
+def test_each_measurement_names_its_faces_for_the_calculator_eye():
+    # A flange: the ring seen along its bore is the projected area; its outer cylinder is the parting line; its two flat ends its depth.
+    disc = _cylinder((0, 0, 0), (0, 0, 1), 50.0, 20.0)
+    flange = BRepAlgoAPI_Cut(disc, _cylinder((0, 0, -1), (0, 0, 1), 15.0, 22.0)).Shape()
+    out = ForgingFeatureExtractor().extract(flange, [100.0, 100.0, 20.0])
+    m = out["feature_graph_v2"]["measurements"]
+    assert m["projected_area"]["value"] == pytest.approx(math.pi * (2500.0 - 225.0), rel=0.01)
+    assert m["projected_area"]["reconciles"] is True
+    top = m["projected_area"]["occurrences"][0]["face_ids"]
+    assert len(top) == 1  # the one end face seen along the die direction
+    assert len(m["die_depth"]["occurrences"][0]["face_ids"]) == 2  # both flat ends
+    outer = m["parting_perimeter"]["occurrences"][0]["face_ids"]
+    assert outer and not (set(outer) & set(out["holes"][0]["face_ids"]))  # the outer wall, never the bore
+    assert m["part_volume"]["value"] == pytest.approx(math.pi * (2500.0 - 225.0) * 20.0, rel=1e-3)
+
+
+def test_a_casting_records_the_same_measurement_faces_along_its_pull_axis():
+    from die_casting.feature_extractor import DieCastingFeatureExtractor
+    disc = _cylinder((0, 0, 0), (0, 0, 1), 50.0, 20.0)
+    flange = BRepAlgoAPI_Cut(disc, _cylinder((0, 0, -1), (0, 0, 1), 15.0, 22.0)).Shape()
+    out = DieCastingFeatureExtractor().extract(flange, [100.0, 100.0, 20.0])
+    m = out["feature_graph_v2"]["measurements"]
+    # The casting's own pull axis and its own numbers: the faces are those behind the projected area and parting line it costs with.
+    assert m["projected_area"]["value"] == pytest.approx(out["projected_area_mm2"], rel=1e-6)
+    assert m["parting_perimeter"]["value"] == pytest.approx(out["parting_perimeter_mm"], rel=1e-6)
+    assert m["projected_area"]["occurrences"][0]["face_ids"]
+    assert m["parting_perimeter"]["occurrences"][0]["face_ids"]
+    assert m["die_depth"]["occurrences"][0]["face_ids"]

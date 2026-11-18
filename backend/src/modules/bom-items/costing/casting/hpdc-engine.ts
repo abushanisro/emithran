@@ -159,7 +159,7 @@ export function hpdcCycleSeeds(input: {
   const s = new SeedSet();
   const pos = (x: number | null | undefined) => (x != null && x > 0 ? x : null);
   s.put('Cavities', n, (x) => castingSeed.engine(x, `${x} cavit${x === 1 ? 'y' : 'ies'} per shot (die layout)`), 'cavities');
-  s.put('Projected Area', pos(g.projectedAreaMm2), (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)'), 'measured projected area (re-run analysis as a casting process)');
+  s.put('Projected Area', pos(g.projectedAreaMm2), (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)', 'projected_area'), 'measured projected area (re-run analysis as a casting process)');
   s.put('Wall Nominal', pos(g.wallNominalMm), (x) => castingSeed.cad(x, 'nominal wall thickness (mm)'), 'measured nominal wall thickness');
   s.put('Wall Max', pos(g.wallMaxMm), (x) => castingSeed.cad(x, 'thickest wall (mm)'), 'measured maximum wall thickness');
   s.put('Injection Temp', m.injectionTempC, (x) => castingSeed.alloy(m, 'injection_temp', 'Injection Temp (C)', x), `${m.name}: Injection Temp`);
@@ -283,7 +283,7 @@ export function computeHpdc(input: {
   const area = input.geometry.projectedAreaMm2;
   const clampSeeds = new SeedSet()
     .put('Cavities', n, (x) => castingSeed.engine(x, cav.trace), 'cavities')
-    .put('Projected Area', area != null && area > 0 ? area : null, (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)'), 'no measured projected area (re-run analysis as a casting process)')
+    .put('Projected Area', area != null && area > 0 ? area : null, (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)', 'projected_area'), 'no measured projected area (re-run analysis as a casting process)')
     .put('Clamping Pressure', mat.clampingPressureMpa != null && mat.clampingPressureMpa > 0 ? mat.clampingPressureMpa : null,
       (x) => castingSeed.alloy(mat, 'clamping_pressure', 'Clamping Pressure (MPa)', x), `${mat.name} has no Clamping Pressure in materials_master`)
     .put('Clamp Force Safety Factor', ref.clampForceSafetyFactor, (x) => castingSeed.variable('clampForceSafetyFactor', x), 'variables clampForceSafetyFactor');

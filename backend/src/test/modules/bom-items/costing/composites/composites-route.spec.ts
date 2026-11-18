@@ -86,6 +86,10 @@ describe('the layup routes on the real memory/Composites data', () => {
     expect(r.lines[2]!.featureBreakdown).toHaveLength(12);
     expect(r.lines[3]!.featureBreakdown!.every((f) => f.featureType === 'Ply')).toBe(true);
     expect(r.totalUsd).toBeGreaterThan(0);
+    // The CAD inputs name the faces they were measured on (the calculator dialog's eye).
+    const clean = r.lines[0]!.calculationTrace!.find((t) => t.fieldName === 'Tool Side Area')!;
+    expect(clean.ref).toEqual({ kind: 'cad', evidence: 'tool_area' });
+    expect(r.lines[0]!.calculationTrace!.find((t) => t.fieldName === 'Trim Length')!.ref).toEqual({ kind: 'cad', evidence: 'trim_length' });
     // The clean room's file gives a labour rate (47.36 USD/hr) but no crew: one operator is charged, and said so.
     const layup = r.lines[3]!;
     expect(layup.labourRate).toBeGreaterThan(0);

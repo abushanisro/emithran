@@ -122,9 +122,10 @@ export function buildPowderMetalRoute(input: PowderMetalRouteInput): { route: Po
     return value == null ? null : { value, source: `Powder metal variable ${name}${ref.unit(name) ? ` (${ref.unit(name)})` : ''}`, ref: { kind: 'variable', domain: POWDER_METAL_DOMAIN, name } };
   };
   const cad: Record<string, CalcSeed | undefined> = {
-    volume_mm3: { value: part.volumeMm3, source: 'part volume (mm³)' },
-    projected_area_mm2: { value: part.projectedAreaMm2, source: 'outline along the press direction (mm²)' },
-    die_depth_mm: { value: part.heightMm, source: "the part's height along the press direction (mm)" },
+    // Each with the faces it was measured on (feature_graph_v2.measurements), for the calculator dialog's eye.
+    volume_mm3: { value: part.volumeMm3, source: 'part volume (mm³)', ref: { kind: 'cad', evidence: 'part_volume' } },
+    projected_area_mm2: { value: part.projectedAreaMm2, source: 'outline along the press direction (mm²)', ref: { kind: 'cad', evidence: 'projected_area' } },
+    die_depth_mm: { value: part.heightMm, source: "the part's height along the press direction (mm)", ref: { kind: 'cad', evidence: 'die_depth' } },
   };
   type Run = { run: ReferenceCalcRun } | { reasons: string[] };
   const run = (calculator: string, machine: SandMachine | null, engine: Record<string, CalcSeed | undefined>, output = 'Cycle Time'): Run => {
@@ -192,8 +193,8 @@ export function buildPowderMetalRoute(input: PowderMetalRouteInput): { route: Po
     const muffle = machineValue(m, 'max_muffle');
     if (muffle != null && muffle < part.heightMm) return fail(`its muffle is ${muffle} mm high, the part ${r2(part.heightMm)} mm`);
     const outcome = timed(CALC('Sintering'), m, {
-      part_length_mm: { value: part.planLengthMm, source: "the part's long side across the press direction, along the belt (mm)" },
-      part_width_mm: { value: part.planWidthMm, source: "the part's short side across the press direction, across the belt (mm)" },
+      part_length_mm: { value: part.planLengthMm, source: "the part's long side across the press direction, along the belt (mm)", ref: { kind: 'cad', evidence: 'plan_length' } },
+      part_width_mm: { value: part.planWidthMm, source: "the part's short side across the press direction, across the belt (mm)", ref: { kind: 'cad', evidence: 'plan_width' } },
       part_kg: { value: partKg, source: 'part mass: volume x green density (Powder)' },
     });
     if (outcome.ok && !(outcome.run!.outputs['Parts Across']! >= 1)) return fail(`its belt is ${machineValue(m, 'belt_width_mm')} mm wide: no part fits between the edge offsets`);

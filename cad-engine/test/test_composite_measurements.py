@@ -36,6 +36,14 @@ def test_a_flat_laminate_is_one_level_its_outline_and_no_curvature():
     assert r["curvature"]["max_per_m"] == 0.0
     types = {f["feature_type"] for f in r["feature_graph_v2"]["features"]}
     assert {"ToolSurface", "LaminateZone", "TrimEdge"} <= types
+    # The calculator eye: the faces behind each number the cost reads.
+    m = r["feature_graph_v2"]["measurements"]
+    assert m["tool_area"]["occurrences"][0]["face_ids"] == r["surfaces"]["tool_face_ids"]
+    assert sorted(m["trim_length"]["occurrences"][0]["face_ids"]) == sorted(r["surfaces"]["edge_face_ids"])
+    assert m["skin_area"]["value"] == pytest.approx(120000, rel=1e-3)
+    assert len(m["layup_height"]["occurrences"][0]["face_ids"]) == 2
+    assert m["footprint_length"]["value"] == pytest.approx(300, rel=1e-3)
+    assert len(m["footprint_length"]["occurrences"][0]["face_ids"]) == 2
 
 
 def test_a_ply_drop_off_is_a_second_level_covering_only_the_thick_region():

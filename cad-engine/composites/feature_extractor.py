@@ -34,7 +34,7 @@ from injection_molding.recognition.vec import Vec, cross, dot, unit
 from injection_molding.recognition.wall_thickness import measure_wall_thickness
 from shared.casting_geometry import _faces
 from shared.stable_face_id import build_stable_face_id_map
-from forging.feature_extractor import hole_features
+from forging.feature_extractor import extreme_faces, hole_features
 
 logger = logging.getLogger(__name__)
 
@@ -245,11 +245,14 @@ def outline(meshes: Sequence[FaceMesh], faces: Set[int], direction: Vec) -> Dict
     outer = sum(Polygon(p.exterior).area for p in parts)
     openings = [{"area_mm2": round(Polygon(r).area, 2), "perimeter_mm": round(r.length, 2)} for p in parts for r in p.interiors if Polygon(r).area > 1.0]
     minx, miny, maxx, maxy = union.bounds
+    # The footprint long side first, with the in-plane direction each is measured along (for the faces at its two ends).
+    sides = sorted([(maxx - minx, u), (maxy - miny, v)], key=lambda x: -x[0])
     return {
         "outer_area_mm2": round(outer, 2), "net_area_mm2": round(union.area, 2),
         "trim_length_mm": round(sum(p.exterior.length for p in parts), 2),
         "openings": sorted(openings, key=lambda o: -o["area_mm2"]),
-        "footprint_mm": sorted([round(maxx - minx, 3), round(maxy - miny, 3)], reverse=True),
+        "footprint_mm": [round(sides[0][0], 3), round(sides[1][0], 3)],
+        "footprint_axes": [[round(c, 6) for c in sides[0][1]], [round(c, 6) for c in sides[1][1]]],
         "height_mm": round(hi - lo, 3),
     }
 
@@ -297,6 +300,31 @@ def curvature_summary(curv: Dict[int, float], area: Dict[int, float]) -> Dict[st
         "near_max_area_fraction": round(near / total, 4) if peak > 0 else 0.0,
         "faces": [{"face_id": i, "curvature_per_m": k} for i, k in sorted(curv.items())],
     }
+
+
+def laminate_measurements(meshes: Sequence[FaceMesh], tool: Set[int], bag: Set[int], trim_faces: Set[int], area: Dict[int, float],
+                          shape_outline: Dict[str, Any], direction: Vec, tol: float) -> Dict[str, Any]:
+    """
+    The faces behind each number the composites cost reads, as feature_graph_v2 measurements (the calculator dialog's eye highlights them):
+    the tool side's area, the trimmed edge (the edge strips that run through the laminate), both skins, the height along the layup direction
+    and the footprint's length and width (the faces at the two ends of each).
+    """
+    out: Dict[str, Any] = {
+        "tool_area": {"value": round(sum(area[i] for i in tool), 3), "unit": "mm2", "method": "the tool side's faces",
+                      "occurrences": [{"face_ids": sorted(tool)}], "reconciles": True},
+        "trim_length": {"value": shape_outline["trim_length_mm"], "unit": "mm", "method": "the edge strips the laminate is trimmed along",
+                        "occurrences": [{"face_ids": sorted(trim_faces)}], "reconciles": bool(trim_faces)},
+        "skin_area": {"value": round(sum(area[i] for i in tool | bag), 3), "unit": "mm2", "method": "both skins of the laminate",
+                      "occurrences": [{"face_ids": sorted(tool | bag)}], "reconciles": True},
+        "layup_height": {"value": shape_outline["height_mm"], "unit": "mm", "method": "faces at the two extremes along the layup direction",
+                         "occurrences": [{"face_ids": extreme_faces(meshes, direction, tol)}], "reconciles": True},
+    }
+    axes = shape_outline.get("footprint_axes") or []
+    for key, i in (("footprint_length", 0), ("footprint_width", 1)):
+        if len(axes) > i:
+            out[key] = {"value": shape_outline["footprint_mm"][i], "unit": "mm", "method": "faces at the two ends of the outline",
+                        "occurrences": [{"face_ids": extreme_faces(meshes, tuple(axes[i]), tol)}], "reconciles": True}
+    return out
 
 
 def skin_features(tool: Set[int], levels: Sequence[Dict[str, Any]], edges: Set[int], stable: Dict[int, str]) -> List[Dict[str, Any]]:
@@ -386,5 +414,8 @@ class CompositeFeatureExtractor:
                 "metadata": {"face_map": face_map or [], "stl_tri_total": face_map_tri_total or None, "stable_face_ids": stable},
                 "features": features,
                 "conditions": [],
+                "measurements": laminate_measurements(
+                    meshes, tool, bag, {i for i in edges if any(i in ids and any(j in tool for j in ids) for ids in edge_faces.values())},
+                    area, shape_outline, direction, deflection * 2.0),
             },
         }

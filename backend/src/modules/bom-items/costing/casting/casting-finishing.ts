@@ -235,7 +235,7 @@ export function trimLine(input: {
   // Force to shear the flash off along the parting line (calculator Trim Force).
   const flash = input.partMassKg != null ? weightBand(input.dimensions, input.partMassKg) ?? null : null;
   const forceSeeds = new SeedSet()
-    .put('Parting Line Perimeter', input.partingPerimeterMm, (x) => castingSeed.cad(x, 'parting-line perimeter (mm)'), 'parting-line perimeter not measured (re-run analysis)')
+    .put('Parting Line Perimeter', input.partingPerimeterMm, (x) => castingSeed.cad(x, 'parting-line perimeter (mm)', 'parting_perimeter'), 'parting-line perimeter not measured (re-run analysis)')
     .put('Flash Thickness', flash?.partingLineThicknessMm, (x) => castingSeed.lookup('tblGrindingDimensions', 'Parting Line Thickness (mm)', x, { 'Max Weight (kg)': flash!.maxWeightKg }),
       `tblGrindingDimensions has no row for ${input.partMassKg != null ? `${r2(input.partMassKg)} kg` : 'an unknown part weight'}`)
     .put('Shear Strength', input.shearStrengthMpa, (x) => castingSeed.alloy(input.alloy ?? { id: null, name: 'alloy' }, 'shear_strength', 'Shear Strength (MPa)', x), 'the alloy has no Shear Strength on file');
@@ -331,7 +331,7 @@ export function partingLineGrindingLine(input: {
   const band = { 'Max Weight (kg)': row.maxWeightKg };
   const v = input.variables;
   const seeds = new SeedSet()
-    .put('Parting Line Perimeter', input.partingPerimeterMm, (x) => castingSeed.cad(x, 'parting-line perimeter (mm)'), 'parting-line perimeter not measured (re-run analysis as a casting process)')
+    .put('Parting Line Perimeter', input.partingPerimeterMm, (x) => castingSeed.cad(x, 'parting-line perimeter (mm)', 'parting_perimeter'), 'parting-line perimeter not measured (re-run analysis as a casting process)')
     .put('Flash Thickness', row.partingLineThicknessMm, (x) => castingSeed.lookup('tblGrindingDimensions', 'Parting Line Thickness (mm)', x, band), 'tblGrindingDimensions Parting Line Thickness')
     .put('Flash Height', row.partingLineHeightMm, (x) => castingSeed.lookup('tblGrindingDimensions', 'Parting Line Height (mm)', x, band), 'tblGrindingDimensions Parting Line Height')
     .put('Ingate Height', row.ingateHeightMm, (x) => castingSeed.lookup('tblGrindingDimensions', 'Ingate Height (mm)', x, band), 'tblGrindingDimensions Ingate Height')

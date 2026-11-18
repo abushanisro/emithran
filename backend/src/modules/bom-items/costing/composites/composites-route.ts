@@ -215,12 +215,13 @@ export function buildCompositesRoutes(input: CompositesRouteInput): { routes: Co
   };
   const [length, width] = part.footprintMm;
   const cad: Record<string, CalcSeed | undefined> = {
-    tool_area_mm2: { value: part.toolAreaMm2, source: 'tool side of the laminate (mm²)' },
-    trim_length_mm: { value: part.trimLengthMm, source: 'trimmed edge: the outline along the layup direction (mm)' },
-    footprint_length_mm: { value: length, source: "the outline's long extent (mm)" },
-    footprint_width_mm: { value: width, source: "the outline's short extent (mm)" },
-    height_mm: { value: part.heightMm, source: "the part's height along the layup direction (mm)" },
-    skin_area_mm2: { value: part.toolAreaMm2 + part.bagAreaMm2, source: 'both skins of the laminate (mm²)' },
+    // Each with the faces it was measured on (feature_graph_v2.measurements), for the calculator dialog's eye.
+    tool_area_mm2: { value: part.toolAreaMm2, source: 'tool side of the laminate (mm²)', ref: { kind: 'cad', evidence: 'tool_area' } },
+    trim_length_mm: { value: part.trimLengthMm, source: 'trimmed edge: the outline along the layup direction (mm)', ref: { kind: 'cad', evidence: 'trim_length' } },
+    footprint_length_mm: { value: length, source: "the outline's long extent (mm)", ref: { kind: 'cad', evidence: 'footprint_length' } },
+    footprint_width_mm: { value: width, source: "the outline's short extent (mm)", ref: { kind: 'cad', evidence: 'footprint_width' } },
+    height_mm: { value: part.heightMm, source: "the part's height along the layup direction (mm)", ref: { kind: 'cad', evidence: 'layup_height' } },
+    skin_area_mm2: { value: part.toolAreaMm2 + part.bagAreaMm2, source: 'both skins of the laminate (mm²)', ref: { kind: 'cad', evidence: 'skin_area' } },
   };
   const materialProvider = (m: CompositeMaterial): SeedProvider => (key) => {
     const value = m.columns[key];

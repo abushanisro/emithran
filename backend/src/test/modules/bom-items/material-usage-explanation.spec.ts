@@ -72,6 +72,49 @@ describe('explainMaterialUsage', () => {
     reconciles(e);
   });
 
+  // Cannula Holder bottom, forged in AA 380.0: the Gross Usage dialog showed "Metal charged per casting, part metal plus the melt loss". A forging
+  // buys the bar its mults are sawn from: the forged volume (part, flash, scale) and the bar stock calculators.
+  it('a forging: the bar bought, worked from the part through its flash and scale to the mults a bar gives', () => {
+    const forged = run('Forging - Forged volume', 'Mult Volume', 13_700, [
+      step('input', 'Part Volume', 11_272), step('input', 'Flash Percentage', 21), step('input', 'Scale Loss', 1),
+      step('calculated', 'Forged Volume', 13_639, { formula: '{Part Volume} * (1 + {Flash Percentage} / 100)' }),
+      step('calculated', 'Mult Volume', 13_775, { formula: '{Forged Volume} * (1 + {Scale Loss} / 100)' }),
+    ]);
+    const stock = run('Forging - Bar stock', 'Material Cost', 0.25, [
+      step('input', 'Mult Volume', 13_775), step('input', 'Bar Diameter', 19.05), step('input', 'Kerf', 3.175), step('input', 'Standard Stock Length', 6096),
+      step('input', 'Density', 2760), step('input', 'Bar Price', 5.9),
+      step('calculated', 'Bar Area', 285.02, { formula: 'pi * {Bar Diameter} ^ 2 / 4' }),
+      step('calculated', 'Mult Length', 48.33, { formula: '{Mult Volume} / {Bar Area}' }),
+      step('calculated', 'Mults per Bar', 118, { formula: 'max(1, floor({Standard Stock Length} / ({Mult Length} + {Kerf})))' }),
+      step('calculated', 'Bought Length', 51.66, { formula: '{Standard Stock Length} / {Mults per Bar}' }),
+      step('calculated', 'Bought Mass', 0.0427, { formula: '{Bar Area} * {Bought Length} * 1e-9 * {Density}' }),
+      step('calculated', 'Material Cost', 0.25, { formula: '{Bought Mass} * {Bar Price}' }),
+    ]);
+    const e = explainMaterialUsage({ ...base, itemVolumeMm3: 11_272, densityKgM3: 2760, castingMetal: { partKg: 0.0311, chargedKg: 0.0427 }, calculatorRuns: { 'Forging forgedVolume': forged, 'Forging stock': stock } });
+    expect(e.gross.title).toBe('Forging - Forged volume → Forging - Bar stock');
+    expect(steps(e.gross)).toEqual([
+      'Part Volume=11272', 'Flash Percentage=21', 'Scale Loss=1', 'Forged Volume=13639', 'Mult Volume=13775',
+      'Bar Diameter=19.05', 'Kerf=3.175', 'Standard Stock Length=6096', 'Density=2760',
+      'Bar Area=285.02', 'Mult Length=48.33', 'Mults per Bar=118', 'Bought Length=51.66', 'Bought Mass=0.0427',
+    ]);
+    expect(e.gross.calculatorId).not.toBeNull();
+    reconciles(e);
+  });
+
+  it('a powder metal part: the part at its green density, and the powder bought over the utilization', () => {
+    const powder = run('Powder Metal - Powder', 'Material Cost', 0.13, [
+      step('input', 'Part Volume', 10_603), step('input', 'Green Density', 7020), step('input', 'Powder Price', 1.621), step('input', 'Utilization', 0.9),
+      step('calculated', 'Part Mass', 0.0744, { formula: '{Part Volume} * {Green Density} * 1e-9' }),
+      step('calculated', 'Powder Mass', 0.0827, { formula: '{Part Mass} / {Utilization}' }),
+      step('calculated', 'Material Cost', 0.13, { formula: '{Powder Mass} * {Powder Price}' }),
+    ]);
+    const e = explainMaterialUsage({ ...base, castingMetal: { partKg: 0.0744, chargedKg: 0.0827 }, calculatorRuns: { 'Powder metal powder': powder } });
+    expect(e.net.title).toBe('Powder Metal - Powder');
+    expect(steps(e.net)).toEqual(['Part Volume=10603', 'Green Density=7020', 'Part Mass=0.0744']);
+    expect(steps(e.gross)).toEqual(['Part Volume=10603', 'Green Density=7020', 'Utilization=0.9', 'Part Mass=0.0744', 'Powder Mass=0.0827']);
+    reconciles(e);
+  });
+
   it('never shows a calculator whose result is not the recorded figure: it falls back to the rule in words', () => {
     const stale = run('Die Casting - Gross Material Usage', 'Gross Usage', 0.5, [step('calculated', 'Gross Usage', 0.5)]);
     const e = explainMaterialUsage({ ...base, itemVolumeMm3: 10000, densityKgM3: 2700, castingMetal: { partKg: 0.027, chargedKg: 0.03 }, calculatorRuns: { 'Gross Material Usage': stale } });

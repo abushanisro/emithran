@@ -114,6 +114,71 @@ def face_features(shape: Any, bbox_dims: Sequence[float], die: Vec, hole_face_id
     return out
 
 
+def solid_volume(shape: Any) -> Optional[float]:
+    """The solid's volume (mm³), or None when OCC cannot measure it."""
+    try:
+        from OCC.Core.BRepGProp import brepgprop  # type: ignore
+        from OCC.Core.GProp import GProp_GProps  # type: ignore
+        props = GProp_GProps()
+        brepgprop.VolumeProperties(shape, props)
+        v = float(props.Mass())
+        return v if v > 0 else None
+    except Exception:
+        return None
+
+
+def extreme_faces(meshes: Sequence[FaceMesh], axis: Vec, tol: float) -> List[int]:
+    """
+    The faces the part's extent along `axis` is measured between: at each end, the faces lying at that extreme (every point within tol of
+    it, a flat end); when no face lies there (a domed or pointed end), the faces reaching it. A side wall that only touches an end is not one.
+    """
+    a = unit(axis)
+    spans = {f.index: [dot(v, a) for t in f.triangles for v in t.vertices] for f in meshes if f.triangles}
+    if not spans:
+        return []
+    lo = min(min(v) for v in spans.values())
+    hi = max(max(v) for v in spans.values())
+    out: set = set()
+    for at_end in (lambda v: v <= lo + tol, lambda v: v >= hi - tol):
+        lying = {i for i, v in spans.items() if all(at_end(x) for x in v)}
+        out |= lying or {i for i, v in spans.items() if any(at_end(x) for x in v)}
+    return sorted(out)
+
+
+def die_measurements(
+    meshes: Sequence[FaceMesh], silhouette: Dict[str, Any], die: Vec, plan: Dict[str, Any], volume_mm3: Optional[float], tol: float,
+) -> Dict[str, Any]:
+    """
+    The faces behind each number the forging and powder metal costs read, as feature_graph_v2 measurements (the calculator dialog's eye
+    highlights them): the projected area (the faces seen along the die direction), the parting line (the faces reaching the silhouette's
+    outer boundary), the die depth and the plan length and width (the faces at the part's two extremes along each direction), and the
+    volume (every face). `reconciles` is False when the faces cannot account for the number: shown, never hidden.
+    """
+    d = unit(die)
+    every = sorted(f.index for f in meshes)
+    seen = silhouette.get("silhouette_face_ids") or []
+    # The faces seen along the die direction cover the silhouette exactly when nothing overhangs: their projected area is then the number.
+    projected = sum(t.area * max(0.0, dot(t.normal, d)) for f in meshes if f.index in set(seen) for t in f.triangles)
+    area = silhouette["area_mm2"]
+    out: Dict[str, Any] = {
+        "projected_area": {"value": round(area, 3), "unit": "mm2", "method": "faces seen along the die direction",
+                           "occurrences": [{"face_ids": list(seen)}], "reconciles": area > 0 and abs(projected - area) <= 0.02 * area},
+        "parting_perimeter": {"value": round(silhouette["parting_perimeter_mm"], 3), "unit": "mm", "method": "faces reaching the outline along the die direction",
+                              "occurrences": [{"face_ids": list(silhouette.get("parting_face_ids") or [])}], "reconciles": bool(silhouette.get("parting_face_ids"))},
+        "die_depth": {"value": round(silhouette["pull_extent_mm"], 3), "unit": "mm", "method": "faces at the two extremes along the die direction",
+                      "occurrences": [{"face_ids": extreme_faces(meshes, d, tol)}], "reconciles": True},
+    }
+    if plan.get("long_axis"):
+        out["plan_length"] = {"value": round(plan["length_mm"], 3), "unit": "mm", "method": "faces at the two extremes along the long direction",
+                              "occurrences": [{"face_ids": extreme_faces(meshes, plan["long_axis"], tol)}], "reconciles": True}
+    if plan.get("cross_axis"):
+        out["plan_width"] = {"value": round(plan["width_mm"], 3), "unit": "mm", "method": "faces at the two extremes across",
+                             "occurrences": [{"face_ids": extreme_faces(meshes, plan["cross_axis"], tol)}], "reconciles": True}
+    if volume_mm3:
+        out["part_volume"] = {"value": round(volume_mm3, 3), "unit": "mm3", "method": "the whole solid", "occurrences": [{"face_ids": every}], "reconciles": True}
+    return out
+
+
 def plan_directions(meshes: Sequence[FaceMesh], die: Vec) -> Dict[str, Any]:
     """
     The part's long and cross directions in the parting plane (the principal directions of its surface, area-weighted, seen along the die direction)
@@ -242,7 +307,7 @@ class ForgingFeatureExtractor:
         deflection = max(0.1, diagonal * 0.001)
         meshes = tessellate_faces(shape, linear_deflection=deflection)
         die = choose_pull_direction(meshes, SIDE_WALL_DEG, die_direction_override)
-        silhouette = parting_plane_silhouette(shape, die.vector, deflection)
+        silhouette = parting_plane_silhouette(shape, die.vector, deflection, with_faces=True)
         # 90 deg as the upper limit: every wall is reported with its angle, none is set aside as "too much draft" (that is a molding notion).
         draft = analyze_draft(meshes, die.vector, SIDE_WALL_DEG, 90.0)
         wall = measure_wall_thickness(meshes, deflection)
@@ -310,6 +375,7 @@ class ForgingFeatureExtractor:
             "feature_graph_v2": {
                 "metadata": {"face_map": face_map or [], "stl_tri_total": face_map_tri_total or None, "stable_face_ids": stable_face_ids},
                 "features": features,
+                "measurements": die_measurements(meshes, silhouette, die.vector, plan, solid_volume(shape), deflection * 2.0),
                 "conditions": [],
             },
         }

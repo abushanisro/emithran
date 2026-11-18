@@ -26,7 +26,7 @@ const fmt = (v: number) => (Math.abs(v) >= 100 ? Math.round(v * 100) / 100 : Mat
  * faces, or the run of the calculator that produced it.
  */
 export const castingSeed = {
-  /** `evidence`: only when the value is that whole-part CAD measurement (the part's volume, or its whole surface). */
+  /** `evidence`: the CAD measurement the value is (the part's volume or surface, its projected area, parting line or depth along the pull axis), whose faces the dialog's eye lights. */
   cad: (value: number, what: string, evidence?: CadEvidenceKey): CalcSeed => ({
     value, source: `CAD: ${what}`, ...(evidence ? { ref: { kind: 'cad', evidence } } : {}),
   }),

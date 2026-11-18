@@ -38,7 +38,8 @@ function useFindings({ itemId, features, onSelectHighlight, process = 'machining
   const forging = useForgingDfm(itemId, process === 'forging');
   const { data, isLoading, error } = process === 'forging' ? forging : machining;
   const [selected, setSelected] = useState<string | null>(null);
-  const keyOf = (f: MachiningDfmFinding) => `${f.rule}_${f.severity}`;
+  // The check too: two checks of one rule (a forging's draft on walls and in holes) can each have a critical finding.
+  const keyOf = (f: MachiningDfmFinding) => `${f.rule}_${f.check ?? ''}_${f.severity}`;
   const select = (f: MachiningDfmFinding) => {
     const key = keyOf(f);
     if (selected === key) { setSelected(null); onSelectHighlight?.(null); return; }
@@ -116,7 +117,7 @@ export function MachiningDfmFindings(props: Props) {
         </button>
         {showChecks && (
           <div className="mt-1 divide-y divide-border/30 border border-border/40 rounded text-[11px]">
-            {checks.map((c) => <CheckRow key={c.rule} check={c} />)}
+            {checks.map((c) => <CheckRow key={`${c.rule}:${c.name}`} check={c} />)}
           </div>
         )}
       </div>
@@ -133,9 +134,11 @@ export function MachiningDfmCheckRows(props: Props) {
   return (
     <>
       {result.checks.map((c) => {
-        // The most severe finding of the check is the one a click highlights.
-        const finding = result.findings.find((f) => (f.rule === c.rule || f.rule.startsWith(c.rule)) && (f.occurrences.length > 0 || f.faces.length > 0));
-        return <CheckRow key={c.rule} check={c} onClick={finding ? () => { select(finding); } : undefined} active={!!finding && selected === keyOf(finding)} />;
+        // The most severe finding of the check is the one a click highlights. One rule can have several checks (a forging's draft on walls and in
+        // forged holes): a finding that names its check belongs to that check's row only, and the row is keyed by both.
+        const ofCheck = (f: (typeof result.findings)[number]) => (f.check != null ? f.check === c.name && f.rule === c.rule : f.rule === c.rule || f.rule.startsWith(c.rule));
+        const finding = result.findings.find((f) => ofCheck(f) && (f.occurrences.length > 0 || f.faces.length > 0));
+        return <CheckRow key={`${c.rule}:${c.name}`} check={c} onClick={finding ? () => { select(finding); } : undefined} active={!!finding && selected === keyOf(finding)} />;
       })}
     </>
   );

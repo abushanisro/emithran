@@ -71,7 +71,7 @@ import { cn } from '@/lib/utils';
 import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
 import { RouteCompareList } from '@/components/features/workflow/RouteCompareList';
 import { RouteStepEditor } from '@/components/features/workflow/RouteStepEditor';
-import { featuresOfHighlight, treePathForFeature } from '@/lib/features/tree-feature-path';
+import { featuresOfHighlight, treePathForFeature, treePathForOccurrence } from '@/lib/features/tree-feature-path';
 import { AddProcessOperationBar } from '@/components/features/workflow/AddProcessOperationBar';
 import type { AddOperationOption } from '@/components/features/workflow/AddOperationPicker';
 import { adaptRoutesToTree, RouteTreeValidationError, type RouteNode } from '@/lib/routing/route-tree';
@@ -8487,16 +8487,6 @@ export default function ManufacturingIntelligencePage() {
     }
   }, [heatmapMode, heatmapLayer, dfmScores, fg, item?.sheetThicknessMm, costHeatmapWeights, toleranceHeatmapWeights, sustainabilityHeatmapWeights, isInjectionMolded, imSignals, imFeatures]);
 
-  // Click on a machined part in 3D -> select the feature occurrence that owns
-  // the picked B-Rep face (face_map), which highlights it and selects its row
-  // in the feature tree. Faces no feature owns select nothing.
-  const handleBrepFacePick = useCallback((faceId: number) => {
-    if (!fg?.machining_features) return;
-    const hit = findFeatureByFaceId(faceId, fg?.feature_graph_v2?.features ?? []);
-    if (!hit) return;
-    setSelectedDirectV2Feature(null);
-    setSelectedMachiningFeatureKey(featureSelectionKey.occurrence(hit.feature.id, hit.occurrenceIndex));
-  }, [fg]);
 
   const handleHeatmapInspect = useCallback((
     worldPos: [number, number, number],
@@ -8876,6 +8866,24 @@ export default function ManufacturingIntelligencePage() {
       setVizLabel(null);
     }
   }, [fg, faceMap]);
+
+  // Click on the part in 3D -> select the feature occurrence that owns the picked B-Rep face (face_map). A machined part selects it in the
+  // feature tree; every other part (a casting, a forging, a powder metal or sheet metal part) selects the occurrence's own row in the
+  // Manufacturing Process tree, revealed and highlighted as a click on the row does. Faces no feature owns select nothing.
+  const handleBrepFacePick = useCallback((faceId: number) => {
+    const hit = findFeatureByFaceId(faceId, fg?.feature_graph_v2?.features ?? []);
+    if (!hit) return;
+    if (fg?.machining_features) {
+      setSelectedDirectV2Feature(null);
+      setSelectedMachiningFeatureKey(featureSelectionKey.occurrence(hit.feature.id, hit.occurrenceIndex));
+      return;
+    }
+    const path = tree ? treePathForOccurrence(tree, hit.feature.id, hit.occurrenceIndex) : null;
+    const node = path && tree ? findNode(tree, path.at(-1)!) : null;
+    if (!path || !node) return;
+    setExpandedNodes((prev) => new Set([...prev, ...path.slice(0, -1)]));
+    handleTreeSelect(node);
+  }, [fg, tree, handleTreeSelect]);
   const maximize = (id: PanelId | null) => { setMaximized((prev) => (prev === id ? null : id)); };
 
   if (isLoading) {
@@ -9246,7 +9254,7 @@ export default function ManufacturingIntelligencePage() {
                       heatmapSources={heatmapSources}
                       heatmapNormalization={heatmapNorm}
                       onHeatmapInspect={handleHeatmapInspect}
-                      {...(fg?.machining_features ? { onBrepFacePick: handleBrepFacePick } : {})}
+                      {...(faceMap?.length ? { onBrepFacePick: handleBrepFacePick } : {})}
                       nestQuantity={batchSize}
                       nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
                       nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}
@@ -9423,7 +9431,7 @@ export default function ManufacturingIntelligencePage() {
                             heatmapSources={heatmapSources}
                             heatmapNormalization={heatmapNorm}
                             onHeatmapInspect={handleHeatmapInspect}
-                            {...(fg?.machining_features ? { onBrepFacePick: handleBrepFacePick } : {})}
+                            {...(faceMap?.length ? { onBrepFacePick: handleBrepFacePick } : {})}
                             nestQuantity={batchSize}
                             nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
                             nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}

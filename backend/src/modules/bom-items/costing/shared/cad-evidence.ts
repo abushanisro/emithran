@@ -16,6 +16,21 @@ export const CAD_EVIDENCE_KEYS = [
   'part_volume',
   // The part's whole surface (a casting's area for coating and blasting): every face.
   'part_surface',
+  // A part measured along its die (or press) direction, a forging or a powder metal part (cad-engine forging/feature_extractor.py
+  // die_measurements): the faces seen along it, those on the parting line, and those its depth and plan extents are measured between.
+  'projected_area',
+  'parting_perimeter',
+  'die_depth',
+  'plan_length',
+  'plan_width',
+  // A composite laminate (cad-engine composites/feature_extractor.py laminate_measurements): its tool side, trimmed edge, both skins, its
+  // height along the layup direction and its footprint's length and width.
+  'tool_area',
+  'trim_length',
+  'skin_area',
+  'layup_height',
+  'footprint_length',
+  'footprint_width',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];

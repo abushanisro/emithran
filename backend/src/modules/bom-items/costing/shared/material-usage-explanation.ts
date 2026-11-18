@@ -68,6 +68,20 @@ function workingOf(trace: CalculationTraceStep[], at: number): CalculationTraceS
   return trace.filter((step, i) => keep.has(i) || (i < at && step.kind === 'input' && needed.has(step.fieldName)));
 }
 
+/**
+ * A forging's gross usage: the bar it is sawn from (Forging - Bar stock's Bought Mass), worked from the mult it saws (Forging - Forged volume:
+ * the part, its flash and the scale its heating loses). One trace, the forged volume's steps first, so it runs from the part to the bar bought.
+ */
+function forgingBar(runs: Record<string, CalculatorRunDto> | null | undefined, usageKg: number): UsageJustification | null {
+  const bar = fromRun(runs?.['Forging stock'], usageKg, 'Bought Mass');
+  if (!bar) return null;
+  const forged = runs?.['Forging forgedVolume'];
+  const at = forged ? forged.trace.findIndex((t) => t.kind === 'calculated' && t.fieldName === forged.output) : -1;
+  if (!forged || at < 0) return bar;
+  // The bar's own "Mult Volume" input is the forged volume's result: shown once, as the calculated step it is.
+  return { ...bar, title: `${forged.name} → ${bar.title}`, trace: [...workingOf(forged.trace, at), ...bar.trace.filter((t) => !(t.kind === 'input' && t.fieldName === forged.output))] };
+}
+
 const NET = 'Net Usage';
 const GROSS = 'Gross Usage';
 
@@ -117,13 +131,17 @@ export function explainMaterialUsage(input_: ExplainMaterialUsageInput): Materia
     }
     case 'casting_charge': {
       // Die casting has a calculator for each figure. Sand and investment casting buy the part metal, the melt loss and the gating that is not
-      // remelted: the Bought Weight of their material-cost calculator (which goes on to price it).
+      // remelted: the Bought Weight of their material-cost calculator (which goes on to price it). A forging buys the bar its mults are sawn from;
+      // a powder metal part the powder for the part over the material utilization.
       const net = fromRun(calculatorRuns?.['Net Material Usage'], usage.netUsage)
+        ?? fromRun(calculatorRuns?.['Powder metal powder'], usage.netUsage, 'Part Mass')
         ?? fromRun(calculatorRuns?.['Sand metal per casting'], usage.netUsage, 'Net Weight')
         ?? fromRun(calculatorRuns?.['Investment metal per casting'], usage.netUsage, 'Net Weight');
       const gross = fromRun(calculatorRuns?.['Gross Material Usage'], usage.grossUsage)
         ?? fromRun(calculatorRuns?.['Sand material cost'], usage.grossUsage, 'Bought Weight')
-        ?? fromRun(calculatorRuns?.['Investment material cost'], usage.grossUsage, 'Bought Weight');
+        ?? fromRun(calculatorRuns?.['Investment material cost'], usage.grossUsage, 'Bought Weight')
+        ?? forgingBar(calculatorRuns, usage.grossUsage)
+        ?? fromRun(calculatorRuns?.['Powder metal powder'], usage.grossUsage, 'Powder Mass');
       const melted = usage.grossUsage > usage.netUsage;
       return {
         ...usage, scrap,
