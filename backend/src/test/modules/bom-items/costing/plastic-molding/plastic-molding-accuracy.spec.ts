@@ -193,12 +193,13 @@ describe('cost summary: worked ABS part', () => {
     expect(r.totalCost).toBeCloseTo(material + run + inspect + weigh, 6);
   });
 
-  it('tooling, USA, 10,000/yr x 3 yr: BOM 2,140 + labour 2,398.67 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 0 (P20, pre-hardened) + cooling 715.29 = 12,059.66, one mold, 0.4020 per part', () => {
-    // BOM (no undercut: no Hydraulic Cylinder / Side Lock; Ejector Pin has no quantity; Electrical has no cost):
-    //   Air Poppet 25x30 + Ejector Guide Pin Bushing 30x6 + Guide Bush 100x4 + Guide Pin 100x4 + Limit Switch 50x4 + Return Pin 35x6 = 2,140
+  it('tooling, USA, 10,000/yr x 3 yr: BOM 1,930 + labour 2,859.53 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 0 (P20, pre-hardened) + cooling 715.29 = 12,310.52, one mold, 0.4104 per part', () => {
+    // BOM (no undercut: no Hydraulic Cylinder; Ejector Pin has no quantity; Electrical has no cost). The injection mold's own components
+    // (memory/Assembly plastic molding), the compression table for the rest:
+    //   Leader pins and bushings 45x6 + Return pins and bushings 35x6 + Ejector guide pins and bushings 30x6 + Side locks 160x2 + Air Poppet 25x30 + Limit Switch 50x4 = 1,930
     // design 3.24 h (area <= 59,253 mm2) x 64.73 = 209.73
     // machining 0.01 m2 / 0.32 x 2 + 4 setup h = 4.0625 h x 100.55 = 408.46
-    // assembly 0.006x30 + 2x6 + 1x4(pins 0.25x4) + 4 + 6 = 23.18 h x 76.81 = 1,780.48 (Guide Bush has no assembly time)
+    // assembly leader 1x6 + return 1x6 + ejector guide 2x6 + side locks 0.5x2 + air poppet 0.006x30 + limit switch 1x4 = 29.18 h x 76.81 = 2,241.32
     // base steel: 100 x 100 mm part, 1,300 kN press: edge borders 140 / 152 mm -> 380 x 404 mm -> standard base 396 x 446 mm;
     //   depth borders 4 in = 101.6 mm: A = B = max(85.725, 0.5 x 30 + 101.6) = 116.6 mm; stack 28.575 + 116.6 + 116.6 + 47.625 + 28.575 = 337.975 mm;
     //   396 x 446 x 337.975 mm = 59.69 dm3 x 7,850 kg/m3 = 468.58 kg x 1.86 USD/kg x 1.0 = 871.56
@@ -209,11 +210,11 @@ describe('cost summary: worked ABS part', () => {
     // heat treatment: the tool steel is AISI P20, supplied pre-hardened (reference/mold-steel-treatment-reference.csv): none is charged
     // cooling: floor(446 / (3 x 8 mm)) = 18 lines x 396 mm / 25.4 mm/min / 60 = 4.677 h x 100.55 = 470.29 + 18 x 2 x (1.25 + 2.50) + 2 x 55 = 715.29
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 10_000, productionLifeYears: 3 })).tooling!;
-    expect(t.moldBomSubtotalUsd).toBe(2140);
+    expect(t.moldBomSubtotalUsd).toBe(1930);
     expect(t.moldEstimatedDesignHrs).toBe(3.24);
     expect(t.moldEstimatedMachiningHrs).toBeCloseTo(4.0625, 6);
-    expect(t.moldEstimatedAssemblyHrs).toBeCloseTo(23.18, 6);
-    expect(t.moldLabourCostUsd).toBe(2398.67);
+    expect(t.moldEstimatedAssemblyHrs).toBeCloseTo(29.18, 6);
+    expect(t.moldLabourCostUsd).toBe(2859.53);
     expect(t.moldToolLifeShots).toBe(144_000);
     expect(t.moldsRequired).toBe(1);
     expect(t.moldBaseSteelUsd).toBeCloseTo(871.56, 2);
@@ -224,15 +225,15 @@ describe('cost summary: worked ABS part', () => {
     expect(t.moldTryoutUsd).toBeCloseTo(2765.16, 6);
     expect(t.moldHeatTreatmentUsd).toBe(0);
     expect(t.moldCoolingUsd).toBeCloseTo(715.29, 2);
-    expect(t.moldCostUsd).toBe(12059.66);
-    expect(t.moldCostPerPartUsd).toBe(0.402);
+    expect(t.moldCostUsd).toBe(12310.52);
+    expect(t.moldCostPerPartUsd).toBe(0.4104);
   });
 
-  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 12,059.66 = 253,252.85 USD, 0.0844 per part (regression: not rounded to 0.08)', () => {
+  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 12,310.52 = 258,520.91 USD, 0.0862 per part (regression: not rounded to 0.09)', () => {
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 1_000_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldsRequired).toBe(21);
-    expect(t.moldCostUsd).toBe(253_252.85);
-    expect(t.moldCostPerPartUsd).toBe(0.0844);
+    expect(t.moldCostUsd).toBe(258_520.91);
+    expect(t.moldCostPerPartUsd).toBe(0.0862);
   });
 });
 
@@ -382,7 +383,7 @@ describe('characterization: what the mold cost depends on today', () => {
   it('I-2: undercuts add the staged slide hardware (hydraulic cylinder, side lock) and raise the class; nothing else about the class is priced', () => {
     const plain = mold({}, { partingComplexity: 0.1 });
     const slides = mold({}, { partingComplexity: 0.9, undercutCount: 6, slideBundleCount: 2 });
-    expect(slides.bom! - plain.bom!).toBe(1400 + 640); // 4 hydraulic cylinders x 350 + 4 side locks x 160
+    expect(slides.bom! - plain.bom!).toBe(1400); // 4 hydraulic cylinders x 350; side locks are on every injection mold
     expect(slides.cls).toBe('Class102');
   });
 });

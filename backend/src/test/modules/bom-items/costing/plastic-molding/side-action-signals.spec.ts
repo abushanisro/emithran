@@ -74,7 +74,7 @@ describe('slide hardware in the mold tooling', () => {
 
   it('is priced when a slide bundle was recognised, at the staged one-set quantity, and says so', () => {
     const r = computeMoldToolingCost({ ...base, undercutCount: 3, slideBundles: 1, slideOrLifterBundles: 0 });
-    expect(has(r, 'Hydraulic Cylinder') && has(r, 'Side Lock')).toBe(true);
+    expect(has(r, 'Hydraulic Cylinder')).toBe(true);
     expect(r.warnings.some((w) => w.includes('staged quantity for one mold set'))).toBe(true);
   });
 

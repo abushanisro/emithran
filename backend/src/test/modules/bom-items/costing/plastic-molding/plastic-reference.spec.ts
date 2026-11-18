@@ -68,11 +68,12 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
     expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toContain('water baffles, the hot-runner manifold, cavity inserts');
   });
 
-  it('counts Guide Pin at its real 0.25 h and says Guide Bush has no assembly time', () => {
+  it('assembles the injection mold\'s own pins and bushings (memory/Assembly plastic molding), so no component lacks an assembly time', () => {
     const r = computeMoldToolingCost({ moldBaseAreaMm2: 50_000, cavityCount: 1, undercutCount: 0, slideBundles: null, slideOrLifterBundles: 0, tables: REF.tooling, scope: COLD });
-    // Air Poppet 30x0.006 + Ejector Guide Pin Bushing 6x2 + Guide Pin 4x0.25 + Limit Switch 4x1 + Return Pin 6x1
-    expect(r.estimatedAssemblyHrs).toBeCloseTo(30 * 0.006 + 6 * 2 + 4 * 0.25 + 4 * 1 + 6 * 1, 6);
-    expect(r.warnings.some((w) => w.includes('No assembly time on file') && w.includes('Guide Bush'))).toBe(true);
+    // air poppets 30 x 0.006 + limit switches 4 x 1 + leader pins and bushings 6 x 1 + return pins and bushings 6 x 1 + ejector guide pins and bushings 6 x 2 + side locks 2 x 0.5
+    expect(r.estimatedAssemblyHrs).toBeCloseTo(30 * 0.006 + 4 * 1 + 6 * 1 + 6 * 1 + 6 * 2 + 2 * 0.5, 6);
+    expect(r.warnings.some((w) => w.includes('No assembly time on file'))).toBe(false);
+    expect(r.items.map((i) => i.componentName)).not.toEqual(expect.arrayContaining(['Guide Pin', 'Guide Bush']));
     // Side-action hardware only with an undercut.
     expect(r.items.some((i) => i.componentName === 'Hydraulic Cylinder')).toBe(false);
   });

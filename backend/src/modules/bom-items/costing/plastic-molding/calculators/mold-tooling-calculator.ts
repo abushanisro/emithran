@@ -157,7 +157,10 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
   const designRef = f.designHoursRowAreaMm2 != null ? plasticLookup('cmMoldBaseDesignHours', 'base_design_hrs_hr', { mold_base_area_mm2: f.designHoursRowAreaMm2 }) : undefined;
   return {
     seeds: {
-      'Purchased Components Cost': { value: f.componentsSubtotalUsd, source: `${REF}/lookup/cmStandardToolingComponents: ${listed || 'none'}`, lookup: true },
+      'Purchased Components Cost': {
+        value: f.componentsSubtotalUsd, lookup: true,
+        source: `memory/Assembly plastic molding variables (pins, bushings, side locks) and ${REF}/lookup/cmStandardToolingComponents for the rest: ${listed || 'none'}`,
+      },
       'Mold Base Area': { value: f.moldBaseAreaMm2, source: `CAD projected area x ${f.cavityCount} cavit${f.cavityCount === 1 ? 'y' : 'ies'} (the required mold window)` },
       'Design Hours': withRef({ value: f.designHours, source: `${REF}/lookup/cmMoldBaseDesignHours: the first row covering ${Math.round(f.moldBaseAreaMm2)} mm²`, lookup: true }, designRef),
       'Plate Machining Rate': {
@@ -165,7 +168,7 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
         ref: machiningRate('Cavity Core Plate General Machining'),
       },
       'Plate Setup Hours': { value: f.tables.cavityPlateSetupHr + f.tables.corePlateSetupHr, source: `${REF}/lookup/cmToolMachiningSetups: cavity ${f.tables.cavityPlateSetupHr} h + core ${f.tables.corePlateSetupHr} h`, lookup: true },
-      'Assembly Hours': { value: f.assemblyHours, source: `${REF}/lookup/cmToolAssemblyTimes: hours per component x its quantity`, lookup: true },
+      'Assembly Hours': { value: f.assemblyHours, source: 'memory/Assembly plastic molding assemblyTimeHrs* and cmToolAssemblyTimes for the rest: hours per component x its quantity', lookup: true },
       'Design Rate': { value: f.toolroomRates.designUsdPerHr, source: `${settings} designRateUsdPerHr`, ref: settingsRef('designRateUsdPerHr') },
       'Machining Rate': { value: f.toolroomRates.machiningUsdPerHr, source: `${settings} machiningRateUsdPerHr`, ref: settingsRef('machiningRateUsdPerHr') },
       'Assembly Rate': { value: f.toolroomRates.assemblyUsdPerHr, source: `${settings} assemblyRateUsdPerHr`, ref: settingsRef('assemblyRateUsdPerHr') },
