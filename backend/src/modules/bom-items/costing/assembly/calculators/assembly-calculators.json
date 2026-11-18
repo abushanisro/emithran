@@ -1,0 +1,1555 @@
+{
+ "domain": "assembly",
+ "processGroup": "Assembly",
+ "calculators": [
+  {
+   "key": "assembly.weld_consumables",
+   "name": "Assembly - Weld consumables",
+   "helper": true,
+   "operations": [],
+   "output": "Consumables Cost",
+   "results": [
+    "Wire Mass",
+    "Wire Cost",
+    "Gas Cost",
+    "Tip and Nozzle Cost",
+    "Spray Cost"
+   ],
+   "description": "What an arc weld consumes per assembly: the filler wire fed during the arc time (its feed speed and diameter at the weld metal's density, priced at the machine's wire cost), the shielding gas (the travel-speed table's gas cost per hour of arc), the contact tips and nozzles worn per kilogram of wire (weldTipReplacementRate, weldNozzleReplacementRate at weldTipCost, weldNozzleCost) and, when weldAntiSpatterSprayEnabled, the anti-spatter spray along the weld (tblWeldAntiSpatterSpray).",
+   "fields": [
+    {
+     "name": "Arc Time",
+     "unit": "s",
+     "source": {
+      "engine": "arc_time_s (the weld's arc time)"
+     }
+    },
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm"
+     }
+    },
+    {
+     "name": "Wire Feed Speed",
+     "unit": "mm/s",
+     "source": {
+      "engine": "wire_feed_speed_mm_s (tblWeldTravelSpeed for MIG, the machine's wire feed rate for TIG)"
+     }
+    },
+    {
+     "name": "Wire Diameter",
+     "unit": "mm",
+     "source": {
+      "engine": "wire_diameter_mm (tblWeldTravelSpeed wire diameter, the TIG table's filler rod)"
+     }
+    },
+    {
+     "name": "Weld Density",
+     "unit": "kg/m³",
+     "source": {
+      "engine": "weld_density_kg_m3 (the machine's weld density, else the metal's)"
+     }
+    },
+    {
+     "name": "Wire Cost Per kg",
+     "unit": "USD/kg",
+     "source": {
+      "machine": "wire_cost_usd_per_kg"
+     }
+    },
+    {
+     "name": "Gas Cost Per Hour",
+     "unit": "USD/hr",
+     "source": {
+      "engine": "gas_cost_usd_hr (the travel-speed table's gas cost)"
+     }
+    },
+    {
+     "name": "Tip Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "weldTipCost"
+     }
+    },
+    {
+     "name": "Tip Life",
+     "unit": "kg",
+     "source": {
+      "variable": "weldTipReplacementRate"
+     }
+    },
+    {
+     "name": "Nozzle Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "weldNozzleCost"
+     }
+    },
+    {
+     "name": "Nozzle Life",
+     "unit": "kg",
+     "source": {
+      "variable": "weldNozzleReplacementRate"
+     }
+    },
+    {
+     "name": "Spray On",
+     "unit": "",
+     "source": {
+      "engine": "spray_on (1 when weldAntiSpatterSprayEnabled, else 0)"
+     }
+    },
+    {
+     "name": "Spray Cost Per Can",
+     "unit": "USD",
+     "source": {
+      "lookup": "tblWeldAntiSpatterSpray.Spray Cost (USD)"
+     }
+    },
+    {
+     "name": "Spray Volume",
+     "unit": "mL",
+     "source": {
+      "lookup": "tblWeldAntiSpatterSpray.Volume (mL)"
+     }
+    },
+    {
+     "name": "Spray Discharge",
+     "unit": "g/s",
+     "source": {
+      "lookup": "tblWeldAntiSpatterSpray.Discharge Rate (g / s)"
+     }
+    },
+    {
+     "name": "Spray Density",
+     "unit": "g/cm³",
+     "source": {
+      "lookup": "tblWeldAntiSpatterSpray.Relative Density (g / cm^3)"
+     }
+    },
+    {
+     "name": "Spray Time Per Length",
+     "unit": "s/mm",
+     "source": {
+      "lookup": "tblWeldAntiSpatterSpray.Spray Time Per Weld Length (s)"
+     }
+    },
+    {
+     "name": "Wire Mass",
+     "unit": "kg",
+     "formula": "pi / 4 * {Wire Diameter} * {Wire Diameter} * {Wire Feed Speed} * {Arc Time} * {Weld Density} / 1000000000"
+    },
+    {
+     "name": "Wire Cost",
+     "unit": "USD",
+     "formula": "{Wire Mass} * {Wire Cost Per kg}"
+    },
+    {
+     "name": "Gas Cost",
+     "unit": "USD",
+     "formula": "{Gas Cost Per Hour} * {Arc Time} / 3600"
+    },
+    {
+     "name": "Tip and Nozzle Cost",
+     "unit": "USD",
+     "formula": "{Wire Mass} / max({Tip Life}, 0.001) * {Tip Cost} + {Wire Mass} / max({Nozzle Life}, 0.001) * {Nozzle Cost}"
+    },
+    {
+     "name": "Spray Cost",
+     "unit": "USD",
+     "formula": "{Spray On} * {Weld Length} * {Spray Time Per Length} * {Spray Discharge} / max({Spray Volume} * {Spray Density}, 0.001) * {Spray Cost Per Can}"
+    },
+    {
+     "name": "Consumables Cost",
+     "unit": "USD",
+     "formula": "{Wire Cost} + {Gas Cost} + {Tip and Nozzle Cost} + {Spray Cost}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.sealant_material",
+   "name": "Assembly - Sealant and adhesive material",
+   "helper": true,
+   "operations": [],
+   "output": "Material Mass",
+   "results": [
+    "Adhesive Mass",
+    "Sealant Mass"
+   ],
+   "description": "The adhesive and sealant an assembly takes: the bonded area (defaultPercentBonded of the joint's area) under defaultResinThickness of resin at resinDensity with resinMaterialFactor for the loss in application; the sealant along the bead at sealantDensity. memory/Assembly gives no price for either: their mass is reported, not priced.",
+   "fields": [
+    {
+     "name": "Bond Area",
+     "unit": "mm²",
+     "source": {
+      "engine": "bond_area_mm2 (the adhesive joints' area)"
+     }
+    },
+    {
+     "name": "Percent Bonded",
+     "unit": "%",
+     "source": {
+      "variable": "defaultPercentBonded"
+     }
+    },
+    {
+     "name": "Resin Thickness",
+     "unit": "m",
+     "source": {
+      "variable": "defaultResinThickness"
+     }
+    },
+    {
+     "name": "Resin Density",
+     "unit": "kg/m³",
+     "source": {
+      "variable": "resinDensity"
+     }
+    },
+    {
+     "name": "Resin Loss Factor",
+     "unit": null,
+     "source": {
+      "variable": "resinMaterialFactor"
+     }
+    },
+    {
+     "name": "Sealant Volume",
+     "unit": "mm³",
+     "source": {
+      "engine": "sealant_volume_mm3 (the sealing joints' bead or faying volume)"
+     }
+    },
+    {
+     "name": "Sealant Density",
+     "unit": "kg/m³",
+     "source": {
+      "variable": "sealantDensity"
+     }
+    },
+    {
+     "name": "Adhesive Mass",
+     "unit": "kg",
+     "formula": "{Bond Area} * {Percent Bonded} / 100 * {Resin Thickness} * 1000 * {Resin Density} / 1000000000 * {Resin Loss Factor}"
+    },
+    {
+     "name": "Sealant Mass",
+     "unit": "kg",
+     "formula": "{Sealant Volume} * {Sealant Density} / 1000000000"
+    },
+    {
+     "name": "Material Mass",
+     "unit": "kg",
+     "formula": "{Adhesive Mass} + {Sealant Mass}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.pick_and_place",
+   "name": "Assembly - Pick and place",
+   "operations": [
+    "Pick and Place"
+   ],
+   "description": "Loading a component into the assembly, per instance: its load time by its weight and largest dimension (componentLoadTimes: the first row that takes both, and the equipment it needs), times handlingMultiplier for the usual handling difficulties; the finished assembly is unloaded once (the same table, by the assembly's weight and size).",
+   "fields": [
+    {
+     "name": "Quantity",
+     "unit": null,
+     "source": {
+      "engine": "quantity (instances of the component in the assembly)"
+     }
+    },
+    {
+     "name": "Load Time",
+     "unit": "s",
+     "source": {
+      "lookup": "componentLoadTimes.Load Time (s)"
+     }
+    },
+    {
+     "name": "Unload Time",
+     "unit": "s",
+     "source": {
+      "engine": "unload_time_s (componentLoadTimes Unload Time for the whole assembly, on its own line; 0 on a component)"
+     }
+    },
+    {
+     "name": "Handling Multiplier",
+     "unit": null,
+     "source": {
+      "variable": "handlingMultiplier"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Quantity} * {Load Time} + {Unload Time}) * {Handling Multiplier} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.mechanical",
+   "name": "Assembly - Mechanical assembly",
+   "operations": [
+    "Mechanical Assembly"
+   ],
+   "description": "A mechanical fastening (a screw, a nut, a snap fit, ...), per joint: the Boothroyd-Dewhurst manual handling and insertion time of the operation (assembly_tblDfaOperationTimes, the eMithran DFA baseline), or the time the engineer set on the joint, times the joints.",
+   "fields": [
+    {
+     "name": "Joints",
+     "unit": null,
+     "source": {
+      "engine": "joint_count"
+     }
+    },
+    {
+     "name": "Operation Time",
+     "unit": "s",
+     "source": {
+      "engine": "operation_time_s (assembly_tblDfaOperationTimes Total Time (s) for the operation, or the joint's own time)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Joints} * {Operation Time} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.threaded_insert",
+   "name": "Assembly - Threaded insert",
+   "operations": [
+    "Threaded Insert"
+   ],
+   "description": "Installing threaded inserts, per insert: the machine's insert time.",
+   "fields": [
+    {
+     "name": "Joints",
+     "unit": null,
+     "source": {
+      "engine": "joint_count"
+     }
+    },
+    {
+     "name": "Insert Time",
+     "unit": "s",
+     "source": {
+      "machine": "insert_time_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Joints} * {Insert Time} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.lock_bolt",
+   "name": "Assembly - Lock bolt",
+   "operations": [
+    "Lock Bolt"
+   ],
+   "description": "Setting lock bolts (Huck), per bolt: the bolt handled and placed (the DFA screw handling time) and swaged at the tool's lock speed.",
+   "fields": [
+    {
+     "name": "Joints",
+     "unit": null,
+     "source": {
+      "engine": "joint_count"
+     }
+    },
+    {
+     "name": "Handling Time",
+     "unit": "s",
+     "source": {
+      "lookup": "assembly_tblDfaOperationTimes.Handling Time (s)"
+     }
+    },
+    {
+     "name": "Lock Time",
+     "unit": "s",
+     "source": {
+      "machine": "lock_speed_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Joints} * ({Handling Time} + {Lock Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.rivet",
+   "name": "Assembly - Rivet",
+   "operations": [
+    "Rivet"
+   ],
+   "description": "Setting rivets, per rivet: the time set on the joint. memory/Assembly's rivet machine gives no rivet time and the DFA baseline holds no verified one, so a rivet joint without a time is a named gap.",
+   "fields": [
+    {
+     "name": "Joints",
+     "unit": null,
+     "source": {
+      "engine": "joint_count"
+     }
+    },
+    {
+     "name": "Rivet Time",
+     "unit": "s",
+     "source": {
+      "engine": "operation_time_s (the joint's own time)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Joints} * {Rivet Time} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.manual_mig",
+   "name": "Assembly - Manual MIG welding",
+   "operations": [
+    "Manual MIG Welding"
+   ],
+   "results": [
+    "Arc Time",
+    "Tack Time"
+   ],
+   "description": "Manual MIG welding, per weld joint: the arc time over its length at the travel speed for its material, throat and gas, in the passes its throat takes (tblNumWeldPasses), times the machine's arc time standard; tacks every tack pitch; the gun placed for each weld and cleaned for its share of the arc (the machine's gun clean time per arc). A manual weld's arc and tacks are over weldingEfficiencyFactor, for fixturing, clamping, moving and cooling.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm (the joint's weld length)"
+     }
+    },
+    {
+     "name": "Welds",
+     "unit": null,
+     "source": {
+      "engine": "weld_count (the joint's welds)"
+     }
+    },
+    {
+     "name": "Passes",
+     "unit": null,
+     "source": {
+      "lookup": "tblNumWeldPasses.Num Passes"
+     }
+    },
+    {
+     "name": "Travel Speed",
+     "unit": "mm/s",
+     "source": {
+      "engine": "travel_speed_mm_s (tblWeldTravelSpeed for MIG; tblTigWeldingV2 with its position multiplier for TIG)"
+     }
+    },
+    {
+     "name": "Arc Time Standard",
+     "unit": null,
+     "source": {
+      "machine": "arc_time_std"
+     }
+    },
+    {
+     "name": "Gun Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "gun_placement_time_s"
+     }
+    },
+    {
+     "name": "Gun Clean Per Arc",
+     "unit": "s",
+     "source": {
+      "machine": "gun_clean_time_per_arc_s"
+     }
+    },
+    {
+     "name": "Tack Pitch",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_pitch_mm"
+     }
+    },
+    {
+     "name": "Tack Length",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_length_mm"
+     }
+    },
+    {
+     "name": "Efficiency",
+     "unit": null,
+     "source": {
+      "engine": "efficiency (weldingEfficiencyFactor for a manual weld, 1 for a robot)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Arc Time",
+     "unit": "s",
+     "formula": "{Weld Length} * {Passes} / {Travel Speed} * {Arc Time Standard}"
+    },
+    {
+     "name": "Tack Time",
+     "unit": "s",
+     "formula": "{Weld Length} / max({Tack Pitch}, 1) * {Tack Length} / {Travel Speed}"
+    },
+    {
+     "name": "Gun Time",
+     "unit": "s",
+     "formula": "{Welds} * {Gun Placement Time} + {Arc Time} * {Gun Clean Per Arc}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "(({Arc Time} + {Tack Time}) / {Efficiency} + {Gun Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.robotic_mig",
+   "name": "Assembly - Robotic MIG welding",
+   "operations": [
+    "Robotic MIG Welding"
+   ],
+   "results": [
+    "Arc Time",
+    "Tack Time"
+   ],
+   "description": "Robotic MIG welding, per weld joint: the arc time over its length at the travel speed for its material, throat and gas, in the passes its throat takes (tblNumWeldPasses), times the machine's arc time standard; tacks every tack pitch; the gun placed for each weld and cleaned for its share of the arc (the machine's gun clean time per arc). A robot welds at efficiency 1, over its weld heads, and its programming per weld is spread over the batch.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm (the joint's weld length)"
+     }
+    },
+    {
+     "name": "Welds",
+     "unit": null,
+     "source": {
+      "engine": "weld_count (the joint's welds)"
+     }
+    },
+    {
+     "name": "Passes",
+     "unit": null,
+     "source": {
+      "lookup": "tblNumWeldPasses.Num Passes"
+     }
+    },
+    {
+     "name": "Travel Speed",
+     "unit": "mm/s",
+     "source": {
+      "engine": "travel_speed_mm_s (tblWeldTravelSpeed for MIG; tblTigWeldingV2 with its position multiplier for TIG)"
+     }
+    },
+    {
+     "name": "Arc Time Standard",
+     "unit": null,
+     "source": {
+      "machine": "arc_time_std"
+     }
+    },
+    {
+     "name": "Gun Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "gun_placement_time_s"
+     }
+    },
+    {
+     "name": "Gun Clean Per Arc",
+     "unit": "s",
+     "source": {
+      "machine": "gun_clean_time_per_arc_s"
+     }
+    },
+    {
+     "name": "Tack Pitch",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_pitch_mm"
+     }
+    },
+    {
+     "name": "Tack Length",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_length_mm"
+     }
+    },
+    {
+     "name": "Efficiency",
+     "unit": null,
+     "source": {
+      "engine": "efficiency (weldingEfficiencyFactor for a manual weld, 1 for a robot)"
+     }
+    },
+    {
+     "name": "Programming Time Per Weld",
+     "unit": "s",
+     "source": {
+      "machine": "programming_time_per_weld_s"
+     }
+    },
+    {
+     "name": "Weld Heads",
+     "unit": null,
+     "source": {
+      "machine": "number_of_weld_heads"
+     }
+    },
+    {
+     "name": "Batch Size",
+     "unit": null,
+     "source": {
+      "scenario": "batch_size"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Arc Time",
+     "unit": "s",
+     "formula": "{Weld Length} * {Passes} / {Travel Speed} * {Arc Time Standard}"
+    },
+    {
+     "name": "Tack Time",
+     "unit": "s",
+     "formula": "{Weld Length} / max({Tack Pitch}, 1) * {Tack Length} / {Travel Speed}"
+    },
+    {
+     "name": "Gun Time",
+     "unit": "s",
+     "formula": "{Welds} * {Gun Placement Time} + {Arc Time} * {Gun Clean Per Arc}"
+    },
+    {
+     "name": "Programming Per Assembly",
+     "unit": "s",
+     "formula": "{Welds} * {Programming Time Per Weld} / max({Batch Size}, 1)"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "(({Arc Time} + {Tack Time}) / {Efficiency} + {Gun Time}) / max({Weld Heads}, 1) * {Cycle Time Factor} + {Programming Per Assembly}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.manual_tig",
+   "name": "Assembly - Manual TIG welding",
+   "operations": [
+    "Manual TIG Welding"
+   ],
+   "results": [
+    "Arc Time",
+    "Tack Time"
+   ],
+   "description": "Manual TIG welding, per weld joint: the arc time over its length at the travel speed for its material, throat and gas, in the passes its throat takes (tblNumWeldPasses), times the machine's arc time standard; tacks every tack pitch; the gun placed for each weld and cleaned for its share of the arc (the machine's gun clean time per arc). A manual weld's arc and tacks are over weldingEfficiencyFactor, for fixturing, clamping, moving and cooling.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm (the joint's weld length)"
+     }
+    },
+    {
+     "name": "Welds",
+     "unit": null,
+     "source": {
+      "engine": "weld_count (the joint's welds)"
+     }
+    },
+    {
+     "name": "Passes",
+     "unit": null,
+     "source": {
+      "lookup": "tblNumWeldPasses.Num Passes"
+     }
+    },
+    {
+     "name": "Travel Speed",
+     "unit": "mm/s",
+     "source": {
+      "engine": "travel_speed_mm_s (tblWeldTravelSpeed for MIG; tblTigWeldingV2 with its position multiplier for TIG)"
+     }
+    },
+    {
+     "name": "Arc Time Standard",
+     "unit": null,
+     "source": {
+      "machine": "arc_time_std"
+     }
+    },
+    {
+     "name": "Gun Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "gun_placement_time_s"
+     }
+    },
+    {
+     "name": "Gun Clean Per Arc",
+     "unit": "s",
+     "source": {
+      "machine": "gun_clean_time_per_arc_s"
+     }
+    },
+    {
+     "name": "Tack Pitch",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_pitch_mm"
+     }
+    },
+    {
+     "name": "Tack Length",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_length_mm"
+     }
+    },
+    {
+     "name": "Efficiency",
+     "unit": null,
+     "source": {
+      "engine": "efficiency (weldingEfficiencyFactor for a manual weld, 1 for a robot)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Arc Time",
+     "unit": "s",
+     "formula": "{Weld Length} * {Passes} / {Travel Speed} * {Arc Time Standard}"
+    },
+    {
+     "name": "Tack Time",
+     "unit": "s",
+     "formula": "{Weld Length} / max({Tack Pitch}, 1) * {Tack Length} / {Travel Speed}"
+    },
+    {
+     "name": "Gun Time",
+     "unit": "s",
+     "formula": "{Welds} * {Gun Placement Time} + {Arc Time} * {Gun Clean Per Arc}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "(({Arc Time} + {Tack Time}) / {Efficiency} + {Gun Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.robotic_tig",
+   "name": "Assembly - Robotic TIG welding",
+   "operations": [
+    "Robotic TIG Welding"
+   ],
+   "results": [
+    "Arc Time",
+    "Tack Time"
+   ],
+   "description": "Robotic TIG welding, per weld joint: the arc time over its length at the travel speed for its material, throat and gas, in the passes its throat takes (tblNumWeldPasses), times the machine's arc time standard; tacks every tack pitch; the gun placed for each weld and cleaned for its share of the arc (the machine's gun clean time per arc). A robot welds at efficiency 1, over its weld heads, and its programming per weld is spread over the batch.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm (the joint's weld length)"
+     }
+    },
+    {
+     "name": "Welds",
+     "unit": null,
+     "source": {
+      "engine": "weld_count (the joint's welds)"
+     }
+    },
+    {
+     "name": "Passes",
+     "unit": null,
+     "source": {
+      "lookup": "tblNumWeldPasses.Num Passes"
+     }
+    },
+    {
+     "name": "Travel Speed",
+     "unit": "mm/s",
+     "source": {
+      "engine": "travel_speed_mm_s (tblWeldTravelSpeed for MIG; tblTigWeldingV2 with its position multiplier for TIG)"
+     }
+    },
+    {
+     "name": "Arc Time Standard",
+     "unit": null,
+     "source": {
+      "machine": "arc_time_std"
+     }
+    },
+    {
+     "name": "Gun Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "gun_placement_time_s"
+     }
+    },
+    {
+     "name": "Gun Clean Per Arc",
+     "unit": "s",
+     "source": {
+      "machine": "gun_clean_time_per_arc_s"
+     }
+    },
+    {
+     "name": "Tack Pitch",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_pitch_mm"
+     }
+    },
+    {
+     "name": "Tack Length",
+     "unit": "mm",
+     "source": {
+      "machine": "tack_length_mm"
+     }
+    },
+    {
+     "name": "Efficiency",
+     "unit": null,
+     "source": {
+      "engine": "efficiency (weldingEfficiencyFactor for a manual weld, 1 for a robot)"
+     }
+    },
+    {
+     "name": "Programming Time Per Weld",
+     "unit": "s",
+     "source": {
+      "machine": "programming_time_per_weld_s"
+     }
+    },
+    {
+     "name": "Weld Heads",
+     "unit": null,
+     "source": {
+      "machine": "number_of_weld_heads"
+     }
+    },
+    {
+     "name": "Batch Size",
+     "unit": null,
+     "source": {
+      "scenario": "batch_size"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Arc Time",
+     "unit": "s",
+     "formula": "{Weld Length} * {Passes} / {Travel Speed} * {Arc Time Standard}"
+    },
+    {
+     "name": "Tack Time",
+     "unit": "s",
+     "formula": "{Weld Length} / max({Tack Pitch}, 1) * {Tack Length} / {Travel Speed}"
+    },
+    {
+     "name": "Gun Time",
+     "unit": "s",
+     "formula": "{Welds} * {Gun Placement Time} + {Arc Time} * {Gun Clean Per Arc}"
+    },
+    {
+     "name": "Programming Per Assembly",
+     "unit": "s",
+     "formula": "{Welds} * {Programming Time Per Weld} / max({Batch Size}, 1)"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "(({Arc Time} + {Tack Time}) / {Efficiency} + {Gun Time}) / max({Weld Heads}, 1) * {Cycle Time Factor} + {Programming Per Assembly}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.manual_spot",
+   "name": "Assembly - Manual spot welding",
+   "operations": [
+    "Manual Spot Welding"
+   ],
+   "description": "Manual resistance spot welding, per spot: the gun placed and the spot welded (the machine's times).",
+   "fields": [
+    {
+     "name": "Spots",
+     "unit": null,
+     "source": {
+      "engine": "weld_count (the joint's spots)"
+     }
+    },
+    {
+     "name": "Spot Weld Time",
+     "unit": "s",
+     "source": {
+      "machine": "spot_weld_time_s"
+     }
+    },
+    {
+     "name": "Gun Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "gun_placement_time_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Spots} * ({Spot Weld Time} + {Gun Placement Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.robotic_spot",
+   "name": "Assembly - Robotic spot welding",
+   "operations": [
+    "Robotic Spot Welding"
+   ],
+   "description": "Robotic resistance spot welding, per spot: the gun placed and the spot welded over the robot's weld heads, its programming per spot spread over the batch.",
+   "fields": [
+    {
+     "name": "Spots",
+     "unit": null,
+     "source": {
+      "engine": "weld_count (the joint's spots)"
+     }
+    },
+    {
+     "name": "Spot Weld Time",
+     "unit": "s",
+     "source": {
+      "machine": "spot_weld_time_s"
+     }
+    },
+    {
+     "name": "Gun Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "gun_placement_time_s"
+     }
+    },
+    {
+     "name": "Programming Time Per Weld",
+     "unit": "s",
+     "source": {
+      "machine": "programming_time_per_weld_s"
+     }
+    },
+    {
+     "name": "Weld Heads",
+     "unit": null,
+     "source": {
+      "machine": "number_of_weld_heads"
+     }
+    },
+    {
+     "name": "Batch Size",
+     "unit": null,
+     "source": {
+      "scenario": "batch_size"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Spots} * ({Spot Weld Time} + {Gun Placement Time}) / max({Weld Heads}, 1) * {Cycle Time Factor} + {Spots} * {Programming Time Per Weld} / max({Batch Size}, 1)"
+    }
+   ]
+  },
+  {
+   "key": "assembly.electron_beam",
+   "name": "Assembly - Electron beam welding",
+   "operations": [
+    "Electron Beam Welding"
+   ],
+   "results": [
+    "Weld Speed"
+   ],
+   "description": "Electron beam welding, per weld joint: the weld at a speed from the beam power and the penetration (EBWSpeedFactor, EBWPowerFactor, EBWDepthFactor; memory/Assembly gives the factors, not how they combine: unverified rule), capped by the machine's maximum speed; the part placed, and the chamber pumped down and vented for it.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm"
+     }
+    },
+    {
+     "name": "Weld Depth",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_depth_mm (the joint's penetration)"
+     }
+    },
+    {
+     "name": "Beam Power",
+     "unit": "kW",
+     "source": {
+      "machine": "beam_output_power_kw"
+     }
+    },
+    {
+     "name": "Max Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "max_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Speed Factor",
+     "unit": null,
+     "source": {
+      "variable": "EBWSpeedFactor"
+     }
+    },
+    {
+     "name": "Power Factor",
+     "unit": null,
+     "source": {
+      "variable": "EBWPowerFactor"
+     }
+    },
+    {
+     "name": "Depth Factor",
+     "unit": null,
+     "source": {
+      "variable": "EBWDepthFactor"
+     }
+    },
+    {
+     "name": "Part Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "part_placement_time_s"
+     }
+    },
+    {
+     "name": "Pump Time",
+     "unit": "s",
+     "source": {
+      "machine": "pump_time_s"
+     }
+    },
+    {
+     "name": "Vent Time",
+     "unit": "s",
+     "source": {
+      "machine": "vent_time_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Weld Speed",
+     "unit": "mm/s",
+     "formula": "min({Max Speed}, {Speed Factor} * {Power Factor} * {Beam Power} / max({Depth Factor} * {Weld Depth}, 0.001))"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Weld Length} / {Weld Speed} + {Part Placement Time} + {Pump Time} + {Vent Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.laser",
+   "name": "Assembly - Laser welding",
+   "operations": [
+    "Laser Welding"
+   ],
+   "results": [
+    "Weld Speed"
+   ],
+   "description": "Laser welding, per weld joint: the weld at a speed from the laser power over the penetration (LWEfficiencyFactor; memory/Assembly gives the factor, not the rule: unverified rule), capped by the machine's maximum speed; the part placed, and the programming per weld spread over the batch.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm"
+     }
+    },
+    {
+     "name": "Weld Depth",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_depth_mm (the joint's penetration)"
+     }
+    },
+    {
+     "name": "Beam Power",
+     "unit": "kW",
+     "source": {
+      "machine": "beam_output_power_kw"
+     }
+    },
+    {
+     "name": "Max Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "max_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Efficiency Factor",
+     "unit": null,
+     "source": {
+      "variable": "LWEfficiencyFactor"
+     }
+    },
+    {
+     "name": "Part Placement Time",
+     "unit": "s",
+     "source": {
+      "machine": "part_placement_time_s"
+     }
+    },
+    {
+     "name": "Programming Time Per Weld",
+     "unit": "s",
+     "source": {
+      "machine": "programming_time_per_weld_s"
+     }
+    },
+    {
+     "name": "Welds",
+     "unit": null,
+     "source": {
+      "engine": "weld_count"
+     }
+    },
+    {
+     "name": "Batch Size",
+     "unit": null,
+     "source": {
+      "scenario": "batch_size"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Weld Speed",
+     "unit": "mm/s",
+     "formula": "min({Max Speed}, {Efficiency Factor} * {Beam Power} / max({Weld Depth}, 0.001))"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Weld Length} / {Weld Speed} + {Part Placement Time}) * {Cycle Time Factor} + {Welds} * {Programming Time Per Weld} / max({Batch Size}, 1)"
+    }
+   ]
+  },
+  {
+   "key": "assembly.ultrasonic",
+   "name": "Assembly - Ultrasonic welding",
+   "operations": [
+    "Ultrasonic Welding"
+   ],
+   "description": "Ultrasonic welding, staking or insertion, per joint: the horn's ultrasonic time for the joint type (defaultUltrasonicWeldTime, defaultUltrasonicStakeTime, defaultUltrasonicInsertionTime) and its travel to the part and back (defaultHornTravelTime).",
+   "fields": [
+    {
+     "name": "Joints",
+     "unit": null,
+     "source": {
+      "engine": "joint_count"
+     }
+    },
+    {
+     "name": "Ultrasonic Time",
+     "unit": "s",
+     "source": {
+      "engine": "ultrasonic_time_s (defaultUltrasonicWeldTime, StakeTime or InsertionTime by the joint type)"
+     }
+    },
+    {
+     "name": "Horn Travel Time",
+     "unit": "s",
+     "source": {
+      "variable": "defaultHornTravelTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Joints} * ({Ultrasonic Time} + {Horn Travel Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.adhesive",
+   "name": "Assembly - Adhesive bonding",
+   "operations": [
+    "Adhesive Bonding"
+   ],
+   "results": [
+    "Degrease Time",
+    "Application Time"
+   ],
+   "description": "Adhesive bonding, per bonded joint: the faying area degreased (degreaseApplicationRate) and the adhesive applied over the bonded share of it (defaultPercentBonded) at the machine's application rate.",
+   "fields": [
+    {
+     "name": "Bond Area",
+     "unit": "mm²",
+     "source": {
+      "engine": "bond_area_mm2 (the joint's area)"
+     }
+    },
+    {
+     "name": "Percent Bonded",
+     "unit": "%",
+     "source": {
+      "variable": "defaultPercentBonded"
+     }
+    },
+    {
+     "name": "Degrease Rate",
+     "unit": "m²/min",
+     "source": {
+      "variable": "degreaseApplicationRate"
+     }
+    },
+    {
+     "name": "Application Rate",
+     "unit": "m²/min",
+     "source": {
+      "machine": "application_rate_m2_per_min"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Degrease Time",
+     "unit": "s",
+     "formula": "{Bond Area} / 1000000 / {Degrease Rate} * 60"
+    },
+    {
+     "name": "Application Time",
+     "unit": "s",
+     "formula": "{Bond Area} * {Percent Bonded} / 100 / 1000000 / {Application Rate} * 60"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Degrease Time} + {Application Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.fay_sealing",
+   "name": "Assembly - Fay sealing",
+   "operations": [
+    "Fay Sealing"
+   ],
+   "description": "Fay sealing, per sealed joint: the faying surface covered at the machine's application rate.",
+   "fields": [
+    {
+     "name": "Seal Area",
+     "unit": "mm²",
+     "source": {
+      "engine": "seal_area_mm2 (the joint's faying area)"
+     }
+    },
+    {
+     "name": "Application Rate",
+     "unit": "m²/min",
+     "source": {
+      "machine": "application_rate_m2_per_min"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Seal Area} / 1000000 / {Application Rate} * 60 * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.fillet_sealing",
+   "name": "Assembly - Fillet sealing",
+   "operations": [
+    "Fillet Sealing"
+   ],
+   "description": "Fillet sealing, per sealed joint: the bead run along its length at the machine's application rate (seconds per millimetre).",
+   "fields": [
+    {
+     "name": "Bead Length",
+     "unit": "mm",
+     "source": {
+      "engine": "bead_length_mm (the joint's bead length)"
+     }
+    },
+    {
+     "name": "Application Rate",
+     "unit": "s/mm",
+     "source": {
+      "machine": "application_rate_s_per_mm"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Bead Length} * {Application Rate} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.cap_sealing",
+   "name": "Assembly - Cap sealing",
+   "operations": [
+    "Cap Sealing"
+   ],
+   "description": "Cap sealing, per fastener capped: the machine's application time per cap.",
+   "fields": [
+    {
+     "name": "Caps",
+     "unit": null,
+     "source": {
+      "engine": "joint_count (the fasteners capped)"
+     }
+    },
+    {
+     "name": "Application Time",
+     "unit": "s",
+     "source": {
+      "machine": "application_rate_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Caps} * {Application Time} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.weld_prep",
+   "name": "Assembly - Weld prep",
+   "operations": [
+    "Weld Prep"
+   ],
+   "results": [
+    "Grinding Time",
+    "Brushing Time"
+   ],
+   "description": "Preparing a weld joint's edges, per weld: ground and wire brushed along its length at the machine's speeds.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm"
+     }
+    },
+    {
+     "name": "Grinding Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "grinding_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Wire Brushing Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "wire_brushing_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Grinding Time",
+     "unit": "s",
+     "formula": "{Weld Length} / {Grinding Speed}"
+    },
+    {
+     "name": "Brushing Time",
+     "unit": "s",
+     "formula": "{Weld Length} / {Wire Brushing Speed}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Grinding Time} + {Brushing Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "assembly.weld_clean_up",
+   "name": "Assembly - Weld clean up",
+   "operations": [
+    "Weld Clean Up"
+   ],
+   "description": "Grinding a weld clean after welding, along its length at the machine's grinding speed.",
+   "fields": [
+    {
+     "name": "Weld Length",
+     "unit": "mm",
+     "source": {
+      "engine": "weld_length_mm"
+     }
+    },
+    {
+     "name": "Grinding Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "grinding_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Weld Length} / {Grinding Speed} * {Cycle Time Factor}"
+    }
+   ]
+  }
+ ]
+}
