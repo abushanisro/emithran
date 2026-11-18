@@ -4600,6 +4600,7 @@ function CostGuidePanel({
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                   hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
+                  currencySymbol={cgpCostSummary.currencySymbol}
                 />
               </Section>
             )}

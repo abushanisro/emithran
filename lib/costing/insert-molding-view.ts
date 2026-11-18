@@ -38,3 +38,29 @@ export function insertEntryPatch(entry: InsertEntry): Record<string, unknown> {
     },
   };
 }
+
+/** How the shot cycle is made up: on a rotary or shuttle table the next inserts are loaded while the other half molds; without one, in series. */
+export function shotCycleOf(im: Pick<InsertMoldingSummary, 'press'>): { rule: string; explanation: string } {
+  return im.press.tablePress
+    ? { rule: 'longer of loading and molding', explanation: 'The table loads the next lower mold half while the other is molded, so the shot is the longer of the two.' }
+    : { rule: 'loading + molding', explanation: 'No table: the inserts are loaded with the mold open, so loading and molding add.' };
+}
+
+export interface InsertRouteRow { route: string; method: string; quoted: boolean; cost: number | null; reason: string | null; sameAsQuoted: boolean }
+
+/**
+ * The load-method routes as the panel lists them: the method alone (every route is insert molding), which is quoted, and whether a route
+ * not quoted costs the same as the quoted one to the cent (a tie, which the engine breaks by route order).
+ */
+export function insertRouteRows(im: Pick<InsertMoldingSummary, 'route' | 'options'>): InsertRouteRow[] {
+  const cents = (v: number | null) => (v == null ? null : Math.round(v * 100));
+  const quotedCents = cents(im.options.find((o) => o.route === im.route)?.totalCost ?? null);
+  return im.options.map((o) => ({
+    route: o.route,
+    method: o.label.replace(/^Insert molding · /i, ''),
+    quoted: o.route === im.route,
+    cost: o.totalCost,
+    reason: o.reason,
+    sameAsQuoted: o.route !== im.route && quotedCents != null && cents(o.totalCost) === quotedCents,
+  }));
+}
