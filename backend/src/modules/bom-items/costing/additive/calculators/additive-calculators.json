@@ -1,0 +1,1309 @@
+{
+ "domain": "additive",
+ "processGroup": "Additive Manufacturing",
+ "calculators": [
+  {
+   "key": "additive.nesting",
+   "name": "Additive - Parts per build",
+   "helper": true,
+   "operations": [],
+   "output": "Parts per Build",
+   "results": [
+    "Parts per Layer",
+    "Parts Stacked"
+   ],
+   "description": "How many parts one build takes: the part's footprint on the plate, with the nesting allowance (nestingAllowance) on each side, laid in rows on the machine's bed, the better of the two ways round; a powder bed that needs no plate supports (SLS) also stacks them in height above its base layers. Capped by the batch.",
+   "fields": [
+    {
+     "name": "Bed Length",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_length_mm"
+     }
+    },
+    {
+     "name": "Bed Width",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_width_mm"
+     }
+    },
+    {
+     "name": "Bed Height",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_height_mm"
+     }
+    },
+    {
+     "name": "Part Length",
+     "unit": "mm",
+     "source": {
+      "cad": "footprint_length"
+     }
+    },
+    {
+     "name": "Part Width",
+     "unit": "mm",
+     "source": {
+      "cad": "footprint_width"
+     }
+    },
+    {
+     "name": "Build Height",
+     "unit": "mm",
+     "source": {
+      "engine": "build_height_mm (the part's height plus its support base)"
+     }
+    },
+    {
+     "name": "Nesting Allowance",
+     "unit": "mm",
+     "source": {
+      "variable": "nestingAllowance"
+     }
+    },
+    {
+     "name": "Stacks",
+     "unit": null,
+     "source": {
+      "engine": "stacks (1 for a laser sintered build, which needs no plate, else 0)"
+     }
+    },
+    {
+     "name": "Base Height",
+     "unit": "mm",
+     "source": {
+      "engine": "base_height_mm (slsBaseLayersHeight for a laser sintered build, else 0)"
+     }
+    },
+    {
+     "name": "Batch Size",
+     "unit": null,
+     "source": {
+      "scenario": "batch_size"
+     }
+    },
+    {
+     "name": "Parts per Layer",
+     "unit": null,
+     "formula": "max(floor({Bed Length} / ({Part Length} + 2 * {Nesting Allowance})) * floor({Bed Width} / ({Part Width} + 2 * {Nesting Allowance})), floor({Bed Length} / ({Part Width} + 2 * {Nesting Allowance})) * floor({Bed Width} / ({Part Length} + 2 * {Nesting Allowance})))"
+    },
+    {
+     "name": "Parts Stacked",
+     "unit": null,
+     "formula": "{Stacks} > 0 ? max(1, floor(({Bed Height} - {Base Height}) / ({Build Height} + 2 * {Nesting Allowance}))) : 1"
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "formula": "max(1, min({Batch Size}, {Parts per Layer} * {Parts Stacked}))"
+    }
+   ]
+  },
+  {
+   "key": "additive.complexity",
+   "name": "Additive - Melt complexity",
+   "helper": true,
+   "operations": [],
+   "output": "Complexity Factor",
+   "results": [
+    "Melting Modulus"
+   ],
+   "description": "The scan time adjustment of a laser melted part by its melting modulus, surface area over volume: below lowMeltingModulus a compact part scans faster (lowComplexityAdjustment), above highMeltingModulus a thin-walled one slower (highComplexityAdjustment).",
+   "fields": [
+    {
+     "name": "Surface Area",
+     "unit": "mm²",
+     "source": {
+      "cad": "surface_area"
+     }
+    },
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Low Modulus",
+     "unit": "1/mm",
+     "source": {
+      "variable": "lowMeltingModulus"
+     }
+    },
+    {
+     "name": "High Modulus",
+     "unit": "1/mm",
+     "source": {
+      "variable": "highMeltingModulus"
+     }
+    },
+    {
+     "name": "Low Adjustment",
+     "unit": null,
+     "source": {
+      "variable": "lowComplexityAdjustment"
+     }
+    },
+    {
+     "name": "High Adjustment",
+     "unit": null,
+     "source": {
+      "variable": "highComplexityAdjustment"
+     }
+    },
+    {
+     "name": "Melting Modulus",
+     "unit": "1/mm",
+     "formula": "{Surface Area} / max({Part Volume}, 1)"
+    },
+    {
+     "name": "Complexity Factor",
+     "unit": null,
+     "formula": "{Melting Modulus} < {Low Modulus} ? {Low Adjustment} : {Melting Modulus} > {High Modulus} ? {High Adjustment} : 1"
+    }
+   ]
+  },
+  {
+   "key": "additive.metal_material",
+   "name": "Additive - Metal powder",
+   "helper": true,
+   "operations": [],
+   "output": "Material Cost",
+   "results": [
+    "Melted Volume",
+    "Powder Mass"
+   ],
+   "description": "The metal powder one part takes: the part and its supports (as a lattice, dmlsLatticeSpacingFactor of the support volume), plus the powder lost to the process (dmlsPowderLossToProcessInefficiency of that volume) and the powder trapped in the supports (dmlsPowderTrappedInSupportStructures of the support volume), at the material's density and price.",
+   "fields": [
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Support Volume",
+     "unit": "mm³",
+     "source": {
+      "engine": "support_volume_mm3 (the overhang supports and the support base)"
+     }
+    },
+    {
+     "name": "Lattice Factor",
+     "unit": null,
+     "source": {
+      "variable": "dmlsLatticeSpacingFactor"
+     }
+    },
+    {
+     "name": "Powder Loss",
+     "unit": null,
+     "source": {
+      "variable": "dmlsPowderLossToProcessInefficiency"
+     }
+    },
+    {
+     "name": "Trapped Powder",
+     "unit": null,
+     "source": {
+      "variable": "dmlsPowderTrappedInSupportStructures"
+     }
+    },
+    {
+     "name": "Density",
+     "unit": "kg/m³",
+     "source": {
+      "material": "density_kg_m3"
+     }
+    },
+    {
+     "name": "Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "material": "cost"
+     }
+    },
+    {
+     "name": "Melted Volume",
+     "unit": "mm³",
+     "formula": "{Part Volume} + {Support Volume} * {Lattice Factor}"
+    },
+    {
+     "name": "Powder Mass",
+     "unit": "kg",
+     "formula": "({Melted Volume} * (1 + {Powder Loss}) + {Support Volume} * {Trapped Powder}) * {Density} / 1000000000"
+    },
+    {
+     "name": "Material Cost",
+     "unit": "USD",
+     "formula": "{Powder Mass} * {Unit Cost}"
+    }
+   ]
+  },
+  {
+   "key": "additive.sls_material",
+   "name": "Additive - Polymer powder",
+   "helper": true,
+   "operations": [],
+   "output": "Material Cost",
+   "results": [
+    "Part Mass",
+    "Spent Powder Mass"
+   ],
+   "description": "The polymer powder one laser sintered part takes: the part itself, and its share of the bed's powder that cannot be used again. The bed (its area times the build's height, at the powder's tapped density) is spent at the share not recycled (1 - the material's recycle percentage) and, of what is recycled, once every Max Powder Cycles builds.",
+   "fields": [
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Density",
+     "unit": "kg/m³",
+     "source": {
+      "material": "density_kg_m3"
+     }
+    },
+    {
+     "name": "Tapped Density",
+     "unit": "kg/m³",
+     "source": {
+      "lookup": "additive_tblMaterialBuild.Tapped Density (kg / m^3)"
+     }
+    },
+    {
+     "name": "Recycle Fraction",
+     "unit": null,
+     "source": {
+      "lookup": "additive_tblMaterialBuild.Recycle Percentage"
+     }
+    },
+    {
+     "name": "Max Powder Cycles",
+     "unit": null,
+     "source": {
+      "lookup": "additive_tblMaterialBuild.Max Powder Cycles"
+     }
+    },
+    {
+     "name": "Bed Length",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_length_mm"
+     }
+    },
+    {
+     "name": "Bed Width",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_width_mm"
+     }
+    },
+    {
+     "name": "Bed Fill Height",
+     "unit": "mm",
+     "source": {
+      "engine": "bed_fill_height_mm (the build's stacked height and base layers)"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build"
+     }
+    },
+    {
+     "name": "Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "material": "cost"
+     }
+    },
+    {
+     "name": "Part Mass",
+     "unit": "kg",
+     "formula": "{Part Volume} * {Density} / 1000000000"
+    },
+    {
+     "name": "Bed Powder Mass",
+     "unit": "kg",
+     "formula": "{Bed Length} * {Bed Width} * {Bed Fill Height} * {Tapped Density} / 1000000000"
+    },
+    {
+     "name": "Spent Powder Mass",
+     "unit": "kg",
+     "formula": "{Bed Powder Mass} * ((1 - {Recycle Fraction}) + {Recycle Fraction} / max({Max Powder Cycles}, 1)) / max({Parts per Build}, 1)"
+    },
+    {
+     "name": "Material Cost",
+     "unit": "USD",
+     "formula": "({Part Mass} + {Spent Powder Mass}) * {Unit Cost}"
+    }
+   ]
+  },
+  {
+   "key": "additive.resin_material",
+   "name": "Additive - Resin and support material",
+   "helper": true,
+   "operations": [],
+   "output": "Material Cost",
+   "results": [
+    "Part Mass",
+    "Support Mass"
+   ],
+   "description": "The material one printed or stereolithography part takes: the part at its density and price, and its supports. Material jetting prints them in a support material of its own (printingSupportMaterialDensity, printingSupportMaterialCost; as solid as printingLatticeSpacingFactor); stereolithography builds them of the part's resin, as solid as slaSupportVolumeFraction.",
+   "fields": [
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Support Volume",
+     "unit": "mm³",
+     "source": {
+      "engine": "support_volume_mm3"
+     }
+    },
+    {
+     "name": "Density",
+     "unit": "kg/m³",
+     "source": {
+      "material": "density_kg_m3"
+     }
+    },
+    {
+     "name": "Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "material": "cost"
+     }
+    },
+    {
+     "name": "Support Fill",
+     "unit": null,
+     "source": {
+      "engine": "support_fill (printingLatticeSpacingFactor when printing, slaSupportVolumeFraction for stereolithography)"
+     }
+    },
+    {
+     "name": "Support Density",
+     "unit": "kg/m³",
+     "source": {
+      "engine": "support_density (printingSupportMaterialDensity when printing, the resin's density for stereolithography)"
+     }
+    },
+    {
+     "name": "Support Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "engine": "support_unit_cost (printingSupportMaterialCost when printing, the resin's price for stereolithography)"
+     }
+    },
+    {
+     "name": "Part Mass",
+     "unit": "kg",
+     "formula": "{Part Volume} * {Density} / 1000000000"
+    },
+    {
+     "name": "Support Mass",
+     "unit": "kg",
+     "formula": "{Support Volume} * {Support Fill} * {Support Density} / 1000000000"
+    },
+    {
+     "name": "Material Cost",
+     "unit": "USD",
+     "formula": "{Part Mass} * {Unit Cost} + {Support Mass} * {Support Unit Cost}"
+    }
+   ]
+  },
+  {
+   "key": "additive.nitrogen",
+   "name": "Additive - Build gas",
+   "helper": true,
+   "operations": [],
+   "output": "Gas Cost",
+   "description": "The nitrogen a laser sintering or melting build consumes, at the machine's rate over the build's time, shared by its parts (the machine's nitrogen cost per litre; a machine without one makes its own and pays nothing here).",
+   "fields": [
+    {
+     "name": "Nitrogen Rate",
+     "unit": "L/hr",
+     "source": {
+      "machine": "nitrogen_rate_l_per_hr"
+     }
+    },
+    {
+     "name": "Nitrogen Cost",
+     "unit": "USD/L",
+     "source": {
+      "machine": "nitrogen_cost_usd_per_l"
+     }
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "source": {
+      "engine": "build_time_s (the sintering step's Build Time)"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build"
+     }
+    },
+    {
+     "name": "Gas Cost",
+     "unit": "USD",
+     "formula": "{Nitrogen Rate} * {Build Time} / 3600 * {Nitrogen Cost} / max({Parts per Build}, 1)"
+    }
+   ]
+  },
+  {
+   "key": "additive.metal_sintering",
+   "name": "Additive - Metal sintering",
+   "operations": [
+    "Metal Sintering"
+   ],
+   "results": [
+    "Layers",
+    "Build Time",
+    "Scan Time"
+   ],
+   "description": "Laser melting on a metal powder bed (DMLS / SLM), per part. The build: every layer is recoated (the blade over the bed at dmlsPowderRecoatSpeedOver and back at dmlsPowderRecoatSpeedReturn) and waits the machine's layer delay; the part and its lattice supports are scanned at the machine's speed, beam and lasers, adjusted for the part's melt complexity. The build's fixed steps (heat the chamber, purge it, fit the plate, load the file, cool down) are shared by its parts. The part stands on a support base (baseSupportHeightPowerRemoval) that is cut away after.",
+   "fields": [
+    {
+     "name": "Build Height",
+     "unit": "mm",
+     "source": {
+      "cad": "build_height"
+     }
+    },
+    {
+     "name": "Support Base Height",
+     "unit": "mm",
+     "source": {
+      "variable": "baseSupportHeightPowerRemoval"
+     }
+    },
+    {
+     "name": "Layer Thickness",
+     "unit": "mm",
+     "source": {
+      "engine": "layer_thickness_mm (the machine's minimum, not below tblLayerThickness)"
+     }
+    },
+    {
+     "name": "Bed Length",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_length_mm"
+     }
+    },
+    {
+     "name": "Recoat Speed Over",
+     "unit": "mm/s",
+     "source": {
+      "variable": "dmlsPowderRecoatSpeedOver"
+     }
+    },
+    {
+     "name": "Recoat Speed Return",
+     "unit": "mm/s",
+     "source": {
+      "variable": "dmlsPowderRecoatSpeedReturn"
+     }
+    },
+    {
+     "name": "Layer Delay",
+     "unit": "s",
+     "source": {
+      "machine": "layer_delay_s"
+     }
+    },
+    {
+     "name": "Melted Volume",
+     "unit": "mm³",
+     "source": {
+      "engine": "melted_volume_mm3 (Additive - Metal powder)"
+     }
+    },
+    {
+     "name": "Scanning Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "scanning_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Beam Diameter",
+     "unit": "mm",
+     "source": {
+      "machine": "beam_diameter_mm"
+     }
+    },
+    {
+     "name": "Lasers",
+     "unit": null,
+     "source": {
+      "machine": "number_of_lasers"
+     }
+    },
+    {
+     "name": "Complexity Factor",
+     "unit": null,
+     "source": {
+      "engine": "complexity_factor (Additive - Melt complexity)"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Additive - Parts per build)"
+     }
+    },
+    {
+     "name": "Heat Time",
+     "unit": "s",
+     "source": {
+      "variable": "dmlsHeatChamberTime"
+     }
+    },
+    {
+     "name": "Purge Time",
+     "unit": "s",
+     "source": {
+      "variable": "dmlsPurgeDuration"
+     }
+    },
+    {
+     "name": "Fit Plate Time",
+     "unit": "s",
+     "source": {
+      "variable": "dmlsFitBuildPlateTime"
+     }
+    },
+    {
+     "name": "Load File Time",
+     "unit": "hr",
+     "source": {
+      "variable": "loadFileAndSpliceTime"
+     }
+    },
+    {
+     "name": "Cool Time",
+     "unit": "s",
+     "source": {
+      "variable": "dmlsCoolChamberTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Layers",
+     "unit": null,
+     "formula": "ceil(({Build Height} + {Support Base Height}) / {Layer Thickness})"
+    },
+    {
+     "name": "Recoat Time",
+     "unit": "s",
+     "formula": "{Bed Length} / {Recoat Speed Over} + {Bed Length} / {Recoat Speed Return} + {Layer Delay}"
+    },
+    {
+     "name": "Scan Time",
+     "unit": "s",
+     "formula": "{Melted Volume} / ({Scanning Speed} * {Beam Diameter} * {Layer Thickness} * max({Lasers}, 1)) * {Complexity Factor}"
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "formula": "{Layers} * {Recoat Time} + {Parts per Build} * {Scan Time}"
+    },
+    {
+     "name": "Build Setup",
+     "unit": "s",
+     "formula": "{Heat Time} + {Purge Time} + {Fit Plate Time} + {Load File Time} * 3600 + {Cool Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Build Time} + {Build Setup}) / {Parts per Build} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.laser_sintering",
+   "name": "Additive - Laser sintering",
+   "operations": [
+    "Laser Sintering"
+   ],
+   "results": [
+    "Layers",
+    "Build Time",
+    "Scan Time"
+   ],
+   "description": "Laser sintering on a polymer powder bed (SLS), per part. The parts need no supports and are stacked in the bed: the build is as tall as the stack above its base layers (slsBaseLayersHeight), every layer at slsLayerThickness waits the machine's layer delay (the recoat), and each part is scanned at the machine's speed and beam. The build's fixed steps (prepare and heat the chamber, fit the plate, cool down) are shared by its parts.",
+   "fields": [
+    {
+     "name": "Bed Fill Height",
+     "unit": "mm",
+     "source": {
+      "engine": "bed_fill_height_mm (the stack of parts and the base layers)"
+     }
+    },
+    {
+     "name": "Layer Thickness",
+     "unit": "mm",
+     "source": {
+      "variable": "slsLayerThickness"
+     }
+    },
+    {
+     "name": "Layer Delay",
+     "unit": "s",
+     "source": {
+      "machine": "layer_delay_s"
+     }
+    },
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Scanning Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "scanning_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Beam Diameter",
+     "unit": "mm",
+     "source": {
+      "machine": "beam_diameter_mm"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Additive - Parts per build)"
+     }
+    },
+    {
+     "name": "Prepare Chamber Time",
+     "unit": "s",
+     "source": {
+      "variable": "slsPrepBuildChamber"
+     }
+    },
+    {
+     "name": "Fit Plate Time",
+     "unit": "s",
+     "source": {
+      "variable": "slsFitBuildPlateTime"
+     }
+    },
+    {
+     "name": "Heat Time",
+     "unit": "s",
+     "source": {
+      "variable": "slsHeatChamberTime"
+     }
+    },
+    {
+     "name": "Cool Time",
+     "unit": "s",
+     "source": {
+      "variable": "slsCoolChamberTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Layers",
+     "unit": null,
+     "formula": "ceil({Bed Fill Height} / {Layer Thickness})"
+    },
+    {
+     "name": "Scan Time",
+     "unit": "s",
+     "formula": "{Part Volume} / ({Scanning Speed} * {Beam Diameter} * {Layer Thickness})"
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "formula": "{Layers} * {Layer Delay} + {Parts per Build} * {Scan Time}"
+    },
+    {
+     "name": "Build Setup",
+     "unit": "s",
+     "formula": "{Prepare Chamber Time} + {Fit Plate Time} + {Heat Time} + {Cool Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Build Time} + {Build Setup}) / {Parts per Build} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.printing",
+   "name": "Additive - Material jetting",
+   "operations": [
+    "Printing"
+   ],
+   "results": [
+    "Layers",
+    "Build Time"
+   ],
+   "description": "Material jetting (PolyJet), per part. Each layer at the machine's layer thickness is jetted by the print head in passes along the bed: as many strips as the scanning width takes to cover the nested parts' width, each crossed defaultNumPrintHeadPasses times at the machine's layer speed over the nested length. The build's preprocessing (printingPreprocessingTime) is shared by its parts.",
+   "fields": [
+    {
+     "name": "Build Height",
+     "unit": "mm",
+     "source": {
+      "cad": "build_height"
+     }
+    },
+    {
+     "name": "Layer Thickness",
+     "unit": "mm",
+     "source": {
+      "machine": "layer_thickness_mm"
+     }
+    },
+    {
+     "name": "Nested Length",
+     "unit": "mm",
+     "source": {
+      "engine": "nested_length_mm (the bed length the nested parts take)"
+     }
+    },
+    {
+     "name": "Nested Width",
+     "unit": "mm",
+     "source": {
+      "engine": "nested_width_mm (the bed width the nested parts take)"
+     }
+    },
+    {
+     "name": "Scanning Width",
+     "unit": "mm",
+     "source": {
+      "machine": "scanning_width_mm"
+     }
+    },
+    {
+     "name": "Head Passes",
+     "unit": null,
+     "source": {
+      "variable": "defaultNumPrintHeadPasses"
+     }
+    },
+    {
+     "name": "Layer Speed",
+     "unit": "m/s",
+     "source": {
+      "machine": "layer_speed_m_per_s"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Additive - Parts per build)"
+     }
+    },
+    {
+     "name": "Preprocessing Time",
+     "unit": "s",
+     "source": {
+      "variable": "printingPreprocessingTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Layers",
+     "unit": null,
+     "formula": "ceil({Build Height} / {Layer Thickness})"
+    },
+    {
+     "name": "Strips",
+     "unit": null,
+     "formula": "max(1, ceil({Nested Width} / {Scanning Width}))"
+    },
+    {
+     "name": "Layer Time",
+     "unit": "s",
+     "formula": "{Strips} * {Head Passes} * {Nested Length} / ({Layer Speed} * 1000)"
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "formula": "{Layers} * {Layer Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Build Time} + {Preprocessing Time}) / {Parts per Build} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.resin_curing",
+   "name": "Additive - Stereolithography",
+   "operations": [
+    "Resin Curing"
+   ],
+   "results": [
+    "Layers",
+    "Build Time",
+    "Scan Time"
+   ],
+   "description": "Stereolithography (SLA), per part. Every layer at slaStandardLayerResolution is wiped across the bed (the bed length at the machine's wiper speed) and waits the machine's layer delay; each part and its supports (slaSupportVolumeFraction of the support volume) are cured by the laser at the machine's speed and beam. The build's preprocessing (slaPreprocessingTime) is shared by its parts.",
+   "fields": [
+    {
+     "name": "Build Height",
+     "unit": "mm",
+     "source": {
+      "cad": "build_height"
+     }
+    },
+    {
+     "name": "Layer Thickness",
+     "unit": "mm",
+     "source": {
+      "variable": "slaStandardLayerResolution"
+     }
+    },
+    {
+     "name": "Bed Length",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_length_mm"
+     }
+    },
+    {
+     "name": "Wiper Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "wiper_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Layer Delay",
+     "unit": "s",
+     "source": {
+      "machine": "layer_delay_s"
+     }
+    },
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Support Volume",
+     "unit": "mm³",
+     "source": {
+      "engine": "support_volume_mm3"
+     }
+    },
+    {
+     "name": "Support Fraction",
+     "unit": null,
+     "source": {
+      "variable": "slaSupportVolumeFraction"
+     }
+    },
+    {
+     "name": "Scanning Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "scanning_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Beam Diameter",
+     "unit": "mm",
+     "source": {
+      "machine": "beam_diameter_mm"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Additive - Parts per build)"
+     }
+    },
+    {
+     "name": "Preprocessing Time",
+     "unit": "s",
+     "source": {
+      "variable": "slaPreprocessingTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Layers",
+     "unit": null,
+     "formula": "ceil({Build Height} / {Layer Thickness})"
+    },
+    {
+     "name": "Layer Time",
+     "unit": "s",
+     "formula": "{Bed Length} / {Wiper Speed} + {Layer Delay}"
+    },
+    {
+     "name": "Scan Time",
+     "unit": "s",
+     "formula": "({Part Volume} + {Support Volume} * {Support Fraction}) / ({Scanning Speed} * {Beam Diameter} * {Layer Thickness})"
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "formula": "{Layers} * {Layer Time} + {Parts per Build} * {Scan Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Build Time} + {Preprocessing Time}) / {Parts per Build} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.part_curing",
+   "name": "Additive - Part curing",
+   "operations": [
+    "Part Curing"
+   ],
+   "description": "Post-curing printed parts in an oven: one cure (curingMaxCureTime) per oven load, shared by the parts the oven's bed takes (Additive - Parts per build on the oven).",
+   "fields": [
+    {
+     "name": "Cure Time",
+     "unit": "s",
+     "source": {
+      "variable": "curingMaxCureTime"
+     }
+    },
+    {
+     "name": "Parts per Load",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_load (Additive - Parts per build, on the oven's bed)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Cure Time} / max({Parts per Load}, 1) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.breakoff",
+   "name": "Additive - Support breakoff",
+   "operations": [
+    "Breakoff"
+   ],
+   "description": "Breaking the supports off by hand: each support region is reached (handbreakoffPositioningTime) and broken off (handBreakOffTime), and its contact with the part is cleared at the process's hand breakoff rate (tblHandBreakoffRate, the row of the build process: Direct Metal Laser Sintering, Material Jetting or Stereolithography).",
+   "fields": [
+    {
+     "name": "Support Regions",
+     "unit": null,
+     "source": {
+      "cad": "overhang_regions"
+     }
+    },
+    {
+     "name": "Contact Area",
+     "unit": "mm²",
+     "source": {
+      "cad": "overhang_area (the supports' contact with the part)"
+     }
+    },
+    {
+     "name": "Breakoff Time",
+     "unit": "s",
+     "source": {
+      "variable": "handBreakOffTime"
+     }
+    },
+    {
+     "name": "Positioning Time",
+     "unit": "s",
+     "source": {
+      "variable": "handbreakoffPositioningTime"
+     }
+    },
+    {
+     "name": "Breakoff Rate",
+     "unit": "mm²/s",
+     "source": {
+      "lookup": "tblHandBreakoffRate.Hand Breakoff Rate (mm^2 / s)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Support Regions} * ({Breakoff Time} + {Positioning Time}) + {Contact Area} / {Breakoff Rate}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.manual_base_removal",
+   "name": "Additive - Manual base removal",
+   "operations": [
+    "Manual Tool Base Removal"
+   ],
+   "description": "Separating the part from the build plate with hand tools: its contact with the plate is cleared at the metal hand breakoff rate (tblHandBreakoffRate, Direct Metal Laser Sintering).",
+   "fields": [
+    {
+     "name": "Plate Contact Area",
+     "unit": "mm²",
+     "source": {
+      "cad": "plate_contact_area"
+     }
+    },
+    {
+     "name": "Breakoff Rate",
+     "unit": "mm²/s",
+     "source": {
+      "lookup": "tblHandBreakoffRate.Hand Breakoff Rate (mm^2 / s)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Plate Contact Area} / {Breakoff Rate} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.power_base_removal",
+   "name": "Additive - Power tool base removal",
+   "operations": [
+    "Power Tool Base Removal"
+   ],
+   "description": "Cutting the part off its build plate through the support base with an oscillating power tool: the plate contact cut at the tool's cutting rate.",
+   "fields": [
+    {
+     "name": "Plate Contact Area",
+     "unit": "mm²",
+     "source": {
+      "cad": "plate_contact_area"
+     }
+    },
+    {
+     "name": "Cutting Rate",
+     "unit": "mm²/s",
+     "source": {
+      "machine": "cutting_rate_mm2_per_s"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Plate Contact Area} / {Cutting Rate} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.powder_loading",
+   "name": "Additive - Powder loading",
+   "operations": [
+    "Powder Loading"
+   ],
+   "description": "Loading the powder into the machine's chamber (dmlsPowderLoadTime), once a build, shared by its parts.",
+   "fields": [
+    {
+     "name": "Load Time",
+     "unit": "s",
+     "source": {
+      "variable": "dmlsPowderLoadTime"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Load Time} / max({Parts per Build}, 1) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.sieving",
+   "name": "Additive - Powder recovery",
+   "operations": [
+    "Sieving"
+   ],
+   "description": "Recovering the unused powder after a build: vacuumed out of the machine (powderVacuumRemovalRate) and sieved back into bottles (powderSieveTimePerRun), once a build, shared by its parts.",
+   "fields": [
+    {
+     "name": "Bed Powder Mass",
+     "unit": "kg",
+     "source": {
+      "engine": "bed_powder_mass_kg (the bed's area times the build's height at the powder's tapped density)"
+     }
+    },
+    {
+     "name": "Vacuum Rate",
+     "unit": "kg/hr",
+     "source": {
+      "variable": "powderVacuumRemovalRate"
+     }
+    },
+    {
+     "name": "Sieve Time",
+     "unit": "s",
+     "source": {
+      "variable": "powderSieveTimePerRun"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Bed Powder Mass} / {Vacuum Rate} * 3600 + {Sieve Time}) / max({Parts per Build}, 1) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "additive.cleaning",
+   "name": "Additive - Cleaning",
+   "operations": [
+    "Cleaning"
+   ],
+   "description": "Blasting the loose powder and residue off the part with compressed air: its surface at the machine's cleaning rate, never less than minCleaningTime. The export gives the rate (metalCleaningRate) without its unit; it is read as square metres a minute (unverified unit).",
+   "fields": [
+    {
+     "name": "Surface Area",
+     "unit": "mm²",
+     "source": {
+      "cad": "surface_area"
+     }
+    },
+    {
+     "name": "Cleaning Rate",
+     "unit": "m²/min",
+     "source": {
+      "machine": "metal_cleaning_rate"
+     }
+    },
+    {
+     "name": "Minimum Time",
+     "unit": "s",
+     "source": {
+      "variable": "minCleaningTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "max({Minimum Time}, {Surface Area} / ({Cleaning Rate} * 1000000 / 60)) * {Cycle Time Factor}"
+    }
+   ]
+  }
+ ]
+}
