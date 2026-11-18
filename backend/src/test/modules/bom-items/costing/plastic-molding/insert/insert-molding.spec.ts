@@ -79,11 +79,21 @@ describe('the loading, on the cheapest loader of the method that carries the ins
     expect(heavy.step.machine?.name).toBe('Staubli TX160L - 2535mm');
   });
 
-  it('names what it cannot do: no inserts, an insert with no weight, an insert no robot of the method carries', () => {
+  it('an insert with no weight loads in the lightest band of its method (Cannula Holder Right: 10 CAD candidates, no weight)', () => {
+    expect(loadTimeRow(ref, 'Manual', null)).toMatchObject({ 'Load Time (s)': 8, 'Weight (kg)': 0.2 });
+    const byHand = load('manual', [insert(10, null)]);
+    expect(byHand.secPerPart).toBeCloseTo(10 * 8 * 1.15 * 1.2, 6);
+    expect(byHand.step.line.physicsGap).toBeUndefined();
+    // the robot must carry the top of that band (0.5 kg), and the trace says the band was assumed
+    const byRobot = load('3_axis', [insert(10, null)]);
+    expect(byRobot.secPerPart).toBeCloseTo(60, 6);
+    expect(JSON.stringify(byRobot.step.line.calculationTrace)).toContain('no weight given, so the lightest band (up to 0.5 kg)');
+  });
+
+  it('names what it cannot do: no inserts, an insert no robot of the method carries', () => {
     // What the part lacks is said once, plainly, not as every loader failing ("no Insert Pick and Place machine fits (Manual: ...)").
     expect(gapOf(load('manual', []).step.line)).toBe('The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.');
     expect(gapOf(load('3_axis', []).step.line)).not.toContain('machine fits');
-    expect(gapOf(load('manual', [insert(1, null)]).step.line)).toContain('The weight of M4 brass insert is not known');
     expect(gapOf(load('3_axis', [insert(1, 25)]).step.line)).toContain('payload does not carry the 25 kg insert');
   });
 });
