@@ -279,3 +279,12 @@ describe('resolveStoredProcessLines — per-part charge rows', () => {
     expect(line!.totalPerPart).toBeCloseTo(0.1873, 12);
   });
 });
+
+describe('resolveStoredProcessLines — rows that share a machine class and operation', () => {
+  it('the n-th row pairs with the n-th live line of that operation (an assembly\'s three screw sizes), not the first line three times', () => {
+    const mech = (id: string) => row({ id, machineClass: 'mechanical_assembly', category: undefined, operation: 'Mechanical Assembly' } as Partial<StoredProcessRow>);
+    const lines: EngineLineLite[] = [49.02, 29.4, 19.62].map((sec) => ({ machineClass: 'mechanical_assembly', process: 'Mechanical Assembly', cycleTimeMin: sec / 60 }) as EngineLineLite);
+    const resolved = resolveStoredProcessLines([mech('a'), mech('b'), mech('c')], lines, EFFECTIVE);
+    expect(resolved.map((r) => Math.round(r.cycleSec * 100) / 100)).toEqual([49.02, 29.4, 19.62]);
+  });
+});
