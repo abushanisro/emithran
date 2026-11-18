@@ -49,6 +49,8 @@ cad-engine/
     feature_extractor.py         — die-casting extractor (reached through family_hint="die_cast")
   forging/
     feature_extractor.py         — closed-die forging measurements (reached through family_hint="forged")
+  additive/
+    feature_extractor.py         — additive build measurements: build direction of least support, height, footprint, overhang, support volume, plate contact (family_hint="additive")
   composites/
     feature_extractor.py         — laid-up composite laminate measurements: skins, thickness levels, outline, curvature (family_hint="composite")
   contract/

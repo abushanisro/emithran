@@ -34,9 +34,12 @@ POWDER_METAL = "powder_metal"
 # Composites (prepreg laid on a one-sided tool, bagged and autoclave cured): measured as a laminate by composites/feature_extractor.py. Reached only
 # through the explicit family_hint, like the casting and forging families.
 COMPOSITE = "composite"
+# Additive manufacturing (built layer by layer: DMLS, SLS, material jetting, SLA): measured for its build by additive/feature_extractor.py.
+# Reached only through the explicit family_hint: no shape is a printed part by its geometry alone.
+ADDITIVE = "additive"
 
 ALL_FAMILIES: FrozenSet[str] = frozenset({
-    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED, POWDER_METAL, COMPOSITE,
+    SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED, POWDER_METAL, COMPOSITE, ADDITIVE,
 })
 
 # 2-Model Machining (a finished part machined from a cast blank, memory/"2 Mold Molding"): a hint, not a family. The part is analysed as
