@@ -14,8 +14,10 @@ import { toast } from 'sonner';
 
 import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
+import { CompositesSection } from '@/components/costing/CompositesSection';
 import { ForgingSection } from '@/components/costing/ForgingSection';
 import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
+import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
 import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
@@ -2612,6 +2614,7 @@ function RouteSelectionDialog({
   const isInvestmentCast = partFamily === 'investment_cast';
   // Forged parts: the closed-die forging route as quoted, like sand.
   const isForged = partFamily === 'forged';
+  const isComposite = partFamily === 'composite';
   const isPowderMetal = partFamily === 'powder_metal';
   const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
@@ -3117,6 +3120,7 @@ function RouteSelectionDialog({
       directApplyRouteId: selected.routeId,
       ...(isDieCast ? { dieCastingProcess: selected.routeLabel } : {}),
       ...(() => { const key = isForged ? forgingRouteKeyOf(selected.routeId) : undefined; return key ? { forgingRoute: key } : {}; })(),
+      ...(() => { const key = isComposite ? compositesRouteKeyOf(selected.routeId) : undefined; return key ? { compositesRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -4562,6 +4566,16 @@ function CostGuidePanel({
               <Section title="Forging">
                 <ForgingSection
                   forging={cgpCostSummary.forging}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'composite' && (
+              <Section title="Composites">
+                <CompositesSection
+                  composites={cgpCostSummary.composites}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
