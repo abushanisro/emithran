@@ -1151,6 +1151,8 @@ export interface ToolingCostDto {
   moldRibInsertUsd?: number;
   /** The hot drops of a hot-runner mold, USD (formula registry F-33): one per gate. */
   moldHotDropUsd?: number;
+  /** The water baffles of one mold, USD (formula registry F-37): the baffles, their assembly and tapping. */
+  moldBaffleUsd?: number;
   /** The tooling calculator's run (migration 1012): every input with its source and every formula with its value. */
   calculationTrace?: CalculationTraceStep[];
   /** The tooling calculator's name: a part's own field values are set by it (calculator_field_overrides). */

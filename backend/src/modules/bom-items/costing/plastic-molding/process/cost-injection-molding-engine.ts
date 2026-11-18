@@ -876,6 +876,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
         moldCoolingUsd: o['Cooling Cost']!,
         moldRibInsertUsd: o['Rib Insert Cost']!,
         moldHotDropUsd: o['Hot Drop Cost']!,
+        moldBaffleUsd: o['Baffle Cost']!,
         calculationTrace: tooling.trace,
         calculatorName: tooling.calculator.name,
       };

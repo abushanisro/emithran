@@ -56,16 +56,17 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
   });
 
   it('names only the gaps that apply to the mold: no hot drops on a cold runner, no inserts for a class built without, no texture for None', () => {
-    expect(toolingGapIds(COLD)).toEqual(['G-03', 'G-04', 'G-06']);
-    expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toEqual(['G-03', 'G-04', 'G-05', 'G-06', 'G-07', 'G-08']);
+    expect(toolingGapIds(COLD)).toEqual(['G-03', 'G-04']);
+    expect(toolingGapIds({ runner: 'hot', classUsesInserts: true, cavityTexture: 'Mold-Tech-A-11000 10.2um (400uin) depth', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toEqual(['G-03', 'G-04', 'G-05', 'G-07', 'G-08']);
     // every bundle recognised and sized: the slides and lifters are priced (F-28), not a gap
-    expect(toolingGapIds({ ...COLD, sideActionsPriced: true })).toEqual(['G-04', 'G-06']);
+    expect(toolingGapIds({ ...COLD, sideActionsPriced: true })).toEqual(['G-04']);
     // every rib measured and classed: the rib inserts are priced (F-31), not a gap
-    expect(toolingGapIds({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toEqual(['G-06']);
+    expect(toolingGapIds({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toEqual([]);
     // One line: only what the mold leaves out.
-    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toBe('Mold tooling excludes water baffles (no data yet): the real investment is higher.');
-    expect(toolingScopeWarning(COLD)).toBe('Mold tooling excludes slides and lifters, rib inserts, water baffles (no data yet): the real investment is higher.');
-    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toContain('water baffles, the hot-runner manifold, cavity inserts');
+    // Everything priced: no note at all.
+    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toBe('');
+    expect(toolingScopeWarning(COLD)).toBe('Mold tooling excludes slides and lifters, rib inserts (no data yet): the real investment is higher.');
+    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toContain('rib inserts, the hot-runner manifold, cavity inserts');
   });
 
   it('assembles the injection mold\'s own pins and bushings (memory/Assembly plastic molding), so no component lacks an assembly time', () => {

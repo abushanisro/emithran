@@ -116,7 +116,6 @@ export function toolingGapIds(scope: MoldToolingInput['scope']): string[] {
     ...(scope.sideActionsPriced ? [] : ['G-03']),
     ...(scope.ribInsertsPriced ? [] : ['G-04']),
     ...(scope.cavityTexture.toLowerCase() !== 'none' ? ['G-05'] : []),
-    'G-06',
     ...(scope.classUsesInserts !== false ? ['G-07'] : []),
     ...(scope.runner === 'hot' ? ['G-08'] : []),
   ];
@@ -127,13 +126,12 @@ export function toolingScopeWarning(scope: MoldToolingInput['scope']): string {
   const left = [
     ...(scope.sideActionsPriced ? [] : ['slides and lifters']),
     ...(scope.ribInsertsPriced ? [] : ['rib inserts']),
-    'water baffles',
     ...(scope.runner === 'hot' ? ['the hot-runner manifold'] : []),
     ...(scope.steelTreatmentKnown ? [] : ['tool steel heat treatment']),
     ...(scope.classUsesInserts !== false ? ['cavity inserts'] : []),
     ...(scope.cavityTexture.toLowerCase() !== 'none' ? [`the ${scope.cavityTexture} texture`] : []),
   ];
-  return `Mold tooling excludes ${left.join(', ')} (no data yet): the real investment is higher.`;
+  return left.length ? `Mold tooling excludes ${left.join(', ')} (no data yet): the real investment is higher.` : '';
 }
 
 /**
@@ -171,7 +169,7 @@ export function computeMoldToolingCost(input: MoldToolingInput): MoldToolingResu
   const estimatedDesignHrs = designRow.hours;
   const estimatedAssemblyOperators = bracket(t.operatorsByArea, (r) => r.areaM2, areaM2).operators;
 
-  const warnings = [toolingScopeWarning(input.scope)];
+  const warnings = [toolingScopeWarning(input.scope)].filter(Boolean);
   if (input.slideBundles != null && input.slideBundles === 0 && input.slideOrLifterBundles > 0) {
     warnings.push(
       `Slide hardware (hydraulic cylinder) is not priced: ${input.slideOrLifterBundles} side-action bundle${input.slideOrLifterBundles === 1 ? '' : 's'} could be lifters or slides, `
