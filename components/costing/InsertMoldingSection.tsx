@@ -22,6 +22,8 @@ const boxClass = 'divide-y divide-border rounded-md border border-border';
 const rowClass = 'flex items-baseline justify-between gap-3 px-2 py-1.5';
 const controlClass = 'w-full min-w-0 text-sm border border-border rounded-md px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
 const seconds = (s: number | null) => (s == null ? '—' : `${s.toFixed(1)} s`);
+/** An insert with no weight is loaded in the lightest componentLoadTime band (insert-molding.ts loadTimeRow). */
+const NO_WEIGHT_NOTE = 'Loaded in the lightest load-time band (up to 0.2 kg by hand, 0.5 kg by robot). Enter its weight for an exact band.';
 const grams = (kg: number) => `${Math.round(kg * 10_000) / 10} g`;
 
 function Row({ label, children, title }: { label: ReactNode; children: ReactNode; title?: string }) {
@@ -112,7 +114,7 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
                 key={i.id ?? i.name}
                 label={<>{hrefOf && i.id ? <a className={action} href={hrefOf(i.id)}>{i.name}</a> : <span className="text-foreground">{i.name}</span>} × {i.perPart}</>}
               >
-                {i.massKg != null ? `${grams(i.massKg)} each` : <span className="text-amber-600" title="Its load time is read by weight: set its weight or material in the BOM.">no weight</span>}
+                {i.massKg != null ? `${grams(i.massKg)} each` : <span className="text-muted-foreground" title={NO_WEIGHT_NOTE}>weight not given</span>}
               </Row>
             ))}
           </ul>
@@ -126,7 +128,7 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
         ) : saved ? (
           <ul className={boxClass}>
             <Row label={<><span className="text-foreground">{saved.name || 'Insert'}</span> × {saved.count}</>}>
-              {saved.weightKg != null ? `${grams(saved.weightKg)} each` : <span className="text-amber-600" title="Its load time is read by weight.">no weight</span>}
+              {saved.weightKg != null ? `${grams(saved.weightKg)} each` : <span className="text-muted-foreground" title={NO_WEIGHT_NOTE}>weight not given</span>}
             </Row>
           </ul>
         ) : (

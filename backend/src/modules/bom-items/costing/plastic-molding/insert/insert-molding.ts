@@ -70,9 +70,10 @@ export function insertsOf(children: readonly AssemblyComponent[], overrides: Rec
 }
 
 /** The componentLoadTime row for an insert: the first of the method whose weight takes it. */
-export function loadTimeRow(ref: SandReference, method: 'Manual' | 'Robotic', massKg: number): Row | null {
+export function loadTimeRow(ref: SandReference, method: 'Manual' | 'Robotic', massKg: number | null): Row | null {
   const rows = ref.table('componentLoadTime').filter((r) => r['Load Method'] === method).sort((a, b) => num(a['Weight (kg)'])! - num(b['Weight (kg)'])!);
-  return rows.find((r) => num(r['Weight (kg)'])! >= massKg && num(r['Weight (kg)'])! > 0) ?? null;
+  // No weight given: the lightest band. An insert is a nut, pin or bush of a few grams, far inside it (0.2 kg by hand, 0.5 kg by robot).
+  return rows.find((r) => num(r['Weight (kg)'])! >= (massKg ?? 0) && num(r['Weight (kg)'])! > 0) ?? null;
 }
 
 /** Whether a press loads while it molds: a rotary or shuttle table carries a second lower mold half. */
@@ -101,21 +102,22 @@ export function insertLoading(input: {
     const value = ref.number(name);
     return value == null ? null : { value, source: `Assembly Molding variable ${name}`, ref: { kind: 'variable', domain: INSERT_MOLDING_DOMAIN, name } };
   };
-  const heaviest = Math.max(0, ...inserts.map((i) => i.massKg ?? 0));
-  const unweighed = inserts.filter((i) => i.massKg == null).map((i) => i.name);
   // Each insert's load time, from its own componentLoadTime row; the per-part load is their sum over the inserts of the part.
-  const rows = inserts.map((i) => ({ insert: i, row: i.massKg != null ? loadTimeRow(ref, route.method, i.massKg) : null }));
+  const rows = inserts.map((i) => ({ insert: i, row: loadTimeRow(ref, route.method, i.massKg) }));
+  // The payload a robot must carry: the insert's weight, or for one with no weight the top of the band it was loaded in.
+  const heaviest = Math.max(0, ...rows.map(({ insert, row }) => insert.massKg ?? num(row?.['Weight (kg)']) ?? 0));
+  const weightOf = ({ insert, row }: (typeof rows)[number]) =>
+    insert.massKg != null ? `${String(insert.massKg)} kg` : `no weight given, so the lightest band (up to ${String(num(row?.['Weight (kg)']))} kg)`;
   const loadSec = rows.reduce((s, { insert, row }) => s + insert.perPart * (num(row?.['Load Time (s)']) ?? 0), 0);
   const loadSeed: CalcSeed = {
     value: loadSec,
-    source: `componentLoadTime (${route.method}): ${rows.map(({ insert, row }) => `${insert.perPart} x ${insert.name} at ${String(insert.massKg)} kg, ${String(row?.['Load Time (s)'])} s`).join('; ')}`,
+    source: `componentLoadTime (${route.method}): ${rows.map((x) => `${x.insert.perPart} x ${x.insert.name} at ${weightOf(x)}, ${String(x.row?.['Load Time (s)'])} s`).join('; ')}`,
     lookup: true,
     ...(rows[0]?.row ? { ref: { kind: 'lookup' as const, domain: INSERT_MOLDING_DOMAIN, table: 'componentLoadTime', column: 'Load Time (s)', row: { 'Load Method': route.method, 'Weight (kg)': num(rows[0].row['Weight (kg)'])! } } } : {}),
   };
   // What the part lacks is not a machine's limit: it is said once, plainly, instead of as every loader failing ("no loader fits (X: ...)").
   const missingRow = rows.find((x) => !x.row);
   const partGap = inserts.length === 0 ? 'The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.'
-    : unweighed.length ? `The weight of ${unweighed.join(', ')} is not known: set it (or its material) in the BOM, or in the Cost Guide.`
     : missingRow ? `componentLoadTime has no ${route.method} row for ${missingRow.insert.name} at ${String(missingRow.insert.massKg)} kg.`
     : null;
   if (partGap) {
