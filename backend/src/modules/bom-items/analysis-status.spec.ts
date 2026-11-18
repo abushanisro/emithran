@@ -33,6 +33,15 @@ describe('deriveAnalysisStatus', () => {
     expect(deriveAnalysisStatus(part({ featureGraph: { classification: { family: 'milled' } } }), 'none', CURRENT).cad).toBe('stale');
   });
 
+  it('features from another process\'s extractor are stale; a 2-Model Machining part analysed as machined is its own analysis', () => {
+    expect(deriveAnalysisStatus(part({ chosenFamilyHint: 'die_cast' }), 'none', CURRENT).cad).toBe('stale');
+    // Cannula Holder Left: Process 2-Model Machining (hint two_model), stored as milled. It was stale for ever: Refresh analysis said the
+    // features could not be extracted and Apply was blocked.
+    expect(deriveAnalysisStatus(part({ chosenFamilyHint: 'two_model' }), 'none', CURRENT)).toMatchObject({ cad: 'ready', ready: true });
+    expect(deriveAnalysisStatus(part({ chosenFamilyHint: 'two_model', featureGraph: analysed('turned') }), 'none', CURRENT).cad).toBe('ready');
+    expect(deriveAnalysisStatus(part({ chosenFamilyHint: 'two_model', featureGraph: analysed('sand_cast') }), 'none', CURRENT).cad).toBe('stale');
+  });
+
   it('a part with no 3D file is not blocked: there is nothing to extract', () => {
     expect(deriveAnalysisStatus({ file3dPath: null, featureGraph: null }, 'none', CURRENT)).toMatchObject({ cad: 'not_required', ready: true });
   });
