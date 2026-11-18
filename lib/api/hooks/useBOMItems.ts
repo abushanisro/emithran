@@ -1782,7 +1782,7 @@ export interface RouteComparisonDto {
   routes: RouteResultDto[];
   comparisonWarnings: string[];
   /** Molding: why the material itself cannot be molded or lacks reference data; said once for the whole comparison. */
-  materialNote?: { kind: 'additive_feedstock' | 'not_molding_feedstock' | 'no_injection_data'; reason: string; missing: string[] } | null;
+  materialNote?: { kind: 'metal' | 'additive_feedstock' | 'not_molding_feedstock' | 'no_injection_data'; reason: string; missing: string[] } | null;
   /** Part-level 2D-drawing-vs-3D-CAD fact agreement — see FactMismatch above. */
   drawingCadConsistency?: FactMismatch[];
   currency: string;

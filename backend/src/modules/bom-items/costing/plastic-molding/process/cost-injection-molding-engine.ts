@@ -301,6 +301,7 @@ function materialNotMoldable(input: InjectionMoldingCostInput): MoldabilityGap |
     moldTempC: input.realResinInputs?.moldTempC ?? null,
     densityOfMeltKgM3: input.realResinInputs?.densityOfMeltKgM3 ?? null,
     cureTimeMin: null,
+    materialType: input.materialType ?? null,
   });
   return gap && gap.kind !== 'no_injection_data' ? gap : null;
 }
