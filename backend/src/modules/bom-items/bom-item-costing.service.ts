@@ -132,6 +132,9 @@ import { investmentCastingRoute } from './costing/casting/investment/investment-
 import { ForgingCostService } from './costing/forging/forging-cost.service';
 import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost.service';
 import { CompositesCostService, type CompositeLaminateSummary } from './costing/composites/composites-cost.service';
+import { machinedOnlyFeatureGraph, sourceComponentCost, twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, type SourceComponentCost } from './costing/two-model/two-model-cost';
+import { currentComparison, TWO_MODEL_SOURCE_VERSION } from './services/two-model.service';
+import { twoModelRoute } from './costing/two-model/two-model-route-comparison';
 import { buildCompositesCostSummary } from './costing/composites/composites-cost-summary';
 import { COMPOSITES_ROUTES } from './costing/composites/composites-route';
 import { compositesRouteFor, compositesRouteId } from './costing/composites/composites-route-comparison';
@@ -216,7 +219,7 @@ export function holeGroupsOfGraph(features: unknown): Array<{ diameter_mm: numbe
 
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
@@ -1168,6 +1171,15 @@ export class BomItemCostingService {
     return timed;
   }
 
+  /** The 2-Model Machining variables (memory/"2 Mold Molding", staged 2026-2MoldMolding): the source's cost basis. */
+  private async twoModelVariables(accessToken: string): Promise<{ fullyBurdened: boolean }> {
+    const { data } = await this.databaseService.getClient(accessToken).from('machining_reference_data').select('key, value')
+      .eq('category', 'variable').eq('source_version', TWO_MODEL_SOURCE_VERSION).eq('key', 'useSourceModelFBCAsMaterialCost');
+    const v = (data as Array<{ value: unknown }> | null)?.[0]?.value;
+    // The data's own default is true (fully burdened); only an explicit false is piece part.
+    return { fullyBurdened: String(v ?? 'true').toLowerCase() !== 'false' };
+  }
+
   private resolveEffectiveFamily(input: {
     item: BOMItemResponseDto;
     fg: any;
@@ -1833,7 +1845,7 @@ export class BomItemCostingService {
     const { batchSize, annualVolume, productionLifeYears } = costingInputs;
     const location = costingInputs.location ?? requestedLocation;
 
-    const fg = item.featureGraph as any;
+    let fg = item.featureGraph as any;
     const summary = fg?.summary ?? {};
 
     const sheetThicknessMm = resolveEffectiveSheetThicknessMm(item.scenarioOverrides, summary.sheetThicknessMm, item.sheetThicknessMm ?? 0);
@@ -1905,7 +1917,36 @@ export class BomItemCostingService {
     // Override > material > geometry — one precedence chain for both costing
     // endpoints (see resolveEffectiveFamily).
     const familyResolution = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
-    const family = forceFamily ?? familyResolution.family;
+    let family = forceFamily ?? familyResolution.family;
+    // 2-Model Machining: the part is priced as the machined part it was analysed as (milled, turned, mill-turn), on its machined features
+    // only: what lies on its source component is as supplied (two-model-cost.ts). The source's cost is read once the rates are known.
+    let twoModel: { sourceItemId: string; sourceName: string; asSupplied: number; removedVolumeMm3: number | null; gap: string | null } | null = null;
+    if (family === TWO_MODEL_FAMILY) {
+      const analysed = isMachiningFamily(item.familyClassification) ? item.familyClassification! : 'milled';
+      const sourceId = item.sourceItemId ?? null;
+      const source = sourceId ? await this.items.findOne(sourceId, userId, accessToken).catch(() => null) : null;
+      const current = currentComparison(
+        { sourceItemId: sourceId, fileStepPath: item.fileStepPath ?? null, twoModelComparison: item.twoModelComparison ?? null },
+        source?.fileStepPath ?? null,
+      );
+      let gap: string | null = sourceId && !source ? 'the source component is not an item you can read' : null;
+      let asSupplied = 0;
+      if (!gap && 'missing' in current) gap = current.missing;
+      else if (!gap && 'comparison' in current) {
+        const r = current.comparison.result;
+        if (!r.aligned) gap = r.misalignment ?? 'the part and its source component are not in one coordinate frame';
+        else {
+          const filtered = machinedOnlyFeatureGraph(fg, r.as_supplied_face_ids ?? []);
+          fg = filtered.fg;
+          asSupplied = filtered.asSupplied.length;
+        }
+      }
+      twoModel = {
+        sourceItemId: sourceId ?? '', sourceName: source?.name ?? '', asSupplied,
+        removedVolumeMm3: 'comparison' in current ? current.comparison.result.removed_volume_mm3 ?? null : null, gap,
+      };
+      family = analysed;
+    }
     // A family with no cost model is not priced as sheet metal (the path below) with zeros for its geometry: it says what is missing.
     if (!hasCostModel(family)) {
       return this.unpricedSummary({
@@ -2037,6 +2078,30 @@ export class BomItemCostingService {
           }),
           overrides: await this.overrides.fetchMachineOverrides(id, accessToken, location),
         };
+
+    // 2-Model Machining: a part that cannot be machined from its source says why, and is never priced from bar stock instead. Else the
+    // source component's own Cost Summary (same location and batch) is its material.
+    let twoModelSource: SourceComponentCost | null = null;
+    if (twoModel) {
+      const variables = await this.twoModelVariables(accessToken);
+      const sourceSummary = twoModel.gap ? null
+        : await this.computeCostSummary(twoModel.sourceItemId, userId, accessToken, batchSize, location, requestedProductionLifeYears).catch((e: Error) => { twoModel!.gap = `the source component could not be costed: ${e.message}`; return null; });
+      if (!twoModel.gap && sourceSummary && (sourceSummary.costStatus === 'incomplete' || sourceSummary.processLines.some((l) => l.physicsGap))) {
+        twoModel.gap = `the source component "${twoModel.sourceName}" is not fully costed: ${sourceSummary.warnings[0] ?? 'a step of it has no price'}`;
+      }
+      if (twoModel.gap || !sourceSummary) {
+        return {
+          ...this.normalizeCostSummaryToCurrency(
+            { ...twoModelGapSummary(twoModel.gap ?? 'the source component could not be costed', { materialGrade: grade, batchSize, ratesSource: RATES_SOURCE_LABEL }), ...currencyMeta },
+            rates, locInfo.code, item.scenarioOverrides),
+          resolvedInputs: costingInputs,
+        };
+      }
+      twoModelSource = sourceComponentCost({
+        itemId: twoModel.sourceItemId, name: twoModel.sourceName, summary: sourceSummary,
+        fullyBurdened: variables.fullyBurdened, usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
+      });
+    }
 
     const mhrRates = await this.rates.resolveMHRRates(accessToken, location, physics, rates);
 
@@ -2402,7 +2467,12 @@ export class BomItemCostingService {
         };
       }
       return {
-        ...this.normalizeCostSummaryToCurrency(cncResult, rates, locInfo.code, item.scenarioOverrides),
+        ...this.normalizeCostSummaryToCurrency(
+          // 2-Model Machining: the source component is the material (no bar stock); its features left as supplied cost nothing.
+          twoModel && twoModelSource
+            ? withSourceComponent(cncResult, twoModelSource, { asSuppliedCount: twoModel.asSupplied, removedVolumeMm3: twoModel.removedVolumeMm3, warnings: [] })
+            : cncResult,
+          rates, locInfo.code, item.scenarioOverrides),
         resolvedInputs: costingInputs,
       };
     }
@@ -4626,6 +4696,11 @@ export class BomItemCostingService {
     // Powder metal: one route, the cost summary as quoted (powder-metal-route-comparison.ts).
     if (family === 'powder_metal') {
       return this.singleCastingRouteComparison('powder_metal', powderMetalRoute, 'The powder metal route could not be fully costed for this part.',
+        id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // 2-Model Machining: one route, the cost summary as quoted (the source component and the machining of what it does not supply).
+    if (family === TWO_MODEL_FAMILY) {
+      return this.singleCastingRouteComparison(TWO_MODEL_FAMILY, twoModelRoute, 'The 2-Model Machining part could not be fully costed: the quote says what is missing.',
         id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     // Composites: one complete route per layup route, each the full quote on that route (composites-route-comparison.ts).

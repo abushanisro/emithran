@@ -11,6 +11,8 @@ export interface BomTotalItem {
   id: string;
   parent_item_id: string | null;
   quantity: unknown;
+  /** 2-Model Machining (migration 1066): the item this part is machined from. That item's cost is inside this part's, so it counts once. */
+  source_item_id?: string | null;
 }
 
 export interface BomCostRow {
@@ -56,6 +58,8 @@ export function computeBomTotal(input: {
   const quantities = new Map<string, number>();
   const subtotals = new Map<string, number>();
   const childCounts = new Map(items.map(item => [item.id, 0]));
+  // A source component (the casting a part is machined from) is priced inside the part made from it: counted there, not again on its own.
+  const consumed = new Set(items.map(item => item.source_item_id).filter((id): id is string => !!id));
 
   for (const item of items) {
     const quantity = numeric(item.quantity);
@@ -89,7 +93,7 @@ export function computeBomTotal(input: {
   for (let index = 0; index < ready.length; index++) {
     const id = ready[index];
     const item = byId.get(id)!;
-    const extended = subtotals.get(id)! * quantities.get(id)!;
+    const extended = consumed.has(id) ? 0 : subtotals.get(id)! * quantities.get(id)!;
     if (!Number.isFinite(extended)) unresolved.add(id);
     if (item.parent_item_id) {
       const parent = item.parent_item_id;

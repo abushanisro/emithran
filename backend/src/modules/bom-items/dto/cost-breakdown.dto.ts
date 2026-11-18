@@ -687,6 +687,16 @@ export interface CostSummaryDto {
   investmentCasting?: InvestmentCastingBreakdown;
   /** Powder metal: what the press-and-sinter route decided (green density, compaction, fill, sintering belt). */
   powderMetal?: PowderMetalBreakdown;
+  /**
+   * 2-Model Machining: the source component the part is machined from (another item of the BOM), its cost in its own categories (the part's
+   * currency) and the basis (fully burdened: material, process and tooling per part; piece part: material and process), with the features
+   * left as supplied and the volume machined off.
+   */
+  sourceComponent?: {
+    itemId: string; name: string; basis: 'fully_burdened' | 'piece_part';
+    materialCost: number; processCost: number; toolingCost: number; totalCost: number;
+    asSuppliedFeatures: number; removedVolumeMm3: number | null;
+  };
   /** Composites: the ply stack read from the laminate, the core, the layup route quoted and every route. */
   composites?: CompositesBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */

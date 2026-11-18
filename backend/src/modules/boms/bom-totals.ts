@@ -57,7 +57,7 @@ export async function loadBomTotals(
     const uniqueBomIds = [...result.keys()];
     for (let start = 0; start < uniqueBomIds.length; start += ID_BATCH_SIZE) {
       items.push(...await readAllRows<CostedItem>((from, to) => client.from('bom_items')
-        .select('id, bom_id, parent_item_id, quantity, organization_id', { count: 'exact' })
+        .select('id, bom_id, parent_item_id, quantity, organization_id, source_item_id', { count: 'exact' })
         .in('bom_id', uniqueBomIds.slice(start, start + ID_BATCH_SIZE)).order('id').range(from, to)));
     }
     const itemsByBom = new Map<string, CostedItem[]>();

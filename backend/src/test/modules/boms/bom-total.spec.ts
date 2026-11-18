@@ -21,6 +21,11 @@ describe('computeBomTotal', () => {
     expect(total([item('assembly', null, 2), item('child', 'assembly', 3)], [row('assembly', 5), row('child', 10)]).total).toBe(70);
   });
 
+  it('counts a 2-Model source component once, inside the part machined from it (50, not 80)', () => {
+    const items = [item('casting'), { ...item('machined'), source_item_id: 'casting' }];
+    expect(total(items, [row('casting', 30), row('machined', 50)]).total).toBe(50);
+  });
+
   it('multiplies quantities through every level and adds multiple roots', () => {
     const items = [item('top', null, 2), item('mid', 'top', 3), item('leaf', 'mid', 4), item('other', null, 2)];
     expect(total(items, [row('top', 0), row('mid', 0), row('leaf', 1), row('other', 5)]).total).toBe(34);

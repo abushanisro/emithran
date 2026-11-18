@@ -310,6 +310,11 @@
             "example": 0.85,
             "type": "number"
           },
+          "twoModelComparison": {
+            "additionalProperties": true,
+            "nullable": true,
+            "type": "object"
+          },
           "unit": {
             "example": "pcs",
             "type": "string"

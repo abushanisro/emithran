@@ -109,3 +109,19 @@ def test_the_endpoint_compares_two_step_files(tmp_path):
     assert body["aligned"] is True
     assert body["removed_volume_mm3"] == pytest.approx(12000, rel=1e-6)
     assert len(body["machined_face_ids"]) == 5
+
+
+def test_a_two_model_part_is_analysed_as_a_machined_part_whatever_the_geometry_alone_reads():
+    # A 2 mm plate reads as sheet metal by its geometry; as a 2-Model part it is machined (milled), with the geometry's verdict beside it.
+    from shared.memory_optimizer import AdvancedCADMemoryOptimizer
+    from shared.part_family import MACHINING_FAMILIES, MILLED, TWO_MODEL_HINT
+
+    plate = box(200, 150, 2)
+    mi = AdvancedCADMemoryOptimizer().analyze_and_optimize(plate, family_hint=TWO_MODEL_HINT).geometry_features.manufacturing_features["manufacturing_intelligence"]
+    assert mi["detected_family"] in MACHINING_FAMILIES
+    if mi["geometric_family"] not in MACHINING_FAMILIES:
+        assert mi["detected_family"] == MILLED
+    # A block that the geometry already reads as machined keeps that family.
+    block = box(60, 50, 40)
+    mi = AdvancedCADMemoryOptimizer().analyze_and_optimize(block, family_hint=TWO_MODEL_HINT).geometry_features.manufacturing_features["manufacturing_intelligence"]
+    assert mi["detected_family"] in MACHINING_FAMILIES
