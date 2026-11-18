@@ -54,6 +54,14 @@ describe('the inserts', () => {
     expect(insertsOf([], {})).toEqual([]);
   });
 
+  it('with neither, are the insert candidates the CAD recognised, with no weight (R_M-0230-039_STIFFNER 2: 3 candidates, nothing entered)', () => {
+    expect(insertsOf([], {}, 3)).toEqual([{ id: null, name: 'Insert candidate (CAD)', perPart: 3, massKg: null, source: 'cad' }]);
+    // the BOM and the Cost Guide still win over the CAD
+    expect(insertsOf([], { insertMoldingInserts: { count: 2 } }, 3)[0]).toMatchObject({ perPart: 2, source: 'cost_guide' });
+    expect(insertsOf([], {}, 0)).toEqual([]);
+    expect(insertsOf([], {}, null)).toEqual([]);
+  });
+
   it('load by componentLoadTime: the first row of the method whose weight takes the insert', () => {
     expect(loadTimeRow(ref, 'Manual', 0.1)).toMatchObject({ 'Load Time (s)': 8, 'Weight (kg)': 0.2 });
     expect(loadTimeRow(ref, 'Robotic', 0.1)).toMatchObject({ 'Load Time (s)': 6, 'Weight (kg)': 0.5 });

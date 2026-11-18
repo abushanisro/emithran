@@ -161,7 +161,7 @@ import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { useAuth } from '@/lib/providers/auth-context';
 import type { PanelId, ManualRouteOption, AddProcessRequest } from '@/lib/features/mi-page-types';
-import { fmt, materialLabel, splitMaterialDisplay, fmtInt, formatCell, machineDisplayLabel, familyLabel, confidenceCls, formatEstCycleTime, money } from '@/lib/features/display-format';
+import { fmt, materialLabel, splitMaterialDisplay, fmtInt, formatCell, machineDisplayLabel, familyLabel, confidenceCls, formatEstCycleTime, money, partProcessBadge } from '@/lib/features/display-format';
 import { type ProcessTreeNode, resolveDisplayFamily, resolveProcessGroupLabel, collectLeaves, findNode, buildProcessTree } from '@/lib/features/process-tree';
 import { resolveFeatureOpHighlight, mergeFeaturesToHL, type OperationVisual, computeOperationVisual, computeFeatureNodeVisual, getVizLabel } from '@/lib/features/operation-highlight';
 import { normalizeFeatureGraph, buildSummary } from '@/lib/features/feature-graph-normalize';
@@ -8989,7 +8989,7 @@ export default function ManufacturingIntelligencePage() {
     );
   }
 
-  const cls = fg?.classification;
+  const badge = partProcessBadge(fg?.classification, typeof item.scenarioOverrides?.processGroup === 'string' ? item.scenarioOverrides.processGroup : null);
 
   const sharedHeader = (
     <header className="flex items-center gap-2 px-3 py-1.5 border-b shrink-0 bg-muted/10">
@@ -9019,9 +9019,12 @@ export default function ManufacturingIntelligencePage() {
         )}
       </div>
 
-      {cls && (
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0 ${confidenceCls(cls.confidence ?? 0)}`}>
-          {familyLabel(cls.family)}{cls.confidence != null ? ` · ${Math.round(cls.confidence * 100)}%` : ''}
+      {badge && (
+        <span
+          title={badge.title}
+          className={`text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0 ${badge.confidence != null ? confidenceCls(badge.confidence) : 'text-foreground bg-muted border-border'}`}
+        >
+          {badge.label}
         </span>
       )}
 

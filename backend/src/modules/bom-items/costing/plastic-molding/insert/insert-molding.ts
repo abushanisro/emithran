@@ -52,7 +52,8 @@ export interface MoldInsert {
   perPart: number;
   massKg: number | null;
   /** Where the insert is defined: a BOM child, or the Cost Guide's entry. */
-  source: 'bom' | 'cost_guide';
+  /** Where the insert comes from: a BOM child, the Cost Guide entry, or the CAD's insert candidates when neither names any. */
+  source: 'bom' | 'cost_guide' | 'cad';
 }
 
 type Row = Readonly<Record<string, unknown>>;
@@ -60,11 +61,17 @@ const num = (v: unknown): number | null => (v == null || v === '' || !Number.isF
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** The part's inserts: its BOM children, else the Cost Guide's count and weight; none when neither is given. */
-export function insertsOf(children: readonly AssemblyComponent[], overrides: Record<string, unknown> | null | undefined): MoldInsert[] {
+export function insertsOf(
+  children: readonly AssemblyComponent[], overrides: Record<string, unknown> | null | undefined, cadInsertCandidates?: number | null,
+): MoldInsert[] {
   if (children.length > 0) return children.map((c) => ({ id: c.id, name: c.name, perPart: c.quantity, massKg: c.massKg, source: 'bom' }));
   const entry = (overrides?.[INSERT_MOLDING_INSERTS_KEY] ?? null) as Row | null;
   const count = num(entry?.count);
-  if (count == null || !(count > 0)) return [];
+  if (count == null || !(count > 0)) {
+    // Neither the BOM nor the Cost Guide names them: the insert candidates the CAD recognised (bosses and holes sized for an insert), no weight.
+    const cad = cadInsertCandidates != null && cadInsertCandidates > 0 ? Math.round(cadInsertCandidates) : 0;
+    return cad > 0 ? [{ id: null, name: 'Insert candidate (CAD)', perPart: cad, massKg: null, source: 'cad' }] : [];
+  }
   const weight = num(entry?.weightKg);
   return [{ id: null, name: typeof entry?.name === 'string' && entry.name.trim() ? entry.name.trim() : 'Insert', perPart: Math.round(count), massKg: weight != null && weight > 0 ? weight : null, source: 'cost_guide' }];
 }
