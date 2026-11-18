@@ -1,59 +1,19 @@
-// 2-Model Machining (memory/"2 Mold Molding", the factory's 2-Model Machining data): a finished part machined from a source component, another
-// item of the same BOM (the casting or forging blank). The part is priced on the Machining engine with two differences, decided here (pure):
-//   - only the features it machines: an occurrence whose faces all lie on the source (the cad-engine's comparison, two_model/compare.py) is
-//     the catalog's "Source Component: As Supplied" and costs nothing;
-//   - no bar stock: its material is the source component, at its fully burdened cost (useSourceModelFBCAsMaterialCost) or its piece part
-//     cost, shown in its own categories (rollupSourceCostsInCategories).
+// 2-Model Machining (memory/"2 Mold Molding", the factory's 2-Model Machining data): a finished part machined from a cast or forged blank,
+// its source component. The blank is derived from the part's own model (derived-blank.ts, user decision 2026-11-18): its cost is the part's
+// material, at its fully burdened cost (useSourceModelFBCAsMaterialCost) or its piece part cost, shown in its own categories
+// (rollupSourceCostsInCategories); the part's machining is what the blank's casting cannot hold. Pure.
 import type { CostSummaryDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import { computeSustainability } from '../shared/core/cost-engine';
-import { routeToolingItems } from '../shared/route-tooling';
 
 export const TWO_MODEL_FAMILY = 'two_model';
 export const TWO_MODEL_PROCESS_GROUP = '2-Model Machining';
+/** The staged 2-Model Machining data (memory/"2 Mold Molding", migration 823): useSourceModelFBCAsMaterialCost. */
+export const TWO_MODEL_SOURCE_VERSION = '2026-2MoldMolding';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
-type Occurrence = { face_ids?: number[] } & Record<string, unknown>;
-type Feature = { id?: string; feature_type?: string; occurrences?: Occurrence[] } & Record<string, unknown>;
-type LegacyFeature = { id?: string; type?: string; face_ids?: number[] } & Record<string, unknown>;
-
-/** A feature occurrence is as supplied when every face it has lies on the source; one with no faces is not judged so (it is machined). */
-const supplied = (faces: number[] | undefined, asSupplied: ReadonlySet<number>) => !!faces && faces.length > 0 && faces.every((f) => asSupplied.has(f));
-
-/**
- * The part's feature graph with only what it machines: each feature_graph_v2 occurrence (and each machining recognizer feature) whose faces
- * all lie on the source is left out, and a feature with none left is dropped. Returns the graph and the features left as supplied, for the
- * process tree's "Source Component: As Supplied" step.
- */
-export function machinedOnlyFeatureGraph(fg: any, asSuppliedFaceIds: readonly number[]): { fg: any; asSupplied: Array<{ featureId: string; featureType: string; occurrenceIndex: number; faceIds: number[] }> } {
-  const set = new Set(asSuppliedFaceIds);
-  const asSupplied: Array<{ featureId: string; featureType: string; occurrenceIndex: number; faceIds: number[] }> = [];
-  const filterV2 = (graph: any) => {
-    if (!graph || !Array.isArray(graph.features)) return graph;
-    const features = (graph.features as Feature[]).flatMap((f) => {
-      const occurrences = f.occurrences ?? [];
-      const kept = occurrences.filter((o, i) => {
-        if (!supplied(o.face_ids, set)) return true;
-        if (graph === fg?.feature_graph_v2 || !fg?.feature_graph_v2) {
-          asSupplied.push({ featureId: String(f.id ?? ''), featureType: String(f.feature_type ?? ''), occurrenceIndex: i, faceIds: o.face_ids ?? [] });
-        }
-        return false;
-      });
-      return kept.length === 0 ? [] : [{ ...f, occurrences: kept }];
-    });
-    return { ...graph, features };
-  };
-  const mf = fg?.machining_features;
-  const machining = mf ? {
-    ...mf,
-    ...(Array.isArray(mf.features) ? { features: (mf.features as LegacyFeature[]).filter((f) => !supplied(f.face_ids, set)) } : {}),
-    ...(mf.feature_graph_v2 ? { feature_graph_v2: filterV2(mf.feature_graph_v2) } : {}),
-  } : mf;
-  return { fg: { ...fg, feature_graph_v2: filterV2(fg?.feature_graph_v2), machining_features: machining }, asSupplied };
-}
-
-/** What the source component contributes, in the finished part's (local) currency. */
+/** What the source component (the derived blank) contributes, in the summary's currency. */
 export interface SourceComponentCost {
   itemId: string;
   name: string;
@@ -65,29 +25,6 @@ export interface SourceComponentCost {
   totalCost: number;
   /** The source's mass (kg): what the part is machined from. */
   massKg: number | null;
-}
-
-/**
- * The source component's cost from its own Cost Summary (any display currency), in the part's local currency: the summary's money is
- * brought to USD through its own usdToDisplayRate and then to the part's currency. Its tooling per part (dies, molds, patterns) is in USD.
- */
-export function sourceComponentCost(input: {
-  itemId: string; name: string;
-  summary: Pick<CostSummaryDto, 'materialCost' | 'totalProcessCost' | 'totalCost' | 'grossWeightKg' | 'tooling' | 'family' | 'dieTooling' | 'coreboxTooling' | 'patternTooling' | 'forgingDies'> & { usdToDisplayRate?: number };
-  fullyBurdened: boolean;
-  usdToLocal: number;
-}): SourceComponentCost {
-  const toLocal = (v: number) => (v / (input.summary.usdToDisplayRate ?? 1)) * input.usdToLocal;
-  const tooling = input.fullyBurdened
-    ? routeToolingItems(input.summary).reduce((s, t) => s + (t.amortizationParts > 0 ? t.investmentUsd / t.amortizationParts : 0), 0) * input.usdToLocal
-    : 0;
-  const material = toLocal(input.summary.materialCost);
-  const process = toLocal(input.summary.totalProcessCost);
-  return {
-    itemId: input.itemId, name: input.name, basis: input.fullyBurdened ? 'fully_burdened' : 'piece_part',
-    materialCost: material, processCost: process, toolingCost: tooling, totalCost: material + process + tooling,
-    massKg: input.summary.grossWeightKg > 0 ? input.summary.grossWeightKg : null,
-  };
 }
 
 /**
