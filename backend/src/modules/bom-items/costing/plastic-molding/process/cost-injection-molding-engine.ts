@@ -286,8 +286,8 @@ export interface InjectionMoldingCostInput {
 }
 
 /**
- * Why the resolved material cannot be injection molded at all (a printing feedstock or a stock shape), or null. A grade that is molding feedstock
- * but lacks some reference value keeps the specific warnings below: they name exactly what is missing. Silicone (LSR) is costed by its cure model.
+ * Why the resolved material cannot be injection molded at all (a metal, a printing feedstock, a stock shape, or a grade with no injection pressure
+ * or flow length on file), or null. Silicone (LSR) is costed by its cure model.
  */
 function materialNotMoldable(input: InjectionMoldingCostInput): MoldabilityGap | null {
   if (resolveSubtype(input) === 'lsr') return null;
@@ -303,7 +303,11 @@ function materialNotMoldable(input: InjectionMoldingCostInput): MoldabilityGap |
     cureTimeMin: null,
     materialType: input.materialType ?? null,
   });
-  return gap && gap.kind !== 'no_injection_data' ? gap : null;
+  if (!gap) return null;
+  // A grade missing the injection pressure or flow length cannot be sized at all (no clamp force): that is the material's fault, said once
+  // in the material's words. One missing only thermal data keeps the specific warnings below, which name exactly what is missing.
+  const unsizable = gap.missing.includes('injection pressure') || gap.missing.includes('flow length ratio');
+  return gap.kind !== 'no_injection_data' || unsizable ? gap : null;
 }
 
 // Auto-derive molding subtype from material grade + signals.
