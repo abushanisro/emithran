@@ -42,6 +42,8 @@ export interface ManualRouteOption {
   additiveRoute?: string;
   // An assembly route picked in the Workflow Builder (its ASSEMBLY_ROUTES key): committed as the scenario's assemblyRoute.
   assemblyRoute?: string;
+  // An insert molding route picked in the Workflow Builder (its INSERT_MOLDING_ROUTES key): committed as the scenario's insertMoldingRoute.
+  insertMoldingRoute?: string;
   // A real, already-valid apply-route.dto.ts routeId (e.g. one of the 3 real
   // Injection Molding tonnage tiers) to apply directly via the plain
   // applyRoute mutation — for a family whose real routes are already
