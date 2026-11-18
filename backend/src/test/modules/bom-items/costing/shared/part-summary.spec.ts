@@ -96,6 +96,18 @@ describe('buildPartSummary: cost by category and by process', () => {
     expect(p.map((x) => [x.process, x.usd, x.pct])).toEqual([['Melting', 0.1, 10], ['Die Casting', 0.7, 70], ['Painting', 0.2, 20]]);
   });
 
+  it('sums a process that runs on several lines into its one row, in route order (an assembly\'s loads and its three screw sizes)', () => {
+    const t = table([
+      row('part', 'p', { pieceCost: 3 }),
+      row('process', 'Pick and Place', { processCost: 0.17 }), row('process', 'Pick and Place', { processCost: 0.17 }),
+      row('process', 'Mechanical Assembly', { processCost: 0.96 }), row('process', 'Mechanical Assembly', { processCost: 0.45 }), row('process', 'Mechanical Assembly', { processCost: 0.3 }),
+    ]);
+    const p = buildPartSummary(input({ table: t })).costByProcess;
+    expect(p.map((x) => x.process)).toEqual(['Pick and Place', 'Mechanical Assembly']);
+    expect(p.map((x) => x.usd)).toEqual([0.34, 1.71]);
+    expect(p.reduce((s, x) => s + (x.pct ?? 0), 0)).toBeCloseTo(100, 0);
+  });
+
   it('shows the Back cover\'s one process as all of its process cost', () => {
     expect(buildPartSummary(input()).costByProcess).toEqual([{ process: 'Injection Molding', usd: 0.36, pct: 100 }]);
   });
