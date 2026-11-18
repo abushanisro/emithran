@@ -806,7 +806,7 @@ function CostSummaryTab({
         <div className="pt-3 pb-1 text-xs text-muted-foreground">
           Route: <span className="font-semibold text-foreground">{appliedRoute.routeLabel}</span>
           {routeMachineDrift(appliedRoute.processLines, (existingProcRecords?.records ?? []).filter((r) => r.isActive)).map((d) => (
-            <div key={d.process} className="mt-0.5 text-amber-600 dark:text-amber-500">
+            <div key={`${d.process}-${d.applied}-${d.now}`} className="mt-0.5 text-amber-600 dark:text-amber-500">
               {d.process} is costed on {d.applied}, as applied. This route now picks {d.now} (its inputs changed since); Apply again to cost it there.
             </div>
           ))}
@@ -1967,8 +1967,9 @@ function RouteComparisonCard({
                 </div>
                 <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">{sym}{fmt(comparison.materialCost, 2)}</span>
               </div>
-              {appliedRoute.processLines.map((line) => (
-                <div key={line.process} className="px-3 py-2.5">
+              {appliedRoute.processLines.map((line, lineIndex) => (
+                // A process can run on several lines (an assembly's screw sizes): the line's place in the route identifies it.
+                <div key={`${lineIndex}-${line.process}`} className="px-3 py-2.5">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-foreground">{line.process}</p>
                     <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">{sym}{fmt(line.totalCost, 2)}</span>
@@ -5729,7 +5730,10 @@ function PartDetailTab({
     ? 'Based on feature analysis'
     : null;
 
-  const topDrivers = [...(cost?.processLines ?? [])].sort((a, b) => b.totalCost - a.totalCost).slice(0, 2);
+  // The processes that cost most: a process that runs on several lines (an assembly's screw sizes) is one driver, its lines summed.
+  const topDrivers = [...(cost?.processLines ?? []).reduce((m, l) => m.set(l.process, (m.get(l.process) ?? 0) + l.totalCost), new Map<string, number>())]
+    .map(([process, totalCost]) => ({ process, totalCost }))
+    .sort((a, b) => b.totalCost - a.totalCost).slice(0, 2);
   const sustainDriver = cost?.sustainability?.co2Contributors?.[0];
 
   const thicknessSuffix =

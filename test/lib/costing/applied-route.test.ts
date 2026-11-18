@@ -30,4 +30,11 @@ describe('routeMachineDrift', () => {
     expect(routeMachineDrift([line('Tooling', 'tooling', null)], [saved('Tooling', 'tooling', 'X')])).toEqual([]);
     expect(routeMachineDrift([line('Injection Molding', 'injection_molding', 'A')], [saved('Painting', 'painting', 'B')])).toEqual([]);
   });
+
+  it('pairs the n-th saved row of an operation with the n-th line of it (one bench, two screw sizes), not the first line twice', () => {
+    expect(routeMachineDrift(
+      [line('Mechanical Assembly', 'mechanical_assembly', 'Bench A'), line('Mechanical Assembly', 'mechanical_assembly', 'Bench B')],
+      [saved('Mechanical Assembly', 'mechanical_assembly', 'Bench A'), saved('Mechanical Assembly', 'mechanical_assembly', 'Bench B')],
+    )).toEqual([]);
+  });
 });

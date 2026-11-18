@@ -125,7 +125,11 @@ export function buildPartSummary(input: PartSummaryInput): PartSummary {
 
   const processRows = (table?.rows ?? []).filter((r) => r.kind === 'process');
   const processTotal = processRows.reduce((s, r) => s + processCostOf(r), 0);
-  const costByProcess = processRows.map((r) => ({ process: r.name, usd: r4(processCostOf(r)), pct: pct(processCostOf(r), processTotal) }));
+  // Cost by process: one row per process, in route order. A process can run on several lines (an assembly screws in three sizes on one
+  // bench, loads and unloads its part): their costs are that process's, summed.
+  const byProcess = new Map<string, number>();
+  for (const r of processRows) byProcess.set(r.name, (byProcess.get(r.name) ?? 0) + processCostOf(r));
+  const costByProcess = [...byProcess].map(([process, usd]) => ({ process, usd: r4(usd), pct: pct(usd, processTotal) }));
 
   const annualVolume = positive(inputs.annualVolume);
   const life = positive(inputs.productionLifeYears);

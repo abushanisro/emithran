@@ -28,10 +28,16 @@ export interface MachineDrift {
  * is no drift.
  */
 export function routeMachineDrift(lines: readonly RouteLine[], saved: readonly SavedRow[]): MachineDrift[] {
+  // The n-th saved row of a class and name is the n-th line of them (an assembly screws in three sizes on one bench), never the first again.
+  const seen = new Map<string, number>();
   return saved.flatMap((row): MachineDrift[] => {
     const name = (row.category || row.operation || '').trim();
     const sameClass = lines.filter((l) => row.machineClass != null && l.machineClass === row.machineClass);
-    const line = sameClass.length === 1 ? sameClass[0] : sameClass.find((l) => l.process === name);
+    const key = `${row.machineClass ?? ''}|${name}`;
+    const nth = seen.get(key) ?? 0;
+    seen.set(key, nth + 1);
+    const named = sameClass.filter((l) => l.process === name);
+    const line = sameClass.length === 1 ? sameClass[0] : named[nth] ?? named[0];
     return row.machineName && line?.machineName && line.machineName !== row.machineName
       ? [{ process: line.process, applied: row.machineName, now: line.machineName }]
       : [];
