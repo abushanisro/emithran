@@ -1,0 +1,34 @@
+{
+ "domain": "assembly_molding",
+ "processGroup": "Assembly Molding",
+ "calculators": [
+  {
+   "key": "assembly_molding.insert_loading",
+   "name": "Assembly Molding - Insert loading",
+   "operations": ["Insert Pick and Place"],
+   "description": "Loading a shot's inserts into the mold, by hand or by robot: each insert's load time by its weight and the load method (componentLoadTime: Manual or Robotic, the first row whose weight takes it), summed over the inserts of every cavity; a manual load is slowed by handlingMultiplier and insertionMultiplier for handling and seating the insert.",
+   "fields": [
+    { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (componentLoadTime of each insert by its weight and the load method, summed per shot)" } },
+    { "name": "Manual Load", "unit": null, "source": { "engine": "manual (1 for a manual load, 0 for a robot)" } },
+    { "name": "Handling Multiplier", "unit": null, "source": { "variable": "handlingMultiplier" } },
+    { "name": "Insertion Multiplier", "unit": null, "source": { "variable": "insertionMultiplier" } },
+    { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+    { "name": "Cycle Time", "unit": "s", "formula": "{Load Time} * ({Manual Load} * {Handling Multiplier} * {Insertion Multiplier} + 1 - {Manual Load}) * {Cycle Time Factor}" }
+   ]
+  },
+  {
+   "key": "assembly_molding.shot_cycle",
+   "name": "Assembly Molding - Shot cycle",
+   "helper": true,
+   "operations": [],
+   "output": "Shot Cycle",
+   "description": "One shot of an insert molding press: on a press with a rotary or shuttle table the next lower mold half is loaded while the other is molded (defaultNumMoldToolsPerTable halves), so the shot takes the longer of the two; on a press with no table the inserts are loaded with the mold open, so the two add.",
+   "fields": [
+    { "name": "Molding Cycle", "unit": "s", "source": { "engine": "molding_cycle_s (the injection cycle of the shot)" } },
+    { "name": "Load Time", "unit": "s", "source": { "engine": "insert_load_s (the insert loading of the shot)" } },
+    { "name": "Table Press", "unit": null, "source": { "engine": "table_press (1 for a rotary or shuttle table, 0 for none)" } },
+    { "name": "Shot Cycle", "unit": "s", "formula": "{Table Press} * max({Molding Cycle}, {Load Time}) + (1 - {Table Press}) * ({Molding Cycle} + {Load Time})" }
+   ]
+  }
+ ]
+}
