@@ -6,6 +6,7 @@ import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
 import type { CostSummaryResponseDto } from '../dto/cost-breakdown.dto';
 import { deriveMaterialUsage, type DeriveMaterialUsageInput, type MaterialUsage } from '../costing/shared/material-usage';
 import { explainMaterialUsage, type MaterialUsageExplanation } from '../costing/shared/material-usage-explanation';
+import { TWO_MODEL_FAMILY } from '../costing/two-model/two-model-cost';
 
 export interface MaterialSnapshotInput {
   item: BOMItemResponseDto;
@@ -24,6 +25,9 @@ export interface MaterialSnapshotResult {
   recordId: string | null;
   usage: MaterialUsage | null;
 }
+
+/** The material record's name for a source component: what the Cost tab lists as the part's material. */
+export const sourceComponentMaterialName = (sourceName: string) => `Source component: ${sourceName}`;
 
 /** A stored usage that differs from the engine's live one by more than this share means the record is stale. */
 const STALE_RELATIVE_DIFFERENCE = 0.01;
@@ -53,6 +57,13 @@ export class MaterialCostSnapshotService {
     const { liveGross, liveNet } = liveWeights(summary);
 
     const active = (await this.costRecords.findAll({ bomItemId: item.id, isActive: true, page: 1, limit: 10 } as never, userId, token)).records ?? [];
+
+    // 2-Model Machining: the material is the source component, one piece at its cost, never the grade's stock by the kg (the summary's weights are
+    // the source's mass, so a stock record would price a casting as raw metal). A 2-Model part that could not be costed (no source linked) gets
+    // no record at all: the Apply is refused at its route, and a stock record would put the bar stock back in the part's total.
+    if (summary.family === TWO_MODEL_FAMILY) {
+      return summary.sourceComponent ? this.ensureSourceComponent(input, active) : { action: 'kept', recordId: null, usage: null };
+    }
 
     const existing = active.find((r) => (r.totalCost ?? 0) > 0 && r.materialName === grade);
     const staleAgainstNesting = !!existing && (
@@ -120,6 +131,47 @@ export class MaterialCostSnapshotService {
       }
     }
     return { action: 'replaced', recordId: created.id, usage };
+  }
+
+  /**
+   * The part's material record when it is machined from a source component: one piece (uom PC) of it, at its cost in USD (the summary's money is in
+   * the display currency: usdToDisplayRate), no scrap, overhead or reclaim (they are inside the source's own cost). Kept when the active record is
+   * this source at this cost and location; otherwise every active record is retired first, as for stock.
+   */
+  private async ensureSourceComponent(input: MaterialSnapshotInput, active: Array<{ id: string; materialName?: string | null; totalCost?: number | null; country?: string | null }>): Promise<MaterialSnapshotResult> {
+    const { item, location, summary, userId, organizationId, token } = input;
+    const source = summary.sourceComponent!;
+    const usd = source.totalCost / (summary.usdToDisplayRate ?? 1);
+    const name = sourceComponentMaterialName(source.name);
+    const existing = active.find((r) => r.materialName === name && (r.country ?? '') === location && Math.abs((r.totalCost ?? 0) - usd) <= Math.max(0.005, usd * STALE_RELATIVE_DIFFERENCE));
+    if (existing && active.length === 1) return { action: 'kept', recordId: existing.id, usage: null };
+    for (const r of active) {
+      try {
+        await this.costRecords.update(r.id, { isActive: false } as never, userId, token);
+      } catch (e: unknown) {
+        throw new InternalServerErrorException(`Could not retire the existing material cost record ${r.id}: ${e instanceof Error ? e.message : String(e)}. Nothing was added, to avoid a duplicate.`);
+      }
+    }
+    const created = await this.costRecords.create(
+      {
+        bomItemId: item.id,
+        materialName: name,
+        materialDescription: `2-Model Machining: machined from ${source.name}, at its ${source.basis === 'fully_burdened' ? 'fully burdened' : 'piece part'} cost (material ${source.materialCost.toFixed(2)}, process ${source.processCost.toFixed(2)}, tooling ${source.toolingCost.toFixed(2)}).`,
+        country: location,
+        uom: 'PC',
+        netUsage: 1,
+        grossUsage: 1,
+        scrap: 0,
+        overhead: 0,
+        reclaimRate: 0,
+        unitCost: usd,
+        isActive: true,
+      } as never,
+      userId,
+      token,
+      organizationId,
+    );
+    return { action: 'replaced', recordId: created.id, usage: null };
   }
 
   /**
