@@ -417,6 +417,24 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
+    id: 'F-37', version: 1, name: 'Water baffles',
+    expression: 'baffles = 2 x floor(L / spacing);  cost = baffles x (unit cost + assembly h x assembly rate) + (baffles x tapping h + tap setup h) x machining rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'L', unit: 'mm', source: 'the standard mold base length (F-25)' },
+      { name: 'spacing', unit: 'mm', source: 'memory/Assembly plastic molding: baffleSpacing ("linear spacing of baffle holes in cavity and core plate")' },
+      { name: 'unit cost, assembly h, tapping h, tap setup h', unit: 'USD, h', source: 'memory/Assembly plastic molding: waterBafflesCost, assemblyTimeHrsWaterBaffles, baffleTappingTimeHrs, baffleTapSetup' },
+    ],
+    dependsOn: ['F-25'],
+    referenceSource: 'memory/Assembly plastic molding/plastic_molding_variables',
+    assumptions: [
+      'Approved rule (2026-11-18; no baffle count is on file): one row of baffles along each of the cavity and core plates, baffleSpacing apart over the mold base length.',
+      'The tapping setup is charged once per tool when it has baffles; the baffles are tapped and the setup run at the machining rate, assembled at the assembly rate.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/mold-tooling-calculator.ts',
+  },
+
+  {
     id: 'F-36', version: 1, name: 'Material drying',
     expression: 'demand = resin per part x 3600 / press time per part;  dryer = smallest model with nylon throughput >= demand;  dryer hourly = (P (1 - salvage) / life + P x maintenance + P x installation / life) / (6240 x uptime x utilization) + rated kW x electricity;  cost per part = dryer hourly x press time per part / 3600',
     outputUnit: 'USD',
@@ -530,7 +548,6 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     ['G-03', 'Slides and lifters of CAD bundles not recognised or not sized (the sized ones are F-28); the slide movement in the cycle', 'tblSlideSizes; slideCycleRate; costPerHydraulicEjector'],
     ['G-04', 'Rib inserts of CAD ribs not measured, or too large for an insert class (the others are F-31; heat treatment is F-29)', 'machinedRibThreshold; *InsertArea'],
     ['G-05', 'Mold texture', 'cavityTextures; cmToolTexture; toolBlastingRate; toolChemicalEtchingRate; toolMaskingRate; toolDryingTime'],
-    ['G-06', 'Water baffles (no count on file; the cooling lines are F-30)', 'waterBafflesCost'],
     ['G-07', 'Cavity inserts (SPI classes built with inserts) and unscrewing mechanisms (no CAD signal counts them)', 'tblSpiType.Use Insert; costPerUnscrewingMechanism'],
     ['G-08', 'Hot-runner manifold and controller (no price on file; the hot drops are F-33)', 'manifoldPlateThickness; defaultHotDropLayout'],
     ['G-09', 'Handling, setup scrap and plasticizing in the cycle', 'partHandlingTimes; materialHandling; scrapTimeInMinutes_*; plasticizingRateByClampForce; machine plasticizingRateGppsGPerS'],

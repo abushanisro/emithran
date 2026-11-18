@@ -3,7 +3,7 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
 
 /**
  * Migration 975 created the five plastic-molding calculators and is applied wherever the platform runs: it is history and is never edited. So are 977,
- * 1007, 1012, 1013, 1014, 1016, 1017, 1018, 1019 and 1020: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
+ * 1007, 1012, 1013, 1014, 1016, 1017, 1018, 1019, 1020 and 1022: their files are kept as committed, and the generator no longer writes them. A calculator in use is changed by a
  * NEW migration, which writes the calculators whose spec `migration` is its number (and raises their `version` when their formulas change, calculators.version, migration 428).
  *   976  the reaction injection calculator, version 2 (fill time added)
  *   977  the injection, structural foam and LSR calculators: their fill-factor inputs name the reference table they are read from, so the cost dialog's eye opens it
@@ -23,14 +23,25 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1022 the injection mold tooling calculator, version 9: heat treatment by steel grade, and the hot drops
  *   1023 the injection molding visual inspection and weight check calculators
  *   1024 the injection molding material drying calculator
+ *   1082 the injection mold tooling calculator, version 10: the water baffles (1022, version 9, is now history and kept as committed)
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1022, 1023, 1024] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1023, 1024, 1082] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
+  1082: {
+    title: 'Injection mold tooling calculator, version 10 -- the water baffles.',
+    rootCause: [
+      'Every mold carried "excludes water baffles (no data yet)": registry gap G-06 read only waterBafflesCost, with no count. memory/Assembly plastic',
+      'molding (2026-AssyPlastic) holds the baffle spacing in the cavity and core plates (baffleSpacing 76.2 mm), the price (8 USD), the assembly time (0.15 h)',
+      'and the tapping time (0.75 h each, 4 h setup per tool). Version 10 counts one row of baffles along each plate, baffleSpacing apart over the mold base',
+      'length (formula registry F-37, ASSUMED: approved 2026-11-18), and prices them with those values. Replaced under version 10 (a calculator in use is',
+      'not edited in place).',
+    ].join('\n'),
+  },
   1024: {
     title: 'Injection molding material drying calculator -- a machine-mounted desiccant dryer running with the press.',
     rootCause: [
@@ -49,16 +60,6 @@ const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 
       'injection engine runs it for the routed visual inspection and charges it at the bench rate. The weight check calculator times one check of 10 s',
       'every 1,000 parts by the press operator (the costing engineer\'s defaults) and derives the bench scale\'s hourly rate from its price (OHAUS',
       'Defender 3000) with the machine-hour rate pattern of migration 580 (formula registry F-35).',
-    ].join('\n'),
-  },
-  1022: {
-    title: 'Injection mold tooling calculator, version 9 -- heat treatment by steel grade, and the hot drops.',
-    rootCause: [
-      'Version 8 (migration 1020) hardened the cavity and core plates and stress relieved the rest of every mold base. The costing engineer\'s research',
-      '(reference/mold-steel-treatment-reference.csv) shows the default tool steel, AISI P20, is supplied pre-hardened (28-34 HRC): hardening it again',
-      'double-counts. Version 9 charges each treatment only where the grade needs it by default (formula registry F-29 version 2). It also prices the hot',
-      'drops of a hot-runner mold, one per gate (cavities x defaultNumberOfGatesPerCavity) at the defaultHotDropType price (F-33). The calculator is',
-      'replaced under version 9 (a calculator in use is not edited in place).',
     ].join('\n'),
   },
   1021: {
@@ -113,7 +114,7 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   1008: '1008_plastic_injection_cycle_restore_v1.sql',
   1010: '1010_plastic_deflashing_calculator.sql',
   1021: '1021_plastic_slide_movement_calculator.sql',
-  1022: '1022_plastic_mold_steel_treatment_hot_drops.sql',
   1023: '1023_plastic_inspection_calculators.sql',
   1024: '1024_plastic_material_drying_calculator.sql',
+  1082: '1082_plastic_mold_water_baffles.sql',
 };

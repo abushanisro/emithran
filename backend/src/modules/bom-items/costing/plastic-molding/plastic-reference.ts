@@ -99,7 +99,11 @@ export const INJECTION_MOLD_COMPONENTS = [
 ] as const;
 /** Assembly hours the injection data holds for a component it has no price for: the price stays the compression row's, the hours are the injection mold's. */
 export const INJECTION_ASSEMBLY_HOURS = [{ name: 'Hydraulic Cylinder', hours: 'assemblyTimeHrsHydraulicCylinder' }] as const;
-export const MOLD_COMPONENT_VARIABLE_KEYS = [...INJECTION_MOLD_COMPONENTS.flatMap((c) => [c.cost, c.quantity, c.hours]), ...INJECTION_ASSEMBLY_HOURS.map((a) => a.hours)];
+/** The water baffles (F-37), from the same injection mold variables. */
+export const WATER_BAFFLE_VARIABLE_KEYS = ['waterBafflesCost', 'baffleSpacing', 'assemblyTimeHrsWaterBaffles', 'baffleTappingTimeHrs', 'baffleTapSetup'] as const;
+export const MOLD_COMPONENT_VARIABLE_KEYS = [
+  ...INJECTION_MOLD_COMPONENTS.flatMap((c) => [c.cost, c.quantity, c.hours]), ...INJECTION_ASSEMBLY_HOURS.map((a) => a.hours), ...WATER_BAFFLE_VARIABLE_KEYS,
+];
 
 export const PLASTIC_LOOKUP_KEYS = [
   'tblSpiType',
@@ -265,6 +269,11 @@ export interface MoldExtrasReference {
   waterFittingUsd: number;
   waterManifoldUsd: number;
   lineDrillingMmPerMin: number;
+  /**
+   * The water baffles (F-37), memory/Assembly plastic molding: waterBafflesCost (USD each), baffleSpacing (mm between baffle holes in the cavity and core
+   * plates), assemblyTimeHrsWaterBaffles (h each), baffleTappingTimeHrs (h each) and baffleTapSetup (h per tool).
+   */
+  baffle: { usd: number; spacingMm: number; assemblyHours: number; tappingHours: number; tapSetupHours: number };
   /** The rib inserts and their EDM (F-31, process/rib-inserts.ts). */
   ribInsert: RibInsertReference;
   /** variables defaultHotDropType and its price (costPerStandardHotDrop or costPerSVGHotDrop), USD per drop (F-33). */
@@ -479,6 +488,10 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
     waterFittingUsd: variable('waterManifoldFittingsCost'),
     waterManifoldUsd: variable('waterManifoldsCost'),
     lineDrillingMmPerMin: named(rates, 'cmToolMachiningRates', 'Heater Line Drilling', 'rate'),
+    baffle: {
+      usd: variable('waterBafflesCost'), spacingMm: variable('baffleSpacing'), assemblyHours: variable('assemblyTimeHrsWaterBaffles'),
+      tappingHours: variable('baffleTappingTimeHrs'), tapSetupHours: variable('baffleTapSetup'),
+    },
     ribInsert,
     hotDrop: ((type) => ({
       type: type ?? '',

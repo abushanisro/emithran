@@ -18,7 +18,9 @@ import { plasticLookup, plasticVariable, withRef } from './plastic-input-sources
 export const MOLD_TOOLING_CALCULATOR = 'Injection Mold - Tooling';
 const OUTPUT = 'Tooling Cost Per Part';
 const REF = 'memory/Plastic Modeling';
-// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment), F-30 (cooling), F-31 (rib inserts, EDM), F-33 (hot drops) are this
+/** The injection mold's own component variables (2026-AssyPlastic). */
+const COMPONENTS = 'memory/Assembly plastic molding/plastic_molding_variables';
+// Formula registry (plastic-molding/formula-registry.ts): F-27 (assembly extras), F-28 (slide and lifter blocks), F-29 (heat treatment), F-30 (cooling), F-31 (rib inserts, EDM), F-33 (hot drops), F-37 (water baffles) are this
 // calculator's formulas; the seeds below supply their inputs.
 /** timePerTryoutBase's note: "basic hrs per tryout for <500T (x2 for bigger)". */
 const TRYOUT_DOUBLE_ABOVE_TONNES = 500;
@@ -249,6 +251,11 @@ export function moldToolingSeeds(f: MoldToolingFacts): { seeds: Record<string, C
       'Water Hose Cost': { value: x.waterHoseUsd, source: `${vars}: waterHosesCost (2 per line)`, ref: v('waterHosesCost') },
       'Water Fitting Cost': { value: x.waterFittingUsd, source: `${vars}: waterManifoldFittingsCost (2 per line)`, ref: v('waterManifoldFittingsCost') },
       'Water Manifold Cost': { value: x.waterManifoldUsd, source: `${vars}: waterManifoldsCost (one per side)`, ref: v('waterManifoldsCost') },
+      'Baffle Spacing': { value: x.baffle.spacingMm, source: `${COMPONENTS}: baffleSpacing (between baffle holes in the cavity and core plates)` },
+      'Water Baffle Cost': { value: x.baffle.usd, source: `${COMPONENTS}: waterBafflesCost` },
+      'Baffle Assembly Hours': { value: x.baffle.assemblyHours, source: `${COMPONENTS}: assemblyTimeHrsWaterBaffles` },
+      'Baffle Tapping Hours': { value: x.baffle.tappingHours, source: `${COMPONENTS}: baffleTappingTimeHrs` },
+      'Baffle Tap Setup Hours': { value: x.baffle.tapSetupHours, source: `${COMPONENTS}: baffleTapSetup (per tool)` },
       'Rib Inserts': { value: rq.inserts, source: ribSource, lookup: true },
       'Rib Insert Area': { value: rq.areaIn2, source: `${rq.breakdown} x {small,medium,large}InsertArea ${ri.areaIn2.small} / ${ri.areaIn2.medium} / ${ri.areaIn2.large} in²`, lookup: true },
       'Rib Insert Electrode Volume': {

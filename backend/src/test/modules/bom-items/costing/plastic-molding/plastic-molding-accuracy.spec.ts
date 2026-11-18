@@ -193,7 +193,7 @@ describe('cost summary: worked ABS part', () => {
     expect(r.totalCost).toBeCloseTo(material + run + inspect + weigh, 6);
   });
 
-  it('tooling, USA, 10,000/yr x 3 yr: BOM 1,930 + labour 2,859.53 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 0 (P20, pre-hardened) + cooling 715.29 = 12,310.52, one mold, 0.4104 per part', () => {
+  it('tooling, USA, 10,000/yr x 3 yr: BOM 1,930 + labour 2,859.53 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 0 (P20, pre-hardened) + cooling 715.29 + water baffles 1,351.54 = 13,662.06, one mold, 0.4554 per part', () => {
     // BOM (no undercut: no Hydraulic Cylinder; Ejector Pin has no quantity; Electrical has no cost). The injection mold's own components
     // (memory/Assembly plastic molding), the compression table for the rest:
     //   Leader pins and bushings 45x6 + Return pins and bushings 35x6 + Ejector guide pins and bushings 30x6 + Side locks 160x2 + Air Poppet 25x30 + Limit Switch 50x4 = 1,930
@@ -208,6 +208,7 @@ describe('cost summary: worked ABS part', () => {
     // ejector pins: ceil(10,000 / 7,903.21 mm2) = 2 x (5 + 0.25 h x 76.81) = 48.405; sprue bushing 70 + locating ring 85;
     // try-out: 12 h x 1 (press under 500 t) x 3 try-outs x 76.81 = 2,765.16
     // heat treatment: the tool steel is AISI P20, supplied pre-hardened (reference/mold-steel-treatment-reference.csv): none is charged
+    // water baffles (F-37): 2 x floor(446 / 76.2) = 10 x (8 + 0.15 h x 76.81) + (10 x 0.75 h + 4 h setup) x 100.55 = 195.22 + 1,156.33 = 1,351.54
     // cooling: floor(446 / (3 x 8 mm)) = 18 lines x 396 mm / 25.4 mm/min / 60 = 4.677 h x 100.55 = 470.29 + 18 x 2 x (1.25 + 2.50) + 2 x 55 = 715.29
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 10_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldBomSubtotalUsd).toBe(1930);
@@ -225,15 +226,15 @@ describe('cost summary: worked ABS part', () => {
     expect(t.moldTryoutUsd).toBeCloseTo(2765.16, 6);
     expect(t.moldHeatTreatmentUsd).toBe(0);
     expect(t.moldCoolingUsd).toBeCloseTo(715.29, 2);
-    expect(t.moldCostUsd).toBe(12310.52);
-    expect(t.moldCostPerPartUsd).toBe(0.4104);
+    expect(t.moldCostUsd).toBe(13662.06);
+    expect(t.moldCostPerPartUsd).toBe(0.4554);
   });
 
-  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 12,310.52 = 258,520.91 USD, 0.0862 per part (regression: not rounded to 0.09)', () => {
+  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 21 x 13,662.06 = 286,903.25 USD, 0.0956 per part (regression: not rounded to 0.10)', () => {
     const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 1_000_000, productionLifeYears: 3 })).tooling!;
     expect(t.moldsRequired).toBe(21);
-    expect(t.moldCostUsd).toBe(258_520.91);
-    expect(t.moldCostPerPartUsd).toBe(0.0862);
+    expect(t.moldCostUsd).toBe(286_903.25);
+    expect(t.moldCostPerPartUsd).toBe(0.0956);
   });
 });
 
@@ -518,7 +519,7 @@ describe('quote validation: how far the quote can be trusted', () => {
     expect(v.complete).toBe(false);
     // G-11: ABS is hygroscopic, so material drying is routed, and no data exists for it. The mold is a cold runner (no hot drops, G-08), an SPI class
     // tblSpiType builds without inserts (G-07) and the default texture None (G-05): only the gaps that apply are listed.
-    expect(v.unsupported.map((u) => u.id)).toEqual(['G-03', 'G-04', 'G-06', 'G-09', 'G-10', 'G-11']);
+    expect(v.unsupported.map((u) => u.id)).toEqual(['G-03', 'G-04', 'G-09', 'G-10', 'G-11']);
   });
 
   it('without a volume there is no mold: the mold formulas and gaps are left out, the cycle and period gaps remain', () => {
