@@ -180,6 +180,7 @@ export function AssemblySection({ assembly: a, overrides, onChange, hrefOf }: Pr
                   )}
                 </div>
                 <div className="truncate text-muted-foreground" title={jointMeasures(j)}>
+                  {a.components.length > 1 && j.componentId ? `${a.components.find((c) => c.id === j.componentId)?.name ?? ''} · ` : ''}
                   {j.operation ?? j.routeProcess ?? j.process} · {jointMeasures(j)}{j.consumablesCost ? ` · consumables ${j.consumablesCost.toFixed(2)}` : ''}
                 </div>
                 {j.enabled && j.reason && <div className="text-red-600">{j.reason}</div>}

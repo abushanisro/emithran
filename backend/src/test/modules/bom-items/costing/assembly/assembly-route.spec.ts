@@ -100,11 +100,12 @@ describe('an assembly\'s routes', () => {
     expect(pick).toHaveLength(2);
     expect(sec(pick[0])).toBeCloseTo(3 * 10 * 1.15, 1);
     expect(pick[0].featureBreakdown!.map((o) => [o.name, o.featureType, o.featureIds])).toEqual([
-      ['Housing x 1', 'AssemblyComponent', ['housing']], ['Bracket x 2', 'AssemblyComponent', ['bracket']],
+      ['Housing ×1', 'AssemblyComponent', ['housing']], ['Bracket ×2', 'AssemblyComponent', ['bracket']],
     ]);
     // 0.044 + 2 x 0.5 kg, its largest component 120 mm: the None band's 10 s unload.
     expect(sec(pick[1])).toBeCloseTo(10 * 1.15, 1);
-    expect(pick[1].featureBreakdown![0].name).toContain('1.044 kg');
+    expect(pick[1].featureBreakdown![0].name).toBe('Finished assembly ×1');
+    expect(JSON.stringify(pick[1].calculationTrace)).toContain('1.044 kg');
   });
 
   it('a machine is set up once per batch: the unload line on the pick and place station charges no second setup', () => {
@@ -218,7 +219,7 @@ describe('the assembly\'s Cost Summary and route comparison', () => {
     expect(s.assembly!.components.map((c) => [c.name, c.quantity, c.threadedHoles])).toEqual([['Housing', 1, 4], ['Bracket', 2, 0]]);
     // At 250 a batch the robot's 300 s programming per weld is 1.2 s an assembly: the robotic route is the cheaper one.
     expect(s.assembly!.route).toBe('robotic');
-    expect(s.assembly!.joints.map((j) => [j.label.split(':')[0], j.routeProcess])).toEqual([['Housing', 'Mechanical Assembly'], ['MIG Welding 1', 'Robotic MIG Welding']]);
+    expect(s.assembly!.joints.map((j) => [j.label, j.componentId, j.routeProcess])).toEqual([['M4×0.7 screws ×4', 'housing', 'Mechanical Assembly'], ['MIG Welding 1', null, 'Robotic MIG Welding']]);
     expect(s.assembly!.consumablesCost).toBeGreaterThan(0);
     expect(Object.keys(s.calculatorRuns ?? {})).toEqual(['w1 consumables']);
   });

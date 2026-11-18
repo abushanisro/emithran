@@ -47,6 +47,25 @@ describe('a part set to Assembly with no parts under it in the BOM', () => {
     expect(r.warnings[0]).toContain('has no parts under it in the BOM');
   });
 
+  it('points at the part on the page: its load and unload highlight it whole, a screw count its own threaded holes, names stay short', async () => {
+    const r = await service().price(request({}));
+    const [load, unload, m4] = r.route!.lines;
+    expect([load!.actsOnWholePart, unload!.actsOnWholePart]).toEqual([true, true]);
+    expect(load!.featureBreakdown!.map((o) => o.name)).toEqual(['Cannula Holder Left ×1']);
+    expect(unload!.featureBreakdown!.map((o) => o.name)).toEqual(['Finished assembly ×1']);
+    expect(m4!.featureBreakdown!.map((o) => [o.name, o.featureIds])).toEqual([['M4×0.7 screws ×5', ['m4']]]);
+    expect(m4!.calculationTrace!.find((t) => t.fieldName === 'Joints')?.ref).toEqual({ kind: 'features', label: 'M4×0.7 screws ×5', features: [{ featureId: 'm4' }] });
+    expect(load!.calculationTrace!.find((t) => t.fieldName === 'Quantity')?.ref).toEqual({ kind: 'cad', evidence: 'part_volume' });
+  });
+
+  it('other parts\' features are not on the page: an assembly of children names them but points at none', async () => {
+    const child = { ...holder, id: 'c' } as unknown as BOMItemResponseDto;
+    const r = await service().price(request({ item: { ...holder, id: 'asm', name: 'Asm' } as unknown as BOMItemResponseDto, children: [child] }));
+    expect(r.route!.lines.some((l) => l.actsOnWholePart)).toBe(false);
+    const m4 = r.route!.lines.find((l) => l.process === 'Mechanical Assembly')!;
+    expect(m4.calculationTrace!.find((t) => t.fieldName === 'Joints')?.ref).toBeUndefined();
+  });
+
   it('a child with no weight is weighed by its volume at its material\'s density', async () => {
     const child = { ...holder, id: 'c', name: 'Bracket', weight: undefined, volume: 38354.17, materialGrade: 'Aluminum, 6061', featureGraph: null } as unknown as BOMItemResponseDto;
     const r = await service().price(request({ children: [child], densityOf: (g) => Promise.resolve(g === 'Aluminum, 6061' ? 2700 : null) }));
