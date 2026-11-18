@@ -6,8 +6,17 @@
 set -euo pipefail
 LABEL=com.emithran.casting-worker-relay
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-if [[ "${1:-}" == "--remove" ]]; then
+unload() {
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  for _ in $(seq 1 50); do
+    launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || return 0
+    sleep 0.2
+  done
+  echo "$LABEL is still loaded after 10 s; try again" >&2
+  return 1
+}
+if [[ "${1:-}" == "--remove" ]]; then
+  unload
   rm -f "$PLIST"
   echo "removed $LABEL"
   exit 0
@@ -29,6 +38,8 @@ cat > "$PLIST" <<PLIST
 </dict>
 </plist>
 PLIST
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+# Reinstalling: unload the running agent first. bootout returns before the job is gone, and a bootstrap while it is still there fails
+# ("Bootstrap failed: 5: Input/output error"), leaving the agent unloaded: wait until launchd no longer has it (at most 10 s).
+unload
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "installed $LABEL: $NODE $SCRIPT"
