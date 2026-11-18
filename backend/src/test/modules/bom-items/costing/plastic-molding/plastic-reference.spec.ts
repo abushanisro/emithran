@@ -62,11 +62,10 @@ describe('computeMoldToolingCost on the real tables (the lookups; the prices are
     expect(toolingGapIds({ ...COLD, sideActionsPriced: true })).toEqual(['G-04', 'G-06']);
     // every rib measured and classed: the rib inserts are priced (F-31), not a gap
     expect(toolingGapIds({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toEqual(['G-06']);
-    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toMatch(/try-out, the slide and lifter blocks, the heat treatment the tool steel grade needs, the cooling lines, the rib inserts and their EDM, and the toolroom hours; it does NOT include water baffles/);
-    const w = toolingScopeWarning(COLD);
-    expect(w).toMatch(/includes .*the cavity and core machining and polish.*ejector pins, sprue bushing, locating ring, try-out/);
-    expect(w).toMatch(/does NOT include slides and lifters \(the CAD bundles are not all recognised and sized\), the rib inserts and their EDM \(the CAD ribs are not all measured, or one is too large for an insert class\), water baffles \(no count on file\) \(/);
-    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toMatch(/the hot-runner manifold and controller \(no price on file\), cavity inserts/);
+    // One line: only what the mold leaves out.
+    expect(toolingScopeWarning({ ...COLD, sideActionsPriced: true, ribInsertsPriced: true })).toBe('Mold tooling excludes water baffles (no data yet): the real investment is higher.');
+    expect(toolingScopeWarning(COLD)).toBe('Mold tooling excludes slides and lifters, rib inserts, water baffles (no data yet): the real investment is higher.');
+    expect(toolingScopeWarning({ runner: 'hot', classUsesInserts: true, cavityTexture: 'None', sideActionsPriced: false, ribInsertsPriced: false, steelTreatmentKnown: true })).toContain('water baffles, the hot-runner manifold, cavity inserts');
   });
 
   it('counts Guide Pin at its real 0.25 h and says Guide Bush has no assembly time', () => {

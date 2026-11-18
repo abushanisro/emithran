@@ -401,7 +401,7 @@ describe('slides and lifters in the mold (F-28)', () => {
       signals: { ...absPart().signals, sideActionBlocks: { slide: NONE, lifter: NONE, unsized: 2 } },
     }));
     expect(unsized.validation?.unsupported.map((u) => u.id)).toContain('G-03');
-    expect(unsized.warnings.join(' ')).toMatch(/slides and lifters \(the CAD bundles are not all recognised and sized\)/);
+    expect(unsized.warnings.join(" ")).toMatch(/Mold tooling excludes slides and lifters/);
   });
 });
 
@@ -483,6 +483,14 @@ describe('operations the model does not cost', () => {
     // the blocks are in the tooling (F-28); what stays unread is the slide movement in the cycle
     expect(w).toContain('slideCycleRate');
     expect(w).not.toMatch(/Side Action[^\n]*no sourced time\/rate data/);
+  });
+
+  it('on an insert press the insert loading is its own costed line, so it is not also listed as not costed', () => {
+    const run = (machineClass: string) => computeInjectionMoldedCostSummary({
+      ...absPart(), signals: { ...absPart().signals, insertCount: 10 }, mhrRate: { ...absPart().mhrRate, machineClass },
+    }).warnings.join('\n');
+    expect(run('injection_molding')).toContain('Insert Loading (In-Mold) required (10 insert(s)): not costed');
+    expect(run('assembly_molding_insert_injection_molding')).not.toContain('Insert Loading (In-Mold)');
   });
 
   it('an operation with nothing in the reference still says there is no sourced data', () => {

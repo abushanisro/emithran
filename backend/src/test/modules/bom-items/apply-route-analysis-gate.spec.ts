@@ -123,9 +123,14 @@ describe('why no route can be applied', () => {
   const route = (routeLabel: string, warning: string | null, gap?: { process: string; reason: string }) =>
     ({ routeLabel, capability: { warnings: warning ? [warning] : [] }, dataGaps: gap ? [{ ...gap, machineClass: 'x' }] : [] }) as never;
 
-  it('names what each route is missing, the same reason once', () => {
+  it('a reason every route shares is the part\'s problem: said once, without the list of routes', () => {
     expect(whyNoRoute([route('High Pressure Die Casting', alloy), route('Gravity Die Casting', alloy)]))
-      .toBe('High Pressure Die Casting, Gravity Die Casting: Material "Generic ABS, Fittings" is not a die-casting alloy in Raw Materials (material group Die Casting). ');
+      .toBe('Material "Generic ABS, Fittings" is not a die-casting alloy in Raw Materials (material group Die Casting). ');
+  });
+
+  it('different reasons name their routes', () => {
+    expect(whyNoRoute([route('Manual', 'Insert Pick and Place: no inserts.'), route('3-axis', 'no robot carries 25 kg')]))
+      .toBe('Manual: Insert Pick and Place: no inserts. 3-axis: no robot carries 25 kg. ');
   });
 
   it('falls back to the first operation with no costing data, and says nothing when no route says', () => {

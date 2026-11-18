@@ -3,6 +3,7 @@
 import { AlertTriangle, Check, Info } from 'lucide-react';
 import { useId, useRef } from 'react';
 
+import { ConciseNote } from '@/components/ui/concise-note';
 import { fmtMinutes, fmtMoney } from '@/lib/routing/route-format';
 import { groupRouteNodes, maxRouteCost, ROUTE_SORT_MODES, sortRouteNodes, type RouteSortMode } from '@/lib/routing/route-sort';
 import type { RouteNode } from '@/lib/routing/route-tree';
@@ -254,7 +255,7 @@ export function RouteCompareList({
                       {!node.feasible && node.infeasibleReason && (
                         <p className="mt-1.5 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground">
                           <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-500" />
-                          <span>{node.infeasibleReason}</span>
+                          <ConciseNote as="span" text={node.infeasibleReason} />
                         </p>
                       )}
                       {/* Why a visible, priced route cannot be picked here.

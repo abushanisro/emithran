@@ -1169,6 +1169,8 @@ export interface CostSummaryDto {
   insertMolding?: {
     route: string; routeLabel: string; complete: boolean;
     inserts: Array<{ id: string | null; name: string; perPart: number; massKg: number | null; source: 'bom' | 'cost_guide' }>;
+    /** The insert candidates the CAD recognised: a starting count to offer. */
+    cadInsertCandidates: number | null;
     loaderName: string | null; loadSecPerPart: number | null;
     press: { name: string | null; tableConfiguration: string | null; tablePress: boolean; reasons: string[] };
     moldingCycleSec: number | null; shotSec: number | null; toolingNote: string | null;

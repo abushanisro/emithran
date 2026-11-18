@@ -36,9 +36,12 @@ export function whyNoRoute(routes: ReadonlyArray<Pick<RouteResultDto, 'routeLabe
   for (const r of routes) {
     const gap = r.dataGaps?.[0];
     const reason = r.capability?.warnings?.[0] ?? (gap ? `${gap.process}: ${gap.reason}` : undefined);
-    if (reason) byReason.set(reason, [...(byReason.get(reason) ?? []), r.routeLabel]);
+    if (reason) byReason.set(reason.replace(/\.+$/, ''), [...(byReason.get(reason.replace(/\.+$/, '')) ?? []), r.routeLabel]);
   }
-  return [...byReason].map(([reason, labels]) => `${labels.join(', ')}: ${reason.replace(/\.+$/, '')}. `).join('');
+  // The same reason for every route is the part's problem, not a route's: said once, without the list of routes.
+  const [only] = byReason;
+  if (byReason.size === 1 && routes.length > 1 && only![1].length === routes.length) return `${only![0]}. `;
+  return [...byReason].map(([reason, labels]) => `${labels.join(', ')}: ${reason}. `).join('');
 }
 
 @Injectable()
@@ -114,8 +117,7 @@ export class RouteApplicationService {
     }
     if (!routeId) {
       throw new BadRequestException(
-        'No route is both feasible and fully costed for this part, so none can be applied automatically. ' +
-        `${whyNoRoute(comparison.routes)}Choose a route manually; the route comparison lists what each one is missing.`,
+        `No route is both feasible and fully costed. ${whyNoRoute(comparison.routes)}`.trim(),
       );
     }
 

@@ -34,10 +34,17 @@ function Row({ label, children, title }: { label: ReactNode; children: ReactNode
 }
 
 /** The inserts entered in the Cost Guide, for a part with no inserts under it in the BOM. Weight is entered in grams, stored in kg. */
-function InsertEntryForm({ initial, onSave, onCancel }: { initial: InsertEntry; onSave: (entry: InsertEntry) => void; onCancel?: (() => void) | undefined }) {
-  const [entry, setEntry] = useState<InsertEntry>(initial);
+function InsertEntryForm({ saved, start, onSave, onCancel }: {
+  /** What is saved; Save is enabled once the form differs from it. */
+  saved: InsertEntry;
+  /** What the form starts from: the saved entry, or the CAD's insert count when nothing is saved. */
+  start: InsertEntry;
+  onSave: (entry: InsertEntry) => void;
+  onCancel?: (() => void) | undefined;
+}) {
+  const [entry, setEntry] = useState<InsertEntry>(start);
   const number = (v: string) => (v === '' ? null : Number(v));
-  const changed = entry.count !== initial.count || entry.weightKg !== initial.weightKg || entry.name !== initial.name;
+  const changed = entry.count !== saved.count || entry.weightKg !== saved.weightKg || entry.name !== saved.name;
   return (
     <div className="grid grid-cols-[4.5rem_5.5rem_1fr] gap-2 rounded-md border border-border p-2">
       <label className="flex flex-col gap-1">
@@ -80,6 +87,7 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
   const entered = insertEntryOf(overrides);
   const showEntered = !fromBom && entered.count != null && !editing;
   const shot = shotCycleOf(im);
+  const cad = im.cadInsertCandidates != null && im.cadInsertCandidates > 0 ? im.cadInsertCandidates : null;
 
   return (
     <div className="space-y-4 text-xs">
@@ -107,9 +115,12 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
           </ul>
         ) : (
           <>
-            <p className="text-muted-foreground">Add the inserts as BOM children of this part, or enter them here.</p>
+            <p className="text-muted-foreground">
+              {cad ? `CAD found ${String(cad)} insert candidates. Confirm the count and add the weight, or add the inserts as BOM children.` : 'Add the inserts as BOM children of this part, or enter them here.'}
+            </p>
             <InsertEntryForm
-              initial={entered}
+              saved={entered}
+              start={entered.count == null && cad ? { ...entered, count: cad } : entered}
               onSave={(e) => { onChange(insertEntryPatch(e)); setEditing(false); }}
               onCancel={editing ? () => { setEditing(false); } : undefined}
             />
@@ -129,7 +140,7 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
             <Row label="Molding">{seconds(im.moldingCycleSec)}</Row>
             <Row label={<span className="font-medium text-foreground">Shot cycle</span>} title={shot.explanation}>
               <span className="font-medium text-foreground">{seconds(im.shotSec)}</span>
-              <span className="block text-muted-foreground">{shot.rule}</span>
+              {im.shotSec != null && <span className="block text-muted-foreground">{shot.rule}</span>}
             </Row>
           </ul>
         ) : (

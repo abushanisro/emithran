@@ -131,9 +131,9 @@ const UNREAD_BY_LABEL = new Map(Object.entries(UNREAD_REFERENCE_DATA).map(([key,
 function uncostedOpWarning(label: string, detail?: string): string {
   const unread = UNREAD_BY_LABEL.get(label);
   const why = unread
-    ? `the reference holds ${unread}, which the cost model does not read yet`
-    : 'no sourced time/rate data exists for this operation yet';
-  return `${label} required${detail ? ` (${detail})` : ''} — not costed: ${why}; excluded from Direct Process Costs rather than estimated.`;
+    ? `the reference has ${unread}, not yet read by the model`
+    : 'no sourced time/rate data exists';
+  return `${label} required${detail ? ` (${detail})` : ''}: not costed, ${why}.`;
 }
 
 // Hot-tip and sub gates self-de-gate; no vestige trimming needed.
@@ -672,11 +672,13 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       `${(signals as any).unscrewingCoreCount ?? '?'} unscrewing core(s) — hydraulic/servo rotation required`,
     ));
   }
-  if (routed.has('insert_loading')) {
+  // On an insert press the loading is its own costed line (Insert Pick and Place), so these are not "not costed" operations there.
+  const insertPress = mhrRate.machineClass === 'assembly_molding_insert_injection_molding';
+  if (routed.has('insert_loading') && !insertPress) {
     notCosted(UNCOSTED_OPERATION_LABELS.insert_loading, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_loading, `${signals.insertCount ?? '?'} insert(s)`));
   }
   if (routed.has('insert_inspection')) notCosted(UNCOSTED_OPERATION_LABELS.insert_inspection, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_inspection));
-  if (routed.has('insert_installation')) {
+  if (routed.has('insert_installation') && !insertPress) {
     notCosted(UNCOSTED_OPERATION_LABELS.insert_installation, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_installation, `${signals.insertCount ?? '?'} insert candidate(s)`));
   }
   if (routed.has('secondary_cure_oven')) notCosted(UNCOSTED_OPERATION_LABELS.secondary_cure_oven, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.secondary_cure_oven));
