@@ -25,7 +25,7 @@ function serviceOver(client: unknown) {
 }
 
 describe('the material picker for a process group', () => {
-  const links = { 'Plastic Molding': ['Plastic & Rubber'], Machining: ['Steel'] };
+  const links = { 'Plastic Molding': ['Plastic & Rubber'], 'Assembly Molding': ['Plastic & Rubber'], Machining: ['Steel'] };
 
   it('offers a molding process only molding feedstock: the printing resins in its material group are filtered out in the database', async () => {
     const { client, calls } = recordingClient([], links);
@@ -37,6 +37,14 @@ describe('the material picker for a process group', () => {
   it('and only the grades the engine can cost: an older catalog row with no injection pressure and no cure time is not offered', async () => {
     const { client, calls } = recordingClient([], links);
     await serviceOver(client).findAll({ processGroup: 'Plastic Molding' } as never);
+    expect(calls).toContainEqual(['or', [moldingCostableFilter()]]);
+  });
+
+  it('offers insert molding (Assembly Molding) the same costable molding feedstock: no PolyJet or SLA resin, no stock shape', async () => {
+    const { client, calls } = recordingClient([], links);
+    await serviceOver(client).findAll({ processGroup: 'Assembly Molding' } as never);
+    expect(calls).toContainEqual(['in', ['material_group', ['Plastic & Rubber']]]);
+    expect(calls).toContainEqual(['or', [moldingFeedstockFilter()]]);
     expect(calls).toContainEqual(['or', [moldingCostableFilter()]]);
   });
 

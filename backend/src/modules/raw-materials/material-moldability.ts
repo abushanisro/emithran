@@ -134,4 +134,5 @@ export function moldingCostableFilter(): string {
  * The process groups whose picker offers only molding feedstock (see moldingFeedstockFilter). Their material group (Plastic & Rubber) also holds
  * 3D-printing resins and powders and stock shapes, which no molding route can use.
  */
-export const MOLDING_PROCESS_GROUPS: ReadonlySet<string> = new Set(['Plastic Molding']);
+// Assembly Molding (insert molding) is injection molding on insert presses: it molds the same feedstock, from the same material group.
+export const MOLDING_PROCESS_GROUPS: ReadonlySet<string> = new Set(['Plastic Molding', 'Assembly Molding']);
