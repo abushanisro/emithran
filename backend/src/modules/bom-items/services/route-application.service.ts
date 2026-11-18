@@ -117,7 +117,8 @@ export class RouteApplicationService {
     }
     if (!routeId) {
       throw new BadRequestException(
-        `No route is both feasible and fully costed. ${whyNoRoute(comparison.routes)}`.trim(),
+        // The reason leads: a short view of the message (the Cost tab, the toast) shows its first sentence.
+        whyNoRoute(comparison.routes) ? `No route can be applied: ${whyNoRoute(comparison.routes).trim()}` : 'No route is both feasible and fully costed.',
       );
     }
 

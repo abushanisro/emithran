@@ -139,7 +139,7 @@ export function InsertMoldingCycle({ insertMolding: im }: { insertMolding: Inser
     <ul className={`${boxClass} text-xs`}>
       <Row label="Press">
         <span className="text-foreground">{im.press.name}</span>
-        <span className="block text-muted-foreground">{im.press.tableConfiguration ? `${im.press.tableConfiguration} table` : 'No rotary or shuttle table'}</span>
+        <span className="block text-muted-foreground">{im.press.tablePress && im.press.tableConfiguration ? `${im.press.tableConfiguration} table` : 'No rotary or shuttle table'}</span>
       </Row>
       {im.shotSec == null ? (
         <li className={`${rowClass} text-amber-600`}>

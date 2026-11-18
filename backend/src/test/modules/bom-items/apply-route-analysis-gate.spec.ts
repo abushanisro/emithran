@@ -75,6 +75,14 @@ describe('applying "auto" when every route is incompatible', () => {
     expect(error.message).toContain('Compression Molding: 2 x SlideBundle (The reference lists no SlideBundle for it.)');
   });
 
+  it('leads with the reason no route can be applied, so its first sentence says what to fix (Cannula Holder Right: no inserts)', async () => {
+    const noInserts = 'Insert Pick and Place: The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.';
+    const route = (routeLabel: string) => ({ routeId: routeLabel, routeLabel, isFeasible: false, capability: { warnings: [noInserts] }, dataGaps: [] });
+    const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [route('Manual'), route('3-axis'), route('6-axis')] });
+    const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;
+    expect(error.message).toBe(`No route can be applied: ${noInserts}`);
+  });
+
   it('a null recommendation for another reason keeps its own message', async () => {
     const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [] });
     const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;

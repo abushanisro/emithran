@@ -4609,7 +4609,9 @@ export class BomItemCostingService {
       const reason = `Insert loading cannot be costed: ${inputs.missing.join('; ')}`;
       return { ...appendLines(computeInjectionMoldedCostSummary(pressInput), [gapLine('Insert Pick and Place', INSERT_MOLDING_PROCESS_GROUP, 'assembly_molding_insert_pick_and_place', reason)]), warnings: [reason] };
     }
-    const tableConfiguration = press?.tableConfiguration ?? null;
+    // Only a rotary or shuttle table is a table: the press records also say "No table".
+    const rawTable = press?.tableConfiguration ?? null;
+    const tableConfiguration = isTablePress(rawTable) ? rawTable : null;
     const pressName = press?.record?.name ?? a.mhrRates.insertInjectionMolding.machineName ?? null;
     const usdToLocal = a.imInput.usdToLocal ?? 1;
     const routes = priceInsertRoutes({
