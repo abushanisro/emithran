@@ -11,6 +11,26 @@ import type { MachiningAllowanceSummary } from './useMachiningAllowance';
 
 export type { OccurrenceScore };
 
+/** The cad-engine's comparison of a finished part with its source component (backend two-model.service.ts). */
+export interface StoredTwoModelComparison {
+  sourceItemId: string;
+  targetFile: string;
+  sourceFile: string;
+  comparedAt: string;
+  result: {
+    comparison_version: string;
+    aligned: boolean;
+    misalignment: string | null;
+    target_volume_mm3: number;
+    source_volume_mm3: number;
+    outside_fraction?: number;
+    allowed_outside_fraction?: number;
+    as_supplied_face_ids?: number[];
+    machined_face_ids?: number[];
+    removed_volume_mm3?: number;
+  };
+}
+
 export interface BOMItem {
   id: string;
   bomId: string;
@@ -33,6 +53,12 @@ export interface BOMItem {
   file3dPath?: string;
   file2dPath?: string;
   fileDxfPath?: string;
+  /** The STEP model the CAD analysis and the 2-Model comparison read. */
+  fileStepPath?: string;
+  /** 2-Model Machining (migration 1066): the item of the same BOM this part is machined from, its source component. */
+  sourceItemId?: string | null;
+  /** 2-Model Machining (migration 1068): the comparison of this part's STEP with its source's, keyed by both files. */
+  twoModelComparison?: StoredTwoModelComparison | null;
   createdAt: string;
   updatedAt: string;
   weight?: number;
@@ -324,6 +350,24 @@ export function useUpdateBOMItem() {
       } else {
         toast.error('Unable to update BOM item. Please try again or contact support.');
       }
+    },
+  });
+}
+
+/**
+ * 2-Model Machining: links the part to the item of its BOM it is machined from (PUT /bom-items/:id/source-item), or clears the link with
+ * null. The backend compares the two STEP models right after, so the response carries the comparison the cost reads.
+ */
+export function useSetSourceItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, sourceItemId }: { id: string; sourceItemId: string | null }) =>
+      apiClient.put<BOMItem>(`/bom-items/${id}/source-item`, { sourceItemId }, { timeout: 200_000 }),
+    onSuccess: (data) => {
+      if (data) invalidateBOMItemUpdateQueries(queryClient, data);
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof ApiError ? error.getUserMessage() : 'Could not link the source component');
     },
   });
 }
@@ -1147,6 +1191,12 @@ export interface CostSummaryDto {
     flash: { thicknessMm: number; widthMm: number; volumeMm3: number } | null;
     complete: boolean;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
+  /** 2-Model Machining: the source component the part is machined from, its cost being this part's material (backend withSourceComponent). */
+  sourceComponent?: {
+    itemId: string; name: string; basis: 'fully_burdened' | 'piece_part';
+    materialCost: number; processCost: number; toolingCost: number; totalCost: number;
+    asSuppliedFeatures: number; removedVolumeMm3: number | null;
   };
   /** Composites: the ply stack read from the laminate, the core and the layup route quoted (mirrors the backend's CompositesBreakdown). */
   composites?: {

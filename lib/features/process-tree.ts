@@ -1,5 +1,6 @@
 import { type CostSummaryDto, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { type SecondaryProcessLine } from '@/lib/api/hooks/useSecondaryProcesses';
+import { AS_SUPPLIED_STEP, asSuppliedOccurrences } from '@/lib/costing/two-model-view';
 import { fmt, fmtInt, formatEstCycleTime } from '@/lib/features/display-format';
 import { gdtCalloutNodes } from '@/lib/features/gdt-callout-nodes';
 import { groupFeaturesByType } from '@/lib/features/machining-feature-tree';
@@ -205,7 +206,12 @@ export function buildProcessTree(
   // "Milling"/"Machining": that substring test skipped real steps such as
   // "4 Axis Mill", which is why they showed no features at all.
   const isMachiningFamily = isMachiningTreeFamily(family);
-  const v2All = fg?.feature_graph_v2?.features ?? [];
+  // 2-Model Machining: the occurrences left as the source component made them are not machined (the backend costs only the rest). A
+  // feature all of whose occurrences are as supplied leaves the machining steps; they are listed under their own step below.
+  const asSupplied = cost?.sourceComponent ? asSuppliedOccurrences(fg, item.twoModelComparison?.result.as_supplied_face_ids) : [];
+  const suppliedCount = new Map<string, number>();
+  for (const o of asSupplied) suppliedCount.set(o.featureId, (suppliedCount.get(o.featureId) ?? 0) + 1);
+  const v2All = (fg?.feature_graph_v2?.features ?? []).filter((f) => (suppliedCount.get(f.id) ?? 0) < f.occurrences.length);
   const v2ById = new Map(v2All.map((f) => [f.id, f]));
   // The cost line of a step: by the engine's name for it, else by machine class when exactly one line
   // runs on that class (a step saved as "Deburring" is the engine's "Finishing" line).
@@ -594,6 +600,30 @@ export function buildProcessTree(
       factory,
       machine: 'Not applied',
       attrs: [{ name: 'Reason', value: reasonText }],
+    });
+  }
+
+  // 2-Model Machining: the catalog's "Source Component: As Supplied" step, first, with each occurrence the source already made (costing
+  // nothing; its cost is the source component's, the part's material).
+  if (cost?.sourceComponent && asSupplied.length > 0) {
+    const source = cost.sourceComponent;
+    operations.unshift({
+      id: 'op_as_supplied',
+      kind: 'operation',
+      label: AS_SUPPLIED_STEP,
+      processName: AS_SUPPLIED_STEP,
+      factory,
+      machine: source.name,
+      attrs: [{ name: 'Source component', value: source.name }, { name: 'Occurrences', value: String(asSupplied.length) }],
+      children: asSupplied.map((o) => ({
+        id: `as_supplied_${o.featureId}_${o.occurrenceIndex}`,
+        kind: 'feature' as const,
+        label: `${o.featureType} ${o.occurrenceIndex + 1}`,
+        factory,
+        machine: source.name,
+        v2Occurrences: [{ featureId: o.featureId, occurrenceIndex: o.occurrenceIndex }],
+        attrs: [{ name: 'Feature', value: o.featureType }, { name: 'Faces', value: String(o.faceIds.length) }, { name: 'Machined', value: 'No: as supplied' }],
+      })),
     });
   }
 
