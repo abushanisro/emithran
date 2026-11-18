@@ -5,7 +5,7 @@ import { isCostedProcessGroup, processGroupOptionLabel, processGroupToFamilyHint
 // A Process with no cost model is not costed (the backend's familiesOfProcessGroup), so the Process fields mark it instead of offering it blind:
 // a part whose Process had none was priced as whatever it was last analysed as.
 describe('process groups with a cost model', () => {
-  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal', 'Additive Manufacturing', 'Assembly'])('%s is costed', (group) => {
+  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal', 'Additive Manufacturing', 'Assembly', 'Assembly Molding'])('%s is costed', (group) => {
     expect(isCostedProcessGroup(group)).toBe(true);
     expect(processGroupOptionLabel(group)).toBe(group);
   });
@@ -31,5 +31,7 @@ describe('process groups with a cost model', () => {
     expect(processGroupToFamilyHint('Rapid Prototyping')).toBeUndefined();
     // An assembly is costed from its children: there is no CAD extractor to force for it.
     expect(processGroupToFamilyHint('Assembly')).toBeUndefined();
+    // Insert molding is analysed as the molded plastic part it is.
+    expect(processGroupToFamilyHint('Assembly Molding')).toBe('plastic_molded');
   });
 });

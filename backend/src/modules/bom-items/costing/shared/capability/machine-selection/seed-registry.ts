@@ -369,6 +369,8 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // 2026-09-02 from structural_foam_molding_machines.json's real
   // clampingForceKn) via MachineCandidate, not this seed fallback.
   structural_foam_molding: {},
+  // The insert presses' clamp, shot, mold heights and tie bars are their own (migration 1080), never a class default.
+  assembly_molding_insert_injection_molding: {},
   // Compression molding has no clamp-tonnage-style capability concept this
   // registry models (see cost-compression-molding-engine.ts) — real per-
   // machine press force/kinematics are staged directly onto mhr_records'

@@ -66,6 +66,20 @@ function routeToLocal(route: AssemblyRoute, usdToLocal: number): AssemblyRoute {
   };
 }
 
+/**
+ * BOM items as components: each one's quantity, size, threaded holes and mass (its weight, else its volume at its material's density, each
+ * material's density read once). Shared with insert molding, whose inserts are the molded part's children.
+ */
+export async function componentsOf(
+  parts: ReadonlyArray<Parameters<typeof componentOf>[0]>, densityOf?: (grade: string) => Promise<number | null>,
+): Promise<AssemblyComponent[]> {
+  const density = new Map<string, number | null>();
+  for (const g of new Set(parts.filter((p) => !(Number(p.weight) > 0) && Number(p.volume) > 0 && p.materialGrade).map((p) => p.materialGrade!))) {
+    density.set(g, densityOf ? await densityOf(g) : null);
+  }
+  return parts.map((p) => componentOf(p, p.materialGrade ? density.get(p.materialGrade) ?? null : null));
+}
+
 /** The finished assembly's mass (its components') and size (its own, from the BOM, else its largest component's), with where they came from. */
 export function finishedAssembly(item: AssemblyCostRequest['item'], components: readonly AssemblyComponent[]): { massKg: number | null; maxDimensionMm: number | null; sizeSource: string } {
   const massKg = components.every((c) => c.massKg != null) ? components.reduce((s, c) => s + c.massKg! * c.quantity, 0) : null;
@@ -102,11 +116,7 @@ export class AssemblyCostService {
     // A part set to Assembly with no parts under it in the BOM is the one component: it is loaded, and its own threaded holes are screwed.
     const self = req.children.length === 0;
     const parts = self ? [{ ...req.item, quantity: 1 }] : req.children;
-    const density = new Map<string, number | null>();
-    for (const g of new Set(parts.filter((p) => !(Number(p.weight) > 0) && Number(p.volume) > 0 && p.materialGrade).map((p) => p.materialGrade!))) {
-      density.set(g, req.densityOf ? await req.densityOf(g) : null);
-    }
-    const components = parts.map((p) => componentOf(p, p.materialGrade ? density.get(p.materialGrade) ?? null : null));
+    const components = await componentsOf(parts, req.densityOf);
     const { joints, ignored } = mergeJoints(deriveJoints(components), o[ASSEMBLY_JOINTS_KEY]);
     const warnings = [...ignored, ...(self ? [`${req.item.name} has no parts under it in the BOM: it is costed as the one component, loaded and screwed into its own threaded holes.`] : [])];
     const none = (...missing: string[]): AssemblyCostResult => ({ route: null, routes: [], gaps: [], components, joints, note: null, missing, warnings });

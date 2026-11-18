@@ -136,7 +136,14 @@ import { AdditiveCostService, type AdditiveBuildSummary } from './costing/additi
 import { buildAdditiveCostSummary } from './costing/additive/additive-cost-summary';
 import { ADDITIVE_ROUTES } from './costing/additive/additive-route';
 import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
-import { AssemblyCostService, type AssemblyCostResult } from './costing/assembly/assembly-cost.service';
+import { AssemblyCostService, componentsOf, type AssemblyCostResult } from './costing/assembly/assembly-cost.service';
+import { InsertMoldingService } from './costing/plastic-molding/insert/insert-molding.service';
+import {
+  INSERT_MOLDING_ROUTE_KEY, INSERT_MOLDING_ROUTES, chooseInsertRoute, insertMoldingRouteId, insertsOf, isTablePress, priceInsertRoutes,
+} from './costing/plastic-molding/insert/insert-molding';
+import { insertMoldingRouteFor } from './costing/plastic-molding/insert/insert-molding-route-comparison';
+import { lineToLocal } from './costing/casting/sand/sand-cost';
+import { gap as gapLine } from './costing/casting/casting-finishing';
 import { buildAssemblyCostSummary } from './costing/assembly/assembly-cost-summary';
 import { ASSEMBLY_ROUTES } from './costing/assembly/assembly-route';
 import { assemblyRouteFor, assemblyRouteId } from './costing/assembly/assembly-route-comparison';
@@ -153,7 +160,7 @@ import { buildForgingCostSummary } from './costing/forging/forging-cost-summary'
 import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
 import { FORGING_ROUTES } from './costing/forging/forging-route';
 import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
-import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
+import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, INSERT_MOLDING_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
@@ -234,6 +241,9 @@ export function convertRouteOptions<T extends { totalCost: number | null }>(opti
 export function hasCostModel(family: string): boolean {
   return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
+
+/** Whether a part is insert molded: its Process is Assembly Molding (it is costed as a plastic part, on the insert presses). */
+const isInsertMolding = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === INSERT_MOLDING_PROCESS_GROUP;
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
@@ -322,6 +332,8 @@ export class BomItemCostingService {
     private readonly additiveCostService?: AdditiveCostService,
     /** An assembly's own work; optional for the same reason (without it an assembly is one named, uncosted line). */
     private readonly assemblyCostService?: AssemblyCostService,
+    /** Insert molding's reference data, calculators and loaders; optional for the same reason (without it the loading is a named gap). */
+    private readonly insertMoldingService?: InsertMoldingService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -449,6 +461,7 @@ export class BomItemCostingService {
       ...(dto.forging ? { forging: { ...dto.forging, options: convertRouteOptions(dto.forging.options, conv) } } : {}),
       ...(dto.composites ? { composites: { ...dto.composites, options: convertRouteOptions(dto.composites.options, conv) } } : {}),
       ...(dto.additive ? { additive: { ...dto.additive, options: convertRouteOptions(dto.additive.options, conv) } } : {}),
+      ...(dto.insertMolding ? { insertMolding: { ...dto.insertMolding, options: convertRouteOptions(dto.insertMolding.options, conv) } } : {}),
       ...(dto.assembly ? {
         assembly: {
           ...dto.assembly,
@@ -825,6 +838,8 @@ export class BomItemCostingService {
       // invented, no fabricated data.
       requirements.structural_foam_molding = imRequirement;
       requirements.reaction_injection_molding = imRequirement;
+      // The insert presses carry the same clamp / tie bar / shot / mold height columns (migration 1080): the same requirement sizes them.
+      requirements.assembly_molding_insert_injection_molding = imRequirement;
       // Compression Molding is NOT wired the same way: its real staged data
       // (migration 633) carries max_tonnage (from real pressForceKn) but
       // tie_bar_x/y_mm, shot_capacity_grams, and min/max_mold_height_mm are
@@ -3240,13 +3255,17 @@ export class BomItemCostingService {
         pressTiming: pressRecord,
         goodPartYield: pressRecord?.goodPartYield ?? null,
       };
-      const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
+      // Assembly Molding (insert molding): the same engine on an insert press, with the inserts loaded every shot (plastic-molding/insert).
+      const insertMolding = isInsertMolding(item);
+      const imResult = insertMolding
+        ? { ...(await this.priceInsertMolding({ id, item, imInput, mhrRates, accessToken, location, batchSize, forceRoute: forceDieCastingProcess })), ...currencyMeta }
+        : { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       // What each CAD driver is worth: the same engine, run again with one driver moved one step.
-      imResult.driverImpacts = driverImpacts(imInput, imResult);
+      if (!insertMolding) imResult.driverImpacts = driverImpacts(imInput, imResult);
       imResult.warnings.push(...materialWarnings);
       // The applied route decides the process the part is priced in: another molding process (Structural Foam, Compression, Reaction Injection) is priced by its own engine
       // in the route comparison, and the summary adopts that route, so the Cost tab, the saved rows and the comparison state one price.
-      const appliedOther = await this.appliedOtherMoldingRouteId(id, accessToken);
+      const appliedOther = insertMolding ? null : await this.appliedOtherMoldingRouteId(id, accessToken);
       if (appliedOther) {
         const comparison = await this.plasticRouteComparison.compare({
           item, summary, grade, mhrRates, rates, location, batchSize, annualVolume, productionLifeYears, accessToken,
@@ -4550,6 +4569,115 @@ export class BomItemCostingService {
   }
 
   /**
+   * An insert-molded part (Assembly Molding): every load method priced on the insert press the part needs, the inserts loaded every shot
+   * (overlapped on a rotary or shuttle table), the route forced (comparison), set in the Cost Guide, or the cheapest complete one quoted.
+   */
+  private async priceInsertMolding(a: {
+    id: string; item: BOMItemResponseDto; imInput: InjectionMoldingCostInput; mhrRates: Awaited<ReturnType<RateResolutionService['resolveMHRRates']>>;
+    accessToken: string; location: string; batchSize: number; forceRoute?: string;
+  }): Promise<CostSummaryDto> {
+    const client = this.databaseService.getClient(a.accessToken);
+    const candidate = a.mhrRates.insertInjectionMolding.selection?.balanced?.candidate;
+    const press = candidate?.machineId ? (await this.plasticReferenceService.getPressRecords(client, [candidate.machineId])).get(candidate.machineId) ?? null : null;
+    const pressInput: InjectionMoldingCostInput = {
+      ...a.imInput,
+      mhrRate: a.mhrRates.insertInjectionMolding,
+      machineClampTonnes: candidate?.capability?.maxTonnage ?? null,
+      machineShotCapacityG: candidate?.capability?.shotCapacityGrams ?? null,
+      pressTiming: press,
+      goodPartYield: press?.goodPartYield ?? null,
+    };
+    const inserts = insertsOf(await componentsOf(await this.items.findChildren(a.id, a.accessToken), async (grade) => {
+      const d = await this.items.materialDensity(grade, a.accessToken);
+      return d.density_g_cm3 != null && d.density_g_cm3 > 0 ? d.density_g_cm3 * 1000 : null;
+    }), a.item.scenarioOverrides);
+    const inputs = this.insertMoldingService
+      ? await this.insertMoldingService.inputs(client, a.accessToken, a.location)
+      : { ok: false as const, missing: ['the insert molding service is not available'] };
+    if (!inputs.ok) {
+      const reason = `Insert loading cannot be costed: ${inputs.missing.join('; ')}`;
+      return { ...appendLines(computeInjectionMoldedCostSummary(pressInput), [gapLine('Insert Pick and Place', INSERT_MOLDING_PROCESS_GROUP, 'assembly_molding_insert_pick_and_place', reason)]), warnings: [reason] };
+    }
+    const tableConfiguration = press?.tableConfiguration ?? null;
+    const pressName = press?.record?.name ?? a.mhrRates.insertInjectionMolding.machineName ?? null;
+    const usdToLocal = a.imInput.usdToLocal ?? 1;
+    const routes = priceInsertRoutes({
+      ...inputs, inserts, batchSize: a.batchSize,
+      costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
+      press: { name: pressName, tablePress: isTablePress(tableConfiguration) },
+      toLocal: (l) => (usdToLocal === 1 ? l : lineToLocal(l, usdToLocal)),
+      runEngine: (shot) => computeInjectionMoldedCostSummary({ ...pressInput, shotCycle: shot }),
+      appendLines,
+    });
+    const chosen = chooseInsertRoute(routes, a.forceRoute ?? (a.item.scenarioOverrides?.[INSERT_MOLDING_ROUTE_KEY] as string | undefined));
+    const money = (n: number) => n.toFixed(2);
+    const why = a.forceRoute ? 'priced for the route comparison'
+      : routes.some((r) => r.key === a.item.scenarioOverrides?.[INSERT_MOLDING_ROUTE_KEY]) ? 'set in the Cost Guide'
+      : chosen.complete ? 'the cheapest complete route' : 'no route is complete: the one with the fewest gaps';
+    const others = routes.filter((r) => r !== chosen).map((r) => `${r.label} ${r.complete ? money(r.summary.totalCost) : 'incomplete'}`).join('; ');
+    const toolingNote = isTablePress(tableConfiguration)
+      ? `${pressName ?? 'The press'} has a ${String(tableConfiguration).toLowerCase()} table: its second lower mold half is not in the tooling cost (the tooling model has no separate core half).`
+      : null;
+    return {
+      ...chosen.summary,
+      warnings: [`Insert molding: ${chosen.label} is quoted, ${why}.${others ? ` ${others}.` : ''}`, ...(toolingNote ? [toolingNote] : []), ...chosen.summary.warnings],
+      insertMolding: {
+        route: chosen.key, routeLabel: chosen.label, complete: chosen.complete, inserts,
+        loaderName: chosen.loaderName, loadSecPerPart: chosen.loadSecPerPart,
+        press: {
+          name: pressName, tableConfiguration, tablePress: isTablePress(tableConfiguration),
+          // No press selected: the selector's own reasons (the part's clamp, shot, tie bars or daylight against the insert presses).
+          reasons: candidate?.machineId ? [] : (a.mhrRates.insertInjectionMolding.selection?.balanced?.reasons ?? ['HR Rates has no insert molding press for this location']),
+        },
+        moldingCycleSec: chosen.moldingCycleSec, shotSec: chosen.shotSec, toolingNote,
+        options: routes.map((r) => ({
+          route: r.key, label: r.label, complete: r.complete, totalCost: r.complete ? r.summary.totalCost : null,
+          reason: r.complete ? null : r.summary.processLines.filter((l) => l.physicsGap).map((l) => `${l.process}: ${l.physicsGap && 'reason' in l.physicsGap ? l.physicsGap.reason : 'not costed'}`).join('; '),
+        })),
+      },
+    };
+  }
+
+  /**
+   * An insert-molded part's route comparison: each load method the full Cost Summary priced on it. The recommended one is the route the quote chose.
+   */
+  private async insertMoldingRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = INSERT_MOLDING_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i])),
+    ]);
+    const routes = keys.map((key, i) => insertMoldingRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.insertMolding?.complete ? insertMoldingRouteId(quote!.insertMolding.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No insert molding route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
+  /**
    * An assembly's Cost Summary: its own work, priced by the assembly engine on its children (assembly-cost.service.ts), in the location's
    * currency and then the display currency, with the Cost Guide's cost overrides applied like any quote.
    */
@@ -4924,6 +5052,10 @@ export class BomItemCostingService {
     // Composites: one complete route per layup route, each the full quote on that route (composites-route-comparison.ts).
     // Additive Manufacturing: one route per build process, each the full quote on that route (additive-route-comparison.ts).
     // Assembly: the manual and robotic welding routes, each the full quote on that route (assembly-route-comparison.ts).
+    // Assembly Molding: one route per insert load method, each the full quote on that route (insert-molding-route-comparison.ts).
+    if (family === 'plastic_molded' && isInsertMolding(item)) {
+      return this.insertMoldingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
     if (family === ASSEMBLY_FAMILY) {
       return this.assemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }

@@ -287,7 +287,7 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
 // ── Capability hydration: DB → seed registry → class defaults ─────────────────
 
 const MOLDING_PRESS_CLASSES: ReadonlySet<string> = new Set([
-  'injection_molding', 'structural_foam_molding', 'reaction_injection_molding', 'compression_molding',
+  'injection_molding', 'structural_foam_molding', 'reaction_injection_molding', 'compression_molding', 'assembly_molding_insert_injection_molding',
 ]);
 
 function hydrateCapability(row: RawMachineRow, cls: MachineClass): {

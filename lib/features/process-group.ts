@@ -57,7 +57,12 @@ export function processGroupToFamilyHint(group: string | null | undefined): stri
  * part-family-process-group.ts): a hydroformed part is a sheet-metal part; a Casting part is analysed as a die casting and priced by every
  * casting process.
  */
-const COSTED_AS_FAMILY: Readonly<Record<string, string>> = { 'Sheet Metal - Hydroforming': 'sheet_metal', Casting: 'die_cast' };
+const COSTED_AS_FAMILY: Readonly<Record<string, string>> = {
+  'Sheet Metal - Hydroforming': 'sheet_metal',
+  Casting: 'die_cast',
+  // Insert molding: a molded plastic part on the insert presses (backend plastic-molding/insert).
+  'Assembly Molding': 'plastic_molded',
+};
 
 /**
  * Whether a process group has a cost model (the backend's familiesOfProcessGroup, part-family-process-group.ts). A part whose Process has none
