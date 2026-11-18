@@ -18,12 +18,14 @@ import { CompositesSection } from '@/components/costing/CompositesSection';
 import { AdditiveSection } from '@/components/costing/AdditiveSection';
 import { AssemblySection } from '@/components/costing/AssemblySection';
 import { InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
+import { ConciseNote } from '@/components/ui/concise-note';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
 import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
 import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
 import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
+import { splitNote } from '@/lib/text/concise-note';
 import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
 import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
 import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
@@ -932,10 +934,9 @@ function CostSummaryTab({
       {/* The saved operations come from a route that is not one of this part's routes any more (its
           process changed, e.g. Sheet Metal to Machining) and no later Apply replaced them. */}
       {hasStoredProcs && appliedRouteIsStale(persistedAppliedRouteId, comparison?.routes) && (
-        <div className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 mb-2 text-xs text-destructive">
-          The operations below are the route applied earlier (<strong>{persistedAppliedRouteId}</strong>), which is not a
-          route for this part&apos;s current process. They stay until an Apply succeeds
-          {lastApplyError(item) ? <>; the last Apply was refused: {lastApplyError(item)}</> : null}.
+        <div className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 mb-2 text-xs text-destructive space-y-0.5">
+          <p>These operations are from an earlier route (<strong>{persistedAppliedRouteId}</strong>), not this process. Apply a route to replace them.</p>
+          {lastApplyError(item) && <ConciseNote className="opacity-90" text={`Last Apply refused: ${lastApplyError(item) ?? ''}`} />}
         </div>
       )}
 
@@ -1578,7 +1579,7 @@ function CostSummaryTab({
       {cost.warnings.length > 0 && (
         <div className="mt-3 space-y-1">
           {cost.warnings.map((w, i) => (
-            <p key={i} className="text-xs text-amber-600 leading-snug">⚠ {w}</p>
+            <ConciseNote key={i} className="text-xs text-amber-600 leading-snug" text={`⚠ ${w}`} />
           ))}
         </div>
       )}
@@ -8104,7 +8105,7 @@ export default function ManufacturingIntelligencePage() {
       const message = e instanceof Error ? e.message : 'Unknown error';
       if (code === 'analysis_not_ready') toast.warning(message);
       else if (code === 'scenario_revision_conflict' || code === 'scenario_apply_in_progress') toast.error(message);
-      else toast.error(`Scenario not applied: ${message}`);
+      else toast.error('Scenario not applied', { description: splitNote(message).lead });
       // A staged route the server refused (400) would otherwise stay staged and be re-sent and re-refused by every later Apply.
       if (e instanceof ApiError && e.status === 400 && built.request.route.mode !== 'keep') {
         setSelectedManualRoute(null);

@@ -821,6 +821,8 @@ export interface InsertMoldingBreakdown {
   complete: boolean;
   /** The inserts: the part's BOM children, or the Cost Guide's count and weight. */
   inserts: Array<{ id: string | null; name: string; perPart: number; massKg: number | null; source: 'bom' | 'cost_guide' }>;
+  /** The insert candidates the CAD recognised (bosses and holes sized for inserts): a starting count to offer, never costed by itself. */
+  cadInsertCandidates: number | null;
   loaderName: string | null;
   loadSecPerPart: number | null;
   press: { name: string | null; tableConfiguration: string | null; tablePress: boolean; reasons: string[] };

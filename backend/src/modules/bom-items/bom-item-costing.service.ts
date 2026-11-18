@@ -4621,19 +4621,20 @@ export class BomItemCostingService {
       appendLines,
     });
     const chosen = chooseInsertRoute(routes, a.forceRoute ?? (a.item.scenarioOverrides?.[INSERT_MOLDING_ROUTE_KEY] as string | undefined));
-    const money = (n: number) => n.toFixed(2);
-    const why = a.forceRoute ? 'priced for the route comparison'
+    // One short line each: the Workflow Builder lists every route with its cost, so the note does not repeat them.
+    const why = a.forceRoute ? 'route comparison'
       : routes.some((r) => r.key === a.item.scenarioOverrides?.[INSERT_MOLDING_ROUTE_KEY]) ? 'set in the Cost Guide'
-      : chosen.complete ? 'the cheapest complete route' : 'no route is complete: the one with the fewest gaps';
-    const others = routes.filter((r) => r !== chosen).map((r) => `${r.label} ${r.complete ? money(r.summary.totalCost) : 'incomplete'}`).join('; ');
+      : 'cheapest complete route';
+    const quoteNote = chosen.complete || a.forceRoute ? `Insert molding: ${chosen.label} quoted (${why}).` : 'Insert molding: no load method is fully costed yet.';
     const toolingNote = isTablePress(tableConfiguration)
-      ? `${pressName ?? 'The press'} has a ${String(tableConfiguration).toLowerCase()} table: its second lower mold half is not in the tooling cost (the tooling model has no separate core half).`
+      ? `${String(tableConfiguration)} table: the second lower mold half is not in the tooling cost.`
       : null;
     return {
       ...chosen.summary,
-      warnings: [`Insert molding: ${chosen.label} is quoted, ${why}.${others ? ` ${others}.` : ''}`, ...(toolingNote ? [toolingNote] : []), ...chosen.summary.warnings],
+      warnings: [quoteNote, ...(toolingNote ? [toolingNote] : []), ...chosen.summary.warnings],
       insertMolding: {
         route: chosen.key, routeLabel: chosen.label, complete: chosen.complete, inserts,
+        cadInsertCandidates: a.imInput.signals?.insertCount ?? null,
         loaderName: chosen.loaderName, loadSecPerPart: chosen.loadSecPerPart,
         press: {
           name: pressName, tableConfiguration, tablePress: isTablePress(tableConfiguration),

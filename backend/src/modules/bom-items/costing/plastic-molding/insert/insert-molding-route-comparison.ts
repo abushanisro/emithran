@@ -15,7 +15,7 @@ export function insertMoldingRouteFor(key: InsertMoldingRouteKey, summary: CostS
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const why = !im ? summary.warnings[0] ?? 'the part could not be costed'
     : !isThis ? im.options.find((o) => o.route === key)?.reason ?? 'not a route for this part'
-    : `the route is incomplete: ${gaps.map((g) => `${g.process}: ${g.reason}`).join('; ') || 'a step has no capable machine or data'}`;
+    : gaps.map((g) => `${g.process}: ${g.reason}`).join('; ') || 'a step has no capable machine or data';
   return {
     routeId: insertMoldingRouteId(key),
     routeLabel: isThis && im.press.name ? `${label} · ${im.press.name}${im.loaderName ? ` + ${im.loaderName}` : ''}` : label,
