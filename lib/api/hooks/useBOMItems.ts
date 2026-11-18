@@ -1148,6 +1148,16 @@ export interface CostSummaryDto {
     complete: boolean;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
   };
+  /** Composites: the ply stack read from the laminate, the core and the layup route quoted (mirrors the backend's CompositesBreakdown). */
+  composites?: {
+    route: string; routeLabel: string;
+    /** The laminate at its thickest (core excluded) and the cured ply thickness it is divided by. */
+    laminateMm: number; plyThicknessMm: number; plySource: 'geometry' | 'scenario';
+    plies: Array<{ index: number; areaMm2: number; perimeterMm: number; level: number }>;
+    core: { areaMm2: number; perimeterMm: number; depthMm: number } | null;
+    partsPerLoad: number | null; boughtAreaM2: number; plyMassKg: number; complete: boolean;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
   /** Forging: the finishing and trim dies (USD, separate from the piece cost). */
   forgingDies?: { sets: number; costUsd: number; perPartUsd: number | null; detail: string };
   /** Sand casting: the machining allowance of each machined feature (display only, never costed). */
