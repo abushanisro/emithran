@@ -4589,9 +4589,7 @@ function CostGuidePanel({
             {isTwoModel && (
               <Section title="2-Model Machining">
                 <TwoModelSection
-                  item={item}
                   source={cgpCostSummary?.sourceComponent}
-                  onBlankProcess={(process) => { patchScenarioOverrides.mutate({ id: item.id, patch: { twoModelBlankProcess: process } }); }}
                 />
               </Section>
             )}

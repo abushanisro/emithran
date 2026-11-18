@@ -6,14 +6,9 @@ import type { MachiningAllowanceResult } from '../casting/machining-allowance';
 import { routeToolingItems } from '../shared/route-tooling';
 import type { SourceComponentCost } from './two-model-cost';
 
-/** The blank processes a blank can be derived for from a machined part's analysis, and the casting family each prices as. */
-export const DERIVABLE_BLANK_FAMILY: Readonly<Record<string, string>> = {
-  'Sand Casting': 'sand_cast',
-  'Casting Investment': 'investment_cast',
-};
-/** The Cost Guide key of the process the blank is made by (TwoModelSection "Blank made by"). */
-export const TWO_MODEL_BLANK_PROCESS_KEY = 'twoModelBlankProcess';
-export const DEFAULT_BLANK_PROCESS = 'Sand Casting';
+/** The derived blank is a sand casting (the casting family it prices as): one a machined part's analysis can price, with allowance data. */
+export const BLANK_PROCESS = 'Sand Casting';
+export const BLANK_FAMILY = 'sand_cast';
 
 /** What the casting engine reports back when it prices a derived blank (computeCostSummary's derivedBlank option). */
 export interface DerivedBlankOut {

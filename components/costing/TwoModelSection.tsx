@@ -1,19 +1,14 @@
 'use client';
 
-import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
-import { blankProcessOf, DERIVABLE_BLANK_PROCESSES, type SourceComponentSummary } from '@/lib/costing/two-model-view';
+import type { SourceComponentSummary } from '@/lib/costing/two-model-view';
 
 interface Props {
-  item: BOMItem;
   /** The engine's blank block (absent while the part cannot be costed: the cost names why). */
   source: SourceComponentSummary | null | undefined;
-  /** Saves the process the blank is made by (scenario key twoModelBlankProcess). */
-  onBlankProcess: (process: string) => void;
 }
 
 const rowClass = 'flex items-start gap-2 py-0.5';
 const labelClass = 'text-xs text-muted-foreground w-24 shrink-0';
-const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
 const money = (n: number) => n.toFixed(2);
 const mm3 = (v: number) => `${Math.round(v).toLocaleString('en-US')} mm³`;
 
@@ -21,24 +16,11 @@ const mm3 = (v: number) => `${Math.round(v).toLocaleString('en-US')} mm³`;
  * The Cost Guide's 2-Model Machining settings: the part is costed from its own 3D model. Its blank is derived from it (the part as cast, with
  * its machining allowance), its cost is the part's material, and only what the casting cannot hold is machined.
  */
-export function TwoModelSection({ item, source, onBlankProcess }: Props) {
-  const process = blankProcessOf(item.scenarioOverrides);
+export function TwoModelSection({ source }: Props) {
   return (
     <div className="space-y-1 text-xs">
-      <div className={rowClass}>
-        <span className={labelClass}>Blank made by</span>
-        <select
-          className={`${controlClass} cursor-pointer`}
-          value={process}
-          onChange={(e) => { onBlankProcess(e.target.value); }}
-          title="The blank is derived from this part's 3D model: the part as cast by this process, with its machining allowance."
-        >
-          {DERIVABLE_BLANK_PROCESSES.map((p) => <option key={p} value={p}>{p}</option>)}
-          {!DERIVABLE_BLANK_PROCESSES.includes(process) && <option value={process}>{process} (cannot be derived)</option>}
-        </select>
-      </div>
       <p className="text-muted-foreground">
-        The blank is derived from this part&apos;s 3D model, as a {process.toLowerCase()} with its machining allowance; only what the casting cannot
+        The blank is derived from this part&apos;s 3D model, as a sand casting with its machining allowance; only what the casting cannot
         hold is machined.
       </p>
 
