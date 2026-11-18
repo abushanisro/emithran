@@ -211,8 +211,19 @@ export function resolveStoredProcessLines<
   effective: EffectiveCostingInputs,
 ): ResolvedStoredLine<L, R>[] {
   const batchSize = Math.max(num(effective.batchSize, 1), 1);
+  // How many earlier rows share a row's machine class and operation: the n-th such row is the n-th engine line of them (an assembly
+  // screws in three sizes on one machine, three "Mechanical Assembly" rows and three lines), never the first line again.
+  const opKey = (machineClass: string | null | undefined, operation: string | null | undefined) =>
+    `${machineClass ?? ''}|${(operation ?? '').trim().toLowerCase()}`;
+  const seen = new Map<string, number>();
+  const nthOfKey = rows.map((row) => {
+    const key = opKey(row.machineClass, row.category || row.operation);
+    const n = seen.get(key) ?? 0;
+    seen.set(key, n + 1);
+    return n;
+  });
 
-  return rows.map((row) => {
+  return rows.map((row, rowIndex) => {
     // machine_class alone identifies the RIGHT candidate exactly when a class
     // has one engine line per part (true for almost every class: one Fiber
     // Laser Cutting line, one Press Brake line, ...). It stopped being enough
@@ -233,10 +244,9 @@ export function resolveStoredProcessLines<
       (l) => l.machineClass && row.machineClass && l.machineClass === row.machineClass,
     );
     const rowOperation = (row.category || row.operation || '').trim().toLowerCase();
+    const sameOperation = rowOperation ? classMatches.filter((l) => (l.process ?? '').trim().toLowerCase() === rowOperation) : [];
     const matchedEngineLine =
-      (rowOperation
-        ? classMatches.find((l) => (l.process ?? '').trim().toLowerCase() === rowOperation)
-        : undefined)
+      (sameOperation.length > 0 ? sameOperation[nthOfKey[rowIndex] ?? 0] ?? sameOperation[0] : undefined)
       ?? (classMatches.length === 1 ? classMatches[0] : undefined)
       ?? null;
 

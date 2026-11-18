@@ -9,12 +9,6 @@ export const ASSEMBLY_SCENARIO_KEYS = {
   joints: 'assemblyJoints',
 } as const;
 
-/** The routes (backend assembly-route.ts ASSEMBLY_ROUTES). */
-export const ASSEMBLY_ROUTE_OPTIONS = [
-  { key: 'manual', label: 'Manual assembly' },
-  { key: 'robotic', label: 'Robotic welding' },
-] as const;
-
 /** A measure a joint can carry, as the joint table stores it (backend assembly-joints.ts parseJointRow). */
 export type JointField = 'operation' | 'count' | 'lengthMm' | 'throatMm' | 'depthMm' | 'areaMm2' | 'weldMaterial' | 'gas' | 'position' | 'wireDiameterMm' | 'timeS' | 'prep' | 'cleanUp';
 
