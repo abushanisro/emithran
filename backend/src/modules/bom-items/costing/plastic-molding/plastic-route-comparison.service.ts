@@ -181,6 +181,7 @@ export class PlasticRouteComparisonService {
       moldTempC: rcRealResinInputs?.moldTempC ?? null,
       densityOfMeltKgM3: rcRealResinInputs?.densityOfMeltKgM3 ?? null,
       cureTimeMin: null,
+      materialType: rcMaterialType ?? null,
     });
     // Each tier offers the press with the lowest cost per part among its
     // capable real presses, costed by the engine itself: no utilization sweet

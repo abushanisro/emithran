@@ -242,6 +242,12 @@ export function hasCostModel(family: string): boolean {
   return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
+/** The molding line's material reason, when the engine found the material itself cannot be molded (requiredCapability says so). */
+const materialGapOf = (s: CostSummaryDto): string | null => {
+  const line = s.processLines.find((l) => l.physicsGap && 'requiredCapability' in l.physicsGap && l.physicsGap.requiredCapability === 'An injection-molding material');
+  return line?.physicsGap && 'reason' in line.physicsGap ? line.physicsGap.reason : null;
+};
+
 /** Whether a part is insert molded: its Process is Assembly Molding (it is costed as a plastic part, on the insert presses). */
 const isInsertMolding = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === INSERT_MOLDING_PROCESS_GROUP;
 
@@ -4627,7 +4633,11 @@ export class BomItemCostingService {
         press: {
           name: pressName, tableConfiguration, tablePress: isTablePress(tableConfiguration),
           // No press selected: the selector's own reasons (the part's clamp, shot, tie bars or daylight against the insert presses).
-          reasons: candidate?.machineId ? [] : (a.mhrRates.insertInjectionMolding.selection?.balanced?.reasons ?? ['HR Rates has no insert molding press for this location']),
+          // What is wrong with the material itself (a metal, 3D-printing feedstock) is the reason first; the selector's comes after.
+          reasons: candidate?.machineId ? [] : [
+            ...(materialGapOf(chosen.summary) ? [materialGapOf(chosen.summary)!] : []),
+            ...(a.mhrRates.insertInjectionMolding.selection?.balanced?.reasons ?? ['HR Rates has no insert molding press for this location']),
+          ],
         },
         moldingCycleSec: chosen.moldingCycleSec, shotSec: chosen.shotSec, toolingNote,
         options: routes.map((r) => ({

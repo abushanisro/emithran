@@ -14,6 +14,22 @@ const molding: MoldabilityMaterial = {
 const row = (over: Partial<MoldabilityMaterial>): MoldabilityMaterial => ({ ...molding, ...over });
 
 describe('injectionMoldabilityGap', () => {
+  it('names a metal as a metal, the one cause, with no missing-data list (Aluminum, ANSI 1050A set as an Assembly Molding part)', () => {
+    const gap = injectionMoldabilityGap(row({
+      grade: 'Aluminum, ANSI 1050A', materialType: 'Aluminum', stockForm: null, matlState: null,
+      injectionPressureMaxMpa: null, flowLengthRatio: null, meltingTempC: null, moldTempC: null, densityOfMeltKgM3: null,
+    }));
+    expect(gap).toEqual({
+      kind: 'metal', missing: [],
+      reason: '"Aluminum, ANSI 1050A" is a metal (Aluminum), not a moldable plastic: injection and insert molding mold plastics. Choose a plastic grade in Material Grade.',
+    });
+    expect(['Stainless Steel', 'Gray Iron', 'Brass', 'Zinc-Aluminum', 'Inconel', 'Heat Resistant Super Alloys'].every((t) => injectionMoldabilityGap(row({ materialType: t }))?.kind === 'metal')).toBe(true);
+  });
+
+  it('a plastic is never taken for a metal by its type (ABS, Nylon, Polycarbonate, TPE, Thermoset)', () => {
+    expect(['ABS', 'Nylon', 'Polycarbonate', 'TPE', 'Thermoset', 'Acetal', 'PS - High Impact'].map((t) => injectionMoldabilityGap(row({ materialType: t })))).toEqual([null, null, null, null, null, null, null]);
+  });
+
   it('lets a molding grade with its reference data through', () => {
     expect(injectionMoldabilityGap(molding)).toBeNull();
   });
