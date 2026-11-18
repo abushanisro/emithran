@@ -21,7 +21,7 @@ export function assemblyRouteFor(key: AssemblyRouteKey, summary: CostSummaryResp
   const option = assembly?.options.find((o) => o.route === key);
   const why = !assembly?.route ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith('Assembly cannot be costed')) ?? 'the assembly could not be costed'
     : !isThis ? option?.reason ?? 'not a route for this assembly'
-    : 'the assembly route is incomplete: a step has no capable machine or a joint is missing a measure';
+    : `the assembly route is incomplete: ${gaps.map((g) => `${g.process}: ${g.reason}`).join('; ') || 'a step has no capable machine or a joint is missing a measure'}`;
   const joints = assembly?.joints.filter((j) => j.enabled).length ?? 0;
   return {
     routeId: assemblyRouteId(key),

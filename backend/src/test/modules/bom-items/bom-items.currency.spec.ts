@@ -204,6 +204,26 @@ describe('BOMItemsService.normalizeCostSummaryToCurrency', () => {
     expect(result.toUsdRate).toBeCloseTo(rate, 6);
   });
 
+  it('converts the route options of every family, and an assembly\'s consumables, with the lines (an India quote is not half in rupees)', () => {
+    const service = buildService() as any;
+    const rates = makeRates({ USD: 83.5 });
+    const option = (route: string, totalCost: number | null) => ({ route, label: route, complete: totalCost != null, totalCost, reason: null });
+    const dto = minimalCostSummary({
+      additive: { options: [option('printing', 835), option('resin_curing', null)] },
+      composites: { options: [option('hand_layup', 167)] },
+      forging: { options: [option('closed_die', 83.5)] },
+      assembly: { options: [option('manual', 1670)], consumablesCost: 58.89, joints: [{ id: 'w1', consumablesCost: 58.89 }, { id: 's1', consumablesCost: null }] },
+    } as never);
+    const result = service.normalizeCostSummaryToCurrency(dto, rates, 'INR', null);
+    expect(result.additive.options.map((o: { totalCost: number | null }) => o.totalCost)).toEqual([10, null]);
+    expect(result.composites.options[0].totalCost).toBeCloseTo(2, 9);
+    expect(result.forging.options[0].totalCost).toBeCloseTo(1, 9);
+    expect(result.assembly.options[0].totalCost).toBeCloseTo(20, 9);
+    expect(result.assembly.consumablesCost).toBeCloseTo(58.89 / 83.5, 9);
+    expect(result.assembly.joints[0].consumablesCost).toBeCloseTo(58.89 / 83.5, 9);
+    expect(result.assembly.joints[1].consumablesCost).toBeNull();
+  });
+
   it('converts to the scenario currency (not USD) when a matching fxSnapshot is on file', () => {
     const service = buildService() as any;
     const rates = makeRates({ USD: 83.5 });

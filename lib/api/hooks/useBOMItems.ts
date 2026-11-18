@@ -1161,6 +1161,24 @@ export interface CostSummaryDto {
     asSuppliedFaceIds?: number[];
   };
   /** Composites: the ply stack read from the laminate, the core and the layup route quoted (mirrors the backend's CompositesBreakdown). */
+  /**
+   * Assembly: the components loaded (each BOM child) and every joint (derived from the children's threaded holes or set in the Cost Guide),
+   * the route quoted and every route (backend AssemblyBreakdown). The summary is the assembly's own work; its children are added by the roll-up.
+   */
+  assembly?: {
+    route: string | null; routeLabel: string | null; complete: boolean;
+    components: Array<{ id: string; name: string; quantity: number; massKg: number | null; maxDimensionMm: number | null; threadedHoles: number }>;
+    joints: Array<{
+      id: string; process: string; routeProcess: string | null; operation: string | null; label: string; count: number;
+      source: 'derived' | 'engineer'; enabled: boolean; componentId: string | null; featureIds: string[];
+      lengthMm: number | null; throatMm: number | null; depthMm: number | null; areaMm2: number | null;
+      weldMaterial: string | null; gas: string | null; position: string | null; wireDiameterMm: number | null; timeS: number | null;
+      prep: boolean; cleanUp: boolean; cycleSec: number | null; consumablesCost: number | null; reason: string | null;
+    }>;
+    consumablesCost: number;
+    adhesiveKg: number;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
   /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route (backend AdditiveBreakdown). */
   additive?: {
     route: string; routeLabel: string;

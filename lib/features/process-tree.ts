@@ -214,16 +214,22 @@ export function buildProcessTree(
   const v2All = (fg?.feature_graph_v2?.features ?? []).filter((f) => (suppliedCount.get(f.id) ?? 0) < f.occurrences.length);
   const v2ById = new Map(v2All.map((f) => [f.id, f]));
   // The cost line of a step: by the engine's name for it, else by machine class when exactly one line
-  // runs on that class (a step saved as "Deburring" is the engine's "Finishing" line).
-  const lineForRec = (rec: TreeRec) => {
+  // runs on that class (a step saved as "Deburring" is the engine's "Finishing" line). Several steps can
+  // share a name (an assembly loads its components in two weight bands, or screws in three sizes): the
+  // n-th step of a name is the n-th line of that name, never the first line again.
+  const lineForRec = (rec: TreeRec, recIndex: number) => {
     const lines = cost?.processLines ?? [];
-    const byName = lines.find((l) => l.process === rec.process);
-    if (byName || !rec.machineClass) return byName;
+    const named = lines.filter((l) => l.process === rec.process);
+    if (named.length > 0) {
+      const nth = recs.slice(0, recIndex).filter((r) => r.process === rec.process).length;
+      return named[nth] ?? named[0];
+    }
+    if (!rec.machineClass) return undefined;
     const onClass = lines.filter((l) => l.machineClass === rec.machineClass);
     return onClass.length === 1 ? onClass[0] : undefined;
   };
   const claimedIds = new Set(
-    recs.flatMap((r) => (lineForRec(r)?.featureBreakdown ?? []).flatMap((b) => b.featureIds ?? [])),
+    recs.flatMap((r, i) => (lineForRec(r, i)?.featureBreakdown ?? []).flatMap((b) => b.featureIds ?? [])),
   );
 
   const featureLeaf = (idPrefix: string, f: FeatureNodeV2, machine: string, alone = false): ProcessTreeNode => {
@@ -302,7 +308,7 @@ export function buildProcessTree(
 
     // Only the real machine: the stored row's own machine, else the live cost
     // line's DB-resolved machine, else '—'. Matched by exact process name.
-    const matchedCostLine = lineForRec(rec);
+    const matchedCostLine = lineForRec(rec, opIdx);
     const machine = storedMachineByProcess.get(rec.process) ?? matchedCostLine?.machineName ?? '—';
     const breakdown = matchedCostLine?.featureBreakdown ?? [];
     const featureNodes: ProcessTreeNode[] = [];
@@ -514,7 +520,7 @@ export function buildProcessTree(
   });
   // The process group of each step: its cost line's own processGroup (the
   // machining after a casting is "Machining"), else the part's group.
-  const opGroups = recs.map((rec) => lineForRec(rec)?.processGroup ?? groupLabel);
+  const opGroups = recs.map((rec, i) => lineForRec(rec, i)?.processGroup ?? groupLabel);
 
   // Inject Threaded Features from drawing intelligence for CNC families.
   //
@@ -632,7 +638,7 @@ export function buildProcessTree(
   const groups: ProcessTreeNode[] = [];
   operations.forEach((op) => {
     const idx = recs.findIndex((_, i) => op.id === `op_${i}`);
-    const line = idx >= 0 ? lineForRec(recs[idx]!) : gapLineByOpId.get(op.id);
+    const line = idx >= 0 ? lineForRec(recs[idx]!, idx) : gapLineByOpId.get(op.id);
     const name = idx >= 0 ? opGroups[idx]! : line?.processGroup ?? groupLabel;
     let g = groups.find((x) => x.label === name);
     if (!g) {

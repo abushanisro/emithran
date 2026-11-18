@@ -101,3 +101,27 @@ describe('buildProcessTree: a forged part', () => {
     expect(JSON.stringify(tree)).not.toMatch(/10\.46/);
   });
 });
+
+describe('buildProcessTree: steps that share a name', () => {
+  // An assembly loads its components in two weight bands and screws in two sizes: four lines, two names.
+  const assembly = { id: 'a1', name: 'liner', itemType: 'assembly', quantity: 1 } as unknown as BOMItem;
+  const line = (process: string, names: string[]) => ({ process, cycleTimeMin: 0.1, machineName: `${process} station`, featureBreakdown: names.map((name) => ({ name, featureType: 'AssemblyComponent', timeSec: 1, count: 1 })) });
+  const cost = { processLines: [
+    line('Pick and Place', ['Housing x 1', 'Bracket x 2']), line('Pick and Place', ['The finished assembly unloaded']),
+    line('Mechanical Assembly', ['Housing: 5 x M4 screwed']), line('Mechanical Assembly', ['Housing: 3 x M3 screwed']),
+  ] } as unknown as CostSummaryDto;
+  const stepsOf = (tree: ProcessTreeNode) => (tree.children ?? []).flatMap((g) => g.children ?? []).map((o) => `${o.label}: ${(o.children ?? []).map((f) => f.label).join(', ')}`);
+  const expected = [
+    'Pick and Place: Housing x 1, Bracket x 2', 'Pick and Place: The finished assembly unloaded',
+    'Mechanical Assembly: Housing: 5 x M4 screwed', 'Mechanical Assembly: Housing: 3 x M3 screwed',
+  ];
+
+  it('each costed step lists its own line\'s features, not the first line of its name again', () => {
+    expect(stepsOf(buildProcessTree(assembly, null, summary, 'USA', undefined, cost))).toEqual(expected);
+  });
+
+  it('the applied rows pair with the lines of their name in operation order', () => {
+    const applied = ['Pick and Place', 'Pick and Place', 'Mechanical Assembly', 'Mechanical Assembly'].map((category, i) => ({ opNbr: (i + 1) * 10, category }));
+    expect(stepsOf(buildProcessTree(assembly, null, summary, 'USA', undefined, cost, null, applied))).toEqual(expected);
+  });
+});

@@ -127,9 +127,11 @@ export function parseJointRow(raw: unknown, index: number): AssemblyJoint | null
   const process = oneOf(JOINT_PROCESSES, r.process);
   if (!process) return null;
   const id = text(r.id) ?? `joint-${index + 1}`;
+  const operation = process === 'Mechanical Assembly' ? oneOf(MECHANICAL_OPERATIONS, r.operation) : process === 'Ultrasonic Welding' ? oneOf(ULTRASONIC_TYPES, r.operation) : null;
   return {
-    ...blank(id, process, text(r.label) ?? `${process} ${index + 1}`, 'engineer'),
-    operation: process === 'Mechanical Assembly' ? oneOf(MECHANICAL_OPERATIONS, r.operation) : process === 'Ultrasonic Welding' ? oneOf(ULTRASONIC_TYPES, r.operation) : null,
+    // Unnamed, a joint is called by what it is: its operation ("Snap Fit 2"), else its process ("MIG Welding 1").
+    ...blank(id, process, text(r.label) ?? `${process === 'Mechanical Assembly' && operation ? operation : process} ${index + 1}`, 'engineer'),
+    operation,
     count: Math.max(1, Math.round(positive(r.count) ?? 1)),
     lengthMm: positive(r.lengthMm), throatMm: positive(r.throatMm), depthMm: positive(r.depthMm), areaMm2: positive(r.areaMm2),
     weldMaterial: oneOf(WELD_MATERIALS, r.weldMaterial), gas: oneOf(WELD_GASES, r.gas), position: oneOf(WELD_POSITIONS, r.position),

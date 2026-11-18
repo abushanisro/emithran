@@ -16,6 +16,7 @@ import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { CompositesSection } from '@/components/costing/CompositesSection';
 import { AdditiveSection } from '@/components/costing/AdditiveSection';
+import { AssemblySection } from '@/components/costing/AssemblySection';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
@@ -23,6 +24,8 @@ import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
 import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
 import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
 import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
+import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
+import { isAssemblyItem } from '@/lib/costing/assembly-view';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -3127,6 +3130,8 @@ function RouteSelectionDialog({
       ...(() => { const key = isForged ? forgingRouteKeyOf(selected.routeId) : undefined; return key ? { forgingRoute: key } : {}; })(),
       ...(() => { const key = isComposite ? compositesRouteKeyOf(selected.routeId) : undefined; return key ? { compositesRoute: key } : {}; })(),
       ...(() => { const key = partFamily === 'additive' ? additiveRouteKeyOf(selected.routeId) : undefined; return key ? { additiveRoute: key } : {}; })(),
+      // An assembly's route ids are its own ("assembly-<key>"): the key is committed as the scenario's assemblyRoute.
+      ...(() => { const key = assemblyRouteKeyOf(selected.routeId); return key ? { assemblyRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -3804,6 +3809,8 @@ function CostGuidePanel({
   selectedManualRoute: ManualRouteOption | null;
   onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
 }) {
+  // The project and BOM of this page: an assembly's components (its BOM children) open on their own pages.
+  const cgpParams = useParams();
   type LeftTab = 'scenario' | 'geo' | 'gdt' | 'features' | 'machine';
   const [tab, setTab] = useState<LeftTab>('scenario');
   const [leftAppliedRouteId, setLeftAppliedRouteId] = useState<string | null>(null);
@@ -4576,6 +4583,17 @@ function CostGuidePanel({
                   forging={cgpCostSummary.forging}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'assembly' && (
+              <Section title="Assembly">
+                <AssemblySection
+                  assembly={cgpCostSummary.assembly}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                  hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
                 />
               </Section>
             )}
@@ -8041,6 +8059,7 @@ export default function ManufacturingIntelligencePage() {
       isDieCast: (item.familyClassification ?? fg?.classification?.family) === 'die_cast',
       isForged: (item.familyClassification ?? fg?.classification?.family) === 'forged',
       isAdditive: (item.familyClassification ?? fg?.classification?.family) === 'additive',
+      isAssembly: isAssemblyItem(item),
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });

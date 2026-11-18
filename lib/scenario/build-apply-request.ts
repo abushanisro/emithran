@@ -17,6 +17,8 @@ export interface StagedManualRoute {
   forgingRoute?: string;
   /** An additive route picked in the Workflow Builder (additive-route.ts ADDITIVE_ROUTES key, e.g. "resin_curing"). */
   additiveRoute?: string;
+  /** An assembly route picked in the Workflow Builder (assembly-route.ts ASSEMBLY_ROUTES key, "manual" or "robotic"). */
+  assemblyRoute?: string;
   machineOverrides?: { processKey: string; mhrRecordId: string }[];
 }
 
@@ -37,6 +39,7 @@ export interface StagedScenario {
   isDieCast: boolean;
   isForged: boolean;
   isAdditive?: boolean;
+  isAssembly?: boolean;
   /** Currency and ask price, already resolved by the form. */
   scenarioPatch?: Record<string, unknown>;
   /** The revision of the applied scenario the page read: another apply since then is refused, not overwritten. */
@@ -104,6 +107,8 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
         ...(s.isForged ? { forgingRoute: manual?.forgingRoute ?? null } : {}),
         // Additive the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
         ...(s.isAdditive ? { additiveRoute: manual?.additiveRoute ?? null } : {}),
+        // Assembly the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
+        ...(s.isAssembly ? { assemblyRoute: manual?.assemblyRoute ?? null } : {}),
         ...(s.scenarioPatch ?? {}),
       },
       route,
