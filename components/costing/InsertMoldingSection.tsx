@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -40,7 +40,7 @@ function InsertEntryForm({ saved, start, onSave, onCancel }: {
   /** What the form starts from: the saved entry, or the CAD's insert count when nothing is saved. */
   start: InsertEntry;
   onSave: (entry: InsertEntry) => void;
-  onCancel?: (() => void) | undefined;
+  onCancel: () => void;
 }) {
   const [entry, setEntry] = useState<InsertEntry>(start);
   const number = (v: string) => (v === '' ? null : Number(v));
@@ -66,7 +66,7 @@ function InsertEntryForm({ saved, start, onSave, onCancel }: {
       <div className="col-span-3 flex items-center justify-between gap-2">
         <span className="text-muted-foreground">Load time is read by insert weight.</span>
         <span className="flex gap-2">
-          {onCancel && <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>}
+          <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
           <Button size="sm" disabled={!changed || entry.count == null} onClick={() => { onSave(entry); }}>Save inserts</Button>
         </span>
       </div>
@@ -75,54 +75,64 @@ function InsertEntryForm({ saved, start, onSave, onCancel }: {
 }
 
 /**
- * The Cost Guide's insert molding input: the inserts loaded every shot (its BOM children, or a count and weight entered here). What the
- * engine decided (press and cycle) is in the Cost tab (InsertMoldingCycle); the load-method routes are in the Workflow Builder.
+ * The Cost Guide's insert molding input: the inserts loaded every shot (its BOM children, or a count and weight entered here, shown read-only
+ * with Edit and Delete). What the engine decided (press and cycle) is in the Cost tab (InsertMoldingCycle); the routes are in the Workflow Builder.
  */
 export function InsertMoldingSection({ insertMolding: im, overrides, onChange, hrefOf }: Props) {
   const [editing, setEditing] = useState(false);
+  // What was just saved or deleted, shown until the part's overrides come back with it.
+  const [local, setLocal] = useState<InsertEntry | 'deleted' | null>(null);
+  useEffect(() => { setLocal(null); }, [overrides]);
   if (!im) return <p className="text-xs text-muted-foreground">Costing the insert molding…</p>;
 
   const fromBom = im.inserts.some((i) => i.source === 'bom');
   const entered = insertEntryOf(overrides);
-  const showEntered = !fromBom && entered.count != null && !editing;
+  const saved = local === 'deleted' ? null : local ?? (entered.count != null ? entered : null);
   const cad = im.cadInsertCandidates != null && im.cadInsertCandidates > 0 ? im.cadInsertCandidates : null;
+  const save = (e: InsertEntry) => { onChange(insertEntryPatch(e)); setLocal(e.count == null ? 'deleted' : e); setEditing(false); };
+  const remove = () => { onChange(insertEntryPatch({ count: null, weightKg: null, name: '' })); setLocal('deleted'); setEditing(false); };
+  const action = 'text-brand-600 hover:underline';
 
   return (
     <div className="space-y-4 text-xs">
       <section className="space-y-1.5">
         <div className="flex items-baseline justify-between">
           <h4 className={headClass}>Inserts</h4>
-          {showEntered && <button type="button" className="text-brand-600 hover:underline" onClick={() => { setEditing(true); }}>Edit</button>}
+          {!fromBom && !editing && (
+            <span className="flex gap-3">
+              <button type="button" className={action} onClick={() => { setEditing(true); }}>{saved ? 'Edit' : 'Add'}</button>
+              {saved && <button type="button" className="text-red-600 hover:underline" onClick={remove}>Delete</button>}
+            </span>
+          )}
         </div>
         {fromBom ? (
           <ul className={boxClass}>
             {im.inserts.map((i) => (
               <Row
                 key={i.id ?? i.name}
-                label={<>{hrefOf && i.id ? <a className="text-brand-600 hover:underline" href={hrefOf(i.id)}>{i.name}</a> : <span className="text-foreground">{i.name}</span>} × {i.perPart}</>}
+                label={<>{hrefOf && i.id ? <a className={action} href={hrefOf(i.id)}>{i.name}</a> : <span className="text-foreground">{i.name}</span>} × {i.perPart}</>}
               >
                 {i.massKg != null ? `${grams(i.massKg)} each` : <span className="text-amber-600" title="Its load time is read by weight: set its weight or material in the BOM.">no weight</span>}
               </Row>
             ))}
           </ul>
-        ) : showEntered ? (
+        ) : editing ? (
+          <InsertEntryForm
+            saved={saved ?? { count: null, weightKg: null, name: '' }}
+            start={saved ?? { count: cad, weightKg: null, name: '' }}
+            onSave={save}
+            onCancel={() => { setEditing(false); }}
+          />
+        ) : saved ? (
           <ul className={boxClass}>
-            <Row label={<><span className="text-foreground">{entered.name || 'Insert'}</span> × {entered.count}</>}>
-              {entered.weightKg != null ? `${grams(entered.weightKg)} each` : <span className="text-amber-600" title="Its load time is read by weight.">no weight</span>}
+            <Row label={<><span className="text-foreground">{saved.name || 'Insert'}</span> × {saved.count}</>}>
+              {saved.weightKg != null ? `${grams(saved.weightKg)} each` : <span className="text-amber-600" title="Its load time is read by weight.">no weight</span>}
             </Row>
           </ul>
         ) : (
-          <>
-            <p className="text-muted-foreground">
-              {cad ? `CAD found ${String(cad)} insert candidates. Confirm the count and add the weight, or add the inserts as BOM children.` : 'Add the inserts as BOM children of this part, or enter them here.'}
-            </p>
-            <InsertEntryForm
-              saved={entered}
-              start={entered.count == null && cad ? { ...entered, count: cad } : entered}
-              onSave={(e) => { onChange(insertEntryPatch(e)); setEditing(false); }}
-              onCancel={editing ? () => { setEditing(false); } : undefined}
-            />
-          </>
+          <p className="rounded-md border border-dashed border-border px-2 py-1.5 text-muted-foreground">
+            No inserts yet{cad ? `: CAD found ${String(cad)} candidates` : ''}. Add them here, or as BOM children of this part.
+          </p>
         )}
       </section>
     </div>
