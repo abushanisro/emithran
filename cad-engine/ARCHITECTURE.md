@@ -49,6 +49,8 @@ cad-engine/
     feature_extractor.py         — die-casting extractor (reached through family_hint="die_cast")
   forging/
     feature_extractor.py         — closed-die forging measurements (reached through family_hint="forged")
+  two_model/
+    compare.py                   — 2-Model Machining: a finished part against its source component (POST /analyze/two-model): alignment, faces as supplied, volume machined off
   composites/
     feature_extractor.py         — laid-up composite laminate measurements: skins, thickness levels, outline, curvature (family_hint="composite")
   contract/
