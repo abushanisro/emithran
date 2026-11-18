@@ -593,6 +593,23 @@ export class AutoFillService {
             })),
           } : null,
         } : {}),
+        // An additive build (cad-engine additive/feature_extractor.py): each of the six build directions with its height, footprint and, at each
+        // self-supporting angle, the overhang, supports and plate contact; the additive cost picks the direction at the material's own angle.
+        ...(family.family === 'additive' ? {
+          additiveBuild: cadMI?.features?.extraction_version ? {
+            extractionVersion: cadMI.features.extraction_version,
+            axis: cadMI.features.build_direction?.axis ?? null,
+            partVolumeMm3: cadMI.features.part_volume_mm3 ?? null,
+            surfaceAreaMm2: cadMI.features.surface_area_mm2 ?? null,
+            candidates: Object.fromEntries(Object.entries((cadMI.features.candidates ?? {}) as Record<string, Record<string, any>>).map(([axis, c]) => [axis, {
+              buildHeightMm: Number(c.build_height_mm), footprintMm: (c.footprint_mm ?? []) as number[],
+              byAngle: Object.fromEntries(Object.entries((c.by_angle ?? {}) as Record<string, Record<string, any>>).map(([deg, a]) => [deg, {
+                overhangAreaMm2: Number(a.overhang_area_mm2 ?? 0), overhangProjectedAreaMm2: Number(a.overhang_projected_area_mm2 ?? 0),
+                supportVolumeMm3: Number(a.support_volume_mm3 ?? 0), plateContactAreaMm2: Number(a.plate_contact_area_mm2 ?? 0), overhangRegions: Number(a.overhang_regions ?? 0),
+              }])),
+            }])),
+          } : null,
+        } : {}),
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
         // (cadMI.features). Detection + highlighting only; process routing and
         // costing are a later phase (see the Die Casting Phase 1 plan).

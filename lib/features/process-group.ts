@@ -29,6 +29,7 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   powder_metal: 'Powder Metal',
   composite: 'Composites',
   two_model: '2-Model Machining',
+  additive: 'Additive Manufacturing',
 };
 
 export function familyToProcessGroupLabel(family: string | null | undefined): string | null {

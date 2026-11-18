@@ -57,6 +57,11 @@ const SOURCE_BY_EVIDENCE: Record<string, Source> = {
   layup_height: { kind: 'measurement', key: 'layup_height', label: 'height along the layup direction' },
   footprint_length: { kind: 'measurement', key: 'footprint_length', label: 'footprint length' },
   footprint_width: { kind: 'measurement', key: 'footprint_width', label: 'footprint width' },
+  // An additive build, along its build direction.
+  build_height: { kind: 'measurement', key: 'build_height', label: 'height along the build direction' },
+  overhang_area: { kind: 'measurement', key: 'overhang_area', label: 'overhang needing support' },
+  support_volume: { kind: 'measurement', key: 'support_volume', label: 'supported overhang' },
+  plate_contact_area: { kind: 'measurement', key: 'plate_contact_area', label: 'contact with the build plate' },
 };
 
 /** Every face of the part, from the face map: what a volume or a surface is measured over. Null without a face map (nothing to draw). */

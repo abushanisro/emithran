@@ -132,6 +132,10 @@ import { investmentCastingRoute } from './costing/casting/investment/investment-
 import { ForgingCostService } from './costing/forging/forging-cost.service';
 import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost.service';
 import { CompositesCostService, type CompositeLaminateSummary } from './costing/composites/composites-cost.service';
+import { AdditiveCostService, type AdditiveBuildSummary } from './costing/additive/additive-cost.service';
+import { buildAdditiveCostSummary } from './costing/additive/additive-cost-summary';
+import { ADDITIVE_ROUTES } from './costing/additive/additive-route';
+import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
 import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, isMachiningLine, BLANK_FAMILY, BLANK_PROCESS, type DerivedBlankOut } from './costing/two-model/derived-blank';
 import { twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, TWO_MODEL_SOURCE_VERSION } from './costing/two-model/two-model-cost';
 import { twoModelRoute } from './costing/two-model/two-model-route-comparison';
@@ -219,7 +223,7 @@ export function holeGroupsOfGraph(features: unknown): Array<{ diameter_mm: numbe
 
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
@@ -305,6 +309,8 @@ export class BomItemCostingService {
     private readonly powderMetalCostService?: PowderMetalCostService,
     /** The composites routes; optional for the same reason (without it a composite part is one named, uncosted line). */
     private readonly compositesCostService?: CompositesCostService,
+    /** The additive manufacturing routes; optional for the same reason (without it an additive part is one named, uncosted line). */
+    private readonly additiveCostService?: AdditiveCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -2522,6 +2528,37 @@ export class BomItemCostingService {
       return { ...this.normalizeCostSummaryToCurrency(compositesResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
     }
 
+    // ── Additive Manufacturing ──────────────────────────────────────────────
+    // The build measured by the cad-engine (additive/feature_extractor.py, via auto-fill's additiveBuild: each build direction's height,
+    // footprint, overhang and supports) and memory/Additive Manufacturing price every route (additive-route.ts): metal sintering, laser
+    // sintering, material jetting and stereolithography, each with its post steps, on the machines that build the material.
+    if (family === 'additive') {
+      const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+      const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const additive = this.additiveCostService
+        ? await this.additiveCostService.price({
+          client: this.databaseService.getClient(accessToken), accessToken, location, grade,
+          build: (summary.additiveBuild ?? null) as AdditiveBuildSummary | null,
+          ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+          overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+        })
+        : { route: null, routes: [], gaps: [], note: null, missing: ['the additive cost service is not available'], warnings: [] };
+      const additiveResult = {
+        ...buildAdditiveCostSummary({
+          additive, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
+        }),
+        ...currencyMeta,
+        drawingCadConsistency,
+      };
+      this.overrides.applyCostOverrides(additiveResult, costOverrides);
+      if (costOverrides.size > 0) additiveResult.costOverrides = Object.fromEntries(costOverrides);
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(additiveResult.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
+      return { ...this.normalizeCostSummaryToCurrency(additiveResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+    }
+
     // ── Casting (die / sand / investment) ────────────────────────────────────
     // The part's measured casting geometry (cad-engine casting extractor, via
     // auto-fill's casting* summary keys) and memory/Die Casting data price the
@@ -4481,6 +4518,46 @@ export class BomItemCostingService {
     };
   }
 
+  /**
+   * An additive part's route comparison: every build route (metal sintering, laser sintering, material jetting, stereolithography), each the
+   * full Cost Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
+   */
+  private async additiveRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = ADDITIVE_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'additive'),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'additive')),
+    ]);
+    const routes = keys.map((key, i) => additiveRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.additive?.complete ? additiveRouteId(quote!.additive.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No build route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
   /** A Casting part priced as each casting family; the one to quote, the note on how it was chosen, and its lines in the factory currency. */
   private async priceCastingFamilies(
     id: string, userId: string, accessToken: string,
@@ -4732,6 +4809,10 @@ export class BomItemCostingService {
         id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     // Composites: one complete route per layup route, each the full quote on that route (composites-route-comparison.ts).
+    // Additive Manufacturing: one route per build process, each the full quote on that route (additive-route-comparison.ts).
+    if (family === 'additive') {
+      return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
     if (family === 'composite') {
       return this.compositesRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }

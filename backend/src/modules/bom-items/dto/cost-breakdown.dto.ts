@@ -703,6 +703,8 @@ export interface CostSummaryDto {
   };
   /** Composites: the ply stack read from the laminate, the core, the layup route quoted and every route. */
   composites?: CompositesBreakdown;
+  /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route. */
+  additive?: AdditiveBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
 
@@ -806,6 +808,28 @@ export interface ForgingBreakdown {
 }
 
 /** What the composites route decided: the plies read from the laminate's thickness, the core, the autoclave load and the layup route. */
+export interface AdditiveBreakdown {
+  /** The quoted route (additive-route.ts ADDITIVE_ROUTES key) and its name. */
+  route: string;
+  routeLabel: string;
+  /** The build direction (+z, -z, +x, ...), set in the Cost Guide or the one of least support at the material's self-supporting angle. */
+  buildDirection: string;
+  buildDirectionSource: 'engineer' | 'least_support';
+  selfSupportingDeg: number;
+  buildHeightMm: number;
+  footprintMm: number[];
+  overhangAreaMm2: number;
+  /** The supports' volume (the overhang's columns and, under a metal part, its support base). */
+  supportVolumeMm3: number;
+  plateContactAreaMm2: number;
+  partsPerBuild: number | null;
+  layers: number | null;
+  materialMassKg: number;
+  complete: boolean;
+  /** Every route: its total per part (summary currency) when complete, or why it is not a route for the part. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
 export interface CompositesBreakdown {
   /** The quoted route (composites-route.ts COMPOSITES_ROUTES key) and its name. */
   route: string;

@@ -5,12 +5,12 @@ import { isCostedProcessGroup, processGroupOptionLabel, processGroupToFamilyHint
 // A Process with no cost model is not costed (the backend's familiesOfProcessGroup), so the Process fields mark it instead of offering it blind:
 // a part whose Process had none was priced as whatever it was last analysed as.
 describe('process groups with a cost model', () => {
-  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal'])('%s is costed', (group) => {
+  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal', 'Additive Manufacturing'])('%s is costed', (group) => {
     expect(isCostedProcessGroup(group)).toBe(true);
     expect(processGroupOptionLabel(group)).toBe(group);
   });
 
-  it.each(['Additive Manufacturing', 'Part Assembly'])('%s is not, and its option says so', (group) => {
+  it.each(['Rapid Prototyping', 'Part Assembly'])('%s is not, and its option says so', (group) => {
     expect(isCostedProcessGroup(group)).toBe(false);
     expect(processGroupOptionLabel(group)).toBe(`${group} (not costed yet)`);
   });
@@ -27,6 +27,7 @@ describe('process groups with a cost model', () => {
     expect(processGroupToFamilyHint('Forging')).toBe('forged');
     expect(processGroupToFamilyHint('Powder Metal')).toBe('powder_metal');
     expect(processGroupToFamilyHint('Composites')).toBe('composite');
-    expect(processGroupToFamilyHint('Additive Manufacturing')).toBeUndefined();
+    expect(processGroupToFamilyHint('Additive Manufacturing')).toBe('additive');
+    expect(processGroupToFamilyHint('Rapid Prototyping')).toBeUndefined();
   });
 });

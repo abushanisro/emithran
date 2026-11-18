@@ -11,6 +11,7 @@ import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
 import { DIE_CASTING_PROCESSES, dieCastingRouteId } from '../costing/casting/die-casting-process-choice';
 import { FORGING_ROUTE_IDS } from '../costing/forging/forging-route-comparison';
 import { COMPOSITES_ROUTE_IDS } from '../costing/composites/composites-route-comparison';
+import { ADDITIVE_ROUTE_IDS } from '../costing/additive/additive-route-comparison';
 
 // The locations this system holds real rate and material-cost data for, taken
 // from LOCATION_INFO itself so the validator can never drift from the table
@@ -35,6 +36,7 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...FORGING_ROUTE_IDS,
   // Each composites layup route, priced by the composites engine (composites-route-comparison.ts).
   ...COMPOSITES_ROUTE_IDS,
+  ...ADDITIVE_ROUTE_IDS,
   // The one-route processes: the cost summary as quoted, as one route (the Workflow Builder sets them like any complete route).
   SAND_CASTING_ROUTE_ID, INVESTMENT_CASTING_ROUTE_ID, POWDER_METAL_ROUTE_ID, TWO_MODEL_ROUTE_ID,
 ];

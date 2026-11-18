@@ -31,6 +31,11 @@ export const CAD_EVIDENCE_KEYS = [
   'layup_height',
   'footprint_length',
   'footprint_width',
+  // An additive build (cad-engine additive/feature_extractor.py), along its build direction.
+  'build_height',
+  'overhang_area',
+  'support_volume',
+  'plate_contact_area',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];
