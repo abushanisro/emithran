@@ -130,7 +130,9 @@ export class RouteApplicationService {
 
     // 4. Reject infeasible routes — the engine already did the capability check
     if (!route.isFeasible) {
-      const reason = route.warnings?.[0] ?? 'machine capability constraints not met';
+      // Why the route is not feasible is its capability warning (what the engine found missing); its first general warning is often a
+      // note about how the quote was chosen, which does not say why this route cannot be applied.
+      const reason = route.capability.warnings[0] ?? route.warnings?.[0] ?? 'machine capability constraints not met';
       throw new BadRequestException(
         `Route '${routeId}' (${route.routeLabel}) is not feasible for this part: ${reason}`,
       );

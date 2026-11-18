@@ -40,6 +40,8 @@ export interface ManualRouteOption {
   // An additive route picked in the Workflow Builder (its ADDITIVE_ROUTES key): committed as the scenario's additiveRoute so the Cost Summary
   // quotes it, and its route applied like any complete route.
   additiveRoute?: string;
+  // An assembly route picked in the Workflow Builder (its ASSEMBLY_ROUTES key): committed as the scenario's assemblyRoute.
+  assemblyRoute?: string;
   // A real, already-valid apply-route.dto.ts routeId (e.g. one of the 3 real
   // Injection Molding tonnage tiers) to apply directly via the plain
   // applyRoute mutation — for a family whose real routes are already

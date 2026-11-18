@@ -244,4 +244,12 @@ describe('the assembly\'s Cost Summary and route comparison', () => {
     expect(robotic).toMatchObject({ routeId: 'assembly-robotic', isFeasible: false, totalCost: null });
     expect(robotic.capability.warnings[0]).toContain('no MIG, TIG or spot weld');
   });
+
+  it('an incomplete route says which step is missing what, so Apply can say why it refuses it', () => {
+    const light = componentOf({ id: 'nut', name: 'Nut cap', quantity: 1, weight: null, maxLength: 24 });
+    const summary = buildAssemblyCostSummary({ assembly: assemblyResult(deriveJoints(COMPONENTS), [...COMPONENTS, light]), batchSize: 250, warnings: [], ratesSource: 'test' }) as CostSummaryResponseDto;
+    const manual = assemblyRouteFor('manual', summary);
+    expect(manual.isFeasible).toBe(false);
+    expect(manual.capability.warnings[0]).toContain('Pick and Place: the load time of Nut cap: its weight');
+  });
 });

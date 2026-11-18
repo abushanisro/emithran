@@ -226,6 +226,11 @@ export function holeGroupsOfGraph(features: unknown): Array<{ diameter_mm: numbe
 }
 
 
+/** A family's route options with each total per part in the display currency (`conv`: the factory currency to it). */
+export function convertRouteOptions<T extends { totalCost: number | null }>(options: readonly T[], conv: (v: number) => number): T[] {
+  return options.map((o) => ({ ...o, totalCost: o.totalCost != null ? conv(o.totalCost) : null }));
+}
+
 export function hasCostModel(family: string): boolean {
   return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
@@ -439,6 +444,19 @@ export class BomItemCostingService {
             })),
           }
         : dto.dieCastingProcess,
+      // The route options of the families that compare routes (each option's total per part), and an assembly's consumables: money in the
+      // factory currency like the lines, converted with them. Left as they were, an India quote showed its lines in USD and these in rupees.
+      ...(dto.forging ? { forging: { ...dto.forging, options: convertRouteOptions(dto.forging.options, conv) } } : {}),
+      ...(dto.composites ? { composites: { ...dto.composites, options: convertRouteOptions(dto.composites.options, conv) } } : {}),
+      ...(dto.additive ? { additive: { ...dto.additive, options: convertRouteOptions(dto.additive.options, conv) } } : {}),
+      ...(dto.assembly ? {
+        assembly: {
+          ...dto.assembly,
+          options: convertRouteOptions(dto.assembly.options, conv),
+          consumablesCost: conv(dto.assembly.consumablesCost),
+          joints: dto.assembly.joints.map((j) => ({ ...j, consumablesCost: j.consumablesCost != null ? conv(j.consumablesCost) : null })),
+        },
+      } : {}),
       currency,
       currencySymbol,
       toUsdRate: rate,

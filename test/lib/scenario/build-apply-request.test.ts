@@ -85,4 +85,10 @@ describe("buildApplyScenarioRequest", () => {
     expect(built({ isAdditive: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "additive-resin_curing" });
     expect(built({ isAdditive: true }).scenarioPatch).toEqual({ processRouting: "auto", additiveRoute: null });
   });
+
+  it("an assembly route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
+    const manual = { label: "Robotic welding", directApplyRouteId: "assembly-robotic", assemblyRoute: "robotic" };
+    expect(built({ isAssembly: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", assemblyRoute: "robotic" });
+    expect(built({ isAssembly: true }).scenarioPatch).toEqual({ processRouting: "auto", assemblyRoute: null });
+  });
 });
