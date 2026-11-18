@@ -70,6 +70,11 @@ SELECT 'Composites', n, n, false FROM unnest(ARRAY['Tool Clean','Mold Preparatio
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Additive Manufacturing', n, n, false FROM unnest(ARRAY['Breakoff','Cleaning','Laser Sintering','Manual Tool Base Removal','Metal Sintering',
   'Part Curing','Powder Loading','Power Tool Base Removal','Printing','Resin Curing','Sieving']) AS n;
+-- the assembly catalog rows migration 790 seeds: migrations 1076 and 1078 give them a machine class and link the assembly calculators to them and fails if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Assembly', n, n, false FROM unnest(ARRAY['Pick and Place','Mechanical Assembly','Threaded Insert','Lock Bolt','Rivet','Manual MIG Welding',
+  'Robotic MIG Welding','Manual TIG Welding','Robotic TIG Welding','Manual Spot Welding','Robotic Spot Welding','Electron Beam Welding','Laser Welding',
+  'Ultrasonic Welding','Adhesive Bonding','Fay Sealing','Fillet Sealing','Cap Sealing','Weld Prep','Weld Clean Up']) AS n;
 -- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;
