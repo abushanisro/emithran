@@ -61,6 +61,8 @@ export function buildAdditiveCostSummary(input: {
     warnings: warnings.filter(Boolean),
     ratesSource: input.ratesSource,
     ...(Object.keys(calculatorRuns).length ? { calculatorRuns } : {}),
+    // The material Apply records: the part's mass and what is bought for it (supports, powder lost and spent), not a stock allowance.
+    ...(route ? { castingMetal: { partKg: route.material.partKg, chargedKg: Math.max(route.material.massKg, route.material.partKg) } } : {}),
     ...(route && c && at ? {
       additive: {
         route: route.key, routeLabel: route.label,

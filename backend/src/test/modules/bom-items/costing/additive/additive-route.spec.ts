@@ -136,6 +136,10 @@ describe('the cost summary and the route comparison', () => {
     expect(summary.totalCost).toBeCloseTo(route!.totalUsd!, 2);
     expect(summary.additive).toMatchObject({ route: 'metal_sintering', buildDirection: '+y', selfSupportingDeg: 30, complete: true });
     expect(summary.additive!.options.map((o) => o.route)).toEqual(['metal_sintering', 'laser_sintering', 'printing', 'resin_curing']);
+    // Apply records what is bought for the part (its supports, the powder lost and trapped), not the part with a stock allowance.
+    expect(summary.castingMetal!.partKg).toBeCloseTo((TEE.partVolumeMm3 * 7770) / 1e9, 3);
+    expect(summary.castingMetal!.chargedKg).toBeCloseTo(route!.material.massKg, 6);
+    expect(summary.castingMetal!.chargedKg).toBeGreaterThan(summary.castingMetal!.partKg);
   });
 
   it('a route not for the part is not feasible and says why; the quoted one carries the lines', () => {
