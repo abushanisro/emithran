@@ -131,6 +131,7 @@ import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import { featureCountSummary, featureTypeLabel, geometryFeatureGroups } from '@/lib/features/geometry-feature-rows';
 import { isMachiningTreeFamily } from '@/lib/features/process-tree-family';
+import { appliedRouteForTree } from '@/lib/features/applied-route-for-tree';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
@@ -8283,7 +8284,8 @@ export default function ManufacturingIntelligencePage() {
   }, [procRecordsForTree, comparisonForTree]);
   const effectiveCostForHeatmap = useMemo(() => {
     if (!costForHeatmap || !persistedAppliedRouteIdForTree) return costForHeatmap;
-    const appliedRoute = comparisonForTree?.routes.find((r) => r.routeId === persistedAppliedRouteIdForTree);
+    // An applied route the part can no longer take has no lines: the tree shows the current quote then (appliedRouteForTree).
+    const appliedRoute = appliedRouteForTree(comparisonForTree?.routes, persistedAppliedRouteIdForTree);
     return appliedRoute ? { ...costForHeatmap, processLines: appliedRoute.processLines } : costForHeatmap;
   }, [costForHeatmap, comparisonForTree, persistedAppliedRouteIdForTree]);
   // The substitution above only fixes MACHINE/rate lookups. The tree's actual
@@ -8296,8 +8298,7 @@ export default function ManufacturingIntelligencePage() {
   // route is the most authoritative signal available, so it takes priority over
   // both that mechanism and the fg default.
   const appliedRouteProcessNames = useMemo(() => {
-    if (!persistedAppliedRouteIdForTree) return null;
-    const appliedRoute = comparisonForTree?.routes.find((r) => r.routeId === persistedAppliedRouteIdForTree);
+    const appliedRoute = appliedRouteForTree(comparisonForTree?.routes, persistedAppliedRouteIdForTree);
     return appliedRoute ? appliedRoute.processLines.map((l) => l.process) : null;
   }, [comparisonForTree, persistedAppliedRouteIdForTree]);
   // The route to show when NOTHING has been applied yet.
