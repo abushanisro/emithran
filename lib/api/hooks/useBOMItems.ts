@@ -1161,6 +1161,14 @@ export interface CostSummaryDto {
     asSuppliedFaceIds?: number[];
   };
   /** Composites: the ply stack read from the laminate, the core and the layup route quoted (mirrors the backend's CompositesBreakdown). */
+  /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route (backend AdditiveBreakdown). */
+  additive?: {
+    route: string; routeLabel: string;
+    buildDirection: string; buildDirectionSource: 'engineer' | 'least_support'; selfSupportingDeg: number;
+    buildHeightMm: number; footprintMm: number[]; overhangAreaMm2: number; supportVolumeMm3: number; plateContactAreaMm2: number;
+    partsPerBuild: number | null; layers: number | null; materialMassKg: number; complete: boolean;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
   composites?: {
     route: string; routeLabel: string;
     /** The laminate at its thickest (core excluded) and the cured ply thickness it is divided by. */

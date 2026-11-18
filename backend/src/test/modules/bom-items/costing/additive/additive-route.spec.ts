@@ -54,7 +54,7 @@ describe('the routes on the real memory/Additive Manufacturing data', () => {
     const { routes, gaps } = buildAdditiveRoutes(input('Stainless Steel, 17-4PH'));
     expect(routes.map((r) => r.key)).toEqual(['metal_sintering']);
     expect(gaps.map((g) => g.key)).toEqual(['laser_sintering', 'printing', 'resin_curing']);
-    expect(gaps[0]!.reason).toContain('DMLS material, not built by Laser Sintering');
+    expect(gaps[0]!.reason).toBe('Stainless Steel, 17-4PH is built by DMLS, not by Laser Sintering');
   });
 
   it('metal sintering: powder loading, the build, powder recovery, the base cut off; no breakoff when the part needs no support', () => {

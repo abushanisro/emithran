@@ -78,4 +78,11 @@ describe("buildApplyScenarioRequest", () => {
     expect(built({ isForged: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "forging-closed_die_hammer" });
     expect(built({ isForged: true }).scenarioPatch).toEqual({ processRouting: "auto", forgingRoute: null });
   });
+
+  it("an additive route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
+    const manual = { label: "Stereolithography (SLA)", directApplyRouteId: "additive-resin_curing", additiveRoute: "resin_curing" };
+    expect(built({ isAdditive: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", additiveRoute: "resin_curing" });
+    expect(built({ isAdditive: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "additive-resin_curing" });
+    expect(built({ isAdditive: true }).scenarioPatch).toEqual({ processRouting: "auto", additiveRoute: null });
+  });
 });

@@ -253,13 +253,12 @@ export function buildAdditiveRoutes(input: AdditiveRouteInput): { routes: Additi
 
   const routes: AdditiveRoute[] = [];
   const gaps: AdditiveRouteGap[] = [];
-  const warnings: string[] = [
-    `Built along ${build.axis} (${build.source === 'engineer' ? 'set in the Cost Guide' : `the direction of least support at ${angle.deg} degrees, ${angle.source}`}): ${r2(build.candidate.buildHeightMm)} mm tall, ${r2(at.overhangAreaMm2)} mm² of overhang supported.`,
-  ];
+  // The build (its direction, height and supports) is shown in the Cost Guide's Additive panel (summary.additive), not as a warning.
+  const warnings: string[] = [];
   const breakoffRates = ref.table('tblHandBreakoffRate');
   for (const r of ADDITIVE_ROUTES) {
     if (material.process !== r.materialProcess) {
-      gaps.push({ key: r.key, label: r.label, reason: `${material.name} is a ${material.process ?? 'material with no process'} material, not built by ${r.process}` });
+      gaps.push({ key: r.key, label: r.label, reason: material.process ? `${material.name} is built by ${material.process}, not by ${r.process}` : `${material.name} has no build process` });
       continue;
     }
     const dmls = r.key === 'metal_sintering';
