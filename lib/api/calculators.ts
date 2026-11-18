@@ -261,9 +261,33 @@ export type LookupRecord = {
 // API CLIENT
 // ========================================
 
+/** The most calculators the backend serves in one page (calculators.service.ts findAll). */
+export const CALCULATOR_PAGE_LIMIT = 100;
+const MAX_CALCULATOR_PAGES = 50;
+
 export const calculatorsApi = {
   // Calculator CRUD
+  // The backend serves at most 100 calculators a page, newest first. A caller that names no page means "all of them": the Edit Process
+  // Cost dialog filters this list to the calculators of the line's process group, and with 158 calculators seeded after Plastic Molding's,
+  // the first 100 held none of them ("No calculators available"); the Raw Material and Tooling dialogs, asking for no limit, saw 10.
+  // Fetch every page, as the calculator-mappings list does.
   getAll: async (query?: CalculatorQuery): Promise<CalculatorListResponse> => {
+    if (query?.page !== undefined) return calculatorsApi.getPage(query);
+    const limit = CALCULATOR_PAGE_LIMIT;
+    const first = await calculatorsApi.getPage({ ...query, page: 1, limit });
+    const calculators = [...first.calculators];
+    // A page leaves out its retired rows (a short page is not the last one), so the end is the first empty page; the cap only guards a
+    // misbehaving server.
+    for (let page = 2; page <= MAX_CALCULATOR_PAGES; page++) {
+      const next = await calculatorsApi.getPage({ ...query, page, limit });
+      if (next.calculators.length === 0) break;
+      calculators.push(...next.calculators);
+    }
+    return { ...first, calculators, total: calculators.length, page: 1, limit: calculators.length };
+  },
+
+  /** One page of calculators, as the backend serves it. */
+  getPage: async (query: CalculatorQuery): Promise<CalculatorListResponse> => {
     const params = new URLSearchParams();
     if (query?.search) params.append('search', query.search);
     if (query?.calcCategory) params.append('calcCategory', query.calcCategory);
