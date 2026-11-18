@@ -38,7 +38,7 @@ from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
 from OCC.Core.Standard import Standard_Failure  # type: ignore
 
 from shared.error_reporting import report_failure
-from shared.part_family import ALL_FAMILIES, CASTING_FAMILY_DOMAIN, COMPOSITE, DIE_DIRECTION_FAMILIES, MILLED, PLASTIC_MOLDED, SHEET_METAL
+from shared.part_family import ALL_FAMILIES, CASTING_FAMILY_DOMAIN, COMPOSITE, MACHINING_FAMILIES, TWO_MODEL_HINT, DIE_DIRECTION_FAMILIES, MILLED, PLASTIC_MOLDED, SHEET_METAL
 
 logger = logging.getLogger(__name__)
 
@@ -730,6 +730,15 @@ class AdvancedCADMemoryOptimizer:
             # no veto silently overrules the user; the geometry's own verdict is reported beside it. Only a
             # real platform family is honored; any other string (typo, stale client, unrecognized value) is
             # ignored rather than faked into a family that doesn't exist.
+            # 2-Model Machining: the part is machined, whatever else the geometry alone would read. A geometric machining family stands
+            # (milled, turned, mill-turn); any other is milled, the general machining family, and said so.
+            if family_hint == TWO_MODEL_HINT and detected_family not in MACHINING_FAMILIES:
+                classification_reasons = [
+                    f"family_hint={TWO_MODEL_HINT}: a 2-Model Machining part is machined, analysed as {MILLED}",
+                    f"geometry alone reads {geometric_family}" + (f": {'; '.join(classification_reasons)}" if classification_reasons else ""),
+                ]
+                detected_family = MILLED
+                family_confidence = 1.0
             if family_hint and family_hint in ALL_FAMILIES:
                 _geometry_said = f"geometry alone reads {geometric_family}" + (f": {'; '.join(classification_reasons)}" if classification_reasons else "")
                 detected_family = family_hint

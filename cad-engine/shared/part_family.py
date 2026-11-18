@@ -39,6 +39,11 @@ ALL_FAMILIES: FrozenSet[str] = frozenset({
     SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED, POWDER_METAL, COMPOSITE,
 })
 
+# 2-Model Machining (a finished part machined from a source component, memory/"2 Mold Molding"): a hint, not a family. The finished part
+# is analysed as a machined part: the geometry decides milled, turned or mill-turn, never another process (two_model/compare.py tells
+# its faces left as the source made them from those machined).
+TWO_MODEL_HINT = "two_model"
+
 # Families measured along one die (or press) direction by forging/feature_extractor.py.
 DIE_DIRECTION_FAMILIES: FrozenSet[str] = frozenset({FORGED, POWDER_METAL})
 

@@ -23,6 +23,9 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   powder_metal: 'Powder Metal',
   // A laid-up composite: the cad-engine measures it as a laminate on its tool (composites/feature_extractor.py).
   composite: 'Composites',
+  // A finished part machined from a source component, another item of its BOM (memory/"2 Mold Molding"): analysed as a machined part
+  // (cad-engine family_hint two_model) and compared with its source (two_model/compare.py).
+  two_model: '2-Model Machining',
 };
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */

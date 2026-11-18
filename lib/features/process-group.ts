@@ -28,6 +28,7 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   forged: 'Forging',
   powder_metal: 'Powder Metal',
   composite: 'Composites',
+  two_model: '2-Model Machining',
 };
 
 export function familyToProcessGroupLabel(family: string | null | undefined): string | null {

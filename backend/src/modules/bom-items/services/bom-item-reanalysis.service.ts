@@ -7,6 +7,7 @@ import { BOMItemsService } from '../bom-items.service';
 import { AutoFillService } from './auto-fill.service';
 import { FileStorageService } from './file-storage.service';
 import { PlasticPullDirectionService } from './plastic-pull-direction.service';
+import { TwoModelService } from './two-model.service';
 
 /** Runs the CAD analysis (and the drawing's) on an item's stored files and stores the result on the item. Used by the analysis run (Apply Scenario) and by a changed pull direction. */
 @Injectable()
@@ -18,6 +19,8 @@ export class BomItemReanalysisService {
     private readonly fileStorageService: FileStorageService,
     private readonly autoFillService: AutoFillService,
     private readonly pullDirections: PlasticPullDirectionService,
+    /** 2-Model Machining: re-compares the part with its source when it is re-analysed; optional so hand-built services in tests need not pass it. */
+    private readonly twoModel?: TwoModelService,
   ) {}
 
   async reanalyze(id: string, userId: string, token: string): Promise<BOMItemResponseDto> {
@@ -105,7 +108,13 @@ export class BomItemReanalysisService {
       ...(sug.familyConfidence != null && { familyConfidence: sug.familyConfidence }),
     };
 
-    return this.bomItemsService.update(id, updateData, userId, token);
+    const updated = await this.bomItemsService.update(id, updateData, userId, token);
+    // 2-Model Machining: the part was re-analysed, so its comparison with its source is made again from the files it now has.
+    if (updated.sourceItemId && this.twoModel) {
+      const compared = await this.twoModel.compare(id, token);
+      if (compared.comparison) return { ...updated, twoModelComparison: compared.comparison };
+    }
+    return updated;
   }
 
   /** Reads the title block, thread callouts and tolerances of the stored 2D drawing (a vector PDF) and stores them on the item. */
