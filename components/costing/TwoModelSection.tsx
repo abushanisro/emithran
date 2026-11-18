@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useRef, useState } from 'react';
 
-import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { SOURCE_COMPONENT_PROCESSES, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { comparisonState, currentComparison, sourceCandidates, type SourceComponentSummary } from '@/lib/costing/two-model-view';
 
 interface Props {
@@ -16,6 +17,9 @@ interface Props {
   linking: boolean;
   /** The item page of a BOM item, for the link to the source. */
   hrefOf: (itemId: string) => string;
+  /** Adds the blank as a new item of this BOM from its 3D model, and links it. */
+  onAddSource: (file: File, processGroup: (typeof SOURCE_COMPONENT_PROCESSES)[number]) => void;
+  adding: boolean;
 }
 
 const rowClass = 'flex items-start gap-2 py-0.5';
@@ -28,7 +32,9 @@ const mm3 = (v: number) => `${Math.round(v).toLocaleString('en-US')} mm³`;
  * The Cost Guide's 2-Model Machining settings: the source component the part is machined from (another item of its BOM), whether the two
  * models line up, and what the source costs this part. Only the faces not on the source are machined; the source's cost is the material.
  */
-export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefOf }: Props) {
+export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefOf, onAddSource, adding }: Props) {
+  const [process, setProcess] = useState<(typeof SOURCE_COMPONENT_PROCESSES)[number]>('Casting');
+  const fileRef = useRef<HTMLInputElement>(null);
   const candidates = sourceCandidates(bomItems, item);
   const linked = bomItems.find((i) => i.id === item.sourceItemId) ?? null;
   const state = comparisonState(currentComparison(item, linked));
@@ -40,7 +46,7 @@ export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefO
         <select
           className={`${controlClass} cursor-pointer`}
           value={item.sourceItemId ?? ''}
-          disabled={linking}
+          disabled={linking || adding}
           onChange={(e) => { onLink(e.target.value || null); }}
           title="The item of this BOM the part is machined from (the casting or forging blank). Its STEP model is compared with this part's."
         >
@@ -49,7 +55,39 @@ export function TwoModelSection({ item, bomItems, source, onLink, linking, hrefO
         </select>
       </div>
       {!item.fileStepPath && <p className="text-amber-600 dark:text-amber-400">This part has no STEP model to compare with its source.</p>}
-      {candidates.length === 0 && <p className="text-muted-foreground">No other item of this BOM has a STEP model to be the source.</p>}
+      {!item.sourceItemId && (
+        <div className="rounded border border-dashed border-border p-2 space-y-1" title="The blank is added to this BOM beside the part, with its own process and cost, and counted once in the BOM total (inside this part).">
+          <p className="text-muted-foreground">
+            {candidates.length === 0 ? 'No other item of this BOM has a 3D model to be the source. ' : 'Or, if the blank is not in this BOM yet: '}
+            add the casting or forging blank from its STEP model (exported from the same assembly as this part, so the two line up).
+          </p>
+          <div className={rowClass}>
+            <span className={labelClass}>Blank made by</span>
+            <select className={`${controlClass} cursor-pointer`} value={process} disabled={adding} onChange={(e) => { setProcess(e.target.value as typeof process); }}>
+              {SOURCE_COMPONENT_PROCESSES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".step,.stp,.STEP,.STP"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) onAddSource(file, process);
+            }}
+          />
+          <button
+            type="button"
+            disabled={adding || linking}
+            onClick={() => { fileRef.current?.click(); }}
+            className="w-full text-xs border border-border rounded px-2 py-1 hover:bg-muted/40 disabled:opacity-50"
+          >
+            {adding ? 'Adding the blank, analysing and comparing the two models…' : 'Upload the blank\'s STEP model…'}
+          </button>
+        </div>
+      )}
 
       {item.sourceItemId && (
         <>
