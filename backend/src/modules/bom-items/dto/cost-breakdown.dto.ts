@@ -714,6 +714,7 @@ export interface CostSummaryDto {
   assembly?: AssemblyBreakdown;
   /** Assembly Molding (insert molding): the inserts, how they are loaded, the press and its shot, the route quoted and every route. */
   insertMolding?: InsertMoldingBreakdown;
+  multiShot?: MultiShotBreakdown;
   /** The wax pattern die of an investment casting, USD: separate from the piece cost, like the die. */
   patternTooling?: { tools: number; costUsd: number; perPartUsd: number | null; detail: string };
 
@@ -819,6 +820,28 @@ export interface ForgingBreakdown {
 /** What the composites route decided: the plies read from the laminate's thickness, the core, the autoclave load and the layup route. */
 /** What the assembly route decided: the components loaded, every joint (derived from the children or set in the Cost Guide) and the route. */
 /** What the insert molding route decided: the inserts loaded every shot, the loader, the insert press and its shot (overlapped on a table). */
+/** A multi-shot molded part (Assembly Plastic Molding): its shots, its loaded components, the press and the multi-shot cycle, and every route. */
+export interface MultiShotBreakdown {
+  /** The quoted route (multi-shot.ts MULTI_SHOT_ROUTES key) and its name. */
+  route: string;
+  routeLabel: string;
+  complete: boolean;
+  /** The shots in mold order: a BOM child each, or the part and the Cost Guide's materials (each a share of the part's volume). */
+  shots: Array<{
+    name: string; source: 'bom' | 'part' | 'cost_guide'; itemId: string | null; grade: string | null; volumePct: number | null; volumeMm3: number;
+    /** Its injection cycle on the quoted press (s), and what it needs of a press (clamp t, GPPS shot g); null when not known. */
+    cycleSec: number | null; clampT: number | null; shotGppsG: number | null;
+  }>;
+  /** The pre-made components loaded every shot (the BOM children that are not shots), by Pick and Place. */
+  components: Array<{ id: string | null; name: string; perPart: number; massKg: number | null }>;
+  press: { name: string | null; orientation: string | null; units: number | null; stations: number | null; rotatingStack: boolean; indexSec: number | null; reasons: string[] };
+  /** The multi-shot cycle: max(the longest shot, the loading) + the tool index time (s). */
+  cycleSec: number | null;
+  loaderName: string | null;
+  loadSecPerPart: number | null;
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
 export interface InsertMoldingBreakdown {
   /** The quoted route (insert-molding.ts INSERT_MOLDING_ROUTES key) and its name. */
   route: string;

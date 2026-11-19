@@ -12,6 +12,7 @@ import { loadCompositesCalculatorSpec } from '../costing/composites/calculators/
 import { loadAdditiveCalculatorSpec } from '../costing/additive/calculators/additive-calculator-spec';
 import { loadAssemblyCalculatorSpec } from '../costing/assembly/calculators/assembly-calculator-spec';
 import { loadAssemblyMoldingCalculatorSpec } from '../costing/plastic-molding/insert/calculators/assembly-molding-calculator-spec';
+import { loadAssemblyPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/multi-shot/calculators/assembly-plastic-molding-calculator-spec';
 import { loadForgingCalculatorSpec } from '../costing/forging/calculators/forging-calculator-spec';
 import { loadPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/calculators/plastic-molding-calculator-spec';
 
@@ -201,6 +202,11 @@ export class CalculatorCatalogService {
   /** The assembly molding (insert molding) calculators (migration 1081), from the database. */
   loadAssemblyMoldingCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('assembly-molding-calculators', loadAssemblyMoldingCalculatorSpec(), accessToken);
+  }
+
+  /** The assembly plastic molding (multi-shot) calculators (migration 1086), from the database. */
+  loadAssemblyPlasticMoldingCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('assembly-plastic-molding-calculators', loadAssemblyPlasticMoldingCalculatorSpec(), accessToken);
   }
 
   /** The assembly calculators (migration 1078), from the database. */

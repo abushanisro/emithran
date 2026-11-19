@@ -76,9 +76,28 @@ export function insertsOf(
   return [{ id: null, name: typeof entry?.name === 'string' && entry.name.trim() ? entry.name.trim() : 'Insert', perPart: Math.round(count), massKg: weight != null && weight > 0 ? weight : null, source: 'cost_guide' }];
 }
 
+/**
+ * A loading step a molding process prices with the loaders and componentLoadTime: insert molding's Insert Pick and Place, or multi-shot
+ * molding's Pick and Place (memory/Assembly plastic molding names the same table tblComponentLoadTime).
+ */
+export interface LoadingStep {
+  process: string;
+  processGroup: string;
+  machineClass: string;
+  calculator: string;
+  domain: string;
+  loadTimeTable: string;
+  /** What is loaded, in the messages: "insert" or "component". */
+  noun: string;
+}
+export const INSERT_LOADING_STEP: LoadingStep = {
+  process: 'Insert Pick and Place', processGroup: INSERT_MOLDING_PROCESS_GROUP, machineClass: INSERT_LOADER_CLASS,
+  calculator: INSERT_LOADING_CALC, domain: INSERT_MOLDING_DOMAIN, loadTimeTable: 'componentLoadTime', noun: 'insert',
+};
+
 /** The componentLoadTime row for an insert: the first of the method whose weight takes it. */
-export function loadTimeRow(ref: SandReference, method: 'Manual' | 'Robotic', massKg: number | null): Row | null {
-  const rows = ref.table('componentLoadTime').filter((r) => r['Load Method'] === method).sort((a, b) => num(a['Weight (kg)'])! - num(b['Weight (kg)'])!);
+export function loadTimeRow(ref: SandReference, method: 'Manual' | 'Robotic', massKg: number | null, table = 'componentLoadTime'): Row | null {
+  const rows = ref.table(table).filter((r) => r['Load Method'] === method).sort((a, b) => num(a['Weight (kg)'])! - num(b['Weight (kg)'])!);
   // No weight given: the lightest band. An insert is a nut, pin or bush of a few grams, far inside it (0.2 kg by hand, 0.5 kg by robot).
   return rows.find((r) => num(r['Weight (kg)'])! >= (massKg ?? 0) && num(r['Weight (kg)'])! > 0) ?? null;
 }
@@ -103,14 +122,17 @@ export function insertLoading(input: {
   loaders: readonly SandMachine[];
   batchSize: number;
   costContext: CostContext;
+  /** The process the loading is a step of; insert molding's Insert Pick and Place when absent. */
+  step?: LoadingStep;
 }): InsertLoading {
   const { ref, inserts, route } = input;
+  const kind = input.step ?? INSERT_LOADING_STEP;
   const variable: SeedProvider = (name) => {
     const value = ref.number(name);
-    return value == null ? null : { value, source: `Assembly Molding variable ${name}`, ref: { kind: 'variable', domain: INSERT_MOLDING_DOMAIN, name } };
+    return value == null ? null : { value, source: `${kind.processGroup} variable ${name}`, ref: { kind: 'variable', domain: kind.domain, name } };
   };
   // Each insert's load time, from its own componentLoadTime row; the per-part load is their sum over the inserts of the part.
-  const rows = inserts.map((i) => ({ insert: i, row: loadTimeRow(ref, route.method, i.massKg) }));
+  const rows = inserts.map((i) => ({ insert: i, row: loadTimeRow(ref, route.method, i.massKg, kind.loadTimeTable) }));
   // The payload a robot must carry: the insert's weight, or for one with no weight the top of the band it was loaded in.
   const heaviest = Math.max(0, ...rows.map(({ insert, row }) => insert.massKg ?? num(row?.['Weight (kg)']) ?? 0));
   const weightOf = ({ insert, row }: (typeof rows)[number]) =>
@@ -118,24 +140,24 @@ export function insertLoading(input: {
   const loadSec = rows.reduce((s, { insert, row }) => s + insert.perPart * (num(row?.['Load Time (s)']) ?? 0), 0);
   const loadSeed: CalcSeed = {
     value: loadSec,
-    source: `componentLoadTime (${route.method}): ${rows.map((x) => `${x.insert.perPart} x ${x.insert.name} at ${weightOf(x)}, ${String(x.row?.['Load Time (s)'])} s`).join('; ')}`,
+    source: `${kind.loadTimeTable} (${route.method}): ${rows.map((x) => `${x.insert.perPart} x ${x.insert.name} at ${weightOf(x)}, ${String(x.row?.['Load Time (s)'])} s`).join('; ')}`,
     lookup: true,
-    ...(rows[0]?.row ? { ref: { kind: 'lookup' as const, domain: INSERT_MOLDING_DOMAIN, table: 'componentLoadTime', column: 'Load Time (s)', row: { 'Load Method': route.method, 'Weight (kg)': num(rows[0].row['Weight (kg)'])! } } } : {}),
+    ...(rows[0]?.row ? { ref: { kind: 'lookup' as const, domain: kind.domain, table: kind.loadTimeTable, column: 'Load Time (s)', row: { 'Load Method': route.method, 'Weight (kg)': num(rows[0].row['Weight (kg)'])! } } } : {}),
   };
   // What the part lacks is not a machine's limit: it is said once, plainly, instead of as every loader failing ("no loader fits (X: ...)").
   const missingRow = rows.find((x) => !x.row);
   const partGap = inserts.length === 0 ? 'The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.'
-    : missingRow ? `componentLoadTime has no ${route.method} row for ${missingRow.insert.name} at ${String(missingRow.insert.massKg)} kg.`
+    : missingRow ? `${kind.loadTimeTable} has no ${route.method} row for ${missingRow.insert.name} at ${String(missingRow.insert.massKg)} kg.`
     : null;
   if (partGap) {
-    return { step: { line: gap('Insert Pick and Place', INSERT_MOLDING_PROCESS_GROUP, INSERT_LOADER_CLASS, partGap), machine: null, outcome: null, warnings: [] }, secPerPart: null };
+    return { step: { line: gap(kind.process, kind.processGroup, kind.machineClass, partGap), machine: null, outcome: null, warnings: [] }, secPerPart: null };
   }
-  const calc = input.spec.calculators.find((c) => c.name === INSERT_LOADING_CALC)!;
+  const calc = input.spec.calculators.find((c) => c.name === kind.calculator)!;
   const step = selectAndCost({
-    process: 'Insert Pick and Place', machineClass: INSERT_LOADER_CLASS,
+    process: kind.process, machineClass: kind.machineClass,
     machines: input.loaders.filter((m) => machineText(m, 'loading') === route.loading),
     criteria: [`A ${route.loading} loader`, 'Its payload carries the heaviest insert (a manual station has no limit)'],
-    batchSize: input.batchSize, costContext: input.costContext, ref, partName: 'part', processGroup: INSERT_MOLDING_PROCESS_GROUP,
+    batchSize: input.batchSize, costContext: input.costContext, ref, partName: 'part', processGroup: kind.processGroup,
     evaluate: (m) => {
       const payload = machineValue(m, 'max_payload') ?? 0;
       if (route.loading !== 'manual' && payload < heaviest) return { ok: false, reasons: [`its ${payload} kg payload does not carry the ${heaviest} kg insert`] };
@@ -143,8 +165,8 @@ export function insertLoading(input: {
         variable,
         engine: (key) => (key.startsWith('load_time_s') ? loadSeed : key.startsWith('manual') ? { value: route.loading === 'manual' ? 1 : 0, source: route.loading === 'manual' ? 'a manual load' : `a ${route.loading} robot` } : null),
       });
-      if (missing.length) return { ok: false, reasons: missing.map((x) => `${INSERT_LOADING_CALC}: ${x}`) };
-      const run = runReferenceCalculator(input.calculators, INSERT_LOADING_CALC, seeds, calc.output ?? 'Cycle Time');
+      if (missing.length) return { ok: false, reasons: missing.map((x) => `${kind.calculator}: ${x}`) };
+      const run = runReferenceCalculator(input.calculators, kind.calculator, seeds, calc.output ?? 'Cycle Time');
       if (run.value == null) return { ok: false, reasons: run.missing };
       return { ok: true, sec: run.value, run, energyCostUsd: 0, notes: [] };
     },

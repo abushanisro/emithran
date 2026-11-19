@@ -161,7 +161,15 @@ import { buildForgingCostSummary } from './costing/forging/forging-cost-summary'
 import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
 import { FORGING_ROUTES } from './costing/forging/forging-route';
 import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
-import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, INSERT_MOLDING_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
+import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, INSERT_MOLDING_PROCESS_GROUP, MULTI_SHOT_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
+import {
+  MULTI_SHOT_CYCLE_CALC, MULTI_SHOT_DESIGN_HOURS_FACTOR, MULTI_SHOT_PRESS_CLASS, MULTI_SHOT_ROUTE_KEY, MULTI_SHOT_ROUTES, chooseMultiShotRoute, multiShotRouteId,
+  priceMultiShotRoutes, shotEntriesOf, type MultiShotShot, type ShotNeed,
+} from './costing/plastic-molding/multi-shot/multi-shot';
+import { multiShotRouteFor } from './costing/plastic-molding/multi-shot/multi-shot-route-comparison';
+import { isMetalType } from '../raw-materials/material-moldability';
+import type { MoldInsert } from './costing/plastic-molding/insert/insert-molding';
+import { MultiShotService } from './costing/plastic-molding/multi-shot/multi-shot.service';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
@@ -252,6 +260,21 @@ const materialGapOf = (s: CostSummaryDto): string | null => {
 /** Whether a part is insert molded: its Process is Assembly Molding (it is costed as a plastic part, on the insert presses). */
 const isInsertMolding = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === INSERT_MOLDING_PROCESS_GROUP;
 
+/** Whether a part is multi-shot molded: its Process is Assembly Plastic Molding (each shot costed as a plastic molding, on a multi-shot press). */
+const isMultiShot = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === MULTI_SHOT_PROCESS_GROUP;
+
+/** The material fields of a molding input, from a resolved raw_materials row (the part's, or a shot's). */
+function moldingMaterialOf(m: Awaited<ReturnType<BomItemCostingService['resolveMaterialForFamily']>>) {
+  return {
+    materialCostPerKg: m.materialCostPerKg, materialDensityKgM3: m.materialDensityKgM3, materialSource: m.materialSource, materialType: m.materialType,
+    materialStockForm: m.stockForm, materialMatlState: m.matlState, materialClamp: m.clampProperties, materialRecord: m.materialRecord,
+    realResinInputs: {
+      meltingTempC: m.meltingTempC, moldTempC: m.moldTempC, ejectionTempC: m.ejectionTempC, specificHeatMeltJgC: m.specificHeatMeltJgC,
+      thermalConductivityMeltWMK: m.thermalConductivityMeltWMK, densityOfMeltKgM3: m.densityOfMeltKgM3,
+    },
+  };
+}
+
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
   if (lines.length === 0) return dto;
@@ -341,6 +364,7 @@ export class BomItemCostingService {
     private readonly assemblyCostService?: AssemblyCostService,
     /** Insert molding's reference data, calculators and loaders; optional for the same reason (without it the loading is a named gap). */
     private readonly insertMoldingService?: InsertMoldingService,
+    private readonly multiShotService?: MultiShotService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -469,6 +493,7 @@ export class BomItemCostingService {
       ...(dto.composites ? { composites: { ...dto.composites, options: convertRouteOptions(dto.composites.options, conv) } } : {}),
       ...(dto.additive ? { additive: { ...dto.additive, options: convertRouteOptions(dto.additive.options, conv) } } : {}),
       ...(dto.insertMolding ? { insertMolding: { ...dto.insertMolding, options: convertRouteOptions(dto.insertMolding.options, conv) } } : {}),
+      ...(dto.multiShot ? { multiShot: { ...dto.multiShot, options: convertRouteOptions(dto.multiShot.options, conv) } } : {}),
       ...(dto.assembly ? {
         assembly: {
           ...dto.assembly,
@@ -3245,20 +3270,25 @@ export class BomItemCostingService {
         ? (await this.plasticReferenceService.getPressRecords(this.databaseService.getClient(accessToken), [selectedImCandidate.machineId])).get(selectedImCandidate.machineId) ?? null
         : null;
       const activePlasticRef = await this.plasticReferenceService.getReference();
+      // What every molding of the part shares (the reference, the rates, the volumes); the part (or a shot) adds its geometry and material.
+      const moldingFacts = {
+        calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
+        calculatorOverrides: overridesByCalculator(await CalculatorFieldOverridesService.rows(this.databaseService.getClient(accessToken), id)),
+        family, location, batchSize, annualVolume, productionLifeYears,
+        plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
+        electricity: electricityUsd(await loadLocationElectricity(this.databaseService.getClient(accessToken), location), location,
+          (value: number, currency: string) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),
+        currencySymbol: locInfo.symbol,
+        usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
+        deburrRate: mhrRates.deburring,
+        inspectionRate: mhrRates.inspection,
+        cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
+      };
       const imInput: InjectionMoldingCostInput = {
         ...buildMoldingCommonInput({
-          calculators: await this.calculatorCatalogService.loadPlasticMoldingCalculators(accessToken),
-          calculatorOverrides: overridesByCalculator(await CalculatorFieldOverridesService.rows(this.databaseService.getClient(accessToken), id)),
-          item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade, family, location, batchSize, annualVolume, productionLifeYears,
-          material: { materialCostPerKg, materialDensityKgM3, materialSource, materialType, materialStockForm: stockForm, materialMatlState: matlState, materialClamp: clampProperties, realResinInputs, materialRecord: resolvedMaterial.materialRecord },
-          plasticReference: { plasticReference: activePlasticRef.reference, plasticReferenceMissing: activePlasticRef.missing },
-          electricity: electricityUsd(await loadLocationElectricity(this.databaseService.getClient(accessToken), location), location,
-            (value, currency) => { try { return value * rates.convertStrict(currency, 'USD'); } catch { return null; } }),
-          currencySymbol: locInfo.symbol,
-          usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
-          deburrRate: mhrRates.deburring,
-          inspectionRate: mhrRates.inspection,
-          cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
+          ...moldingFacts,
+          item, summary, cadFaceCount: cadFaceCount((item as { featureGraph?: unknown }).featureGraph), grade,
+          material: moldingMaterialOf(resolvedMaterial),
         }),
         mhrRate: mhrRates.injectionMolding,
         machineClampTonnes: selectedImCandidate?.capability?.maxTonnage ?? null,
@@ -3268,15 +3298,33 @@ export class BomItemCostingService {
       };
       // Assembly Molding (insert molding): the same engine on an insert press, with the inserts loaded every shot (plastic-molding/insert).
       const insertMolding = isInsertMolding(item);
+      // Assembly Plastic Molding (multi-shot): each shot (a BOM child, or the part and the Cost Guide's materials) on a multi-shot press (plastic-molding/multi-shot).
+      const multiShot = isMultiShot(item);
+      // A shot's injection input: the shared facts with its own item (geometry) and material.
+      const shotInputOf = async (shotItem: BOMItemResponseDto, shotGrade: string | null): Promise<InjectionMoldingCostInput> => {
+        const m = await this.resolveMaterialForFamily({
+          accessToken, grade: shotGrade, family, materialCol: locInfo.materialCol, rates, locCurrencyCode: locInfo.code, location, stockForm: null, warnings: materialWarnings,
+        });
+        const shotFg = (shotItem as { featureGraph?: { summary?: Record<string, unknown> } }).featureGraph;
+        return {
+          ...imInput,
+          ...buildMoldingCommonInput({
+            ...moldingFacts, item: shotItem, summary: (shotFg?.summary ?? summary) as typeof summary,
+            cadFaceCount: cadFaceCount(shotFg) ?? imInput.cadFaceCount ?? null, grade: shotGrade, material: moldingMaterialOf(m),
+          }),
+        };
+      };
       const imResult = insertMolding
         ? { ...(await this.priceInsertMolding({ id, item, imInput, mhrRates, accessToken, location, batchSize, forceRoute: forceDieCastingProcess })), ...currencyMeta }
-        : { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
+        : multiShot
+          ? { ...(await this.priceMultiShot({ id, item, grade, imInput, shotInputOf, accessToken, location, batchSize, forceRoute: forceDieCastingProcess })), ...currencyMeta }
+          : { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       // What each CAD driver is worth: the same engine, run again with one driver moved one step.
-      if (!insertMolding) imResult.driverImpacts = driverImpacts(imInput, imResult);
+      if (!insertMolding && !multiShot) imResult.driverImpacts = driverImpacts(imInput, imResult);
       imResult.warnings.push(...materialWarnings);
       // The applied route decides the process the part is priced in: another molding process (Structural Foam, Compression, Reaction Injection) is priced by its own engine
       // in the route comparison, and the summary adopts that route, so the Cost tab, the saved rows and the comparison state one price.
-      const appliedOther = insertMolding ? null : await this.appliedOtherMoldingRouteId(id, accessToken);
+      const appliedOther = insertMolding || multiShot ? null : await this.appliedOtherMoldingRouteId(id, accessToken);
       if (appliedOther) {
         const comparison = await this.plasticRouteComparison.compare({
           item, summary, grade, mhrRates, rates, location, batchSize, annualVolume, productionLifeYears, accessToken,
@@ -4666,6 +4714,173 @@ export class BomItemCostingService {
   }
 
   /**
+   * A multi-shot molded part (Assembly Plastic Molding; decisions 2026-11-19). The shots are its BOM children that are moldable plastics (each its
+   * own CAD and material), else the part and the Cost Guide's extra materials (each a share of its volume); its other children are components
+   * loaded by Pick and Place. Each press orientation is a route, priced on the cheapest press of it that molds the shots
+   * (plastic-molding/multi-shot/multi-shot.ts); the cheapest complete route is quoted unless one is set.
+   */
+  private async priceMultiShot(a: {
+    id: string; item: BOMItemResponseDto; grade: string | null; imInput: InjectionMoldingCostInput;
+    shotInputOf: (item: BOMItemResponseDto, grade: string | null) => Promise<InjectionMoldingCostInput>;
+    accessToken: string; location: string; batchSize: number; forceRoute?: string;
+  }): Promise<CostSummaryDto> {
+    const client = this.databaseService.getClient(a.accessToken);
+    // The part alone with the molding a gap: the reason it cannot be priced as multi-shot, never an injection quote in its place.
+    const notPriced = (reason: string): CostSummaryDto => {
+      const base = computeInjectionMoldedCostSummary(a.imInput);
+      return {
+        ...appendLines({ ...base, processLines: base.processLines.filter((l) => l.process !== 'Injection Molding') },
+          [gapLine('Multi-Shot Molding', MULTI_SHOT_PROCESS_GROUP, MULTI_SHOT_PRESS_CLASS, reason)]),
+        warnings: [reason],
+      };
+    };
+    const inputs = this.multiShotService
+      ? await this.multiShotService.inputs(client, a.accessToken, a.location)
+      : { ok: false as const, missing: ['the multi-shot service is not available'] };
+    if (!inputs.ok) return notPriced(`Multi-shot molding cannot be costed: ${inputs.missing.join('; ')}`);
+
+    // The shots and the components, from the BOM.
+    const children = await this.items.findChildren(a.id, a.accessToken);
+    const childShots: MultiShotShot[] = [];
+    const componentChildren: BOMItemResponseDto[] = [];
+    for (const c of children) {
+      const input = await a.shotInputOf(c, c.materialGrade ?? null);
+      const moldable = input.materialClamp?.injectionPressureMaxMpa != null && !isMetalType(input.materialType) && (c.volume ?? 0) > 0;
+      if (moldable) childShots.push({ name: c.name, source: 'bom', itemId: c.id, grade: c.materialGrade ?? null, volumePct: null, input });
+      else componentChildren.push(c);
+    }
+    const entries = shotEntriesOf(a.item.scenarioOverrides);
+    let shots: MultiShotShot[];
+    if (childShots.length >= 2) {
+      shots = childShots;
+    } else {
+      // The part is the first shot (its own material, the volume the extra shots leave), then the Cost Guide's materials, else a single shot child.
+      const extraPct = entries.reduce((t, e) => t + e.volumePct, 0);
+      const firstPct = entries.length > 0 ? 100 - extraPct : null;
+      const scaled = (pct: number | null): BOMItemResponseDto => (pct == null ? a.item : { ...a.item, volume: (a.item.volume ?? 0) * pct / 100 } as BOMItemResponseDto);
+      const part: MultiShotShot = { name: a.item.name, source: 'part', itemId: a.id, grade: a.grade, volumePct: firstPct, input: firstPct == null ? a.imInput : await a.shotInputOf(scaled(firstPct), a.grade) };
+      const extra = await Promise.all(entries.map(async (e, i): Promise<MultiShotShot> => ({
+        name: `Shot ${i + 2}`, source: 'cost_guide', itemId: null, grade: e.grade, volumePct: e.volumePct, input: await a.shotInputOf(scaled(e.volumePct), e.grade),
+      })));
+      shots = extraPct > 0 && extraPct < 100 ? [part, ...extra] : childShots.length === 1 ? [part, childShots[0]!] : [part];
+    }
+    if (shots.length < 2) {
+      return notPriced('A multi-shot part needs two shots: add them as BOM children (each with its CAD and material), or a second material in the Cost Guide.');
+    }
+    // What each shot needs of a press, as the injection engine derives it from its material and geometry.
+    const needs: ShotNeed[] = shots.map((shot) => {
+      const im = computeInjectionMoldedCostSummary(shot.input).injectionMolding;
+      return { clampT: im?.clampRequiredT ?? null, shotGppsG: im?.shotRequiredG ?? null, reason: null };
+    });
+    const components: MoldInsert[] = (await componentsOf(componentChildren, async (g) => {
+      const d = await this.items.materialDensity(g, a.accessToken);
+      return d.density_g_cm3 != null && d.density_g_cm3 > 0 ? d.density_g_cm3 * 1000 : null;
+    })).map((c) => ({ id: c.id, name: c.name, perPart: c.quantity, massKg: c.massKg, source: 'bom' as const }));
+
+    const usdToLocal = a.imInput.usdToLocal ?? 1;
+    const routes = priceMultiShotRoutes({
+      shots, needs, presses: inputs.presses, components, batchSize: a.batchSize,
+      loading: {
+        ref: inputs.ref, spec: inputs.spec, calculators: inputs.calculators, loaders: inputs.loaders,
+        costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
+      },
+      mold: { surfaceAreaMm2: shots.reduce((t, s) => t + (s.input.surfaceArea > 0 ? s.input.surfaceArea : 0), 0), designHoursFactor: MULTI_SHOT_DESIGN_HOURS_FACTOR, tryouts: inputs.tryouts },
+      onPress: (shot, press) => ({
+        ...shot.input,
+        // The engine works in the factory currency; HR Rates are USD (as the loader line is converted by toLocal).
+        mhrRate: {
+          rate: (press.machine.machineRatePerHr ?? 0) * usdToLocal, source: press.machine.machineRatePerHr != null ? 'mhr_database' : 'no_db_rate',
+          machineClass: MULTI_SHOT_PRESS_CLASS, machineName: press.machine.name, commodityCode: null,
+          labourRate: press.machine.labourRatePerHr != null ? press.machine.labourRatePerHr * usdToLocal : null, operators: press.machine.operators ?? 1,
+        },
+        // A multi-shot part's inserts are the components loaded every shot (not the CAD's insert candidates): they decide the insert operations.
+        signals: { ...shot.input.signals, insertCount: components.reduce((t, c) => t + c.perPart, 0) },
+        machineClampTonnes: press.clampT,
+        machineShotCapacityG: press.shotPerUnitG,
+        pressTiming: press.timing,
+        goodPartYield: press.timing?.goodPartYield ?? null,
+      }),
+      runEngine: (input) => computeInjectionMoldedCostSummary(input),
+      cycle: (longest, load, index) => {
+        const val = (value: number, source: string) => ({ value, source });
+        const run = runReferenceCalculator(inputs.calculators, MULTI_SHOT_CYCLE_CALC, {
+          'Longest Shot Cycle': val(longest, 'the longest of the shots\' injection cycles on this press'),
+          'Load Time': val(load, load > 0 ? 'the component loading of the shot (Pick and Place)' : 'no components to load'),
+          'Tool Index Time': val(index, 'the press: toolIndexTime (memory/Countries data, migration 1085)'),
+        }, 'Shot Cycle');
+        return run.value == null ? null : { sec: run.value, trace: run.trace };
+      },
+      toLocal: (l) => (usdToLocal === 1 ? l : lineToLocal(l, usdToLocal)),
+      appendLines,
+    });
+    const chosen = chooseMultiShotRoute(routes, a.forceRoute ?? (a.item.scenarioOverrides?.[MULTI_SHOT_ROUTE_KEY] as string | undefined));
+    const why = a.forceRoute ? 'route comparison'
+      : routes.some((r) => r.key === a.item.scenarioOverrides?.[MULTI_SHOT_ROUTE_KEY]) ? 'set in the Cost Guide' : 'cheapest complete route';
+    const quoteNote = chosen.complete || a.forceRoute ? `Multi-shot molding: ${chosen.label} quoted (${why}).` : 'Multi-shot molding: no press orientation is fully costed yet.';
+    const p = chosen.press;
+    const moldGap = chosen.summary.processLines.find((l) => l.machineClass === MULTI_SHOT_PRESS_CLASS && l.physicsGap);
+    return {
+      ...chosen.summary,
+      warnings: [quoteNote, ...chosen.summary.warnings],
+      multiShot: {
+        route: chosen.key, routeLabel: chosen.label, complete: chosen.complete,
+        shots: shots.map((s, i) => ({
+          name: s.name, source: s.source, itemId: s.itemId, grade: s.grade, volumePct: s.volumePct, volumeMm3: Math.round(s.input.volume),
+          cycleSec: chosen.shotCycles[i] ?? null, clampT: needs[i]!.clampT, shotGppsG: needs[i]!.shotGppsG,
+        })),
+        components: components.map((c) => ({ id: c.id, name: c.name, perPart: c.perPart, massKg: c.massKg })),
+        press: {
+          name: p?.machine.name ?? null, orientation: p?.orientation ?? null, units: p?.units ?? null, stations: p?.stations ?? null,
+          rotatingStack: p?.rotatingStack ?? false, indexSec: p?.indexSec ?? null,
+          reasons: p ? [] : [moldGap?.physicsGap && 'reason' in moldGap.physicsGap ? moldGap.physicsGap.reason : 'No multi-shot press molds the shots.'],
+        },
+        cycleSec: chosen.cycleSec, loaderName: chosen.loaderName, loadSecPerPart: chosen.loadSecPerPart,
+        options: routes.map((r) => ({
+          route: r.key, label: r.label, complete: r.complete, totalCost: r.complete ? r.summary.totalCost : null,
+          reason: r.complete ? null : r.summary.processLines.filter((l) => l.physicsGap).map((l) => `${l.process}: ${l.physicsGap && 'reason' in l.physicsGap ? l.physicsGap.reason : 'not costed'}`).join('; '),
+        })),
+      },
+    };
+  }
+
+  /** A multi-shot molded part's route comparison: each press orientation, the full Cost Summary priced on it. The recommended one is the quote's. */
+  private async multiShotRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = MULTI_SHOT_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i])),
+    ]);
+    const routes = keys.map((key, i) => multiShotRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.multiShot?.complete ? multiShotRouteId(quote!.multiShot.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No multi-shot route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
+  /**
    * An insert-molded part's route comparison: each load method the full Cost Summary priced on it. The recommended one is the route the quote chose.
    */
   private async insertMoldingRouteComparison(
@@ -5082,6 +5297,10 @@ export class BomItemCostingService {
     // Assembly Molding: one route per insert load method, each the full quote on that route (insert-molding-route-comparison.ts).
     if (family === 'plastic_molded' && isInsertMolding(item)) {
       return this.insertMoldingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Assembly Plastic Molding: one route per press orientation, each the full quote on that route (multi-shot-route-comparison.ts).
+    if (family === 'plastic_molded' && isMultiShot(item)) {
+      return this.multiShotRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     if (family === ASSEMBLY_FAMILY) {
       return this.assemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
