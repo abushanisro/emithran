@@ -175,7 +175,7 @@ describe('cost summary: worked ABS part', () => {
     expect(r.processLines.every((l) => !l.physicsGap)).toBe(true);
   });
 
-  it('prices material 56.16 g x 3.046 = 0.171063, press and operator 20.69 s x (29.18 + 30) USD/h = 0.340125, visual inspection 0.04 m2 x 5 min/m2 = 12 s x 30 USD/h = 0.1, weight check 10 s / 1,000 parts x (30 + scale 0.0377) USD/h, total 0.611271: to the millionth, not to the cent', () => {
+  it('prices material 56.16 g x 3.046 = 0.171063, press and operator 20.69 s x (29.18 + 30) USD/h = 0.340125, visual inspection 0.04 m2 x 5 min/m2 = 12 s x 30 USD/h = 0.1, weight check 10 s / 1,000 parts x (30 + scale 0.0377) USD/h, gate trimming 0.37 s x 30 USD/h = 0.003083, total 0.614350: to the millionth, not to the cent', () => {
     expect(r.grossWeightKg).toBeCloseTo(0.05616, 6);
     expect(im.cycleTimeSec).toBe(20.69);
     const material = 0.05616 * 3.046;
@@ -189,8 +189,13 @@ describe('cost summary: worked ABS part', () => {
     const scale = (1051.99 / 10 + 1051.99 * 0.05 + 1051.99 * 0.2 / 10) / (6240 * 0.8 * 0.95);
     const weigh = (10 / 1000) * (30 + scale) / 3600;
     expect(r.processLines.find((l) => l.process === 'Weight Check')?.totalCost).toBeCloseTo(weigh, 6);
-    expect(r.totalProcessCost).toBeCloseTo(run + inspect + weigh, 6);
-    expect(r.totalCost).toBeCloseTo(material + run + inspect + weigh, 6);
+    // gate trimming (F-38): ABS takes n 0.7 (assumed), w = 0.7 x sqrt(40,000) / 30 = 4.667 mm, cut at 12.7 mm/s = 0.37 s x 30 USD/h
+    const trim = (0.37 * 30) / 3600;
+    expect(r.processLines.find((l) => l.process === 'Gate Trimming')?.totalCost).toBeCloseTo(trim, 6);
+    expect(r.totalProcessCost).toBeCloseTo(run + inspect + weigh + trim, 6);
+    // each line is held to the millionth, so the sum of the rounded lines is within a millionth of the exact sum
+    expect(r.totalCost).toBeCloseTo(material + run + inspect + weigh + trim, 5);
+    expect(r.totalCost).toBe(0.61435);
   });
 
   it('tooling, USA, 10,000/yr x 3 yr: BOM 1,930 + labour 2,859.53 + base steel 871.56 + cavity machining 1,122.14 + polish 1,843.44 + ejector pins 48.41 + sprue and ring 155 + try-out 2,765.16 + heat treatment 0 (P20, pre-hardened) + cooling 715.29 + water baffles 1,351.54 = 13,662.06, one mold, 0.4554 per part', () => {

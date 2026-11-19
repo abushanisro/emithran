@@ -24,14 +24,24 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1023 the injection molding visual inspection and weight check calculators
  *   1024 the injection molding material drying calculator
  *   1082 the injection mold tooling calculator, version 10: the water baffles (1022, version 9, is now history and kept as committed)
+ *   1083 the injection molding gate trimming calculator
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1023, 1024, 1082] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1023, 1024, 1082, 1083] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
+  1083: {
+    title: 'Injection molding gate trimming calculator -- each gate cut at the manual trim rate.',
+    rootCause: [
+      'A cold-runner edge-gated part is routed gate trimming, but it was reported as not costed: the reference stages manualTrimRate (12.7, mm/s in',
+      'memory/Roto & blow molding) but no gate size. This calculator sizes the edge gate by the standard rule w = n x sqrt(A) / 30 (Pye, Injection Mould',
+      'Design; n by material in reference/gate-sizing-reference.csv) and times the cut as the gates per cavity x w / manualTrimRate, per part (formula',
+      'registry F-38, ASSUMED). A helper: the injection engine runs it for the routed gate trimming and charges it at the bench rate.',
+    ].join('\n'),
+  },
   1082: {
     title: 'Injection mold tooling calculator, version 10 -- the water baffles.',
     rootCause: [
@@ -117,4 +127,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   1023: '1023_plastic_inspection_calculators.sql',
   1024: '1024_plastic_material_drying_calculator.sql',
   1082: '1082_plastic_mold_water_baffles.sql',
+  1083: '1083_plastic_gate_trimming_calculator.sql',
 };

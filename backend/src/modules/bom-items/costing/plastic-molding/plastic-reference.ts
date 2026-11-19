@@ -54,7 +54,7 @@ export const PLASTIC_VARIABLE_KEYS = [
   'conventionalRunnerMaxPressureReductionFactor', 'hotRunnerMaxPressureReductionFactor', 'minInjectionPressure',
   // Feature rules (which core method a recognised feature needs): optional, read by plastic-catalog-operation-resolver.ts.
   'maxNoCoreInsertDiameter', 'drawDirectionOrthogonalEpsilonForSlides', 'drawDirectionOrthogonalEpsilonForLifters',
-  'cmAutoIncludeManualFlashTrimming', 'cmManualFlashTrimmingRate', 'slideCycleRate',
+  'cmAutoIncludeManualFlashTrimming', 'cmManualFlashTrimmingRate', 'slideCycleRate', 'manualTrimRate',
   // The mold base and its plate stack (mold-base.ts).
   'aPlateFlatCavityRatio', 'aPlateMinThickness', 'bPlateMinThickness', 'betweenPartsMoldBorder',
   'topClampPlateThickness', 'bottomClampPlateThickness', 'supportPlateThickness', 'useMetricOrImperialValues',
@@ -291,6 +291,8 @@ export interface FeatureRules {
   autoManualFlashTrimming: boolean | null;
   /** variable cmManualFlashTrimmingRate (Length/Time, read as mm/s): the linear rate of manual flash removal; null when not staged. */
   manualFlashTrimmingRateMmPerS?: number | null;
+  /** variables manualTrimRate (12.7, read as mm/s: its unit in memory/Roto & blow molding): the gate trim rate (F-38). */
+  manualTrimRateMmPerS?: number | null;
   /** variable slideCycleRate (Velocity, read as mm/s): how fast a hydraulic slide moves (F-32); null when not staged. */
   slideCycleRateMmPerS?: number | null;
   /** memory/Secondary process visualInspectTimeStandard (min/m2) and defaultPercentToBeTested (%): visual inspection (F-34); null when not staged. */
@@ -616,6 +618,7 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
         lifterEpsilonDeg: optionalPositive('drawDirectionOrthogonalEpsilonForLifters'),
         autoManualFlashTrimming: ((v) => (v === 'true' ? true : v === 'false' ? false : null))(text.get('cmAutoIncludeManualFlashTrimming')?.trim().toLowerCase()),
         manualFlashTrimmingRateMmPerS: optionalPositive('cmManualFlashTrimmingRate'),
+        manualTrimRateMmPerS: optionalPositive('manualTrimRate'),
         slideCycleRateMmPerS: optionalPositive('slideCycleRate'),
         visualInspectMinPerM2: optionalPositive('visualInspectTimeStandard'),
         inspectedPercent: optionalPositive('defaultPercentToBeTested'),

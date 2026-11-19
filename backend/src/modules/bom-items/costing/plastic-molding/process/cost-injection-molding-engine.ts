@@ -38,12 +38,12 @@ import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
 import { computeMoldToolingCost, toolingGapIds } from './mold-tooling-engine';
 import { planRibInserts } from './rib-inserts';
-import { dryerModels, dryingConditionFor, equipmentEconomics, steelTreatment, weightCheckReference } from '../reference/im-reference';
+import { dryerModels, dryingConditionFor, equipmentEconomics, gateWidthConstant, steelTreatment, weightCheckReference } from '../reference/im-reference';
 import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
-import { runDeflashingTime, runInjectionCycleTime, runMaterialDrying, runSlideMovementTime, runVisualInspectionTime, runWeightCheck } from '../calculators/plastic-cycle-time';
+import { runDeflashingTime, runGateTrimmingTime, runInjectionCycleTime, runMaterialDrying, runSlideMovementTime, runVisualInspectionTime, runWeightCheck } from '../calculators/plastic-cycle-time';
 import { runMoldTooling } from '../calculators/mold-tooling-calculator';
 import { selectMoldBase } from './mold-base';
 import { moldCavityLookup } from './mold-cavity';
@@ -124,7 +124,6 @@ const UNREAD_REFERENCE_DATA: Partial<Record<keyof typeof UNCOSTED_OPERATION_LABE
   core_unscrewing: 'the unscrewing mechanism cost (costPerUnscrewingMechanism)',
   insert_loading: 'the in-mold insert loading time and insert cost (cmInsertManualLoadingTime, defaultInsertCost)',
   insert_installation: 'the insert install rate (insertInstallRate)',
-  gate_trimming: 'the manual trim rate and trim stock allowance (manualTrimRate, trimStockAllowance)',
 };
 const UNREAD_BY_LABEL = new Map(Object.entries(UNREAD_REFERENCE_DATA).map(([key, data]) => [UNCOSTED_OPERATION_LABELS[key], data]));
 
@@ -594,7 +593,25 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   }
   processLines.push(line);
 
-  if (routed.has('gate_trimming')) notCosted(UNCOSTED_OPERATION_LABELS.gate_trimming, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
+  // Gate trimming: the operator cuts each gate at the manual trim rate; the gate width from the edge-gate rule (F-38). Charged at the bench rate.
+  if (routed.has('gate_trimming')) {
+    const trim = runGateTrimmingTime({
+      surfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null,
+      gateConstant: gateWidthConstant(input.materialType),
+      gatesPerCavity: plasticRef?.defaultGatesPerCavity ?? null,
+      rateMmPerS: plasticRef?.featureRules.manualTrimRateMmPerS ?? null,
+    }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
+    if (trim.derivable) {
+      const trimLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.gate_trimming, null, batchSize, trim.cycleSec / 60, input.deburrRate));
+      trimLine.calculationTrace = trim.trace;
+      if (trim.calculator.id) trimLine.calculatorId = trim.calculator.id;
+      trimLine.calculatorName = trim.calculator.name;
+      if (trim.calculator.version != null) trimLine.calculatorVersion = trim.calculator.version;
+      processLines.push(trimLine);
+    } else {
+      notCosted(UNCOSTED_OPERATION_LABELS.gate_trimming, `Gate Trimming not costed: missing ${trim.missing.join('; ')}.`);
+    }
+  }
   // Material drying (F-36): a machine-mounted desiccant dryer runs with the press, so its hour (ownership + rated energy) is charged with the press
   // time per part. No operator: the hopper is fed with the press's material handling (no handling time is on file for a machine-mounted dryer).
   if (routed.has('material_drying')) {

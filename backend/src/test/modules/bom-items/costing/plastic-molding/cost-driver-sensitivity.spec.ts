@@ -37,10 +37,10 @@ describe('driverImpacts', () => {
     expect(d.lines.find((l) => l.line === 'Material')!.deltaPerPart).toBeGreaterThan(0);
   });
 
-  it('surface area now prices the visual inspection (memory/Secondary process), and only that line moves', () => {
+  it('surface area prices the visual inspection (memory/Secondary process) and the gate width (F-38), and only those lines move', () => {
     const d = impacts()['Surface area']!;
     expect(d.deltaPerPart).toBeGreaterThan(0);
-    expect(d.lines.map((l) => l.line)).toEqual(['Visual Inspection']);
+    expect(d.lines.map((l) => l.line).sort()).toEqual(['Gate Trimming', 'Visual Inspection']);
   });
 
   it('the lines add up to the change', () => {

@@ -417,6 +417,25 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
+    id: 'F-38', version: 1, name: 'Gate trimming',
+    expression: 'w = n x sqrt(A) / 30;  time s = gates per cavity x w / trim rate',
+    outputUnit: 's',
+    inputs: [
+      { name: 'A', unit: 'mm2', source: 'CAD part surface area' },
+      { name: 'n', unit: 'constant', source: 'reference/gate-sizing-reference.csv (Pye, Injection Mould Design): 0.6 PE/PS, 0.7 POM/PC/PP, 0.8 PMMA/PA, 0.9 PVC; 0.7 assumed for others' },
+      { name: 'gates per cavity', unit: 'count', source: `${MEM}/variables: defaultNumberOfGatesPerCavity` },
+      { name: 'trim rate', unit: 'mm/s', source: `${MEM}/variables: manualTrimRate (mm/s in memory/Roto & blow molding)` },
+    ],
+    dependsOn: [],
+    referenceSource: 'reference/gate-sizing-reference.csv + memory/Plastic Modeling/variables',
+    assumptions: [
+      'The gate is an edge (standard) gate sized by Pye\'s rule; the cut length is its width. Handling the part is not timed.',
+      'A material Pye does not list (ABS, PET, PBT, PPS, TPE) takes the middle constant 0.7, review required.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
     id: 'F-39', version: 1, name: 'First article inspection',
     expression: 'one-off USD = ((touches x probe s x parts) / efficiency adjustments + touches x programming s + CMM setup) / 3600 x CMM machine and crew rate',
     outputUnit: 'USD',

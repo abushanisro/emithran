@@ -31,7 +31,7 @@ describe('plastic molding calculator spec', () => {
     expect(spec.processGroup).toBe('Plastic Molding');
     expect(spec.calculators.filter((c) => !c.helper).map((c) => c.operations[0]).sort()).toEqual(
       ['Compression Molding', 'Injection Molding', 'Reaction Injection Molding', 'Structural foam molding']);
-    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR, 'Injection Molding - Deflashing', 'Injection Molding - Slide Movement', 'Injection Molding - Visual Inspection', 'Injection Molding - Weight Check', 'Injection Molding - Material Drying', 'Injection Mold - Tooling']);
+    expect(spec.calculators.filter((c) => c.helper).map((c) => c.name)).toEqual([LSR_CALCULATOR, 'Injection Molding - Deflashing', 'Injection Molding - Gate Trimming', 'Injection Molding - Slide Movement', 'Injection Molding - Visual Inspection', 'Injection Molding - Weight Check', 'Injection Molding - Material Drying', 'Injection Mold - Tooling']);
   });
 
   it('every operation it computes is a process of the reference catalog (digital_factory_operations.csv)', () => {
