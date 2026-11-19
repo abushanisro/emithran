@@ -9,6 +9,8 @@ function build(over: {
   begin?: { data?: unknown; error?: { message: string } };
   routeError?: Error;
   notes?: Array<{ notes: string | null }>;
+  /** The active records once the route step has run (the route service can remove a route of the part's previous process). */
+  notesAfterRoute?: Array<{ notes: string | null }>;
   machine?: jest.Mock;
 } = {}) {
   const calls: string[] = [];
@@ -20,7 +22,8 @@ function build(over: {
     getCostSummary: jest.fn().mockImplementation(() => { calls.push('cost-summary'); return Promise.resolve({ grossWeightKg: 1 }); }),
     setMachineOverride: over.machine ?? jest.fn().mockResolvedValue({}),
   };
-  const chain = { select: () => chain, eq: () => chain, then: (r: (v: unknown) => void) => r({ data: over.notes ?? [], error: null }) };
+  let routeRan = false;
+  const chain = { select: () => chain, eq: () => chain, then: (r: (v: unknown) => void) => r({ data: (routeRan ? over.notesAfterRoute ?? over.notes : over.notes) ?? [], error: null }) };
   const database = {
     getUserClient: () => ({
       rpc: jest.fn().mockImplementation(() => { calls.push('begin'); return Promise.resolve(over.begin ?? { data: 3, error: null }); }),
@@ -28,7 +31,10 @@ function build(over: {
     }),
   };
   const materials = { ensure: jest.fn().mockImplementation(() => { calls.push('material'); return Promise.resolve({ action: 'replaced', recordId: 'r1', usage: null }); }) };
-  const toolingCosts = { ensure: jest.fn().mockImplementation(() => { calls.push('tooling'); return Promise.resolve({ action: 'replaced', items: ['Injection mold'] }); }) };
+  const toolingCosts = {
+    ensure: jest.fn().mockImplementation(() => { calls.push('tooling'); return Promise.resolve({ action: 'replaced', items: ['Injection mold'] }); }),
+    retire: jest.fn().mockImplementation(() => { calls.push('tooling.retire'); return Promise.resolve(['Forging dies (1 set)']); }),
+  };
   const status = (over.analysis ?? READY) as { ready: boolean; missing: string[] };
   const routes = {
     // The one rule (RouteApplicationService.requireAnalysis): the status is read, never made current here.
@@ -38,6 +44,7 @@ function build(over: {
     }),
     applyRoute: jest.fn().mockImplementation(() => {
       calls.push('route');
+      routeRan = true;
       return over.routeError ? Promise.reject(over.routeError) : Promise.resolve({ created: 5, operations: ['a'], routeLabel: 'Auto', routeId: 'im-standard-200t' });
     }),
     applyCustomRoute: jest.fn().mockImplementation(() => { calls.push('custom-route'); return Promise.resolve({ created: 2, operations: ['x'], routeLabel: 'Custom', needsManualCycleTime: [] }); }),
@@ -107,6 +114,26 @@ describe('ScenarioApplicationService.apply', () => {
     const states = stateWritten(patches);
     expect(states[states.length - 1]).toMatchObject({ status: 'failed', revision: 3, error: 'No route is both feasible and fully costed for this part' });
     expect(states.some((s) => s['status'] === 'applied')).toBe(false);
+  });
+
+  it('a refused route that took the earlier route of another process with it takes that route\'s tooling too (Carriage Mount: forging dies)', async () => {
+    const { svc, calls, toolingCosts } = build({
+      routeError: new Error('No route can be applied: two shots needed.'),
+      notes: [{ notes: 'auto_fill_from_route:forging-closed_die_hammer' }],
+      notesAfterRoute: [],
+    });
+    await expect(svc.apply(input({}))).rejects.toThrow('No route can be applied');
+    expect(toolingCosts.retire).toHaveBeenCalledWith({ bomItemId: 'i1', userId: 'u', token: 't' });
+    expect(calls).toContain('tooling.retire');
+  });
+
+  it('a refused route that leaves the applied route in place leaves its tooling', async () => {
+    const kept = build({ routeError: new Error('refused'), notes: [{ notes: 'auto_fill_from_route:im-standard-200t' }] });
+    await expect(kept.svc.apply(input({}))).rejects.toThrow();
+    const never = build({ routeError: new Error('refused') });
+    await expect(never.svc.apply(input({}))).rejects.toThrow();
+    expect(kept.toolingCosts.retire).not.toHaveBeenCalled();
+    expect(never.toolingCosts.retire).not.toHaveBeenCalled();
   });
 
   it('applying again after a failure converges: the second apply succeeds from the same revision', async () => {

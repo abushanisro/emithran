@@ -46,6 +46,14 @@ export class ToolingCostSnapshotService {
     return { action: wanted.length === 0 ? 'none' : 'replaced', items: wanted.map((w) => w.description) };
   }
 
+  /** Removes the route tooling records (the part's applied route was removed); a tool the user added by hand is kept. */
+  async retire(input: { bomItemId: string; userId: string; token: string }): Promise<string[]> {
+    const { records } = await this.tooling.findAll({ bomItemId: input.bomItemId, page: 1, limit: 100 } as never, input.userId, input.token);
+    const owned = (records as unknown as OwnedRecord[]).filter((r) => r.notes?.startsWith(ROUTE_TOOLING_NOTE_PREFIX));
+    for (const r of owned) await this.tooling.remove(r.id, input.userId, input.token);
+    return owned.map((r) => r.description);
+  }
+
   private isUpToDate(owned: OwnedRecord[], wanted: RouteToolingItem[]): boolean {
     if (owned.length !== wanted.length) return false;
     return wanted.every((w) => owned.some((r) => r.notes === `${ROUTE_TOOLING_NOTE_PREFIX}${w.key}` && r.description === w.description && sameMoney(r.unitCost, w.investmentUsd) && r.amortizationParts === w.amortizationParts));

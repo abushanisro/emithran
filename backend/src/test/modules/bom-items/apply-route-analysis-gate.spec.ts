@@ -2,6 +2,26 @@ import { ConflictException } from '@nestjs/common';
 
 import { RouteApplicationService, whyNoRoute } from '../../../modules/bom-items/services/route-application.service';
 
+/** The part's active process records, by their notes; a delete removes the rows its filters match. */
+function recordsDb(notes: Array<string | null>) {
+  const rows = notes.map((n) => ({ notes: n }));
+  const deleted: string[] = [];
+  const query = (del: boolean) => {
+    const filters: Record<string, unknown> = {};
+    const q = {
+      select: () => q,
+      delete: () => query(true),
+      eq: (col: string, val: unknown) => { filters[col] = val; return q; },
+      then: (resolve: (v: unknown) => void) => {
+        if (del) { const n = filters['notes'] as string; deleted.push(n); rows.splice(0, rows.length, ...rows.filter((r) => r.notes !== n)); }
+        resolve({ data: del ? null : [...rows], error: null });
+      },
+    };
+    return q;
+  };
+  return { databaseService: { getClient: () => ({ from: () => query(false) }) }, rows, deleted };
+}
+
 /**
  * Applying a route writes cost records from the part's analysis. Until the analyses the part needs are finished and current, the
  * apply is refused (409 analysis_not_ready) before anything is computed or written.
@@ -62,6 +82,7 @@ describe('applying "auto" when every route is incompatible', () => {
       costing: { getRouteComparison },
       analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
       audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
+      databaseService: recordsDb([]).databaseService,
     });
     return c;
   }
@@ -122,6 +143,45 @@ describe('a kept route that is no longer a route for the part', () => {
   it('refuses a route chosen by id that the part does not have', async () => {
     await expect(service().applyRoute('i', { routeId: 'sm-laser', location: 'USA' } as never, user, 't'))
       .rejects.toThrow("Route 'sm-laser' not available for this part. Available: sand-casting");
+  });
+});
+
+/**
+ * Carriage Mount: applied as a closed-die forging, then moved to Assembly Plastic Molding, whose route cannot be applied yet (one shot). The forging
+ * operations price a process the part is no longer made by: they are removed with the refusal, not left in its total. Hand-added rows stay.
+ */
+describe('a refused apply after the part changed process', () => {
+  const ready = { cad: 'ready', drawing: 'not_required', casting: 'not_required', ready: true, missing: [] };
+  const twoShots = 'Multi-Shot Molding: A multi-shot part needs two shots.';
+  const ms = (routeId: string) => ({ routeId, routeLabel: routeId, isFeasible: false, capability: { warnings: [twoShots] }, dataGaps: [] });
+  function service(notes: Array<string | null>) {
+    const db = recordsDb(notes);
+    const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
+    Object.assign(c, {
+      bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }) },
+      costing: { getRouteComparison: jest.fn().mockResolvedValue({ resolvedInputs: { batchSize: 250 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [ms('ms-horizontal'), ms('ms-vertical')] }) },
+      analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
+      audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
+      logger: { log: jest.fn() },
+      databaseService: db.databaseService,
+    });
+    return { c, db };
+  }
+  const user = { id: 'u' } as never;
+
+  it('removes the earlier route\'s operations, keeps a hand-added one, and says so after the reason', async () => {
+    const { c, db } = service(['auto_fill_from_route:forging-closed_die_hammer', 'auto_fill_from_route:forging-closed_die_hammer', null]);
+    const error = await c.applyRoute('i', { routeId: 'auto', location: 'USA' } as never, user, 't').catch((e: unknown) => e) as Error;
+    expect(error.message).toBe(`No route can be applied: ${twoShots} The operations of the earlier route forging-closed_die_hammer were removed: they priced the part's previous process.`);
+    expect(db.deleted).toEqual(['auto_fill_from_route:forging-closed_die_hammer']);
+    expect(db.rows).toEqual([{ notes: null }]);
+  });
+
+  it('keeps the operations of a route the part still has', async () => {
+    const { c, db } = service(['auto_fill_from_route:ms-vertical']);
+    const error = await c.applyRoute('i', { routeId: 'auto', location: 'USA' } as never, user, 't').catch((e: unknown) => e) as Error;
+    expect(error.message).toBe(`No route can be applied: ${twoShots}`);
+    expect(db.deleted).toEqual([]);
   });
 });
 

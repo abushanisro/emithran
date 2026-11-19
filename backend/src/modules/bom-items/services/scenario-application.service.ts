@@ -108,8 +108,16 @@ export class ScenarioApplicationService {
         material = { grade, action: snapshot.action, recordId: snapshot.recordId };
       }
 
-      // 5. The route.
-      const route = await this.applyRoute(id, request, user, token, warnings);
+      // 5. The route. When it is refused and the route applied before is gone with it (it was a route of the part's previous process:
+      // RouteApplicationService.retireRouteOfAnotherProcess), that route's tooling goes too: a forging die is not in a molded part's cost.
+      const routeBefore = await this.currentRouteId(id, token);
+      let route: ScenarioApplicationResult['route'];
+      try {
+        route = await this.applyRoute(id, request, user, token, warnings);
+      } catch (e: unknown) {
+        if (routeBefore && !(await this.currentRouteId(id, token))) await this.toolingCosts.retire({ bomItemId: id, userId, token });
+        throw e;
+      }
 
       // 5b. The tooling the applied route needs (the mold), from the cost summary at this scenario.
       const afterRoute = await this.costing.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
