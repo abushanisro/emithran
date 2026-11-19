@@ -44,7 +44,7 @@ describe('the process a part is costed as', () => {
     const r = resolve({ scenarioOverrides: { processGroup: 'Rapid Prototyping' } }, 'Generic ABS, Fittings', 'milled');
     expect(r.family).toBe('unknown');
     expect(r.familySource).toBe('process');
-    expect(r.warning).toBe('The Process "Rapid Prototyping" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Assembly Molding, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
+    expect(r.warning).toBe('The Process "Rapid Prototyping" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Assembly Molding, Assembly Plastic Molding, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
   });
 
   it('a Powder Metal part is a powder metal part, whatever its material or last analysis', () => {

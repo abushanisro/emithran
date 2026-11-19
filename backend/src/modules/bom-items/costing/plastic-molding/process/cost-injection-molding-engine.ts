@@ -239,6 +239,12 @@ export interface InjectionMoldingCostInput {
    * Insert molding (insert/insert-molding.ts shotCycle): the shot's time from the injection cycle and the cavities, when the press also loads
    * inserts every shot (overlapped on a rotary or shuttle table). Absent: the shot is the injection cycle.
    */
+  /**
+   * A multi-shot mold (plastic-molding/multi-shot): one mold that holds every shot's stage, so its cavities are machined and polished over every
+   * shot's surface, its design takes designHoursFactor x the mold base design hours (tblMultiShotMoldBaseDesignHrs is that multiple of the plain
+   * table, memory/Assembly plastic molding), and it is tried out `tryouts` times (defaultNumMultiShotTryOuts). Absent: an ordinary mold.
+   */
+  multiShotMold?: { surfaceAreaMm2: number; designHoursFactor: number; tryouts: number } | null;
   shotCycle?: ((moldingCycleSec: number, cavities: number) => { sec: number; trace: CalculationTraceStep[] } | null) | null;
   /** The part's own values for calculator fields (calculator_field_overrides, migration 1011), laid over the calculators for this calculation. */
   calculatorOverrides?: CalculatorFieldOverrides | null;
@@ -561,6 +567,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     injection_molding: 'Injection Molding',
     structural_foam_molding: 'Structural Foam Molding',
     assembly_molding_insert_injection_molding: 'Insert Injection Molding',
+    assembly_plastic_molding_multi_shot_molding: 'Multi-Shot Molding',
   };
   const processLabel = MOLDING_PROCESS_LABEL[mhrRate.machineClass] ?? 'Injection Molding';
   // An insert press's shot also loads the inserts (overlapped on a table press): its time is the shot's, its trace follows the cycle's.
@@ -868,10 +875,13 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     if (!lifeRow) {
       warnings.push(`No tblToolLife row for material type ${input.materialType ?? '(unknown)'}: mold life uses the reference default ${plasticRef.defaultToolLifeShots.toLocaleString()} shots.`);
     }
+    // A multi-shot mold holds every shot's stage: their surface, its design multiple and its try-outs (multiShotMold).
+    const msMold = input.multiShotMold ?? null;
+    const moldSurfaceMm2 = msMold ? msMold.surfaceAreaMm2 : input.surfaceArea > 0 ? input.surfaceArea : null;
     // Every price, hour and amortization step is the tooling calculator's (migration 1012), shown on the line and changeable for the part.
     const tooling = runMoldTooling({
       components: moldTooling.items, componentsSubtotalUsd: moldTooling.bomSubtotalUsd, moldBaseAreaMm2,
-      designHours: moldTooling.estimatedDesignHrs, designHoursRowAreaMm2: moldTooling.designHoursRowAreaMm2, assemblyHours: moldTooling.estimatedAssemblyHrs, tables: plasticRef.tooling,
+      designHours: moldTooling.estimatedDesignHrs * (msMold?.designHoursFactor ?? 1), designHoursRowAreaMm2: moldTooling.designHoursRowAreaMm2, assemblyHours: moldTooling.estimatedAssemblyHrs, tables: plasticRef.tooling,
       toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null, location: input.location ?? '(unknown location)',
       annualVolume: annualVol, productionLifeYears: prodLife, cavityCount, toolLifeShots, toolLifeMaterialType: lifeRow?.materialType ?? null,
       toolLifeSource: lifeRow ? `memory/Plastic Modeling/lookup/tblToolLife: ${input.materialType}` : `memory/Plastic Modeling/variables: defaultToolLife (no tblToolLife row for ${input.materialType ?? 'the material type'})`,
@@ -881,9 +891,9 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       }),
       moldBaseRef: plasticRef.moldBase,
       partHeightMm: (input.bboxMinMm ?? 0) > 0 ? input.bboxMinMm! : null,
-      cavity: moldCavityLookup({ faceCount: input.cadFaceCount ?? null, surfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null, ref: plasticRef.moldBase }),
-      partSurfaceAreaMm2: input.surfaceArea > 0 ? input.surfaceArea : null,
-      extras: plasticRef.moldExtras,
+      cavity: moldCavityLookup({ faceCount: input.cadFaceCount ?? null, surfaceAreaMm2: moldSurfaceMm2, ref: plasticRef.moldBase }),
+      partSurfaceAreaMm2: moldSurfaceMm2,
+      extras: msMold ? { ...plasticRef.moldExtras, tryouts: msMold.tryouts } : plasticRef.moldExtras,
       pressClampTonnes: input.machineClampTonnes != null && input.machineClampTonnes > 0 ? input.machineClampTonnes : null,
       sideActionBlocks: signals.sideActionBlocks ?? null,
       sideActionBundleIds: signals.sideActionBundleIds ?? null,

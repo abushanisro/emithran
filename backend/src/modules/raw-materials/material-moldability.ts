@@ -135,4 +135,5 @@ export function moldingCostableFilter(): string {
  * 3D-printing resins and powders and stock shapes, which no molding route can use.
  */
 // Assembly Molding (insert molding) is injection molding on insert presses: it molds the same feedstock, from the same material group.
-export const MOLDING_PROCESS_GROUPS: ReadonlySet<string> = new Set(['Plastic Molding', 'Assembly Molding']);
+// Assembly Plastic Molding (multi-shot) molds them too, one material per shot.
+export const MOLDING_PROCESS_GROUPS: ReadonlySet<string> = new Set(['Plastic Molding', 'Assembly Molding', 'Assembly Plastic Molding']);

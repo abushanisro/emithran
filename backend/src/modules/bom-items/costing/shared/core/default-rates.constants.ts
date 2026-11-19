@@ -1151,6 +1151,9 @@ export const MACHINE_REGISTRY = {
   // Insert molding presses (memory/Assembly molding, migrations 862, 1079, 1080): injection physics on vertical presses that load inserts every shot,
   // priced by computeInjectionMoldedCostSummary like Structural Foam; only the pool, the rate and the shot (insert loading) differ.
   assembly_molding_insert_injection_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Assembly Molding'], machineClassKeywords: ['Insert Injection Molding'] },
+  // Multi-shot presses (memory/Assembly plastic molding, migrations 862, 1085): 2K/3K presses, each shot injection physics; chosen and priced by
+  // the multi-shot engine (plastic-molding/multi-shot), which reads the injection units, stations and tool index time from the press.
+  assembly_plastic_molding_multi_shot_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Assembly Plastic Molding'], machineClassKeywords: ['Multi-Shot Molding'] },
   // Real, distinct machine class (2026-09-02). Real machine pool:
   // memory/Injection/machine/compression_molding_machines.json (23 machines,
   // e.g. "Accurl Hydraulic Press HBP-40"). Compression molding is NOT

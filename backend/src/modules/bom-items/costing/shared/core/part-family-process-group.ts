@@ -38,6 +38,9 @@ export const ASSEMBLY_FAMILY = 'assembly';
 /** Insert molding (memory/Assembly molding): costed as a plastic molded part on the insert presses. */
 export const INSERT_MOLDING_PROCESS_GROUP = 'Assembly Molding';
 
+/** Multi-shot molding (memory/Assembly plastic molding): costed as a plastic molded part, each shot on a 2K/3K multi-shot press. */
+export const MULTI_SHOT_PROCESS_GROUP = 'Assembly Plastic Molding';
+
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
 /**
  * The families a CAD analysis run with a family hint may store. A hint names an extractor, and the analysis stores that family, except a
@@ -60,6 +63,8 @@ const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
   [CASTING_PROCESS_GROUP]: ['die_cast', 'sand_cast', 'investment_cast'],
   // Insert molding: a molded plastic part, analysed and priced as one, on the insert presses with its inserts loaded (plastic-molding/insert).
   [INSERT_MOLDING_PROCESS_GROUP]: ['plastic_molded'],
+  // Multi-shot molding: a molded plastic part, each shot priced on a multi-shot press (plastic-molding/multi-shot).
+  [MULTI_SHOT_PROCESS_GROUP]: ['plastic_molded'],
 };
 
 /**
