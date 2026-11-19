@@ -14,7 +14,7 @@ import type { CycleTimeInput, CycleTimeResult } from '../process/cycle-time';
 import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-spec';
 import { REGISTRY_FORMULA_OF_FIELD } from './plastic-calculator-formulas';
 import { cadEvidenceKey } from '../../shared/cad-evidence';
-import { deflashingSeeds, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, visualInspectionSeeds, weightCheckSeeds, materialDryingSeeds, MATERIAL_DRYING_CALCULATOR, type MaterialDryingInput, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR, VISUAL_INSPECTION_CALCULATOR, WEIGHT_CHECK_CALCULATOR } from './plastic-cycle-time-seeds';
+import { deflashingSeeds, gateTrimmingSeeds, GATE_TRIM_CALCULATOR, injectionCalculatorName, injectionCycleTimeSeeds, pressCycleTimeSeeds, rimCycleTimeSeeds, slideMovementSeeds, visualInspectionSeeds, weightCheckSeeds, materialDryingSeeds, MATERIAL_DRYING_CALCULATOR, type MaterialDryingInput, COMPRESSION_CALCULATOR, DEFLASH_CALCULATOR, RIM_CALCULATOR, SLIDE_MOVEMENT_CALCULATOR, VISUAL_INSPECTION_CALCULATOR, WEIGHT_CHECK_CALCULATOR } from './plastic-cycle-time-seeds';
 import type { WeightCheckReference } from '../reference/im-reference';
 
 /** A fingerprint of a calculator's formulas and what feeds it: its calculated fields' formulas and its input fields' names and units, in order. */
@@ -113,6 +113,11 @@ export function runCompressionCycleTime(input: Parameters<typeof pressCycleTimeS
 /** The time to trim the flash off the parting line by hand (length / rate), by the stored calculator. */
 export function runDeflashingTime(input: { partingLineLengthMm: number | null; rateMmPerS: number | null }, calculators: ReferenceCalculators | null | undefined): PressCycle {
   return runPress(DEFLASH_CALCULATOR, deflashingSeeds(input), calculators);
+}
+
+/** The gate trimming time per part (F-38), by the stored gate trimming calculator, or what is missing. */
+export function runGateTrimmingTime(input: Parameters<typeof gateTrimmingSeeds>[0], calculators: ReferenceCalculators | null | undefined): PressCycle {
+  return runPress(GATE_TRIM_CALCULATOR, gateTrimmingSeeds(input), calculators);
 }
 
 /** The time the hydraulic slides add to each part (F-32), by the stored slide movement calculator, or what is missing. */
