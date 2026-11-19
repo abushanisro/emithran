@@ -1821,9 +1821,18 @@ export function routeComparisonUrl(
   return `/bom-items/${itemId}/route-comparison?${costingQuery(batchSize, location)}`;
 }
 
+/**
+ * Whether the server refused the comparison for the part as it is now (a 4xx: a Process with no cost model, a part not analysed). Then the
+ * routes cached from before describe another part and are dropped. A timeout or a network failure is not a refusal: the last good routes stay.
+ */
+export function comparisonRefused(error: unknown): boolean {
+  const status = (error as { statusCode?: unknown } | null)?.statusCode;
+  return typeof status === 'number' && status >= 400 && status < 500;
+}
+
 /** `batchSize` semantics are identical to useCostSummary above. */
 export function useRouteComparison(itemId: string | undefined, batchSize: number | undefined, location = 'USA') {
-  return useQuery({
+  const query = useQuery({
     queryKey: routeComparisonQueryKey(itemId, batchSize, location),
     queryFn: () =>
       // The server takes 46-157 s for this comparison under load. A shorter client
@@ -1842,6 +1851,9 @@ export function useRouteComparison(itemId: string | undefined, batchSize: number
     // out-of-band edits. This is an 8-18s call; remounting should not re-run it.
     refetchOnMount: false,
   });
+  // A failed refetch keeps the last good data in the cache. Those are the routes of the part as it was: after its Process changed to one the
+  // server refuses (no cost model), the Workflow Builder listed the old Process's routes (Bar and Tube showing multi-shot presses).
+  return comparisonRefused(query.error) ? { ...query, data: undefined } : query;
 }
 
 export interface CandidateRouteDto {
