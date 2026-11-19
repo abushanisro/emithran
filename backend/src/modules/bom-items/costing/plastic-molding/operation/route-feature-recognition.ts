@@ -71,8 +71,11 @@ export function resolveRouteFeatureRecognition(input: {
   const vocabulary = new Set<string>();
   for (const raw of input.catalogRaw) {
     if (catalogProcessName(raw) !== process) continue;
-    const [top] = catalogPairs(raw);
+    const [top, inner] = catalogPairs(raw);
     if (top) vocabulary.add(top.featureType);
+    // A mold stage ("Multi-Shot//Stage" of multi-shot molding) holds the features molded in it: the feature right under the stage
+    // (its CurvedWall, Rib, Slides//SlideBundle, Lifters//LifterBundle) is the process's vocabulary as much as a top-level one.
+    if (top?.featureType === 'Stage' && inner) vocabulary.add(inner.featureType);
   }
 
   const recognised = new Map<string, number>();

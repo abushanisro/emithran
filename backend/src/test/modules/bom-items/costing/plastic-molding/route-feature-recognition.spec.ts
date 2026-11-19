@@ -83,3 +83,36 @@ describe('route feature recognition: each molding process against its own refere
     expect(JSON.stringify(resolvePlasticCatalogOperations({ catalogRaw, features: EVERY_FEATURE, rules: RULES }))).toBe(before);
   });
 });
+
+describe('route feature recognition: multi-shot molding, whose features sit in each mold stage', () => {
+  // memory/Assembly plastic molding/Processes/operations.csv: "Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:Lifters//LifterBundle" and so on.
+  const { readFileSync } = require('fs') as typeof import('fs');
+  const { join } = require('path') as typeof import('path');
+  const rows = readFileSync(join(__dirname, '../../../../../../../memory/Assembly plastic molding/Processes/operations.csv'), 'utf8')
+    .split(/\r?\n/).slice(1).map((l) => l.replace(/^"|"$/g, '').trim()).filter((l) => l.startsWith('Multi-Shot Molding'));
+
+  it('reads the stage\'s features as the process\'s vocabulary: lifters and slides are not an incompatibility (Back cover 270924: 4 lifter bundles)', () => {
+    const features = [feature('LifterBundle'), feature('SlideBundle'), feature('Rib'), feature('SimpleHole')];
+    const r = resolveRouteFeatureRecognition({ catalogRaw: rows, features, notYetRecognized: [], operations: [] })!;
+    expect(r.process).toBe('Multi-Shot Molding');
+    expect(r.vocabulary).toEqual(expect.arrayContaining(['LifterBundle', 'SlideBundle', 'Rib', 'CurvedWall', 'PlanarFace', 'SimpleHole']));
+    expect(r.incompatibilities).toEqual([]);
+  });
+
+  it('a side void is formed by the lifter bundle that holds it, or by one of the stage\'s lifters or slides: never "no operation can make it"', () => {
+    // Back cover 270924: void-3 is the member of lifter bundle-3 (90 deg from the pull); void-1 (57.6 deg) is in no bundle.
+    const lifter = feature('LifterBundle', { id: 'bundle-3', attributes: { member_ids: ['void-3'], size_class: 'small' } });
+    const held = feature('Void', { id: 'void-3', variant: 'side', attributes: { angle_to_pull_deg: 90 } });
+    const loose = feature('Void', { id: 'void-1', variant: 'side', attributes: { angle_to_pull_deg: 57.6 } });
+    const ops = resolvePlasticCatalogOperations({ catalogRaw: rows, features: [lifter, held, loose], rules: RULES });
+    const of = (id: string) => ops.find((o) => o.featureIds.includes(id))!;
+    expect(of('void-3')).toMatchObject({ status: 'resolved', reason: expect.stringContaining('formed by its LifterBundle (bundle-3)') });
+    expect(of('void-1')).toMatchObject({ status: 'undecided', reason: expect.stringContaining('stage\'s lifters or slides') });
+    const r = resolveRouteFeatureRecognition({ catalogRaw: rows, features: [lifter, held, loose], notYetRecognized: [], operations: ops })!;
+    expect(r.incompatibilities).toEqual([]);
+  });
+
+  it('a plain injection row has no stage: its vocabulary is read as before', () => {
+    expect(recognise('Injection Molding', EVERY_FEATURE)!.incompatibilities).toEqual([]);
+  });
+});
