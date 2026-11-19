@@ -117,7 +117,28 @@ export function resolvePlasticCatalogOperations(input: {
       ...(decided.reason ? { reason: decided.reason } : {}),
     });
   }
-  return results.sort((a, b) => a.featureType.localeCompare(b.featureType) || (a.diameterMm ?? 0) - (b.diameterMm ?? 0));
+  return groupAlike(results).sort((a, b) => a.featureType.localeCompare(b.featureType) || (a.diameterMm ?? 0) - (b.diameterMm ?? 0));
+}
+
+/**
+ * Features decided alike are one row: the same type, variant and diameter (to 0.1 mm, as the tree shows it), the same operation, status and reason.
+ * Seven Ø2.5 through holes formed by the mold halves read "SimpleHole Ø2.5 ×7", not seven rows of one; their ids stay, so each can still be highlighted.
+ */
+function groupAlike(results: readonly CatalogOperation[]): CatalogOperation[] {
+  const groups = new Map<string, CatalogOperation>();
+  for (const r of results) {
+    const key = [r.featureType, r.variant, r.diameterMm == null ? '' : r.diameterMm.toFixed(1), r.status, r.operations.join('|'), r.reason ?? ''].join('//');
+    const g = groups.get(key);
+    if (g && g.children.length === 0 && r.children.length === 0) {
+      g.count += r.count;
+      g.featureIds = [...g.featureIds, ...r.featureIds];
+    } else if (!g) {
+      groups.set(key, { ...r, featureIds: [...r.featureIds] });
+    } else {
+      groups.set(`${key}//${groups.size}`, r);
+    }
+  }
+  return [...groups.values()];
 }
 
 type Decision = { operations: string[]; status: CatalogOperation['status']; reason?: string };
