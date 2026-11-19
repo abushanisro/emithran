@@ -31,7 +31,7 @@ function fromPerPart(key: string, toolingType: string, description: string, spec
  * The tools of the summary's route: the injection mold (every mold the job wears out, one investment), the die casting die, the coreboxes of the
  * cores (die casting and sand casting), and the wax pattern die of an investment casting.
  */
-export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'family' | 'dieTooling' | 'coreboxTooling' | 'patternTooling' | 'forgingDies'>): RouteToolingItem[] {
+export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'family' | 'dieTooling' | 'coreboxTooling' | 'patternTooling' | 'forgingDies' | 'firstArticleInspection'>): RouteToolingItem[] {
   const items: RouteToolingItem[] = [];
   const die = summary.dieTooling;
   if (die?.ok) {
@@ -47,6 +47,8 @@ export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'fam
   if (pattern) items.push(...fromPerPart('wax-pattern-die', 'die', `Wax pattern die (${pattern.tools})`, pattern.detail, pattern.costUsd, pattern.perPartUsd));
   const dies = summary.forgingDies;
   if (dies) items.push(...fromPerPart('forging-dies', 'die', `Forging dies (${dies.sets} set${dies.sets === 1 ? '' : 's'})`, dies.detail, dies.costUsd, dies.perPartUsd));
+  const fai = summary.firstArticleInspection;
+  if (fai) items.push(...fromPerPart('first-article-inspection', 'inspection', 'First article inspection (CMM)', fai.detail, fai.costUsd, fai.perPartUsd));
   const t = summary.tooling;
   if (t && t.moldCostUsd > 0) {
     const parts = Math.round(t.annualVolume * t.productionLifeYears);

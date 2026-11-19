@@ -368,14 +368,17 @@ function touchesByFeatureType(rows: ReadonlyArray<Record<string, unknown>>): Map
   return out;
 }
 
-function cmm(base: { process: string; machineClass: string }, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+type CmmTouches =
+  | { ok: true; touches: number; probeSec: number; progSecPerTouch: number; trace: SecondaryTraceStep[]; warnings: string[]; featureIds: string[]; provisional: boolean }
+  | { ok: false; reason: string; warnings: string[] };
+
+/** The probe touches that measure the part (CMMInspectionProbeTouches by CAD feature, else its CAD-counted holes), with the probe and programming times. */
+function cmmTouches(part: SecondaryPartFacts, ref: SecondaryReference): CmmTouches {
   const touchRows = ref.lookups.get('CMMInspectionProbeTouches');
-  const sampleRows = ref.lookups.get('CMMInspection');
   const probeSec = variable(ref, 'defaultCMMProbeTime');
   const progSecPerTouch = variable(ref, 'CMMProgrammingTimePerTouch');
-  const inspectionType = ref.variables.get('defaultCMMInspection');
-  if (!touchRows || !sampleRows || probeSec == null || progSecPerTouch == null || !inspectionType) {
-    return notCosted(base, 'gap', 'CMM reference data (probe touches, sample sizes, probe/programming time) is not staged: run migration 817.');
+  if (!touchRows || probeSec == null || progSecPerTouch == null) {
+    return { ok: false, reason: 'CMM reference data (probe touches, probe/programming time) is not staged: run migration 817.', warnings: [] };
   }
   const touchTable = touchesByFeatureType(touchRows);
   const trace: SecondaryTraceStep[] = [];
@@ -404,9 +407,19 @@ function cmm(base: { process: string; machineClass: string }, part: SecondaryPar
     trace.push({ label: `Simple Hole ×${part.holeCount}`, value: touches, unit: 'touches', source: `${SRC_LOOKUP('CMMInspectionProbeTouches')} (${holeTouches}/feature); holes counted from the CAD summary` });
     warnings.push('Provisional: the part has no measurable feature in its feature list, so only its CAD-counted holes are measured (the reference gives touches for holes, planar and curved faces, pockets); faces and other features are not.');
   }
-  if (touches === 0) {
-    return notCosted(base, 'gap', 'No detected feature has a probe-touch count in the reference, so there is nothing to measure.', { warnings });
+  if (touches === 0) return { ok: false, reason: 'No detected feature has a probe-touch count in the reference, so there is nothing to measure.', warnings };
+  return { ok: true, touches, probeSec, progSecPerTouch, trace, warnings, featureIds, provisional };
+}
+
+function cmm(base: { process: string; machineClass: string }, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const sampleRows = ref.lookups.get('CMMInspection');
+  const inspectionType = ref.variables.get('defaultCMMInspection');
+  if (!sampleRows || !inspectionType) {
+    return notCosted(base, 'gap', 'CMM reference data (probe touches, sample sizes, probe/programming time) is not staged: run migration 817.');
   }
+  const t = cmmTouches(part, ref);
+  if (!t.ok) return notCosted(base, 'gap', t.reason, { warnings: t.warnings });
+  const { touches, probeSec, progSecPerTouch, trace, warnings, featureIds, provisional } = t;
   if (part.batchSize == null || part.batchSize <= 0) {
     return notCosted(base, 'gap', 'Batch size is needed to pick the AQL sample size (CMMInspection table).', { trace, warnings, highlight: 'features', featureIds });
   }
@@ -433,6 +446,36 @@ function cmm(base: { process: string; machineClass: string }, part: SecondaryPar
     trace, warnings, highlight: 'features', featureIds,
     ...(provisional ? { provisional: true } : {}),
   }, ref, part.batchSize);
+}
+
+/** The parts measured in a first article inspection (approved default 2026-11-18: three from the first run). */
+export const FIRST_ARTICLE_PARTS = 3;
+
+/**
+ * The first article inspection of a part number: a one-off, not a per-part cost. The CMM program is written once (touches x
+ * CMMProgrammingTimePerTouch) and FIRST_ARTICLE_PARTS parts are measured in full (touches x defaultCMMProbeTime each), with the CMM's setup, at its
+ * machine and crew rate. `costPerPartUsd` of the result is the whole one-off (a batch of one).
+ */
+export function firstArticleInspection(part: SecondaryPartFacts, ref: SecondaryReference, machines: ReadonlyArray<SecondaryMachine>): SecondaryProcessResult {
+  const base = { process: 'First Article Inspection', machineClass: 'cmm' };
+  const t = cmmTouches(part, ref);
+  if (!t.ok) return notCosted(base, 'gap', t.reason, { warnings: t.warnings });
+  const trace = [
+    ...t.trace,
+    { label: 'Probe touches per part', value: t.touches, source: SRC_LOOKUP('CMMInspectionProbeTouches') },
+    { label: 'Parts measured', value: FIRST_ARTICLE_PARTS, source: 'Approved default: three first-run parts measured in full' },
+    { label: 'Probe time per touch', value: t.probeSec, unit: 's', source: `${SRC_VAR} (defaultCMMProbeTime)` },
+    { label: 'Programming (once)', value: t.touches * t.progSecPerTouch, unit: 's', source: `${SRC_VAR} (CMMProgrammingTimePerTouch ${t.progSecPerTouch} s/touch)` },
+  ];
+  const pool = machines.filter((m) => m.machineClass === base.machineClass);
+  const m = pickMachine(base.process, envelopeCapable(pool, part), ref);
+  if (!m) return notCosted(base, 'gap', pool.length === 0 ? 'No CMM machine on file for this location.' : 'No CMM bed takes this part (size or mass).', { trace, warnings: t.warnings });
+  return costed(base, m, {
+    perPartSec: t.touches * t.probeSec * FIRST_ARTICLE_PARTS,
+    batchExtraSec: t.touches * t.progSecPerTouch,
+    trace, warnings: t.warnings, highlight: 'features', featureIds: t.featureIds,
+    ...(t.provisional ? { provisional: true } : {}),
+  }, ref, 1);
 }
 
 function ultrasonicCleaning(base: { process: string; machineClass: string }, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
