@@ -98,6 +98,10 @@ export class CalculatorsServiceV2 {
 
     const { data, error, count } = await queryBuilder;
 
+    // A page past the last one is empty, not an error: the database refuses the range (PGRST103, "Requested range not satisfiable"), and a
+    // client reading every page stops at the first empty one.
+    if (error?.code === 'PGRST103') return { calculators: [], total: count ?? 0, page, limit, hasMore: false };
+
     if (error) {
       this.logger.error(`Failed to fetch calculators: ${error.message}`, 'CalculatorsServiceV2');
       throw new Error(error.message);
@@ -111,6 +115,8 @@ export class CalculatorsServiceV2 {
       total: Math.max((count || 0) - ((data || []).length - active.length), 0),
       page,
       limit,
+      // Rows after this page, retired ones included: a page can be short of its active rows and still not be the last.
+      hasMore: from + (data || []).length < (count ?? 0),
     };
   }
 
