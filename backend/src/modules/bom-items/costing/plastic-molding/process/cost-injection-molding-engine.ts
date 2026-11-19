@@ -38,12 +38,12 @@ import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
 import { computeMoldToolingCost, toolingGapIds } from './mold-tooling-engine';
 import { planRibInserts } from './rib-inserts';
-import { dryerModels, dryingConditionFor, equipmentEconomics, gateWidthConstant, steelTreatment, weightCheckReference } from '../reference/im-reference';
+import { dryerModels, dryingConditionFor, equipmentEconomics, gateWidthConstant, insertPullTestReference, steelTreatment, weightCheckReference } from '../reference/im-reference';
 import type { MoldClass, PlasticReference } from '../plastic-reference';
 import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
-import { runDeflashingTime, runGateTrimmingTime, runInjectionCycleTime, runMaterialDrying, runSlideMovementTime, runVisualInspectionTime, runWeightCheck } from '../calculators/plastic-cycle-time';
+import { runDeflashingTime, runGateTrimmingTime, runInjectionCycleTime, runInsertPullTest, runMaterialDrying, runSlideMovementTime, runVisualInspectionTime, runWeightCheck } from '../calculators/plastic-cycle-time';
 import { runMoldTooling } from '../calculators/mold-tooling-calculator';
 import { selectMoldBase } from './mold-base';
 import { moldCavityLookup } from './mold-cavity';
@@ -694,7 +694,36 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   if (routed.has('insert_loading') && !insertPress) {
     notCosted(UNCOSTED_OPERATION_LABELS.insert_loading, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_loading, `${signals.insertCount ?? '?'} insert(s)`));
   }
-  if (routed.has('insert_inspection')) notCosted(UNCOSTED_OPERATION_LABELS.insert_inspection, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_inspection));
+  // Insert pull test (F-40): a destructive sample of each batch, each insert pulled to failure on a pull-test station by the press operator; the
+  // sampled parts are scrapped, charged as the line's other cost at what they had cost by then (material and the lines so far, USD).
+  if (routed.has('insert_inspection')) {
+    const pull = runInsertPullTest({
+      ref: insertPullTestReference(),
+      insertsPerPart: signals.insertCount ?? null,
+      batchSize,
+      aql: plasticRef?.aqlSamples ?? null,
+      testedPartUsd: r6(materialCost / usdToLocal + processLines.reduce((s, l) => s + l.totalCost, 0)),
+    }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
+    if (pull.derivable && pull.testerRateUsdPerHr != null && pull.scrapUsdPerPart != null && mhrRate.labourRate != null) {
+      const tester: MHRRateInput = {
+        rate: pull.testerRateUsdPerHr, labourRate: mhrRate.labourRate, operators: 1, source: mhrRate.source,
+        machineClass: 'insert_pull_test', machineName: 'Pull-test station (reference)', commodityCode: null,
+      };
+      const base = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.insert_inspection, null, batchSize, pull.cycleSec / 60, tester));
+      const scrap = r6(pull.scrapUsdPerPart);
+      const pullLine: ProcessLineCost = {
+        ...base, runCost: r6(base.runCost + scrap), totalCost: r6(base.totalCost + scrap),
+        otherCostPerPartUsd: scrap, otherCostDetail: `the scrapped test samples ${scrap.toFixed(4)} USD per part`,
+        calculationTrace: pull.trace, calculatorName: pull.calculator.name,
+        ...(pull.calculator.id ? { calculatorId: pull.calculator.id } : {}),
+        ...(pull.calculator.version != null ? { calculatorVersion: pull.calculator.version } : {}),
+      };
+      processLines.push(pullLine);
+    } else {
+      const why = !pull.derivable ? pull.missing.join('; ') : `the operator labour rate of ${mhrRate.machineName ?? 'the press'}`;
+      notCosted(UNCOSTED_OPERATION_LABELS.insert_inspection, `${UNCOSTED_OPERATION_LABELS.insert_inspection} not costed: missing ${why}.`);
+    }
+  }
   if (routed.has('insert_installation') && !insertPress) {
     notCosted(UNCOSTED_OPERATION_LABELS.insert_installation, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_installation, `${signals.insertCount ?? '?'} insert candidate(s)`));
   }

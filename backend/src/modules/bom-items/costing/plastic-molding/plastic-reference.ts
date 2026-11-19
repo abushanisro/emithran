@@ -82,7 +82,9 @@ export const PLASTIC_VARIABLE_KEYS = [
  */
 export const SECONDARY_PROCESS_DOMAIN = 'secondary_process';
 export const SECONDARY_PROCESS_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === SECONDARY_PROCESS_DOMAIN)!.sourceVersion;
-export const SECONDARY_VARIABLE_KEYS = ['visualInspectTimeStandard', 'defaultPercentToBeTested'] as const;
+export const SECONDARY_VARIABLE_KEYS = ['visualInspectTimeStandard', 'defaultPercentToBeTested', 'defaultCMMInspection'] as const;
+/** The AQL sample sizes by batch (memory/Secondary process lookup CMMInspection): the destructive insert pull test samples by them (F-40). */
+export const SECONDARY_LOOKUP_KEYS = ['CMMInspection'] as const;
 
 /**
  * The injection mold's standard components, from memory/Assembly plastic molding (source_version 2026-AssyPlastic): each one's unit cost, quantity
@@ -212,6 +214,11 @@ export interface PlasticReference {
   cavityLayouts: number[];
   /** variables defaultNumberOfGatesPerCavity. */
   defaultGatesPerCavity: number;
+  /**
+   * The AQL sample size by batch at the reference's default inspection type (memory/Secondary process: CMMInspection at defaultCMMInspection), batch
+   * upper bounds ascending; null when not staged. The destructive insert pull test samples by it (F-40).
+   */
+  aqlSamples: { inspectionType: string; rows: Array<{ batch: number; sample: number }> } | null;
   shotSizeSafetyFactor: number;
   /** Ordered cheapest (lowest rating) first. useInsert: tblSpiType Use Insert, whether the class builds its cavity as inserts (null when not staged). */
   spiClasses: Array<{ moldClass: MoldClass; cycleRating: number; useInsert: boolean | null }>;
@@ -604,6 +611,14 @@ export function resolvePlasticReference(rows: PlasticReferenceRows): { reference
       defaultNumCavities,
       cavityLayouts,
       defaultGatesPerCavity,
+      aqlSamples: ((type) => {
+        const aql = (rows.lookups['CMMInspection'] ?? [])
+          .filter((r) => r['Inspection Type'] === type)
+          .map((r) => ({ batch: num(r['Batch Size']), sample: num(r['Sample Size']) }))
+          .filter((r): r is { batch: number; sample: number } => r.batch != null && r.sample != null)
+          .sort((x, y) => x.batch - y.batch);
+        return type && aql.length > 0 ? { inspectionType: type, rows: aql } : null;
+      })(text.get('defaultCMMInspection')?.trim() ?? ''),
       shotSizeSafetyFactor,
       spiClasses: (spiClasses as Array<{ moldClass: MoldClass; cycleRating: number; useInsert: boolean | null }>).sort((a, b) => a.cycleRating - b.cycleRating),
       tooling: { components, assemblyTimes, operatorsByArea, designHoursByArea, plateMachiningRateM2PerHr, cavityPlateSetupHr, corePlateSetupHr },

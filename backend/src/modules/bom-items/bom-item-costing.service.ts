@@ -4624,7 +4624,11 @@ export class BomItemCostingService {
       costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
       press: { name: pressName, tablePress: isTablePress(tableConfiguration) },
       toLocal: (l) => (usdToLocal === 1 ? l : lineToLocal(l, usdToLocal)),
-      runEngine: (shot) => computeInjectionMoldedCostSummary({ ...pressInput, shotCycle: shot }),
+      // The molding's insert operations (the pull test) count the inserts the loading loads: BOM, Cost Guide or CAD.
+      runEngine: (shot) => computeInjectionMoldedCostSummary({
+        ...pressInput, shotCycle: shot,
+        signals: { ...pressInput.signals, insertCount: inserts.reduce((n, i) => n + i.perPart, 0) || (pressInput.signals?.insertCount ?? 0) },
+      }),
       appendLines,
     });
     const chosen = chooseInsertRoute(routes, a.forceRoute ?? (a.item.scenarioOverrides?.[INSERT_MOLDING_ROUTE_KEY] as string | undefined));

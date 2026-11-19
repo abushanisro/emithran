@@ -74,6 +74,22 @@ export function weightCheckReference(
 }
 export type WeightCheckReference = ReturnType<typeof weightCheckReference>;
 
+/** The insert pull test (quality-inspection-reference.csv insert_pull_test) and the economics its tester rate is derived with. */
+export function insertPullTestReference(
+  quality: ReadonlyArray<Record<string, string>> = readReferenceCsv('quality-inspection-reference.csv'),
+  economics: ReadonlyArray<Record<string, string>> = readReferenceCsv('equipment-economics-reference.csv'),
+) {
+  const q = (p: string) => referenceValue(quality, (r) => r['operation'] === 'insert_pull_test' && r['parameter'] === p, 'quality-inspection-reference.csv');
+  const e = (p: string) => referenceValue(economics, (r) => r['parameter'] === p, 'equipment-economics-reference.csv');
+  return {
+    sampleHandlingS: q('sample_handling_time'), insertSeatS: q('insert_seat_time'), pullDisplacementMm: q('pull_displacement'),
+    pullSpeedMmPerMin: q('pull_speed'), approachReturnS: q('approach_return_time'), recordS: q('record_time'), testerPriceUsd: q('tester_price'),
+    lifeYr: e('life'), maintenancePct: e('annual_maintenance_factor'), installationPct: e('installation_factor'), salvagePct: e('salvage_factor'),
+    uptimePct: e('uptime'), utilization: e('utilization'), scheduledHours: e('scheduled_hours'),
+  };
+}
+export type InsertPullTestReference = ReturnType<typeof insertPullTestReference>;
+
 export interface DryingCondition { material: string; grade: string; tempC: string; timeH: string; confidence: string; source: string }
 export interface DryerModel { model: string; throughputKgH: number; ratedKw: number | null; priceUsd: number | null; priceBasis: string; confidence: string; source: string }
 

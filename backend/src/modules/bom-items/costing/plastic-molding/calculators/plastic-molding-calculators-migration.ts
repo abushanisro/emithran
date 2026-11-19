@@ -25,14 +25,25 @@ import { loadPlasticMoldingCalculatorSpec } from './plastic-molding-calculator-s
  *   1024 the injection molding material drying calculator
  *   1082 the injection mold tooling calculator, version 10: the water baffles (1022, version 9, is now history and kept as committed)
  *   1083 the injection molding gate trimming calculator
+ *   1084 the injection molding insert pull test calculator
  */
-export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1023, 1024, 1082, 1083] as const;
+export const PLASTIC_MOLDING_CALCULATOR_MIGRATIONS = [976, 1008, 1010, 1021, 1023, 1024, 1082, 1083, 1084] as const;
 export type PlasticMoldingCalculatorMigration = (typeof PLASTIC_MOLDING_CALCULATOR_MIGRATIONS)[number];
 
 const GENERATOR = 'scripts/generate-plastic-molding-calculators-migration.ts';
 const SPEC = 'src/modules/bom-items/costing/plastic-molding/calculators/plastic-molding-calculators.json';
 
 const TEXT: Record<PlasticMoldingCalculatorMigration, Pick<DomainMigrationText, 'title' | 'rootCause'>> = {
+  1084: {
+    title: 'Injection molding insert pull test calculator -- a destructive AQL sample pulled to failure.',
+    rootCause: [
+      'An insert-molded part is routed an insert pull test, but it was reported as having no sourced data. The costing engineer\'s research found no',
+      'published standard time or frequency, so the test is modelled from what is sourced: the AQL special inspection sample sizes of memory/Secondary',
+      'process (CMMInspection at defaultCMMInspection; ISO 2859-1 uses special levels for destructive tests), the published pull-out test speed (5 mm/min),',
+      'the Mark-10 2026 list price of a pull-test station (rate by the machine-hour pattern of migration 580), with the handling, seating, approach and',
+      'recording times as stated estimates (reference/quality-inspection-reference.csv). Each sampled part is scrapped. Formula registry F-40.',
+    ].join('\n'),
+  },
   1083: {
     title: 'Injection molding gate trimming calculator -- each gate cut at the manual trim rate.',
     rootCause: [
@@ -128,4 +139,5 @@ export const PLASTIC_MOLDING_CALCULATOR_MIGRATION_FILES: Record<PlasticMoldingCa
   1024: '1024_plastic_material_drying_calculator.sql',
   1082: '1082_plastic_mold_water_baffles.sql',
   1083: '1083_plastic_gate_trimming_calculator.sql',
+  1084: '1084_plastic_insert_pull_test_calculator.sql',
 };
