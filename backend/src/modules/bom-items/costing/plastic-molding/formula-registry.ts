@@ -417,6 +417,25 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
+    id: 'F-40', version: 1, name: 'Insert pull test',
+    expression: 'sample s = handling + inserts x (seat + displacement / speed x 60 + approach + record);  time s/part = sample size x sample s / batch;  scrap/part = sample size x tested part cost / batch',
+    outputUnit: 's',
+    inputs: [
+      { name: 'sample size', unit: 'parts per batch', source: 'memory/Secondary process lookup CMMInspection at defaultCMMInspection (AQL special inspection)' },
+      { name: 'speed', unit: 'mm/min', source: 'reference/quality-inspection-reference.csv: 5 mm/min published pull-out test speed' },
+      { name: 'handling, seat, displacement, approach, record', unit: 's, mm', source: 'reference/quality-inspection-reference.csv (costing engineer estimates)' },
+      { name: 'tester rate', unit: 'USD/h', source: 'Mark-10 2026 list price 7,040 USD by the machine-hour pattern of migration 580' },
+    ],
+    dependsOn: [],
+    referenceSource: 'memory/Secondary process + reference/quality-inspection-reference.csv',
+    assumptions: [
+      'No published standard sets the time or the frequency of an insert pull test: the sample is the AQL special level of the reference, the handling times are estimates.',
+      'Each sampled part is destroyed and charged at its material and molding cost.',
+    ],
+    state: 'ASSUMED', implementedIn: 'calculators/plastic-cycle-time-seeds.ts',
+  },
+
+  {
     id: 'F-38', version: 1, name: 'Gate trimming',
     expression: 'w = n x sqrt(A) / 30;  time s = gates per cavity x w / trim rate',
     outputUnit: 's',

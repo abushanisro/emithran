@@ -500,10 +500,10 @@ describe('operations the model does not cost', () => {
     expect(run('assembly_molding_insert_injection_molding')).not.toContain('Insert Loading (In-Mold)');
   });
 
-  it('an operation with nothing in the reference still says there is no sourced data; the dimensional inspection is the one-off first article inspection (F-39), not a gap', () => {
-    // the insert pull test has no data anywhere (memory/ or published), so it stays a named gap
-    expect(warn({ insertCount: 2 }, 'Generic ABS')).toMatch(/Insert Pull Test required[^\n]*no sourced time\/rate data exists/);
-    expect(warn({}, 'Generic ABS')).not.toMatch(/Dimensional Inspection/);
+  it('the dimensional inspection is the one-off first article inspection (F-39) and the insert pull test is costed (F-40): neither is a gap', () => {
+    const w = warn({ insertCount: 2 }, 'Generic ABS');
+    expect(w).not.toMatch(/Dimensional Inspection/);
+    expect(w).not.toMatch(/Insert Pull Test/);
     // material drying is costed (F-36): without an electricity price it names that, and is never also called "no sourced data"
     expect(warn({}, 'Generic ABS')).not.toMatch(/Material Drying required/);
   });

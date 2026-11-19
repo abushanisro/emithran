@@ -7,6 +7,7 @@ import {
   type PlasticReference,
   type PlasticReferenceRows,
   SECONDARY_VARIABLE_KEYS,
+  SECONDARY_LOOKUP_KEYS,
   MOLD_COMPONENT_VARIABLE_KEYS,
 } from '../../../../../modules/bom-items/costing/plastic-molding/plastic-reference';
 import type { MaterialClampProperties } from '../../../../../modules/bom-items/costing/plastic-molding/clamp-force';
@@ -64,7 +65,9 @@ export function realReferenceRows(): PlasticReferenceRows {
   // Same file for each key that migration 823 stages under it (split tables in
   // lookup/ as X__records.csv, the settings export in process/).
   const fileOf = (k: string) => (k.startsWith('digital_factory_') ? `process/${k}.csv` : `lookup/${k}__records.csv`);
-  const lookups = Object.fromEntries(PLASTIC_LOOKUP_KEYS.map((k) => [k, read(fileOf(k))]));
+  // memory/Secondary process (2026-Secondary) lookups the plastic model reads (SECONDARY_LOOKUP_KEYS): the AQL sample sizes.
+  const secondaryLookups = SECONDARY_LOOKUP_KEYS.map((k) => [k, parseCsv(readFileSync(join(memoryFolder('secondary process'), 'lookup', `${k}.csv`), 'utf-8').replace(/^\uFEFF/, ''))]);
+  const lookups = Object.fromEntries([...PLASTIC_LOOKUP_KEYS.map((k) => [k, read(fileOf(k))]), ...secondaryLookups]);
   const gps = read('materials_final.csv').find((r) => r['name'] === GPPS_REFERENCE_MATERIAL);
   const gppsMaterial = gps ? Object.fromEntries(Object.entries(gps).map(([k, v]) => [k, v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : v])) : undefined;
   return { variables, lookups, ...(gppsMaterial ? { gppsMaterial } : {}) };

@@ -12,7 +12,7 @@
  * have no face evidence yet; the shot melt volume and the resin per part are computed by the engine, not by a calculator, so there are no steps to open; the bundled reference package
  * (reference/*.csv), the location electricity price, the cavity count and the scenario are not served by any viewer.
  */
-import type { DryerModel, DryingCondition, ReferenceValue, WeightCheckReference } from '../reference/im-reference';
+import type { DryerModel, DryingCondition, InsertPullTestReference, ReferenceValue, WeightCheckReference } from '../reference/im-reference';
 import type { CalcSeed } from '../../shared/calculators/reference-calculator';
 import type { SourceRef } from '../../../dto/cost-breakdown.dto';
 import { machineColumn, materialColumn, plasticLookup, plasticVariable, secondaryVariable, withRef, type MachineRecord, type MaterialRecord } from './plastic-input-sources';
@@ -116,6 +116,47 @@ export function weightCheckSeeds(ref: WeightCheckReference): SeedResult {
     const v = ref[k]!;
     return [name, { value: v.value, source: `${v.source} (${v.confidence})`, lookup: true }];
   })) };
+}
+
+// Formula registry (plastic-molding/formula-registry.ts): F-40 is the insert pull test calculator's formula.
+export const INSERT_PULL_TEST_CALCULATOR = 'Injection Molding - Insert Pull Test';
+
+export interface InsertPullTestInput {
+  ref: InsertPullTestReference;
+  insertsPerPart: number | null;
+  batchSize: number;
+  /** The reference's AQL sample sizes (memory/Secondary process CMMInspection at defaultCMMInspection), or null when not staged. */
+  aql: { inspectionType: string; rows: ReadonlyArray<{ batch: number; sample: number }> } | null;
+  /** What one tested (scrapped) part has cost by then: its material and its molding lines, USD. */
+  testedPartUsd: number | null;
+}
+
+/** Seeds for the insert pull test calculator (F-40): the sample of the batch pulled to failure, its time and tester, and the parts it destroys. */
+export function insertPullTestSeeds(input: InsertPullTestInput): SeedResult {
+  const r = input.ref;
+  const fields: Array<[string, keyof InsertPullTestReference]> = [
+    ['Sample Handling Time', 'sampleHandlingS'], ['Insert Seat Time', 'insertSeatS'], ['Pull Displacement', 'pullDisplacementMm'], ['Pull Speed', 'pullSpeedMmPerMin'],
+    ['Approach and Return Time', 'approachReturnS'], ['Record Time', 'recordS'], ['Tester Price', 'testerPriceUsd'], ['Equipment Life', 'lifeYr'],
+    ['Salvage Factor', 'salvagePct'], ['Maintenance Factor', 'maintenancePct'], ['Installation Factor', 'installationPct'], ['Scheduled Hours', 'scheduledHours'],
+    ['Uptime', 'uptimePct'], ['Utilization', 'utilization'],
+  ];
+  const missing = fields.filter(([, k]) => r[k] == null).map(([name]) => `${name} (reference package)`);
+  if (!positive(input.insertsPerPart)) missing.push('the inserts per part');
+  if (!positive(input.batchSize)) missing.push('the batch size');
+  const row = input.aql?.rows.find((x) => input.batchSize <= x.batch);
+  if (!row) missing.push('the AQL sample size for the batch (memory/Secondary process CMMInspection)');
+  if (input.testedPartUsd == null || !(input.testedPartUsd >= 0)) missing.push('the cost of a tested part');
+  if (missing.length > 0 || !row || !input.aql) return { missing };
+  return { seeds: {
+    ...Object.fromEntries(fields.map(([name, k]) => [name, { value: r[k]!.value, source: `${r[k]!.source} (${r[k]!.confidence})`, lookup: true }])),
+    'Inserts per Part': { value: input.insertsPerPart!, source: "The part's inserts (BOM, Cost Guide or CAD insert candidates)" },
+    'Batch Size': { value: input.batchSize, source: 'Scenario: batch size' },
+    'Sample Size': {
+      value: Math.min(row.sample, input.batchSize), lookup: true,
+      source: `memory/Secondary process/lookup/CMMInspection: ${input.aql.inspectionType}, batch up to ${row.batch} -> ${row.sample} (defaultCMMInspection; a destructive test samples at a special level, ISO 2859-1)`,
+    },
+    'Tested Part Cost': { value: input.testedPartUsd!, source: "The part's material and molding cost per part, scrapped with each sample" },
+  } };
 }
 
 // Formula registry (plastic-molding/formula-registry.ts): F-36 is the material drying calculator's formula.

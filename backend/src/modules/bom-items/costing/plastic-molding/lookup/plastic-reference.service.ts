@@ -9,6 +9,7 @@ import {
   PLASTIC_VARIABLE_KEYS,
   SECONDARY_PROCESS_SOURCE_VERSION,
   SECONDARY_VARIABLE_KEYS,
+  SECONDARY_LOOKUP_KEYS,
   MOLD_COMPONENT_SOURCE_VERSION,
   MOLD_COMPONENT_VARIABLE_KEYS,
   resolvePlasticReference,
@@ -56,7 +57,7 @@ export class PlasticReferenceService {
   async getReference(): Promise<{ reference: PlasticReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
     const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
-    const [vars, secondaryVars, componentVars, lookups, gpps] = await Promise.all([
+    const [vars, secondaryVars, componentVars, lookups, secondaryLookups, gpps] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
         .in('key', [...PLASTIC_VARIABLE_KEYS]),
@@ -69,13 +70,16 @@ export class PlasticReferenceService {
       db.from('machining_reference_data').select('key, raw')
         .eq('category', 'lookup_table').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
         .in('key', [...PLASTIC_LOOKUP_KEYS]),
+      db.from('machining_reference_data').select('key, raw')
+        .eq('category', 'lookup_table').eq('source_version', SECONDARY_PROCESS_SOURCE_VERSION)
+        .in('key', [...SECONDARY_LOOKUP_KEYS]),
       this.loadGpps(db),
     ]);
-    const error = vars.error ?? secondaryVars.error ?? componentVars.error ?? lookups.error ?? gpps.error;
+    const error = vars.error ?? secondaryVars.error ?? componentVars.error ?? lookups.error ?? secondaryLookups.error ?? gpps.error;
     if (error) return { reference: null, missing: [`Plastic reference data (${error.message})`] };
     const rows = {
       variables: [...(vars.data ?? []), ...(secondaryVars.data ?? []), ...(componentVars.data ?? [])],
-      lookups: Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
+      lookups: Object.fromEntries([...(lookups.data ?? []), ...(secondaryLookups.data ?? [])].map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
       gppsMaterial: gpps.data ?? undefined,
     };
     this.cached = resolvePlasticReference(rows);
