@@ -1166,6 +1166,15 @@ export interface CostSummaryDto {
    * the route quoted and every route (backend AssemblyBreakdown). The summary is the assembly's own work; its children are added by the roll-up.
    */
   /** Assembly Molding (insert molding): the inserts, their loading, the insert press and its shot, every route (backend InsertMoldingBreakdown). */
+  /** Multi-shot molding (Assembly Plastic Molding): the shots, the loaded components, the press and the multi-shot cycle, and every route (backend MultiShotBreakdown). */
+  multiShot?: {
+    route: string; routeLabel: string; complete: boolean;
+    shots: Array<{ name: string; source: 'bom' | 'part' | 'cost_guide'; itemId: string | null; grade: string | null; volumePct: number | null; volumeMm3: number; cycleSec: number | null; clampT: number | null; shotGppsG: number | null }>;
+    components: Array<{ id: string | null; name: string; perPart: number; massKg: number | null }>;
+    press: { name: string | null; orientation: string | null; units: number | null; stations: number | null; rotatingStack: boolean; indexSec: number | null; reasons: string[] };
+    cycleSec: number | null; loaderName: string | null; loadSecPerPart: number | null;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
   insertMolding?: {
     route: string; routeLabel: string; complete: boolean;
     inserts: Array<{ id: string | null; name: string; perPart: number; massKg: number | null; source: 'bom' | 'cost_guide' | 'cad' }>;
