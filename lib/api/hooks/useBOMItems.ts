@@ -1209,6 +1209,8 @@ export interface CostSummaryDto {
   };
   /** Forging: the finishing and trim dies (USD, separate from the piece cost). */
   forgingDies?: { sets: number; costUsd: number; perPartUsd: number | null; detail: string };
+  /** A molded part number's first article inspection: a one-off on the CMM, USD, kept out of the piece cost (backend F-39). */
+  firstArticleInspection?: { costUsd: number | null; perPartUsd: number | null; detail: string; machineName: string | null };
   /** Sand casting: the machining allowance of each machined feature (display only, never costed). */
   machiningAllowance?: MachiningAllowanceSummary;
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */

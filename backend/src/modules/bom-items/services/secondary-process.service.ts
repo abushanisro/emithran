@@ -10,7 +10,7 @@ import {
   SECONDARY_PROCESSES,
   SECONDARY_SOURCE_VERSION,
   applyMachineOverrides,
-  computeSecondaryProcesses,
+  computeSecondaryProcesses, firstArticleInspection,
   type SecondaryMachine,
   type SecondaryPartFacts,
   type SecondaryProcessResult,
@@ -55,6 +55,8 @@ export interface SecondaryProcessesResponse {
   chemicalMillingCallout: string | null;
   /** Missing reference data (migrations 817/818 not run), when detected. */
   dataWarnings: string[];
+  /** The first article inspection of the part number: a one-off on the CMM (its costPerPartUsd is the whole of it), or null with no CMM reference. */
+  firstArticle: SecondaryProcessLine | null;
 }
 
 const num = (v: unknown): number | null => {
@@ -341,6 +343,7 @@ export class SecondaryProcessService {
     return {
       location,
       batchSize,
+      firstArticle: ref ? withLocal(firstArticleInspection(part, ref, machines)) : null,
       materialCutCode: cutCode,
       materialTypeName: materialType,
       dataWarnings,

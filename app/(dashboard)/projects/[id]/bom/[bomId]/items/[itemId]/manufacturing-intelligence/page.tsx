@@ -6880,7 +6880,8 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
   const mold = cost.tooling;
   const pattern = cost.patternTooling;
   const forgingDies = cost.forgingDies;
-  if (!die && !boxes && !mold && !pattern && !forgingDies) return null;
+  const fai = cost.firstArticleInspection;
+  if (!die && !boxes && !mold && !pattern && !forgingDies && !fai) return null;
   const money = (usd: number | null | undefined, d = 2) =>
     usd == null ? 'not priced' : `${currencySymbol}${(usd * conversionRate).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d })}`;
   const perPart = (usd: number | null | undefined) => (usd == null ? 'not amortised' : `${money(usd, 4)}/part`);
@@ -6914,6 +6915,15 @@ function RouteTooling({ itemId, cost, currencySymbol, conversionRate }: { itemId
           </summary>
           <div className="mt-2"><DieToolingSection tooling={die} /></div>
         </details>
+      )}
+      {fai && (
+        <div className="rounded border border-border px-3 py-2">
+          <div className="flex items-baseline justify-between gap-2 text-xs">
+            <span className="font-medium text-foreground">First article inspection{fai.machineName ? ` (${fai.machineName})` : ''}</span>
+            <span className="tabular-nums">{fai.costUsd != null ? `${money(fai.costUsd, 2)} · ${perPart(fai.perPartUsd)}` : 'not priced'}</span>
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">One-off per part number. {fai.detail}</p>
+        </div>
       )}
       {forgingDies && (
         <div className="rounded border border-border px-3 py-2">

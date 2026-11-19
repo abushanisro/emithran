@@ -724,7 +724,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       notCosted(UNCOSTED_OPERATION_LABELS.visual_inspection, `${UNCOSTED_OPERATION_LABELS.visual_inspection} not costed: missing ${look.derivable ? `the operator labour rate of ${mhrRate.machineName ?? 'the press'}` : look.missing.join('; ')}.`);
     }
   }
-  if (routed.has('dimensional_inspection')) notCosted(UNCOSTED_OPERATION_LABELS.dimensional_inspection, uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
+  // Dimensional inspection is the first article inspection (formula registry F-39): a one-off on the CMM, priced with the part number's NRE
+  // (summary.firstArticleInspection, costing/secondary/first-article.ts), so it is neither a piece-cost line nor reported as not costed.
   // Weight check: the press operator weighs one part every sampling interval on a bench scale (F-35), at the operator rate plus the scale's rate.
   if (routed.has('weight_check')) {
     const weigh = runWeightCheck(weightCheckReference(), withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);

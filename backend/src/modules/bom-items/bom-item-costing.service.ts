@@ -141,6 +141,7 @@ import { InsertMoldingService } from './costing/plastic-molding/insert/insert-mo
 import {
   INSERT_MOLDING_ROUTE_KEY, INSERT_MOLDING_ROUTES, chooseInsertRoute, insertMoldingRouteId, insertsOf, isTablePress, priceInsertRoutes,
 } from './costing/plastic-molding/insert/insert-molding';
+import { firstArticleSummary } from './costing/secondary/first-article';
 import { insertMoldingRouteFor } from './costing/plastic-molding/insert/insert-molding-route-comparison';
 import { lineToLocal } from './costing/casting/sand/sand-cost';
 import { gap as gapLine } from './costing/casting/casting-finishing';
@@ -1835,7 +1836,11 @@ export class BomItemCostingService {
     const location = dto.resolvedInputs.location ?? requestedLocation;
     const sec = await this.resolveSecondaryOperations(item, location, dto.resolvedInputs.batchSize, accessToken, dto.toUsdRate ?? 1);
     const summary = appendLines(dto, sec.lines);
-    return { ...summary, ...(await this.realSustainability(summary, location, accessToken)), secondaryOperations: sec.dto };
+    // A molded part number's first article inspection (its dimensional inspection): a one-off on the CMM, with the tooling, not in the piece cost.
+    const fai = dto.family === 'plastic_molded' && sec.firstArticle
+      ? { firstArticleInspection: firstArticleSummary(sec.firstArticle, dto.resolvedInputs.annualVolume, dto.resolvedInputs.productionLifeYears) }
+      : {};
+    return { ...summary, ...fai, ...(await this.realSustainability(summary, location, accessToken)), secondaryOperations: sec.dto };
   }
 
   /**
@@ -4978,7 +4983,7 @@ export class BomItemCostingService {
     const dto: SecondaryOperationsDto = {
       source, heat: dtoGroup('heat'), surface: dtoGroup('surface'), other: dtoGroup('other'), dataWarnings: all.dataWarnings,
     };
-    return { lines, localLines, dto };
+    return { lines, localLines, dto, firstArticle: all.firstArticle };
   }
 
   private async computeRouteComparison(
