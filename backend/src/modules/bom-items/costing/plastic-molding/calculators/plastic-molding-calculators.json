@@ -545,6 +545,54 @@
       "migration": 1010
     },
     {
+      "key": "injection_gate_trim",
+      "name": "Injection Molding - Gate Trimming",
+      "description": "Gate trimming time per part (formula registry F-38, ASSUMED): the operator cuts each gate of the part at the manual trim rate. The gate width is the edge (standard) gate rule w = n x sqrt(A) / 30 (R.G.W. Pye, Injection Mould Design; w mm, A the cavity surface mm2, n the material constant of reference/gate-sizing-reference.csv); the cut length is that width for each gate per cavity (defaultNumberOfGatesPerCavity); the rate is manualTrimRate (12.7, read as mm/s, its unit in memory/Roto & blow molding). Handling the part is not timed. A helper: the injection engine runs it for the routed gate trimming (cold-runner edge gates; hot tips and sub gates self-de-gate) and charges it at the bench rate.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Part Surface Area",
+          "unit": "mm²",
+          "source": {
+            "cad": "part surface area"
+          }
+        },
+        {
+          "name": "Gate Width Constant",
+          "unit": "",
+          "source": {
+            "lookup": "reference/gate-sizing-reference.csv: n by material type"
+          }
+        },
+        {
+          "name": "Gates per Cavity",
+          "unit": "",
+          "source": {
+            "variable": "defaultNumberOfGatesPerCavity"
+          }
+        },
+        {
+          "name": "Manual Trim Rate",
+          "unit": "mm/s",
+          "source": {
+            "variable": "manualTrimRate (read as mm/s)"
+          }
+        },
+        {
+          "name": "Gate Width",
+          "unit": "mm",
+          "formula": "{Gate Width Constant} * sqrt({Part Surface Area}) / 30"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "floor({Gates per Cavity} * {Gate Width} / {Manual Trim Rate} * 100 + 0.5) / 100"
+        }
+      ],
+      "migration": 1083
+    },
+    {
       "key": "injection_slide_movement",
       "name": "Injection Molding - Slide Movement",
       "description": "The time the hydraulic slides add to each shot, per part (formula registry F-32, ASSUMED: the reference gives the slide speed, slideCycleRate, not the motion): the slides move out and back once per shot, all together, so the longest slide stroke (the CAD SlideBundle stroke) twice over slideCycleRate (Velocity, read as mm/s), shared by the cavities. Lifters ride on the ejector stroke and add no time. A helper: the injection engine runs it for the routed side action and charges it at the press rate.",

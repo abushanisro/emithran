@@ -39,6 +39,28 @@ export function deflashingSeeds(input: { partingLineLengthMm: number | null; rat
   } };
 }
 
+export const GATE_TRIM_CALCULATOR = 'Injection Molding - Gate Trimming';
+
+/** Seeds for the gate trimming calculator (F-38, formula registry): the part surface, the edge-gate width constant, the gates per cavity and the manual trim rate. */
+export function gateTrimmingSeeds(input: {
+  surfaceAreaMm2: number | null; gateConstant: { n: number; family: string; confidence: string; source: string } | null;
+  gatesPerCavity: number | null; rateMmPerS: number | null;
+}): SeedResult {
+  const missing: string[] = [];
+  if (!positive(input.surfaceAreaMm2)) missing.push('the part surface area (CAD)');
+  if (!input.gateConstant) missing.push('the edge gate width constant (reference/gate-sizing-reference.csv)');
+  if (!positive(input.gatesPerCavity)) missing.push('the gates per cavity (defaultNumberOfGatesPerCavity)');
+  if (!positive(input.rateMmPerS)) missing.push('the manual trim rate (manualTrimRate)');
+  if (missing.length > 0 || !input.gateConstant) return { missing };
+  const g = input.gateConstant;
+  return { seeds: {
+    'Part Surface Area': { value: input.surfaceAreaMm2!, source: 'CAD part surface area (the cavity surface the gate fills)', ref: { kind: 'cad', evidence: 'part_surface' } },
+    'Gate Width Constant': { value: g.n, source: `reference/gate-sizing-reference.csv: ${g.family} n = ${g.n} (${g.confidence}; ${g.source})`, lookup: true },
+    'Gates per Cavity': { value: input.gatesPerCavity!, source: `${REF}/variables: defaultNumberOfGatesPerCavity`, ref: plasticVariable('defaultNumberOfGatesPerCavity') },
+    'Manual Trim Rate': { value: input.rateMmPerS!, source: `${REF}/variables: manualTrimRate (read as mm/s, its unit in memory/Roto & blow molding)`, ref: plasticVariable('manualTrimRate') },
+  } };
+}
+
 export const SLIDE_MOVEMENT_CALCULATOR = 'Injection Molding - Slide Movement';
 
 /** Seeds for the slide movement calculator (F-32): the longest CAD slide stroke, the reference slide speed and the cavities, or what is missing. */

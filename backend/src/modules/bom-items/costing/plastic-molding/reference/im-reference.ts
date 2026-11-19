@@ -120,6 +120,17 @@ export function equipmentEconomics(rows: ReadonlyArray<Record<string, string>> =
   };
 }
 
+/** The edge-gate width constant n of a material type (gate-sizing-reference.csv), with the row it came from; the "*" row for a type Pye does not list. */
+export function gateWidthConstant(
+  materialType: string | null | undefined, rows: ReadonlyArray<Record<string, string>> = readReferenceCsv('gate-sizing-reference.csv'),
+): { n: number; family: string; confidence: string; source: string } | null {
+  const type = (materialType ?? '').trim().toLowerCase();
+  const listed = (r: Record<string, string>) => (r['material_types'] ?? '').split(';').map((t) => t.trim().toLowerCase());
+  const row = (type ? rows.find((r) => listed(r).includes(type)) : undefined) ?? rows.find((r) => listed(r).includes('*'));
+  const n = Number(row?.['n']);
+  return row && Number.isFinite(n) && n > 0 ? { n, family: row['material_family']!, confidence: row['confidence']!, source: row['source_name']! } : null;
+}
+
 export interface SteelTreatment {
   steelGrade: string;
   deliveryCondition: string;

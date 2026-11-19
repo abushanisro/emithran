@@ -1,0 +1,6 @@
+material_family,material_types,n,confidence,source_name,source_url,source_checked,review_required,retrieved,notes
+PE / PS,"Polyethylene;Polystyrene",0.6,source_backed,"R.G.W. Pye, Injection Mould Design: edge gate width w = n x sqrt(A) / 30 (w mm, A cavity surface mm2)",,false,true,2026-11-18,"Material constant n of the edge (standard) gate width rule."
+POM / PC / PP,"Acetal;Polycarbonate;Polypropylene",0.7,source_backed,"R.G.W. Pye, Injection Mould Design: edge gate width w = n x sqrt(A) / 30",,false,true,2026-11-18,
+CA / PMMA / PA,"Acrylic;Nylon",0.8,source_backed,"R.G.W. Pye, Injection Mould Design: edge gate width w = n x sqrt(A) / 30",,false,true,2026-11-18,
+PVC,"PVC",0.9,source_backed,"R.G.W. Pye, Injection Mould Design: edge gate width w = n x sqrt(A) / 30",,false,true,2026-11-18,
+Other,"*",0.7,assumed,"Emithran default: the middle of Pye's table (0.6 to 0.9) for a material it does not list (ABS, PET, PBT, PPS, TPE ...)",,false,true,2026-11-18,"Assumed, review required: the trim time moves by about +/-0.05 s per gate across the whole range."
