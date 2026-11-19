@@ -1,0 +1,34 @@
+{
+  "domain": "assembly_plastic_molding",
+  "processGroup": "Assembly Plastic Molding",
+  "calculators": [
+    {
+      "key": "apm_component_loading",
+      "name": "Assembly Plastic Molding - Component loading",
+      "description": "Loading the pre-made components of a multi-shot part (Pick and Place: Manual Load / Robotic Load of each AssemblyComponentGcd) every shot: each component at tblComponentLoadTime for its weight and the load method, summed per shot; a manual load is slowed by handlingMultiplier and insertionMultiplier (memory/Assembly plastic molding variables), a robot is not.",
+      "operations": ["Pick and Place"],
+      "fields": [
+        { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (tblComponentLoadTime of each component by its weight and the load method, summed per shot)" } },
+        { "name": "Manual Load", "unit": null, "source": { "engine": "manual (1 for a manual load, 0 for a robot)" } },
+        { "name": "Handling Multiplier", "unit": null, "source": { "variable": "handlingMultiplier" } },
+        { "name": "Insertion Multiplier", "unit": null, "source": { "variable": "insertionMultiplier" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Load Time} * ({Manual Load} * {Handling Multiplier} * {Insertion Multiplier} + 1 - {Manual Load}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "apm_multi_shot_cycle",
+      "name": "Assembly Plastic Molding - Multi-shot cycle",
+      "description": "The cycle of a multi-shot press (approved 2026-11-19: overlapped). Every station molds at once, each shot into its own stage, so the press waits for the longest shot (its fill, pack, cool and mold open/close by the injection cycle-time calculator with that shot's material); the components load at a station while the shots mold. Then the mold indexes (rotary table, rotating stack or core turn) for the press's tool index time (memory: toolIndexTime). A helper: no catalog operation maps to it.",
+      "operations": [],
+      "helper": true,
+      "output": "Shot Cycle",
+      "fields": [
+        { "name": "Longest Shot Cycle", "unit": "s", "source": { "engine": "longest_shot_cycle_s (the longest of the shots' injection cycles)" } },
+        { "name": "Load Time", "unit": "s", "source": { "engine": "component_load_s (the component loading of the shot, 0 without components)" } },
+        { "name": "Tool Index Time", "unit": "s", "source": { "engine": "tool_index_time_s (the press: India export toolIndexTime)" } },
+        { "name": "Shot Cycle", "unit": "s", "formula": "max({Longest Shot Cycle}, {Load Time}) + {Tool Index Time}" }
+      ]
+    }
+  ]
+}
