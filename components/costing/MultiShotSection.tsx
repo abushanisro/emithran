@@ -91,8 +91,9 @@ export function MultiShotSection({ multiShot: ms, overrides, onChange, hrefOf }:
 
   const fromBom = ms.shots.length > 0 && ms.shots.every((s) => s.source === 'bom');
   const entries = local ?? shotEntriesOf(overrides);
-  // One shot is not a multi-shot part: the panel asks for the second at once instead of waiting for a click on Add shot.
-  const asking = !fromBom && ms.shots.length < 2 && entries.length === 0 && !editing;
+  // One shot is not a multi-shot part: until the engine costs two, the panel keeps the shot form open (with what is saved, if anything), so the
+  // place to add the material never hides behind a saved-but-not-costed state.
+  const asking = !fromBom && ms.shots.length < 2 && !editing;
   const save = (next: ShotEntry[]) => { onChange(shotEntriesPatch(next)); setLocal(next); setEditing(false); };
   const action = 'text-brand-600 hover:underline';
   const link = (name: string, id: string | null) => (hrefOf && id ? <a className={action} href={hrefOf(id)}>{name}</a> : <span className="text-foreground">{name}</span>);
@@ -115,17 +116,11 @@ export function MultiShotSection({ multiShot: ms, overrides, onChange, hrefOf }:
               What is the second shot? {ms.shots[0] ? `Shot 1 is the part (${ms.shots[0].grade ?? 'its material'}).` : ''} Pick the material molded onto it and its share of the part,
               or add each shot as a BOM child with its own CAD and material.
             </p>
-            <ShotEntriesForm start={[]} onSave={save} />
+            <ShotEntriesForm key={JSON.stringify(entries)} start={entries} onSave={save} />
+            {entries.length > 0 && <p className="text-muted-foreground">Saved; costing the shots…</p>}
           </div>
         ) : editing ? (
           <ShotEntriesForm start={entries} onSave={save} onCancel={() => { setEditing(false); }} />
-        ) : ms.shots.length < 2 && entries.length > 0 ? (
-          <ul className={boxClass}>
-            {entries.map((e, i) => (
-              <Row key={`${e.grade}-${String(i)}`} label={<>{i + 2}. Shot {i + 2}<span className="block">{e.grade}</span></>}>{`${String(e.volumePct)} %`}</Row>
-            ))}
-            <li className={`${rowClass} text-muted-foreground`}>Saved; costing the shots…</li>
-          </ul>
         ) : ms.shots.length >= 2 ? (
           <ul className={boxClass}>
             {ms.shots.map((s, i) => (
