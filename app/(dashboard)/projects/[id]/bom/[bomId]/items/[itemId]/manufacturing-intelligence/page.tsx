@@ -8416,6 +8416,12 @@ export default function ManufacturingIntelligencePage() {
   }, [processRouting, selectedManualRoute, comparisonForTree]);
 
   const effectiveOverrideProcesses = appliedRouteProcessNames ?? activeOverrideProcesses;
+  // Saved operations from a route this part can no longer take (a forging route on a part since moved to plastic molding) are not its
+  // process: the tree shows the current quote's steps and their recognised features instead, as the stale banner on the Cost tab says.
+  const storedRecordsForTree = useMemo(
+    () => (appliedRouteIsStale(persistedAppliedRouteIdForTree, comparisonForTree?.routes) ? null : procRecordsForTree?.records ?? null),
+    [persistedAppliedRouteIdForTree, comparisonForTree, procRecordsForTree],
+  );
 
   // Real density for this item's own material grade — replaces a flat PA66
   // default that was applied to every molded part's mass estimate
@@ -8427,8 +8433,8 @@ export default function ManufacturingIntelligencePage() {
   const { data: secondaryForTree } = useSecondaryProcesses(item?.id, batchSize, factory);
 
   const tree = useMemo(
-    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree?.records ?? null, secondaryForTree ? [...secondaryForTree.lines, ...secondaryForTree.surfaceLines, ...secondaryForTree.heatTreatmentLines, ...secondaryForTree.chemicalMillingLines] : null) : null,
-    [item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree, secondaryForTree],
+    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, storedRecordsForTree, secondaryForTree ? [...secondaryForTree.lines, ...secondaryForTree.surfaceLines, ...secondaryForTree.heatTreatmentLines, ...secondaryForTree.chemicalMillingLines] : null) : null,
+    [item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, storedRecordsForTree, secondaryForTree],
   );
 
   // Process groups and machine-class steps (Machining > 3 Axis Mill > Drilling)

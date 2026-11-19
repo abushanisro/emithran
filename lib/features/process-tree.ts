@@ -300,6 +300,14 @@ export function buildProcessTree(
       };
     });
 
+  // The catalog operations a step performs on the part's recognised features, when its family lists them (sheet metal, plastic molding).
+  const catalogOperationNodes = (idPrefix: string, line: { catalogOperations?: CostSummaryDto['processLines'][number]['catalogOperations'] } | undefined, machine: string): ProcessTreeNode[] => {
+    if (!showsCatalogOperations(family) || !line?.catalogOperations?.length) return [];
+    const withMachine = (n: OperationTreeNode): ProcessTreeNode =>
+      ({ ...n, factory, machine, ...(n.children ? { children: n.children.map(withMachine) } : {}) });
+    return sheetMetalOperationNodes(idPrefix, line.catalogOperations).map(withMachine);
+  };
+
   const operations: ProcessTreeNode[] = recs.map((rec, opIdx) => {
     // Moulded-part geometry is PART-level: it belongs to the part's first
     // resolved operation, whatever the engineer named or however many steps
@@ -316,11 +324,7 @@ export function buildProcessTree(
     // Sheet metal: the catalog operations this step performs on the part's own
     // CAD features ("Punching // SimpleHole Ø4.0 ×14"), resolved by the backend.
     // Plastic molding: the same, from the recognised features and the molding process's catalog rows (backend plastic-catalog-operation-resolver.ts).
-    if (showsCatalogOperations(family) && matchedCostLine?.catalogOperations?.length) {
-      const withMachine = (n: OperationTreeNode): ProcessTreeNode =>
-        ({ ...n, factory, machine, ...(n.children ? { children: n.children.map(withMachine) } : {}) });
-      featureNodes.push(...sheetMetalOperationNodes(`catop_${opIdx}`, matchedCostLine.catalogOperations).map(withMachine));
-    }
+    featureNodes.push(...catalogOperationNodes(`catop_${opIdx}`, matchedCostLine, machine));
 
     // GD&T callouts this line covers (Inspection; family-agnostic — the
     // backend resolver serves both sheet-metal and machining parts alike).
@@ -598,6 +602,9 @@ export function buildProcessTree(
     const gap = l.physicsGap!;
     const reasonText = gap.gapType === 'missing_lookup' ? gap.requiredAction : gap.reason;
     gapLineByOpId.set(`op_gap_${l.process}`, l);
+    // An unpriced step still performs its operations on the part's features (a multi-shot part waiting for its second shot): they are
+    // listed under it, so the recognition is never hidden behind the gap.
+    const recognised = catalogOperationNodes(`catop_gap_${l.process}`, l, 'Not applied');
     operations.push({
       id: `op_gap_${l.process}`,
       kind: 'operation',
@@ -606,6 +613,7 @@ export function buildProcessTree(
       factory,
       machine: 'Not applied',
       attrs: [{ name: 'Reason', value: reasonText }],
+      ...(recognised.length > 0 ? { children: recognised } : {}),
     });
   }
 
