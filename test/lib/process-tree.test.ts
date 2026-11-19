@@ -136,3 +136,27 @@ describe('buildProcessTree: steps that share a name', () => {
     expect(stepsOf(buildProcessTree(assembly, null, summary, 'USA', undefined, cost, null, applied))).toEqual(expected);
   });
 });
+
+describe('buildProcessTree: an unpriced molding step keeps its recognised features', () => {
+  const molded = { classification: { family: 'plastic_molded' } } as unknown as FeatureGraph;
+  const gapLine = {
+    process: 'Multi-Shot Molding', cycleTimeMin: 0, machineName: null, processGroup: 'Assembly Plastic Molding',
+    physicsGap: { gapType: 'not_costed', reason: 'A multi-shot part needs two shots.' },
+    catalogOperations: [{ operations: ['Mold Hole'], featureType: 'SimpleHole', variant: 'default', diameterMm: 2.5, count: 7, featureIds: ['h1'], status: 'resolved', children: [] }],
+  };
+  const cost = { processLines: [{ process: 'Gate Trimming', cycleTimeMin: 0.1, machineName: 'Bench' }, gapLine] } as unknown as CostSummaryDto;
+
+  it('lists the operations under the unresolved step behind saved rows of another route', () => {
+    const tree = buildProcessTree(item, molded, summary, 'USA', undefined, cost, null, [{ opNbr: 10, category: 'Hammer', machineName: 'Lasco' }]);
+    const gap = findNode(tree, 'op_gap_Multi-Shot Molding');
+    expect(gap?.label).toBe('Multi-Shot Molding — unresolved');
+    expect(gap?.children?.length).toBeGreaterThan(0);
+    expect(JSON.stringify(gap)).toContain('Mold Hole');
+  });
+
+  it('shows the quoted steps, with their features, when no saved rows are given (a stale route is not passed)', () => {
+    const tree = buildProcessTree(item, molded, summary, 'USA', undefined, cost, null, null);
+    expect(operations(tree)).toEqual(['Gate Trimming @ Bench', 'Multi-Shot Molding @ —']);
+    expect(JSON.stringify(findNode(tree, 'op_1'))).toContain('Mold Hole');
+  });
+});
