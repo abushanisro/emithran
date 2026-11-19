@@ -110,15 +110,19 @@ export class RouteApplicationService {
     const askedFor = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
     const replaced = !!askedFor && options.fallbackToRecommended === true && !comparison.routes.some((r) => r.routeId === askedFor);
     const routeId = replaced ? comparison.recommendedRouteId : askedFor;
+    // No route of the part's process can be applied: the operations still saved from a route of its previous process (a forging route on a part
+    // since moved to plastic molding) price a process the part is no longer made by, so they are removed rather than left in its total.
+    const retired = routeId ? null : await this.retireRouteOfAnotherProcess(id, comparison.routes.map((r) => r.routeId), token);
+    const retiredNote = retired ? ` The operations of the earlier route ${retired} were removed: they priced the part's previous process.` : '';
     if (!routeId && comparison.noCompatibleProcessMessage) {
       // Every route is ruled out by a feature its process cannot make: say so, with each route's reason, and choose nothing.
       const reasons = comparison.routes.flatMap((r) => (r.compatibility?.incompatibilities ?? []).map((i) => `${r.routeLabel}: ${i.count} x ${i.featureType} (${i.reason})`));
-      throw new BadRequestException(`${comparison.noCompatibleProcessMessage} ${reasons.join(' ')}`.trim());
+      throw new BadRequestException(`${`${comparison.noCompatibleProcessMessage} ${reasons.join(' ')}`.trim()}${retiredNote}`);
     }
     if (!routeId) {
       throw new BadRequestException(
         // The reason leads: a short view of the message (the Cost tab, the toast) shows its first sentence.
-        whyNoRoute(comparison.routes) ? `No route can be applied: ${whyNoRoute(comparison.routes).trim()}` : 'No route is both feasible and fully costed.',
+        `${whyNoRoute(comparison.routes) ? `No route can be applied: ${whyNoRoute(comparison.routes).trim()}` : 'No route is both feasible and fully costed.'}${retiredNote}`,
       );
     }
 
@@ -189,6 +193,26 @@ export class RouteApplicationService {
       ...(replaced ? { replacedRouteId: askedFor } : {}),
     };
   }, { route: dto.routeId, custom: false });
+  }
+
+  /**
+   * Removes the active operations written by an applied route that is not one of the part's routes any more (its process changed), and returns that
+   * route's id; null when the applied route is still offered, or none was applied. Only rows the route wrote (`auto_fill_from_route:<id>`) go: an
+   * operation the user added by hand is kept.
+   */
+  async retireRouteOfAnotherProcess(id: string, offeredRouteIds: readonly string[], token: string): Promise<string | null> {
+    const db = this.databaseService.getClient(token);
+    const { data, error } = await db.from('process_cost_records').select('notes').eq('bom_item_id', id).eq('is_active', true);
+    if (error) throw new InternalServerErrorException(`Could not read the applied route: ${error.message}`);
+    const applied = ((data ?? []) as Array<{ notes: string | null }>)
+      .map((r) => /^auto_fill_from_route:(.+)$/.exec(r.notes ?? '')?.[1])
+      .find((routeId): routeId is string => !!routeId);
+    if (!applied || offeredRouteIds.includes(applied)) return null;
+    const { error: removeErr } = await db.from('process_cost_records').delete()
+      .eq('bom_item_id', id).eq('is_active', true).eq('notes', `auto_fill_from_route:${applied}`);
+    if (removeErr) throw new InternalServerErrorException(`Could not remove the operations of the earlier route ${applied}: ${removeErr.message}`);
+    this.logger.log(`[apply-route] partId=${id} removed the operations of ${applied}: not a route for the part's process`);
+    return applied;
   }
 
   // ── Apply a dynamically-assembled Workflow Builder route → write real process_cost_records ─
