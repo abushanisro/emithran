@@ -96,5 +96,9 @@ describe("buildApplyScenarioRequest", () => {
     const manual = { label: "Insert molding · 3-axis robot", directApplyRouteId: "im-insert-3-axis", insertMoldingRoute: "3_axis" };
     expect(built({ isInsertMolding: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", insertMoldingRoute: "3_axis" });
     expect(built({ isInsertMolding: true }).scenarioPatch).toEqual({ processRouting: "auto", insertMoldingRoute: null });
+    // Multi-shot the same: Manual quotes the press orientation picked; Auto clears it.
+    const ms = { label: "Multi-shot · vertical press", directApplyRouteId: "ms-vertical", multiShotRoute: "vertical" };
+    expect(built({ isMultiShot: true, processRouting: "manual", manualRoute: ms }).scenarioPatch).toEqual({ processRouting: "manual", multiShotRoute: "vertical" });
+    expect(built({ isMultiShot: true }).scenarioPatch).toEqual({ processRouting: "auto", multiShotRoute: null });
   });
 });

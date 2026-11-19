@@ -30,6 +30,9 @@ import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
 import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
 import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
 import { isInsertMoldingItem } from '@/lib/costing/insert-molding-view';
+import { isMultiShotItem } from '@/lib/costing/multi-shot-view';
+import { multiShotRouteKeyOf } from '@/lib/routing/multi-shot-route-id';
+import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
 import { isAssemblyItem } from '@/lib/costing/assembly-view';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
@@ -926,6 +929,13 @@ function CostSummaryTab({
         <>
           <SectionHeader label="Insert Molding Cycle" />
           <div className="pb-2"><InsertMoldingCycle insertMolding={cost.insertMolding} /></div>
+        </>
+      )}
+      {/* A multi-shot part: the press the engine chose, each shot's cycle and the cycle they make (the shots are entered in the Cost Guide). */}
+      {cost.multiShot && (
+        <>
+          <SectionHeader label="Multi-Shot Cycle" />
+          <div className="pb-2"><MultiShotCycle multiShot={cost.multiShot} /></div>
         </>
       )}
 
@@ -3147,6 +3157,8 @@ function RouteSelectionDialog({
       ...(() => { const key = assemblyRouteKeyOf(selected.routeId); return key ? { assemblyRoute: key } : {}; })(),
       // An insert molding route ("im-insert-<method>"): its load method is committed as the scenario's insertMoldingRoute.
       ...(() => { const key = insertMoldingRouteKeyOf(selected.routeId); return key ? { insertMoldingRoute: key } : {}; })(),
+      // A multi-shot route ("ms-<orientation>"): its orientation is committed as the scenario's multiShotRoute.
+      ...(() => { const key = multiShotRouteKeyOf(selected.routeId); return key ? { multiShotRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -4606,6 +4618,17 @@ function CostGuidePanel({
               <Section title="Insert molding">
                 <InsertMoldingSection
                   insertMolding={cgpCostSummary.insertMolding}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                  hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.multiShot && (
+              <Section title="Multi-shot molding">
+                <MultiShotSection
+                  multiShot={cgpCostSummary.multiShot}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                   hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
@@ -8100,6 +8123,7 @@ export default function ManufacturingIntelligencePage() {
       isAdditive: (item.familyClassification ?? fg?.classification?.family) === 'additive',
       isAssembly: isAssemblyItem(item),
       isInsertMolding: isInsertMoldingItem(item),
+      isMultiShot: isMultiShotItem(item),
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });

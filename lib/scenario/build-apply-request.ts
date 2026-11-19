@@ -21,6 +21,8 @@ export interface StagedManualRoute {
   assemblyRoute?: string;
   /** An insert molding route picked in the Workflow Builder (insert-molding.ts INSERT_MOLDING_ROUTES key: manual, 3_axis, 6_axis). */
   insertMoldingRoute?: string;
+  /** A multi-shot route picked in the Workflow Builder (multi-shot.ts MULTI_SHOT_ROUTES key: horizontal, vertical). */
+  multiShotRoute?: string;
   machineOverrides?: { processKey: string; mhrRecordId: string }[];
 }
 
@@ -43,6 +45,7 @@ export interface StagedScenario {
   isAdditive?: boolean;
   isAssembly?: boolean;
   isInsertMolding?: boolean;
+  isMultiShot?: boolean;
   /** Currency and ask price, already resolved by the form. */
   scenarioPatch?: Record<string, unknown>;
   /** The revision of the applied scenario the page read: another apply since then is refused, not overwritten. */
@@ -114,6 +117,8 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
         ...(s.isAssembly ? { assemblyRoute: manual?.assemblyRoute ?? null } : {}),
         // Insert molding the same: Manual quotes the load method picked; Auto clears it, so the cheapest complete one is quoted.
         ...(s.isInsertMolding ? { insertMoldingRoute: manual?.insertMoldingRoute ?? null } : {}),
+        // Multi-shot the same: Manual quotes the press orientation picked; Auto clears it, so the cheapest complete one is quoted.
+        ...(s.isMultiShot ? { multiShotRoute: manual?.multiShotRoute ?? null } : {}),
         ...(s.scenarioPatch ?? {}),
       },
       route,

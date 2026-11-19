@@ -62,6 +62,8 @@ const COSTED_AS_FAMILY: Readonly<Record<string, string>> = {
   Casting: 'die_cast',
   // Insert molding: a molded plastic part on the insert presses (backend plastic-molding/insert).
   'Assembly Molding': 'plastic_molded',
+  // Multi-shot molding: a molded plastic part, each shot on a multi-shot press (backend plastic-molding/multi-shot).
+  'Assembly Plastic Molding': 'plastic_molded',
 };
 
 /**
