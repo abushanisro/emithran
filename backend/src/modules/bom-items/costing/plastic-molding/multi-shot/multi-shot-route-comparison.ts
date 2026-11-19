@@ -2,6 +2,7 @@
 // lines and totals as the quote, so the comparison cannot disagree with it). Apply saves a route's lines as the part's process records. Pure.
 import { MULTI_SHOT_ROUTES, multiShotRouteId, type MultiShotRouteKey } from './multi-shot';
 import { findRouteDataGaps } from '../../shared/core/engine-kernel';
+import { routeCompatibility } from '../operation/route-compatibility';
 
 import type { CostSummaryResponseDto } from '../../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../../dto/route-comparison.dto';
@@ -14,7 +15,8 @@ export function multiShotRouteFor(key: MultiShotRouteKey, summary: CostSummaryRe
   const feasible = isThis && im.complete;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const why = !im ? summary.warnings[0] ?? 'the part could not be costed'
-    : !isThis ? im.options.find((o) => o.route === key)?.reason ?? 'not a route for this part'
+    // A part not priced as multi-shot yet (one shot) has no options: the reason is the engine's (on the press).
+    : !isThis ? im.options.find((o) => o.route === key)?.reason ?? im.press.reasons[0] ?? 'not a route for this part'
     : gaps.map((g) => `${g.process}: ${g.reason}`).join('; ') || 'a step has no capable machine or data';
   return {
     routeId: multiShotRouteId(key),
@@ -37,6 +39,9 @@ export function multiShotRouteFor(key: MultiShotRouteKey, summary: CostSummaryRe
       estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
     },
     warnings: isThis ? summary.warnings : [],
+    // Both orientations are the same process on the same features: each route says what of the part it can make.
+    featureRecognition: summary.featureRecognition ?? null,
+    compatibility: routeCompatibility(summary.featureRecognition),
     ratesSource: summary.ratesSource,
     ...(isThis && summary.tooling ? { tooling: summary.tooling } : {}),
   };
