@@ -4730,9 +4730,14 @@ export class BomItemCostingService {
     const notPriced = (reason: string, shotsSoFar?: MultiShotShot[]): CostSummaryDto => {
       const base = computeInjectionMoldedCostSummary(a.imInput);
       const shots = shotsSoFar ?? [{ name: a.item.name, source: 'part' as const, itemId: a.id, grade: a.grade, volumePct: null, input: a.imInput }];
+      // The molding step stays where the injection line was, ahead of the trimming after it: the route reads in the order the part is made.
+      const at = Math.max(0, base.processLines.findIndex((l) => l.process === 'Injection Molding'));
+      const withGap = appendLines({ ...base, processLines: base.processLines.filter((l) => l.process !== 'Injection Molding') },
+        [gapLine('Multi-Shot Molding', MULTI_SHOT_PROCESS_GROUP, MULTI_SHOT_PRESS_CLASS, reason)]);
+      const gap = withGap.processLines[withGap.processLines.length - 1]!;
       return {
-        ...appendLines({ ...base, processLines: base.processLines.filter((l) => l.process !== 'Injection Molding') },
-          [gapLine('Multi-Shot Molding', MULTI_SHOT_PROCESS_GROUP, MULTI_SHOT_PRESS_CLASS, reason)]),
+        ...withGap,
+        processLines: [...withGap.processLines.slice(0, at), gap, ...withGap.processLines.slice(at, -1)],
         warnings: [reason],
         multiShot: {
           route: '', routeLabel: '', complete: false,

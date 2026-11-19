@@ -16,6 +16,15 @@ const hole = (id: string, diameter: number, angle: number | null): PlasticFeatur
 const run = (features: PlasticFeature[], catalogRaw = INJECTION, rules: FeatureRules | null = RULES) => resolvePlasticCatalogOperations({ catalogRaw, features, rules });
 
 describe('resolvePlasticCatalogOperations', () => {
+  it('holes decided alike are one row with their count and every id (Carriage Mount: Ø2.2 ×4, Ø2.5 ×5); a hole decided otherwise keeps its own row', () => {
+    const rows = run([hole('h1', 2.2, 0), hole('h2', 2.2, 0), hole('h3', 2.2, 0), hole('h4', 2.2, 0), hole('h5', 2.529, 0), hole('h6', 2.53, 0), hole('h7', 6.3, 90)]);
+    expect(rows.map((r) => [r.diameterMm?.toFixed(1), r.count, r.featureIds, r.status])).toEqual([
+      ['2.2', 4, ['h1', 'h2', 'h3', 'h4'], 'resolved'],
+      ['2.5', 2, ['h5', 'h6'], 'resolved'],
+      ['6.3', 1, ['h7'], 'undecided'],
+    ]);
+  });
+
   it('a hole along the pull is formed by the mold halves', () => {
     const [r] = run([hole('h1', 6.3, 2)]);
     expect(r).toMatchObject({ status: 'resolved', operations: ['As Molded'], featureType: 'SimpleHole' });
