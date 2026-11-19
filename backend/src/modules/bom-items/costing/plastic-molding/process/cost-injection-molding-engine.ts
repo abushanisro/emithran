@@ -609,7 +609,9 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       rateMmPerS: plasticRef?.featureRules.manualTrimRateMmPerS ?? null,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
     if (trim.derivable) {
-      const trimLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.gate_trimming, null, batchSize, trim.cycleSec / 60, input.deburrRate));
+      // At the bench operator's rate, under its own class (its Plastic Molding catalog row, migration 1088), not the deburring bench's.
+      const trimmer: MHRRateInput = { ...input.deburrRate, machineClass: 'gate_trimming', machineName: 'Gate trimming (operator)' };
+      const trimLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.gate_trimming, null, batchSize, trim.cycleSec / 60, trimmer));
       trimLine.calculationTrace = trim.trace;
       if (trim.calculator.id) trimLine.calculatorId = trim.calculator.id;
       trimLine.calculatorName = trim.calculator.name;
@@ -651,7 +653,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       rateMmPerS: plasticRef?.featureRules.manualFlashTrimmingRateMmPerS ?? null,
     }, withFieldOverrides(input.calculators, input.calculatorOverrides) ?? null);
     if (trim.derivable) {
-      const deflashLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.deflashing, null, batchSize, trim.cycleSec / 60, input.deburrRate));
+      const deflasher: MHRRateInput = { ...input.deburrRate, machineClass: 'deflashing', machineName: 'Deflashing (operator)' };
+      const deflashLine = noOwnSetup(makeLine(UNCOSTED_OPERATION_LABELS.deflashing, null, batchSize, trim.cycleSec / 60, deflasher));
       deflashLine.calculationTrace = trim.trace;
       if (trim.calculator.id) deflashLine.calculatorId = trim.calculator.id;
       deflashLine.calculatorName = trim.calculator.name;
