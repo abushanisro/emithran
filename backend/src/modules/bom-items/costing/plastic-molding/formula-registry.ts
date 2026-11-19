@@ -417,6 +417,25 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
   },
 
   {
+    id: 'F-39', version: 1, name: 'First article inspection',
+    expression: 'one-off USD = ((touches x probe s x parts) / efficiency adjustments + touches x programming s + CMM setup) / 3600 x CMM machine and crew rate',
+    outputUnit: 'USD',
+    inputs: [
+      { name: 'touches', unit: 'count', source: 'memory/Secondary process lookup CMMInspectionProbeTouches by CAD feature (else the CAD hole count)' },
+      { name: 'probe s, programming s', unit: 's', source: 'memory/Secondary process variables: defaultCMMProbeTime, CMMProgrammingTimePerTouch' },
+      { name: 'parts', unit: 'count', source: 'Approved default (2026-11-18): 3 first-run parts measured in full' },
+      { name: 'CMM rate, setup', unit: 'USD/h, h', source: 'memory/Secondary process machines: the CMM chosen for the part (Axiom Too 1200, USA)' },
+    ],
+    dependsOn: [],
+    referenceSource: 'memory/Secondary process (2026-Secondary)',
+    assumptions: [
+      'The dimensional inspection of a molded part is its first article inspection: one-off per part number, NRE, not a per-part line.',
+      'Three first-run parts are measured in full, programmed once; the CMM model is the one the CMM Inspection secondary operation uses.',
+    ],
+    state: 'ASSUMED', implementedIn: 'process/cost-injection-molding-engine.ts',
+  },
+
+  {
     id: 'F-37', version: 1, name: 'Water baffles',
     expression: 'baffles = 2 x floor(L / spacing);  cost = baffles x (unit cost + assembly h x assembly rate) + (baffles x tapping h + tap setup h) x machining rate',
     outputUnit: 'USD',

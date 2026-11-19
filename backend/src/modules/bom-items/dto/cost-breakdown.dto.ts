@@ -683,6 +683,11 @@ export interface CostSummaryDto {
   forging?: ForgingBreakdown;
   /** The forging dies (finishing and trim), USD: separate from the piece cost, like the die. */
   forgingDies?: { sets: number; costUsd: number; perPartUsd: number | null; detail: string };
+  /**
+   * The first article inspection of a molded part number (formula registry F-39): a one-off on the CMM, USD, kept out of the piece cost like the
+   * tooling. Null cost with the reason when it cannot be priced.
+   */
+  firstArticleInspection?: { costUsd: number | null; perPartUsd: number | null; detail: string; machineName: string | null };
   /** Investment casting: the tree the route built and its shell. */
   investmentCasting?: InvestmentCastingBreakdown;
   /** Powder metal: what the press-and-sinter route decided (green density, compaction, fill, sintering belt). */

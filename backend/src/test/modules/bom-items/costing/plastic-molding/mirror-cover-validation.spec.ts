@@ -218,10 +218,10 @@ describe('Part B3: the differences that remain, pinned, each with its cause', ()
     expect(r.warnings.join(' ')).not.toMatch(/profit|overhead/i);
   });
 
-  it('INSPECTION (method): ours costs a visual inspection of every part (0.22 per part) and names the first-article dimensional inspection as required and not costed; the workbook costs a sampled QA inspector (0.096 per part)', () => {
+  it('INSPECTION (method): ours costs a visual inspection of every part (0.22 per part) and prices the first-article dimensional inspection as a one-off (F-39, with the tooling, not here); the workbook costs a sampled QA inspector (0.096 per part)', () => {
     const visual = r.processLines.find((l) => l.process === 'Visual Inspection')!;
     expect(visual.totalCost).toBeCloseTo(0.22, 2);
-    expect(r.warnings.join(' ')).toMatch(/Dimensional Inspection \(First Article\) required: not costed/);
+    expect(r.warnings.join(' ')).not.toMatch(/Dimensional Inspection/);
     expect(WB_OUT.inspectionCost).toBeCloseTo(0.0958, 3);
     expect(visual.totalCost).toBeGreaterThan(WB_OUT.inspectionCost);
   });
