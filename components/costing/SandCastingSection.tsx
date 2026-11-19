@@ -27,7 +27,7 @@ interface Props {
 
 const rowClass = 'flex items-center gap-2 py-0.5';
 const labelClass = 'text-xs text-muted-foreground w-24 shrink-0';
-const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 
 /** The Cost Guide choices of a sand casting (what the route decided is in the Cost tab: SandRouteSummary). Every choice is optional; unset means the engine decides or, for the energy price and the tooling life, charges nothing. */
 export function SandCastingSection({ overrides, onChange }: Props) {
@@ -43,7 +43,7 @@ export function SandCastingSection({ overrides, onChange }: Props) {
           className="cursor-pointer select-none text-[11px] text-muted-foreground"
           title="Moulding, cores and cavities from the CAD analysis; energy, coating and drying from the plant data; hot box from published values. What was used is on each line of the Cost tab."
         >
-          Sand settings: {overridden > 0 ? `${overridden} overridden` : 'automatic'} · <span className="font-medium text-brand-500 hover:text-brand-400">Override</span>
+          Sand settings: {overridden > 0 ? `${overridden} overridden` : 'automatic'} · <span className="font-medium text-primary hover:text-primary">Override</span>
         </summary>
         <div className="space-y-1 pt-1">
       <div className={rowClass}>

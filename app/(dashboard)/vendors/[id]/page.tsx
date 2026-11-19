@@ -235,7 +235,7 @@ export default function VendorDetailPage() {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-gray-800 text-white min-h-[calc(100vh-73px)] p-4">
+        <aside className="w-64 bg-card text-foreground min-h-[calc(100vh-73px)] p-4">
           <nav className="space-y-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -245,8 +245,8 @@ export default function VendorDetailPage() {
                   onClick={() => setActiveTab(tab.id as TabType)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm transition-colors ${
                     activeTab === tab.id
-                      ? 'bg-gray-700 text-white'
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                      ? 'bg-muted text-foreground'
+                      : 'text-foreground/80 hover:bg-accent hover:text-foreground'
                   }`}
                 >
                   <Icon className="h-4 w-4" />

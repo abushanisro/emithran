@@ -318,7 +318,7 @@ function HierarchicalNode({
       case BOMItemType.ASSEMBLY:
         return { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', hoverBorder: 'hover:border-emerald-500/50', text: 'text-emerald-700', hoverBg: 'bg-emerald-500/15', hoverBorderStrong: 'border-emerald-500/60' };
       case BOMItemType.SUB_ASSEMBLY:
-        return { bg: 'bg-blue-500/10',    border: 'border-blue-500/30',    hoverBorder: 'hover:border-blue-500/50',    text: 'text-blue-700',    hoverBg: 'bg-blue-500/15',    hoverBorderStrong: 'border-blue-500/60'    };
+        return { bg: 'bg-primary/10', border: 'border-primary/30', hoverBorder: 'hover:border-primary/50', text: 'text-primary', hoverBg: 'bg-primary/15', hoverBorderStrong: 'border-primary/60' };
       case BOMItemType.CHILD_PART:
         return { bg: 'bg-orange-500/10',  border: 'border-orange-500/30',  hoverBorder: 'hover:border-orange-500/50',  text: 'text-orange-700',  hoverBg: 'bg-orange-500/15',  hoverBorderStrong: 'border-orange-500/60'  };
       default:
@@ -515,7 +515,7 @@ export function BOMTreeView({ items, projectName, projectId, onAddItem, onEditIt
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: 'Assemblies',     value: validationResult.summary.assemblies,    color: 'text-emerald-600' },
-              { label: 'Sub-Assemblies', value: validationResult.summary.subAssemblies, color: 'text-blue-600'    },
+              { label: 'Sub-Assemblies', value: validationResult.summary.subAssemblies, color: 'text-primary' },
               { label: 'Child Parts',    value: validationResult.summary.childParts,    color: 'text-amber-600'   },
               { label: 'Max Depth',      value: validationResult.summary.maxDepth,      color: 'text-muted-foreground' },
             ].map(({ label, value, color }) => (

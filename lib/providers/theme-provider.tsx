@@ -9,7 +9,8 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="brand"
+      // The brand is light-first (ubaabu brand-identity); a theme someone already picked is kept.
+      defaultTheme="light"
       themes={['light', 'dark', 'brand']}
       disableTransitionOnChange
       {...props}

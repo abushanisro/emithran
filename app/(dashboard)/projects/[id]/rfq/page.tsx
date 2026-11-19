@@ -275,10 +275,10 @@ export default function RFQPage() {
                     {[1, 2, 3].map(i => (
                       <div key={i} className="flex items-center justify-between p-4 border rounded-lg animate-pulse">
                         <div className="space-y-2">
-                          <div className="h-4 w-48 bg-gray-200 rounded"></div>
-                          <div className="h-3 w-32 bg-gray-200 rounded"></div>
+                          <div className="h-4 w-48 bg-muted rounded"></div>
+                          <div className="h-3 w-32 bg-muted rounded"></div>
                         </div>
-                        <div className="h-6 w-16 bg-gray-200 rounded"></div>
+                        <div className="h-6 w-16 bg-muted rounded"></div>
                       </div>
                     ))}
                   </div>
@@ -361,10 +361,10 @@ export default function RFQPage() {
                     {[1, 2, 3].map(i => (
                       <div key={i} className="flex items-center justify-between p-4 border rounded-lg animate-pulse">
                         <div className="space-y-2">
-                          <div className="h-4 w-40 bg-gray-200 rounded"></div>
-                          <div className="h-3 w-56 bg-gray-200 rounded"></div>
+                          <div className="h-4 w-40 bg-muted rounded"></div>
+                          <div className="h-3 w-56 bg-muted rounded"></div>
                         </div>
-                        <div className="h-6 w-20 bg-gray-200 rounded"></div>
+                        <div className="h-6 w-20 bg-muted rounded"></div>
                       </div>
                     ))}
                   </div>
@@ -576,7 +576,7 @@ export default function RFQPage() {
                                           )}
                                         </div>
                                         {bomItem ? (
-                                          <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800">
+                                          <div className="mt-2 p-2 bg-primary/10 rounded text-xs text-primary">
                                             <p className="flex items-center gap-1">
                                               <CheckCircle className="h-3 w-3" />
                                               BOM Item Found: {bomItem.id}
@@ -749,7 +749,7 @@ export default function RFQPage() {
                       ) : trackingRecords && trackingRecords.length > 0 ? (
                         trackingRecords.map(record => (
                           <div key={record.id} className="flex items-start gap-3 p-3 border rounded">
-                            <Mail className="h-4 w-4 mt-1 text-blue-600" />
+                            <Mail className="h-4 w-4 mt-1 text-primary" />
                             <div className="flex-1">
                               <div className="flex items-center justify-between">
                                 <p className="text-sm font-medium">RFQ sent: {record.rfqName} ({record.rfqNumber})</p>

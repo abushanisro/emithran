@@ -85,7 +85,7 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
             </div>
             <div className="text-[11px] text-muted-foreground">
               Table: <span className="font-mono">{gap.lookupResolution.table}</span>
-              <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-blue-500/15 text-blue-700 dark:text-blue-400">
+              <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-primary/15 text-primary dark:text-primary">
                 {gap.lookupResolution.policy}
               </span>
             </div>
@@ -179,7 +179,7 @@ export function CalculationTracePanel({ line, renderInput }: {
                     <span className="text-muted-foreground truncate min-w-0">
                       {step.displayLabel}
                       {step.stepType === 'lookup' && (
-                        <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-blue-500/15 text-blue-700 dark:text-blue-400">
+                        <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-primary/15 text-primary dark:text-primary">
                           lookup
                         </span>
                       )}
@@ -207,7 +207,7 @@ export function CalculationTracePanel({ line, renderInput }: {
                     <span className="text-muted-foreground truncate min-w-0">
                       {step.displayLabel}
                       {step.stepType === 'physics' && (
-                        <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-brand-500/15 text-brand-700 dark:text-brand-400">
+                        <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-primary/15 text-primary dark:text-primary">
                           physics
                         </span>
                       )}

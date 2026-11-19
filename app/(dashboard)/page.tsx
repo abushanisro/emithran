@@ -276,7 +276,7 @@ export default function DashboardPage() {
                   <p className="text-muted-foreground">BOM Items</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-semibold text-brand-600">
+                  <p className="font-semibold text-primary">
                     {projects.reduce((s, p) => s + (p.bomCount || 0), 0)}
                   </p>
                   <p className="text-muted-foreground">BOMs</p>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
         <Card className="border-border/50 bg-card">
           <CardContent className="p-6">
             <div className="text-center space-y-2">
-              <p className="text-3xl font-bold text-brand-600">{vendorsData?.total || vendors.length}</p>
+              <p className="text-3xl font-bold text-primary">{vendorsData?.total || vendors.length}</p>
               <p className="text-sm text-muted-foreground">Total Vendors</p>
               <div className="grid grid-cols-3 gap-1 text-xs mt-2">
                 <div className="text-center">
@@ -505,8 +505,8 @@ export default function DashboardPage() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">from {projects.filter(p => (p.targetBomCost ?? 0) > 0).length} projects with targets</p>
                 </div>
-                <div className="text-center p-6 rounded-xl bg-brand-500/5 border border-brand-500/20">
-                  <p className="text-sm text-brand-400 mb-1 uppercase tracking-wider font-bold">Actual BOM Cost</p>
+                <div className="text-center p-6 rounded-xl bg-primary/5 border border-primary/20">
+                  <p className="text-sm text-primary mb-1 uppercase tracking-wider font-bold">Actual BOM Cost</p>
                   <p className="text-2xl font-bold text-foreground">
                     {formatProjectMoney(totalActual)}
                   </p>

@@ -442,7 +442,7 @@ export default function VendorsPage() {
                   </div>
                   <div className="flex justify-between items-center text-sm group hover:bg-muted/50 p-1 rounded transition-colors">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      <div className="w-2 h-2 rounded-full bg-muted-foreground/30"></div>
                       <span className="text-muted-foreground">Inactive</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -880,7 +880,7 @@ export default function VendorsPage() {
                                 href={websiteUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                className="text-xs text-primary hover:underline flex items-center gap-1"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 Visit website <ExternalLink className="h-3 w-3" />

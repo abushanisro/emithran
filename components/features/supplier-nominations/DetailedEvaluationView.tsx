@@ -422,7 +422,7 @@ export function DetailedEvaluationView({
     if (isLoadingCapability) {
       return (
         <div className="flex justify-center items-center h-64">
-          <div className="text-white">Loading capability scores...</div>
+          <div className="text-foreground">Loading capability scores...</div>
         </div>
       );
     }
@@ -478,7 +478,7 @@ export function DetailedEvaluationView({
                   disabled={isSavingCapability}
                   variant="outline"
                   size="sm"
-                  className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                  className="border-border text-foreground/80 hover:bg-accent"
                 >
                   Cancel
                 </Button>
@@ -488,7 +488,7 @@ export function DetailedEvaluationView({
                 onClick={() => setIsEditingCapability(true)}
                 variant="outline"
                 size="sm"
-                className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                className="border-border text-foreground/80 hover:bg-accent"
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Scores
@@ -498,26 +498,26 @@ export function DetailedEvaluationView({
         </div>
 
         {/* Capability Scoring Table */}
-        <Card className="bg-gray-800 border-gray-700 shadow-lg">
+        <Card className="bg-card border-border shadow-lg">
           <CardContent className="p-0">
             <div className="overflow-x-auto min-w-full">
               {/* Header Row */}
-              <div className="grid grid-cols-3 bg-gray-800 border-b border-gray-600 sticky top-0">
-                <div className="text-white font-semibold py-4 px-6 text-left">
+              <div className="grid grid-cols-3 bg-card border-b border-border sticky top-0">
+                <div className="text-foreground font-semibold py-4 px-6 text-left">
                   CRITERIA
                 </div>
-                <div className="text-white font-semibold py-4 px-4 text-center">
+                <div className="text-foreground font-semibold py-4 px-4 text-center">
                   Max Score
                 </div>
-                <div className="text-white font-semibold py-4 px-4 text-center">
+                <div className="text-foreground font-semibold py-4 px-4 text-center">
                   Current Score
                 </div>
               </div>
 
               {/* Table Body */}
-              <div className="bg-gray-900">
+              <div className="bg-card">
                 {capabilityData.length === 0 ? (
-                  <div className="grid grid-cols-1 text-center py-8 text-gray-400 border-b border-gray-700">
+                  <div className="grid grid-cols-1 text-center py-8 text-muted-foreground border-b border-border">
                     <div>
                       No capability criteria available.
                       <br />
@@ -531,7 +531,7 @@ export function DetailedEvaluationView({
                             toast.error('Failed to initialize capability scoring');
                           }
                         }}
-                        className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                        className="mt-4 bg-brand-600 hover:bg-brand-700 text-white"
                         size="sm"
                       >
                         Initialize Capability Scoring
@@ -541,11 +541,11 @@ export function DetailedEvaluationView({
                 ) : (
                   <>
                     {capabilityData.map((criteria, criteriaIndex) => (
-                      <div key={criteriaIndex} className="grid grid-cols-3 border-b border-gray-700 hover:bg-gray-800/50">
-                        <div className="text-white py-4 px-6 font-medium wrap-break-word">
+                      <div key={criteriaIndex} className="grid grid-cols-3 border-b border-border hover:bg-accent/50">
+                        <div className="text-foreground py-4 px-6 font-medium wrap-break-word">
                           <span>{getCriteriaName(criteriaIndex)}</span>
                         </div>
-                        <div className="text-white text-center py-4 px-4 font-medium">
+                        <div className="text-foreground text-center py-4 px-4 font-medium">
                           {criteria.maxScore || 0}
                         </div>
                         <div className="text-center py-4 px-4 flex justify-center items-center">
@@ -557,10 +557,10 @@ export function DetailedEvaluationView({
                               step="1"
                               value={getCurrentCapabilityScore(criteriaIndex)}
                               onChange={(e) => updateCapabilityScoreLocal(criteriaIndex, parseInt(e.target.value) || 0)}
-                              className="w-20 h-10 text-center bg-gray-700 border-gray-600 text-white hover:bg-gray-600 focus:bg-gray-600 focus:border-blue-500"
+                              className="w-20 h-10 text-center bg-muted border-border text-foreground hover:bg-accent focus:bg-accent focus:border-primary/40"
                             />
                           ) : (
-                            <span className="text-white font-medium text-lg">
+                            <span className="text-foreground font-medium text-lg">
                               {getCurrentCapabilityScore(criteriaIndex)}
                             </span>
                           )}
@@ -569,14 +569,14 @@ export function DetailedEvaluationView({
                     ))}
 
                     {/* Total Score Row */}
-                    <div className="grid grid-cols-3 border-b-2 border-gray-600 bg-gray-800">
-                      <div className="text-white font-bold py-4 px-6">
+                    <div className="grid grid-cols-3 border-b-2 border-border bg-card">
+                      <div className="text-foreground font-bold py-4 px-6">
                         Total Score
                       </div>
-                      <div className="text-white text-center font-bold py-4 px-4">
+                      <div className="text-foreground text-center font-bold py-4 px-4">
                         {maxTotal}
                       </div>
-                      <div className="text-white text-center font-bold py-4 px-4">
+                      <div className="text-foreground text-center font-bold py-4 px-4">
                         {currentVendorTotal?.toFixed(1) || 0}
                       </div>
                     </div>
@@ -593,7 +593,7 @@ export function DetailedEvaluationView({
 // renderTechnicalTab function removed
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
@@ -602,13 +602,13 @@ export function DetailedEvaluationView({
               variant="outline"
               size="sm"
               onClick={onBack}
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              className="border-border text-foreground/80 hover:bg-accent"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Overview
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-2xl font-bold text-foreground">
                 {vendor?.name || 'Vendor Evaluation'}
               </h1>
               <div className="flex items-center gap-3 mt-2">
@@ -632,7 +632,7 @@ export function DetailedEvaluationView({
           </div>
 
           <div className="text-right">
-            <div className="text-3xl font-bold text-white">
+            <div className="text-3xl font-bold text-foreground">
               {(() => {
                 if (activeTab === 'capability' && capabilityScores.criteria.length > 0) {
                   // Real-time capability score calculation
@@ -706,7 +706,7 @@ export function DetailedEvaluationView({
                 }
               })()}%
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-muted-foreground">
               {activeTab === 'capability' ? 'Capability Score' :
                 activeTab === 'dashboard' ? 'Overall Score' :
                   activeTab === 'cost' ? 'Cost Analysis Score' :
@@ -716,7 +716,7 @@ export function DetailedEvaluationView({
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-700">
+        <div className="border-b border-border">
           <nav className="flex space-x-8">
             {[
               { id: 'dashboard', label: 'Overview', icon: BarChart3 },
@@ -730,8 +730,8 @@ export function DetailedEvaluationView({
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    ? 'border-primary/40 text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground/80 hover:border-border'
                     }`}
                 >
                   <Icon className="h-4 w-4" />

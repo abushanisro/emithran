@@ -39,7 +39,7 @@ interface CalculatorInputFieldProps {
 }
 
 // A value that came from a real source is tinted; the calculator's own default and a hand-typed value are not.
-const REAL_VALUE_CLASS = 'border-blue-400 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200';
+const REAL_VALUE_CLASS = 'border-primary/40 bg-primary/10 text-primary dark:border-primary/40 dark:bg-primary/30 dark:text-primary';
 
 /**
  * One input row of the calculator form. Memoized: typing in one input re-renders that row only,

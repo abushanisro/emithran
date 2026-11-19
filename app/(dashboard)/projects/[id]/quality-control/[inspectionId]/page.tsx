@@ -273,9 +273,9 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
 
         if (balloonCoordinates.length > 0) {
           const successfulExtractions = tableData.successfulExtractions || tableData.inspectionRows.filter((row: any) => row.nominal && row.nominal !== '').length;
-          toast.success(`Extracted ${successfulExtractions}/${balloonCoordinates.length} dimensions from balloon locations!`);
+          toast.success(`Extracted ${successfulExtractions}/${balloonCoordinates.length} dimensions from balloon locations.`);
         } else {
-          toast.success(`Extracted ${tableData.inspectionRows.length} inspection items from PDF!`);
+          toast.success(`Extracted ${tableData.inspectionRows.length} inspection items from PDF.`);
         }
       } else {
         if (balloonCoordinates.length > 0) {
@@ -572,7 +572,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
       // Add annotation metadata
       pdfDoc.setTitle(`${bomItem.partNumber || bomItem.name || 'Drawing'} - Balloon Annotated`);
       pdfDoc.setSubject('Technical Drawing with Balloon Annotations');
-      pdfDoc.setCreator('Mithran Quality Control System');
+      pdfDoc.setCreator('EMITHRAN Quality Control System');
       pdfDoc.setProducer('PDF-lib');
       pdfDoc.setCreationDate(new Date());
       pdfDoc.setModificationDate(new Date());
@@ -751,7 +751,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                   onClick={toggleAnnotationMode}
                   variant={isAnnotationMode ? 'destructive' : 'default'}
                   size="sm"
-                  className={isAnnotationMode ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}
+                  className={isAnnotationMode ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-600 hover:bg-brand-700'}
                 >
                   <Edit3 className="h-4 w-4 lg:mr-1" />
                   <span className="hidden lg:inline">
@@ -783,7 +783,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       }`}
                       title="Circle Outline"
                     >
-                      <span className="w-3 h-3 rounded-full border-2 border-red-600 inline-block bg-white" />
+                      <span className="w-3 h-3 rounded-full border-2 border-red-600 inline-block bg-card" />
                       <span className="hidden sm:inline">Circle</span>
                     </button>
                     <button
@@ -799,7 +799,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       }`}
                       title="Square Outline"
                     >
-                      <span className="w-3 h-3 rounded-[2px] border-2 border-red-600 inline-block bg-white" />
+                      <span className="w-3 h-3 rounded-[2px] border-2 border-red-600 inline-block bg-card" />
                       <span className="hidden sm:inline">Square</span>
                     </button>
                     <button
@@ -815,19 +815,19 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       }`}
                       title="Diamond Outline"
                     >
-                      <span className="w-3 h-3 rotate-45 border-2 border-red-600 inline-block bg-white transform scale-90" />
+                      <span className="w-3 h-3 rotate-45 border-2 border-red-600 inline-block bg-card transform scale-90" />
                       <span className="hidden sm:inline">Diamond</span>
                     </button>
                   </div>
                 )}
                 {pdfUrl && (
-                  <div className="flex items-center gap-1 bg-blue-50/80 border border-blue-200 rounded-md px-2 py-0.5 shadow-xs">
-                    <span className="text-[11px] font-bold text-blue-900 hidden sm:inline">Sheet:</span>
+                  <div className="flex items-center gap-1 bg-primary/80 border border-primary/40 rounded-md px-2 py-0.5 shadow-xs">
+                    <span className="text-[11px] font-bold text-primary hidden sm:inline">Sheet:</span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 font-bold hover:bg-blue-100 text-blue-900"
+                      className="h-6 w-6 p-0 font-bold hover:bg-primary/10 text-primary"
                       disabled={currentPage <= 1}
                       onClick={() => {
                         setCurrentPage(prev => Math.max(1, prev - 1));
@@ -837,14 +837,14 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                     >
                       ‹
                     </Button>
-                    <span className="text-xs font-extrabold px-2 py-0.5 bg-white border border-blue-300 rounded text-blue-900 shadow-inner">
+                    <span className="text-xs font-extrabold px-2 py-0.5 bg-card border border-primary/40 rounded text-primary shadow-inner">
                       {currentPage} / {totalPages}
                     </span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 font-bold hover:bg-blue-100 text-blue-900"
+                      className="h-6 w-6 p-0 font-bold hover:bg-primary/10 text-primary"
                       onClick={() => {
                         setCurrentPage(prev => {
                           const next = prev + 1;
@@ -963,7 +963,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all select-none ${isAnnotationMode
                         ? (isDragging && selectedBalloon === balloon.id ? 'cursor-grabbing' : 'cursor-grab')
                         : 'cursor-default'
-                        } ${selectedBalloon === balloon.id && isAnnotationMode ? 'ring-4 ring-blue-500 ring-opacity-50' : ''
+                        } ${selectedBalloon === balloon.id && isAnnotationMode ? 'ring-4 ring-primary/40 ring-opacity-50' : ''
                         } ${isDragging && selectedBalloon === balloon.id ? 'z-50 scale-110' : ''
                         }`}
                       style={{ left: `${balloon.x}%`, top: `${balloon.y}%`, zIndex: 10 }}
@@ -980,7 +980,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                             className={`w-6 h-6 rounded-[2px] border-2 flex items-center justify-center text-[11px] font-bold shadow-md transition-all ${
                               selectedBalloon === balloon.id && isAnnotationMode
                                 ? 'border-red-600 bg-red-50 text-red-600 scale-110 ring-2 ring-red-500/30'
-                                : `border-red-600 bg-white/95 text-red-600 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
+                                : `border-red-600 bg-card/95 text-red-600 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
                             } ${isDragging && selectedBalloon === balloon.id ? 'shadow-2xl scale-110' : ''}`}
                           >
                             {editingNumber === balloon.id ? (
@@ -1010,7 +1010,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                               className={`absolute inset-0 w-7 h-7 m-auto rotate-45 rounded-[2px] border-2 shadow-md transition-all ${
                                 selectedBalloon === balloon.id && isAnnotationMode
                                   ? 'border-red-600 bg-red-50 ring-2 ring-red-500/30'
-                                  : `border-red-600 bg-white/95 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
+                                  : `border-red-600 bg-card/95 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
                               }`}
                             />
                             <div className="relative z-10 flex items-center justify-center">
@@ -1039,7 +1039,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                             className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-md transition-all ${
                               selectedBalloon === balloon.id && isAnnotationMode
                                 ? 'border-red-600 bg-red-50 text-red-600 scale-110 ring-2 ring-red-500/30'
-                                : `border-red-600 bg-white/95 text-red-600 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
+                                : `border-red-600 bg-card/95 text-red-600 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
                             } ${isDragging && selectedBalloon === balloon.id ? 'shadow-2xl scale-110' : ''}`}
                           >
                             {editingNumber === balloon.id ? (
@@ -1063,7 +1063,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                         {selectedBalloon === balloon.id && isAnnotationMode && (
                           <button
                             onClick={(e) => { e.stopPropagation(); deleteBalloon(balloon.id); }}
-                            className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs hover:bg-gray-900 z-20"
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-card text-foreground rounded-full flex items-center justify-center text-xs hover:bg-accent z-20"
                           >
                             ×
                           </button>
@@ -1074,11 +1074,11 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
 
                   {balloons.filter(b => (b.page || 1) === currentPage).length === 0 && isAnnotationMode && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/10" style={{ zIndex: 5 }}>
-                      <div className="bg-white/95 rounded-lg p-4 text-center border border-red-200 shadow-lg">
-                        <div className="w-8 h-8 bg-white rounded-full border-2 border-red-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
+                      <div className="bg-card/95 rounded-lg p-4 text-center border border-red-200 shadow-lg">
+                        <div className="w-8 h-8 bg-card rounded-full border-2 border-red-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
                           <span className="text-red-600 font-bold text-sm">{balloons.length + 1}</span>
                         </div>
-                        <p className="text-sm font-semibold text-gray-800">Click anywhere on Sheet {currentPage} to place balloon #{balloons.length + 1}</p>
+                        <p className="text-sm font-semibold text-foreground">Click anywhere on Sheet {currentPage} to place balloon #{balloons.length + 1}</p>
                         <p className="text-xs text-muted-foreground mt-1">Choose shape (Circle, Square, Diamond) or Sheet above</p>
                       </div>
                     </div>
@@ -1097,7 +1097,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                         setCurrentPage(prev => Math.max(1, prev - 1));
                         setSelectedBalloon(null);
                       }}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 z-40 bg-white/95 hover:bg-blue-50 border border-blue-300 text-blue-900 rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition-all text-lg font-extrabold hover:scale-105 select-none"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 z-40 bg-card/95 hover:bg-primary/10 border border-primary/40 text-primary rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition-all text-lg font-extrabold hover:scale-105 select-none"
                       title="Previous Sheet (Scroll up)"
                     >
                       ‹
@@ -1114,15 +1114,15 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       });
                       setSelectedBalloon(null);
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 z-40 bg-white/95 hover:bg-blue-50 border border-blue-300 text-blue-900 rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition-all text-lg font-extrabold hover:scale-105 select-none"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-40 bg-card/95 hover:bg-primary/10 border border-primary/40 text-primary rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition-all text-lg font-extrabold hover:scale-105 select-none"
                     title="Next Sheet (Scroll down)"
                   >
                     ›
                   </button>
 
                   {/* Floating sheet switcher badge */}
-                  <div className="absolute bottom-4 right-4 z-40 bg-white/95 backdrop-blur-sm border border-blue-200 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 select-none">
-                    <span className="text-xs font-bold text-gray-700">Sheet {currentPage} of {totalPages}</span>
+                  <div className="absolute bottom-4 right-4 z-40 bg-card/95 backdrop-blur-sm border border-primary/40 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 select-none">
+                    <span className="text-xs font-bold text-foreground">Sheet {currentPage} of {totalPages}</span>
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
@@ -1703,7 +1703,7 @@ export default function QualityInspectionPage() {
         }
       } else {
         if (!silent) {
-          toast.success(`Inspection report ${isDraft ? 'saved as draft' : 'submitted'} successfully!`);
+          toast.success(`Inspection report ${isDraft ? 'saved as draft' : 'submitted'} successfully.`);
         }
       }
     } catch (error) {
@@ -1751,7 +1751,7 @@ export default function QualityInspectionPage() {
   const copyFormattedOutput = () => {
     const output = generateFormattedOutput();
     navigator.clipboard.writeText(output).then(() => {
-      toast.success("Formatted output copied to clipboard!");
+      toast.success("Formatted output copied to clipboard.");
     }).catch(() => {
       toast.error("Failed to copy to clipboard");
     });
@@ -1997,7 +1997,7 @@ export default function QualityInspectionPage() {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.text(`Page ${i} of ${totalPages}`, pageWidth - 30, pageHeight - 10);
-        doc.text('Generated by Mithran QC System', 20, pageHeight - 10);
+        doc.text('Generated by EMITHRAN QC System', 20, pageHeight - 10);
       }
 
       // Save the PDF specifically for this 1 part
@@ -2005,7 +2005,7 @@ export default function QualityInspectionPage() {
       const filename = `QC-Part-Report-${safePartName}-${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
-      toast.success(`QC Report exported for ${activeBomItem?.partNumber || activeBomItem?.name || 'this part'}!`);
+      toast.success(`QC Report exported for ${activeBomItem?.partNumber || activeBomItem?.name || 'this part'}.`);
 
     } catch (error) {
       toast.error('Failed to generate PDF report');
@@ -2053,7 +2053,7 @@ export default function QualityInspectionPage() {
         setSampleCount(tableData.sampleCount);
       }
 
-      toast.success(`Successfully extracted ${extractedRows.length} inspection items from PDF!`);
+      toast.success(`Successfully extracted ${extractedRows.length} inspection items from PDF.`);
     }
   };
 
@@ -2700,12 +2700,12 @@ export default function QualityInspectionPage() {
               <div className={`flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-md border text-xs sm:text-sm ${status === 'draft' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
                 status === 'release' ? 'bg-primary/10 border-primary/20 text-primary' :
                   status === 'rejected' ? 'bg-red-50 border-red-200 text-red-800' :
-                    'bg-gray-50 border-gray-200 text-gray-600'
+                    'bg-muted border-border text-muted-foreground'
                 }`}>
                 <div className={`${status === 'draft' ? 'text-yellow-600' :
                   status === 'release' ? 'text-primary' :
                     status === 'rejected' ? 'text-red-600' :
-                      'text-gray-400'
+                      'text-muted-foreground'
                   }`}>
                   {status === 'draft' ? <Clock className="h-3 w-3 sm:h-4 sm:w-4" /> :
                     status === 'release' ? <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" /> :

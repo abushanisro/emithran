@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useCreateSandSnapshot, useReviewSandSnapshot, useSandSnapshots } from '@/lib/api/hooks/useSandSnapshots';
 import type { SandSnapshot } from '@/lib/api/sand-snapshots';
 
-const fieldClass = 'text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const fieldClass = 'text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 const BADGE: Record<SandSnapshot['status'], string> = {
   submitted: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   approved: 'bg-green-500/15 text-green-700 dark:text-green-400',

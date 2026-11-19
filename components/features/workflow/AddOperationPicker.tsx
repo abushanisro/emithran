@@ -66,8 +66,8 @@ export function AddOperationPicker({ options, onAdd, disabled, emptyLabel }: Add
           className={cn(
             'flex min-h-8 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border px-3 py-1.5',
             'text-xs font-medium text-muted-foreground transition-colors',
-            'hover:border-brand-500/60 hover:bg-brand-500/10 hover:text-brand-200',
-            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500',
+            'hover:border-primary/60 hover:bg-primary/10 hover:text-primary',
+            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40',
             'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-transparent disabled:hover:text-muted-foreground',
           )}
         >

@@ -26,7 +26,7 @@ afterEach(() => {
 describe('sign-in page', () => {
   it('shows Sign In, company SSO and Request a demo, and no credential fields', async () => {
     const html = await render();
-    expect(html).toContain('Sign in your account');
+    expect(html).toContain('Sign in to your account');
     expect(html).not.toContain('id="email"');
     expect(html).not.toContain('id="password"');
     expect(html).toContain('>Sign In<');

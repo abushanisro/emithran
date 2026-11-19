@@ -230,7 +230,7 @@ export function NestView({
                     onClick={() => { pickSheet(s); }}
                     title={s.source}
                     className={`text-left rounded border px-3 py-1.5 text-xs transition-colors ${
-                      isActive ? 'bg-blue-600 border-blue-400' : 'bg-[#4a4a4a] border-[#666666] hover:bg-[#565656]'
+                      isActive ? 'bg-brand-600 border-brand-400' : 'bg-[#4a4a4a] border-[#666666] hover:bg-[#565656]'
                     }`}
                   >
                     <div className="flex items-center gap-1.5 font-medium">
@@ -239,7 +239,7 @@ export function NestView({
                         <span className="text-[9px] uppercase tracking-wide bg-emerald-500 text-black rounded px-1 py-0.5">Recommended</span>
                       )}
                       {isCosted && (
-                        <span className="text-[9px] uppercase tracking-wide bg-sky-400 text-black rounded px-1 py-0.5">Costed</span>
+                        <span className="text-[9px] uppercase tracking-wide bg-brand-400 text-black rounded px-1 py-0.5">Costed</span>
                       )}
                     </div>
                     <div className="text-white/60 mt-0.5">

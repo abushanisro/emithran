@@ -8,7 +8,7 @@ import { useClearSandVariableOverride, useSandVariableOverrides, useSetSandVaria
 import type { SandVariableOverride } from '@/lib/api/sand-variable-overrides';
 import { calculatorRunEntries, variableOfSource, type CalculatorRun } from '@/lib/costing/sand-calculations';
 
-const fieldClass = 'text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const fieldClass = 'text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 
 /** Set this part's own value for a plant variable (with the reason), or return it to the plant value. */
 function VariableEditor({ bomItemId, variable, current }: { bomItemId: string; variable: string; current: SandVariableOverride | undefined }) {
@@ -28,7 +28,7 @@ function VariableEditor({ bomItemId, variable, current }: { bomItemId: string; v
       )}
       {!open ? (
         <div className="flex gap-2 text-[10px]">
-          <button type="button" className="text-brand-600 hover:underline" onClick={() => { setValue(current?.value ?? ''); setReason(''); setOpen(true); }}>
+          <button type="button" className="text-primary hover:underline" onClick={() => { setValue(current?.value ?? ''); setReason(''); setOpen(true); }}>
             {current ? 'Change this part’s value' : 'Set this part’s value'}
           </button>
           {current && (

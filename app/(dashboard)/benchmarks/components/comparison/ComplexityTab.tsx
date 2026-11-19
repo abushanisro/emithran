@@ -166,7 +166,7 @@ export function ComplexityTab({ bomMetrics }: Props) {
                 <Tooltip />
                 <Bar dataKey="assemblyParts" stackId="a" fill="#3b82f6" name="Assembly Parts" />
                 <Bar dataKey="subAssemblyParts" stackId="a" fill="#f26822" name="Sub-Assembly Parts" />
-                <Bar dataKey="childParts" stackId="a" fill="#06b6d4" name="Child Parts" />
+                <Bar dataKey="childParts" stackId="a" fill="#14b8a6" name="Child Parts" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -274,11 +274,11 @@ export function ComplexityTab({ bomMetrics }: Props) {
                     </div>
                     <div>
                       <div className="text-muted-foreground">Complex Geometry</div>
-                      <div className="text-lg font-semibold text-brand-600">{data.complexGeometry}</div>
+                      <div className="text-lg font-semibold text-primary">{data.complexGeometry}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Custom Parts</div>
-                      <div className="text-lg font-semibold text-blue-600">{data.customParts}</div>
+                      <div className="text-lg font-semibold text-primary">{data.customParts}</div>
                     </div>
                   </div>
                   <div className="mt-3">

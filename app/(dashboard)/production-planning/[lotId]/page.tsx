@@ -239,12 +239,12 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
 
   const getStatusColor = (status: string) => {
     const colors = {
-      PLANNED: 'bg-blue-100 text-blue-600',
+      PLANNED: 'bg-primary/10 text-primary',
       IN_PROGRESS: 'bg-yellow-100 text-yellow-600',
       COMPLETED: 'bg-green-100 text-green-600',
       ON_HOLD: 'bg-red-100 text-red-600'
     };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-600';
+    return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
   const getPriorityColor = (priority: string) => {
@@ -253,7 +253,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
       MEDIUM: 'bg-yellow-100 text-yellow-600',
       LOW: 'bg-green-100 text-green-600'
     };
-    return colors[priority as keyof typeof colors] || 'bg-gray-100 text-gray-600';
+    return colors[priority as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
   if (loading) {
@@ -379,7 +379,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
               <p className="text-xs text-muted-foreground">
                 Estimated: {lot.totalEstimatedHours || 0}h | Actual: {lot.totalActualHours || 0}h
               </p>
-              <p className="text-xs text-blue-600">
+              <p className="text-xs text-primary">
                 View detailed breakdown in Tracking tab
               </p>
             </div>

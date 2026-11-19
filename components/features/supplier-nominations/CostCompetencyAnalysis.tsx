@@ -876,10 +876,10 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
   const getRankingColor = (rank: number) => {
     switch (rank) {
       case 1: return 'bg-green-500/20 text-green-400 border-green-500';
-      case 2: return 'bg-blue-500/20 text-blue-400 border-blue-500';
+      case 2: return 'bg-primary/20 text-primary border-primary/40';
       case 3: return 'bg-yellow-500/20 text-yellow-400 border-yellow-500';
       case 4: return 'bg-red-500/20 text-red-400 border-red-500';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500';
+      default: return 'bg-muted-foreground/20 text-muted-foreground border-border';
     }
   };
 
@@ -895,11 +895,11 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
   if (!vendors || vendors.length === 0) {
     return (
       <div className="space-y-6">
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
-            <Calculator className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-300 mb-2">No Vendors Selected</h3>
-            <p className="text-gray-400 mb-4">Add vendors to the nomination to start cost competency analysis</p>
+            <Calculator className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground/80 mb-2">No Vendors Selected</h3>
+            <p className="text-muted-foreground mb-4">Add vendors to the nomination to start cost competency analysis</p>
           </CardContent>
         </Card>
       </div>
@@ -910,11 +910,11 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
   if (!projectId) {
     return (
       <div className="space-y-6">
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-300 mb-2">No Project Context</h3>
-            <p className="text-gray-400 mb-4">Project information is required to load BOMs for cost analysis</p>
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground/80 mb-2">No Project Context</h3>
+            <p className="text-muted-foreground mb-4">Project information is required to load BOMs for cost analysis</p>
           </CardContent>
         </Card>
       </div>
@@ -925,9 +925,9 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
     <div className="space-y-6">
       {/* Part-wise Cost Vendor Rating Dashboard */}
       {availableBomParts.length > 1 && (
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
               Part-wise Vendor Performance Overview
             </CardTitle>
@@ -944,17 +944,17 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                 };
 
                 return (
-                  <div key={part.bomItemId} className="bg-gray-900 rounded-lg p-4 border border-gray-600">
+                  <div key={part.bomItemId} className="bg-card rounded-lg p-4 border border-border">
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <h4 className="text-white font-medium text-sm">{part.bomItemName}</h4>
+                        <h4 className="text-foreground font-medium text-sm">{part.bomItemName}</h4>
                         {part.partNumber && (
-                          <p className="text-gray-400 text-xs">Part: {part.partNumber}</p>
+                          <p className="text-muted-foreground text-xs">Part: {part.partNumber}</p>
                         )}
                       </div>
                       <Badge
                         variant={selectedBomItemId === part.bomItemId ? "default" : "outline"}
-                        className={selectedBomItemId === part.bomItemId ? "bg-blue-600" : "border-gray-600"}
+                        className={selectedBomItemId === part.bomItemId ? "bg-brand-600" : "border-border"}
                       >
                         {selectedBomItemId === part.bomItemId ? "Active" : "View"}
                       </Badge>
@@ -963,7 +963,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                     <div className="space-y-2">
                       {/* Top Vendor */}
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-400 text-xs">Top Vendor:</span>
+                        <span className="text-muted-foreground text-xs">Top Vendor:</span>
                         {partSummary.topVendor ? (
                           <div className="flex items-center gap-1">
                             <Award className="h-3 w-3 text-green-400" />
@@ -972,14 +972,14 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                             </span>
                           </div>
                         ) : (
-                          <span className="text-gray-500 text-xs">No data</span>
+                          <span className="text-muted-foreground text-xs">No data</span>
                         )}
                       </div>
 
                       {/* Overall Score */}
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-400 text-xs">Best Score:</span>
-                        <span className="text-white text-xs font-medium">
+                        <span className="text-muted-foreground text-xs">Best Score:</span>
+                        <span className="text-foreground text-xs font-medium">
                           {partSummary.bestScore > 0 ? partSummary.bestScore.toFixed(2) : "No data"}
                         </span>
                       </div>
@@ -987,7 +987,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                       {/* Net Price (if available) */}
                       {partSummary.lowestCost > 0 && (
                         <div className="flex items-center justify-between">
-                          <span className="text-gray-400 text-xs">Best Price:</span>
+                          <span className="text-muted-foreground text-xs">Best Price:</span>
                           <span className="text-green-400 text-xs font-medium">
                             {partSummary.lowestCost.toFixed(2)}
                           </span>
@@ -996,15 +996,15 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
 
                       {/* Vendor Count */}
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-400 text-xs">Vendors:</span>
-                        <span className="text-blue-400 text-xs font-medium">{partSummary.vendorCount}</span>
+                        <span className="text-muted-foreground text-xs">Vendors:</span>
+                        <span className="text-primary text-xs font-medium">{partSummary.vendorCount}</span>
                       </div>
 
                       {/* Action Button */}
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full mt-2 border-gray-600 text-gray-300 hover:bg-gray-700"
+                        className="w-full mt-2 border-border text-foreground/80 hover:bg-accent"
                         onClick={() => setSelectedBomItemId(part.bomItemId)}
                       >
                         {selectedBomItemId === part.bomItemId ? "Currently Selected" : "Analyze Part"}
@@ -1020,10 +1020,10 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
 
       {/* BOM Part Selection for Nomination */}
       {availableBomParts.length > 0 ? (
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-4">
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-foreground flex items-center gap-2">
                 <Package className="h-5 w-5" />
                 Select BOM Part for Cost Analysis
               </CardTitle>
@@ -1032,23 +1032,23 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
           <CardContent>
             <div className="flex items-center gap-4">
               <div className="flex-1 max-w-md">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-foreground/80 mb-2">
                   BOM Parts (from this nomination)
                 </label>
                 <Select value={selectedBomItemId} onValueChange={setSelectedBomItemId}>
-                  <SelectTrigger className="w-full bg-gray-700 border-gray-600 text-white">
+                  <SelectTrigger className="w-full bg-muted border-border text-foreground">
                     <SelectValue placeholder="Select a BOM part to analyze..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-700 border-gray-600">
+                  <SelectContent className="bg-muted border-border">
                     {availableBomParts.map((part) => (
                       <SelectItem
                         key={part.bomItemId}
                         value={part.bomItemId}
-                        className="text-white hover:bg-gray-600 focus:bg-gray-600"
+                        className="text-foreground hover:bg-accent focus:bg-accent"
                       >
                         <div className="flex flex-col">
                           <span className="font-medium">{part.bomItemName}</span>
-                          <div className="text-xs text-gray-400 space-x-2">
+                          <div className="text-xs text-muted-foreground space-x-2">
                             {part.partNumber && <span>Part: {part.partNumber}</span>}
                             {part.material && <span>Material: {part.material}</span>}
                             <span>Qty: {part.quantity}</span>
@@ -1060,7 +1060,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                 </Select>
               </div>
               {selectedBomItemId && (
-                <div className="flex items-center gap-2 text-sm text-gray-300">
+                <div className="flex items-center gap-2 text-sm text-foreground/80">
                   <span>Selected:</span>
                   <Badge variant="outline" className="border-green-500 text-green-400">
                     {availableBomParts.find(part => part.bomItemId === selectedBomItemId)?.bomItemName}
@@ -1071,11 +1071,11 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
           </CardContent>
         </Card>
       ) : (
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-300 mb-2">No BOMs Available</h3>
-            <p className="text-gray-400 mb-4">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground/80 mb-2">No BOMs Available</h3>
+            <p className="text-muted-foreground mb-4">
               No BOMs found for this project. Create a BOM first to perform part-wise cost analysis.
             </p>
           </CardContent>
@@ -1085,10 +1085,10 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
       {/* Cost Competency Analysis Table */}
       {(availableBomParts.length === 0 || selectedBomItemId) ? (
         // Show cost analysis table if no BOMs available (fallback) or when a BOM part is selected
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-foreground flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
                 {selectedBomItemId ? (
                   <>
@@ -1133,7 +1133,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                       disabled={isSavingCost}
                       variant="outline"
                       size="sm"
-                      className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                      className="border-border text-foreground/80 hover:bg-accent"
                     >
                       Cancel
                     </Button>
@@ -1143,7 +1143,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                     onClick={() => setIsEditingCost(true)}
                     variant="outline"
                     size="sm"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                    className="border-border text-foreground/80 hover:bg-accent"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Cost Data
@@ -1155,11 +1155,11 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
           <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-gray-700">
-                  <TableHead className="text-gray-300 font-medium w-[200px]">Cost Component</TableHead>
-                  <TableHead className="text-center text-gray-300 font-medium w-[120px]">Base/Reference</TableHead>
+                <TableRow className="border-border">
+                  <TableHead className="text-foreground/80 font-medium w-[200px]">Cost Component</TableHead>
+                  <TableHead className="text-center text-foreground/80 font-medium w-[120px]">Base/Reference</TableHead>
                   {vendors.length > 0 ? vendors.map((vendor, index) => {
-                    const colors = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-brand-400'];
+                    const colors = ['text-primary', 'text-green-400', 'text-yellow-400', 'text-primary'];
                     return (
                       <TableHead key={vendor.id} className={`text-center ${colors[index % colors.length]} font-medium w-[100px]`}>
                         {vendor.name}
@@ -1167,36 +1167,36 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                     );
                   }) : (
                     <>
-                      <TableHead className="text-center text-blue-400 font-medium w-[100px]">Supplier-1</TableHead>
+                      <TableHead className="text-center text-primary font-medium w-[100px]">Supplier-1</TableHead>
                       <TableHead className="text-center text-green-400 font-medium w-[100px]">Supplier-2</TableHead>
                       <TableHead className="text-center text-yellow-400 font-medium w-[100px]">Supplier-3</TableHead>
-                      <TableHead className="text-center text-brand-400 font-medium w-[100px]">Supplier-4</TableHead>
+                      <TableHead className="text-center text-primary font-medium w-[100px]">Supplier-4</TableHead>
                     </>
                   )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {costData.map((row) => (
-                  <TableRow key={row.id} className="border-gray-700">
-                    <TableCell className="text-white font-medium text-left pl-4">{row.costComponent}</TableCell>
+                  <TableRow key={row.id} className="border-border">
+                    <TableCell className="text-foreground font-medium text-left pl-4">{row.costComponent}</TableCell>
 
                     {/* Base/Reference Value - Edit Mode Pattern */}
-                    <TableCell className="text-center text-gray-300">
+                    <TableCell className="text-center text-foreground/80">
                       {row.costComponent === "Payment Terms" ? (
                         isEditingCost ? (
                           <Select
                             value={getCurrentBasePaymentTerm()}
                             onValueChange={updateBasePaymentTermLocal}
                           >
-                            <SelectTrigger className="w-32 h-8 bg-gray-700 border-gray-600 text-white text-xs">
+                            <SelectTrigger className="w-32 h-8 bg-muted border-border text-foreground text-xs">
                               <SelectValue placeholder="Base terms" />
                             </SelectTrigger>
-                            <SelectContent className="bg-gray-700 border-gray-600">
+                            <SelectContent className="bg-muted border-border">
                               {paymentTermOptions.map((option) => (
                                 <SelectItem
                                   key={option}
                                   value={option}
-                                  className="text-white hover:bg-gray-600 focus:bg-gray-600"
+                                  className="text-foreground hover:bg-accent focus:bg-accent"
                                 >
                                   {option}
                                 </SelectItem>
@@ -1204,12 +1204,12 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                             </SelectContent>
                           </Select>
                         ) : (
-                          <span className="text-white font-medium text-sm px-2 py-1">
+                          <span className="text-foreground font-medium text-sm px-2 py-1">
                             {getCurrentBasePaymentTerm() || "-"}
                           </span>
                         )
                       ) : row.isRanking ? (
-                        <div className="text-xs text-gray-400 px-2 py-1">
+                        <div className="text-xs text-muted-foreground px-2 py-1">
                           Auto-calc
                         </div>
                       ) : isEditingCost ? (
@@ -1219,11 +1219,11 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                           min={0}
                           value={getCurrentBaseValue(row.id) ?? ''}
                           onChange={(e) => updateBaseValueLocal(row.id, parseCostInput(e.target.value))}
-                          className="w-24 h-8 bg-gray-700 border-gray-600 text-white text-sm text-center"
+                          className="w-24 h-8 bg-muted border-border text-foreground text-sm text-center"
                           placeholder="0.00"
                         />
                       ) : (
-                        <span className="text-white font-medium text-sm">
+                        <span className="text-foreground font-medium text-sm">
                           {formatCostValue(getCurrentBaseValue(row.id))}
                         </span>
                       )}
@@ -1240,15 +1240,15 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                                 value={getCurrentPaymentTerm(row.id, index)}
                                 onValueChange={(value) => updatePaymentTermLocal(row.id, index, value)}
                               >
-                                <SelectTrigger className="w-32 h-8 bg-gray-700 border-gray-600 text-white text-xs">
+                                <SelectTrigger className="w-32 h-8 bg-muted border-border text-foreground text-xs">
                                   <SelectValue placeholder="Select terms" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-gray-700 border-gray-600">
+                                <SelectContent className="bg-muted border-border">
                                   {paymentTermOptions.map((option) => (
                                     <SelectItem
                                       key={option}
                                       value={option}
-                                      className="text-white hover:bg-gray-600 focus:bg-gray-600"
+                                      className="text-foreground hover:bg-accent focus:bg-accent"
                                     >
                                       {option}
                                     </SelectItem>
@@ -1256,7 +1256,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <span className="text-white font-medium text-sm px-2 py-1">
+                              <span className="text-foreground font-medium text-sm px-2 py-1">
                                 {getCurrentPaymentTerm(row.id, index) || "-"}
                               </span>
                             )}
@@ -1266,7 +1266,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                     ) : (
                       // Regular Numeric Values - Edit Mode Pattern  
                       row.supplierValues.map((_, index) => {
-                        const colors = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-brand-400'];
+                        const colors = ['text-primary', 'text-green-400', 'text-yellow-400', 'text-primary'];
                         const colorClass = colors[index % colors.length];
                         const currentValue = getCurrentSupplierValue(row.id, index);
 
@@ -1284,7 +1284,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                                 min={0}
                                 value={currentValue ?? ''}
                                 onChange={(e) => updateSupplierValueLocal(row.id, index, parseCostInput(e.target.value))}
-                                className={`w-20 h-8 bg-gray-700 border-gray-600 text-white text-sm text-center ${colorClass} font-medium`}
+                                className={`w-20 h-8 bg-muted border-border text-foreground text-sm text-center ${colorClass} font-medium`}
                                 placeholder="0.00"
                               />
                             ) : (
@@ -1304,11 +1304,11 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
         </Card>
       ) : (
         // Show message when BOM parts are available but none is selected
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-300 mb-2">Select a BOM Part</h3>
-            <p className="text-gray-400 mb-4">Choose a BOM part from the dropdown above to start part-wise cost analysis</p>
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground/80 mb-2">Select a BOM Part</h3>
+            <p className="text-muted-foreground mb-4">Choose a BOM part from the dropdown above to start part-wise cost analysis</p>
           </CardContent>
         </Card>
       )}

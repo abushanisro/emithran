@@ -89,7 +89,7 @@ function getDefaultBomLevel(itemType: string): string {
 function getItemTypeBadge(type: string): React.ReactElement {
   const typeConfig: Record<string, { label: string; className: string }> = {
     assembly:     { label: 'Assembly',     className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
-    sub_assembly: { label: 'Sub-Assembly', className: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
+    sub_assembly: { label: 'Sub-Assembly', className: 'bg-primary/10 text-primary border-primary/20' },
     child_part:   { label: 'Child Part',   className: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
   };
 
@@ -108,7 +108,7 @@ function getBorderColor(type: string, depth: number = 0): string {
     case 'assembly':    return depth === 0 ? 'border-l-emerald-500' : `border-l-emerald-${intensity}`;
     case 'sub_assembly': return depth <= 1 ? 'border-l-blue-500'   : `border-l-blue-${intensity}`;
     case 'child_part':  return depth <= 2 ? 'border-l-amber-500'   : `border-l-amber-${intensity}`;
-    default:            return 'border-l-gray-500';
+    default: return 'border-l-border';
   }
 }
 
@@ -463,7 +463,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
             'rounded-md border bg-card text-card-foreground shadow-xs border-l-4 transition-all duration-200 relative',
             getBorderColor(item.itemType, depth),
             isBeingDragged  ? 'opacity-50'                                                              : '',
-            isDraggedOver   ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-950/20'       : '',
+            isDraggedOver ? 'ring-2 ring-primary/40 ring-offset-2 bg-primary/10 dark:bg-primary/20' : '',
             isDragging && !isBeingDragged ? 'hover:ring-2 hover:ring-green-400'                         : '',
             isUpdating      ? 'cursor-wait opacity-75'                                                   : 'cursor-move',
           ].join(' ')}
@@ -493,7 +493,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <div className="flex items-center gap-1">
                     <GripVertical className={`h-4 w-4 transition-colors cursor-grab active:cursor-grabbing ${
-                      isBeingDragged ? 'text-blue-500' : isDraggedOver ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'
+                      isBeingDragged ? 'text-primary' : isDraggedOver ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'
                     }`} />
                     {hasChildren && (
                       <Button
@@ -514,7 +514,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                   {getItemTypeBadge(item.itemType)}
 
                   {isDragging && !isBeingDragged && draggedItem && (
-                    <Badge variant="outline" className="text-xs bg-brand-50 dark:bg-brand-950/20 border-brand-300">
+                    <Badge variant="outline" className="text-xs bg-primary/10 dark:bg-primary/20 border-primary/40">
                       Drop to Swap Positions ↔
                     </Badge>
                   )}
@@ -591,7 +591,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                   onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
                   title="Manufacturing Intelligence"
                 >
-                  <Cpu className="h-4 w-4 text-brand-500" />
+                  <Cpu className="h-4 w-4 text-primary" />
                 </Button>
                 {childType && (
                   <Button variant="default" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAddChild(item)} title="Add Component">

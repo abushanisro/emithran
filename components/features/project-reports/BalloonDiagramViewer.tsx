@@ -65,7 +65,7 @@ function BalloonAnnotation({
         <div 
           className={`
             flex items-center justify-center w-8 h-8 rounded-full border-2 
-            ${hover ? 'bg-blue-600 border-blue-400' : 'bg-blue-500 border-blue-300'}
+            ${hover ? 'bg-brand-600 border-brand-400' : 'bg-brand-500 border-brand-300'}
             text-white font-bold text-sm shadow-lg cursor-pointer
             transition-all duration-200 hover:scale-110
           `}

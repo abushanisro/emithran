@@ -73,9 +73,9 @@ export function VendorSelectionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl bg-gray-800 border-gray-700">
+      <DialogContent className="max-w-2xl bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+          <DialogTitle className="text-foreground flex items-center gap-2">
             <Building2 className="h-5 w-5" />
             Select Vendors for Evaluation
           </DialogTitle>
@@ -84,32 +84,32 @@ export function VendorSelectionModal({
         <div className="space-y-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search vendors by name, email, or location..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-gray-700 border-gray-600 text-white"
+              className="pl-10 bg-muted border-border text-foreground"
             />
           </div>
 
           {/* Selected vendors count */}
           {selectedIds.length > 0 && (
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-blue-600 text-white">
+              <Badge variant="secondary" className="bg-brand-600 text-white">
                 {selectedIds.length} vendor{selectedIds.length !== 1 ? 's' : ''} selected
               </Badge>
             </div>
           )}
 
           {/* Vendors list */}
-          <div className="max-h-96 overflow-y-auto border border-gray-600 rounded-lg">
+          <div className="max-h-96 overflow-y-auto border border-border rounded-lg">
             {isLoading ? (
-              <div className="p-8 text-center text-gray-400">
+              <div className="p-8 text-center text-muted-foreground">
                 Loading vendors...
               </div>
             ) : filteredVendors.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
+              <div className="p-8 text-center text-muted-foreground">
                 {searchTerm ? 'No vendors found matching your search.' : 'No available vendors to select.'}
               </div>
             ) : (
@@ -119,26 +119,26 @@ export function VendorSelectionModal({
                   return (
                     <div
                       key={vendor.id}
-                      className="flex items-center space-x-3 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors"
+                      className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent transition-colors"
                     >
                       <Checkbox
                         id={vendor.id}
                         checked={selectedIds.includes(vendor.id)}
                         onCheckedChange={() => handleVendorToggle(vendor.id)}
-                        className="border-gray-400"
+                        className="border-border"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h4 className="text-white font-medium truncate">
+                          <h4 className="text-foreground font-medium truncate">
                             {vendor.name}
                           </h4>
                           {vendor.vendorType && (
-                            <Badge variant="outline" className="text-xs border-gray-500 text-gray-300">
+                            <Badge variant="outline" className="text-xs border-border text-foreground/80">
                               {vendor.vendorType}
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
+                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                           {vendor.companyEmail && <span>{vendor.companyEmail}</span>}
                           {vendorLocation && <span>{vendorLocation}</span>}
                         </div>
@@ -155,7 +155,7 @@ export function VendorSelectionModal({
             <Button
               variant="outline"
               onClick={handleClose}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              className="border-border text-foreground/80 hover:bg-accent"
               disabled={isSubmitting}
             >
               Cancel
@@ -163,7 +163,7 @@ export function VendorSelectionModal({
             <Button
               onClick={handleSubmit}
               disabled={selectedIds.length === 0 || isSubmitting}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-brand-600 hover:bg-brand-700"
             >
               <Plus className="h-4 w-4 mr-2" />
               {isSubmitting 

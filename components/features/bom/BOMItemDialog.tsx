@@ -335,20 +335,20 @@ const AutoBadgeFor = React.memo(function AutoBadgeFor({
   if (!lineage) return null;
   if (lineage.source === 'derived') {
     return (
-      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-brand-400 border-brand-400/40 ml-1">
+      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-primary border-primary/40 ml-1">
         DERIVED
       </Badge>
     );
   }
   if (lineage.source === 'drawing') {
     return (
-      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-blue-500 border-blue-400/40 ml-1">
+      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-primary border-primary/40 ml-1">
         DRAWING
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-cyan-500 border-cyan-400/40 ml-1">
+    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-primary border-primary/40 ml-1">
       CAD
     </Badge>
   );
@@ -1767,7 +1767,7 @@ export function BOMItemDialog({
                             : 'hover:bg-muted',
                         )}
                       >
-                        {pf.status === 'analyzing' && <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />}
+                        {pf.status === 'analyzing' && <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />}
                         {pf.status === 'ready'     && <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />}
                         {pf.status === 'error'     && <XCircle className="h-3 w-3 text-red-500 shrink-0" />}
                         {pf.status === 'pending'   && <div className="h-3 w-3 rounded-full bg-muted-foreground/30 shrink-0" />}
@@ -2038,7 +2038,7 @@ export function BOMItemDialog({
                 {formData.file2d ? formData.file2d.name : 'Choose file…'}
               </label>
               {isAnalyzing2d ? (
-                <div className="flex items-center gap-2 text-xs text-blue-600">
+                <div className="flex items-center gap-2 text-xs text-primary">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   <span>Analysing drawing…</span>
                 </div>
@@ -2211,7 +2211,7 @@ export function BOMItemDialog({
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-medium">Physical Properties (Optional)</h4>
                   {(formData.volume > 0 || formData.weight > 0 || formData.surfaceArea > 0 || formData.maxLength > 0) && (
-                    <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">Auto-extracted</span>
+                    <span className="text-xs text-primary bg-primary/10 dark:bg-primary/20 px-2 py-1 rounded">Auto-extracted</span>
                   )}
                 </div>
               </div>

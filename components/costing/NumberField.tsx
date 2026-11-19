@@ -6,7 +6,7 @@ import type { FieldCommit } from '@/lib/costing/sand-scenario';
 
 const rowClass = 'flex items-center gap-2 py-0.5';
 const labelClass = 'text-xs text-muted-foreground w-24 shrink-0';
-const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 
 /**
  * A Cost Guide number that commits on blur: an unusable number keeps the field and changes nothing. Empty is the engine's own value, shown as

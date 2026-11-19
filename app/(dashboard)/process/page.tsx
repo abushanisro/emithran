@@ -1132,9 +1132,9 @@ export default function ProcessPage() {
 
         {/* STATUS INFO */}
         {processesLoading && (
-          <Card className="border-blue-200 bg-blue-50">
+          <Card className="border-primary/40 bg-primary/10">
             <CardContent className="p-4">
-              <p className="text-blue-800">Loading manufacturing processes...</p>
+              <p className="text-primary">Loading manufacturing processes...</p>
             </CardContent>
           </Card>
         )}

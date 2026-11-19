@@ -340,7 +340,7 @@ export default function Projects() {
       case 'draft':
         return <Clock className="h-4 w-4 text-orange-600" />;
       case 'completed':
-        return <CheckCircle2 className="h-4 w-4 text-blue-600" />;
+        return <CheckCircle2 className="h-4 w-4 text-primary" />;
       case 'on_hold':
         return <Pause className="h-4 w-4 text-yellow-600" />;
       case 'cancelled':
@@ -409,8 +409,8 @@ export default function Projects() {
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-blue-600" />
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-medium">Completed</p>

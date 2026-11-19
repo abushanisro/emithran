@@ -286,17 +286,17 @@ export function SupplierEvaluationDashboard({
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary/40"></div>
             </div>
         );
     }
 
     if (!evaluation) {
         return (
-            <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
+            <div className="text-center py-12 bg-card rounded-xl border border-border">
                 <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white">Evaluation Data Not Found</h3>
-                <p className="text-gray-400">Could not find evaluation records for this supplier.</p>
+                <h3 className="text-lg font-medium text-foreground">Evaluation Data Not Found</h3>
+                <p className="text-muted-foreground">Could not find evaluation records for this supplier.</p>
             </div>
         );
     }
@@ -309,9 +309,9 @@ export function SupplierEvaluationDashboard({
                 {/* Header with Edit Weights Button */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-semibold text-white">Scoring Breakdown</h2>
+                        <h2 className="text-xl font-semibold text-foreground">Scoring Breakdown</h2>
                         {isEditingWeights && (
-                            <p className="text-sm text-gray-400 mt-1">
+                            <p className="text-sm text-muted-foreground mt-1">
                                 Total: <span className={`font-medium ${weights.costWeight + weights.vendorWeight + weights.capabilityWeight === 100
                                     ? 'text-green-400'
                                     : 'text-yellow-400'
@@ -329,7 +329,7 @@ export function SupplierEvaluationDashboard({
                             size="sm"
                             variant="outline"
                             onClick={() => setIsEditingWeights(true)}
-                            className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                            className="border-border text-foreground/80 hover:bg-accent"
                         >
                             <Edit2 className="h-4 w-4 mr-2" />
                             Edit Weights
@@ -340,14 +340,14 @@ export function SupplierEvaluationDashboard({
                                 size="sm"
                                 variant="outline"
                                 onClick={resetWeights}
-                                className="border-gray-600 text-gray-300"
+                                className="border-border text-foreground/80"
                             >
                                 Reset
                             </Button>
                             <Button
                                 size="sm"
                                 onClick={() => setIsEditingWeights(false)}
-                                className="bg-blue-600 hover:bg-blue-700"
+                                className="bg-brand-600 hover:bg-brand-700"
                             >
                                 Done
                             </Button>
@@ -356,22 +356,22 @@ export function SupplierEvaluationDashboard({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <Card className="bg-gray-800 border-gray-700">
+                    <Card className="bg-card border-border">
                         <CardContent className="p-6">
-                            <p className="text-sm text-gray-400 font-medium">Overall Score</p>
+                            <p className="text-sm text-muted-foreground font-medium">Overall Score</p>
                             <div className="flex items-baseline gap-2 mt-2">
-                                <h3 className="text-3xl font-bold text-white">{calculateOverallScore(evaluation, evaluationData, weights.costWeight, weights.vendorWeight, weights.capabilityWeight, costScore, ratingEngineScore, capabilityScore).toFixed(1)}%</h3>
-                                <Badge variant="outline" className="text-[10px] border-blue-500/50 text-blue-400 font-bold">
+                                <h3 className="text-3xl font-bold text-foreground">{calculateOverallScore(evaluation, evaluationData, weights.costWeight, weights.vendorWeight, weights.capabilityWeight, costScore, ratingEngineScore, capabilityScore).toFixed(1)}%</h3>
+                                <Badge variant="outline" className="text-[10px] border-primary/50 text-primary font-bold">
                                     RANK #{evaluationData?.final_rank || evaluation.overallRank || 1}
                                 </Badge>
                             </div>
-                            <Progress value={calculateOverallScore(evaluation, evaluationData, weights.costWeight, weights.vendorWeight, weights.capabilityWeight, costScore, ratingEngineScore, capabilityScore)} className="h-1.5 mt-4 bg-gray-700" />
+                            <Progress value={calculateOverallScore(evaluation, evaluationData, weights.costWeight, weights.vendorWeight, weights.capabilityWeight, costScore, ratingEngineScore, capabilityScore)} className="h-1.5 mt-4 bg-muted" />
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-gray-800 border-gray-700">
+                    <Card className="bg-card border-border">
                         <CardContent className="p-6">
-                            <p className="text-sm text-gray-400 font-medium mb-2">
+                            <p className="text-sm text-muted-foreground font-medium mb-2">
                                 Cost Competency
                                 {isEditingWeights ? (
                                     <span className="inline-flex items-center ml-1">
@@ -379,7 +379,7 @@ export function SupplierEvaluationDashboard({
                                             type="number"
                                             value={weights.costWeight}
                                             onChange={(e) => handleWeightChange('costWeight', parseInt(e.target.value) || 0)}
-                                            className="w-12 h-6 text-xs bg-gray-700 border-gray-600 text-center p-1 mx-1"
+                                            className="w-12 h-6 text-xs bg-muted border-border text-center p-1 mx-1"
                                             min="0"
                                             max="100"
                                         />%)
@@ -389,7 +389,7 @@ export function SupplierEvaluationDashboard({
                                 )}
                             </p>
                             <div className="flex items-baseline gap-2 mt-2">
-                                <h3 className="text-3xl font-bold text-white">{getCostScore(evaluation, evaluationData, costScore).toFixed(1)}%</h3>
+                                <h3 className="text-3xl font-bold text-foreground">{getCostScore(evaluation, evaluationData, costScore).toFixed(1)}%</h3>
                             </div>
                             <div className="flex items-center gap-1 mt-4 text-xs text-green-400">
                                 <TrendingUp className="h-3 w-3" />
@@ -398,9 +398,9 @@ export function SupplierEvaluationDashboard({
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-gray-800 border-gray-700">
+                    <Card className="bg-card border-border">
                         <CardContent className="p-6">
-                            <p className="text-sm text-gray-400 font-medium mb-2">
+                            <p className="text-sm text-muted-foreground font-medium mb-2">
                                 Vendor Rating
                                 {isEditingWeights ? (
                                     <span className="inline-flex items-center ml-1">
@@ -408,7 +408,7 @@ export function SupplierEvaluationDashboard({
                                             type="number"
                                             value={weights.vendorWeight}
                                             onChange={(e) => handleWeightChange('vendorWeight', parseInt(e.target.value) || 0)}
-                                            className="w-12 h-6 text-xs bg-gray-700 border-gray-600 text-center p-1 mx-1"
+                                            className="w-12 h-6 text-xs bg-muted border-border text-center p-1 mx-1"
                                             min="0"
                                             max="100"
                                         />%)
@@ -418,7 +418,7 @@ export function SupplierEvaluationDashboard({
                                 )}
                             </p>
                             <div className="flex items-baseline gap-2 mt-2">
-                                <h3 className="text-3xl font-bold text-white">{getVendorRatingScore(evaluation, evaluationData, ratingEngineScore).toFixed(1)}%</h3>
+                                <h3 className="text-3xl font-bold text-foreground">{getVendorRatingScore(evaluation, evaluationData, ratingEngineScore).toFixed(1)}%</h3>
                                 <Badge
                                     variant="outline"
                                     className={`text-[10px] border-${getRiskLevelColor(evaluationData?.overview?.risk_level || evaluation.riskLevel)}-500 text-${getRiskLevelColor(evaluationData?.overview?.risk_level || evaluation.riskLevel)}-400 font-bold`}
@@ -426,17 +426,17 @@ export function SupplierEvaluationDashboard({
                                     {(evaluationData?.overview?.risk_level || evaluation.riskLevel).toUpperCase()}
                                 </Badge>
                             </div>
-                            <div className="flex items-center gap-2 mt-4 text-xs text-gray-400">
+                            <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
                                 <span>{evaluationData?.rating_engine?.major_nc_count || evaluation.majorNcCount} Major</span>
-                                <span className="text-gray-600">/</span>
+                                <span className="text-muted-foreground">/</span>
                                 <span>{evaluationData?.rating_engine?.minor_nc_count || evaluation.minorNcCount} Minor NCs</span>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-gray-800 border-gray-700">
+                    <Card className="bg-card border-border">
                         <CardContent className="p-6">
-                            <p className="text-sm text-gray-400 font-medium mb-2">
+                            <p className="text-sm text-muted-foreground font-medium mb-2">
                                 Capability Score
                                 {isEditingWeights ? (
                                     <span className="inline-flex items-center ml-1">
@@ -444,7 +444,7 @@ export function SupplierEvaluationDashboard({
                                             type="number"
                                             value={weights.capabilityWeight}
                                             onChange={(e) => handleWeightChange('capabilityWeight', parseInt(e.target.value) || 0)}
-                                            className="w-12 h-6 text-xs bg-gray-700 border-gray-600 text-center p-1 mx-1"
+                                            className="w-12 h-6 text-xs bg-muted border-border text-center p-1 mx-1"
                                             min="0"
                                             max="100"
                                         />%)
@@ -454,13 +454,13 @@ export function SupplierEvaluationDashboard({
                                 )}
                             </p>
                             <div className="flex items-baseline gap-2 mt-2">
-                                <h3 className="text-3xl font-bold text-white">{getCapabilityScore(evaluation, evaluationData, capabilityScore).toFixed(0)}/100</h3>
+                                <h3 className="text-3xl font-bold text-foreground">{getCapabilityScore(evaluation, evaluationData, capabilityScore).toFixed(0)}/100</h3>
                             </div>
                             <div className="mt-4 flex gap-1">
                                 {[1, 2, 3, 4, 5].map(i => (
                                     <div
                                         key={i}
-                                        className={`h-1.5 flex-1 rounded-full ${i <= (getCapabilityScore(evaluation, evaluationData, capabilityScore) / 20) ? 'bg-brand-500' : 'bg-gray-700'}`}
+                                        className={`h-1.5 flex-1 rounded-full ${i <= (getCapabilityScore(evaluation, evaluationData, capabilityScore) / 20) ? 'bg-brand-500' : 'bg-muted'}`}
                                     />
                                 ))}
                             </div>
@@ -471,16 +471,16 @@ export function SupplierEvaluationDashboard({
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Recommendation Panel */}
-                <Card className="bg-gray-800 border-gray-700 lg:col-span-1">
+                <Card className="bg-card border-border lg:col-span-1">
                     <CardHeader>
-                        <CardTitle className="text-lg text-white flex items-center gap-2">
-                            <BarChart3 className="h-5 w-5 text-blue-400" />
+                        <CardTitle className="text-lg text-foreground flex items-center gap-2">
+                            <BarChart3 className="h-5 w-5 text-primary" />
                             Final Verdict
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700 text-center">
-                            <p className="text-xs text-gray-500 uppercase font-black tracking-widest mb-3">Recommendation</p>
+                        <div className="p-4 bg-card/50 rounded-xl border border-border text-center">
+                            <p className="text-xs text-muted-foreground uppercase font-black tracking-widest mb-3">Recommendation</p>
                             <Badge
                                 className={`px-6 py-2 text-sm font-bold bg-${getRecommendationColor(evaluationData?.overview?.recommendation || evaluation.recommendation || Recommendation.PENDING)}-500/10 text-${getRecommendationColor(evaluationData?.overview?.recommendation || evaluation.recommendation || Recommendation.PENDING)}-400 border-${getRecommendationColor(evaluationData?.overview?.recommendation || evaluation.recommendation || Recommendation.PENDING)}-500/50`}
                                 variant="outline"
@@ -490,14 +490,14 @@ export function SupplierEvaluationDashboard({
                         </div>
 
                         <div className="space-y-4">
-                            <h4 className="text-sm font-medium text-gray-300">Category Scores</h4>
+                            <h4 className="text-sm font-medium text-foreground/80">Category Scores</h4>
                             {evaluation.scores.slice(0, 5).map((score) => (
                                 <div key={score.id} className="space-y-1.5">
                                     <div className="flex justify-between text-xs">
-                                        <span className="text-gray-400">Criteria ID: {score.criteriaId.slice(0, 8)}</span>
-                                        <span className="text-white font-bold">{score.score} / {score.maxPossibleScore}</span>
+                                        <span className="text-muted-foreground">Criteria ID: {score.criteriaId.slice(0, 8)}</span>
+                                        <span className="text-foreground font-bold">{score.score} / {score.maxPossibleScore}</span>
                                     </div>
-                                    <Progress value={(score.score / score.maxPossibleScore) * 100} className="h-1 bg-gray-700" />
+                                    <Progress value={(score.score / score.maxPossibleScore) * 100} className="h-1 bg-muted" />
                                 </div>
                             ))}
                         </div>
@@ -505,10 +505,10 @@ export function SupplierEvaluationDashboard({
                 </Card>
 
                 {/* Detailed Insights */}
-                <Card className="bg-gray-800 border-gray-700 lg:col-span-2">
+                <Card className="bg-card border-border lg:col-span-2">
                     <CardHeader>
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg text-white">Evaluation Insights</CardTitle>
+                            <CardTitle className="text-lg text-foreground">Evaluation Insights</CardTitle>
                             <div className="flex gap-2">
                                 {isEditing ? (
                                     <>
@@ -516,7 +516,7 @@ export function SupplierEvaluationDashboard({
                                             size="sm"
                                             variant="outline"
                                             onClick={handleCancel}
-                                            className="border-gray-600 text-gray-300"
+                                            className="border-border text-foreground/80"
                                         >
                                             <X className="h-4 w-4 mr-1" />
                                             Cancel
@@ -536,7 +536,7 @@ export function SupplierEvaluationDashboard({
                                         size="sm"
                                         variant="outline"
                                         onClick={() => setIsEditing(true)}
-                                        className="border-gray-600 text-gray-300"
+                                        className="border-border text-foreground/80"
                                     >
                                         <Edit2 className="h-4 w-4 mr-1" />
                                         Edit
@@ -548,49 +548,49 @@ export function SupplierEvaluationDashboard({
                     <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <h5 className="text-xs font-black text-gray-500 uppercase tracking-widest">General Notes</h5>
+                                <h5 className="text-xs font-black text-muted-foreground uppercase tracking-widest">General Notes</h5>
                                 {isEditing ? (
                                     <Textarea
                                         value={editableData.evaluationNotes}
                                         onChange={(e) => setEditableData({ ...editableData, evaluationNotes: e.target.value })}
                                         placeholder="Enter evaluation notes..."
-                                        className="text-sm text-gray-300 bg-gray-900/30 border border-gray-700/50 min-h-[100px] resize-none"
+                                        className="text-sm text-foreground/80 bg-card/30 border border-border/50 min-h-[100px] resize-none"
                                     />
                                 ) : (
-                                    <p className="text-sm text-gray-300 bg-gray-900/30 p-4 rounded-lg border border-gray-700/50 min-h-[100px]">
+                                    <p className="text-sm text-foreground/80 bg-card/30 p-4 rounded-lg border border-border/50 min-h-[100px]">
                                         {evaluationData?.overview?.evaluation_notes || 'No evaluation notes available.'}
                                     </p>
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <h5 className="text-xs font-black text-gray-500 uppercase tracking-widest">Technical Summary</h5>
+                                <h5 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Technical Summary</h5>
                                 {isEditing ? (
                                     <Textarea
                                         value={editableData.technicalDiscussion}
                                         onChange={(e) => setEditableData({ ...editableData, technicalDiscussion: e.target.value })}
                                         placeholder="Enter technical discussion..."
-                                        className="text-sm text-gray-300 bg-gray-900/30 border border-gray-700/50 min-h-[100px] resize-none"
+                                        className="text-sm text-foreground/80 bg-card/30 border border-border/50 min-h-[100px] resize-none"
                                     />
                                 ) : (
-                                    <p className="text-sm text-gray-300 bg-gray-900/30 p-4 rounded-lg border border-gray-700/50 min-h-[100px]">
+                                    <p className="text-sm text-foreground/80 bg-card/30 p-4 rounded-lg border border-border/50 min-h-[100px]">
                                         {evaluationData?.technical?.discussion || 'No technical discussion available.'}
                                     </p>
                                 )}
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-gray-700 flex flex-wrap gap-4">
-                            <div className="flex items-center gap-2 bg-gray-900/50 px-4 py-2 rounded-full border border-gray-700">
+                        <div className="pt-4 border-t border-border flex flex-wrap gap-4">
+                            <div className="flex items-center gap-2 bg-card/50 px-4 py-2 rounded-full border border-border">
                                 <DollarSign className="h-4 w-4 text-green-400" />
-                                <span className="text-xs text-gray-300 font-medium">Cost Ratio: <span className="text-white italic">{calculateCostRatio(evaluation, evaluationData).toFixed(2)}</span></span>
+                                <span className="text-xs text-foreground/80 font-medium">Cost Ratio: <span className="text-foreground italic">{calculateCostRatio(evaluation, evaluationData).toFixed(2)}</span></span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-900/50 px-4 py-2 rounded-full border border-gray-700">
-                                <Activity className="h-4 w-4 text-blue-400" />
-                                <span className="text-xs text-gray-300 font-medium">Response Rate: <span className="text-white italic">{calculateResponseRate(evaluation, evaluationData)}</span></span>
+                            <div className="flex items-center gap-2 bg-card/50 px-4 py-2 rounded-full border border-border">
+                                <Activity className="h-4 w-4 text-primary" />
+                                <span className="text-xs text-foreground/80 font-medium">Response Rate: <span className="text-foreground italic">{calculateResponseRate(evaluation, evaluationData)}</span></span>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-900/50 px-4 py-2 rounded-full border border-gray-700">
+                            <div className="flex items-center gap-2 bg-card/50 px-4 py-2 rounded-full border border-border">
                                 <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                                <span className="text-xs text-gray-300 font-medium">Compliance: <span className="text-white italic">{calculateCompliance(evaluation, evaluationData).toFixed(0)}%</span></span>
+                                <span className="text-xs text-foreground/80 font-medium">Compliance: <span className="text-foreground italic">{calculateCompliance(evaluation, evaluationData).toFixed(0)}%</span></span>
                             </div>
                         </div>
                     </CardContent>

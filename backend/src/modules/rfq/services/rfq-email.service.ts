@@ -147,7 +147,7 @@ export class RfqEmailService {
       // Send email
       const mailOptions: SendMailOptions = {
         from: {
-          name: process.env.COMPANY_NAME || 'Mithran Engineering',
+          name: process.env.COMPANY_NAME || 'EMITHRAN',
           address: process.env.SMTP_USER || 'noreply@mithran.com'
         },
         to: vendorEmail,
@@ -280,7 +280,7 @@ export class RfqEmailService {
       vendorName: vendor.name,
       vendorLocation: vendor.location,
       buyerName: rfq.buyerName || 'Procurement Team',
-      companyName: process.env.COMPANY_NAME || 'Mithran Engineering',
+      companyName: process.env.COMPANY_NAME || 'EMITHRAN',
       quoteDeadline: rfq.quoteDeadline ? new Date(rfq.quoteDeadline).toLocaleDateString() : 'Please contact us',
       selectionType: rfq.selectionType,
       bomItems: bomItems.map(item => ({

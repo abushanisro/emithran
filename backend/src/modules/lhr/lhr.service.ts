@@ -563,7 +563,7 @@ export class LHRService {
           perks_percentage:      defaults.perks,
           lhr,
           location:              'India - Manufacturing Standard',
-          reference:             `eMithran ${gradeVal} — auto-calculated at ${WORKING_HOURS_PER_YEAR} hrs/yr`,
+          reference:             `EMITHRAN ${gradeVal} — auto-calculated at ${WORKING_HOURS_PER_YEAR} hrs/yr`,
         });
       });
     } else {

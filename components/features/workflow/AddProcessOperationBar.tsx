@@ -20,7 +20,7 @@ export function AddProcessOperationBar({
   const [operation, setOperation] = useState('');
   const operations = options.find((o) => o.process === process)?.operations ?? [];
   const picked = operations.find((o) => o.operation === operation);
-  const select = 'h-8 min-w-0 flex-1 rounded border border-border bg-background px-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-500 disabled:opacity-50';
+  const select = 'h-8 min-w-0 flex-1 rounded border border-border bg-background px-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-primary/40 disabled:opacity-50';
 
   return (
     <div className="mb-3 flex items-end gap-2 rounded-md border border-border/60 bg-muted/20 p-2">

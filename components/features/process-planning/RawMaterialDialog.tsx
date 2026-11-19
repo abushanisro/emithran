@@ -1211,17 +1211,17 @@ export function RawMaterialDialog({
               <>
                 {/* Info Banner - Show when no data available */}
                 {materialGroups.length === 0 && (
-                  <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+                  <Card className="border-primary/40 bg-primary/10 dark:bg-primary/15 dark:border-primary/40">
                     <CardContent className="pt-4 pb-4">
                       <div className="flex gap-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary dark:text-primary shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                         <div className="flex-1">
-                          <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                          <h4 className="text-sm font-semibold text-primary dark:text-primary mb-1">
                             No Raw Materials Available
                           </h4>
-                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                          <p className="text-xs text-primary dark:text-primary">
                             There are no raw materials in your database yet. Please add raw materials by uploading an Excel file or creating them manually in the Raw Materials management page.
                           </p>
                         </div>
@@ -1487,9 +1487,9 @@ export function RawMaterialDialog({
 
             {/* ── CAD Geometry Banner ────────────────────────────────────────── */}
             {cadVolumeMm3 != null && cadVolumeMm3 > 0 && (
-              <div className="rounded-lg border border-cyan-200 bg-cyan-50 dark:border-cyan-800 dark:bg-cyan-950/30 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wider text-cyan-700 dark:text-cyan-400 font-semibold mb-1.5">From CAD Analysis</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-cyan-800 dark:text-cyan-300">
+              <div className="rounded-lg border border-primary/40 bg-primary/10 dark:border-primary/40 dark:bg-primary/30 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wider text-primary dark:text-primary font-semibold mb-1.5">From CAD Analysis</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-primary dark:text-primary">
                   <span>Volume: <strong>{cadVolumeMm3.toLocaleString(undefined, { maximumFractionDigits: 2 })} mm³</strong></span>
                   {bomItemData?.weight && <span>Weight: <strong>{Number(bomItemData.weight).toFixed(4)} kg</strong></span>}
                   {bomItemData?.materialGrade && <span>Grade: <strong>{bomItemData.materialGrade}</strong></span>}
@@ -1497,7 +1497,7 @@ export function RawMaterialDialog({
                 </div>
                 {smartFillAvailable && (
                   <Button type="button" size="sm" variant="outline"
-                    className="mt-2 h-7 text-xs border-cyan-400 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900"
+                    className="mt-2 h-7 text-xs border-primary/40 text-primary dark:text-primary hover:bg-primary/10 dark:hover:bg-primary/15"
                     onClick={handleSmartFill}>
                     Smart Fill — net usage from geometry
                   </Button>
@@ -1507,7 +1507,7 @@ export function RawMaterialDialog({
 
             {/* Usage and Cost Fields */}
             {!selectedMaterialId && !editData && (
-              <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-700 dark:text-blue-300">
+              <div className="bg-primary/10 dark:bg-primary/50 border border-primary/40 dark:border-primary/40 rounded-lg p-3 text-xs text-primary dark:text-primary">
                 Select a material above to enable usage and cost fields
               </div>
             )}
@@ -1519,7 +1519,7 @@ export function RawMaterialDialog({
                   Net Usage
                   <span className="text-muted-foreground text-xs font-normal">(kg · finished part)</span>
                   {cadFilled && (
-                    <span className="text-[10px] bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded font-semibold">CAD</span>
+                    <span className="text-[10px] bg-primary/10 dark:bg-primary/15 text-primary dark:text-primary px-1.5 py-0.5 rounded font-semibold">CAD</span>
                   )}
                 </label>
                 <div className="flex gap-2">
@@ -1561,7 +1561,7 @@ export function RawMaterialDialog({
                   </Button>
                 </div>
                 {cadFilled && cadVolumeMm3 && matDensityKgM3 ? (
-                  <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                  <p className="text-[11px] text-primary dark:text-primary font-mono">
                     {cadVolumeMm3.toLocaleString(undefined, { maximumFractionDigits: 2 })} mm³ × {matDensityKgM3.toLocaleString()} kg/m³ ÷ 1,000,000,000
                   </p>
                 ) : (
@@ -1629,7 +1629,7 @@ export function RawMaterialDialog({
                   <div className="space-y-0.5">
                     {nestingIsTrustworthy && (
                       <>
-                        <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                        <p className="text-[11px] text-primary dark:text-primary font-mono">
                           {nestingBlankSpec.sheetWidthMm}×{nestingBlankSpec.sheetLengthMm}mm sheet · {nestingBlankSpec.partsPerSheet} parts/sheet · {nestingBlankSpec.utilizationPct}% util · verified CAD flat pattern
                         </p>
                         {typeof nestingBlankSpec.sheetsRequired === 'number' && (
@@ -1641,7 +1641,7 @@ export function RawMaterialDialog({
                     )}
                     {stockDriven && nestingBlankSpec && (
                       <>
-                        <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                        <p className="text-[11px] text-primary dark:text-primary font-mono">
                           {nestingBlankSpec.sizeLabel} ({nestingBlankSpec.form.replace(/_/g, ' ')})
                           {typeof nestingBlankSpec.stockVolumeMm3 === 'number' && typeof nestingBlankSpec.densityKgM3 === 'number'
                             ? ` · ${nestingBlankSpec.stockVolumeMm3.toLocaleString()} mm³ × ${nestingBlankSpec.densityKgM3.toLocaleString()} kg/m³`
@@ -2137,7 +2137,7 @@ export function RawMaterialDialog({
                                     const displayName = propertyDisplayNames[sourceProperty] || sourceProperty;
                                     
                                     return sourceProperty ? (
-                                      <span className="text-[10px] text-muted-foreground bg-gray-50 px-1.5 py-0.5 rounded border">
+                                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded border">
                                         {displayName}
                                       </span>
                                     ) : null;

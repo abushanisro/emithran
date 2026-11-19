@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         try {
             fileRes = await fetchTrustedFile(fileUrl, {
                 maxRedirects: 0, // A trusted host must not redirect us anywhere.
-                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Mithran-FileProxy/1.0)' },
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EMITHRAN-FileProxy/1.0)' },
             });
         } catch (e) {
             // The destination was checked above, so a refusal here is a redirect.

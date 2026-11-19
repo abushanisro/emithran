@@ -82,7 +82,7 @@ export function MithranAICreditsBar() {
         {/* Brand */}
         <div className="flex items-center gap-2.5 shrink-0">
           <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-primary">
-            Mithran AI
+            EMITHRAN AI
           </span>
           <span className="text-[10px] text-muted-foreground/40">·</span>
           <span className="text-[10px] text-muted-foreground">{orgName}</span>
@@ -95,7 +95,7 @@ export function MithranAICreditsBar() {
               className="h-full rounded-full transition-all duration-700"
               style={{
                 width: `${pct}%`,
-                background: pct > 85 ? 'hsl(0 72% 51%)' : pct > 65 ? 'hsl(38 92% 50%)' : 'linear-gradient(90deg, hsl(187 100% 42%), hsl(220 90% 65%))',
+                background: pct > 85 ? 'hsl(0 72% 51%)' : pct > 65 ? 'hsl(38 92% 50%)' : 'linear-gradient(90deg, hsl(var(--primary)), hsl(173 66% 50%))',
               }}
             />
           </div>
@@ -149,7 +149,7 @@ export function MithranAICreditsBar() {
                         className="h-full rounded-full"
                         style={{
                           width: `${Math.round((credits / usedCredits) * 100)}%`,
-                          background: 'hsl(187 100% 42% / 0.6)',
+                          background: 'hsl(var(--primary) / 0.6)',
                         }}
                       />
                     </div>

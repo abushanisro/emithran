@@ -96,7 +96,7 @@ export class ExcelReportService {
     }
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'Mithran';
+    wb.creator = 'EMITHRAN';
     wb.created = new Date();
 
     this.buildReportSheet(wb, item, cost);

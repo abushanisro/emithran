@@ -277,7 +277,7 @@ export function ChildPartDialog({
             {/* Purchased Part Fields */}
             {makeBuy === 'buy' && (
               <>
-                <div className="border-l-4 border-l-blue-500 pl-4 bg-blue-50 dark:bg-blue-950/20 py-3 rounded">
+                <div className="border-l-4 border-l-blue-500 pl-4 bg-primary/10 dark:bg-primary/20 py-3 rounded">
                   <h4 className="font-semibold text-sm mb-3">Purchased Part Costs</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">

@@ -75,10 +75,10 @@ export const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
   const getStatusColor = (status: WorkflowModule['status']) => {
     switch (status) {
       case 'completed': return 'text-green-600 bg-green-100 border-green-200';
-      case 'current': return 'text-blue-600 bg-blue-100 border-blue-200';
+      case 'current': return 'text-primary bg-primary/10 border-primary/40';
       case 'pending': return 'text-orange-600 bg-orange-100 border-orange-200';
-      case 'locked': return 'text-gray-400 bg-gray-100 border-gray-200';
-      default: return 'text-gray-600 bg-gray-100 border-gray-200';
+      case 'locked': return 'text-muted-foreground bg-muted border-border';
+      default: return 'text-muted-foreground bg-muted border-border';
     }
   };
 

@@ -118,9 +118,9 @@ function UploadCard({ entry, onRetry, onRemove, onDone }: { entry: Entry; onRetr
   const failure = entry.error ?? (upload?.status === 'failed' ? describeFailure(upload) : null);
 
   return (
-    <div className={cn('rounded-lg border', status === 'done' && 'border-green-500/20 bg-green-500/5', status === 'failed' && 'border-red-500/20 bg-red-500/5', (status === 'queued' || status === 'running') && 'border-blue-500/20 bg-blue-500/5')}>
+    <div className={cn('rounded-lg border', status === 'done' && 'border-green-500/20 bg-green-500/5', status === 'failed' && 'border-red-500/20 bg-red-500/5', (status === 'queued' || status === 'running') && 'border-primary/20 bg-primary/5')}>
       <div className="flex items-center gap-3 px-4 py-3">
-        {status === 'done' ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : status === 'failed' ? <XCircle className="h-4 w-4 text-red-500" /> : <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+        {status === 'done' ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : status === 'failed' ? <XCircle className="h-4 w-4 text-red-500" /> : <Loader2 className="h-4 w-4 animate-spin text-primary" />}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{entry.file.name}</p>
           <p className="text-xs text-muted-foreground">

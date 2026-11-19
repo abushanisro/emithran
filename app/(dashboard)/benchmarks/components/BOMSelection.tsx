@@ -64,8 +64,8 @@ export function BOMSelection({
       <div className="w-full max-w-4xl mx-auto">
         {/* Hero */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-blue-100 mb-4">
-            <Package className="h-6 w-6 text-blue-600" />
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-primary/10 mb-4">
+            <Package className="h-6 w-6 text-primary" />
           </div>
           <h2 className="text-xl font-bold mb-2">Select BOMs to Compare</h2>
           <p className="text-muted-foreground text-sm">

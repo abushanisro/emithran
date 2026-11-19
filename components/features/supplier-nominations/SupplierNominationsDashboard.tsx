@@ -205,7 +205,7 @@ export function SupplierNominationsDashboard({
           </div>
 
           <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Users className="h-6 w-6" />
             </div>
             <div>
@@ -395,7 +395,7 @@ function OEMNominationCard({ nomination, onClick, onEdit, onDelete }: OEMNominat
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
                 isCompleted
-                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                  ? 'bg-primary/10 text-primary dark:text-primary border-primary/30'
                   : isInProgress
                   ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                   : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
@@ -403,7 +403,7 @@ function OEMNominationCard({ nomination, onClick, onEdit, onDelete }: OEMNominat
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  isCompleted ? 'bg-blue-500' : isInProgress ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  isCompleted ? 'bg-brand-500' : isInProgress ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                 }`}
               />
               {statusText}

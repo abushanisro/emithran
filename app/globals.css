@@ -56,21 +56,23 @@
 }
 
 @theme {
-  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-display: var(--font-sora), 'Sora', system-ui, sans-serif;
   --font-mono: var(--font-mono), monospace;
 
-  /* Brand orange (#F26822 = brand-500), the accent formerly drawn in purple. */
-  --color-brand-50: #fef4ee;
-  --color-brand-100: #fde5d6;
-  --color-brand-200: #fbc8ad;
-  --color-brand-300: #f8a279;
-  --color-brand-400: #f57a44;
-  --color-brand-500: #f26822;
-  --color-brand-600: #e04f12;
-  --color-brand-700: #b93b10;
-  --color-brand-800: #933115;
-  --color-brand-900: #772b14;
-  --color-brand-950: #401308;
+  /* Brand teal: the brand's #2dd4bf / #14b8a6 / #0d9488 are brand-400 / 500 / 600 (design-tokens.json). */
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+  --color-brand-950: #042f2e;
+  --color-navy: #0f1b2d;
 
   /* text-* line heights stay the v3 absolute values. v4 uses a unitless ratio
      (text-xs: 1/0.75), which children inherit and rescale to their own size,
@@ -341,199 +343,205 @@
 }
 
 @layer base {
+  /*
+   * EMITHRAN brand (ubaabu/.agent/skills/brand-identity/resources/design-tokens.json):
+   *   teal  #2dd4bf (bright) · #0d9e8a (deep) · #0d9488 (darker) · #14b8a6 (hover)
+   *   navy  #0f1b2d (ink, dark cards) · #0a2a26 (teal-navy)
+   *   light #ffffff · #f0fdf9 (teal tint) · borders black/8 · destructive #ef4444 · success #10b981
+   * Three themes: light (the brand's own, default), dark (the marketing site's #080808/#111), brand (navy).
+   */
   :root {
-    /* mithran Dark Theme — pure black base */
-    --background: 0 0% 0%;
+    --background: 0 0% 3%;
     --foreground: 0 0% 98%;
 
-    --card: 0 0% 4%;
+    --card: 0 0% 7%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 6%;
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 187 100% 42%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 173 66% 50%;
+    --primary-foreground: 216 50% 12%;
 
     --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary-foreground: 0 0% 92%;
 
     --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 55%;
+    --muted-foreground: 0 0% 62%;
 
-    --accent: 187 100% 42%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 173 40% 14%;
+    --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 187 100% 42%;
+    --input: 0 0% 16%;
+    --ring: 173 66% 50%;
 
     --radius: 0.75rem;
 
     /* Custom tokens */
-    --success: 160 70% 40%;
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --info: 200 90% 50%;
+    --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
-    /* Chart colors */
-    --chart-1: 187 100% 42%;
-    --chart-2: 160 70% 45%;
+    /* Chart colors: brand teal first */
+    --chart-1: 173 66% 50%;
+    --chart-2: 175 84% 32%;
     --chart-3: 38 92% 50%;
-    --chart-4: 280 70% 50%;
-    --chart-5: 0 72% 51%;
+    --chart-4: 216 50% 45%;
+    --chart-5: 0 84% 60%;
 
-    /* Sidebar — pure black */
-    --sidebar-background: 0 0% 2%;
+    --sidebar-background: 0 0% 4%;
     --sidebar-foreground: 0 0% 88%;
-    --sidebar-primary: 187 100% 42%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 8%;
+    --sidebar-primary: 173 66% 50%;
+    --sidebar-primary-foreground: 216 50% 12%;
+    --sidebar-accent: 173 40% 12%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 12%;
-    --sidebar-ring: 187 100% 42%;
+    --sidebar-ring: 173 66% 50%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(187 100% 42%), hsl(187 100% 55%));
-    --gradient-accent: linear-gradient(135deg, hsl(160 70% 40%), hsl(160 70% 50%));
-    --gradient-dark: linear-gradient(180deg, hsl(0 0% 0%), hsl(0 0% 2%));
+    /* The brand's teal button gradient */
+    --gradient-primary: linear-gradient(135deg, oklch(0.68 0.13 180), oklch(0.55 0.16 185));
+    --gradient-accent: linear-gradient(135deg, hsl(160 84% 39%), hsl(160 70% 50%));
+    --gradient-dark: linear-gradient(135deg, #0f1b2d 0%, #0a2a26 55%, #0f1b2d 100%);
 
-    /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.5);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.6), 0 2px 4px -2px hsl(0 0% 0% / 0.5);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.6), 0 4px 6px -4px hsl(0 0% 0% / 0.5);
     --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.5), 0 1px 2px -1px hsl(0 0% 0% / 0.4);
-    --shadow-glow: 0 0 20px hsl(187 100% 42% / 0.15);
+    --shadow-glow: 0 4px 24px rgba(45, 212, 191, 0.3);
   }
 
-  /* Explicit dark class — pure black and white */
+  /* Dark: the marketing site's dark sections */
   .dark {
-    --background: 0 0% 0%;
+    --background: 0 0% 3%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 4%;
+    --card: 0 0% 7%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 6%;
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 187 100% 42%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 173 66% 50%;
+    --primary-foreground: 216 50% 12%;
     --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary-foreground: 0 0% 92%;
     --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 187 100% 42%;
-    --accent-foreground: 0 0% 0%;
-    --destructive: 0 72% 51%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 173 40% 14%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 187 100% 42%;
-    --sidebar-background: 0 0% 2%;
+    --input: 0 0% 16%;
+    --ring: 173 66% 50%;
+    --sidebar-background: 0 0% 4%;
     --sidebar-foreground: 0 0% 88%;
-    --sidebar-primary: 187 100% 42%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 8%;
+    --sidebar-primary: 173 66% 50%;
+    --sidebar-primary-foreground: 216 50% 12%;
+    --sidebar-accent: 173 40% 12%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 12%;
-    --sidebar-ring: 187 100% 42%;
+    --sidebar-ring: 173 66% 50%;
   }
 
-  /* Original mithran brand palette — dark blue-gray with cyan accent */
+  /* Navy: the brand's navy and teal-navy dark cards */
   .brand {
-    --background: 220 20% 7%;
-    --foreground: 210 20% 95%;
+    --background: 218 52% 7%;
+    --foreground: 210 40% 96%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 20% 95%;
+    --card: 216 50% 12%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 216 50% 12%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 187 100% 42%;
-    --primary-foreground: 220 20% 7%;
+    --primary: 173 66% 50%;
+    --primary-foreground: 216 50% 12%;
 
-    --secondary: 220 15% 15%;
-    --secondary-foreground: 210 20% 90%;
+    --secondary: 216 40% 17%;
+    --secondary-foreground: 210 40% 92%;
 
-    --muted: 220 15% 15%;
-    --muted-foreground: 215 15% 55%;
+    --muted: 216 40% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 187 100% 42%;
-    --accent-foreground: 220 20% 7%;
+    --accent: 173 62% 14%;
+    --accent-foreground: 210 40% 96%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 187 100% 42%;
+    --border: 216 35% 21%;
+    --input: 216 35% 23%;
+    --ring: 173 66% 50%;
 
-    --sidebar-background: 220 20% 5%;
-    --sidebar-foreground: 210 20% 85%;
-    --sidebar-primary: 187 100% 42%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 18% 12%;
-    --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 220 15% 15%;
-    --sidebar-ring: 187 100% 42%;
+    --sidebar-background: 173 62% 6%;
+    --sidebar-foreground: 210 30% 86%;
+    --sidebar-primary: 173 66% 50%;
+    --sidebar-primary-foreground: 216 50% 12%;
+    --sidebar-accent: 173 62% 12%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 173 40% 13%;
+    --sidebar-ring: 173 66% 50%;
 
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
     --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
-    --shadow-glow: 0 0 20px hsl(187 100% 42% / 0.15);
+    --shadow-glow: 0 4px 24px rgba(45, 212, 191, 0.3);
   }
 
+  /* Light: the brand's own palette (the default) */
   .light {
-    /* Main surfaces */
-    --background: 0 0% 100%;
-    --foreground: 220 20% 6%;
+    --background: 210 40% 98%;
+    --foreground: 216 50% 12%;
 
-    --card: 0 0% 98%;
-    --card-foreground: 220 20% 6%;
+    --card: 0 0% 100%;
+    --card-foreground: 216 50% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 6%;
+    --popover-foreground: 216 50% 12%;
 
-    --primary: 187 100% 32%;
+    /* #0d9488, the brand's darker teal: white labels on it stay readable */
+    --primary: 175 84% 32%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 15% 90%;
-    --secondary-foreground: 220 20% 12%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 216 50% 12%;
 
-    --muted: 210 15% 91%;
-    --muted-foreground: 215 20% 28%;   /* dark enough to read at 9-10px */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 19% 35%;   /* slate-600: readable at 9-10px */
 
-    --accent: 187 100% 32%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 162 76% 95%;             /* #f0fdf9 teal tint for hover and selection */
+    --accent-foreground: 216 50% 12%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 20% 70%;             /* clearly visible on white */
-    --input: 214 20% 72%;
-    --ring: 187 100% 32%;
+    --border: 214 27% 84%;             /* visible on white in dense tables */
+    --input: 214 27% 82%;
+    --ring: 173 66% 50%;
 
-    /* Sidebar — fully light in light mode */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 220 20% 10%;
-    --sidebar-primary: 187 100% 32%;
+    --chart-1: 175 84% 32%;
+    --chart-2: 173 66% 50%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 216 50% 12%;
+    --sidebar-primary: 175 84% 32%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 15% 88%;
-    --sidebar-accent-foreground: 220 20% 6%;
-    --sidebar-border: 214 20% 72%;
-    --sidebar-ring: 187 100% 32%;
+    --sidebar-accent: 162 76% 95%;
+    --sidebar-accent-foreground: 216 50% 12%;
+    --sidebar-border: 214 27% 88%;
+    --sidebar-ring: 173 66% 50%;
 
-    /* Shadows — lighter for light mode */
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.06);
-    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.08), 0 2px 4px -2px hsl(0 0% 0% / 0.06);
-    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.08), 0 4px 6px -4px hsl(0 0% 0% / 0.06);
-    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.06), 0 1px 2px -1px hsl(0 0% 0% / 0.04);
-    --shadow-glow: 0 0 20px hsl(187 100% 32% / 0.10);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 2px 16px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 12px 48px rgba(13, 158, 138, 0.1), 0 2px 16px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.07);
+    --shadow-glow: 0 4px 24px rgba(45, 212, 191, 0.3);
   }
 }
 
@@ -574,7 +582,7 @@
   h4,
   h5,
   h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-display font-semibold tracking-tight;
   }
 }
 

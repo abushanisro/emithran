@@ -24,7 +24,7 @@ import { ViewerCanvas } from './viewer/ViewerCanvas';
 import { ComponentsPanel, LayersPanel, SelectedPanel } from './viewer/ViewerPanels';
 
 const tabList = 'h-8 w-full justify-start rounded-none border-b bg-transparent p-0';
-const tabTrigger = 'h-8 rounded-none border-b-2 border-transparent px-3 text-xs data-[state=active]:border-brand-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
+const tabTrigger = 'h-8 rounded-none border-b-2 border-transparent px-3 text-xs data-[state=active]:border-primary/40 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
 const scroll = 'h-full overflow-auto';
 
 // Below this width the panes stack instead of splitting, so the workspace stays usable on a tablet or phone.

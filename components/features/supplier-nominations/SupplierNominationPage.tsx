@@ -232,8 +232,8 @@ function CircularProgress({
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {children ?? (
           <>
-            <span className="text-2xl font-bold text-white">{value.toFixed(1)}%</span>
-            <span className="text-xs text-gray-400">Score</span>
+            <span className="text-2xl font-bold text-foreground">{value.toFixed(1)}%</span>
+            <span className="text-xs text-muted-foreground">Score</span>
           </>
         )}
       </div>
@@ -344,15 +344,15 @@ function SupplierCard({
       case Recommendation.REJECTED:
         return <XCircle className="h-4 w-4 text-red-400" />;
       default:
-        return <Clock className="h-4 w-4 text-gray-400" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getRankColor = (r: number) => {
     if (r === 1) return 'text-green-400 bg-green-400/20';
-    if (r === 2) return 'text-blue-400 bg-blue-400/20';
+    if (r === 2) return 'text-primary bg-primary/20';
     if (r === 3) return 'text-orange-400 bg-orange-400/20';
-    return 'text-gray-400 bg-gray-400/20';
+    return 'text-muted-foreground bg-muted-foreground/20';
   };
 
   const overallScore = calculateOverallScore(
@@ -405,7 +405,7 @@ function SupplierCard({
   );
 
   return (
-    <Card className="bg-gray-800 border-gray-700 transition-all duration-200 hover:border-gray-600">
+    <Card className="bg-card border-border transition-all duration-200 hover:border-border">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -415,7 +415,7 @@ function SupplierCard({
               {rank}
             </div>
             <div>
-              <CardTitle className="text-lg text-white">
+              <CardTitle className="text-lg text-foreground">
                 {vendor?.name || evaluation.vendorName || 'Unknown Vendor'}
               </CardTitle>
               <div className="flex items-center gap-2 mt-1">
@@ -433,8 +433,8 @@ function SupplierCard({
           </div>
 
           <CircularProgress value={overallScore} size={80} strokeWidth={6}>
-            <span className="text-lg font-bold text-white">{overallScore.toFixed(0)}</span>
-            <span className="text-xs text-gray-400">Score</span>
+            <span className="text-lg font-bold text-foreground">{overallScore.toFixed(0)}</span>
+            <span className="text-xs text-muted-foreground">Score</span>
           </CircularProgress>
         </div>
       </CardHeader>
@@ -443,23 +443,23 @@ function SupplierCard({
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="text-lg font-semibold text-white">{costScore.toFixed(0)}%</div>
-            <div className="text-xs text-gray-400">Cost Competency</div>
+            <div className="text-lg font-semibold text-foreground">{costScore.toFixed(0)}%</div>
+            <div className="text-xs text-muted-foreground">Cost Competency</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-white">{vendorScore.toFixed(0)}%</div>
-            <div className="text-xs text-gray-400">Vendor Rating</div>
+            <div className="text-lg font-semibold text-foreground">{vendorScore.toFixed(0)}%</div>
+            <div className="text-xs text-muted-foreground">Vendor Rating</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-white">{capScore.toFixed(0)}%</div>
-            <div className="text-xs text-gray-400">Capability Score</div>
+            <div className="text-lg font-semibold text-foreground">{capScore.toFixed(0)}%</div>
+            <div className="text-xs text-muted-foreground">Capability Score</div>
           </div>
         </div>
 
         {/* Risk Assessment */}
-        <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
           <div>
-            <div className="text-sm font-medium text-white">Risk Level</div>
+            <div className="text-sm font-medium text-foreground">Risk Level</div>
             <div className="flex items-center gap-2 mt-1">
               <Badge
                 variant="outline"
@@ -467,7 +467,7 @@ function SupplierCard({
               >
                 {evaluation.riskLevel.toUpperCase()}
               </Badge>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 NC: {evaluation.minorNcCount}M / {evaluation.majorNcCount}Mj
               </span>
             </div>
@@ -477,7 +477,7 @@ function SupplierCard({
               variant="outline"
               size="sm"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="border-gray-600 text-gray-300"
+              className="border-border text-foreground/80"
             >
               {isExpanded ? 'Less' : 'Details'}
             </Button>
@@ -486,7 +486,7 @@ function SupplierCard({
                 variant="default"
                 size="sm"
                 onClick={() => onSelectEvaluation(evaluation.id)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-brand-600 hover:bg-brand-700 text-white"
               >
                 Evaluate
               </Button>
@@ -495,8 +495,8 @@ function SupplierCard({
         </div>
 
         {/* Quick Approval Actions */}
-        <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
-          <div className="text-sm font-medium text-white">Quick Actions:</div>
+        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+          <div className="text-sm font-medium text-foreground">Quick Actions:</div>
           <div className="flex gap-2">
             {evaluation.recommendation === Recommendation.APPROVED
               ? renderActionButton(
@@ -533,43 +533,43 @@ function SupplierCard({
 
         {/* Expanded Details */}
         {isExpanded && (
-          <div className="space-y-4 border-t border-gray-700 pt-4">
-            <h4 className="text-sm font-medium text-white mb-3">Score Calculation Breakdown</h4>
+          <div className="space-y-4 border-t border-border pt-4">
+            <h4 className="text-sm font-medium text-foreground mb-3">Score Calculation Breakdown</h4>
 
 
             {/* Vendor Rating */}
-            <div className="p-4 bg-gray-700/30 rounded-lg">
+            <div className="p-4 bg-muted/30 rounded-lg">
               <div className="flex items-center justify-between mb-3">
-                <h5 className="text-sm font-medium text-white">
+                <h5 className="text-sm font-medium text-foreground">
                   Vendor Rating Analysis (20% Weight)
                 </h5>
-                <span className="text-lg font-bold text-white">{vendorScore.toFixed(1)}%</span>
+                <span className="text-lg font-bold text-foreground">{vendorScore.toFixed(1)}%</span>
               </div>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Section-wise Capability:</span>
-                  <span className="text-white">
+                  <span className="text-foreground/80">Section-wise Capability:</span>
+                  <span className="text-foreground">
                     {vendorRatingScores?.sectionWiseCapability ?? 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Risk Mitigation:</span>
-                  <span className="text-white">{vendorRatingScores?.riskMitigation ?? 0}</span>
+                  <span className="text-foreground/80">Risk Mitigation:</span>
+                  <span className="text-foreground">{vendorRatingScores?.riskMitigation ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Total Records:</span>
-                  <span className="text-white">{vendorRatingScores?.totalRecords ?? 0}</span>
+                  <span className="text-foreground/80">Total Records:</span>
+                  <span className="text-foreground">{vendorRatingScores?.totalRecords ?? 0}</span>
                 </div>
               </div>
             </div>
 
             {/* Capability Assessment */}
-            <div className="p-4 bg-gray-700/30 rounded-lg">
+            <div className="p-4 bg-muted/30 rounded-lg">
               <div className="flex items-center justify-between mb-3">
-                <h5 className="text-sm font-medium text-white">
+                <h5 className="text-sm font-medium text-foreground">
                   Capability Assessment (10% Weight)
                 </h5>
-                <span className="text-lg font-bold text-white">{capScore.toFixed(1)}%</span>
+                <span className="text-lg font-bold text-foreground">{capScore.toFixed(1)}%</span>
               </div>
               <div className="space-y-2 text-xs">
                 {capabilityData.length > 0 ? (
@@ -580,55 +580,55 @@ function SupplierCard({
                     return (
                       <div key={item.criteriaId} className="space-y-1">
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-300">{item.criteriaName}:</span>
-                          <span className="text-white">
+                          <span className="text-foreground/80">{item.criteriaName}:</span>
+                          <span className="text-foreground">
                             {vs} / {ms} ({pct.toFixed(0)}%)
                           </span>
                         </div>
-                        <Progress value={pct} className="h-1 bg-gray-600" />
+                        <Progress value={pct} className="h-1 bg-muted-foreground/50" />
                       </div>
                     );
                   })
                 ) : (
-                  <p className="text-gray-400 text-center py-2">No capability criteria available</p>
+                  <p className="text-muted-foreground text-center py-2">No capability criteria available</p>
                 )}
               </div>
             </div>
 
             {/* Final Score Calculation */}
-            <div className="p-4 bg-gray-600/50 rounded-lg border border-gray-500">
-              <h5 className="text-sm font-medium text-white mb-3">Final Score Calculation</h5>
+            <div className="p-4 bg-muted-foreground/50 rounded-lg border border-border">
+              <h5 className="text-sm font-medium text-foreground mb-3">Final Score Calculation</h5>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Cost Score × 70%:</span>
-                  <span className="text-white">
+                  <span className="text-foreground/80">Cost Score × 70%:</span>
+                  <span className="text-foreground">
                     {costScore.toFixed(1)}% × 0.7 = {(costScore * 0.7).toFixed(1)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Vendor Rating × 20%:</span>
-                  <span className="text-white">
+                  <span className="text-foreground/80">Vendor Rating × 20%:</span>
+                  <span className="text-foreground">
                     {vendorScore.toFixed(1)}% × 0.2 = {(vendorScore * 0.2).toFixed(1)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Capability × 10%:</span>
-                  <span className="text-white">
+                  <span className="text-foreground/80">Capability × 10%:</span>
+                  <span className="text-foreground">
                     {capScore.toFixed(1)}% × 0.1 = {(capScore * 0.1).toFixed(1)}
                   </span>
                 </div>
-                <hr className="border-gray-500" />
+                <hr className="border-border" />
                 <div className="flex justify-between font-medium">
-                  <span className="text-white">Total Score:</span>
-                  <span className="text-white text-lg">{overallScore.toFixed(1)}</span>
+                  <span className="text-foreground">Total Score:</span>
+                  <span className="text-foreground text-lg">{overallScore.toFixed(1)}</span>
                 </div>
               </div>
             </div>
 
             {/* Configured Evaluation Criteria */}
             {criteria.length > 0 && (
-              <div className="p-4 bg-gray-700/20 rounded-lg">
-                <h5 className="text-sm font-medium text-white mb-3">
+              <div className="p-4 bg-muted/20 rounded-lg">
+                <h5 className="text-sm font-medium text-foreground mb-3">
                   Configured Evaluation Criteria
                 </h5>
                 <div className="space-y-2">
@@ -672,12 +672,12 @@ function SupplierCard({
                     return (
                       <div key={criterion.id} className="space-y-1">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{criterion.criteriaName}</span>
-                          <span className="text-white font-medium">
+                          <span className="text-foreground/80">{criterion.criteriaName}</span>
+                          <span className="text-foreground font-medium">
                             {actualScore.toFixed(0)} / {maxScore}
                           </span>
                         </div>
-                        <Progress value={percentage} className="h-2 bg-gray-700" />
+                        <Progress value={percentage} className="h-2 bg-muted" />
                       </div>
                     );
                   })}
@@ -688,8 +688,8 @@ function SupplierCard({
             {/* Notes */}
             {evaluation.evaluationNotes && (
               <div>
-                <h4 className="text-sm font-medium text-white mb-2">Evaluation Notes</h4>
-                <p className="text-sm text-gray-300 p-3 bg-gray-700/50 rounded">
+                <h4 className="text-sm font-medium text-foreground mb-2">Evaluation Notes</h4>
+                <p className="text-sm text-foreground/80 p-3 bg-muted/50 rounded">
                   {evaluation.evaluationNotes}
                 </p>
               </div>
@@ -698,8 +698,8 @@ function SupplierCard({
             {/* Technical Discussion */}
             {evaluation.technicalDiscussion && (
               <div>
-                <h4 className="text-sm font-medium text-white mb-2">Technical Discussion</h4>
-                <p className="text-sm text-gray-300 p-3 bg-gray-700/50 rounded">
+                <h4 className="text-sm font-medium text-foreground mb-2">Technical Discussion</h4>
+                <p className="text-sm text-foreground/80 p-3 bg-muted/50 rounded">
                   {evaluation.technicalDiscussion}
                 </p>
               </div>
@@ -894,9 +894,9 @@ export function SupplierNominationPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 p-6">
+      <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto flex items-center justify-center h-64">
-          <div className="text-white">Loading nomination...</div>
+          <div className="text-foreground">Loading nomination...</div>
         </div>
       </div>
     );
@@ -904,26 +904,26 @@ export function SupplierNominationPage({
 
   if (error || !nomination) {
     return (
-      <div className="min-h-screen bg-gray-900 p-6">
+      <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto flex flex-col items-center justify-center h-64 space-y-4">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-8 w-8 text-red-400" />
-            <div className="text-xl font-semibold text-white">Nomination Not Found</div>
+            <div className="text-xl font-semibold text-foreground">Nomination Not Found</div>
           </div>
-          <div className="text-gray-400 text-center max-w-md">
+          <div className="text-muted-foreground text-center max-w-md">
             The supplier nomination with ID &ldquo;{nominationId}&rdquo; could not be found.
           </div>
           {onBack && (
             <Button
               variant="outline"
               onClick={onBack}
-              className="mt-4 border-gray-600 text-gray-300 hover:bg-gray-800"
+              className="mt-4 border-border text-foreground/80 hover:bg-accent"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Project
             </Button>
           )}
-          <div className="text-sm text-gray-500 mt-2">
+          <div className="text-sm text-muted-foreground mt-2">
             Tip: Create nominations through the project dashboard with proper vendor selection.
           </div>
         </div>
@@ -932,7 +932,7 @@ export function SupplierNominationPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
@@ -942,14 +942,14 @@ export function SupplierNominationPage({
                 variant="outline"
                 size="sm"
                 onClick={onBack}
-                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                className="border-border text-foreground/80 hover:bg-accent"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
             )}
             <div>
-              <h1 className="text-3xl font-bold text-white">{nomination.nominationName}</h1>
+              <h1 className="text-3xl font-bold text-foreground">{nomination.nominationName}</h1>
               <div className="flex items-center gap-4 mt-2">
                 <Badge
                   variant="outline"
@@ -960,7 +960,7 @@ export function SupplierNominationPage({
                 <Badge variant="secondary">
                   {getNominationTypeLabel(nomination.nominationType)}
                 </Badge>
-                <span className="text-gray-400 text-sm">
+                <span className="text-muted-foreground text-sm">
                   {nomination.vendorEvaluations.length} vendors under evaluation
                 </span>
               </div>
@@ -971,7 +971,7 @@ export function SupplierNominationPage({
               variant="outline"
               size="sm"
               onClick={handleExportResults}
-              className="border-gray-600 text-gray-300"
+              className="border-border text-foreground/80"
             >
               <Download className="h-4 w-4 mr-2" />
               Export
@@ -980,7 +980,7 @@ export function SupplierNominationPage({
               variant="outline"
               size="sm"
               onClick={() => setAddVendorsOpen(true)}
-              className="border-blue-600 text-blue-400 hover:bg-blue-900/20"
+              className="border-primary/40 text-primary hover:bg-primary/20"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Vendors
@@ -998,15 +998,15 @@ export function SupplierNominationPage({
 
         {/* BOM Details */}
         {groupBomParts.length > 0 && (
-          <Card className="bg-gray-800 border-gray-700">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-foreground flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
                 Selected BOM Parts ({groupBomParts.length}{' '}
                 {groupBomParts.length === 1 ? 'Part' : 'Parts'})
               </CardTitle>
               {nomination.evaluationGroupId && (
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-muted-foreground">
                   Evaluation Group: {nomination.evaluationGroupId}
                 </div>
               )}
@@ -1016,12 +1016,12 @@ export function SupplierNominationPage({
                 {groupBomParts.map((bomPart, index) => (
                   <div
                     key={bomPart.bomItemId}
-                    className={index > 0 ? 'pt-6 border-t border-gray-700' : ''}
+                    className={index > 0 ? 'pt-6 border-t border-border' : ''}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-lg font-semibold text-white">{bomPart.bomItemName}</h3>
-                        <div className="text-sm text-gray-400 mt-1">
+                        <h3 className="text-lg font-semibold text-foreground">{bomPart.bomItemName}</h3>
+                        <div className="text-sm text-muted-foreground mt-1">
                           From: {bomPart.nominationName}
                         </div>
                       </div>
@@ -1038,35 +1038,35 @@ export function SupplierNominationPage({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-foreground/80 mb-1">
                           BOM Item Name
                         </label>
-                        <div className="text-white font-medium">{bomPart.bomItemName}</div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-foreground font-medium">{bomPart.bomItemName}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
                           ID: {bomPart.bomItemId.slice(-8)}
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-foreground/80 mb-1">
                           Part Number
                         </label>
-                        <div className="text-white font-medium">
+                        <div className="text-foreground font-medium">
                           {bomPart.partNumber || 'Not specified'}
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-foreground/80 mb-1">
                           Material
                         </label>
-                        <div className="text-white font-medium">
+                        <div className="text-foreground font-medium">
                           {bomPart.material || 'Not specified'}
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-foreground/80 mb-1">
                           Quantity Required
                         </label>
-                        <div className="text-white font-medium">
+                        <div className="text-foreground font-medium">
                           {bomPart.quantity.toLocaleString()} units
                         </div>
                       </div>
@@ -1074,7 +1074,7 @@ export function SupplierNominationPage({
 
                     {bomPart.vendorIds.length > 0 && (
                       <div className="mt-3">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-foreground/80 mb-2">
                           Assigned Vendors
                         </label>
                         <div className="flex flex-wrap gap-2">
@@ -1094,11 +1094,11 @@ export function SupplierNominationPage({
               </div>
 
               {nomination.description && (
-                <div className="mt-6 pt-6 border-t border-gray-700">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                <div className="mt-6 pt-6 border-t border-border">
+                  <label className="block text-sm font-medium text-foreground/80 mb-2">
                     Nomination Description
                   </label>
-                  <div className="text-gray-300 text-sm">{nomination.description}</div>
+                  <div className="text-foreground/80 text-sm">{nomination.description}</div>
                 </div>
               )}
             </CardContent>
@@ -1108,38 +1108,38 @@ export function SupplierNominationPage({
         {/* Summary Statistics */}
         {summaryStats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-card border-border">
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-white">{summaryStats.totalVendors}</div>
-                <div className="text-sm text-gray-400">Total Vendors</div>
+                <div className="text-2xl font-bold text-foreground">{summaryStats.totalVendors}</div>
+                <div className="text-sm text-muted-foreground">Total Vendors</div>
               </CardContent>
             </Card>
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-card border-border">
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-blue-400">
+                <div className="text-2xl font-bold text-primary">
                   {summaryStats.avgScore.toFixed(1)}%
                 </div>
-                <div className="text-sm text-gray-400">Avg Score</div>
+                <div className="text-sm text-muted-foreground">Avg Score</div>
               </CardContent>
             </Card>
             <Card
-              className={`bg-gray-800 border-gray-700 cursor-pointer transition-all hover:border-green-500 ${statusFilter === 'approved' ? 'border-green-500 bg-green-500/10' : ''
+              className={`bg-card border-border cursor-pointer transition-all hover:border-green-500 ${statusFilter === 'approved' ? 'border-green-500 bg-green-500/10' : ''
                 }`}
               onClick={() => setStatusFilter(statusFilter === 'approved' ? 'all' : 'approved')}
             >
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-green-400">{summaryStats.approved}</div>
-                <div className="text-sm text-gray-400">Approved</div>
+                <div className="text-sm text-muted-foreground">Approved</div>
               </CardContent>
             </Card>
             <Card
-              className={`bg-gray-800 border-gray-700 cursor-pointer transition-all hover:border-red-500 ${statusFilter === 'rejected' ? 'border-red-500 bg-red-500/10' : ''
+              className={`bg-card border-border cursor-pointer transition-all hover:border-red-500 ${statusFilter === 'rejected' ? 'border-red-500 bg-red-500/10' : ''
                 }`}
               onClick={() => setStatusFilter(statusFilter === 'rejected' ? 'all' : 'rejected')}
             >
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-red-400">{summaryStats.rejected}</div>
-                <div className="text-sm text-gray-400">Not Approved</div>
+                <div className="text-sm text-muted-foreground">Not Approved</div>
               </CardContent>
             </Card>
           </div>
@@ -1148,32 +1148,32 @@ export function SupplierNominationPage({
         {/* Filter Bar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold text-white">Supplier Evaluations</h2>
+            <h2 className="text-xl font-semibold text-foreground">Supplier Evaluations</h2>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Filter by status:</span>
+              <span className="text-sm text-muted-foreground">Filter by status:</span>
               <Select
                 value={statusFilter}
                 onValueChange={(value: 'all' | 'approved' | 'rejected') =>
                   setStatusFilter(value)
                 }
               >
-                <SelectTrigger className="w-40 bg-gray-800 border-gray-600 text-white">
+                <SelectTrigger className="w-40 bg-card border-border text-foreground">
                   <SelectValue placeholder="All Vendors" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-600">
-                  <SelectItem value="all" className="text-white hover:bg-gray-700">
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="all" className="text-foreground hover:bg-accent">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gray-400" />
+                      <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
                       All Vendors ({nomination.vendorEvaluations.length})
                     </div>
                   </SelectItem>
-                  <SelectItem value="approved" className="text-white hover:bg-gray-700">
+                  <SelectItem value="approved" className="text-foreground hover:bg-accent">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-400" />
                       Approved ({summaryStats?.approved ?? 0})
                     </div>
                   </SelectItem>
-                  <SelectItem value="rejected" className="text-white hover:bg-gray-700">
+                  <SelectItem value="rejected" className="text-foreground hover:bg-accent">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-red-400" />
                       Not Approved ({summaryStats?.rejected ?? 0})
@@ -1183,7 +1183,7 @@ export function SupplierNominationPage({
               </Select>
             </div>
           </div>
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-muted-foreground">
             Showing {sortedEvaluations.length} of {nomination.vendorEvaluations.length} vendors
           </div>
         </div>
@@ -1191,17 +1191,17 @@ export function SupplierNominationPage({
         {/* Evaluation Cards */}
         <div>
           {sortedEvaluations.length === 0 ? (
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-card border-border">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Users className="h-12 w-12 text-gray-600 mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">
+                <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   {statusFilter === 'all'
                     ? 'No Vendor Evaluations'
                     : statusFilter === 'approved'
                       ? 'No Approved Vendors'
                       : 'No Vendors to Approve'}
                 </h3>
-                <p className="text-gray-400 max-w-md">
+                <p className="text-muted-foreground max-w-md">
                   {statusFilter === 'all'
                     ? 'This nomination currently has no vendor evaluations. Vendors should be added during nomination creation.'
                     : statusFilter === 'approved'
@@ -1213,7 +1213,7 @@ export function SupplierNominationPage({
                     variant="outline"
                     size="sm"
                     onClick={() => setStatusFilter('all')}
-                    className="mt-4 border-gray-600 text-gray-300 hover:bg-gray-700"
+                    className="mt-4 border-border text-foreground/80 hover:bg-accent"
                   >
                     Show All Vendors
                   </Button>
@@ -1246,8 +1246,8 @@ export function SupplierNominationPage({
 
         {/* Loading indicator for background score fetch */}
         {isLoadingScores && (
-          <div className="fixed bottom-4 right-4 bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 flex items-center gap-2 text-sm text-gray-300">
-            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400" />
+          <div className="fixed bottom-4 right-4 bg-card border border-border rounded-lg px-4 py-2 flex items-center gap-2 text-sm text-foreground/80">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary/40" />
             Loading vendor scores...
           </div>
         )}

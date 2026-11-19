@@ -87,7 +87,7 @@ export function MeasurementPanel({
     <div className="space-y-0.5">
       {/* Type badge */}
       <div className="flex items-center gap-1">
-        <span className="text-[7px] px-1 py-0.5 rounded bg-blue-900/60 text-blue-300 font-medium">
+        <span className="text-[7px] px-1 py-0.5 rounded bg-brand-900/60 text-brand-300 font-medium">
           {TYPE_LABEL[r.measureType] ?? r.measureType}
         </span>
         {r.isParallel !== undefined && (
@@ -104,7 +104,7 @@ export function MeasurementPanel({
         <div className="bg-[#3f3f3f] rounded px-1 py-0.5 space-y-0.5">
           {([r.selA, r.selB] as ArcSelection[]).map((arc, i) => (
             <div key={i} className="flex items-center justify-between">
-              <span className={`text-[7px] font-medium ${i === 0 ? 'text-blue-400' : 'text-orange-400'}`}>
+              <span className={`text-[7px] font-medium ${i === 0 ? 'text-brand-400' : 'text-orange-400'}`}>
                 {i === 0 ? 'A' : 'B'} Diameter
               </span>
               <span className="font-mono text-[10px] text-yellow-300 font-bold">
@@ -118,7 +118,7 @@ export function MeasurementPanel({
       {/* Single arc A */}
       {r.selA.type === 'arc' && r.measureType !== 'arc-arc' && !compact && (
         <div className="bg-[#3f3f3f] rounded px-1 py-0.5">
-          <div className="text-[7px] text-blue-400 font-medium mb-0.5">A — Arc/Circle</div>
+          <div className="text-[7px] text-brand-400 font-medium mb-0.5">A — Arc/Circle</div>
           <div className="flex items-center justify-between">
             <span className="text-[7px] text-gray-400">Diameter</span>
             <span className="font-mono text-[11px] text-yellow-300 font-bold">
@@ -142,7 +142,7 @@ export function MeasurementPanel({
       {/* Point A */}
       {r.selA.type !== 'arc' && !compact && (
         <div className="bg-[#3f3f3f] rounded px-1 py-0.5">
-          <div className="text-[7px] text-blue-400 font-medium mb-0.5">A — {selLabel(r.selA)}</div>
+          <div className="text-[7px] text-brand-400 font-medium mb-0.5">A — {selLabel(r.selA)}</div>
           <div className="font-mono text-[7px] text-white">{fmtPt(getSelectionPoint(r.selA))} {unit}</div>
         </div>
       )}
@@ -190,7 +190,7 @@ export function MeasurementPanel({
           <h4 className="text-[9px] font-semibold text-white flex items-center gap-0.5">
             <Ruler className="h-2.5 w-2.5 text-yellow-300" /> Measurement
             {results.length > 0 && (
-              <span className="ml-1 text-[7px] bg-blue-600 text-white px-1 py-0.5 rounded">
+              <span className="ml-1 text-[7px] bg-brand-600 text-white px-1 py-0.5 rounded">
                 {results.length}
               </span>
             )}
@@ -210,7 +210,7 @@ export function MeasurementPanel({
                 onClick={() => onSubModeChange(key)}
                 className={`text-[7px] px-1 py-0.5 rounded font-medium transition-colors flex-1 ${
                   measureSubMode === key
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-600 text-white'
                     : 'bg-[#3f3f3f] text-gray-400 hover:text-white'
                 }`}
               >
@@ -227,7 +227,7 @@ export function MeasurementPanel({
               key={u}
               onClick={() => onUnitChange(u)}
               className={`flex-1 text-[8px] px-1 py-0.5 rounded font-medium transition-colors ${
-                unit === u ? 'bg-blue-600 text-white' : 'bg-[#3f3f3f] text-gray-400 hover:text-white'
+                unit === u ? 'bg-brand-600 text-white' : 'bg-[#3f3f3f] text-gray-400 hover:text-white'
               }`}
             >
               {u}
@@ -248,7 +248,7 @@ export function MeasurementPanel({
         {/* Selection A info while picking B */}
         {mode === 'PICKING_B' && selA && (
           <div className="bg-[#3f3f3f] rounded px-1 py-0.5 space-y-0.5">
-            <div className="text-[7px] text-blue-400 font-medium">A — {selLabel(selA)}</div>
+            <div className="text-[7px] text-brand-400 font-medium">A — {selLabel(selA)}</div>
             {selA.type === 'arc' ? (
               <div className="flex items-center justify-between">
                 <span className="text-[7px] text-gray-400">Diameter</span>
@@ -281,7 +281,7 @@ export function MeasurementPanel({
                     <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: colB }} />
                   </span>
                   <span className="text-[7px] text-gray-400 font-medium">Latest</span>
-                  {isSelected && <span className="text-[6px] text-blue-400 font-medium">● selected</span>}
+                  {isSelected && <span className="text-[6px] text-brand-400 font-medium">● selected</span>}
                 </div>
                 <div className="flex gap-0.5">
                   <button onClick={(e) => { e.stopPropagation(); copyResult(latestResult); }} className="text-gray-500 hover:text-white" title="Copy">
@@ -333,7 +333,7 @@ export function MeasurementPanel({
                         <span className="text-[7px] text-gray-400 font-medium">
                           {TYPE_LABEL[r.measureType] ?? r.measureType}
                         </span>
-                        {isSelected && <span className="text-[6px] text-blue-400 font-medium">● selected</span>}
+                        {isSelected && <span className="text-[6px] text-brand-400 font-medium">● selected</span>}
                       </div>
                       <div className="flex gap-0.5">
                         <button onClick={(e) => { e.stopPropagation(); copyResult(r); }} className="text-gray-500 hover:text-white">

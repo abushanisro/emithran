@@ -167,7 +167,7 @@ export function ProjectModules({ projectId, bomCount, firstBomId: _firstBomId }:
     {
       title: 'Process Planning & Costing',
       description: 'Define manufacturing processes, material selection, and cost estimation for OEM and suppliers',
-      borderColor: 'border-l-4 border-l-brand-500',
+      borderColor: 'border-l-4 border-l-primary/40',
       status: 'available' as const,
       onClick: () => {
         router.push(`/projects/${projectId}/process-planning`);
@@ -221,7 +221,7 @@ export function ProjectModules({ projectId, bomCount, firstBomId: _firstBomId }:
     {
       title: 'VAVE',
       description: 'Value Analysis & Value Engineering — AI-accelerated cost reduction using SCAMPER, TRIZ, and should-cost analysis',
-      borderColor: 'border-l-4 border-l-brand-500',
+      borderColor: 'border-l-4 border-l-primary/40',
       status: 'available' as const,
       onClick: () => {
         router.push(`/vave?sourceProjectId=${projectId}`);

@@ -20,6 +20,7 @@ import {
   LogOut,
   ChevronRight,
 } from 'lucide-react';
+import { EmithranLogo, EmithranMark } from '@/components/brand/EmithranLogo';
 import { NavLink } from '@/components/common/nav-link';
 import { useAuth } from '@/lib/providers/auth';
 import {
@@ -130,15 +131,14 @@ export function AppSidebar() {
     <Sidebar className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="p-4">
         {!collapsed ? (
-          <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-lg text-sidebar-foreground tracking-tight">mithran</h2>
-            <p className="text-xs text-sidebar-foreground/50">One-Stop Solution</p>
+          <div className="flex-1 min-w-0 text-sidebar-foreground">
+            <EmithranLogo />
+            <p className="mt-1 text-xs text-sidebar-foreground/50">Manufacturing intelligence</p>
           </div>
         ) : (
-          <div className="flex items-center justify-center">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <span className="text-sm font-bold text-primary">m</span>
-            </div>
+          <div className="flex items-center justify-center text-sidebar-foreground">
+            <EmithranMark className="h-8" />
+            <span className="sr-only">EMITHRAN</span>
           </div>
         )}
       </SidebarHeader>

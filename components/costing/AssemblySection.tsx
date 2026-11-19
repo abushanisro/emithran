@@ -21,8 +21,8 @@ interface Props {
 }
 
 const headClass = 'text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
-const controlClass = 'w-full min-w-0 text-sm border border-border rounded-md px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
-const linkButton = 'text-xs text-brand-600 hover:underline disabled:opacity-50';
+const controlClass = 'w-full min-w-0 text-sm border border-border rounded-md px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
+const linkButton = 'text-xs text-primary hover:underline disabled:opacity-50';
 const FLAGS: ReadonlySet<JointField> = new Set(['prep', 'cleanUp']);
 const seconds = (s: number) => (s >= 60 ? `${Math.round((s / 60) * 10) / 10} min` : `${Math.round(s * 10) / 10} s`);
 
@@ -141,7 +141,7 @@ export function AssemblySection({ assembly: a, overrides, onChange, hrefOf }: Pr
           {a.components.map((c) => (
             <li key={c.id} className="flex items-center gap-2 px-2 py-1.5">
               <span className="flex-1 min-w-0 truncate">
-                {hrefOf && a.components.length > 1 ? <a className="text-brand-600 hover:underline" href={hrefOf(c.id)}>{c.name}</a> : c.name}
+                {hrefOf && a.components.length > 1 ? <a className="text-primary hover:underline" href={hrefOf(c.id)}>{c.name}</a> : c.name}
                 <span className="text-muted-foreground"> × {c.quantity}</span>
               </span>
               <span className="shrink-0 tabular-nums text-muted-foreground">

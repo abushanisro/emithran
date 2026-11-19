@@ -458,10 +458,10 @@ await apiClient.post(`/production-lots/${lotId}/vendor-assignments`, assignmentD
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Available Vendors</CardTitle>
-            <Users className="h-4 w-4 text-blue-500" />
+            <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-primary">
               {availableVendors.length}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -572,7 +572,7 @@ await apiClient.post(`/production-lots/${lotId}/vendor-assignments`, assignmentD
                                   {isApprovedGenerally ? (
                                     <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
                                   ) : (
-                                    <Users className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                                    <Users className="h-3.5 w-3.5 text-primary shrink-0" />
                                   )}
                                   <span className="truncate text-sm font-medium" title={displayName}>
                                     {displayName}

@@ -40,7 +40,7 @@ function BRow({ label, value, sub, highlight, icon }: {
   icon?: 'db' | 'formula';
 }) {
   const ico =
-    icon === 'db'      ? <Database    className="h-2.5 w-2.5 text-blue-500 inline mr-1" /> :
+    icon === 'db' ? <Database className="h-2.5 w-2.5 text-primary inline mr-1" /> :
     icon === 'formula' ? <FlaskConical className="h-2.5 w-2.5 text-amber-500 inline mr-1" /> : null;
   return (
     <div className={`flex items-start justify-between py-0.5 ${highlight ? 'font-semibold text-foreground border-t border-border mt-0.5 pt-1' : 'text-muted-foreground'}`}>

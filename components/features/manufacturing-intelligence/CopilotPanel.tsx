@@ -373,7 +373,7 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
           "font-semibold",
           isTitle
             ? "text-[11px] text-foreground mb-1"
-            : "text-[9px] uppercase tracking-wider text-brand-600 dark:text-brand-400 mt-3 mb-1 border-b border-brand-100 dark:border-brand-900 pb-0.5",
+            : "text-[9px] uppercase tracking-wider text-primary dark:text-primary mt-3 mb-1 border-b border-primary/40 dark:border-primary/40 pb-0.5",
         )}>
           {inner}
         </div>
@@ -386,7 +386,7 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
       const rest = trimmed.slice(1).trim();
       nodes.push(
         <div key={i++} className="flex gap-2 py-1.5 border-b border-border/30 last:border-0">
-          <span className="shrink-0 w-4 h-4 rounded-full bg-brand-100 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 text-[8px] font-bold flex items-center justify-center mt-0.5">
+          <span className="shrink-0 w-4 h-4 rounded-full bg-primary/10 dark:bg-primary/60 text-primary dark:text-primary text-[8px] font-bold flex items-center justify-center mt-0.5">
             {trimmed[0]}
           </span>
           <span className="text-[10px] leading-relaxed">{parseInline(rest, showSources)}</span>
@@ -454,7 +454,7 @@ export function MemoryProposalChip({
 }) {
   const expired = proposal.status === "pending" && Date.parse(proposal.expiresAt) <= Date.now();
   return (
-    <div className="mt-1.5 rounded border border-brand-200 dark:border-brand-800 bg-background px-2 py-1.5 text-[10px]" data-testid="memory-proposal">
+    <div className="mt-1.5 rounded border border-primary/40 dark:border-primary/40 bg-background px-2 py-1.5 text-[10px]" data-testid="memory-proposal">
       <p className="font-medium text-foreground">Save to copilot memory?</p>
       {proposal.add.map((p) => (
         <p key={`a-${p}`} className="text-foreground/80">+ {p}</p>
@@ -494,7 +494,7 @@ function MessageBubble({
       <div
         className={cn(
           "shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5",
-          isUser ? "bg-brand-100 text-brand-600" : "bg-slate-100 text-slate-500",
+          isUser ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
         )}
       >
         {isUser ? (
@@ -507,7 +507,7 @@ function MessageBubble({
         className={cn(
           "max-w-[85%] rounded-lg px-2.5 py-1.5",
           isUser
-            ? "bg-brand-50 text-brand-900 dark:bg-brand-950/40 dark:text-brand-100 text-[11px] leading-relaxed"
+            ? "bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary text-[11px] leading-relaxed"
             : "bg-muted text-foreground",
         )}
       >
@@ -590,7 +590,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
       {/* ── Header bar ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0 bg-muted/30">
         <span className="text-[10px] font-medium text-foreground shrink-0">Manufacturing Copilot</span>
-        <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-brand-100 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 border border-brand-200 dark:border-brand-800">BETA</span>
+        <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary border border-primary/40 dark:border-primary/40">BETA</span>
         <div className="flex-1" />
         {messages.length > 0 && (
           <button
@@ -614,7 +614,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
               "shrink-0 text-[10px] font-medium px-2 py-0.5 rounded border transition-colors",
               isStreaming
                 ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
-                : "border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-300 dark:hover:bg-brand-950/40",
+                : "border-primary/40 text-primary hover:bg-primary/10 dark:border-primary/40 dark:text-primary dark:hover:bg-primary/40",
             )}
           >
             {action.label}
@@ -642,7 +642,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
                 <button
                   key={q}
                   onClick={() => void handleAction(q)}
-                  className="text-[10px] border border-border rounded-full px-2 py-0.5 text-muted-foreground hover:text-foreground hover:border-brand-400 transition-colors"
+                  className="text-[10px] border border-border rounded-full px-2 py-0.5 text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
                 >
                   {q}
                 </button>
@@ -684,7 +684,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
           rows={2}
           className={cn(
             "flex-1 resize-none rounded border bg-background text-[11px] px-2.5 py-1.5 placeholder:text-muted-foreground/50",
-            "focus:outline-hidden focus:ring-1 focus:ring-brand-500",
+            "focus:outline-hidden focus:ring-1 focus:ring-primary/40",
             isStreaming && "opacity-50",
           )}
         />
@@ -704,7 +704,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
 
       {/* ── Footer attribution ─────────────────────────────────────────────── */}
       <div className="shrink-0 px-3 pb-1.5 text-[9px] text-muted-foreground/40 text-center">
-        Powered by AI · Figures from Mithran engines · Not a substitute for engineering judgment
+        Powered by AI · Figures from EMITHRAN engines · Not a substitute for engineering judgment
       </div>
     </div>
   );

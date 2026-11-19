@@ -43,33 +43,33 @@ function BalloonDrawingSection({ report }: { report: InspectionReport }) {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <span className="font-medium">Material:</span>
-            <span className="text-blue-600 font-semibold">{report.material}</span>
+            <span className="text-primary font-semibold">{report.material}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <span className="font-medium">Surface Treatment:</span>
-            <span className="text-blue-600 font-semibold">{report.surface_treatment}</span>
+            <span className="text-primary font-semibold">{report.surface_treatment}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <span className="font-medium">Part Name:</span>
-            <span className="text-blue-600 font-semibold">{report.part_name}</span>
+            <span className="text-primary font-semibold">{report.part_name}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <span className="font-medium">Drawing No.:</span>
-            <span className="text-blue-600 font-semibold">{report.drawing_no}</span>
+            <span className="text-primary font-semibold">{report.drawing_no}</span>
           </div>
         </div>
         
         <div className="space-y-3">
-          <h4 className="font-medium text-gray-700">General Notes:</h4>
+          <h4 className="font-medium text-foreground">General Notes:</h4>
           <ul className="space-y-1 text-sm">
             {report.general_notes.map((note, index) => (
               <li key={index} className="flex items-start">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 shrink-0"></span>
+                <span className="w-2 h-2 bg-brand-500 rounded-full mt-2 mr-2 shrink-0"></span>
                 {note}
               </li>
             ))}
           </ul>
-          <div className="mt-4 p-3 bg-gray-50 rounded">
+          <div className="mt-4 p-3 bg-muted rounded">
             <strong>Section:</strong> A–A
           </div>
         </div>
@@ -120,7 +120,7 @@ function InspectionDetailsTable({
     <div className="border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50">
+          <TableRow className="bg-muted">
             <TableHead className="text-center font-semibold">S.No</TableHead>
             <TableHead className="font-semibold">Description</TableHead>
             <TableHead className="text-center font-semibold">Specification (mm)</TableHead>
@@ -169,7 +169,7 @@ function InspectionDetailsTable({
                         {detail.measurements[i].toFixed(2)}
                       </span>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                 ))}
@@ -339,7 +339,7 @@ export default function InspectionReportTable({
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="font-medium">Company Name:</span>
-              <span className="text-blue-600 font-semibold">{report.company_name}</span>
+              <span className="text-primary font-semibold">{report.company_name}</span>
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Part Name:</span>
@@ -366,7 +366,7 @@ export default function InspectionReportTable({
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Inspected by:</span>
-              <span className="text-blue-600 font-semibold">{report.inspected_by}</span>
+              <span className="text-primary font-semibold">{report.inspected_by}</span>
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Approved by:</span>
@@ -386,19 +386,19 @@ export default function InspectionReportTable({
           />
         </div>
         
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+        <div className="mt-6 p-4 bg-muted rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Badge variant="outline" className="bg-green-100 text-green-800">
                 <FileText className="h-3 w-3 mr-1" />
                 Approved
               </Badge>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 Report generated on {report.inspection_date}
               </span>
             </div>
             
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
               Total measurements: {report.inspection_details.reduce((acc, detail) => 
                 acc + detail.measurements.filter(m => m > 0).length, 0
               )}
