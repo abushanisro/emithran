@@ -226,6 +226,8 @@ export type CalculatorListResponse = {
   total: number;
   page: number;
   limit: number;
+  /** Whether rows follow this page (retired ones included, so a short page can still have more). */
+  hasMore?: boolean;
 };
 
 export type ExecutionListResponse = {
@@ -276,12 +278,13 @@ export const calculatorsApi = {
     const limit = CALCULATOR_PAGE_LIMIT;
     const first = await calculatorsApi.getPage({ ...query, page: 1, limit });
     const calculators = [...first.calculators];
-    // A page leaves out its retired rows (a short page is not the last one), so the end is the first empty page; the cap only guards a
+    // A page leaves out its retired rows (a short page is not the last one): the server says whether rows follow; the cap only guards a
     // misbehaving server.
-    for (let page = 2; page <= MAX_CALCULATOR_PAGES; page++) {
+    let more = first.hasMore !== false && first.calculators.length > 0;
+    for (let page = 2; more && page <= MAX_CALCULATOR_PAGES; page++) {
       const next = await calculatorsApi.getPage({ ...query, page, limit });
-      if (next.calculators.length === 0) break;
       calculators.push(...next.calculators);
+      more = next.hasMore !== false && next.calculators.length > 0;
     }
     return { ...first, calculators, total: calculators.length, page: 1, limit: calculators.length };
   },

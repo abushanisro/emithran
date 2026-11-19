@@ -32,6 +32,16 @@ describe('calculatorsApi.getAll', () => {
     expect((await calculatorsApi.getAll()).calculators).toHaveLength(237);
   });
 
+  it('stops after the page the server says is the last: no request for the page past it (299 calculators: page 4 was a 500)', async () => {
+    get.mockImplementation((url: string) => {
+      const page = Number(new URL(url, 'http://x').searchParams.get('page') ?? 1);
+      const size = [100, 100, 99][page - 1] ?? 0;
+      return Promise.resolve({ calculators: Array.from({ length: size }, (_, i) => ({ id: `p${page}-${i}` })), total: 299, page, limit: 100, hasMore: page < 3 });
+    });
+    expect((await calculatorsApi.getAll()).calculators).toHaveLength(299);
+    expect(get).toHaveBeenCalledTimes(3);
+  });
+
   it('asks for 100 a page even when the caller names no limit (the backend default is 10)', async () => {
     serve([3]);
     await calculatorsApi.getAll();
