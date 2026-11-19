@@ -4726,12 +4726,21 @@ export class BomItemCostingService {
   }): Promise<CostSummaryDto> {
     const client = this.databaseService.getClient(a.accessToken);
     // The part alone with the molding a gap: the reason it cannot be priced as multi-shot, never an injection quote in its place.
-    const notPriced = (reason: string): CostSummaryDto => {
+    // The multi-shot breakdown still comes with it: the Cost Guide shows the shots so far, so the second can be added there.
+    const notPriced = (reason: string, shotsSoFar?: MultiShotShot[]): CostSummaryDto => {
       const base = computeInjectionMoldedCostSummary(a.imInput);
+      const shots = shotsSoFar ?? [{ name: a.item.name, source: 'part' as const, itemId: a.id, grade: a.grade, volumePct: null, input: a.imInput }];
       return {
         ...appendLines({ ...base, processLines: base.processLines.filter((l) => l.process !== 'Injection Molding') },
           [gapLine('Multi-Shot Molding', MULTI_SHOT_PROCESS_GROUP, MULTI_SHOT_PRESS_CLASS, reason)]),
         warnings: [reason],
+        multiShot: {
+          route: '', routeLabel: '', complete: false,
+          shots: shots.map((s) => ({ name: s.name, source: s.source, itemId: s.itemId, grade: s.grade, volumePct: s.volumePct, volumeMm3: Math.round(s.input.volume), cycleSec: null, clampT: null, shotGppsG: null })),
+          components: [],
+          press: { name: null, orientation: null, units: null, stations: null, rotatingStack: false, indexSec: null, reasons: [reason] },
+          cycleSec: null, loaderName: null, loadSecPerPart: null, options: [],
+        },
       };
     };
     const inputs = this.multiShotService
@@ -4765,7 +4774,7 @@ export class BomItemCostingService {
       shots = extraPct > 0 && extraPct < 100 ? [part, ...extra] : childShots.length === 1 ? [part, childShots[0]!] : [part];
     }
     if (shots.length < 2) {
-      return notPriced('A multi-shot part needs two shots: add them as BOM children (each with its CAD and material), or a second material in the Cost Guide.');
+      return notPriced('A multi-shot part needs two shots: add them as BOM children (each with its CAD and material), or a second material in the Cost Guide.', shots);
     }
     // What each shot needs of a press, as the injection engine derives it from its material and geometry.
     const needs: ShotNeed[] = shots.map((shot) => {
