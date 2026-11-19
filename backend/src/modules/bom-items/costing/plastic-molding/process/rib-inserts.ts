@@ -9,8 +9,11 @@ const CLASSES: readonly InsertClass[] = ['small', 'medium', 'large'];
 const MM2_PER_IN2 = 645.16;
 
 export interface MeasuredRib { heightMm: number; lengthMm: number; thicknessMm: number }
-/** The ribs of the CAD feature graph: those measured along the pull, and how many it found but did not measure. */
-export interface RibSignals { measured: MeasuredRib[]; unmeasured: number }
+/**
+ * The ribs of the CAD feature graph: those measured in full along the pull, those with a height but no footprint (heightOnlyMm), and how many it
+ * found with no height at all. Only a rib taller than machinedRibThreshold is an insert, so a short one needs no footprint.
+ */
+export interface RibSignals { measured: MeasuredRib[]; heightOnlyMm?: number[]; unmeasured: number }
 
 /** What memory/Plastic Modeling says a rib insert takes (plastic-reference.ts). */
 export interface RibInsertReference {
@@ -39,14 +42,19 @@ export interface RibInsertReference {
 export function ribSignals(graph: PlasticFeatureGraph | null | undefined): RibSignals | null {
   if (!graph || graph.schema !== 'plastic_feature_graph_v1' || !Array.isArray(graph.items)) return null;
   const measured: MeasuredRib[] = [];
+  const heightOnlyMm: number[] = [];
   let unmeasured = 0;
   for (const f of graph.items) {
     if (f.feature_type !== 'Rib') continue;
     const ribs = (f.attributes?.ribs ?? []).filter((r) => r.height_mm > 0 && r.length_mm > 0 && r.thickness_mm > 0);
     measured.push(...ribs.map((r) => ({ heightMm: r.height_mm, lengthMm: r.length_mm, thicknessMm: r.thickness_mm })));
-    unmeasured += Math.max(0, (f.attributes?.count ?? 0) - ribs.length);
+    // The heights the engine measured beyond the full ribs (each full rib's height taken out once): a 0 is a pair that does not stand along the pull.
+    const rest = [...(f.attributes?.heights_mm ?? [])].filter((h) => Number.isFinite(h) && h >= 0);
+    for (const r of ribs) { const i = rest.indexOf(r.height_mm); if (i >= 0) rest.splice(i, 1); }
+    heightOnlyMm.push(...rest);
+    unmeasured += Math.max(0, (f.attributes?.count ?? 0) - ribs.length - rest.length);
   }
-  return { measured, unmeasured };
+  return { measured, heightOnlyMm, unmeasured };
 }
 
 export interface RibInsertPlan {
@@ -68,7 +76,8 @@ export function planRibInserts(ribs: RibSignals | null, ref: RibInsertReference)
     if (cls) counts[cls] += 1;
     else oversize += 1;
   }
-  const unmeasured = ribs?.unmeasured ?? 0;
+  // A rib with a height but no footprint is a gap only when it is tall enough to be an insert.
+  const unmeasured = (ribs?.unmeasured ?? 0) + (ribs?.heightOnlyMm ?? []).filter((h) => h > ref.thresholdMm).length;
   return { counts, oversize, unmeasured, priced: ribs != null && unmeasured === 0 && oversize === 0 };
 }
 

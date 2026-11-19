@@ -45,6 +45,8 @@ export interface PlasticFeature {
     size_class?: string;
     /** Rib: each rib the CAD engine measured along the pull (height, length = wall area / height, thickness), mm. */
     ribs?: ReadonlyArray<{ height_mm: number; length_mm: number; thickness_mm: number }>;
+    /** Rib: the height along the pull of every rib the engine found (0: it does not stand along the pull), including those with no footprint. */
+    heights_mm?: ReadonlyArray<number>;
     /** PartingLine: through holes (internal cutouts). */
     internal_cutouts?: number;
     /** PartingLine: the measured parting line length, mm. */

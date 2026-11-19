@@ -13,7 +13,7 @@ describe('rib inserts (EDM, formula registry F-31)', () => {
       rib({ count: 3, ribs: [{ height_mm: 30, length_mm: 40, thickness_mm: 1.2 }, { height_mm: 10, length_mm: 20, thickness_mm: 1.2 }] }),
       rib({ count: 2 }), // an analysis from before heights were measured
     ]));
-    expect(s).toEqual({ measured: [{ heightMm: 30, lengthMm: 40, thicknessMm: 1.2 }, { heightMm: 10, lengthMm: 20, thicknessMm: 1.2 }], unmeasured: 3 });
+    expect(s).toEqual({ measured: [{ heightMm: 30, lengthMm: 40, thicknessMm: 1.2 }, { heightMm: 10, lengthMm: 20, thicknessMm: 1.2 }], heightOnlyMm: [], unmeasured: 3 });
     expect(ribSignals(null)).toBeNull();
   });
 
@@ -41,6 +41,18 @@ describe('rib inserts (EDM, formula registry F-31)', () => {
     expect(p.counts).toEqual({ small: 2, medium: 1, large: 1 });
     expect(p.oversize).toBe(1);
     expect(p.priced).toBe(false); // an oversize rib is a gap, never squeezed into the large class
+  });
+
+  it('a rib measured with a height but no footprint needs one only when it is tall enough to be an insert (Cannula Holder Right: heights 0, 21.35, 21.5)', () => {
+    // The CAD graph of the part: 3 ribs, two measured in full, the third only a height of 0 (a pair that does not stand along the pull).
+    const s = ribSignals({ schema: 'plastic_feature_graph_v1', not_yet_recognized: [], unclassified_faces: 0, items: [{
+      id: 'rib-t1.0', feature_type: 'Rib', occurrences: [],
+      attributes: { count: 3, heights_mm: [0, 21.35, 21.5], ribs: [{ height_mm: 21.35, length_mm: 1.45, thickness_mm: 1.25 }, { height_mm: 21.5, length_mm: 1.43, thickness_mm: 1.25 }] },
+    }] } as never)!;
+    expect(s).toMatchObject({ heightOnlyMm: [0], unmeasured: 0 });
+    expect(planRibInserts(s, REF)).toMatchObject({ priced: true, unmeasured: 0, counts: { small: 2, medium: 0, large: 0 } });
+    // a tall rib with no footprint is still a gap
+    expect(planRibInserts({ measured: [], heightOnlyMm: [25], unmeasured: 0 }, REF)).toMatchObject({ priced: false, unmeasured: 1 });
   });
 
   it('is priced only when every rib was measured and classed; no ribs at all is a real zero', () => {
