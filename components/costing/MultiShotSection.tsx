@@ -34,38 +34,43 @@ function Row({ label, children, title }: { label: ReactNode; children: ReactNode
   );
 }
 
-/** The extra shots' editor: a moldable grade and a share of the part per shot, saved together. */
+/**
+ * The extra shots' editor: a moldable grade and a share of the part per shot. Saved the moment the shots are complete (a grade picked, a share
+ * left), never held for a second button: Apply prices what is saved, so a picked grade waiting on "Save shots" was a shot Apply never saw.
+ */
 function ShotEntriesForm({ start, onSave, onCancel }: { start: ShotEntry[]; onSave: (entries: ShotEntry[]) => void; onCancel?: (() => void) | undefined }) {
   const [entries, setEntries] = useState<ShotEntry[]>(start.length > 0 ? start : [{ grade: '', volumePct: 30 }]);
   // The grades a multi-shot part can mold (the backend offers only molding feedstock for this process).
   const { data } = useRawMaterials({ processGroup: MULTI_SHOT_PROCESS_GROUP, limit: 1000 });
   const grades = useMemo(() => [...new Set((data?.items ?? []).map((m) => m.materialGrade ?? m.material).filter(Boolean))].sort(), [data]);
   const problem = shotEntriesProblem(entries);
-  const set = (i: number, patch: Partial<ShotEntry>) => { setEntries(entries.map((e, j) => (j === i ? { ...e, ...patch } : e))); };
+  const commit = (next: ShotEntry[]) => {
+    setEntries(next);
+    if (shotEntriesProblem(next) == null) onSave(next);
+  };
+  const with_ = (i: number, patch: Partial<ShotEntry>) => entries.map((e, j) => (j === i ? { ...e, ...patch } : e));
   return (
     <div className="space-y-2 rounded-md border border-border p-2">
       {entries.map((e, i) => (
         <div key={i} className="grid grid-cols-[1fr_5rem_auto] items-end gap-2">
           <label className="flex flex-col gap-1">
             <span className="text-muted-foreground">Shot {i + 2} material</span>
-            <select className={controlClass} value={e.grade} onChange={(ev) => { set(i, { grade: ev.target.value }); }}>
+            <select className={controlClass} value={e.grade} onChange={(ev) => { commit(with_(i, { grade: ev.target.value })); }}>
               <option value="">Pick a grade…</option>
               {grades.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-muted-foreground">% of part</span>
-            <input className={controlClass} type="number" min={1} max={99} value={e.volumePct} onChange={(ev) => { set(i, { volumePct: Number(ev.target.value) }); }} />
+            <input className={controlClass} type="number" min={1} max={99} value={e.volumePct}
+              onChange={(ev) => { setEntries(with_(i, { volumePct: Number(ev.target.value) })); }} onBlur={() => { commit(entries); }} />
           </label>
-          <Button size="sm" variant="ghost" aria-label={`Remove shot ${i + 2}`} onClick={() => { setEntries(entries.filter((_, j) => j !== i)); }}>✕</Button>
+          <Button size="sm" variant="ghost" aria-label={`Remove shot ${i + 2}`} onClick={() => { commit(entries.filter((_, j) => j !== i)); }}>✕</Button>
         </div>
       ))}
       <div className="flex items-center justify-between gap-2">
         <button type="button" className="text-brand-600 hover:underline" onClick={() => { setEntries([...entries, { grade: '', volumePct: 20 }]); }}>+ Add shot</button>
-        <span className="flex gap-2">
-          {onCancel && <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>}
-          <Button size="sm" disabled={problem != null && entries.length > 0} onClick={() => { onSave(entries); }}>Save shots</Button>
-        </span>
+        {onCancel && <Button size="sm" variant="ghost" onClick={onCancel}>Close</Button>}
       </div>
       {problem && entries.length > 0 && <p className="text-amber-600">{problem}</p>}
     </div>
@@ -114,6 +119,13 @@ export function MultiShotSection({ multiShot: ms, overrides, onChange, hrefOf }:
           </div>
         ) : editing ? (
           <ShotEntriesForm start={entries} onSave={save} onCancel={() => { setEditing(false); }} />
+        ) : ms.shots.length < 2 && entries.length > 0 ? (
+          <ul className={boxClass}>
+            {entries.map((e, i) => (
+              <Row key={`${e.grade}-${String(i)}`} label={<>{i + 2}. Shot {i + 2}<span className="block">{e.grade}</span></>}>{`${String(e.volumePct)} %`}</Row>
+            ))}
+            <li className={`${rowClass} text-muted-foreground`}>Saved; costing the shots…</li>
+          </ul>
         ) : ms.shots.length >= 2 ? (
           <ul className={boxClass}>
             {ms.shots.map((s, i) => (
