@@ -218,10 +218,10 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: Resolve
       </Card>
 
       {/* Cost data status */}
-      <Card className="border-slate-600 bg-slate-800">
+      <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-slate-100">Cost Data Status</CardTitle>
-          <CardDescription className="text-slate-300">
+          <CardTitle className="text-foreground">Cost Data Status</CardTitle>
+          <CardDescription className="text-foreground/80">
             Cost analysis coverage for selected parts
           </CardDescription>
         </CardHeader>
@@ -236,17 +236,17 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: Resolve
             return (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-slate-700 rounded border border-slate-500">
-                    <div className="text-2xl font-bold text-blue-400">{totalParts}</div>
-                    <div className="text-sm text-slate-200">Total Parts</div>
+                  <div className="text-center p-4 bg-muted rounded border border-border">
+                    <div className="text-2xl font-bold text-primary">{totalParts}</div>
+                    <div className="text-sm text-foreground">Total Parts</div>
                   </div>
-                  <div className="text-center p-4 bg-slate-700 rounded border border-slate-500">
+                  <div className="text-center p-4 bg-muted rounded border border-border">
                     <div className="text-2xl font-bold text-green-400">{costedParts}</div>
-                    <div className="text-sm text-slate-200">With Cost Data</div>
+                    <div className="text-sm text-foreground">With Cost Data</div>
                   </div>
-                  <div className="text-center p-4 bg-slate-700 rounded border border-slate-500">
+                  <div className="text-center p-4 bg-muted rounded border border-border">
                     <div className="text-2xl font-bold text-red-400">{missing}</div>
-                    <div className="text-sm text-slate-200">Missing Cost Data</div>
+                    <div className="text-sm text-foreground">Missing Cost Data</div>
                   </div>
                 </div>
                 {missing > 0 && (
@@ -261,12 +261,12 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: Resolve
                   </div>
                 )}
                 {costedParts === 0 && (
-                  <div className="bg-blue-900 border border-blue-600 rounded p-4">
+                  <div className="bg-primary/15 border border-primary/40 rounded p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Info className="h-4 w-4 text-blue-400" />
-                      <span className="text-sm font-semibold text-blue-100">Alternative Analysis</span>
+                      <Info className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold text-primary">Alternative Analysis</span>
                     </div>
-                    <p className="text-xs text-blue-200">
+                    <p className="text-xs text-primary">
                       While cost analysis is unavailable, you can still analyze Materials,
                       Processes, Assembly complexity, and VAVE opportunities.
                     </p>
@@ -820,10 +820,10 @@ function VAVEContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMe
 
   if (materialCount > 3) {
     opportunities.push(
-      <Card key="materials" className="p-4 bg-blue-50 border-blue-200">
-        <h4 className="text-sm font-semibold mb-2 text-blue-800">Material Standardization</h4>
-        <p className="text-xs text-blue-700 mb-3">{materialCount} different materials used</p>
-        <div className="text-xs text-blue-600">
+      <Card key="materials" className="p-4 bg-primary/10 border-primary/40">
+        <h4 className="text-sm font-semibold mb-2 text-primary">Material Standardization</h4>
+        <p className="text-xs text-primary mb-3">{materialCount} different materials used</p>
+        <div className="text-xs text-primary">
           Consider standardizing on fewer material types for volume benefits
         </div>
       </Card>

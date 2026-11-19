@@ -25,7 +25,7 @@ import { BoardThumbnail } from './BoardThumbnail';
 // Child Part amber), a thumbnail tile, name with type badges, a grid of label/value pairs, a level badge, and icon actions.
 const LEVEL_STYLE: Record<ItemType, { border: string; badge: string }> = {
   assembly: { border: 'border-l-emerald-500', badge: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
-  sub_assembly: { border: 'border-l-blue-500', badge: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
+  sub_assembly: { border: 'border-l-blue-500', badge: 'bg-primary/10 text-primary border-primary/20' },
   child_part: { border: 'border-l-amber-500', badge: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
 };
 
@@ -139,7 +139,7 @@ export function ElectronicsItemsList({ designs, onOpen, onAddRevision, onAddSubA
                       <FileText className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" title="Viewer, features and cost" onClick={() => { onOpen(design); }}>
-                      <Cpu className="h-4 w-4 text-brand-500" />
+                      <Cpu className="h-4 w-4 text-primary" />
                     </Button>
                   </>
                 )}

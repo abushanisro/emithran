@@ -63,7 +63,7 @@ export function SecondaryOperationsPicker({
                     <li key={o.process}>
                       <label
                         title={o.reason}
-                        className={`flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-muted/40 ${o.selected ? 'bg-brand-50/40 dark:bg-brand-950/20' : ''}`}
+                        className={`flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-muted/40 ${o.selected ? 'bg-primary/40 dark:bg-primary/20' : ''}`}
                       >
                         <input
                           type="checkbox"
@@ -75,7 +75,7 @@ export function SecondaryOperationsPicker({
                         <span className="min-w-0 flex-1">
                           <span className="block truncate">
                             {o.process}
-                            {o.fromDrawing && <span className="ml-1 text-[9px] text-brand-400">from drawing</span>}
+                            {o.fromDrawing && <span className="ml-1 text-[9px] text-primary">from drawing</span>}
                             {o.provisional && <span className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">provisional</span>}
                           </span>
                           {o.selected && (

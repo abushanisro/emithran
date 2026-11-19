@@ -20,7 +20,7 @@ interface Props {
 const headClass = 'text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
 const boxClass = 'divide-y divide-border rounded-md border border-border';
 const rowClass = 'flex items-baseline justify-between gap-3 px-2 py-1.5';
-const controlClass = 'w-full min-w-0 text-sm border border-border rounded-md px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const controlClass = 'w-full min-w-0 text-sm border border-border rounded-md px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 const seconds = (s: number | null) => (s == null ? '—' : `${s.toFixed(1)} s`);
 /** An insert with no weight is loaded in the lightest componentLoadTime band (insert-molding.ts loadTimeRow). */
 const NO_WEIGHT_NOTE = 'Loaded in the lightest load-time band (up to 0.2 kg by hand, 0.5 kg by robot). Enter its weight for an exact band.';
@@ -95,7 +95,7 @@ export function InsertMoldingSection({ insertMolding: im, overrides, onChange, h
   const cad = im.cadInsertCandidates != null && im.cadInsertCandidates > 0 ? im.cadInsertCandidates : null;
   const save = (e: InsertEntry) => { onChange(insertEntryPatch(e)); setLocal(e.count == null ? 'deleted' : e); setEditing(false); };
   const remove = () => { onChange(insertEntryPatch({ count: null, weightKg: null, name: '' })); setLocal('deleted'); setEditing(false); };
-  const action = 'text-brand-600 hover:underline';
+  const action = 'text-primary hover:underline';
 
   return (
     <div className="space-y-4 text-xs">

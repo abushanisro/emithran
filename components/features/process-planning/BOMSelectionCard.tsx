@@ -112,9 +112,9 @@ export function BOMSelectionCard({
           {/* Quick Stats - Only show when BOM selected */}
           {selectedBomId && (
             <>
-              <div className="bg-blue-50 dark:bg-blue-950/50 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
-                <p className="text-[10px] font-medium text-blue-700 dark:text-blue-300">Total Items</p>
-                <p className="text-sm font-bold text-blue-900 dark:text-blue-100">{totalItems}</p>
+              <div className="bg-primary/10 dark:bg-primary/50 rounded-lg p-2 border border-primary/40 dark:border-primary/40">
+                <p className="text-[10px] font-medium text-primary dark:text-primary">Total Items</p>
+                <p className="text-sm font-bold text-primary dark:text-primary">{totalItems}</p>
               </div>
               <div className="bg-green-50 dark:bg-green-950/50 rounded-lg p-2 border border-green-200 dark:border-green-800">
                 <p className="text-[10px] font-medium text-green-700 dark:text-green-300">Completed</p>

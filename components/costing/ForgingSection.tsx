@@ -16,7 +16,7 @@ interface Props {
 
 const rowClass = 'flex items-center gap-2 py-0.5';
 const labelClass = 'text-xs text-muted-foreground w-24 shrink-0';
-const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 
 /**
  * The Cost Guide's forging settings. Every one is the engine's until set: complexity, the bar, the heating, the blows and the flash land, each
@@ -55,7 +55,7 @@ export function ForgingSection({ forging, overrides, onChange }: Props) {
           </div>
           <details open={open} onToggle={(e) => { setOpen(e.currentTarget.open); }}>
             <summary className="cursor-pointer select-none text-[11px] text-muted-foreground" title="Each setting is the engine's until you set it; empty a field to give it back to the engine.">
-              Forging settings: {overridden > 0 ? `${overridden} overridden` : 'automatic'} · <span className="font-medium text-brand-500 hover:text-brand-400">Override</span>
+              Forging settings: {overridden > 0 ? `${overridden} overridden` : 'automatic'} · <span className="font-medium text-primary hover:text-primary">Override</span>
             </summary>
             <div className="space-y-1 pt-1">
               <NumberField

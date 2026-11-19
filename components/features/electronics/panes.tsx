@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 export function HResizeHandle() {
   return (
     <PanelResizeHandle className="group relative flex w-1 items-center justify-center bg-border transition-colors hover:bg-brand-400">
-      <GripVertical className="absolute h-4 w-4 text-muted-foreground group-hover:text-brand-600" />
+      <GripVertical className="absolute h-4 w-4 text-muted-foreground group-hover:text-primary" />
     </PanelResizeHandle>
   );
 }
@@ -18,7 +18,7 @@ export function HResizeHandle() {
 export function VResizeHandle() {
   return (
     <PanelResizeHandle className="group relative flex h-1 items-center justify-center bg-border transition-colors hover:bg-brand-400">
-      <GripHorizontal className="absolute h-4 w-4 text-muted-foreground group-hover:text-brand-600" />
+      <GripHorizontal className="absolute h-4 w-4 text-muted-foreground group-hover:text-primary" />
     </PanelResizeHandle>
   );
 }

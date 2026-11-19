@@ -62,9 +62,9 @@ export interface RouteCompareListProps {
 function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'violet' | 'red'; children: React.ReactNode }) {
   const tones: Record<typeof tone, string> = {
     emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    blue: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+    blue: 'bg-primary/15 text-primary border-primary/30',
     amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    violet: 'bg-brand-500/15 text-brand-300 border-brand-500/30',
+    violet: 'bg-primary/15 text-primary border-primary/30',
     red: 'bg-red-500/15 text-red-300 border-red-500/30',
   };
   return (
@@ -130,7 +130,7 @@ export function RouteCompareList({
               className={cn(
                 'min-h-6 rounded px-2 py-1 text-[11px] font-medium transition-colors',
                 sortMode === m.id
-                  ? 'bg-brand-500/20 text-brand-200 ring-1 ring-inset ring-brand-500/40'
+                  ? 'bg-primary/20 text-primary ring-1 ring-inset ring-primary/40'
                   : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
               )}
             >
@@ -196,11 +196,11 @@ export function RouteCompareList({
                     }}
                     className={cn(
                       'group relative flex items-start gap-3 px-4 py-2.5 outline-hidden transition-colors',
-                      'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
+                      'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
                       node.selectable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
-                      isSelected && 'bg-brand-500/10',
+                      isSelected && 'bg-primary/10',
                       !node.feasible && 'text-muted-foreground',
-                      recommendedRank === 0 && !isSelected && 'bg-brand-500/5',
+                      recommendedRank === 0 && !isSelected && 'bg-primary/5',
                     )}
                   >
                     {/* Selected marker as a full-height rail — reads at a glance
@@ -214,7 +214,7 @@ export function RouteCompareList({
                       aria-hidden
                       className={cn(
                         'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
-                        isSelected ? 'border-brand-500 bg-brand-500 text-white' : 'border-muted-foreground/40',
+                        isSelected ? 'border-primary/40 bg-brand-500 text-white' : 'border-muted-foreground/40',
                         !node.selectable && 'opacity-0',
                       )}
                     >

@@ -896,7 +896,7 @@ return {
                               <div key={dayIndex} className="relative h-6 bg-muted/20 rounded border-l border-muted/30">
                                 {isInTimeRange && (
                                   <div className="absolute inset-0 bg-primary/60 rounded flex items-center justify-center">
-                                    <span className="text-white text-xs font-medium">
+                                    <span className="text-foreground text-xs font-medium">
                                       {viewMode === 'daily' ? `Wk ${dayIndex + 1}` : 
                                        viewMode === 'weekly' ? `Wk ${dayIndex + 1}` : 
                                        `Wk ${dayIndex + 1}`}
@@ -1021,9 +1021,9 @@ return {
                                       }}
                                     >
                                       {dayIndex === 0 || (!subTaskStartTime && !subTaskEndTime) ? (
-                                        <div className="text-white text-xs truncate">{subTask.name}</div>
+                                        <div className="text-foreground text-xs truncate">{subTask.name}</div>
                                       ) : (
-                                        <div className="text-white text-xs font-medium text-center">
+                                        <div className="text-foreground text-xs font-medium text-center">
                                           {(() => {
                                             const startDate = subTaskStartTime ? subTaskStartTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) : '';
                                             const endDate = subTaskEndTime ? subTaskEndTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) : '';
@@ -1068,10 +1068,10 @@ return {
                             <div className="w-72 pr-4">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-4 h-4 bg-blue-500/20 rounded-full flex items-center justify-center text-xs font-medium">
+                                  <div className="w-4 h-4 bg-primary/20 rounded-full flex items-center justify-center text-xs font-medium">
                                     {bomIndex + 1}
                                   </div>
-                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <div className="w-2 h-2 bg-brand-500 rounded-full"></div>
                                   <div>
                                     <div className="font-medium text-xs">{bomItem.partNumber}</div>
                                     <div className="text-xs text-muted-foreground">
@@ -1160,9 +1160,9 @@ return {
                                         }}
                                       >
                                         {dayIndex === 0 ? (
-                                          <div className="text-white text-xs truncate">{bomItem.partNumber}</div>
+                                          <div className="text-foreground text-xs truncate">{bomItem.partNumber}</div>
                                         ) : (
-                                          <span className="text-white text-xs font-medium">
+                                          <span className="text-foreground text-xs font-medium">
                                             {bomItem.consumedQuantity || 0}/{bomItem.requiredQuantity || 0}
                                           </span>
                                         )}
@@ -1212,7 +1212,7 @@ return {
                   <span className="text-sm">Shortage</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-gray-500"></div>
+                  <div className="w-4 h-4 rounded bg-muted-foreground/30"></div>
                   <span className="text-sm">Pending</span>
                 </div>
               </div>

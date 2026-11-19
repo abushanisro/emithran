@@ -1182,7 +1182,7 @@ export default function BOMDetailPage() {
                   </div>
 
                   {selectedBOMItems.length > 1 && (
-                    <p className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                    <p className="text-xs text-muted-foreground bg-primary/10 p-2 rounded">
                       {selectedBOMItems.length} parts selected. Click a part to toggle it.
                     </p>
                   )}
@@ -1228,7 +1228,7 @@ export default function BOMDetailPage() {
                         max="100"
                         value={explodeDistance}
                         onChange={e => setExplodeDistance(parseInt(e.target.value))}
-                        className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        className="w-32 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
                       />
                       <span className="text-sm text-muted-foreground w-8">{explodeDistance}</span>
                     </div>
@@ -1389,7 +1389,7 @@ export default function BOMDetailPage() {
                   <div className="text-sm text-muted-foreground">Failed</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-blue-600">{importSummary.total}</div>
+                  <div className="text-2xl font-bold text-primary">{importSummary.total}</div>
                   <div className="text-sm text-muted-foreground">Total</div>
                 </div>
               </div>
@@ -1485,7 +1485,7 @@ export default function BOMDetailPage() {
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 text-sm text-blue-800">
+            <div className="bg-primary/10 border border-primary/40 rounded-lg p-3 flex items-start gap-2 text-sm text-primary">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <p>
                 Deletion proceeds deepest-first (child parts → sub-assemblies → assemblies) to

@@ -56,7 +56,7 @@ export async function generateEMithranPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(...C.dark);
-  doc.text('EMithran', M, y);
+  doc.text('EMITHRAN', M, y);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
@@ -286,9 +286,9 @@ export async function generateEMithranPdf(
     doc.setDrawColor(210, 210, 210);
     doc.setLineWidth(0.3);
     doc.line(M, 287, pageW - M, 287);
-    doc.text('EMithran  ·  Confidential  ·  For internal use only', M, 291);
+    doc.text('EMITHRAN  ·  Confidential  ·  For internal use only', M, 291);
     doc.text(`Page ${p} of ${count}`, pageW - M, 291, { align: 'right' });
   }
 
-  doc.save(`${part.partNumber ?? part.partName ?? 'cost-report'}-EMithran-Report.pdf`);
+  doc.save(`${part.partNumber ?? part.partName ?? 'cost-report'}-EMITHRAN-Report.pdf`);
 }

@@ -150,10 +150,10 @@ function UndercutFigure() {
       <text x="120" y="107" textAnchor="middle" className="fill-muted-foreground text-[9px]">core half</text>
       <path d="M70 92 V40 H170 V92 H150 V58 H90 V92 Z" className="fill-emerald-500/60 stroke-emerald-700" />
       <rect x="150" y="66" width="20" height="10" className="fill-background stroke-emerald-700" />
-      <rect x="176" y="60" width="62" height="22" rx="2" className="fill-sky-500/50 stroke-sky-700" />
-      <rect x="152" y="67" width="26" height="8" className="fill-sky-500/50 stroke-sky-700" />
+      <rect x="176" y="60" width="62" height="22" rx="2" className="fill-primary/50 stroke-primary" />
+      <rect x="152" y="67" width="26" height="8" className="fill-primary/50 stroke-primary" />
       <text x="207" y="74" textAnchor="middle" className="fill-foreground text-[9px]">slide</text>
-      <path d="M244 71 H276 M270 66 L277 71 L270 76" className="fill-none stroke-sky-700" strokeWidth="1.5" />
+      <path d="M244 71 H276 M270 66 L277 71 L270 76" className="fill-none stroke-primary" strokeWidth="1.5" />
       <path d="M120 34 V10 M115 16 L120 9 L125 16" className="fill-none stroke-foreground" strokeWidth="1.5" />
       <text x="128" y="16" className="fill-foreground text-[9px]">draw direction</text>
       <text x="62" y="70" textAnchor="end" className="fill-foreground text-[9px]">part</text>
@@ -164,14 +164,14 @@ function UndercutFigure() {
 
 // ── Panels ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-const SEVERITY_DOT: Record<string, string> = { critical: 'bg-red-500', major: 'bg-amber-500', minor: 'bg-sky-500' };
+const SEVERITY_DOT: Record<string, string> = { critical: 'bg-red-500', major: 'bg-amber-500', minor: 'bg-brand-500' };
 
 function Panel({ title, topic, onHelp, children }: { title: string; topic: Topic; onHelp: (t: Topic) => void; children: React.ReactNode }) {
   return (
     <section className="min-w-0 rounded-md border border-border bg-card/40">
       <h3 className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1.5 text-[11px] font-semibold tracking-wide">
         <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
-        <button type="button" onClick={() => { onHelp(topic); }} aria-label={`About ${title}`} className="shrink-0 rounded-full p-0.5 text-sky-600 hover:bg-sky-500/10 dark:text-sky-400">
+        <button type="button" onClick={() => { onHelp(topic); }} aria-label={`About ${title}`} className="shrink-0 rounded-full p-0.5 text-primary hover:bg-primary/10 dark:text-primary">
           <Info className="h-3.5 w-3.5" />
         </button>
       </h3>
@@ -192,7 +192,7 @@ function Row({ label, value, why, review, open, onReview }: {
       <span className={`shrink-0 max-w-[55%] text-right font-medium tabular-nums [overflow-wrap:anywhere] ${value === '—' ? 'font-normal text-muted-foreground' : ''}`}>{value}</span>
       {review && (
         <button type="button" disabled={!canReview} onClick={() => onReview?.(review.key)} aria-expanded={open === review.key}
-          className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium transition-colors ${open === review.key ? 'border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400' : 'border-border hover:bg-muted/60'} disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent`}>
+          className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium transition-colors ${open === review.key ? 'border-primary/40 bg-primary/10 text-primary dark:text-primary' : 'border-border hover:bg-muted/60'} disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent`}>
           Review
         </button>
       )}
@@ -209,7 +209,7 @@ function ReviewList({ items, selected, onSelect }: { items: DesignGuidanceItem[]
         return (
           <li key={key}>
             <button type="button" onClick={() => { onSelect(item); }} aria-pressed={selected === item.label}
-              className={`flex w-full items-start gap-2 rounded px-1.5 py-1 text-left text-[11px] ${selected === item.label ? 'bg-brand-500/15' : 'hover:bg-muted/60'}`}>
+              className={`flex w-full items-start gap-2 rounded px-1.5 py-1 text-left text-[11px] ${selected === item.label ? 'bg-primary/15' : 'hover:bg-muted/60'}`}>
               <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${(item.severity && SEVERITY_DOT[item.severity]) ?? 'bg-muted-foreground/50'}`} aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className="block [overflow-wrap:anywhere]">{item.label}</span>

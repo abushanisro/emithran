@@ -55,14 +55,14 @@ function truncate(s: string, n: number) {
 
 const QUADRANT_COLORS: Record<string, { bar: string; text: string; border: string; bg: string }> = {
   QuickWin:  { bar: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10' },
-  Strategic: { bar: 'bg-blue-500',    text: 'text-blue-400',    border: 'border-blue-500/40',    bg: 'bg-blue-500/10' },
+  Strategic: { bar: 'bg-brand-500', text: 'text-primary', border: 'border-primary/40', bg: 'bg-primary/10' },
   FillIn:    { bar: 'bg-amber-500',   text: 'text-amber-400',   border: 'border-amber-500/40',   bg: 'bg-amber-500/10' },
   Avoid:     { bar: 'bg-muted-foreground', text: 'text-muted-foreground', border: 'border-border', bg: 'bg-muted/40' },
 };
 
 const FRAMEWORK_COLORS: Record<string, { bar: string; text: string }> = {
   SCAMPER: { bar: 'bg-primary',            text: 'text-primary' },
-  TRIZ:    { bar: 'bg-brand-500',         text: 'text-brand-400' },
+  TRIZ:    { bar: 'bg-brand-500',         text: 'text-primary' },
   FAST:    { bar: 'bg-amber-500',          text: 'text-amber-400' },
   Manual:  { bar: 'bg-muted-foreground',   text: 'text-muted-foreground' },
 };
@@ -113,7 +113,7 @@ function A3Report({
           <p className="text-[10px] text-muted-foreground mt-0.5">Value Analysis · Value Engineering</p>
         </div>
         <div className="text-right text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Mithran MFG</p>
+          <p className="font-medium text-foreground">EMITHRAN MFG</p>
           <p>{today}</p>
         </div>
       </div>

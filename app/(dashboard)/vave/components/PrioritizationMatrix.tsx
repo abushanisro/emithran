@@ -32,7 +32,7 @@ const QUADRANT_CONFIG: Record<Quadrant, {
   barColor: string;
 }> = {
   QuickWin:  { label: 'Quick Wins',     subLabel: 'High savings · Low effort',  bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', headerText: 'text-emerald-400', countText: 'text-emerald-300', barColor: 'bg-emerald-500' },
-  Strategic: { label: 'Strategic Bets', subLabel: 'High savings · High effort', bg: 'bg-blue-500/10',    border: 'border-blue-500/30',    headerText: 'text-blue-400',    countText: 'text-blue-300',   barColor: 'bg-blue-500' },
+  Strategic: { label: 'Strategic Bets', subLabel: 'High savings · High effort', bg: 'bg-primary/10', border: 'border-primary/30', headerText: 'text-primary', countText: 'text-primary', barColor: 'bg-brand-500' },
   FillIn:    { label: 'Fill-ins',       subLabel: 'Low savings · Low effort',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   headerText: 'text-amber-400',   countText: 'text-amber-300',  barColor: 'bg-amber-500' },
   Avoid:     { label: 'Avoid',          subLabel: 'Low savings · High effort',  bg: 'bg-muted/40',       border: 'border-border',         headerText: 'text-muted-foreground', countText: 'text-muted-foreground', barColor: 'bg-muted-foreground' },
 };

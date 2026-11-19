@@ -136,7 +136,7 @@ export function SupplierEvaluationDashboard({
           </div>
 
           <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Factory className="h-6 w-6" />
             </div>
             <div>
@@ -291,8 +291,8 @@ function OEMEvaluationCard({ group, onClick, onEdit }: OEMEvaluationCardProps) {
     },
     completed: {
       label: 'Qualified / Complete',
-      className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
-      dotColor: 'bg-blue-500'
+      className: 'bg-primary/10 text-primary dark:text-primary border-primary/30',
+      dotColor: 'bg-brand-500'
     },
     draft: {
       label: 'Draft Program',
@@ -302,7 +302,7 @@ function OEMEvaluationCard({ group, onClick, onEdit }: OEMEvaluationCardProps) {
     archived: {
       label: 'Archived',
       className: 'bg-muted text-muted-foreground border-border',
-      dotColor: 'bg-gray-400'
+      dotColor: 'bg-muted-foreground/30'
     }
   };
 

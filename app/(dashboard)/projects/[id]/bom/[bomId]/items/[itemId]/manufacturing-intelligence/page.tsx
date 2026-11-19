@@ -292,7 +292,7 @@ function FeatureBreakdown({
             disabled={!highlight}
             onClick={() => highlight && onSelectHighlight?.(highlight)}
             title={highlight ? 'Click to highlight in the 3D view' : undefined}
-            className="w-full flex items-center justify-between py-0.5 pl-3 border-l-2 border-brand-500/20 text-left transition-colors disabled:cursor-default enabled:hover:border-brand-500/60 enabled:hover:bg-brand-500/5"
+            className="w-full flex items-center justify-between py-0.5 pl-3 border-l-2 border-primary/20 text-left transition-colors disabled:cursor-default enabled:hover:border-primary/60 enabled:hover:bg-primary/5"
           >
             <span className="min-w-0">
               <span className="text-[11px] text-muted-foreground/80 font-mono">{op.name}</span>
@@ -346,11 +346,11 @@ function CutLengthRows({ cutLengthMm, fg, onSelectHighlight, label = 'Cut Length
       disabled={!highlight}
       onClick={() => highlight && onSelectHighlight?.(highlight)}
       title={highlight ? 'Click to highlight in the 3D view' : 'Re-analyse the part to highlight its cut path'}
-      className={cn(rowClassName, 'w-full text-left', highlight ? 'hover:bg-brand-500/5 cursor-pointer' : 'cursor-default')}
+      className={cn(rowClassName, 'w-full text-left', highlight ? 'hover:bg-primary/5 cursor-pointer' : 'cursor-default')}
       style={indent ? { paddingLeft: '28px' } : undefined}
     >
       <span className={labelClassName}>{text}</span>
-      {highlight && <span className="text-[9px] text-brand-500/70 shrink-0">show in 3D</span>}
+      {highlight && <span className="text-[9px] text-primary/70 shrink-0">show in 3D</span>}
       <span className={valueClassName}>{fmt(mm, 0)} mm</span>
     </button>
   );
@@ -1301,7 +1301,7 @@ function CostSummaryTab({
                         setProcDialogAutoOpenCalculator(true);
                         setProcDialogOpen(true);
                       }}
-                      className="text-muted-foreground/40 hover:text-brand-500 transition-colors shrink-0"
+                      className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0"
                       title="Open in process calculator"
                     >
                       <Calculator className="h-3 w-3" />
@@ -1627,7 +1627,7 @@ function RouteComparisonCard({
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-      <div className="h-4 w-4 rounded-full border-2 border-brand-500/40 border-t-brand-500 animate-spin" />
+      <div className="h-4 w-4 rounded-full border-2 border-primary/40 border-t-primary/40 animate-spin" />
       <span className="text-xs">Comparing routes…</span>
     </div>
   );
@@ -1678,12 +1678,12 @@ function RouteComparisonCard({
       className={cn(
         'w-full flex items-center justify-between py-0.5 pl-3 border-l-2 text-left transition-colors',
         highlight
-          ? 'border-brand-500/20 hover:border-brand-500/60 hover:bg-brand-500/5 cursor-pointer'
+          ? 'border-primary/20 hover:border-primary/60 hover:bg-primary/5 cursor-pointer'
           : 'border-transparent cursor-default',
       )}
     >
       <p className="text-[10px] text-muted-foreground">✓ {label}</p>
-      {highlight && <span className="text-[9px] text-brand-500/70 shrink-0">show in 3D</span>}
+      {highlight && <span className="text-[9px] text-primary/70 shrink-0">show in 3D</span>}
     </button>
   );
   const hasDetected = !!summary && (
@@ -1788,13 +1788,13 @@ function RouteComparisonCard({
               className={cn(
                 'rounded-lg border transition-all cursor-pointer overflow-hidden',
                 incapable ? 'border-red-200/40 opacity-60 cursor-default' :
-                isApplied ? 'border-brand-500/60 ring-1 ring-brand-500/20' :
-                isSelected ? 'border-brand-400/50' :
+                isApplied ? 'border-primary/60 ring-1 ring-primary/20' :
+                isSelected ? 'border-primary/50' :
                 'border-border/50 hover:border-border',
               )}
             >
               {/* Route header */}
-              <div className={cn('px-3 py-2.5', isApplied ? 'bg-brand-500/8' : 'bg-muted/10')}>
+              <div className={cn('px-3 py-2.5', isApplied ? 'bg-primary/8' : 'bg-muted/10')}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-foreground">{route.routeLabel}</p>
@@ -1803,13 +1803,13 @@ function RouteComparisonCard({
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-medium">↓ Lowest Cost</span>
                       )}
                       {route.badges.fastest && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 border border-blue-500/20 font-medium">⚡ Fastest</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">⚡ Fastest</span>
                       )}
                       {route.badges.bestQuality && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-brand-500/10 text-brand-700 border border-brand-500/20 font-medium">★ Best Quality</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">★ Best Quality</span>
                       )}
                       {isApplied && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-brand-500/20 text-brand-600 border border-brand-500/30 font-semibold">✓ Applied</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 font-semibold">✓ Applied</span>
                       )}
                     </div>
                   </div>
@@ -1924,7 +1924,7 @@ function RouteComparisonCard({
 
               {/* Apply button — shown when selected but not yet applied */}
               {isSelected && !isApplied && !incapable && (
-                <div className="px-3 py-2 border-t border-brand-500/20 bg-brand-500/5 flex justify-end">
+                <div className="px-3 py-2 border-t border-primary/20 bg-primary/5 flex justify-end">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1947,7 +1947,7 @@ function RouteComparisonCard({
                 </div>
               )}
               {isApplied && (
-                <div className="px-3 py-2 border-t border-brand-500/20 bg-brand-500/5 flex justify-end">
+                <div className="px-3 py-2 border-t border-primary/20 bg-primary/5 flex justify-end">
                   <button
                     onClick={(e) => { e.stopPropagation(); onAppliedRouteChange(null); }}
                     className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
@@ -1968,11 +1968,11 @@ function RouteComparisonCard({
 
         {/* ── Applied route cost breakdown ── */}
         {appliedRoute && (
-          <div className="rounded-lg border border-brand-500/30 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20">
+          <div className="rounded-lg border border-primary/30 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2.5 bg-primary/8 border-b border-primary/20">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-brand-500">Cost Breakdown</p>
-                <p className="text-xs font-medium text-brand-700 mt-0.5">{appliedRoute.routeLabel}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">Cost Breakdown</p>
+                <p className="text-xs font-medium text-primary mt-0.5">{appliedRoute.routeLabel}</p>
               </div>
               <button onClick={() => { onAppliedRouteChange(null); }}
                 className="text-xs text-muted-foreground hover:text-foreground w-6 h-6 flex items-center justify-center rounded hover:bg-muted/40 transition-colors">
@@ -2484,7 +2484,7 @@ function InputRow({ label, value, onChange, onBlur }: { label: string; value: nu
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
             if (e.key === 'Escape') { if (priorValue !== null) onChange(priorValue); setIsEditing(false); }
           }}
-          className="text-xs font-medium text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 tabular-nums"
+          className="text-xs font-medium text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 tabular-nums"
         />
       ) : (
         <button
@@ -2508,14 +2508,14 @@ function InputRow({ label, value, onChange, onBlur }: { label: string; value: nu
 function HResizeHandle() {
   return (
     <PanelResizeHandle className="w-1 bg-border hover:bg-brand-400 transition-colors relative group flex items-center justify-center">
-      <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-brand-600 absolute" />
+      <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary absolute" />
     </PanelResizeHandle>
   );
 }
 function VResizeHandle() {
   return (
     <PanelResizeHandle className="h-1 bg-border hover:bg-brand-400 transition-colors relative group flex items-center justify-center">
-      <GripHorizontal className="h-4 w-4 text-muted-foreground group-hover:text-brand-600 absolute" />
+      <GripHorizontal className="h-4 w-4 text-muted-foreground group-hover:text-primary absolute" />
     </PanelResizeHandle>
   );
 }
@@ -2556,7 +2556,7 @@ function TreeRow({
                 </button>
               )
               : <span className="w-3 shrink-0" />}
-            {node.kind === 'feature' && <span className="text-blue-400 text-[9px] shrink-0">▣</span>}
+            {node.kind === 'feature' && <span className="text-primary text-[9px] shrink-0">▣</span>}
             <span className={`truncate ${
               node.kind === 'part' ? 'font-semibold' :
               node.kind === 'group' ? 'font-medium' :
@@ -3563,12 +3563,12 @@ function MaterialPickerDialog({
             value={search}
             onChange={(e) => { setSearch(e.target.value); }}
             autoFocus
-            className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+            className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40"
           />
           <select
             value={groupFilter}
             onChange={(e) => { setGroupFilter(e.target.value); }}
-            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer w-40 shrink-0"
+            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 cursor-pointer w-40 shrink-0"
           >
             {processGroup && <option value={PROCESS_MATERIALS}>{processGroup} materials</option>}
             <option value="">All Groups</option>
@@ -3577,7 +3577,7 @@ function MaterialPickerDialog({
           <select
             value={classFilter}
             onChange={(e) => { setClassFilter(e.target.value); }}
-            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer w-36 shrink-0"
+            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 cursor-pointer w-36 shrink-0"
             aria-label="Material class"
           >
             <option value="">All Classes</option>
@@ -3625,7 +3625,7 @@ function MaterialPickerDialog({
                         className={cn(
                           'border-b cursor-pointer transition-colors text-xs',
                           isActive
-                            ? 'bg-brand-500/10 border-brand-500/20'
+                            ? 'bg-primary/10 border-primary/20'
                             : 'hover:bg-muted/30',
                         )}
                       >
@@ -4142,7 +4142,7 @@ function CostGuidePanel({
         ] as [LeftTab, string][]).map(([key, label]) => (
           <button key={key} onClick={() => { setTab(key); }}
             className={`px-2.5 py-1.5 text-[11px] font-medium border-b-2 whitespace-nowrap transition-colors ${
-              tab === key ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-background' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
+              tab === key ? 'border-primary/40 text-primary dark:text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
             }`}>{label}</button>
         ))}
       </div>
@@ -4155,7 +4155,7 @@ function CostGuidePanel({
               <select
                 value={factoryDraft}
                 onChange={(e) => { setFactoryDraft(e.target.value); }}
-                className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40"
               >
                 {!factories && <option value={factoryDraft}>{factoryDraft}</option>}
                 {(factories ?? []).map((f) => (
@@ -4182,7 +4182,7 @@ function CostGuidePanel({
                 <select
                   value={selectedProcessGroup ?? ''}
                   onChange={(e) => { patchScenarioOverrides.mutate({ id: item.id, patch: { processGroup: e.target.value || null } }); }}
-                  className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                  className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40"
                 >
                   {!selectedProcessGroup && <option value="">Select process…</option>}
                   {processGroupChoices.map((g) => (
@@ -4220,7 +4220,7 @@ function CostGuidePanel({
                   <select
                     value={scenarioCurrencyDraft}
                     onChange={(e) => { handleScenarioCurrencyChange(e.target.value); }}
-                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer"
+                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 cursor-pointer"
                   >
                     {!currencies && <option value={scenarioCurrencyDraft}>{scenarioCurrencyDraft}</option>}
                     {(currencies ?? []).map((c) => (
@@ -4253,7 +4253,7 @@ function CostGuidePanel({
                   <select
                     value={rateTypeDraft}
                     onChange={(e) => { setRateTypeDraft(e.target.value as FxRateType); }}
-                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer"
+                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 cursor-pointer"
                   >
                     <option value="reference">Reference (latest available FX rate)</option>
                     <option value="budget">Budget (admin-set rate)</option>
@@ -4269,7 +4269,7 @@ function CostGuidePanel({
                       placeholder={factoryCurrencyInfo ? `${factoryCurrencyInfo.code} → ${scenarioCurrencyDraft} rate` : 'rate'}
                       value={customRateDraft}
                       onChange={(e) => { setCustomRateDraft(e.target.value); }}
-                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40"
                     />
                   </div>
                 ) : null}
@@ -4280,7 +4280,7 @@ function CostGuidePanel({
                       type="text" placeholder="Required — e.g. contract-locked rate"
                       value={customReasonDraft}
                       onChange={(e) => { setCustomReasonDraft(e.target.value); }}
-                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40"
                     />
                   </div>
                 ) : null}
@@ -4319,7 +4319,7 @@ function CostGuidePanel({
                   <button
                     onClick={() => { refreshFxRate.mutate({ base: factoryCurrencyInfo.code, quote: scenarioCurrencyDraft }); }}
                     disabled={refreshFxRate.isPending}
-                    className="text-[10px] text-brand-400 hover:text-brand-300 disabled:opacity-50"
+                    className="text-[10px] text-primary hover:text-primary disabled:opacity-50"
                   >{refreshFxRate.isPending ? 'Refreshing…' : 'Refresh FX'}</button>
                 )}
 
@@ -4336,7 +4336,7 @@ function CostGuidePanel({
                       placeholder="Target / quoted price"
                       value={askPriceDraft}
                       onChange={(e) => { setAskPriceDraft(e.target.value); }}
-                      className="w-full text-xs border border-border rounded pl-6 pr-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                      className="w-full text-xs border border-border rounded pl-6 pr-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40"
                     />
                   </div>
                 </div>
@@ -4380,7 +4380,7 @@ function CostGuidePanel({
               {processRouting === 'manual' && selectedManualRoute && (
                 <button
                   onClick={onManualClick}
-                  className="ml-4 mt-0.5 text-[11px] text-brand-400 hover:text-brand-300 underline text-left"
+                  className="ml-4 mt-0.5 text-[11px] text-primary hover:text-primary underline text-left"
                 >
                   {selectedManualRoute.label} ↗
                 </button>
@@ -4414,7 +4414,7 @@ function CostGuidePanel({
                   }}
                   placeholder={selectedProcessGroup ? `Search ${selectedProcessGroup} materials…` : "Search raw materials database…"}
                   title="Select a material grade from the raw materials database"
-                  className="w-full text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 pl-8 pr-24"
+                  className="w-full text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 pl-8 pr-24"
                 />
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   <button
@@ -4488,10 +4488,10 @@ function CostGuidePanel({
                     <span className="text-xs font-medium truncate block">{drawingMaterial}</span>
                     <span className="text-[9px] text-muted-foreground/60 leading-tight">From drawing title block</span>
                   </div>
-                  <span className="text-[9px] font-semibold text-blue-400 border border-blue-500/40 rounded px-1 py-px leading-none shrink-0">DRAWING</span>
+                  <span className="text-[9px] font-semibold text-primary border border-primary/40 rounded px-1 py-px leading-none shrink-0">DRAWING</span>
                   <button
                     onClick={() => { setMatInputValue(drawingMaterial); }}
-                    className="text-[9px] font-medium text-brand-400 hover:text-brand-300 shrink-0"
+                    className="text-[9px] font-medium text-primary hover:text-primary shrink-0"
                     title="Stage this grade — commit it with the main Apply button below"
                   >Use</button>
                 </div>
@@ -4527,7 +4527,7 @@ function CostGuidePanel({
                           if (e.key === 'Escape') cancelBlankThicknessEdit();
                         }}
                         placeholder={cadThicknessMm > 0 ? String(cadThicknessMm) : '—'}
-                        className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                        className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40"
                       />
                       <span className="text-xs text-muted-foreground shrink-0">mm</span>
                     </>
@@ -4555,7 +4555,7 @@ function CostGuidePanel({
                 </div>
                 <div className="flex items-center justify-between text-[11px] py-1 border-t border-border/50 mt-1 pt-1.5">
                   <span className="text-foreground font-medium">Effective Thickness</span>
-                  <span className="font-semibold text-brand-400">{effectiveThicknessMm} mm</span>
+                  <span className="font-semibold text-primary">{effectiveThicknessMm} mm</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground/50 mt-0.5">Used for costing — override wins when set, else the real CAD value</p>
               </Section>
@@ -4748,7 +4748,7 @@ function CostGuidePanel({
               <div className="flex items-center gap-2 py-0.5">
                 <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">Product Line</span>
                 <input type="text" value={productLine} onChange={(e) => { setProductLine(e.target.value); }} placeholder="—"
-                  className="text-xs text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500" />
+                  className="text-xs text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40" />
               </div>
               <Row label="Model Number" value={item.partNumber ?? '—'} />
             </Section>
@@ -5254,7 +5254,7 @@ function MachiningFeatureInspectorPanel({ featureIds, occurrences, fg, lines, cu
           <div className="flex flex-col gap-2">
             {diamEntries.map(([d, count]) => (
               <div key={d} className="flex items-center gap-2">
-                <span className="text-[11px] font-mono text-cyan-400 w-10 shrink-0">{d}</span>
+                <span className="text-[11px] font-mono text-primary w-10 shrink-0">{d}</span>
                 <div className="flex-1 h-[3px] bg-muted rounded-full overflow-hidden">
                   <div className="h-full bg-amber-400/70 rounded-full" style={{ width: `${(count / maxDiamCount) * 100}%` }} />
                 </div>
@@ -5389,7 +5389,7 @@ function ThreadFeatureInspectorPanel({ selectedId, item }: { selectedId: string;
           <div className="text-base font-semibold text-foreground leading-tight">
             {isHelicoil ? 'Helicoil Insert' : 'Internal Thread'}
           </div>
-          <div className="text-[11px] font-mono text-cyan-400 mt-1">{t.size}</div>
+          <div className="text-[11px] font-mono text-primary mt-1">{t.size}</div>
         </div>
         <div className="text-right shrink-0">
           <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">Count</div>
@@ -6281,7 +6281,7 @@ function ValidationTab({
                 Blank Development
               </span>
               <Button variant="ghost" size="sm" onClick={() => { setOptionsOpen(true); }}
-                className="text-[10px] h-5 px-2 text-brand-400 hover:text-brand-300 hover:bg-brand-500/10">
+                className="text-[10px] h-5 px-2 text-primary hover:text-primary hover:bg-primary/10">
                 Options
               </Button>
             </div>
@@ -6366,7 +6366,7 @@ function ValidationTab({
                   <div className="flex items-center gap-1.5">
                     <p className="text-xs text-foreground flex-1">{routeSummary}</p>
                     <Button variant="ghost" size="sm"
-                      className="text-[10px] h-5 px-1.5 text-brand-400 hover:text-brand-300 shrink-0">
+                      className="text-[10px] h-5 px-1.5 text-primary hover:text-primary shrink-0">
                       Edit Routing
                     </Button>
                   </div>
@@ -6446,7 +6446,7 @@ function ValidationTab({
                     disabled={!highlight}
                     onClick={() => highlight && onSelectHighlight?.(highlight)}
                     title={highlight ? 'Click to highlight in the 3D view' : undefined}
-                    className="w-full px-2 py-1.5 flex items-start gap-2 text-left transition-colors disabled:cursor-default enabled:hover:bg-brand-500/5"
+                    className="w-full px-2 py-1.5 flex items-start gap-2 text-left transition-colors disabled:cursor-default enabled:hover:bg-primary/5"
                   >
                     <span className="shrink-0 mt-0.5 w-3">{icon}</span>
                     <div className="flex-1 min-w-0">
@@ -6486,7 +6486,7 @@ function DesignGuidanceTab({ fg, plastic, machining }: {
   const severityConfig = {
     critical: { icon: '❌', cls: 'border-red-500/30 bg-red-500/10', labelCls: 'text-red-400 bg-red-500/20', textCls: 'text-red-100', mutedCls: 'text-red-300/70', label: 'CRITICAL' },
     warning:  { icon: '⚠️', cls: 'border-amber-500/30 bg-amber-500/10', labelCls: 'text-amber-400 bg-amber-500/20', textCls: 'text-amber-100', mutedCls: 'text-amber-300/70', label: 'WARNING' },
-    info:     { icon: 'ℹ️', cls: 'border-blue-500/30 bg-blue-500/10', labelCls: 'text-blue-400 bg-blue-500/20', textCls: 'text-blue-100', mutedCls: 'text-blue-300/70', label: 'INFO' },
+    info: { icon: 'ℹ️', cls: 'border-primary/30 bg-primary/10', labelCls: 'text-primary bg-primary/20', textCls: 'text-primary', mutedCls: 'text-primary/70', label: 'INFO' },
   };
 
   if (!fg) {
@@ -6533,8 +6533,8 @@ function DesignGuidanceTab({ fg, plastic, machining }: {
 function ConfidenceBadge({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const cls =
-    pct >= 80 ? 'bg-cyan-500/15 text-cyan-700 border-cyan-500/30' :
-    pct >= 50 ? 'bg-blue-500/15 text-blue-700 border-blue-500/30' :
+    pct >= 80 ? 'bg-primary/15 text-primary border-primary/30' :
+    pct >= 50 ? 'bg-primary/15 text-primary border-primary/30' :
     'bg-amber-500/15 text-amber-700 border-amber-500/30';
   return (
     <span className={`text-[9px] font-semibold px-1 py-0.5 rounded border ${cls} tabular-nums`}>
@@ -6588,7 +6588,7 @@ function DrawingIntelligenceTab({ item }: { item: BOMItem }) {
                       <span className="text-[11px] font-medium text-foreground/90 leading-tight">{s.name}</span>
                       <span className={`text-[9px] font-semibold px-1 py-px rounded shrink-0 ${
                         i === 0
-                          ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                          ? 'bg-primary/15 text-primary dark:text-primary'
                           : 'bg-muted/60 text-muted-foreground'
                       }`}>
                         {i === 0 ? 'Recommended' : 'Alternative'}
@@ -6685,7 +6685,7 @@ function DrawingIntelligenceTab({ item }: { item: BOMItem }) {
                         <td className="py-0.5 font-medium">{t.size}</td>
                         <td className="py-0.5 text-right tabular-nums text-muted-foreground">{t.pitch}</td>
                         <td className="py-0.5 text-right tabular-nums font-medium">{t.count}</td>
-                        <td className="py-0.5 text-right tabular-nums text-blue-600 dark:text-blue-400 font-medium">
+                        <td className="py-0.5 text-right tabular-nums text-primary dark:text-primary font-medium">
                           {intel.tapDrillMm != null ? `Ø${intel.tapDrillMm}` : '—'}
                         </td>
                         <td className="py-0.5 text-right text-[10px] text-muted-foreground">{intel.classFit}</td>
@@ -6881,7 +6881,7 @@ function MoldCavitiesSection({
       <div className="flex items-center gap-2 py-0.5">
         <span className="text-xs text-muted-foreground w-20 shrink-0">Cavities</span>
         <select
-          className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer"
+          className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 cursor-pointer"
           value={override ?? ''}
           onChange={(e) => { onChange(e.target.value === '' ? null : Number(e.target.value)); }}
         >
@@ -7021,11 +7021,11 @@ function BlankStockSection({
         <div className="flex items-center gap-2 py-0.5">
           <span className="text-xs text-muted-foreground w-20 shrink-0">Stock Form</span>
           <select
-            className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500 cursor-pointer"
+            className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40 cursor-pointer"
             value={stockFormOverride ?? ''}
             onChange={(e) => { onStockFormChange(e.target.value === '' ? null : e.target.value); }}
           >
-            <option value="">Let eMithran Decide</option>
+            <option value="">Let EMITHRAN Decide</option>
             {MACHINING_STOCK_FORM_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -7105,7 +7105,7 @@ function AnalysisTabsPanel({
         {RIGHT_TABS.map(({ key, label }) => (
           <button key={key} onClick={() => { setTab(key); }}
             className={`px-2.5 py-1.5 text-[11px] font-medium border-b-2 whitespace-nowrap transition-colors ${
-              tab === key ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-background' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
+              tab === key ? 'border-primary/40 text-primary dark:text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
             }`}>{label}</button>
         ))}
       </div>
@@ -9102,7 +9102,7 @@ export default function ManufacturingIntelligencePage() {
         title={fg?.feature_graph_v2 ? 'Toggle heatmap overlay' : 'Upload and analyze a 3D model to enable heatmaps'}
         className={cn(
           'flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border transition-colors shrink-0',
-          heatmapMode ? 'bg-blue-600 text-white border-blue-500' : 'border-border hover:bg-muted',
+          heatmapMode ? 'bg-brand-600 text-white border-primary/40' : 'border-border hover:bg-muted',
           !fg?.feature_graph_v2 && 'opacity-40 cursor-not-allowed',
         )}
       >
@@ -9131,7 +9131,7 @@ export default function ManufacturingIntelligencePage() {
   const actionToolbar = null;
 
   const heatmapLegend = heatmapMode && heatmapSources.length > 0 ? (
-    <div className="flex items-center gap-3 px-4 py-1.5 border-b bg-slate-950/60 shrink-0">
+    <div className="flex items-center gap-3 px-4 py-1.5 border-b bg-background/60 shrink-0">
       <div className="flex flex-col gap-0.5">
         <div className="h-2 w-36 rounded-sm" style={{ background: 'linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444)' }} />
         <div className="flex justify-between text-[9px] text-muted-foreground w-36">
@@ -9142,7 +9142,7 @@ export default function ManufacturingIntelligencePage() {
         {(['absolute', 'relative'] as const).map((mode) => (
           <button key={mode} onClick={() => { setHeatmapNorm(mode); }}
             className={cn('px-1.5 py-0.5 rounded border text-[9px] capitalize',
-              heatmapNorm === mode ? 'bg-slate-600 text-white border-slate-500' : 'text-muted-foreground border-border hover:bg-muted')}>
+              heatmapNorm === mode ? 'bg-muted-foreground/50 text-foreground border-border' : 'text-muted-foreground border-border hover:bg-muted')}>
             {mode}
           </button>
         ))}
@@ -9172,15 +9172,15 @@ export default function ManufacturingIntelligencePage() {
   ) : null;
 
   const heatmapInspectorPanel = heatmapInspector && heatmapMode ? (
-    <div className="border border-blue-800/60 rounded-md bg-slate-900 p-3 text-xs mb-3 shrink-0">
+    <div className="border border-primary/60 rounded-md bg-card p-3 text-xs mb-3 shrink-0">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold text-slate-200 text-[11px]">Heatmap Inspector</span>
-        <button onClick={() => { setHeatmapInspector(null); }} className="text-slate-500 hover:text-slate-300 text-[10px] leading-none">✕</button>
+        <span className="font-semibold text-foreground text-[11px]">Heatmap Inspector</span>
+        <button onClick={() => { setHeatmapInspector(null); }} className="text-muted-foreground hover:text-foreground/80 text-[10px] leading-none">✕</button>
       </div>
 
       {/* Score bar */}
       <div className="mb-3">
-        <div className="flex justify-between text-slate-400 mb-1 text-[10px]">
+        <div className="flex justify-between text-muted-foreground mb-1 text-[10px]">
           <span>
             {isInjectionMolded
               ? (heatmapLayer === 'thermal' ? 'Heat concentration at location'
@@ -9203,7 +9203,7 @@ export default function ManufacturingIntelligencePage() {
             {Math.round(heatmapInspector.riskValue * 100)} / 100 · {heatmapInspector.riskLevel}
           </span>
         </div>
-        <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
           <div className="h-full rounded-full" style={{
             width: `${heatmapInspector.riskValue * 100}%`,
             background: 'linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444)',
@@ -9216,12 +9216,12 @@ export default function ManufacturingIntelligencePage() {
       {/* Dominant contributors */}
       {heatmapInspector.contributors.length > 0 && (
         <div className="mb-2">
-          <div className="text-slate-400 text-[10px] mb-1 font-medium">Dominant Contributors</div>
+          <div className="text-muted-foreground text-[10px] mb-1 font-medium">Dominant Contributors</div>
           {heatmapInspector.contributors.map((c, i) => (
-            <div key={i} className="flex items-start gap-1 text-slate-300 text-[10px] py-0.5">
+            <div key={i} className="flex items-start gap-1 text-foreground/80 text-[10px] py-0.5">
               <span className="shrink-0 mt-0.5">•</span>
               <span className="flex-1 min-w-0 truncate">{c.label}</span>
-              <span className="tabular-nums text-slate-400 shrink-0">{c.contributionPct}%</span>
+              <span className="tabular-nums text-muted-foreground shrink-0">{c.contributionPct}%</span>
               <span
                 className="shrink-0 flex gap-px"
                 title={c.confidence === 'measured' ? 'From CAD geometry' : c.confidence === 'heuristic' ? 'Physics estimate' : 'Global proxy'}
@@ -9230,8 +9230,8 @@ export default function ManufacturingIntelligencePage() {
                   <span key={j} className={cn('text-[7px]',
                     c.confidence === 'measured' ? 'text-emerald-400'
                     : c.confidence === 'heuristic' && j < 2 ? 'text-yellow-400'
-                    : c.confidence === 'signal' && j < 1 ? 'text-slate-500'
-                    : 'text-slate-700')}>●</span>
+                    : c.confidence === 'signal' && j < 1 ? 'text-muted-foreground'
+                    : 'text-foreground')}>●</span>
                 ))}
               </span>
             </div>
@@ -9242,7 +9242,7 @@ export default function ManufacturingIntelligencePage() {
       {/* Manufacturing impact / Cost drivers */}
       {heatmapInspector.manufacturingImpact.length > 0 && (
         <div className="mb-2">
-          <div className="text-slate-400 text-[10px] mb-1 font-medium">
+          <div className="text-muted-foreground text-[10px] mb-1 font-medium">
             {heatmapLayer === 'cost_density' ? 'Cost Drivers'
               : heatmapLayer === 'tolerance_risk' ? 'Tolerance Impact'
               : heatmapLayer === 'sustainability' ? 'CO₂ Drivers'
@@ -9256,7 +9256,7 @@ export default function ManufacturingIntelligencePage() {
               <span className={cn('mt-0.5 shrink-0',
                 imp.severity === 'critical' ? 'text-red-400' : imp.severity === 'high' ? 'text-orange-400'
                 : imp.severity === 'medium' ? 'text-yellow-400' : 'text-green-400')}>▲</span>
-              <span className="text-slate-300">{imp.label}</span>
+              <span className="text-foreground/80">{imp.label}</span>
             </div>
           ))}
         </div>
@@ -9265,12 +9265,12 @@ export default function ManufacturingIntelligencePage() {
       {/* Recommendations */}
       {heatmapInspector.recommendations.length > 0 && (
         <div className="mb-2">
-          <div className="text-slate-400 text-[10px] mb-1 font-medium">Recommendations</div>
+          <div className="text-muted-foreground text-[10px] mb-1 font-medium">Recommendations</div>
           {heatmapInspector.recommendations.map((rec, i) => (
             <div key={i} className="flex items-start gap-1 text-[10px] py-0.5">
               <span className={cn('mt-0.5 shrink-0',
-                rec.priority === 'high' ? 'text-blue-400' : rec.priority === 'medium' ? 'text-slate-400' : 'text-slate-600')}>→</span>
-              <span className="text-slate-300">{rec.label}</span>
+                rec.priority === 'high' ? 'text-primary' : rec.priority === 'medium' ? 'text-muted-foreground' : 'text-muted-foreground')}>→</span>
+              <span className="text-foreground/80">{rec.label}</span>
             </div>
           ))}
         </div>
@@ -9279,9 +9279,9 @@ export default function ManufacturingIntelligencePage() {
       {/* Nearby features */}
       {heatmapInspector.nearbyFeatures.length > 0 && (
         <div className="mb-2">
-          <div className="text-slate-400 text-[10px] mb-1 font-medium">Nearby Features</div>
+          <div className="text-muted-foreground text-[10px] mb-1 font-medium">Nearby Features</div>
           {heatmapInspector.nearbyFeatures.map((f, i) => (
-            <div key={i} className="flex justify-between text-slate-300 text-[10px] py-0.5">
+            <div key={i} className="flex justify-between text-foreground/80 text-[10px] py-0.5">
               <span>• {f.type} — {f.distanceMm}mm</span>
               <span className={cn('capitalize',
                 f.riskLevel === 'critical' ? 'text-red-400' : f.riskLevel === 'high' ? 'text-orange-400'
@@ -9301,7 +9301,7 @@ export default function ManufacturingIntelligencePage() {
             setVendorHotspotContext({ layer: heatmapLayer, riskLevel: heatmapInspector.riskLevel });
             rightPanelScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className="w-full mt-1 text-[9px] text-brand-400 hover:text-brand-300 border border-brand-800/50 hover:border-brand-600/60 rounded px-2 py-1 transition-colors text-left"
+          className="w-full mt-1 text-[9px] text-primary hover:text-primary border border-primary/50 hover:border-primary/60 rounded px-2 py-1 transition-colors text-left"
         >
           Find vendors for this risk → Vendor Network
         </button>

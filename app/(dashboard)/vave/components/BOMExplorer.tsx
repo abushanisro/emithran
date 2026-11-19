@@ -366,9 +366,9 @@ function HierarchyView({ items, allProcesses, analysisResults, analyzingId, onAn
 // ── Spend Analysis view ───────────────────────────────────────────────────────
 
 const CHART_COLORS = [
-  'hsl(187 100% 42%)',
-  'hsl(187 100% 55%)',
-  'hsl(187 80% 35%)',
+  'hsl(175 84% 32%)',
+  'hsl(173 66% 50%)',
+  'hsl(175 77% 26%)',
   'hsl(160 60% 45%)',
   'hsl(215 80% 55%)',
   'hsl(250 70% 60%)',
@@ -436,9 +436,9 @@ function SpendAnalysisView({ items }: SpendAnalysisViewProps) {
     {
       label: 'Parts Count',
       value: items.length.toLocaleString(),
-      accent: 'text-blue-400',
-      bg: 'bg-blue-500/10',
-      border: 'border-blue-500/20',
+      accent: 'text-primary',
+      bg: 'bg-primary/10',
+      border: 'border-primary/20',
     },
     {
       label: 'Top Supplier Spend',
@@ -545,7 +545,7 @@ function SpendAnalysisView({ items }: SpendAnalysisViewProps) {
                       fontSize: 11,
                     }}
                     labelStyle={{ color: 'hsl(220 15% 70%)' }}
-                    itemStyle={{ color: 'hsl(187 100% 42%)' }}
+                    itemStyle={{ color: 'hsl(175 84% 32%)' }}
                   />
                   <Bar dataKey="spend" radius={[0, 3, 3, 0]}>
                     {materialData.map((_, i) => (
@@ -591,7 +591,7 @@ function SpendAnalysisView({ items }: SpendAnalysisViewProps) {
                       fontSize: 11,
                     }}
                     labelStyle={{ color: 'hsl(220 15% 70%)' }}
-                    itemStyle={{ color: 'hsl(187 100% 42%)' }}
+                    itemStyle={{ color: 'hsl(175 84% 32%)' }}
                   />
                   <Bar dataKey="spend" radius={[0, 3, 3, 0]}>
                     {supplierData.map((_, i) => (
@@ -847,7 +847,7 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
 
         <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
           <Upload className="h-3.5 w-3.5 mr-1.5" />
-          Import from Mithran BOM
+          Import from EMITHRAN BOM
         </Button>
       </div>
 
@@ -936,7 +936,7 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
-              <p className="text-sm">No BOM items yet. Import from a Mithran BOM to get started.</p>
+              <p className="text-sm">No BOM items yet. Import from a EMITHRAN BOM to get started.</p>
               <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5 mr-1.5" />
                 Import BOM
@@ -955,7 +955,7 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
-                <p className="text-sm">No BOM items yet. Import from a Mithran BOM to get started.</p>
+                <p className="text-sm">No BOM items yet. Import from a EMITHRAN BOM to get started.</p>
                 <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
                   <Upload className="h-3.5 w-3.5 mr-1.5" />
                   Import BOM
@@ -1012,7 +1012,7 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Import from Mithran BOM</DialogTitle>
+            <DialogTitle>Import from EMITHRAN BOM</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">

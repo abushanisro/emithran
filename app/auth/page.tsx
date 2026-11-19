@@ -1,14 +1,15 @@
 'use client'
 
-import { KeyRound, Loader2 } from 'lucide-react'
+import { ChevronDown, KeyRound, Loader2 } from 'lucide-react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
+import { MarketingNavbar } from '@/components/layout/MarketingNavbar'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
 import { SIGN_IN_PATH, ssoSignInPath } from '@/lib/auth/sign-in'
+import { marketingUrl, REQUEST_DEMO_URL } from '@/lib/marketing-site'
 import { useAuth } from '@/lib/providers/auth'
 
 /**
@@ -31,6 +32,22 @@ function SignInLink({ href, variant, className, children }: { href: string; vari
   )
 }
 
+const WHY_CHOOSE_US = [
+  'Comprehensive manufacturing cost analysis',
+  'Real-time data insights and analytics',
+  'Seamless integration with existing systems',
+  'Expert support and consultation',
+  'Scalable solutions for all business sizes',
+]
+
+const FAQS = [
+  { q: 'What is EMITHRAN?', a: 'EMITHRAN is a comprehensive manufacturing solution platform that provides cost modeling, process optimization, and data analytics tools for engineering teams across all manufacturing segments.' },
+  { q: 'How do I get started?', a: 'You can get started by requesting a demo. Our team will reach out to schedule a personalized demonstration. If you already have an account, simply sign in above.' },
+  { q: 'What features does EMITHRAN offer?', a: 'EMITHRAN offers manufacturing cost modeling, real-time analytics, vendor management, raw materials database, equipment tracking, BOM management, and collaborative tools.' },
+  { q: 'Is my data secure?', a: 'Yes, data security is our top priority. We implement industry-standard encryption, secure authentication, and regular security audits to protect your data.' },
+  { q: 'Can EMITHRAN integrate with existing systems?', a: 'Yes, EMITHRAN integrates with existing ERP, PLM, and other manufacturing systems through APIs and custom integrations. Contact us to discuss your requirements.' },
+]
+
 export default function AuthPage() {
   const { signOut, accessDenied } = useAuth()
   const ssoPath = ssoSignInPath()
@@ -52,318 +69,146 @@ export default function AuthPage() {
     }
   }, [])
 
+  // Light, like the marketing site's navbar above it: white and soft-grey surfaces, ink text, the same teal for actions.
+  // Fixed colours (not the app theme), so the public page looks the same whatever theme a signed-in user picked.
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Navigation Bar */}
-      <nav className="w-full bg-background border-b border-border/50">
-        <div className="max-w-full mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            {/* Left Side - Logo and Links */}
-            <div className="flex items-center gap-8">
-              <Link href="/auth" className="flex items-center">
-                <Image
-                  src="/M.svg"
-                  alt="Emithran"
-                  width={100}
-                  height={38}
-                  className="h-6 w-auto"
-                  priority
-                />
-              </Link>
-              <a href="#about" className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors pb-1">
-                About
-              </a>
-              <a href="#faqs" className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors pb-1">
-                FAQ
-              </a>
-            </div>
+    <div className="min-h-screen flex flex-col bg-white text-[#0f1b2d]" style={{ colorScheme: 'light' }}>
+      <MarketingNavbar />
 
-            {/* Right Side - Navigation Links */}
-            <div className="flex items-center gap-4">
-              <Link href="/auth" className="text-sm font-medium text-foreground border-b-2 border-primary pb-1">
-                Sign In
-              </Link>
-              <Link href="/demo">
-                <Button variant="outline" className="h-9 px-5 rounded-none border-foreground/80 text-sm text-foreground hover:bg-transparent hover:text-primary hover:border-primary">
-                  Request Demo
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Top Section - Auth Form */}
       <div className="flex relative flex-1">
-        {/* Left Side - Branding */}
-        <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-card to-secondary p-12 flex-col relative overflow-hidden"
-          style={{
-            clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)'
-          }}>
-
-          <div className="relative z-10 text-center flex-1 flex flex-col justify-center items-center -ml-8 pt-8">
-            <Image
-              src="/favicon.svg"
-              alt="Emithran"
-              width={90}
-              height={90}
-              className="mb-8"
-              priority
-            />
-            <h2 className="text-3xl font-semibold text-foreground mb-4">Welcome back!</h2>
-            <p className="text-muted-foreground text-base max-w-xs">
-              One-stop solution provider to all manufacturing segments
-            </p>
-          </div>
-
-          {/* Illustration at bottom */}
-          <div className="flex justify-center items-end relative z-10 pb-8">
-            <div className="relative w-full max-w-lg">
-              <Image
-                src="/hero.svg"
-                alt="Manufacturing illustration"
-                width={500}
-                height={400}
-                className="w-full h-auto"
-                priority
-              />
+        {/* Left side: branding and illustration */}
+        <div
+          className="hidden lg:flex lg:w-1/2 p-12 flex-col relative overflow-hidden bg-[linear-gradient(160deg,#eef8f6_0%,#f4f6f8_55%,#e9eef3_100%)]"
+          style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)' }}
+        >
+          <div className="relative z-10 flex flex-col items-center -ml-8 pt-6 text-center">
+            <h1 className="text-3xl font-semibold tracking-tight mb-3">Welcome back</h1>
+            <p className="text-black/55 text-base max-w-xs">One-stop solution provider to all manufacturing segments</p>
+            <div className="mt-10 w-full max-w-lg">
+              <Image src="/hero.svg" alt="Manufacturing illustration" width={500} height={400} className="w-full h-auto drop-shadow-xl" priority />
             </div>
           </div>
         </div>
 
-        {/* Right Side - Login Form */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 bg-background relative">
-          <div className="w-full max-w-md space-y-8">
+        {/* Right side: sign in */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 relative">
+          <div className="w-full max-w-sm space-y-6">
             <div>
-              <h2 className="text-3xl font-bold text-foreground mb-2">Sign in your account</h2>
+              <h2 className="text-2xl font-bold tracking-tight mb-1.5">Sign in to your account</h2>
+              <p className="text-sm text-black/50">Use your company account, or single sign-on if your organisation has it.</p>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-3">
               {accessDenied && (
-                <div role="alert" className="rounded-xl border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
-                  Your account has not been invited to eMithran. Ask your administrator for access, or{' '}
-                  <button type="button" onClick={() => void signOut()} className="text-primary hover:underline font-medium">use another account</button>.
+                <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
+                  Your account has not been invited to EMITHRAN. Ask your administrator for access, or{' '}
+                  <button type="button" onClick={() => void signOut()} className="font-semibold text-[#0b7f70] hover:underline">use another account</button>.
                 </div>
               )}
 
-
               <SignInLink
                 href={SIGN_IN_PATH}
-                className="w-full h-14 bg-card hover:bg-card/80 text-foreground font-semibold rounded-2xl transition-all duration-200 border border-border/50"
+                className="w-full h-11 rounded-lg text-sm font-semibold text-white shadow-sm transition-[filter,transform] duration-150 bg-[linear-gradient(135deg,#0d9488,#0f766e)] hover:bg-transparent hover:brightness-110 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[#0d9488]/40 focus-visible:ring-offset-2"
               >
                 Sign In
               </SignInLink>
 
               {ssoPath && (
                 <>
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">Or</span>
-                    </div>
+                  <div className="flex items-center gap-3 py-1">
+                    <span className="h-px flex-1 bg-black/[0.08]" />
+                    <span className="text-[11px] font-medium uppercase tracking-widest text-black/40">Or</span>
+                    <span className="h-px flex-1 bg-black/[0.08]" />
                   </div>
 
                   <SignInLink
                     href={ssoPath}
                     variant="outline"
-                    className="w-full h-14 border-border bg-secondary/30 hover:bg-secondary/50 hover:text-foreground hover:border-primary/50 rounded-2xl font-semibold transition-all duration-200"
+                    className="w-full h-11 rounded-lg border border-black/15 bg-white text-sm font-semibold text-[#0f1b2d] shadow-sm transition-colors duration-150 hover:bg-black/[0.03] hover:border-[#0d9488]/50 hover:text-[#0f766e] focus-visible:ring-2 focus-visible:ring-[#0d9488]/40 focus-visible:ring-offset-2"
                   >
-                    <KeyRound className="w-5 h-5 mr-2" aria-hidden="true" />
+                    <KeyRound className="w-4 h-4" aria-hidden="true" />
                     Sign in with SSO
                   </SignInLink>
                 </>
               )}
             </div>
 
-            <div className="text-center pt-4">
-              <p className="text-sm text-muted-foreground">
-                Don't have an account?{' '}
-                <Link href="/demo" className="text-primary hover:underline font-medium">
-                  Request a demo
-                </Link>
-              </p>
-            </div>
+            <p className="text-center text-sm text-black/55">
+              Don&apos;t have an account?{' '}
+              <a href={REQUEST_DEMO_URL} className="font-semibold text-[#0b7f70] hover:underline">Request a demo</a>
+            </p>
 
-            {/* Progress indicator dots at bottom */}
-            <div className="flex justify-center gap-2 pt-4">
-              <Link href="/demo">
-                <div className="w-8 h-1 bg-muted-foreground/30 rounded-full cursor-pointer hover:bg-muted-foreground/50 transition-colors" />
-              </Link>
-              <Link href="/auth">
-                <div className="w-8 h-1 bg-muted-foreground rounded-full cursor-pointer hover:bg-primary transition-colors" />
-              </Link>
-            </div>
-
-            {/* Footer Links */}
-            <div className="flex justify-center gap-6 pt-8 text-sm">
-              <a href="#about" className="text-muted-foreground hover:text-primary transition-colors">
-                About Us
-              </a>
-              <span className="text-muted-foreground/30">•</span>
-              <a href="#faqs" className="text-muted-foreground hover:text-primary transition-colors">
-                FAQs
-              </a>
+            <div className="flex justify-center gap-5 pt-2 text-xs">
+              <a href="#about" className="text-black/45 hover:text-[#0b7f70] transition-colors">About Us</a>
+              <span className="text-black/20" aria-hidden="true">•</span>
+              <a href="#faqs" className="text-black/45 hover:text-[#0b7f70] transition-colors">FAQs</a>
             </div>
           </div>
         </div>
       </div>
 
-      {/* About Us & FAQs Section */}
-      <div id="about" className="w-full bg-background border-t border-border">
-        <div className="container max-w-3xl mx-auto px-8 py-16 space-y-12">
-
-          {/* About Emithran */}
+      {/* About Us & FAQs */}
+      <section id="about" className="w-full scroll-mt-20 border-t border-black/[0.08] bg-white">
+        <div className="mx-auto max-w-3xl space-y-12 px-6 py-16">
           <div>
-            <h2 className="text-3xl font-bold text-foreground mb-6">About Emithran</h2>
-            <p className="text-muted-foreground mb-4 leading-relaxed">
-              Emithran is dedicated to revolutionizing the manufacturing industry by providing
-              comprehensive solutions that streamline operations, optimize costs, and enhance
-              productivity across all manufacturing segments.
+            <h2 className="text-3xl font-bold tracking-tight mb-5">About EMITHRAN</h2>
+            <p className="text-black/60 mb-4 leading-relaxed">
+              EMITHRAN is dedicated to revolutionizing the manufacturing industry by providing comprehensive solutions that streamline
+              operations, optimize costs, and enhance productivity across all manufacturing segments.
             </p>
-            <p className="text-muted-foreground mb-0 leading-relaxed">
-              We specialize in manufacturing cost modeling, process optimization, and end-to-end
-              solutions that help engineering teams make informed decisions.
+            <p className="text-black/60 leading-relaxed">
+              We specialize in manufacturing cost modeling, process optimization, and end-to-end solutions that help engineering teams
+              make informed decisions.
             </p>
           </div>
 
-          {/* Why Choose Us */}
           <div>
-            <h3 className="text-2xl font-semibold text-foreground mb-6">Why Choose Us</h3>
-            <ul className="space-y-4 text-muted-foreground">
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-0.5"></span>
-                <span>Comprehensive manufacturing cost analysis</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-0.5"></span>
-                <span>Real-time data insights and analytics</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-0.5"></span>
-                <span>Seamless integration with existing systems</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-0.5"></span>
-                <span>Expert support and consultation</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-0.5"></span>
-                <span>Scalable solutions for all business sizes</span>
-              </li>
+            <h3 className="text-2xl font-semibold tracking-tight mb-5">Why Choose Us</h3>
+            <ul className="space-y-3">
+              {WHY_CHOOSE_US.map((item) => (
+                <li key={item} className="flex items-start gap-3 text-black/60">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0d9e8a]" aria-hidden="true" />
+                  {item}
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* FAQs */}
-          <div id="faqs">
-            <h2 className="text-3xl font-bold text-foreground mb-8">Frequently Asked Questions</h2>
-            <div className="space-y-4">
-              <details className="group bg-card border border-border rounded-lg">
-                <summary className="cursor-pointer p-4 font-semibold text-foreground hover:text-primary transition-colors list-none flex items-center justify-between">
-                  What is Emithran?
-                  <span className="text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div className="px-4 pb-4 text-muted-foreground">
-                  Emithran is a comprehensive manufacturing solution platform that provides cost modeling,
-                  process optimization, and data analytics tools for engineering teams across all
-                  manufacturing segments.
-                </div>
-              </details>
-
-              <details className="group bg-card border border-border rounded-lg">
-                <summary className="cursor-pointer p-4 font-semibold text-foreground hover:text-primary transition-colors list-none flex items-center justify-between">
-                  How do I get started?
-                  <span className="text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div className="px-4 pb-4 text-muted-foreground">
-                  You can get started by requesting a demo. Our team will reach out to schedule a
-                  personalized demonstration. If you already have an account, simply sign in above.
-                </div>
-              </details>
-
-              <details className="group bg-card border border-border rounded-lg">
-                <summary className="cursor-pointer p-4 font-semibold text-foreground hover:text-primary transition-colors list-none flex items-center justify-between">
-                  What features does Emithran offer?
-                  <span className="text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div className="px-4 pb-4 text-muted-foreground">
-                  Emithran offers manufacturing cost modeling, real-time analytics, vendor management,
-                  raw materials database, equipment tracking, BOM management, and collaborative tools.
-                </div>
-              </details>
-
-              <details className="group bg-card border border-border rounded-lg">
-                <summary className="cursor-pointer p-4 font-semibold text-foreground hover:text-primary transition-colors list-none flex items-center justify-between">
-                  Is my data secure?
-                  <span className="text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div className="px-4 pb-4 text-muted-foreground">
-                  Yes, data security is our top priority. We implement industry-standard encryption,
-                  secure authentication, and regular security audits to protect your data.
-                </div>
-              </details>
-
-              <details className="group bg-card border border-border rounded-lg">
-                <summary className="cursor-pointer p-4 font-semibold text-foreground hover:text-primary transition-colors list-none flex items-center justify-between">
-                  Can Emithran integrate with existing systems?
-                  <span className="text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div className="px-4 pb-4 text-muted-foreground">
-                  Yes, Emithran integrates with existing ERP, PLM, and other manufacturing systems
-                  through APIs and custom integrations. Contact us to discuss your requirements.
-                </div>
-              </details>
+          <div id="faqs" className="scroll-mt-20">
+            <h2 className="text-3xl font-bold tracking-tight mb-6">Frequently Asked Questions</h2>
+            <div className="space-y-3">
+              {FAQS.map(({ q, a }) => (
+                <details key={q} className="group rounded-xl border border-black/[0.08] bg-[#f8fafc]">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 font-semibold hover:text-[#0b7f70] transition-colors">
+                    {q}
+                    <ChevronDown className="h-4 w-4 shrink-0 text-black/40 transition-transform group-open:rotate-180" aria-hidden="true" />
+                  </summary>
+                  <p className="px-4 pb-4 text-black/60 leading-relaxed">{a}</p>
+                </details>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Footer */}
-      <footer className="w-full bg-card border-t border-border">
-        <div className="max-w-full px-6 py-12">
-          <div className="mb-8">
-            <Image
-              src="/M.svg"
-              alt="Emithran"
-              width={140}
-              height={52}
-              className="h-10 w-auto mb-6"
-            />
-            <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed">
+      <footer className="w-full border-t border-black/[0.08] bg-[#f8fafc]">
+        <div className="mx-auto max-w-[1280px] px-6 py-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-1 mb-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- the marketing site's logo */}
+              <img src="/brand/emithran-mark.png" alt="" width={256} height={256} className="h-6 w-auto" />
+              <span className="text-base font-semibold tracking-tight text-[#080808]">EMITHRAN</span>
+            </div>
+            <p className="text-xs leading-relaxed text-black/45">
               This Manufacturing Cost Calculator is provided for general informational purposes only and does not constitute any legal, tax or business advice. Verify all calculations with your accounting and engineering teams as cost estimates are subject to change without notice. We do not accept any liability as a result of using this tool.
             </p>
           </div>
-
-          {/* Bottom Bar */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-6">
-            <div className="flex gap-4">
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                </svg>
-              </a>
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-              </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                </svg>
-              </a>
-            </div>
-
-            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-              <span>© {new Date().getFullYear()} Emithran. All rights reserved.</span>
-              <span>/</span>
-              <a href="#" className="hover:text-primary transition-colors">Terms of Use</a>
-              <span>/</span>
-              <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-              <span>/</span>
-              <a href="#faqs" className="hover:text-primary transition-colors">FAQ</a>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-black/45">
+            <span>© {new Date().getFullYear()} Emithran Technologies Pvt. Ltd.</span>
+            <span className="text-black/20">·</span>
+            <a href={marketingUrl('/terms')} className="hover:text-[#0b7f70] transition-colors">Terms of Use</a>
+            <span className="text-black/20">·</span>
+            <a href={marketingUrl('/privacy')} className="hover:text-[#0b7f70] transition-colors">Privacy Policy</a>
           </div>
         </div>
       </footer>

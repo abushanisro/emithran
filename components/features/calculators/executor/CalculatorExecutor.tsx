@@ -1102,7 +1102,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
               {error instanceof Error ? userMessage : 'The calculator you requested could not be found.'}
             </p>
             {suggestion && (
-              <p className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg">
+              <p className="text-sm text-primary dark:text-primary bg-primary/10 dark:bg-primary/30 p-3 rounded-lg">
                 💡 {suggestion}
               </p>
             )}
@@ -1128,7 +1128,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
           {/* Technical details for debugging (only in development) */}
           {process.env.NODE_ENV === 'development' && error && (
-            <details className="text-left bg-gray-100 dark:bg-gray-800 p-4 rounded text-xs">
+            <details className="text-left bg-muted p-4 rounded text-xs">
               <summary className="cursor-pointer font-medium">Technical Details</summary>
               <pre className="mt-2 whitespace-pre-wrap">
                 {error instanceof Error ? error.stack : JSON.stringify(error, null, 2)}
@@ -1298,7 +1298,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                             ? 'border-destructive bg-destructive/5 focus:border-destructive'
                             : errorSeverity === 'warning'
                             ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 focus:border-yellow-500'
-                            : 'border-blue-500 bg-blue-50 dark:bg-blue-950/20 focus:border-blue-500'
+                            : 'border-primary/40 bg-primary/10 dark:bg-primary/20 focus:border-primary/40'
                           : 'bg-primary/5 border-primary/10'
                       } ${fieldError ? 'pr-10' : ''}`}
                     />
@@ -1312,7 +1312,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                       }`}>
                         <ErrorIcon className={`h-4 w-4 ${
                           errorSeverity === 'error' ? 'text-destructive' :
-                          errorSeverity === 'warning' ? 'text-yellow-500' : 'text-blue-500'
+                          errorSeverity === 'warning' ? 'text-yellow-500' : 'text-primary'
                         }`} />
                       </div>
                     )}
@@ -1340,7 +1340,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                     <div className={`flex items-start gap-2 text-xs p-2 rounded ${
                       errorSeverity === 'error' ? 'bg-destructive/10 text-destructive' :
                       errorSeverity === 'warning' ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-950/20 dark:text-yellow-300' :
-                      'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-300'
+                      'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary'
                     }`}>
                       {ErrorIcon && <ErrorIcon className="h-3 w-3 mt-0.5 shrink-0" />}
                       <div className="flex-1">
@@ -1510,7 +1510,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
       {/* Live Calculation Preview */}
       {calculator.fields?.some(field => field.fieldType === 'calculated') && Object.keys(fieldValues).length > 0 && (
-        <Card className="bg-linear-to-r from-blue-50 to-brand-50 dark:from-blue-950/20 dark:to-brand-950/20">
+        <Card className="bg-linear-to-r from-brand-50 to-brand-50 dark:from-brand-950/20 dark:to-brand-950/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
@@ -1527,7 +1527,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                   const calculationSteps = createCalculationSteps(field.defaultValue, fieldValues);
                   
                   return (
-                    <div key={field.id} className="bg-white dark:bg-gray-950 p-4 rounded-lg border">
+                    <div key={field.id} className="bg-card p-4 rounded-lg border">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">{field.displayLabel || field.fieldName}</Label>
@@ -1545,19 +1545,19 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                         
                         {/* Live calculation breakdown */}
                         {calculationSteps.length > 0 && (
-                          <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border">
-                            <h5 className="text-xs font-semibold mb-3 text-gray-700 dark:text-gray-300">
+                          <div className="bg-muted p-4 rounded-lg border">
+                            <h5 className="text-xs font-semibold mb-3 text-foreground ">
                               Live Calculation Steps:
                             </h5>
                             <div className="space-y-2">
                               {calculationSteps.slice(0, 4).map((step, index) => (
                                 <div key={index} className="flex gap-2 items-center text-xs">
                                   <div className={`w-5 h-5 text-white rounded-full flex items-center justify-center text-xs font-bold ${
-                                    step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-brand-500' : 'bg-green-500'
+                                    step.isIntermediate ? 'bg-brand-500' : step.step === 1 ? 'bg-brand-500' : 'bg-green-500'
                                   }`}>
                                     {step.step}
                                   </div>
-                                  <div className="flex-1 font-mono text-xs bg-white dark:bg-gray-950 p-2 rounded border">
+                                  <div className="flex-1 font-mono text-xs bg-card p-2 rounded border">
                                     {step.calculation}
                                   </div>
                                   {step.result && step.isIntermediate && (
@@ -1687,8 +1687,8 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                             <CollapsibleContent className="mt-2">
                               {field.defaultValue && (
                                 <div className="space-y-3">
-                                  <div className="bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 rounded-lg border">
-                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                                  <div className="bg-linear-to-r from-muted to-muted p-4 rounded-lg border">
+                                    <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                                       <Calculator className="h-4 w-4" />
                                       Step-by-Step Calculation
                                     </h4>
@@ -1696,22 +1696,22 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                       {createCalculationSteps(field.defaultValue, fieldValues).map((step, index) => (
                                         <div key={index} className="flex gap-3 items-start">
                                           <div className={`shrink-0 w-7 h-7 text-white rounded-full flex items-center justify-center text-xs font-bold ${
-                                            step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-brand-500' : 'bg-green-500'
+                                            step.isIntermediate ? 'bg-brand-500' : step.step === 1 ? 'bg-brand-500' : 'bg-green-500'
                                           }`}>
                                             {step.step}
                                           </div>
                                           <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
-                                              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{step.description}</p>
+                                              <p className="text-xs font-medium text-foreground ">{step.description}</p>
                                               {step.result && (
-                                                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
+                                                <span className="text-xs bg-primary/10 dark:bg-primary/15 text-primary dark:text-primary px-2 py-1 rounded">
                                                   = {step.result}
                                                 </span>
                                               )}
                                             </div>
-                                            <div className="bg-white dark:bg-gray-950 p-3 rounded border font-mono text-sm overflow-x-auto border-l-4 border-blue-500">
+                                            <div className="bg-card p-3 rounded border font-mono text-sm overflow-x-auto border-l-4 border-primary/40">
                                               <div className="flex items-center justify-between">
-                                                <span className="text-gray-800 dark:text-gray-200">{step.calculation}</span>
+                                                <span className="text-foreground ">{step.calculation}</span>
                                                 {step.result && step.isIntermediate && (
                                                   <span className="text-green-600 dark:text-green-400 font-bold ml-3">
                                                     → {step.result}
@@ -1723,7 +1723,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                         </div>
                                       ))}
                                       
-                                      <div className="mt-4 pt-3 border-t border-gray-300 dark:border-gray-600">
+                                      <div className="mt-4 pt-3 border-t border-border ">
                                         <div className="flex gap-3 items-center">
                                           <div className="shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                                             ✓
@@ -1791,27 +1791,27 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                             <CollapsibleContent className="mt-2">
                               {formula.formulaExpression && (
                                 <div className="space-y-3">
-                                  <div className="bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 rounded-lg border">
-                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                                  <div className="bg-linear-to-r from-muted to-muted p-4 rounded-lg border">
+                                    <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                                       <Calculator className="h-4 w-4" />
                                       Step-by-Step Calculation
                                     </h4>
                                     <div className="space-y-3">
                                       {createCalculationSteps(formula.formulaExpression, fieldValues).map((step, index) => (
                                         <div key={index} className="flex gap-3 items-start">
-                                          <div className="shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                          <div className="shrink-0 w-6 h-6 bg-brand-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
                                             {step.step}
                                           </div>
                                           <div className="flex-1 min-w-0">
                                             <p className="text-xs text-muted-foreground mb-1">{step.description}:</p>
-                                            <div className="bg-white dark:bg-gray-950 p-2 rounded border font-mono text-sm overflow-x-auto">
+                                            <div className="bg-card p-2 rounded border font-mono text-sm overflow-x-auto">
                                               {step.calculation}
                                             </div>
                                           </div>
                                         </div>
                                       ))}
                                       
-                                      <div className="mt-4 pt-3 border-t border-gray-300 dark:border-gray-600">
+                                      <div className="mt-4 pt-3 border-t border-border ">
                                         <div className="flex gap-3 items-center">
                                           <div className="shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                                             ✓

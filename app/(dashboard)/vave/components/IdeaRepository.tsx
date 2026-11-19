@@ -22,8 +22,8 @@ type IdeaView = 'table' | 'kanban' | 'cards';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const FRAMEWORK_COLORS: Record<string, string> = {
-  SCAMPER: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  TRIZ:    'bg-brand-500/10 text-brand-400 border-brand-500/30',
+  SCAMPER: 'bg-primary/10 text-primary border-primary/30',
+  TRIZ:    'bg-primary/10 text-primary border-primary/30',
   FAST:    'bg-amber-500/10 text-amber-400 border-amber-500/30',
   Manual:  'bg-muted/60 text-muted-foreground border-border',
 };
@@ -32,7 +32,7 @@ type StatusStyle = { badge: string; dot: string; header: string; border: string 
 const STATUS_STYLES: Record<string, StatusStyle> = {
   draft:        { badge: 'bg-muted text-muted-foreground',                                         dot: 'bg-muted-foreground',  header: 'text-muted-foreground', border: 'border-muted'        },
   approved:     { badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',               dot: 'bg-emerald-400',       header: 'text-emerald-400',      border: 'border-emerald-500/30' },
-  'in-progress':{ badge: 'bg-blue-500/10 text-blue-400 border-blue-500/30',                        dot: 'bg-blue-400',          header: 'text-blue-400',         border: 'border-blue-500/30'  },
+  'in-progress':{ badge: 'bg-primary/10 text-primary border-primary/30', dot: 'bg-brand-400', header: 'text-primary', border: 'border-primary/30' },
   done:         { badge: 'bg-primary/10 text-primary border-primary/30',                           dot: 'bg-primary',           header: 'text-primary',          border: 'border-primary/30'   },
 };
 const FALLBACK_STYLE: StatusStyle = { badge: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground', header: 'text-muted-foreground', border: 'border-muted' };

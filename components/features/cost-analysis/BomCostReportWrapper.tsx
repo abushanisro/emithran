@@ -265,10 +265,10 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                   
                   const getItemTypeColor = (type: string) => {
                     switch (type) {
-                      case 'assembly': return 'bg-blue-100 text-blue-800';
-                      case 'sub_assembly': return 'bg-brand-100 text-brand-800';
+                      case 'assembly': return 'bg-primary/10 text-primary';
+                      case 'sub_assembly': return 'bg-primary/10 text-primary';
                       case 'child_part': return 'bg-green-100 text-green-800';
-                      default: return 'bg-gray-100 text-gray-800';
+                      default: return 'bg-muted text-foreground';
                     }
                   };
                   
@@ -296,12 +296,12 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                             </div>
                           )}
                           {bomItem.material && (
-                            <div className="text-xs text-blue-600 font-mono">
+                            <div className="text-xs text-primary font-mono">
                               Material: {bomItem.material}
                             </div>
                           )}
                           {bomItem.makeBuy && (
-                            <Badge variant="outline" className={`text-xs ${bomItem.makeBuy === 'make' ? 'bg-orange-50 text-orange-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                            <Badge variant="outline" className={`text-xs ${bomItem.makeBuy === 'make' ? 'bg-orange-50 text-orange-700' : 'bg-primary/10 text-primary'}`}>
                               {bomItem.makeBuy.toUpperCase()}
                             </Badge>
                           )}
@@ -346,7 +346,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <td className="p-2 text-sm border-r border-border">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Badge className="text-xs bg-gray-100 text-gray-800">
+                            <Badge className="text-xs bg-muted text-foreground">
                               UNKNOWN
                             </Badge>
                             <span className="font-medium">#{index + 1}</span>

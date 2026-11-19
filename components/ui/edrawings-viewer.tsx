@@ -3967,7 +3967,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               variant="ghost"
               size="sm"
               onClick={measureMode === 'IDLE' ? startMeasure : exitMeasure}
-              className={`text-[#1f2d3a] hover:bg-[#dfe8e0] gap-1.5 text-xs font-medium ${measureMode !== 'IDLE' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+              className={`text-[#1f2d3a] hover:bg-[#dfe8e0] gap-1.5 text-xs font-medium ${measureMode !== 'IDLE' ? 'bg-brand-600 hover:bg-brand-700' : ''}`}
               title="Measure tool — click two points on the model"
             >
               <Ruler className="h-3.5 w-3.5" />
@@ -4217,7 +4217,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
 
           {highlightOccurrences && (
             <div className="absolute top-12 left-4 z-10 bg-black/70 backdrop-blur-sm border border-white/20 rounded px-2.5 py-1 text-xs flex items-center gap-2 pointer-events-none">
-              <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-brand-400 shrink-0" />
               <span className="font-medium text-white">
                 {highlightLabel(highlightOccurrences)}
               </span>
@@ -4404,7 +4404,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                             setInternalSelectedFeature(next);
                             if (next) setInternalShowFeatures(true);
                           }}
-                          className={`w-full text-left p-0.5 rounded border transition-all ${isSel ? 'border-blue-400 bg-blue-900/30' : 'border-[#666666] bg-[#3f3f3f] hover:bg-[#484848]'}`}
+                          className={`w-full text-left p-0.5 rounded border transition-all ${isSel ? 'border-brand-400 bg-brand-900/30' : 'border-[#666666] bg-[#3f3f3f] hover:bg-[#484848]'}`}
                         >
                           <div className="flex items-center gap-1 mb-0.5">
                             <Crosshair className="h-2.5 w-2.5 shrink-0" style={{ color: featureColor }} />
@@ -4448,8 +4448,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                     <div className="bg-[#3f3f3f] rounded px-1 py-0.5">
                       <div className="text-[7px] text-gray-400 mb-0.5">Recommended Processes</div>
                       {dfmAnalysisData.dfmAnalysis.recommendedProcesses.slice(0, 3).map((p: string, i: number) => (
-                        <div key={i} className="text-[8px] text-blue-300 flex items-center gap-1">
-                          <span className="w-1 h-1 bg-blue-400 rounded-full shrink-0" />{p}
+                        <div key={i} className="text-[8px] text-brand-300 flex items-center gap-1">
+                          <span className="w-1 h-1 bg-brand-400 rounded-full shrink-0" />{p}
                         </div>
                       ))}
                     </div>

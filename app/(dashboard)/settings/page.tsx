@@ -51,75 +51,44 @@ const TIMEZONES = [
 
 type ColorMode = 'light' | 'brand' | 'dark';
 
+/** A miniature of the app in one theme: sidebar with the teal active item, a heading, two lines and a card. Colours are the theme's tokens (app/globals.css). */
+function ThemePreview({ c }: { c: { bg: string; sidebar: string; border: string; teal: string; ink: string; line: string; card: string } }) {
+  return (
+    <div className="w-full h-full rounded-md overflow-hidden flex" style={{ background: c.bg, border: `1px solid ${c.border}` }}>
+      <div className="w-[28%] p-1.5 flex flex-col gap-1" style={{ background: c.sidebar, borderRight: `1px solid ${c.border}` }}>
+        <div className="h-1.5 w-8 rounded-full" style={{ background: c.teal }} />
+        <div className="h-1 w-6 rounded-full mt-1" style={{ background: c.line }} />
+        <div className="h-1 w-6 rounded-full" style={{ background: c.line }} />
+        <div className="h-1 w-5 rounded-full" style={{ background: c.line }} />
+      </div>
+      <div className="flex-1 p-1.5 flex flex-col gap-1">
+        <div className="h-1.5 w-12 rounded-full" style={{ background: c.ink }} />
+        <div className="h-1 w-full rounded-full mt-1" style={{ background: c.line }} />
+        <div className="h-1 w-4/5 rounded-full" style={{ background: c.line }} />
+        <div className="h-4 w-full rounded mt-1" style={{ background: c.card, border: `1px solid ${c.border}` }} />
+      </div>
+    </div>
+  );
+}
+
 const COLOR_MODES: { value: ColorMode; label: string; icon: React.FC<{ className?: string }>; preview: React.ReactNode }[] = [
   {
     value: 'light',
     label: 'Light',
     icon: Sun,
-    preview: (
-      <div className="w-full h-full rounded-md overflow-hidden bg-gray-50 border border-gray-200 flex">
-        {/* mini sidebar */}
-        <div className="w-[28%] bg-gray-100 border-r border-gray-200 p-1.5 flex flex-col gap-1">
-          <div className="h-1.5 w-8 rounded-full bg-gray-300" />
-          <div className="h-1 w-6 rounded-full bg-gray-200 mt-1" />
-          <div className="h-1 w-6 rounded-full bg-gray-200" />
-          <div className="h-1 w-5 rounded-full bg-gray-200" />
-        </div>
-        {/* mini content */}
-        <div className="flex-1 p-1.5 flex flex-col gap-1">
-          <div className="h-1.5 w-12 rounded-full bg-gray-300" />
-          <div className="h-1 w-full rounded-full bg-gray-200 mt-1" />
-          <div className="h-1 w-4/5 rounded-full bg-gray-200" />
-          <div className="h-4 w-full rounded bg-gray-100 border border-gray-200 mt-1" />
-        </div>
-      </div>
-    ),
+    preview: <ThemePreview c={{ bg: '#f8fafc', sidebar: '#ffffff', border: '#cbd5e1', teal: '#0d9488', ink: '#0f1b2d', line: '#e2e8f0', card: '#ffffff' }} />,
   },
   {
     value: 'brand',
-    label: 'System',
+    label: 'Navy',
     icon: Monitor,
-    preview: (
-      <div className="w-full h-full rounded-md overflow-hidden flex" style={{ background: 'hsl(220 20% 7%)' }}>
-        {/* mini sidebar — brand dark blue */}
-        <div className="w-[28%] p-1.5 flex flex-col gap-1" style={{ background: 'hsl(220 20% 5%)', borderRight: '1px solid hsl(220 15% 15%)' }}>
-          <div className="h-1.5 w-8 rounded-full" style={{ background: 'hsl(187 100% 42%)' }} />
-          <div className="h-1 w-6 rounded-full mt-1" style={{ background: 'hsl(220 15% 25%)' }} />
-          <div className="h-1 w-6 rounded-full" style={{ background: 'hsl(220 15% 25%)' }} />
-          <div className="h-1 w-5 rounded-full" style={{ background: 'hsl(220 15% 25%)' }} />
-        </div>
-        {/* mini content */}
-        <div className="flex-1 p-1.5 flex flex-col gap-1">
-          <div className="h-1.5 w-12 rounded-full" style={{ background: 'hsl(210 20% 70%)' }} />
-          <div className="h-1 w-full rounded-full mt-1" style={{ background: 'hsl(220 15% 18%)' }} />
-          <div className="h-1 w-4/5 rounded-full" style={{ background: 'hsl(220 15% 18%)' }} />
-          <div className="h-4 w-full rounded mt-1" style={{ background: 'hsl(220 18% 10%)', border: '1px solid hsl(220 15% 18%)' }} />
-        </div>
-      </div>
-    ),
+    preview: <ThemePreview c={{ bg: '#081120', sidebar: '#06180f', border: '#22324a', teal: '#2dd4bf', ink: '#e2e8f0', line: '#22324a', card: '#0f1b2d' }} />,
   },
   {
     value: 'dark',
     label: 'Dark',
     icon: Moon,
-    preview: (
-      <div className="w-full h-full rounded-md overflow-hidden bg-gray-950 border border-gray-800 flex">
-        {/* mini sidebar */}
-        <div className="w-[28%] bg-gray-900 border-r border-gray-800 p-1.5 flex flex-col gap-1">
-          <div className="h-1.5 w-8 rounded-full bg-gray-600" />
-          <div className="h-1 w-6 rounded-full bg-gray-700 mt-1" />
-          <div className="h-1 w-6 rounded-full bg-gray-700" />
-          <div className="h-1 w-5 rounded-full bg-gray-700" />
-        </div>
-        {/* mini content */}
-        <div className="flex-1 p-1.5 flex flex-col gap-1">
-          <div className="h-1.5 w-12 rounded-full bg-gray-600" />
-          <div className="h-1 w-full rounded-full bg-gray-800 mt-1" />
-          <div className="h-1 w-4/5 rounded-full bg-gray-800" />
-          <div className="h-4 w-full rounded bg-gray-900 border border-gray-800 mt-1" />
-        </div>
-      </div>
-    ),
+    preview: <ThemePreview c={{ bg: '#080808', sidebar: '#0a0a0a', border: '#242424', teal: '#2dd4bf', ink: '#e5e5e5', line: '#242424', card: '#111111' }} />,
   },
 ];
 
@@ -166,7 +135,7 @@ function PreferencesTab() {
         <div className="mb-6">
           <h3 className="text-base font-semibold">Appearance</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Customize how Emithran looks on your device.
+            Customize how EMITHRAN looks on your device.
           </p>
         </div>
 
@@ -336,8 +305,8 @@ function ProfileTab() {
                 className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 {avatarUploading
-                  ? <Loader2 className="h-5 w-5 text-white animate-spin" />
-                  : <Camera className="h-5 w-5 text-white" />}
+                  ? <Loader2 className="h-5 w-5 text-foreground animate-spin" />
+                  : <Camera className="h-5 w-5 text-foreground" />}
               </button>
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
             </div>

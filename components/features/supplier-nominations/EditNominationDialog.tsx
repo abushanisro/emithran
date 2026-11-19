@@ -61,14 +61,14 @@ export function EditNominationDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <h2 className="text-xl font-semibold text-white">Edit Nomination</h2>
+      <div className="bg-card rounded-lg border border-border w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <h2 className="text-xl font-semibold text-foreground">Edit Nomination</h2>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="h-8 w-8 p-0 text-gray-400 hover:text-white"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -76,40 +76,40 @@ export function EditNominationDialog({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <Label htmlFor="nominationName" className="text-sm font-medium text-gray-300">
+            <Label htmlFor="nominationName" className="text-sm font-medium text-foreground/80">
               Nomination Name *
             </Label>
             <Input
               id="nominationName"
               value={formData.nominationName}
               onChange={(e) => handleChange('nominationName', e.target.value)}
-              className="mt-1 bg-gray-700 border-gray-600 text-white"
+              className="mt-1 bg-muted border-border text-foreground"
               required
             />
           </div>
 
           <div>
-            <Label htmlFor="description" className="text-sm font-medium text-gray-300">
+            <Label htmlFor="description" className="text-sm font-medium text-foreground/80">
               Description
             </Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
-              className="mt-1 bg-gray-700 border-gray-600 text-white"
+              className="mt-1 bg-muted border-border text-foreground"
               rows={3}
             />
           </div>
 
           <div>
-            <Label htmlFor="nominationType" className="text-sm font-medium text-gray-300">
+            <Label htmlFor="nominationType" className="text-sm font-medium text-foreground/80">
               Nomination Type *
             </Label>
             <select
               id="nominationType"
               value={formData.nominationType}
               onChange={(e) => handleChange('nominationType', e.target.value)}
-              className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-full px-3 py-2 bg-muted border border-border rounded-md text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40"
               required
             >
               <option value={NominationType.OEM}>OEM</option>
@@ -123,14 +123,14 @@ export function EditNominationDialog({
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              className="border-border text-foreground/80 hover:bg-accent"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={updateNominationMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-brand-600 hover:bg-brand-700 text-white"
             >
               {updateNominationMutation.isPending ? (
                 <>

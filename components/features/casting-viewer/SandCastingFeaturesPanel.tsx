@@ -38,7 +38,7 @@ type ViewOverlay = OverlayKind | "thickness";
 const SEVERITY_CLASS: Record<DfmFinding["severity"], string> = {
   Critical: "bg-red-500/15 text-red-600 border-red-500/30",
   Major: "bg-amber-500/15 text-amber-600 border-amber-500/30",
-  Minor: "bg-sky-500/15 text-sky-600 border-sky-500/30",
+  Minor: "bg-brand-500/15 text-brand-600 border-brand-500/30",
 };
 
 /**

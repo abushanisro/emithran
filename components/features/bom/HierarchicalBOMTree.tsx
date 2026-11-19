@@ -80,11 +80,11 @@ export function HierarchicalBOMTree({
       case 'assembly':
         return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20';
       case 'sub_assembly':
-        return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
+        return 'bg-primary/10 text-primary border-primary/20';
       case 'child_part':
         return 'bg-orange-500/10 text-orange-700 border-orange-500/20';
       default:
-        return 'bg-gray-500/10 text-gray-700 border-gray-500/20';
+        return 'bg-muted-foreground/10 text-foreground border-border/20';
     }
   };
 
@@ -194,7 +194,7 @@ export function HierarchicalBOMTree({
                   <Button 
                     size="sm" 
                     variant="ghost"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary hover:bg-primary/10"
                     onClick={(e) => {
                       e.stopPropagation();
                       // TODO: Implement DFM analysis for specific part

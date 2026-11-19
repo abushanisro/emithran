@@ -35,8 +35,8 @@ function BRow({ label, value, sub, highlight, icon }: {
   icon?: 'db' | 'calc' | 'formula';
 }) {
   const ico =
-    icon === 'db'      ? <Database    className="h-2.5 w-2.5 text-blue-500 inline mr-1" /> :
-    icon === 'calc'    ? <Calculator  className="h-2.5 w-2.5 text-brand-500 inline mr-1" /> :
+    icon === 'db' ? <Database className="h-2.5 w-2.5 text-primary inline mr-1" /> :
+    icon === 'calc'    ? <Calculator  className="h-2.5 w-2.5 text-primary inline mr-1" /> :
     icon === 'formula' ? <FlaskConical className="h-2.5 w-2.5 text-amber-500 inline mr-1" /> : null;
   return (
     <div className={`flex items-start justify-between py-0.5 ${highlight ? 'font-semibold text-foreground border-t border-border mt-0.5 pt-1' : 'text-muted-foreground'}`}>
@@ -371,9 +371,9 @@ export function ManufacturingProcessSection({
                           {proc.timingSource && proc.timingSource !== 'default' && (
                             <span className={`text-[9px] px-1 rounded font-mono shrink-0 ${
                               proc.timingSource === 'feature_geometry' || proc.timingSource === 'machining_rules'
-                                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400'
+                                ? 'bg-primary/15 text-primary dark:text-primary'
                                 : proc.timingSource === 'calculator'
-                                ? 'bg-brand-500/15 text-brand-600 dark:text-brand-400'
+                                ? 'bg-primary/15 text-primary dark:text-primary'
                                 : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                             }`}>
                               {proc.timingSource === 'feature_geometry' ? 'CAD'
@@ -562,8 +562,8 @@ export function ManufacturingProcessSection({
                               <span>{process.cycleTime || 0}</span>
                               {process.timingSource && process.timingSource !== 'default' && (
                                 <span className={`text-[9px] px-1 rounded font-mono ${
-                                  process.timingSource === 'feature_geometry' || process.timingSource === 'machining_rules' ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400' :
-                                  process.timingSource === 'calculator' ? 'bg-brand-500/15 text-brand-600 dark:text-brand-400' :
+                                  process.timingSource === 'feature_geometry' || process.timingSource === 'machining_rules' ? 'bg-primary/15 text-primary dark:text-primary' :
+                                  process.timingSource === 'calculator' ? 'bg-primary/15 text-primary dark:text-primary' :
                                   'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                                 }`}>
                                   {process.timingSource === 'feature_geometry' ? 'CAD' :

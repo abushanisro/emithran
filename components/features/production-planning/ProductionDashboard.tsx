@@ -28,7 +28,7 @@ export function ProductionDashboard({ dashboardData }: ProductionDashboardProps)
   };
 
   const statusConfig = {
-    planned: { color: 'bg-blue-100 text-blue-800', icon: Clock },
+    planned: { color: 'bg-primary/10 text-primary', icon: Clock },
     in_production: { color: 'bg-green-100 text-green-800', icon: Factory },
     completed: { color: 'bg-green-200 text-green-900', icon: CheckCircle },
     on_hold: { color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle },
@@ -111,7 +111,7 @@ export function ProductionDashboard({ dashboardData }: ProductionDashboardProps)
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-brand-500 rounded-full"></div>
                   <span className="text-sm">Planned</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export function ProductionDashboard({ dashboardData }: ProductionDashboardProps)
               ) : (
                 recentLots.map((lot: any) => {
                   const StatusIcon = statusConfig[lot.status as keyof typeof statusConfig]?.icon || Clock;
-                  const statusColor = statusConfig[lot.status as keyof typeof statusConfig]?.color || 'bg-gray-100 text-gray-800';
+                  const statusColor = statusConfig[lot.status as keyof typeof statusConfig]?.color || 'bg-muted text-foreground';
 
                   return (
                     <div key={lot.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -225,7 +225,7 @@ export function ProductionDashboard({ dashboardData }: ProductionDashboardProps)
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Resource Utilization</span>
-                <span className="text-sm font-bold text-blue-600">72%</span>
+                <span className="text-sm font-bold text-primary">72%</span>
               </div>
               <Progress value={72} className="h-2" />
               <p className="text-xs text-muted-foreground">

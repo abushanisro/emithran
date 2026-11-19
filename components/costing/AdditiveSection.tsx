@@ -12,7 +12,7 @@ interface Props {
 
 const rowClass = 'flex items-start gap-2 py-0.5';
 const labelClass = 'text-xs text-muted-foreground w-24 shrink-0';
-const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const controlClass = 'flex-1 min-w-0 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 const mm = (v: number) => `${Math.round(v * 10) / 10} mm`;
 const area = (v: number) => `${Math.round(v).toLocaleString('en-US')} mm²`;
 const volume = (v: number) => `${Math.round(v).toLocaleString('en-US')} mm³`;

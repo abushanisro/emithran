@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<BenchmarkSession['status'], string> = {
 
 const STATUS_COLORS: Record<BenchmarkSession['status'], string> = {
   draft: 'bg-muted text-muted-foreground border-muted',
-  active: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  active: 'bg-primary/10 text-primary border-primary/30',
   archived: 'bg-muted/60 text-muted-foreground/60 border-border',
 };
 
@@ -128,8 +128,8 @@ export default function BenchmarkPage() {
         <Card style={{ background: 'hsl(220 18% 10%)' }}>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'hsl(187 100% 42% / 0.12)' }}>
-                <Activity className="h-5 w-5" style={{ color: 'hsl(187 100% 42%)' }} />
+              <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--primary) / 0.12)' }}>
+                <Activity className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
               </div>
               <div>
                 <p className="text-2xl font-bold">{activeSessions}</p>
@@ -141,8 +141,8 @@ export default function BenchmarkPage() {
         <Card style={{ background: 'hsl(220 18% 10%)' }}>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'hsl(187 100% 42% / 0.12)' }}>
-                <Layers className="h-5 w-5" style={{ color: 'hsl(187 100% 42%)' }} />
+              <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--primary) / 0.12)' }}>
+                <Layers className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalBOMsCompared}</p>
@@ -154,8 +154,8 @@ export default function BenchmarkPage() {
         <Card style={{ background: 'hsl(220 18% 10%)' }}>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'hsl(187 100% 42% / 0.12)' }}>
-                <CalendarDays className="h-5 w-5" style={{ color: 'hsl(187 100% 42%)' }} />
+              <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--primary) / 0.12)' }}>
+                <CalendarDays className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
               </div>
               <div>
                 <p className="text-2xl font-bold">{sessionsThisMonth}</p>
@@ -239,7 +239,7 @@ export default function BenchmarkPage() {
                   variant="ghost"
                   size="sm"
                   className="w-full group-hover:bg-primary/10 transition-colors"
-                  style={{ color: 'hsl(187 100% 42%)' }}
+                  style={{ color: 'hsl(var(--primary))' }}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedSessionId(session.id);

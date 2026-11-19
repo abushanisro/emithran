@@ -117,7 +117,7 @@ function buildHtml(analysis: BomItemCostAnalysis, part: PartInfo): string {
 
   <!-- Header -->
   <div style="${s({ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' })}">
-    <span style="${s({ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' })}">EMithran</span>
+    <span style="${s({ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' })}">EMITHRAN</span>
     <div style="${s({ textAlign: 'right', fontSize: '11px', color: '#777', lineHeight: '1.6' })}">
       <div>${today}</div>
       <div>Cost Estimate Report</div>
@@ -182,7 +182,7 @@ function buildHtml(analysis: BomItemCostAnalysis, part: PartInfo): string {
 
   <!-- Footer -->
   <hr style="${s({ border: 'none', borderTop: '1px solid #ddd', margin: '24px 0 8px' })}">
-  <div style="${s({ fontSize: '10px', color: '#999', textAlign: 'center' })}">EMithran · Confidential · For internal use only</div>
+  <div style="${s({ fontSize: '10px', color: '#999', textAlign: 'center' })}">EMITHRAN · Confidential · For internal use only</div>
 </div>`;
 }
 
@@ -207,7 +207,7 @@ export async function generateEMithranImage(
     });
 
     const link = document.createElement('a');
-    link.download = `${part.partNumber ?? part.partName ?? 'cost-report'}-EMithran-Report.png`;
+    link.download = `${part.partNumber ?? part.partName ?? 'cost-report'}-EMITHRAN-Report.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   } finally {

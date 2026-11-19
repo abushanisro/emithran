@@ -52,10 +52,10 @@ import type { FeatureGroup } from '@/lib/utils/feature-colors';
 
 function DimMetricCard({ label, value, unit, accent }: { label: string; value: string; unit?: string; accent?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 bg-[#1a2235] rounded-lg p-2.5">
-      <span className="text-[9px] uppercase tracking-widest font-medium" style={{ color: accent ?? '#6b7280' }}>{label}</span>
-      <span className="text-sm font-mono font-bold text-[#f0f4ff] leading-tight">{value}</span>
-      {unit && <span className="text-[9px] text-[#4b5563]">{unit}</span>}
+    <div className="flex flex-col gap-0.5 bg-muted rounded-lg p-2.5">
+      <span className="text-[9px] uppercase tracking-widest font-medium text-muted-foreground" style={accent ? { color: accent } : undefined}>{label}</span>
+      <span className="text-sm font-mono font-bold text-foreground leading-tight">{value}</span>
+      {unit && <span className="text-[9px] text-muted-foreground">{unit}</span>}
     </div>
   );
 }
@@ -96,13 +96,13 @@ function DimensionValidationDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-[640px] p-0 overflow-hidden border border-[#1a2540] bg-[#0b0f1a]">
-        <DialogHeader className="px-5 pt-4 pb-3 border-b border-[#1a2540]">
-          <DialogTitle className="text-sm font-semibold text-[#c9d8f0] flex items-center gap-2">
-            <Ruler className="h-4 w-4 text-emerald-400" />
+      <DialogContent className="max-w-[640px] p-0 overflow-hidden border border-border bg-card">
+        <DialogHeader className="px-5 pt-4 pb-3 border-b border-border">
+          <DialogTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Ruler className="h-4 w-4 text-primary" />
             Part Dimension Validation
           </DialogTitle>
-          <DialogDescription className="text-[10px] text-[#4a6080]">
+          <DialogDescription className="text-[10px] text-muted-foreground">
             Bounding envelope extracted from CAD geometry
           </DialogDescription>
         </DialogHeader>
@@ -110,7 +110,7 @@ function DimensionValidationDialog({
         <div className="flex flex-col gap-0 overflow-y-auto" style={{ maxHeight: '85vh' }}>
 
           {/* ── Part Envelope: full-width PartDimensionViewer ── */}
-          <div className="relative bg-[#0d1520] border-b border-[#1a2540] flex justify-center overflow-hidden" style={{ height: 320 }}>
+          <div className="relative bg-[#0d1520] border-b border-border flex justify-center overflow-hidden" style={{ height: 320 }}>
 
             {/* Isometric thumbnail — top-right corner if screenshot available */}
             {screenshot && (
@@ -154,13 +154,13 @@ function DimensionValidationDialog({
           </div>
 
           {/* ── Metrics — 3 columns in one row ── */}
-          <div className="px-5 py-4 grid grid-cols-3 gap-3 border-b border-[#1a2540]">
+          <div className="px-5 py-4 grid grid-cols-3 gap-3 border-b border-border">
             <DimMetricCard label="Width (X)"    value={dims?.x ? dims.x.toFixed(2) : '—'} unit="mm" accent="#60a5fa" />
             <DimMetricCard label="Height (Y)"   value={dims?.y ? dims.y.toFixed(2) : '—'} unit="mm" accent="#34d399" />
             <DimMetricCard label="Depth (Z)"    value={dims?.z ? dims.z.toFixed(2) : '—'} unit="mm" accent="#f59e0b" />
           </div>
 
-          <div className="px-5 py-4 grid grid-cols-3 gap-3 border-b border-[#1a2540]">
+          <div className="px-5 py-4 grid grid-cols-3 gap-3 border-b border-border">
             <DimMetricCard label="Surface Area" value={displaySA}  accent="#f57a44" />
             <DimMetricCard label="Volume"        value={displayVol} accent="#38bdf8" />
             <DimMetricCard label="Calc. Weight"  value={displayWt}  accent="#34d399" />
@@ -168,9 +168,9 @@ function DimensionValidationDialog({
 
           <div className="px-5 py-4 grid grid-cols-4 gap-3">
             <DimMetricCard label="Material"       value={material || '—'}                                              accent="#fb923c" />
-            <DimMetricCard label="Density"        value={densityGcm3 > 0 ? `${densityGcm3.toFixed(2)} g/cm³` : '—'}  accent="#64748b" />
-            <DimMetricCard label="Tolerance"      value={tolerance || '—'}                                             accent="#64748b" />
-            <DimMetricCard label="Surface Finish" value={surfaceFinish || '—'}                                         accent="#64748b" />
+            <DimMetricCard label="Density"        value={densityGcm3 > 0 ? `${densityGcm3.toFixed(2)} g/cm³` : '—'}  />
+            <DimMetricCard label="Tolerance"      value={tolerance || '—'}                                             />
+            <DimMetricCard label="Surface Finish" value={surfaceFinish || '—'}                                         />
           </div>
         </div>
       </DialogContent>
@@ -194,7 +194,7 @@ function getMaterialDensityGcm3(material: string): number {
 // ── Route badge chips ─────────────────────────────────────────────────────────
 function RouteBadge({ label, icon }: { label: string; icon: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white/90">
+    <span className="inline-flex items-center gap-1 rounded-full bg-card/15 px-2 py-0.5 text-[10px] font-semibold text-foreground/90">
       {icon}
       {label}
     </span>
@@ -309,7 +309,7 @@ function RouteSelectionButton({ bomItemId, location }: { bomItemId: string | nul
         size="sm"
         onClick={() => bomItemId && setOpen(true)}
         disabled={!bomItemId}
-        className="h-6 px-2 text-xs text-white hover:bg-white/20 disabled:opacity-50"
+        className="h-6 px-2 text-xs text-foreground hover:bg-card/20 disabled:opacity-50"
       >
         Auto-Fill from CAD
       </Button>
@@ -762,7 +762,7 @@ function ProcessPlanningPageContent() {
       setIsEditingPartDetails(false);
       
       // Show success message
-      alert('Manufacturing specifications saved successfully!');
+      alert('Manufacturing specifications saved.');
       
     } catch (error) {
       alert('Failed to save manufacturing specifications. Please try again.');
@@ -1029,7 +1029,7 @@ function ProcessPlanningPageContent() {
                                   <Badge
                                     variant="outline"
                                     className={`text-xs ${item.itemType === 'assembly' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' :
-                                      item.itemType === 'sub_assembly' ? 'bg-blue-500/10 text-blue-700 border-blue-500/20' :
+                                      item.itemType === 'sub_assembly' ? 'bg-primary/10 text-primary border-primary/20' :
                                         'bg-amber-500/10 text-amber-700 border-amber-500/20'
                                       }`}
                                   >
@@ -1142,7 +1142,7 @@ function ProcessPlanningPageContent() {
                         <select
                           value={location}
                           onChange={(e) => setLocation(e.target.value)}
-                          className="h-6 text-xs bg-white text-gray-800 font-medium border border-green-300 rounded px-1.5 focus:outline-hidden focus:ring-2 focus:ring-white/60 shadow-xs [&>option]:bg-white [&>option]:text-gray-800"
+                          className="h-6 text-xs bg-card text-foreground font-medium border border-green-300 rounded px-1.5 focus:outline-hidden focus:ring-2 focus:ring-white/60 shadow-xs [&>option]:bg-card [&>option]:text-foreground"
                         >
                           <option value="India">India</option>
                           <option value="USA">USA</option>
@@ -1161,7 +1161,7 @@ function ProcessPlanningPageContent() {
                             variant="ghost"
                             size="sm"
                             onClick={handleEditPartDetails}
-                            className="h-6 px-2 text-xs text-white hover:bg-white/20"
+                            className="h-6 px-2 text-xs text-foreground hover:bg-card/20"
                           >
                             Edit All
                           </Button>
@@ -1171,7 +1171,7 @@ function ProcessPlanningPageContent() {
                               variant="ghost"
                               size="sm"
                               onClick={handleSavePartDetails}
-                              className="h-6 px-2 text-xs text-white hover:bg-white/20"
+                              className="h-6 px-2 text-xs text-foreground hover:bg-card/20"
                             >
                               Save
                             </Button>
@@ -1179,7 +1179,7 @@ function ProcessPlanningPageContent() {
                               variant="ghost"
                               size="sm"
                               onClick={handleCancelEdit}
-                              className="h-6 px-2 text-xs text-white hover:bg-white/20"
+                              className="h-6 px-2 text-xs text-foreground hover:bg-card/20"
                             >
                               Cancel
                             </Button>
@@ -1306,7 +1306,7 @@ function ProcessPlanningPageContent() {
                                   <button
                                     type="button"
                                     onClick={() => setEditablePartData(prev => ({ ...prev, unitWeight: cadDerivedWeightKg.toFixed(4) }))}
-                                    className="text-xs text-blue-600 hover:underline"
+                                    className="text-xs text-primary hover:underline"
                                   >
                                     Use CAD
                                   </button>
@@ -1327,7 +1327,7 @@ function ProcessPlanningPageContent() {
                                       setEditablePartData(prev => ({ ...prev, unitWeight: cadDerivedWeightKg.toFixed(4) }));
                                       setIsEditingPartDetails(true);
                                     }}
-                                    className="text-xs text-blue-600 hover:underline"
+                                    className="text-xs text-primary hover:underline"
                                   >
                                     Use CAD Weight
                                   </button>

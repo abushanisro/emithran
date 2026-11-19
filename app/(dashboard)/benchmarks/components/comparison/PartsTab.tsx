@@ -91,7 +91,7 @@ export function PartsTab({
           { label: "Total Unique Parts", color: "text-primary", value: uniquePartCount, sub: "Across all BOMs" },
           { label: "Common Parts", color: "text-green-600", value: commonPartsCount, sub: "Present in all BOMs" },
           { label: "Cost Variance", color: "text-orange-600", value: costVariance, sub: "Max vs Min BOM cost" },
-          { label: "Weight Variance", color: "text-blue-600", value: weightVariance, sub: "Max vs Min BOM weight" },
+          { label: "Weight Variance", color: "text-primary", value: weightVariance, sub: "Max vs Min BOM weight" },
         ].map(({ label, color, value, sub }) => (
           <Card key={label} className="p-4">
             <h4 className="text-sm font-semibold mb-2">{label}</h4>
@@ -265,7 +265,7 @@ export function PartsTab({
                                     </>
                                   )}
                                   {itemWeight(item) > 0 && (
-                                    <div className="text-xs text-blue-600">
+                                    <div className="text-xs text-primary">
                                       {itemWeight(item).toFixed(2)}kg
                                     </div>
                                   )}
@@ -423,7 +423,7 @@ function StandardizationCard({ bomMetrics }: { bomMetrics: BOMMetricEntry[] }) {
             opps.map(([mat, parts], i) => (
               <div
                 key={i}
-                className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200"
+                className="flex justify-between items-center p-3 bg-primary/10 rounded border border-primary/40"
               >
                 <div>
                   <div className="font-medium">{mat}</div>

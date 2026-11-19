@@ -130,7 +130,7 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
                 <span className="font-medium">{type}</span>
                 <span className="text-muted-foreground">[{members.length}]</span>
                 {flagged > 0 && <span className="ml-auto text-[10px] text-amber-600">{flagged} need machining</span>}
-                {flagged === 0 && toleranced > 0 && <span className="ml-auto text-[10px] text-brand-500">{toleranced} toleranced</span>}
+                {flagged === 0 && toleranced > 0 && <span className="ml-auto text-[10px] text-primary">{toleranced} toleranced</span>}
               </button>
               {open && members.map(({ instance, requirements }) => (
                 <button
@@ -138,12 +138,12 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
                   type="button"
                   onClick={() => { setSelected(instance.label); highlight(instance); }}
                   onDoubleClick={() => instance.key && setEditing(instance)}
-                  className={`w-full grid grid-cols-[2.5rem_1fr] items-center px-2 py-0.5 text-left hover:bg-muted/40 ${selected === instance.label ? 'bg-brand-500/10' : ''}`}
+                  className={`w-full grid grid-cols-[2.5rem_1fr] items-center px-2 py-0.5 text-left hover:bg-muted/40 ${selected === instance.label ? 'bg-primary/10' : ''}`}
                 >
                   <StatusIcon need={needByLabel.get(instance.label)} />
                   <span className="pl-4 truncate">
                     {instance.label}
-                    {requirements.length > 0 && <span className="text-brand-500"> · {requirements.length} tol.</span>}
+                    {requirements.length > 0 && <span className="text-primary"> · {requirements.length} tol.</span>}
                   </span>
                 </button>
               ))}
@@ -170,7 +170,7 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
           {toleranced.map(({ instance, requirements }) => (
             <div key={instance.label}>
               <div className="flex items-center justify-between">
-                <button type="button" className="font-medium hover:text-brand-500" onClick={() => { setSelected(instance.label); highlight(instance); }}>
+                <button type="button" className="font-medium hover:text-primary" onClick={() => { setSelected(instance.label); highlight(instance); }}>
                   {instance.label}
                 </button>
                 {instance.key && (
@@ -239,7 +239,7 @@ function DetectedTolerances({ view, need, onShow }: { view: FeatureTolerancesVie
   const undecided = (need?.decisions ?? []).filter((d) => d.decision === 'needs_review' && d.requirements.length > 0);
   if (detected.length === 0 && !general && undecided.length === 0) return null;
   const labels = (d: DetectedTolerance) => d.labels.map((l, i) => (
-    <span key={l}>{i ? ', ' : ''}<button type="button" className="hover:text-brand-500 hover:underline" onClick={() => { onShow(l); }}>{l}</button></span>
+    <span key={l}>{i ? ', ' : ''}<button type="button" className="hover:text-primary hover:underline" onClick={() => { onShow(l); }}>{l}</button></span>
   ));
   return (
     <section aria-label="Detected tolerances" className="border-t border-border/50 pt-1.5 space-y-1.5">
@@ -278,7 +278,7 @@ function DetectedTolerances({ view, need, onShow }: { view: FeatureTolerancesVie
           <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Toleranced features left for review, no cost added [{undecided.length}]</div>
           {undecided.map((d) => (
             <div key={d.label} className="pl-2 text-[11px]">
-              <button type="button" className="font-medium hover:text-brand-500" onClick={() => { onShow(d.label); }}>{d.label}</button>
+              <button type="button" className="font-medium hover:text-primary" onClick={() => { onShow(d.label); }}>{d.label}</button>
               <span className="text-muted-foreground"> — {d.reason}</span>
             </div>
           ))}

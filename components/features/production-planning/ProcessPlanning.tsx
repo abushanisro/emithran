@@ -199,12 +199,12 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
   const getStatusColor = (status: string) => ({
-    PLANNED:     'bg-blue-100 text-blue-600',
+    PLANNED: 'bg-primary/10 text-primary',
     IN_PROGRESS: 'bg-yellow-100 text-yellow-600',
     COMPLETED:   'bg-green-100 text-green-600',
     BLOCKED:     'bg-red-100 text-red-600',
-    PENDING:     'bg-gray-100 text-gray-600',
-  }[status] ?? 'bg-gray-100 text-gray-600');
+    PENDING: 'bg-muted text-muted-foreground',
+  }[status] ?? 'bg-muted text-muted-foreground');
 
   const getStatusIcon = (status: string) => ({
     PLANNED:     <Calendar className="h-4 w-4" />,
@@ -216,12 +216,12 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
 
   const sectionBorder: Record<string, string> = {
     'Raw Material': 'border-l-blue-500',
-    'Process':      'border-l-brand-500',
+    'Process':      'border-l-primary/40',
     'Inspection':   'border-l-amber-500',
     'Packing':      'border-l-green-500',
   };
   const sectionNumBg: Record<string, string> = {
-    'Raw Material': 'bg-blue-500',
+    'Raw Material': 'bg-brand-500',
     'Process':      'bg-brand-500',
     'Inspection':   'bg-amber-500',
     'Packing':      'bg-green-500',
@@ -439,7 +439,7 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
               const bomCount = section.subTasks.reduce((s, t) => s + t.bomRequirements.length, 0);
 
               return (
-                <Card key={section.id} className={`border-l-4 ${sectionBorder[section.name] ?? 'border-l-gray-400'}`}>
+                <Card key={section.id} className={`border-l-4 ${sectionBorder[section.name] ?? 'border-l-border'}`}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -455,7 +455,7 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
                           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
 
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${sectionNumBg[section.name] ?? 'bg-gray-500'}`}>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-foreground text-xs font-bold shrink-0 ${sectionNumBg[section.name] ?? 'bg-muted-foreground/30'}`}>
                           {section.sequence}
                         </div>
 

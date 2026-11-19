@@ -193,7 +193,7 @@ function SingleFlatPatternView({
               Holes ({bbox.holes.length}) — click a hole to inspect (position is distance from the part&apos;s own bottom-left corner)
             </p>
             {selectedHole && (
-              <div className="mb-1.5 rounded bg-blue-600/20 px-2 py-1">
+              <div className="mb-1.5 rounded bg-brand-600/20 px-2 py-1">
                 <Row label={`Hole ${((selectedHoleIdx ?? 0) + 1).toString()} position`} value={`${selectedHole.cx_mm.toFixed(2)}, ${selectedHole.cy_mm.toFixed(2)} mm`} />
                 <Row label={`Hole ${((selectedHoleIdx ?? 0) + 1).toString()} diameter`} value={`Ø${selectedHole.diameter_mm.toFixed(2)} mm`} />
               </div>
@@ -203,7 +203,7 @@ function SingleFlatPatternView({
                 <button
                   key={hi}
                   onClick={() => { setSelectedHoleIdx(hi); }}
-                  className={`w-full text-left flex items-center justify-between px-1.5 py-0.5 rounded ${selectedHoleIdx === hi ? 'bg-blue-600' : 'hover:bg-white/10'}`}
+                  className={`w-full text-left flex items-center justify-between px-1.5 py-0.5 rounded ${selectedHoleIdx === hi ? 'bg-brand-600' : 'hover:bg-white/10'}`}
                 >
                   <span>#{hi + 1}</span>
                   <span className="font-mono">Ø{h.diameter_mm.toFixed(2)} @ ({h.cx_mm.toFixed(1)}, {h.cy_mm.toFixed(1)})</span>

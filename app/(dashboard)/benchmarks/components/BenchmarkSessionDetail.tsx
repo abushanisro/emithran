@@ -39,7 +39,7 @@ const STATUS_LABELS: Record<BenchmarkSession['status'], string> = {
 
 const STATUS_COLORS: Record<BenchmarkSession['status'], string> = {
   draft: 'bg-muted text-muted-foreground border-muted',
-  active: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  active: 'bg-primary/10 text-primary border-primary/30',
   archived: 'bg-muted/60 text-muted-foreground/60 border-border',
 };
 
@@ -378,7 +378,7 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
           <>
             <div className="w-px h-4 bg-border" />
             <div>
-              <span className="font-semibold" style={{ color: 'hsl(187 100% 42%)' }}>
+              <span className="font-semibold" style={{ color: 'hsl(var(--primary))' }}>
                 Ready to compare
               </span>
             </div>

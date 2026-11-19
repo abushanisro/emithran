@@ -338,7 +338,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="capability" className="text-blue-700 dark:text-blue-400">Capability</TabsTrigger>
+              <TabsTrigger value="capability" className="text-primary dark:text-primary">Capability</TabsTrigger>
             </TabsList>
 
             {/* ── Basic Info ── */}

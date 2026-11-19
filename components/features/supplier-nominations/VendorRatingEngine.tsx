@@ -408,25 +408,25 @@ const handleSave = async () => {
     <div className="space-y-6">
       {/* Header with Overall Scores */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-400">Overall Score 1</div>
-            <div className="text-2xl font-bold text-white">{getDisplayValue(getCurrentOverallScores().sectionWiseCapability)}%</div>
-            <div className="text-xs text-gray-400">Section Capability</div>
+            <div className="text-sm text-muted-foreground">Overall Score 1</div>
+            <div className="text-2xl font-bold text-foreground">{getDisplayValue(getCurrentOverallScores().sectionWiseCapability)}%</div>
+            <div className="text-xs text-muted-foreground">Section Capability</div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-400">Overall Score 2</div>
-            <div className="text-2xl font-bold text-white">{getDisplayValue(getCurrentOverallScores().riskMitigation)}%</div>
-            <div className="text-xs text-gray-400">Risk Mitigation</div>
+            <div className="text-sm text-muted-foreground">Overall Score 2</div>
+            <div className="text-2xl font-bold text-foreground">{getDisplayValue(getCurrentOverallScores().riskMitigation)}%</div>
+            <div className="text-xs text-muted-foreground">Risk Mitigation</div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-400">Non-Conformities</div>
+            <div className="text-sm text-muted-foreground">Non-Conformities</div>
             <div className="flex gap-2 mt-1">
               <Badge className="bg-green-500/20 text-green-400">Minor: {getCurrentOverallScores().totalMinorNC}</Badge>
               <Badge className="bg-red-500/20 text-red-400">Major: {getCurrentOverallScores().totalMajorNC}</Badge>
@@ -434,10 +434,10 @@ const handleSave = async () => {
           </CardContent>
         </Card>
         
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-400">Rating Status</div>
-            <div className="text-lg font-bold text-white">{overallScores.totalRecords} criteria loaded</div>
+            <div className="text-sm text-muted-foreground">Rating Status</div>
+            <div className="text-lg font-bold text-foreground">{overallScores.totalRecords} criteria loaded</div>
             
             {!isEditing ? (
               <div className="flex items-center gap-2 mt-2">
@@ -465,7 +465,7 @@ const handleSave = async () => {
                     variant="outline"
                     disabled={isSaving}
                     size="sm"
-                    className="border-gray-600 text-gray-400 hover:text-white"
+                    className="border-border text-muted-foreground hover:text-foreground"
                   >
                     <X className="h-4 w-4 mr-1" />
                     Cancel
@@ -496,18 +496,18 @@ const handleSave = async () => {
       </div>
 
       {/* Vendor Rating Header with Overall Scores */}
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-card border-border">
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-2xl font-bold text-foreground">
                 {vendorName || 'Vendor Rating Assessment'}
               </h2>
-              <p className="text-gray-400 mt-1">Rating Matrix Evaluation</p>
+              <p className="text-muted-foreground mt-1">Rating Matrix Evaluation</p>
             </div>
             
             <div className="text-right">
-              <div className="text-3xl font-bold text-white">
+              <div className="text-3xl font-bold text-foreground">
                 {(() => {
                   // Calculate combined overall score from all metrics
                   const sectionCapability = overallScores.sectionWiseCapability || 0;
@@ -518,21 +518,21 @@ const handleSave = async () => {
                   return overallScore.toFixed(1);
                 })()}%
               </div>
-              <div className="text-sm text-gray-400">Overall Score</div>
+              <div className="text-sm text-muted-foreground">Overall Score</div>
               
               <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
                 <div className="text-center">
-                  <div className="text-lg font-semibold text-blue-400">
+                  <div className="text-lg font-semibold text-primary">
                     {overallScores.riskMitigation.toFixed(1)}%
                   </div>
-                  <div className="text-gray-400">Risk Mitigation</div>
+                  <div className="text-muted-foreground">Risk Mitigation</div>
                 </div>
                 
                 <div className="text-center">
                   <div className="text-lg font-semibold text-orange-400">
                     {overallScores.totalMinorNC + overallScores.totalMajorNC}
                   </div>
-                  <div className="text-gray-400">Total NCs</div>
+                  <div className="text-muted-foreground">Total NCs</div>
                 </div>
               </div>
             </div>
@@ -541,9 +541,9 @@ const handleSave = async () => {
       </Card>
 
       {/* Vendor Rating Assessment Matrix */}
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-white flex items-center justify-between">
+          <CardTitle className="text-foreground flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
               Vendor Rating Assessment Matrix
@@ -559,7 +559,7 @@ const handleSave = async () => {
         <CardContent className="p-0">
           {!ratingData || ratingData.length === 0 ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-center text-gray-400">
+              <div className="text-center text-muted-foreground">
                 {isLoading ? 'Loading rating matrix...' : 'No rating data available'}
               </div>
             </div>
@@ -567,24 +567,24 @@ const handleSave = async () => {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="p-3 text-center bg-blue-100 text-black font-medium">S.no</th>
-                    <th className="p-3 text-center bg-blue-100 text-black font-medium">Category</th>
-                    <th className="p-3 text-center bg-blue-100 text-black font-medium">Assessment Aspects</th>
-                    <th className="p-3 text-center bg-blue-100 text-black font-medium">Section wise Capability %</th>
-                    <th className="p-3 text-center bg-blue-100 text-black font-medium">Risk Mitigation %</th>
-                    <th className="p-3 text-center bg-blue-100 text-black font-medium">No of Minor NC</th>
-                    <th className="p-3 text-center bg-blue-100 text-black font-medium">No of Major NC</th>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-center bg-primary/10 text-black font-medium">S.no</th>
+                    <th className="p-3 text-center bg-primary/10 text-black font-medium">Category</th>
+                    <th className="p-3 text-center bg-primary/10 text-black font-medium">Assessment Aspects</th>
+                    <th className="p-3 text-center bg-primary/10 text-black font-medium">Section wise Capability %</th>
+                    <th className="p-3 text-center bg-primary/10 text-black font-medium">Risk Mitigation %</th>
+                    <th className="p-3 text-center bg-primary/10 text-black font-medium">No of Minor NC</th>
+                    <th className="p-3 text-center bg-primary/10 text-black font-medium">No of Major NC</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ratingData
                     .sort((a, b) => (a.sortOrder || a.sNo || 0) - (b.sortOrder || b.sNo || 0))
                     .map((item) => (
-                      <tr key={`row-${item.id}`} className="border-b border-gray-700">
-                        <td className="p-3 text-gray-300 text-center">{item.sNo}</td>
-                        <td className="p-3 text-gray-300 text-center">{item.category}</td>
-                        <td className="p-3 text-gray-300">{item.assessmentAspects}</td>
+                      <tr key={`row-${item.id}`} className="border-b border-border">
+                        <td className="p-3 text-foreground/80 text-center">{item.sNo}</td>
+                        <td className="p-3 text-foreground/80 text-center">{item.category}</td>
+                        <td className="p-3 text-foreground/80">{item.assessmentAspects}</td>
                         <td className="p-3 text-center">
                           {isEditing ? (
                             <input
@@ -594,10 +594,10 @@ const handleSave = async () => {
                               step="0.1"
                               value={getCurrentValue(item, 'sectionWiseCapabilityPercent')}
                               onChange={(e) => handleFieldChange(item.id, 'sectionWiseCapabilityPercent', parseFloat(e.target.value) || 0)}
-                              className="w-20 h-8 text-center bg-gray-700 border border-gray-600 text-white rounded px-2"
+                              className="w-20 h-8 text-center bg-muted border border-border text-foreground rounded px-2"
                             />
                           ) : (
-                            <span className="text-gray-300">{getDisplayValue(item.sectionWiseCapabilityPercent)}%</span>
+                            <span className="text-foreground/80">{getDisplayValue(item.sectionWiseCapabilityPercent)}%</span>
                           )}
                         </td>
                         <td className="p-3 text-center">
@@ -609,10 +609,10 @@ const handleSave = async () => {
                               step="0.1"
                               value={getCurrentValue(item, 'riskMitigationPercent')}
                               onChange={(e) => handleFieldChange(item.id, 'riskMitigationPercent', parseFloat(e.target.value) || 0)}
-                              className="w-20 h-8 text-center bg-gray-700 border border-gray-600 text-white rounded px-2"
+                              className="w-20 h-8 text-center bg-muted border border-border text-foreground rounded px-2"
                             />
                           ) : (
-                            <span className="text-gray-300">{getDisplayValue(item.riskMitigationPercent)}%</span>
+                            <span className="text-foreground/80">{getDisplayValue(item.riskMitigationPercent)}%</span>
                           )}
                         </td>
                         <td className="p-3 text-center">
@@ -624,10 +624,10 @@ const handleSave = async () => {
                               step="1"
                               value={getCurrentValue(item, 'minorNC')}
                               onChange={(e) => handleFieldChange(item.id, 'minorNC', parseInt(e.target.value) || 0)}
-                              className="w-16 h-8 text-center bg-gray-700 border border-gray-600 text-white rounded px-2"
+                              className="w-16 h-8 text-center bg-muted border border-border text-foreground rounded px-2"
                             />
                           ) : (
-                            <span className="text-gray-300">{item.minorNC || 0}</span>
+                            <span className="text-foreground/80">{item.minorNC || 0}</span>
                           )}
                         </td>
                         <td className="p-3 text-center">
@@ -639,16 +639,16 @@ const handleSave = async () => {
                               step="1"
                               value={getCurrentValue(item, 'majorNC')}
                               onChange={(e) => handleFieldChange(item.id, 'majorNC', parseInt(e.target.value) || 0)}
-                              className="w-16 h-8 text-center bg-gray-700 border border-gray-600 text-white rounded px-2"
+                              className="w-16 h-8 text-center bg-muted border border-border text-foreground rounded px-2"
                             />
                           ) : (
-                            <span className="text-gray-300">{item.majorNC || 0}</span>
+                            <span className="text-foreground/80">{item.majorNC || 0}</span>
                           )}
                         </td>
                       </tr>
                     ))}
                   
-                  <tr className="bg-yellow-200 border-t-2 border-gray-600">
+                  <tr className="bg-yellow-200 border-t-2 border-border">
                     <td colSpan={3} className="p-3 text-black font-bold text-center">Overall Score</td>
                     <td className="p-3 text-black font-bold text-center">{getCurrentOverallScores().sectionWiseCapability.toFixed(1)}%</td>
                     <td className="p-3 text-black font-bold text-center">{getCurrentOverallScores().riskMitigation.toFixed(1)}%</td>

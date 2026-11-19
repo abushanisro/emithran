@@ -358,10 +358,10 @@ export const ProductionEntry = ({ lotId = '' }: ProductionEntryProps) => {
   const getShiftColor = (shift: string) => {
     const colors = {
       MORNING: 'bg-yellow-100 text-yellow-600',
-      AFTERNOON: 'bg-blue-100 text-blue-600',
-      NIGHT: 'bg-brand-100 text-brand-600'
+      AFTERNOON: 'bg-primary/10 text-primary',
+      NIGHT: 'bg-primary/10 text-primary'
     };
-    return colors[shift as keyof typeof colors] || 'bg-gray-100 text-gray-600';
+    return colors[shift as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
   const getEfficiencyColor = (efficiency: number) => {
@@ -953,7 +953,7 @@ export const ProductionEntry = ({ lotId = '' }: ProductionEntryProps) => {
                               On Track
                             </Badge>
                           ) : week.producedQuantity === 0 ? (
-                            <Badge className="bg-gray-100 text-gray-600">
+                            <Badge className="bg-muted text-muted-foreground">
                               <Clock className="h-3 w-3 mr-1" />
                               Planned
                             </Badge>

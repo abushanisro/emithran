@@ -104,14 +104,14 @@ export class IdentityService {
     });
     if (linked.error) throw this.unavailable('link_identity failed', linked.error);
     const userId = linked.data as string | null;
-    if (!userId) throw new ForbiddenException('This account has not been invited to eMithran');
+    if (!userId) throw new ForbiddenException('This account has not been invited to EMITHRAN');
 
     // The allow-list check and the account's own email in one step (migration 938): the email bound into the request and the
     // database token is auth.users.email, never the token's claim, which an upstream change could make differ for a known sub.
     const account = await admin.rpc('identity_user_email', { p_user_id: userId });
     if (account.error) throw this.unavailable('identity_user_email failed', account.error);
     const email = account.data;
-    if (typeof email !== 'string' || email === '') throw new ForbiddenException('This account has not been invited to eMithran');
+    if (typeof email !== 'string' || email === '') throw new ForbiddenException('This account has not been invited to EMITHRAN');
     return { userId, email };
   }
 }

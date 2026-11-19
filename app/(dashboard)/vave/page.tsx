@@ -23,9 +23,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  phase1: 'bg-blue-100 text-blue-700 border-blue-200',
+  phase1: 'bg-primary/10 text-primary border-primary/40',
   phase2: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  phase3: 'bg-brand-100 text-brand-700 border-brand-200',
+  phase3: 'bg-primary/10 text-primary border-primary/40',
   complete: 'bg-green-100 text-green-700 border-green-200',
 };
 
@@ -118,8 +118,8 @@ export default function VavePage() {
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Layers className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Layers className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{projectList.length}</p>
@@ -144,8 +144,8 @@ export default function VavePage() {
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-brand-100 rounded-lg">
-                <Zap className="h-5 w-5 text-brand-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Zap className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalIdeas}</p>

@@ -254,10 +254,10 @@ export function VAVETab({ bomMetrics }: Props) {
           <p className="text-2xl font-bold text-success">{formatPrice(totalPotential)}</p>
           <p className="text-xs text-success/70">Estimated potential</p>
         </Card>
-        <Card className="p-4 bg-card/50 border-brand-500/20 hover:border-brand-500/40 transition-all">
+        <Card className="p-4 bg-card/50 border-primary/20 hover:border-primary/40 transition-all">
           <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">AI Insights Savings</h4>
-          <p className="text-2xl font-bold text-brand-400">{formatPrice(aiTotalSavings)}</p>
-          <p className="text-xs text-brand-400/70">
+          <p className="text-2xl font-bold text-primary">{formatPrice(aiTotalSavings)}</p>
+          <p className="text-xs text-primary/70">
             {aiInsights.size > 0 ? `From ${aiInsights.size} BOM(s)` : "Generate AI insights"}
           </p>
         </Card>
@@ -462,8 +462,8 @@ export function VAVETab({ bomMetrics }: Props) {
                       {/* Design Optimization */}
                       {(v.aiInsights.designOptimization.partConsolidation.length > 0 || 
                         v.aiInsights.designOptimization.toleranceOptimization.length > 0) && (
-                        <div className="p-4 bg-brand-500/5 rounded-lg border border-brand-500/20 hover:border-brand-500/40 transition-all">
-                          <h6 className="text-xs font-bold mb-3 text-brand-400 uppercase tracking-widest">Design Optimization</h6>
+                        <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 hover:border-primary/40 transition-all">
+                          <h6 className="text-xs font-bold mb-3 text-primary uppercase tracking-widest">Design Optimization</h6>
                           {v.aiInsights.designOptimization.partConsolidation.map((con, i) => (
                             <div key={i} className="text-xs mb-3 p-2 bg-background/40 rounded border border-border/50">
                               <div className="flex justify-between items-center mb-1">

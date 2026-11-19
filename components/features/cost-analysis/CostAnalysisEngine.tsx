@@ -181,7 +181,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
                   <svg className="w-2.5 h-2.5 mr-1" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <text x="0" y="13" fontSize="13" fontWeight="700" fill="currentColor" fontFamily="sans-serif">e</text>
                   </svg>
-                  EMithran Report
+                  EMITHRAN Report
                 </Badge>
                 <span className="text-[10px] text-muted-foreground">{today}</span>
               </div>

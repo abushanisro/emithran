@@ -7,7 +7,7 @@ import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 import { useClearCalculatorFieldOverride, useSetCalculatorFieldOverride } from '@/lib/api/hooks/useCalculatorFieldOverrides';
 import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
 
-const box = 'w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm tabular-nums focus:outline-hidden focus:ring-1 focus:ring-brand-500';
+const box = 'w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm tabular-nums focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 const label = (s: CalculationTraceStep) => `${s.fieldName}${s.unit ? ` (${s.unit})` : ''}`;
 
 /** One field: its value and why it has it; the pencil opens an editor to set the part's own value (with the reason). */

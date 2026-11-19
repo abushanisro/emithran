@@ -191,14 +191,14 @@ function ReportHeader({
     <div className="flex items-center justify-between p-6 border-b">
       <div>
         <h1 className="text-2xl font-bold">Project Report</h1>
-        <p className="text-gray-600 mt-1">{projectName}</p>
+        <p className="text-muted-foreground mt-1">{projectName}</p>
         {inspectionReport && (
           <div className="flex items-center gap-2 mt-2">
             <Badge variant="outline" className="bg-green-100 text-green-800">
               <CheckCircle className="h-3 w-3 mr-1" />
               Report Generated
             </Badge>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               {inspectionReport.inspection_date}
             </span>
           </div>
@@ -283,14 +283,14 @@ export default function ProjectReportPage() {
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
           <h3 className="text-lg font-semibold mb-2">Project Not Found</h3>
-          <p className="text-gray-600">The requested project could not be found.</p>
+          <p className="text-muted-foreground">The requested project could not be found.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       <ReportHeader 
         projectName={currentProject.name}
         inspectionReport={inspectionReport}
@@ -309,10 +309,10 @@ export default function ProjectReportPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card className="p-6">
                 <div className="flex items-center">
-                  <FileText className="h-8 w-8 text-blue-500 mr-3" />
+                  <FileText className="h-8 w-8 text-primary mr-3" />
                   <div>
                     <h3 className="text-lg font-semibold">Balloon Diagrams</h3>
-                    <p className="text-2xl font-bold text-blue-600">
+                    <p className="text-2xl font-bold text-primary">
                       {balloonDiagrams?.length || 0}
                     </p>
                   </div>
@@ -333,10 +333,10 @@ export default function ProjectReportPage() {
               
               <Card className="p-6">
                 <div className="flex items-center">
-                  <Settings className="h-8 w-8 text-brand-500 mr-3" />
+                  <Settings className="h-8 w-8 text-primary mr-3" />
                   <div>
                     <h3 className="text-lg font-semibold">Annotations</h3>
-                    <p className="text-2xl font-bold text-brand-600">
+                    <p className="text-2xl font-bold text-primary">
                       {balloonDiagrams?.reduce((sum, d) => sum + (d.annotations?.length || 0), 0) || 0}
                     </p>
                   </div>
@@ -411,9 +411,9 @@ export default function ProjectReportPage() {
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No Balloon Diagrams</h3>
-                    <p className="text-gray-600 mb-4">Create your first balloon diagram to get started.</p>
+                    <p className="text-muted-foreground mb-4">Create your first balloon diagram to get started.</p>
                     <CreateBalloonDiagramDialog
                       projectId={projectId}
                       onSuccess={refetchDiagrams}
@@ -436,7 +436,7 @@ export default function ProjectReportPage() {
               <Card className="p-8 text-center">
                 <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Inspection Report</h3>
-                <p className="text-gray-600">Complete quality inspections to generate the report.</p>
+                <p className="text-muted-foreground">Complete quality inspections to generate the report.</p>
               </Card>
             )}
           </TabsContent>
@@ -477,7 +477,7 @@ export default function ProjectReportPage() {
               <Card className="p-8 text-center">
                 <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Complete Report Not Available</h3>
-                <p className="text-gray-600">Complete balloon diagrams and inspections to generate the full report.</p>
+                <p className="text-muted-foreground">Complete balloon diagrams and inspections to generate the full report.</p>
               </Card>
             )}
           </TabsContent>

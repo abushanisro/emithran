@@ -165,8 +165,8 @@ export default function ProjectDetail() {
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-blue-600" />
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-medium">Should Cost</p>

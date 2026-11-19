@@ -18,7 +18,7 @@ import type { QuoteFlow } from './useQuoteFlow';
 
 const statusTone: Record<FileReportRow['status'], string> = {
   used: 'bg-emerald-500/10 text-emerald-600',
-  reference: 'bg-sky-500/10 text-sky-600',
+  reference: 'bg-primary/10 text-primary',
   ignored: 'bg-muted text-muted-foreground',
 };
 

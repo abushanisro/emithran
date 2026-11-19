@@ -448,8 +448,8 @@ export default function RawMaterialsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4 border border-blue-200 dark:border-blue-900">
-              <p className="text-sm text-blue-900 dark:text-blue-100 mb-2">
+            <div className="rounded-lg bg-primary/10 dark:bg-primary/20 p-4 border border-primary/40 dark:border-primary/40">
+              <p className="text-sm text-primary dark:text-primary mb-2">
                 Need help with the format?
               </p>
               <Button
@@ -668,8 +668,8 @@ export default function RawMaterialsPage() {
             </div>
 
             {/* Plastic Processing Parameters Section */}
-            <div className="space-y-4 p-4 bg-blue-50/30 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Processing Parameters</h3>
+            <div className="space-y-4 p-4 bg-primary/30 dark:bg-primary/30 rounded-lg border border-primary/40 dark:border-primary/40">
+                <h3 className="text-sm font-semibold text-primary dark:text-primary">Processing Parameters</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Regrinding</label>
@@ -776,8 +776,8 @@ export default function RawMaterialsPage() {
               </div>
 
             {/* Mechanical Properties Section */}
-            <div className="space-y-4 p-4 bg-indigo-50/30 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800">
-                <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Mechanical Properties</h3>
+            <div className="space-y-4 p-4 bg-primary/30 dark:bg-primary/30 rounded-lg border border-primary/40 dark:border-primary/40">
+                <h3 className="text-sm font-semibold text-primary dark:text-primary">Mechanical Properties</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Density (g/cm³)</label>
@@ -827,8 +827,8 @@ export default function RawMaterialsPage() {
               </div>
 
             {/* Material Standards Section */}
-            <div className="space-y-4 p-4 bg-brand-50/30 dark:bg-brand-950/30 rounded-lg border border-brand-200 dark:border-brand-800">
-                <h3 className="text-sm font-semibold text-brand-900 dark:text-brand-100">Material Standards</h3>
+            <div className="space-y-4 p-4 bg-primary/30 dark:bg-primary/30 rounded-lg border border-primary/40 dark:border-primary/40">
+                <h3 className="text-sm font-semibold text-primary dark:text-primary">Material Standards</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">ASTM Standard</label>
@@ -1072,7 +1072,7 @@ export default function RawMaterialsPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEditMaterial(material)}
-                        className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
                         title="Edit"
                       >
                         <Pencil className="h-3 w-3" />

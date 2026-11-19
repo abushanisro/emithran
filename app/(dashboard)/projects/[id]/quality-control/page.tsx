@@ -158,9 +158,9 @@ export default function QualityControlPage() {
       case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'approved': return <ThumbsUp className="h-4 w-4 text-green-600" />;
       case 'rejected': return <ThumbsDown className="h-4 w-4 text-red-600" />;
-      case 'in_progress': return <Clock className="h-4 w-4 text-blue-600" />;
-      case 'planned': return <Calendar className="h-4 w-4 text-gray-600" />;
-      default: return <Clock className="h-4 w-4 text-gray-400" />;
+      case 'in_progress': return <Clock className="h-4 w-4 text-primary" />;
+      case 'planned': return <Calendar className="h-4 w-4 text-muted-foreground" />;
+      default: return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -173,9 +173,9 @@ export default function QualityControlPage() {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
       case 'approved': return 'bg-green-100 text-green-800 border-green-200';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
-      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'planned': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'in_progress': return 'bg-primary/10 text-primary border-primary/40';
+      case 'planned': return 'bg-muted text-foreground border-border';
+      default: return 'bg-muted text-foreground border-border';
     }
   };
 

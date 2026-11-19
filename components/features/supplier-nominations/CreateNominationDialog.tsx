@@ -397,11 +397,11 @@ export function CreateNominationDialog({
   const getVendorTypeIcon = (vendorType?: string) => {
     switch (vendorType?.toLowerCase()) {
       case 'oem':
-        return <Award className="h-4 w-4 text-blue-400" />;
+        return <Award className="h-4 w-4 text-primary" />;
       case 'manufacturer':
         return <Factory className="h-4 w-4 text-green-400" />;
       default:
-        return <Building2 className="h-4 w-4 text-gray-400" />;
+        return <Building2 className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -414,7 +414,7 @@ export function CreateNominationDialog({
     } else if (responseRate >= 2) {
       return <Badge variant="outline" className="border-yellow-500 text-yellow-400">Reliable</Badge>;
     }
-    return <Badge variant="outline" className="border-gray-500 text-gray-400">New Vendor</Badge>;
+    return <Badge variant="outline" className="border-border text-muted-foreground">New Vendor</Badge>;
   };
 
   if (!open) return null;
@@ -430,14 +430,14 @@ export function CreateNominationDialog({
       {/* Modal Content */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div 
-          className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
+          className="bg-card border border-border rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-700">
+          <div className="flex items-center justify-between p-6 border-b border-border">
             <div>
-              <h2 className="text-xl font-semibold text-white">Create Supplier Nomination</h2>
-              <p className="text-sm text-gray-400 mt-1">
+              <h2 className="text-xl font-semibold text-foreground">Create Supplier Nomination</h2>
+              <p className="text-sm text-muted-foreground mt-1">
                 Create a new supplier nomination from approved RFQ vendors for evaluation and scoring.
               </p>
             </div>
@@ -445,7 +445,7 @@ export function CreateNominationDialog({
               variant="ghost"
               size="sm"
               onClick={() => onOpenChange(false)}
-              className="text-gray-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -455,28 +455,28 @@ export function CreateNominationDialog({
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-foreground/80 mb-2">
                   Nomination Name *
                 </label>
                 <Input
                   value={nominationName}
                   onChange={(e) => setNominationName(e.target.value)}
                   placeholder="e.g., Q2 2026 OEM Selection"
-                  className="bg-gray-700 border-gray-600 text-white"
+                  className="bg-muted border-border text-foreground"
                   required
                   maxLength={255}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-foreground/80 mb-2">
                   Description
                 </label>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Enter nomination description and objectives..."
-                  className="bg-gray-700 border-gray-600 text-white"
+                  className="bg-muted border-border text-foreground"
                   rows={3}
                   maxLength={1000}
                 />
@@ -485,7 +485,7 @@ export function CreateNominationDialog({
               {/* BOM Selection */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="block text-sm font-medium text-gray-300">
+                  <label className="block text-sm font-medium text-foreground/80">
                     BOM Selection (Optional)
                   </label>
                   <Button
@@ -493,7 +493,7 @@ export function CreateNominationDialog({
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowBomParts(!showBomParts)}
-                    className="text-gray-400 hover:text-white"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     {showBomParts ? (
                       <>
@@ -514,7 +514,7 @@ export function CreateNominationDialog({
                     <select
                       value={selectedBomId}
                       onChange={(e) => setSelectedBomId(e.target.value)}
-                      className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2"
+                      className="w-full bg-muted border-border text-foreground rounded-md px-3 py-2"
                     >
                       <option value="">Select a BOM (optional)</option>
                       {boms.map((bom) => (
@@ -525,13 +525,13 @@ export function CreateNominationDialog({
                     </select>
 
                     {selectedBomId && showBomParts && (
-                      <Card className="bg-gray-700 border-gray-600">
+                      <Card className="bg-muted border-border">
                         <CardContent className="p-4">
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <Package className="h-4 w-4 text-blue-400" />
-                                <h4 className="text-sm font-medium text-white">
+                                <Package className="h-4 w-4 text-primary" />
+                                <h4 className="text-sm font-medium text-foreground">
                                   BOM Parts ({bomItems.length})
                                 </h4>
                               </div>
@@ -541,7 +541,7 @@ export function CreateNominationDialog({
                                   variant="ghost"
                                   size="sm"
                                   onClick={handleSelectAllBomParts}
-                                  className="text-xs text-blue-400 hover:text-blue-300"
+                                  className="text-xs text-primary hover:text-primary"
                                 >
                                   {filteredBomItems.every(item => selectedBomPartIds.includes(item.id)) ? 'Deselect All' : 'Select All'}
                                 </Button>
@@ -550,21 +550,21 @@ export function CreateNominationDialog({
 
                             {bomItems.length > 0 && (
                               <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                   placeholder="Search BOM parts..."
                                   value={bomPartsSearchTerm}
                                   onChange={(e) => setBomPartsSearchTerm(e.target.value)}
-                                  className="pl-9 bg-gray-600 border-gray-500 text-white text-sm"
+                                  className="pl-9 bg-muted-foreground/50 border-border text-foreground text-sm"
                                 />
                               </div>
                             )}
                           </div>
                           
                           {bomItems.length === 0 ? (
-                            <p className="text-sm text-gray-400 mt-3">No parts found in this BOM</p>
+                            <p className="text-sm text-muted-foreground mt-3">No parts found in this BOM</p>
                           ) : filteredBomItems.length === 0 ? (
-                            <p className="text-sm text-gray-400 mt-3">No parts match your search criteria</p>
+                            <p className="text-sm text-muted-foreground mt-3">No parts match your search criteria</p>
                           ) : (
                             <div className="space-y-2 max-h-64 overflow-y-auto mt-3">
                               {filteredBomItems.map((item) => {
@@ -574,26 +574,26 @@ export function CreateNominationDialog({
                                     key={item.id} 
                                     className={`p-3 rounded cursor-pointer transition-all ${
                                       isSelected 
-                                        ? 'bg-blue-900/50 border border-blue-500' 
-                                        : 'bg-gray-800 border border-gray-700 hover:border-gray-600'
+                                        ? 'bg-primary/50 border border-primary/40' 
+                                        : 'bg-card border border-border hover:border-border'
                                     }`}
                                     onClick={() => handleBomPartToggle(item.id)}
                                   >
                                     <div className="flex items-start gap-3">
                                       <div className={`w-4 h-4 mt-0.5 rounded border-2 flex items-center justify-center ${
                                         isSelected 
-                                          ? 'bg-blue-600 border-blue-600' 
-                                          : 'border-gray-400 bg-transparent'
+                                          ? 'bg-brand-600 border-primary/40' 
+                                          : 'border-border bg-transparent'
                                       }`}>
                                         {isSelected && (
-                                          <CheckCircle className="w-3 h-3 text-white" />
+                                          <CheckCircle className="w-3 h-3 text-foreground" />
                                         )}
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                        <div className="font-medium text-gray-200 text-sm truncate">
+                                        <div className="font-medium text-foreground text-sm truncate">
                                           {item.name}
                                         </div>
-                                        <div className="text-xs text-gray-400 mt-1">
+                                        <div className="text-xs text-muted-foreground mt-1">
                                           Part: {item.partNumber || '—'} | Qty: {item.quantity} {item.unit || ''} | Material: {item.material || '—'}
                                         </div>
                                       </div>
@@ -605,8 +605,8 @@ export function CreateNominationDialog({
                           )}
                           
                           {selectedBomPartIds.length > 0 && (
-                            <div className="mt-3 p-2 bg-blue-900/20 border border-blue-700 rounded">
-                              <div className="text-xs text-blue-400">
+                            <div className="mt-3 p-2 bg-primary/20 border border-primary/40 rounded">
+                              <div className="text-xs text-primary">
                                 {selectedBomPartIds.length} part(s) selected for nomination
                               </div>
                             </div>
@@ -616,13 +616,13 @@ export function CreateNominationDialog({
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">No BOMs available for this project</p>
+                  <p className="text-sm text-muted-foreground">No BOMs available for this project</p>
                 )}
               </div>
 
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-white">
+                  <h3 className="text-lg font-medium text-foreground">
                     {selectedBomPartIds.length > 0 
                       ? `Select Vendors for BOM Parts (${approvedVendors.length} available with RFQs)`
                       : `Select Approved Vendors (${approvedVendors.length} available)`
@@ -634,7 +634,7 @@ export function CreateNominationDialog({
                       variant="outline"
                       size="sm"
                       onClick={handleSelectAll}
-                      className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                      className="border-border text-foreground/80 hover:bg-accent"
                     >
                       {selectedVendorIds.length === approvedVendors.length ? 'Deselect All' : 'Select All'}
                     </Button>
@@ -642,15 +642,15 @@ export function CreateNominationDialog({
                 </div>
 
                 {approvedVendors.length === 0 ? (
-                  <Card className="bg-gray-700 border-gray-600">
+                  <Card className="bg-muted border-border">
                     <CardContent className="p-6 text-center">
-                      <div className="text-gray-400 mb-2">
+                      <div className="text-muted-foreground mb-2">
                         {selectedBomPartIds.length > 0 
                           ? `No vendors found with RFQs for ${selectedBomPartIds.length} selected BOM parts`
                           : "No approved vendors found"
                         }
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-muted-foreground">
                         {selectedBomPartIds.length > 0
                           ? `Check: 1) RFQs sent for selected parts, 2) Part numbers match in RFQ tracking, 3) Try different BOM parts`
                           : "Complete RFQ evaluations first to nominate vendors"
@@ -672,10 +672,10 @@ export function CreateNominationDialog({
                           key={vendor.id}
                           className={`transition-all duration-200 ${
                             isDisabled 
-                              ? 'bg-gray-800 border-gray-700 opacity-50 cursor-not-allowed'
+                              ? 'bg-card border-border opacity-50 cursor-not-allowed'
                               : isSelected
-                                ? 'bg-blue-900/50 border-blue-500 cursor-pointer'
-                                : 'bg-gray-700 border-gray-600 hover:border-gray-500 cursor-pointer'
+                                ? 'bg-primary/50 border-primary/40 cursor-pointer'
+                                : 'bg-muted border-border hover:border-border cursor-pointer'
                             }`}
                           onClick={() => !isDisabled && handleVendorToggle(vendor.id)}
                         >
@@ -684,24 +684,24 @@ export function CreateNominationDialog({
                               <div className="flex items-start gap-3">
                                 <div className={`w-4 h-4 mt-1 rounded border-2 flex items-center justify-center ${
                                   isDisabled 
-                                    ? 'cursor-not-allowed border-gray-600 bg-gray-700'
+                                    ? 'cursor-not-allowed border-border bg-muted'
                                     : isSelected 
-                                      ? 'bg-blue-600 border-blue-600 cursor-pointer' 
-                                      : 'border-gray-400 bg-transparent cursor-pointer'
+                                      ? 'bg-brand-600 border-primary/40 cursor-pointer' 
+                                      : 'border-border bg-transparent cursor-pointer'
                                 }`}>
                                   {isSelected && (
-                                    <CheckCircle className="w-3 h-3 text-white" />
+                                    <CheckCircle className="w-3 h-3 text-foreground" />
                                   )}
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     {getVendorTypeIcon(vendor.vendorType)}
-                                    <h4 className="font-medium text-white">{vendor.name || 'Unknown Vendor'}</h4>
+                                    <h4 className="font-medium text-foreground">{vendor.name || 'Unknown Vendor'}</h4>
                                   </div>
 
                                   <div className="space-y-2">
                                     {vendor.companyEmail && (
-                                      <p className="text-sm text-gray-400">{vendor.companyEmail}</p>
+                                      <p className="text-sm text-muted-foreground">{vendor.companyEmail}</p>
                                     )}
 
                                     <div className="flex flex-wrap gap-2">
@@ -715,7 +715,7 @@ export function CreateNominationDialog({
                                       )}
                                       
                                       {vendor.rfqData && (
-                                        <Badge variant="outline" className="text-xs border-blue-500 text-blue-400">
+                                        <Badge variant="outline" className="text-xs border-primary/40 text-primary">
                                           BOM Part RFQ
                                         </Badge>
                                       )}
@@ -724,12 +724,12 @@ export function CreateNominationDialog({
                                     {vendor.process && Array.isArray(vendor.process) && vendor.process.length > 0 && (
                                       <div className="flex flex-wrap gap-1">
                                         {vendor.process.slice(0, 3).map((process: string, idx: number) => (
-                                          <Badge key={idx} variant="outline" className="text-xs border-gray-500 text-gray-400">
+                                          <Badge key={idx} variant="outline" className="text-xs border-border text-muted-foreground">
                                             {process}
                                           </Badge>
                                         ))}
                                         {vendor.process.length > 3 && (
-                                          <Badge variant="outline" className="text-xs border-gray-500 text-gray-400">
+                                          <Badge variant="outline" className="text-xs border-border text-muted-foreground">
                                             +{vendor.process.length - 3} more
                                           </Badge>
                                         )}
@@ -740,7 +740,7 @@ export function CreateNominationDialog({
                               </div>
 
                               {isSelected && (
-                                <CheckCircle className="h-5 w-5 text-blue-400 shrink-0" />
+                                <CheckCircle className="h-5 w-5 text-primary shrink-0" />
                               )}
                             </div>
                           </CardContent>
@@ -752,8 +752,8 @@ export function CreateNominationDialog({
               </div>
 
               {selectedVendorIds.length > 0 && (
-                <div className="p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
-                  <div className="text-sm text-blue-400">
+                <div className="p-4 bg-primary/20 border border-primary/40 rounded-lg">
+                  <div className="text-sm text-primary">
                     <strong>{selectedVendorIds.length} of 4</strong> vendor(s) selected for nomination
                     {selectedVendorIds.length === 4 && (
                       <span className="ml-2 text-yellow-400">(Maximum reached)</span>
@@ -762,12 +762,12 @@ export function CreateNominationDialog({
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                  className="border-border text-foreground/80 hover:bg-accent"
                   disabled={createNominationMutation.isPending}
                 >
                   Cancel
@@ -779,7 +779,7 @@ export function CreateNominationDialog({
                     selectedVendorIds.length === 0 ||
                     !nominationName.trim()
                   }
-                  className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                  className="bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50"
                 >
                   {createNominationMutation.isPending ? 'Creating...' : 'Create Nomination'}
                 </Button>
