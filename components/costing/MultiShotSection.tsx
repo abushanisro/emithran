@@ -35,7 +35,7 @@ function Row({ label, children, title }: { label: ReactNode; children: ReactNode
 }
 
 /** The extra shots' editor: a moldable grade and a share of the part per shot, saved together. */
-function ShotEntriesForm({ start, onSave, onCancel }: { start: ShotEntry[]; onSave: (entries: ShotEntry[]) => void; onCancel: () => void }) {
+function ShotEntriesForm({ start, onSave, onCancel }: { start: ShotEntry[]; onSave: (entries: ShotEntry[]) => void; onCancel?: (() => void) | undefined }) {
   const [entries, setEntries] = useState<ShotEntry[]>(start.length > 0 ? start : [{ grade: '', volumePct: 30 }]);
   // The grades a multi-shot part can mold (the backend offers only molding feedstock for this process).
   const { data } = useRawMaterials({ processGroup: MULTI_SHOT_PROCESS_GROUP, limit: 1000 });
@@ -63,7 +63,7 @@ function ShotEntriesForm({ start, onSave, onCancel }: { start: ShotEntry[]; onSa
       <div className="flex items-center justify-between gap-2">
         <button type="button" className="text-brand-600 hover:underline" onClick={() => { setEntries([...entries, { grade: '', volumePct: 20 }]); }}>+ Add shot</button>
         <span className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+          {onCancel && <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>}
           <Button size="sm" disabled={problem != null && entries.length > 0} onClick={() => { onSave(entries); }}>Save shots</Button>
         </span>
       </div>
@@ -86,6 +86,8 @@ export function MultiShotSection({ multiShot: ms, overrides, onChange, hrefOf }:
 
   const fromBom = ms.shots.length > 0 && ms.shots.every((s) => s.source === 'bom');
   const entries = local ?? shotEntriesOf(overrides);
+  // One shot is not a multi-shot part: the panel asks for the second at once instead of waiting for a click on Add shot.
+  const asking = !fromBom && ms.shots.length < 2 && entries.length === 0 && !editing;
   const save = (next: ShotEntry[]) => { onChange(shotEntriesPatch(next)); setLocal(next); setEditing(false); };
   const action = 'text-brand-600 hover:underline';
   const link = (name: string, id: string | null) => (hrefOf && id ? <a className={action} href={hrefOf(id)}>{name}</a> : <span className="text-foreground">{name}</span>);
@@ -95,14 +97,22 @@ export function MultiShotSection({ multiShot: ms, overrides, onChange, hrefOf }:
       <section className="space-y-1.5">
         <div className="flex items-baseline justify-between">
           <h4 className={headClass}>Shots</h4>
-          {!fromBom && !editing && (
+          {!fromBom && !editing && !asking && (
             <span className="flex gap-3">
               <button type="button" className={action} onClick={() => { setEditing(true); }}>{entries.length > 0 ? 'Edit' : 'Add shot'}</button>
               {entries.length > 0 && <button type="button" className="text-red-600 hover:underline" onClick={() => { save([]); }}>Delete</button>}
             </span>
           )}
         </div>
-        {editing ? (
+        {asking ? (
+          <div className="space-y-1.5">
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+              What is the second shot? {ms.shots[0] ? `Shot 1 is the part (${ms.shots[0].grade ?? 'its material'}).` : ''} Pick the material molded onto it and its share of the part,
+              or add each shot as a BOM child with its own CAD and material.
+            </p>
+            <ShotEntriesForm start={[]} onSave={save} />
+          </div>
+        ) : editing ? (
           <ShotEntriesForm start={entries} onSave={save} onCancel={() => { setEditing(false); }} />
         ) : ms.shots.length >= 2 ? (
           <ul className={boxClass}>
