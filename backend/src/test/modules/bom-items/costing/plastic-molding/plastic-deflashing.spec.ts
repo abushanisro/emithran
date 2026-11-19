@@ -68,7 +68,8 @@ describe('the injection molding route', () => {
     const line = r.processLines.find((l) => l.process === 'Deflashing')!;
     expect(line).toBeDefined();
     expect(line.cycleTimeMin).toBeCloseTo(10.46 / 60, 6);
-    expect(line.machineClass).toBe('deburring');
+    // its own class and catalog row (migration 1088), at the bench rate
+    expect(line.machineClass).toBe('deflashing');
     // 10.46 s at (12 + 34.48 x 1) USD/h
     expect(line.totalCost).toBeCloseTo((10.46 / 3600) * (12 + 34.48), 6);
     expect(line.calculationTrace?.map((t) => t.fieldName)).toEqual(['Parting Line Length', 'Manual Flash Trimming Rate', 'Cycle Time']);

@@ -4792,6 +4792,8 @@ export class BomItemCostingService {
           rate: (press.machine.machineRatePerHr ?? 0) * usdToLocal, source: press.machine.machineRatePerHr != null ? 'mhr_database' : 'no_db_rate',
           machineClass: MULTI_SHOT_PRESS_CLASS, machineName: press.machine.name, commodityCode: null,
           labourRate: press.machine.labourRatePerHr != null ? press.machine.labourRatePerHr * usdToLocal : null, operators: press.machine.operators ?? 1,
+          // The press's own setup (mhr_records.setup_time_hr: 2 / 3 / 4 h by its injection units), as Apply persists it.
+          setupTimeHr: press.machine.setupTimeHr,
         },
         // A multi-shot part's inserts are the components loaded every shot (not the CAD's insert candidates): they decide the insert operations.
         signals: { ...shot.input.signals, insertCount: components.reduce((t, c) => t + c.perPart, 0) },

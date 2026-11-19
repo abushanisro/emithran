@@ -32,3 +32,13 @@ describe('the gate trimming time', () => {
     expect(!r.derivable && r.missing.join('; ')).toMatch(/part surface area.*gate width constant.*manual trim rate/);
   });
 });
+
+describe('gate trimming on the line', () => {
+  it('has its own machine class, which migration 1088 gives a Plastic Molding catalog row (not the deburring bench\'s Finishing / Deslag)', () => {
+    const sql = require('fs').readFileSync(require('path').join(__dirname, '../../../../../../migrations/1088_plastic_trim_pull_test_catalog_rows.sql'), 'utf8') as string;
+    for (const [op, cls] of [['Gate Trimming', 'gate_trimming'], ['Deflashing', 'deflashing'], ['Insert Pull Test', 'insert_pull_test']]) {
+      expect(sql).toContain(`'Plastic Molding', '${op}',`);
+      expect(sql).toContain(`'${cls}'`);
+    }
+  });
+});
