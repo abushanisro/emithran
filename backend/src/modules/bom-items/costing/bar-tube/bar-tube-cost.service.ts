@@ -77,6 +77,7 @@ export function barTubePart(g: BarTubeGeometrySummary | null | undefined): { par
       section: {
         areaMm2: area, widthMm: width, heightMm: height, outerPerimeterMm: positive(s.outer_perimeter_mm) ?? 2 * (width + height),
         odMm: positive(s.od_mm), wallMm: positive(s.wall_mm) ?? positive(s.thickness_mm), circumscribingDiameterMm: positive(s.circumscribing_diameter_mm),
+        hollows: num(s.hollows),
       },
       developedLengthMm: length,
       bends: (g.bends ?? []).map((b) => ({ clrMm: Number(b.clr_mm), angleDeg: Number(b.angle_deg), clockAngleDeg: num(b.clock_angle_deg), arcLengthMm: positive(b.arc_length_mm) }))
@@ -101,6 +102,8 @@ export interface BarTubeCostRequest {
   forceRoute?: string;
   overrides: Record<string, unknown> | null | undefined;
   batchSize: number;
+  /** Parts the route's tooling is spread over (annual volume x production life); null when the scenario gives none. */
+  amortizationParts?: number | null;
   /** USD -> the location's currency. */
   usdToLocal: number;
   costContext: CostContext;
@@ -210,7 +213,7 @@ export class BarTubeCostService {
     const chosen = keyOf(req.forceRoute) ?? keyOf(o[BAR_TUBE_ROUTE_KEY]);
     const { routes, gaps, missing } = buildBarTubeRoutes({
       ref: reference, spec, calculators, material, part, machinesByClass: machines, costContext: req.costContext,
-      scenario: { batchSize: req.batchSize, route: chosen },
+      scenario: { batchSize: req.batchSize, route: chosen, amortizationParts: req.amortizationParts ?? null },
     });
     if (missing.length) return none(part, ...missing);
     const { route, note } = chooseBarTubeRoute(routes, gaps, chosen);

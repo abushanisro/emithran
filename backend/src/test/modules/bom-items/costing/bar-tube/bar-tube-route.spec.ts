@@ -62,10 +62,25 @@ describe('saw and punch, a 25 x 1.5 A36 round tube 1 m long', () => {
 });
 
 describe('the tube laser route', () => {
-  it('is a named gap when process_cut_rate has no Tube Laser feed for the material: its feeds are for cut-code family 9 only', () => {
+  it('steel is cut on the tube laser\'s steel table (memory lists it under family 9) at the carbon steel factor; both routes are complete', () => {
     const laser = routeOf('laser');
-    expect(laser.complete).toBe(false);
-    expect(gapsOf(laser).join(' ')).toMatch(/no Tube Laser feed for cut-code family 1 .*family 9/);
+    expect(laser.complete).toBe(true);
+    expect(JSON.stringify(laser.lines[0]!.calculationTrace ?? laser.lines[0])).toMatch(/Tube Laser steel feed \(family 9\) x 1/);
+  });
+
+  it('an aluminium tube is cut at the IPG aluminium-over-steel factor; past what the chart cuts at the power, it says so', () => {
+    const al = barTubeMaterial('Aluminum, ANSI 6061', 'ROUND_TUBE');
+    const r = buildBarTubeRoutes(input(TUBE, { material: al })).routes.find((x) => x.key === 'laser')!;
+    expect(gapsOf(r)).toEqual([]);
+    expect(JSON.stringify(r.lines[0])).toMatch(/aluminium over carbon steel at 1\.5 mm/);
+    const thick = { ...TUBE, section: { ...TUBE.section, wallMm: 8, areaMm2: Math.PI / 4 * (25 ** 2 - 9 ** 2) } };
+    expect(gapsOf(buildBarTubeRoutes(input(thick, { material: al })).routes.find((x) => x.key === 'laser')!).join(' ')).toMatch(/laser cuts aluminium up to \d+ mm/);
+  });
+
+  it('copper has no fiber laser chart at these powers: a named gap, the saw route quoted', () => {
+    const cu = barTubeMaterial('Copper, UNS C11000', 'ROUND_TUBE');
+    const { routes } = buildBarTubeRoutes(input(TUBE, { material: cu }));
+    expect(gapsOf(routes.find((x) => x.key === 'laser')!).join(' ')).toMatch(/no published fiber laser chart for Copper/);
   });
 
   it('a solid bar is not a tube laser route (sawn), and says why', () => {
@@ -78,8 +93,9 @@ describe('the tube laser route', () => {
   it('the saw route is quoted: the only complete one', () => {
     const { routes, gaps } = buildBarTubeRoutes(input());
     const { route, note } = chooseBarTubeRoute(routes, gaps, null);
-    expect(route!.key).toBe('saw');
-    expect(note).toMatch(/Saw and punch is quoted .* the cheapest complete route/);
+    expect(routes.every((r) => r.complete)).toBe(true);
+    expect(route!.totalUsd).toBe(Math.min(...routes.map((r) => r.totalUsd!)));
+    expect(note).toMatch(/is quoted .* the cheapest complete route/);
   });
 });
 
@@ -148,15 +164,15 @@ describe('the cost summary and the route comparison', () => {
   it('totals the stock and the saw line, and lists both routes with the laser\'s reason', () => {
     expect(summary.family).toBe('bar_tube');
     expect(summary.totalCost).toBeCloseTo(route!.totalUsd!, 2);
-    expect(summary.barTube).toMatchObject({ route: 'saw', stockForm: 'ROUND_TUBE', partsPerStock: 6, complete: true });
-    expect(summary.barTube!.options.find((o) => o.route === 'laser')!.reason).toMatch(/^Tube Laser: no Tube Laser machine fits .*no Tube Laser feed for cut-code family 1/);
+    expect(summary.barTube).toMatchObject({ stockForm: 'ROUND_TUBE', complete: true });
+    expect(summary.barTube!.options.map((o) => o.complete)).toEqual([true, true]);
   });
 
-  it('the comparison entry of the quoted route carries its lines; the other says why it is not usable', () => {
-    const saw = barTubeRouteFor('saw', summary as CostSummaryResponseDto);
-    expect(saw).toMatchObject({ routeId: 'bar-tube-saw', isFeasible: true });
-    const laser = barTubeRouteFor('laser', summary as CostSummaryResponseDto);
-    expect(laser).toMatchObject({ routeId: 'bar-tube-laser', isFeasible: false, processLines: [] });
+  it('the comparison entry of the quoted route carries its lines; the other, priced on its own summary, is not this one', () => {
+    const quoted = route!.key;
+    const other = quoted === 'saw' ? 'laser' : 'saw';
+    expect(barTubeRouteFor(quoted, summary as CostSummaryResponseDto)).toMatchObject({ routeId: `bar-tube-${quoted}`, isFeasible: true });
+    expect(barTubeRouteFor(other, summary as CostSummaryResponseDto)).toMatchObject({ routeId: `bar-tube-${other}`, isFeasible: false, processLines: [] });
   });
 
   it('a part that is not stock is one named, uncosted line', () => {
@@ -232,12 +248,37 @@ describe('an extruded profile', () => {
     expect(processes(ex)).toEqual(['Extrusion', 'Billet Preheat', 'Die Preheat', 'Reciprocating Saw']);
     expect(ex.lines[0]!.machineName).toMatch(/76.2mm Billet/);
     expect(ex.material.partsPerStock).toBeGreaterThan(1);
-    expect(ex.warnings.join(' ')).toMatch(/extrusion die is a tooling investment/);
+    expect(ex.tooling.map((t) => t.key)).toEqual(['extrusion-die']);
   });
 
   it('an alloy with no exit speed is not extruded, and says why', () => {
     const { routes, gaps } = buildBarTubeRoutes(input(PROFILE, { material: barTubeMaterial('Steel, Hot Worked, ASTM A36', 'GENERIC_EXTRUSION') }));
     expect(routes).toEqual([]);
     expect(gaps.find((g) => g.key === 'extrusion')!.reason).toMatch(/no extrusion exit speed/);
+  });
+});
+
+describe('the tooling a route needs, kept out of the piece cost', () => {
+  it('a bend die set per tube size and CLR drawn; the mandrel and wiper named, not priced (no published price)', () => {
+    const saw = buildBarTubeRoutes(input({ ...TUBE, bends: [{ clrMm: 50, angleDeg: 90 }, { clrMm: 50, angleDeg: 45 }] }, { scenario: { batchSize: 100, route: null, amortizationParts: 5000 } })).routes.find((r) => r.key === 'saw')!;
+    expect(saw.tooling.map((t) => [t.key, t.costUsd, t.perPartUsd])).toEqual([['bend-die-50', 739, 0.1478], ['mandrel-wiper', null, null]]);
+  });
+
+  it('an extruded profile\'s die by the press and its voids: a hollow 30 x 20 profile on the 3 in press, 2,350 USD', () => {
+    const profile: BarTubePart = { ...TUBE, stockForm: 'GENERIC_EXTRUSION', developedLengthMm: 500, section: { areaMm2: 200, widthMm: 30, heightMm: 20, outerPerimeterMm: 120, odMm: null, wallMm: 2, circumscribingDiameterMm: 36, hollows: 1 } };
+    const ex = buildBarTubeRoutes(input(profile, { material: barTubeMaterial('Aluminum, ANSI 6061', 'GENERIC_EXTRUSION', 6.618), scenario: { batchSize: 100, route: null, amortizationParts: 10000 } })).routes[0]!;
+    expect(ex.tooling).toEqual([expect.objectContaining({ key: 'extrusion-die', costUsd: 2350, perPartUsd: 0.235 })]);
+  });
+
+  it('a stainless plate is not cut by oxyfuel (it says why); the laser cuts it at the stainless factor', () => {
+    const PLATE: BarTubePart = {
+      ...TUBE, stockForm: 'PLATE', developedLengthMm: 200, ends: [],
+      section: { areaMm2: 300, widthMm: 100, heightMm: 3, outerPerimeterMm: 206, odMm: null, wallMm: 3, circumscribingDiameterMm: null },
+      plate: { thicknessMm: 3, cutLengthMm: 700, pierces: 3, blankLengthMm: 200, blankWidthMm: 100, faceAreaMm2: 18000 },
+    };
+    const ss = barTubeMaterial('Stainless Steel, AISI 304', 'PLATE');
+    const { routes } = buildBarTubeRoutes(input(PLATE, { material: ss }));
+    expect(gapsOf(routes.find((r) => r.key === 'plate_oxyfuel')!).join(' ')).toMatch(/oxyfuel cuts carbon and low-alloy steel only/);
+    expect(gapsOf(routes.find((r) => r.key === 'plate_laser')!)).toEqual([]);
   });
 });

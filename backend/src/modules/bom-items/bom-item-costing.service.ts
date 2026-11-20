@@ -2658,6 +2658,7 @@ export class BomItemCostingService {
         ? await this.barTubeCostService.price({
           client: this.databaseService.getClient(accessToken), accessToken, location, grade,
           geometry: (summary.barTubeGeometry ?? null) as BarTubeGeometrySummary | null,
+          amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
           ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
           overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
         })

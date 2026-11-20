@@ -712,6 +712,8 @@ export interface CostSummaryDto {
   additive?: AdditiveBreakdown;
   /** Bar and Tube Fabrication: the stock (form, section, length, parts per stock), the bends, ends and openings, the route quoted and every route. */
   barTube?: BarTubeBreakdown;
+  /** Bar and tube: the tools the quoted route needs for this part (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when no source prices one. */
+  barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
   assembly?: AssemblyBreakdown;
   /** Assembly Molding (insert molding): the inserts, how they are loaded, the press and its shot, the route quoted and every route. */

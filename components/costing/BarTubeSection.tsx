@@ -6,6 +6,8 @@ import {
 
 interface Props {
   barTube: BarTubeSummary | null | undefined;
+  /** The quoted route's tools (USD): an investment each, spread over the job, kept out of the piece cost. */
+  tooling?: { key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }[] | undefined;
   /** The part's scenario overrides (unset keys: the engine decides). */
   overrides: Record<string, unknown> | null | undefined;
   /** Writes one scenario key; null clears it. */
@@ -22,7 +24,7 @@ const n = (v: number) => (Math.round(v * 10) / 10).toLocaleString('en-US');
  * method that makes it, the end cuts, forms and openings, and the routes the engine compared (the cheapest complete one quoted unless one is
  * set here).
  */
-export function BarTubeSection({ barTube: b, overrides, onChange }: Props) {
+export function BarTubeSection({ barTube: b, tooling, overrides, onChange }: Props) {
   const forced = barTubeRouteOf(overrides);
   if (!b) return <p className="text-xs text-muted-foreground">Not costed as bar or tube yet: see the warning on the Cost tab.</p>;
   const ends = b.ends.filter((e) => e.variant !== 'square');
@@ -84,6 +86,22 @@ export function BarTubeSection({ barTube: b, overrides, onChange }: Props) {
               ...(b.openingCount ? [`${b.openingCount} opening${b.openingCount === 1 ? '' : 's'}`] : []),
             ].join(' · ')}
           </span>
+        </div>
+      )}
+
+      {tooling && tooling.length > 0 && (
+        <div className={rowClass}>
+          <span className={labelClass}>Tooling</span>
+          <ul className="flex-1 min-w-0 space-y-0.5">
+            {tooling.map((t) => (
+              <li key={t.key} className="tabular-nums" title={t.detail}>
+                {t.description} ·{' '}
+                {t.costUsd != null
+                  ? `${t.costUsd.toLocaleString('en-US')} USD${t.perPartUsd != null ? ` (${t.perPartUsd.toFixed(4)} per part)` : ''}`
+                  : <span className="text-amber-600">not priced</span>}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
