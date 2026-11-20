@@ -418,6 +418,9 @@ class MachiningFeatureRecognizer:
                         "pcd_mm": round(sample.params["distance_from_axis_mm"] * 2.0, 3),
                         "hole_count": len(group),
                         "hole_diameter_mm": sample.params["diameter_mm"],
+                        # The members' depth, as an axial bolt circle carries it (_detect_pcd_from_axial_bores): the member holes are
+                        # absorbed into the pattern, so without it costing would have no depth to drill them to.
+                        "depth_mm": round(sum(f.params["depth_mm"] for f in group) / len(group), 3),
                     },
                     confidence=0.82,
                     children=group_ids,

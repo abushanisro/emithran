@@ -267,6 +267,33 @@ def test_real_pcd_bolt_pattern_is_grouped_into_one_pattern_feature():
     assert _by_type(tree, "SimpleHole", "blind") == []
 
 
+def _stepped_shaft_with_radial_holes(n=4, hole_r=1.5, depth=4.0):
+    """The stepped shaft of _stepped_shaft_with_holes (OD1 D40 z0-40, OD2 D25 z40-80) with n blind radial holes, equally spaced round
+    OD1 at z20, each `depth` deep from its surface."""
+    cyl_a = BRepPrimAPI_MakeCylinder(20.0, 40.0).Shape()
+    ax_b = gp_Ax2(gp_Pnt(0, 0, 40.0), gp_Dir(0, 0, 1))
+    body = _unify(BRepAlgoAPI_Fuse(cyl_a, BRepPrimAPI_MakeCylinder(ax_b, 12.5, 40.0).Shape()).Shape())
+    for i in range(n):
+        ang = 2 * math.pi * i / n
+        dx, dy = math.cos(ang), math.sin(ang)
+        ax = gp_Ax2(gp_Pnt(21.0 * dx, 21.0 * dy, 20.0), gp_Dir(-dx, -dy, 0))
+        body = BRepAlgoAPI_Cut(body, BRepPrimAPI_MakeCylinder(ax, hole_r, depth + 1.0).Shape()).Shape()
+    return _unify(body)
+
+
+def test_real_radial_hole_pattern_carries_its_holes_depth():
+    # Holes along X and Y: their measured depth (the face's box along the hole axis) is exact there, so the pattern's is the 4 mm cut.
+    tree = _recognize(_stepped_shaft_with_radial_holes(n=4, depth=4.0), "turned")
+    patterns = _by_type(tree, "SimpleHole", "pcd_pattern")
+    assert len(patterns) == 1
+    p = patterns[0]
+    assert p.params["hole_count"] == 4
+    assert p.params["hole_diameter_mm"] == 3.0
+    # The radial holes are absorbed into the pattern: their depth must go with them, or costing has none to drill them to.
+    assert abs(p.params["depth_mm"] - 4.0) < 0.2
+    assert _by_type(tree, "SimpleHole", "cross") == []
+
+
 # ── Milled-path fixtures + tests ──────────────────────────────────────────
 
 
