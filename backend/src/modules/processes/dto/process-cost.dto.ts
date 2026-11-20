@@ -16,6 +16,8 @@ import {
   Min,
   Max,
   IsUUID,
+  IsInt,
+  IsObject,
   ValidateIf,
   ValidationArguments,
   ValidatorConstraint,
@@ -261,6 +263,25 @@ export class CreateProcessCostDto {
   @IsString()
   notes?: string;
 
+  // The calculation behind cycleTime (process_cost_records.calculator_id / calculator_version / calculator_run, migrations 428 and 1097):
+  // the calculator the dialog computed the cycle with and its run, so the line reopens that calculator with those inputs. All three null
+  // (or absent) when the cycle was typed in.
+  @ApiPropertyOptional({ description: 'The stored calculator that computed cycleTime. Null when the cycle was typed in.', nullable: true, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  calculatorId?: string | null;
+
+  @ApiPropertyOptional({ description: 'calculators.version of calculatorId when it computed cycleTime.', nullable: true, example: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  calculatorVersion?: number | null;
+
+  @ApiPropertyOptional({ description: 'The run that computed cycleTime: {trace, lookupMatches}, the calculation as the calculator ran it. Null when the cycle was typed in.', nullable: true, type: Object })
+  @IsOptional()
+  @IsObject()
+  calculatorRun?: { trace: unknown[]; lookupMatches?: Record<string, unknown> } | null;
+
   // Optional linking
   @ApiPropertyOptional({ description: 'Process ID to link this cost to', example: 'uuid' })
   @IsOptional()
@@ -497,6 +518,25 @@ export class UpdateProcessCostDto {
   notes?: string;
 
   // Optional linking
+  // The calculation behind cycleTime (process_cost_records.calculator_id / calculator_version / calculator_run, migrations 428 and 1097):
+  // the calculator the dialog computed the cycle with and its run, so the line reopens that calculator with those inputs. All three null
+  // (or absent) when the cycle was typed in.
+  @ApiPropertyOptional({ description: 'The stored calculator that computed cycleTime. Null when the cycle was typed in.', nullable: true, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  calculatorId?: string | null;
+
+  @ApiPropertyOptional({ description: 'calculators.version of calculatorId when it computed cycleTime.', nullable: true, example: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  calculatorVersion?: number | null;
+
+  @ApiPropertyOptional({ description: 'The run that computed cycleTime: {trace, lookupMatches}, the calculation as the calculator ran it. Null when the cycle was typed in.', nullable: true, type: Object })
+  @IsOptional()
+  @IsObject()
+  calculatorRun?: { trace: unknown[]; lookupMatches?: Record<string, unknown> } | null;
+
   @ApiPropertyOptional({ description: 'Process ID to link this cost to' })
   @IsOptional()
   @IsUUID()
@@ -587,6 +627,18 @@ export class CyclePhaseDto {
   seconds: number;
 }
 
+/** The calculation columns of a process_cost_records row (migrations 428, 1097). */
+interface CalculationColumns {
+  calculator_id?: string | null;
+  calculator_version?: number | null;
+  calculator_run?: ProcessCostResponseDto['calculatorRun'];
+}
+
+/** A row's calculation as the API returns it: the calculator, its version and its run; null for each it does not have. */
+function calculationOfRow(row: CalculationColumns): Pick<ProcessCostResponseDto, 'calculatorId' | 'calculatorVersion' | 'calculatorRun'> {
+  return { calculatorId: row.calculator_id ?? null, calculatorVersion: row.calculator_version ?? null, calculatorRun: row.calculator_run ?? null };
+}
+
 export class ProcessCostResponseDto {
   @ApiProperty({ description: 'Record ID' })
   id: string;
@@ -665,6 +717,15 @@ export class ProcessCostResponseDto {
 
   @ApiProperty({ description: 'The phases of the operation cycle as its stored calculator gave them, in the order of the cycle-time formula (migration 1009). Null when the line has no calculator cycle.', type: () => [CyclePhaseDto], nullable: true })
   cyclePhases: CyclePhaseDto[] | null;
+
+  @ApiProperty({ description: 'The stored calculator that computed the cycle (migrations 428, 1097). Null when the cycle is not a calculator\'s.', nullable: true, type: String })
+  calculatorId: string | null;
+
+  @ApiProperty({ description: 'calculators.version of calculatorId when it computed the cycle.', nullable: true, type: Number })
+  calculatorVersion: number | null;
+
+  @ApiProperty({ description: 'The run that computed the cycle: {trace, lookupMatches} (migration 1097). Its inputs are what the calculator reopens with. Null when none.', nullable: true, type: Object })
+  calculatorRun: { trace: unknown[]; lookupMatches: Record<string, unknown> } | null;
 
   @ApiProperty({ description: 'Parts per cycle', example: 1 })
   partsPerCycle: number;
@@ -784,6 +845,7 @@ export class ProcessCostResponseDto {
       totalCostPerPart: parseFloat(row.total_cost_per_part) || 0,
       otherCostPerPart: row.other_cost_per_part != null ? parseFloat(row.other_cost_per_part) : null,
       cyclePhases: Array.isArray(row.cycle_phases) ? row.cycle_phases : null,
+      ...calculationOfRow(row as CalculationColumns),
       setupCostPerPart: parseFloat(row.setup_cost_per_part) || 0,
       totalCycleCostPerPart: parseFloat(row.total_cycle_cost_per_part) || 0,
       totalCostBeforeScrap: parseFloat(row.total_cost_before_scrap) || 0,

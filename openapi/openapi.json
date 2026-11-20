@@ -2371,6 +2371,23 @@
             "example": "uuid",
             "type": "string"
           },
+          "calculatorId": {
+            "description": "The stored calculator that computed cycleTime. Null when the cycle was typed in.",
+            "format": "uuid",
+            "nullable": true,
+            "type": "object"
+          },
+          "calculatorRun": {
+            "description": "The run that computed cycleTime: {trace, lookupMatches}, the calculation as the calculator ran it. Null when the cycle was typed in.",
+            "nullable": true,
+            "type": "object"
+          },
+          "calculatorVersion": {
+            "description": "calculators.version of calculatorId when it computed cycleTime.",
+            "example": 1,
+            "nullable": true,
+            "type": "object"
+          },
           "category": {
             "description": "Real HR Rates machine category this line is costed against (migration 719)",
             "example": "3 Roll Bender",
@@ -6032,6 +6049,21 @@
             "description": "Complete calculation breakdown",
             "type": "object"
           },
+          "calculatorId": {
+            "description": "The stored calculator that computed the cycle (migrations 428, 1097). Null when the cycle is not a calculator's.",
+            "nullable": true,
+            "type": "string"
+          },
+          "calculatorRun": {
+            "description": "The run that computed the cycle: {trace, lookupMatches} (migration 1097). Its inputs are what the calculator reopens with. Null when none.",
+            "nullable": true,
+            "type": "object"
+          },
+          "calculatorVersion": {
+            "description": "calculators.version of calculatorId when it computed the cycle.",
+            "nullable": true,
+            "type": "number"
+          },
           "category": {
             "description": "Real HR Rates machine category this line is costed against (migration 719). NULL on engine-generated lines, which identify themselves through operation instead.",
             "example": "3 Roll Bender",
@@ -6275,6 +6307,9 @@
           "chargeBasis",
           "otherCostPerPart",
           "cyclePhases",
+          "calculatorId",
+          "calculatorVersion",
+          "calculatorRun",
           "partsPerCycle",
           "scrap",
           "totalCostPerPart",
@@ -9790,6 +9825,23 @@
           "bomItemId": {
             "description": "BOM item ID to link this cost to",
             "type": "string"
+          },
+          "calculatorId": {
+            "description": "The stored calculator that computed cycleTime. Null when the cycle was typed in.",
+            "format": "uuid",
+            "nullable": true,
+            "type": "object"
+          },
+          "calculatorRun": {
+            "description": "The run that computed cycleTime: {trace, lookupMatches}, the calculation as the calculator ran it. Null when the cycle was typed in.",
+            "nullable": true,
+            "type": "object"
+          },
+          "calculatorVersion": {
+            "description": "calculators.version of calculatorId when it computed cycleTime.",
+            "example": 1,
+            "nullable": true,
+            "type": "object"
           },
           "category": {
             "description": "Real HR Rates machine category this line is costed against (migration 719)",

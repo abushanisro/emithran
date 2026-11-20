@@ -167,6 +167,7 @@ import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, HoleGro
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
+import { calculationOfLine, calculationOfRecord, NO_CALCULATION, seedOfCalculation, tracedLineOf, type LineCalculation } from '@/lib/calculators/calculator-run';
 import { useAuth } from '@/lib/providers/auth-context';
 import type { PanelId, ManualRouteOption, AddProcessRequest } from '@/lib/features/mi-page-types';
 import { fmt, materialLabel, splitMaterialDisplay, fmtInt, formatCell, machineDisplayLabel, familyLabel, confidenceCls, formatEstCycleTime, money, partProcessBadge } from '@/lib/features/display-format';
@@ -531,8 +532,11 @@ function CostSummaryTab({
       // The route comparison's lines are current and traced; a calculator's inputs
       // are the same on every route that contains it.
       ...(comparison?.routes.flatMap((r) => r.processLines) ?? []),
+      // Last, the calculations saved with the part's lines (migration 1097): a calculator no live line ran on this part (another process
+      // chosen, the part not costed) still opens with the inputs its saved line was costed from.
+      ...(existingProcRecords?.records ?? []).flatMap((r) => tracedLineOf(calculationOfRecord(r)) ?? []),
     ]),
-    [eff, cost, comparison],
+    [eff, cost, comparison, existingProcRecords],
   );
 
   const [expandedProcs, setExpandedProcs] = useState<Set<string>>(new Set());
@@ -651,6 +655,8 @@ function CostSummaryTab({
             batchSize: data.batchSize,
             heads: data.heads,
             cycleTime: data.cycleTime,
+            // The calculator and run the cycle was computed with, or none for a typed cycle (migration 1097).
+            ...(data as { calculation: LineCalculation }).calculation,
             partsPerCycle: data.partsPerCycle,
             scrap: data.scrap,
           },
@@ -681,6 +687,8 @@ function CostSummaryTab({
           batchSize: data.batchSize,
           heads: data.heads,
           cycleTime: data.cycleTime,
+          // The calculator and run the cycle was computed with, or none for a typed cycle (migration 1097).
+          ...(data as { calculation: LineCalculation }).calculation,
           partsPerCycle: data.partsPerCycle,
           scrap: data.scrap,
           isActive: true,
@@ -1080,6 +1088,14 @@ function CostSummaryTab({
         const resolved = storedLineById.get(String(proc.id));
         const matchedEngineLine = resolved?.matchedEngineLine ?? undefined;
         const ms = matchedEngineLine?.machineSelection;
+        // The calculation behind each cycle this row can show: the live engine line's (the part as costed now) and the one saved with the row
+        // (migration 1097). The calculator opens on the one behind the cycle it opens with, else the other: a saved line has its own
+        // calculator and inputs even when no live line matches it (another process chosen, the part not costed), never a catalog guess.
+        const liveCalculation = calculationOfLine(matchedEngineLine);
+        const savedCalculation = calculationOfRecord(proc as Partial<LineCalculation>);
+        const liveSeed = seedOfCalculation(liveCalculation) ?? (matchedEngineLine?.calculatorId ? engineCalculators[matchedEngineLine.calculatorId] : undefined);
+        const savedSeed = seedOfCalculation(savedCalculation);
+        const calculatorSeedFor = (liveCycle: boolean) => (liveCycle ? liveSeed ?? savedSeed : savedSeed ?? liveSeed);
 
         // Still needed on its own: the Cycle Time calculator popup below opens
         // seeded with the live geometry-derived value (see its use), not the
@@ -1155,7 +1171,7 @@ function CostSummaryTab({
               <div className="shrink-0 flex items-center gap-0.5 pr-1">
                 <button
                   type="button"
-                  onClick={() => { setProcDialogPrefill({ ...proc, engineCalculators, ...(laborRate > 0 ? { liveLabourRate: laborRate } : {}) }); setProcDialogAutoOpenCalculator(false); setProcDialogOpen(true); }}
+                  onClick={() => { const seed = calculatorSeedFor(false); setProcDialogPrefill({ ...proc, engineCalculators, ...(seed ? { engineCalculator: seed } : {}), ...(laborRate > 0 ? { liveLabourRate: laborRate } : {}) }); setProcDialogAutoOpenCalculator(false); setProcDialogOpen(true); }}
                   className="px-1.5 flex items-center text-muted-foreground/60 hover:text-foreground transition-colors"
                   title="Edit"
                 >
@@ -1176,9 +1192,13 @@ function CostSummaryTab({
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
                 {/* The cycle: the live calculation, each field changeable for this part where the engine applies a part's own values; else the
-                    phases the line's calculator gave when it was applied (process_cost_records.cycle_phases). */}
+                    calculation saved with the line (process_cost_records.calculator_run); else, on a line applied before that was kept, the
+                    phases its calculator gave (process_cost_records.cycle_phases). */}
                 {matchedEngineLine?.calculationTrace && cycleFields(matchedEngineLine.calculationTrace) ? (
                   <CycleCalculator trace={matchedEngineLine.calculationTrace} bomItemId={item.id} calculator={matchedEngineLine.calculatorName ?? null} />
+                ) : savedCalculation?.calculatorRun && cycleFields(savedCalculation.calculatorRun.trace) ? (
+                  // No live line: the calculation the row was saved with, as it ran (a part's own values are set on the live calculation).
+                  <CycleCalculator trace={savedCalculation.calculatorRun.trace} bomItemId={item.id} calculator={null} />
                 ) : (() => {
                   const phases = (proc as StoredProcessRow).cyclePhases ?? [];
                   return phases.length > 0 && (
@@ -1295,16 +1315,14 @@ function CostSummaryTab({
                         setProcDialogPrefill({
                           // At the precision process_cost_records.cycle_time stores (NUMERIC(12,4)):
                           // two decimals turned a 0.0041 s melting share into 0.
-                          ...(liveCycleSec != null ? { ...proc, cycleTime: storableCycleSec(liveCycleSec) } : proc),
+                          // The live cycle comes with the live line's calculation (none when that line has no trace): the run behind the cycle shown.
+                          ...(liveCycleSec != null ? { ...proc, cycleTime: storableCycleSec(liveCycleSec), ...(liveCalculation ?? NO_CALCULATION) } : proc),
                           ...(matchedEngineLine?.featureBreakdown ? { featureBreakdown: matchedEngineLine.featureBreakdown } : {}),
                           // The labour rate the engine costed this line with, for a line that has no machine.
                           ...(laborRate > 0 ? { liveLabourRate: laborRate } : {}),
-                          // A machining line was computed BY a database calculator:
-                          // open that calculator with the engine's own inputs, their
-                          // sources, and the lookup rows they came from.
-                          ...(matchedEngineLine?.calculatorId && engineCalculators[matchedEngineLine.calculatorId]
-                            ? { engineCalculator: engineCalculators[matchedEngineLine.calculatorId] }
-                            : {}),
+                          // The line's cycle was computed BY a database calculator: open that calculator with the inputs it ran on,
+                          // their sources, and the lookup rows they came from (the live run behind a live cycle, else the saved one).
+                          ...(calculatorSeedFor(liveCycleSec != null) ? { engineCalculator: calculatorSeedFor(liveCycleSec != null) } : {}),
                           // Every other machining line's calculator too, so picking a
                           // different calculator in the dropdown opens it with the
                           // inputs the engine used for that line.
@@ -1328,6 +1346,14 @@ function CostSummaryTab({
                   // A sand line's inputs read from a plant variable can be set for this part, under the input.
                   ? <SandLineTrace bomItemId={item.id} line={matchedEngineLine} />
                   : <CalculationTracePanel line={matchedEngineLine} />)}
+                {/* No live line: why the saved cycle is what it is, from the calculation saved with the row. */}
+                {!matchedEngineLine && savedCalculation?.calculatorRun && (
+                  <CalculationTracePanel line={{
+                    calculationTrace: savedCalculation.calculatorRun.trace,
+                    ...(savedCalculation.calculatorId ? { calculatorId: savedCalculation.calculatorId } : {}),
+                    ...(savedCalculation.calculatorVersion != null ? { calculatorVersion: savedCalculation.calculatorVersion } : {}),
+                  }} />
+                )}
                 {/* The moulding line: how the part was measured, cavities, cores, and the other moulding machines compared. */}
                 {cost.sandCasting && matchedEngineLine?.process === cost.sandCasting.mouldingProcess && <SandMouldingDetail route={cost.sandCasting} />}
                 {(heads > 1 || ppc > 1) && (

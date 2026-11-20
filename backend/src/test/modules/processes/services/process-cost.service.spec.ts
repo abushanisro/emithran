@@ -510,3 +510,55 @@ describe('ProcessCostService — labor_type derivation', () => {
     });
   });
 });
+
+// Migration 1097: a saved line keeps the calculator its cycle was computed with and the run (the inputs, with their sources), so the Edit
+// Process Cost calculator reopens that calculator with those inputs; and the run always describes the saved cycle.
+describe('ProcessCostService — the calculation behind the cycle', () => {
+  const CALCULATOR = '3f1c2b9a-7d4e-4c1a-9b2f-0a1b2c3d4e5f';
+  const run = {
+    trace: [
+      { fieldName: 'Slowest Station', displayLabel: 'Slowest Station', kind: 'input', value: 5.0825, unit: 's', source: 'Station 1' },
+      { fieldName: 'Index Time', displayLabel: 'Index Time', kind: 'input', value: 5, unit: 's', source: 'Tsugami M08SY (HR Rates)' },
+      { fieldName: 'Cycle Time', displayLabel: 'Cycle Time', kind: 'calculated', value: 10.0825, unit: 's', formula: '{Slowest Station} + {Index Time}' },
+    ],
+    lookupMatches: {},
+  };
+  const PHASES = [{ name: 'Slowest Station', seconds: 5.0825 }, { name: 'Index Time', seconds: 5 }];
+
+  it('create stores the calculator, its version and run, and the cycle\'s phases read off the run', async () => {
+    const database = makeDatabaseStub({});
+    const service = new ProcessCostService(database as any, fakeLogger, fakeExchangeRateService);
+    await service.create(baseCreateDto({ cycleTime: 10.08, calculatorId: CALCULATOR, calculatorVersion: 1, calculatorRun: run }), 'user-1', 'token');
+    expect(database.insertPayload()).toMatchObject({ calculator_id: CALCULATOR, calculator_version: 1, calculator_run: run, cycle_phases: PHASES });
+  });
+
+  it('create with a typed cycle stores no calculation', async () => {
+    const database = makeDatabaseStub({});
+    const service = new ProcessCostService(database as any, fakeLogger, fakeExchangeRateService);
+    await service.create(baseCreateDto(), 'user-1', 'token');
+    expect(database.insertPayload()).toMatchObject({ calculator_id: null, calculator_version: null, calculator_run: null, cycle_phases: null });
+  });
+
+  it('update with the dialog\'s run replaces the calculation', async () => {
+    const database = makeDatabaseStub({ existingRecord: { data: existingRow({ cycle_time: 12 }), error: null } });
+    const service = new ProcessCostService(database as any, fakeLogger, fakeExchangeRateService);
+    await service.update('existing-id', { cycleTime: 10.08, calculatorId: CALCULATOR, calculatorVersion: 1, calculatorRun: run } as UpdateProcessCostDto, 'user-1', 'token');
+    expect(database.updatePayload()).toMatchObject({ cycle_time: 10.08, calculator_id: CALCULATOR, calculator_run: run, cycle_phases: PHASES });
+  });
+
+  it('a cycle typed over the calculator\'s clears the calculation, which no longer describes it', async () => {
+    const database = makeDatabaseStub({ existingRecord: { data: existingRow({ cycle_time: 10.08, calculator_id: CALCULATOR, calculator_run: run }), error: null } });
+    const service = new ProcessCostService(database as any, fakeLogger, fakeExchangeRateService);
+    await service.update('existing-id', { cycleTime: 12 } as UpdateProcessCostDto, 'user-1', 'token');
+    expect(database.updatePayload()).toMatchObject({ cycle_time: 12, calculator_id: null, calculator_version: null, calculator_run: null, cycle_phases: null });
+  });
+
+  it('an edit that leaves the cycle as it is keeps the calculation', async () => {
+    const database = makeDatabaseStub({ existingRecord: { data: existingRow({ cycle_time: 10.08 }), error: null } });
+    const service = new ProcessCostService(database as any, fakeLogger, fakeExchangeRateService);
+    await service.update('existing-id', { cycleTime: 10.08, setupTime: 30 } as UpdateProcessCostDto, 'user-1', 'token');
+    const payload = database.updatePayload();
+    expect(payload).not.toHaveProperty('calculator_run');
+    expect(payload).not.toHaveProperty('calculator_id');
+  });
+});

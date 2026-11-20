@@ -13,6 +13,7 @@ import { Logger } from '../../../common/logger/logger.service';
 import { DatabaseService } from '../../../common/database/database.service';
 import { ExchangeRateService, organizationIdOf } from '../../../common/exchange-rate/exchange-rate.service';
 import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
+import { calculatorColumnsFromClient, NO_CALCULATION } from '../../bom-items/costing/shared/calculator-run';
 import { PERSISTED_PROCESS_COST_COLUMNS, PROCESS_COST_MONEY_COLUMNS, PersistedProcessCostRow, processCostRowsInUsd, resolvePersistedProcessCost, sumPersistedProcessCost } from '../../bom-items/costing/shared/core/persisted-process-cost';
 import {
   CreateProcessCostDto,
@@ -499,6 +500,8 @@ export class ProcessCostService {
       cycle_time: createDto.cycleTime,
       parts_per_cycle: createDto.partsPerCycle,
       scrap: createDto.scrap,
+      // The calculator the cycle was computed with and its run (migration 1097), and the cycle's phases from that run; none for a typed cycle.
+      ...calculatorColumnsFromClient(createDto),
 
       // Calculated results
       total_cost_per_part: calculationResult.totalCostPerPart,
@@ -734,6 +737,13 @@ export class ProcessCostService {
     if (updateDto.batchSize !== undefined) updateData.batch_size = updateDto.batchSize;
     if (updateDto.heads !== undefined) updateData.heads = updateDto.heads;
     if (updateDto.cycleTime !== undefined) updateData.cycle_time = updateDto.cycleTime;
+    // The calculation behind the cycle (migration 1097). Sent: the calculator and run the cycle was computed with (none for a typed
+    // cycle), with the cycle's phases from that run. Not sent while the cycle changes: the stored run no longer describes it, so it goes.
+    if (updateDto.calculatorId !== undefined || updateDto.calculatorRun !== undefined) {
+      Object.assign(updateData, calculatorColumnsFromClient(updateDto));
+    } else if (updateDto.cycleTime !== undefined && updateDto.cycleTime !== Number((existing as { cycle_time?: unknown }).cycle_time)) {
+      Object.assign(updateData, NO_CALCULATION);
+    }
     if (updateDto.partsPerCycle !== undefined) updateData.parts_per_cycle = updateDto.partsPerCycle;
     if (updateDto.scrap !== undefined) updateData.scrap = updateDto.scrap;
     if (updateDto.isActive !== undefined) updateData.is_active = updateDto.isActive;

@@ -12,11 +12,11 @@ interface User {
   [key: string]: any;
 }
 
+import { calculatorRunColumns, NO_CALCULATION, type LookupMatches } from '../costing/shared/calculator-run';
 import { catalogRowForLine, identityRows, type CatalogRow } from '../process-catalog/catalog-row-for-line';
 import { MISSING_ANALYSIS_TEXT } from '../analysis-status';
 import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from '../dto/apply-route.dto';
 import type { CalculationTraceStep, PhysicsGap } from '../dto/cost-breakdown.dto';
-import { cyclePhasesOf } from '../costing/shared/cycle-phases';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
 import { findRouteDataGaps, isNoCostFeature, isPerPartCharge, lineDataGap, NO_COST_FEATURE, noCostFeatureLine, persistableCycleSec, selectAppliableRoute, type RouteDataGapLine } from '../costing/shared/core/engine-kernel';
 import { RouteResultDto } from '../dto/route-comparison.dto';
@@ -48,7 +48,7 @@ function noCostFeatureColumns(operation: string): Record<string, unknown> {
     machine_rate: 0, labor_rate: 0, direct_rate: 0, line_hourly_rate: 0, line_labour_rate: null,
     setup_time: 0, cycle_time: null, charge_basis: 'per_part',
     setup_cost_per_part: 0, total_cycle_cost_per_part: 0, total_cost_per_part: 0,
-    machine_cost_per_part: null, labor_cost_per_part: null, other_cost_per_part: null, cycle_phases: null,
+    machine_cost_per_part: null, labor_cost_per_part: null, other_cost_per_part: null, ...NO_CALCULATION,
     setup_time_source: 'none',
   };
 }
@@ -456,8 +456,14 @@ export class RouteApplicationService {
       otherCostPerPartUsd?: number;
       /** The versions the line was calculated with (ProcessLineCost.calculationSnapshot); persisted into calculation_breakdown (migration 972). */
       calculationSnapshot?: object;
-      /** The stored calculator's run (ProcessLineCost.calculationTrace); its cycle phases are persisted into cycle_phases (migration 1009). */
+      /**
+       * The calculation behind the cycle (ProcessLineCost.calculatorId / calculatorVersion / calculationTrace / lookupMatches): persisted into
+       * calculator_id, calculator_version and calculator_run (migration 1097), and its phases into cycle_phases (migration 1009).
+       */
+      calculatorId?: string;
+      calculatorVersion?: number;
       calculationTrace?: CalculationTraceStep[];
+      lookupMatches?: LookupMatches;
     }>,
     batchSize: number,
     location: string,
@@ -789,8 +795,9 @@ export class RouteApplicationService {
         labor_cost_per_part:       line.laborCostPerPart ?? null,
         // What the line charges beyond machine and crew time (energy, a consumable), USD like total_cost_per_part (migration 1005).
         other_cost_per_part:       line.otherCostPerPartUsd ?? null,
-        // The phases of the cycle as the line's stored calculator gave them (migration 1009); null when the line has no calculator cycle.
-        cycle_phases:              cyclePhasesOf(line.calculationTrace),
+        // The calculation behind the cycle: the stored calculator, its run and the cycle's phases (migrations 1097, 1009); nulls when the
+        // line has no calculator cycle. What lets the saved line reopen its own calculator with the inputs it was costed from.
+        ...calculatorRunColumns(line),
         // Costed-operation provenance (migration 718).
         //
         // line_hourly_rate is line.hourlyRate verbatim and UNROUNDED -- the
