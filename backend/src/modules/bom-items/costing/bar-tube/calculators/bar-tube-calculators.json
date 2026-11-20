@@ -1,0 +1,334 @@
+{
+  "domain": "bar_tube",
+  "processGroup": "Bar and Tube Fabrication",
+  "calculators": [
+    {
+      "key": "bar_tube.stock",
+      "name": "Bar and Tube - Stock per part",
+      "helper": true,
+      "operations": [],
+      "output": "Material Cost",
+      "results": ["Parts per Stock", "Mass per Part", "Part Mass"],
+      "description": "The stock bought per part: standard lengths (standardStockLength) of the part's section, each cut into as many parts as fit after the trim the saw or laser needs to hold the last piece (minLegLength), one kerf per cut. The drop left at the end is bought with the parts, so each part carries its share of the whole length. Priced per kg for the stock form (material_stock_prices).",
+      "fields": [
+        { "name": "Cut Length", "unit": "mm", "source": { "cad": "developed_length" } },
+        { "name": "Section Area", "unit": "mm²", "source": { "cad": "section_area" } },
+        { "name": "Density", "unit": "kg/m³", "source": { "material": "density_kg_m3" } },
+        { "name": "Price per kg", "unit": "USD/kg", "source": { "engine": "price_per_kg (the stock form's price, material_stock_prices)" } },
+        { "name": "Stock Length", "unit": "mm", "source": { "variable": "standardStockLength" } },
+        { "name": "Trim", "unit": "mm", "source": { "variable": "minLegLength" } },
+        { "name": "Kerf", "unit": "mm", "source": { "engine": "kerf_mm (the cutting process's kerf: bandSawKerf, circSawKerf, recipSawKerf; 0 for a laser)" } },
+        { "name": "Parts per Stock", "unit": null, "formula": "max(1, floor(({Stock Length} - {Trim}) / ({Cut Length} + {Kerf})))" },
+        { "name": "Stock Mass", "unit": "kg", "formula": "{Stock Length} * {Section Area} * {Density} / 1000000000" },
+        { "name": "Mass per Part", "unit": "kg", "formula": "{Stock Mass} / {Parts per Stock}" },
+        { "name": "Part Mass", "unit": "kg", "formula": "{Cut Length} * {Section Area} * {Density} / 1000000000" },
+        { "name": "Material Cost", "unit": "USD", "formula": "{Mass per Part} * {Price per kg}" }
+      ]
+    },
+    {
+      "key": "bar_tube.plate",
+      "name": "Bar and Tube - Plate per part",
+      "helper": true,
+      "operations": [],
+      "output": "Material Cost",
+      "results": ["Parts per Sheet", "Mass per Part", "Part Mass"],
+      "description": "The plate bought per part: blanks nested on a standard sheet (standardSheetLength x standardSheetWidth), the better of the two ways round, each blank its smallest rectangle plus a gap of one plate thickness. The skeleton left is bought with the parts.",
+      "fields": [
+        { "name": "Blank Length", "unit": "mm", "source": { "engine": "blank_length_mm (the flat part's smallest rectangle, long side)" } },
+        { "name": "Blank Width", "unit": "mm", "source": { "engine": "blank_width_mm (the flat part's smallest rectangle, short side)" } },
+        { "name": "Thickness", "unit": "mm", "source": { "engine": "thickness_mm (the plate)" } },
+        { "name": "Face Area", "unit": "mm²", "source": { "engine": "face_area_mm2 (the flat part's face)" } },
+        { "name": "Density", "unit": "kg/m³", "source": { "material": "density_kg_m3" } },
+        { "name": "Price per kg", "unit": "USD/kg", "source": { "engine": "price_per_kg (the plate's price, material_stock_prices)" } },
+        { "name": "Sheet Length", "unit": "mm", "source": { "variable": "standardSheetLength" } },
+        { "name": "Sheet Width", "unit": "mm", "source": { "variable": "standardSheetWidth" } },
+        { "name": "Parts per Sheet", "unit": null, "formula": "max(1, max(floor({Sheet Length} / ({Blank Length} + {Thickness})) * floor({Sheet Width} / ({Blank Width} + {Thickness})), floor({Sheet Length} / ({Blank Width} + {Thickness})) * floor({Sheet Width} / ({Blank Length} + {Thickness}))))" },
+        { "name": "Sheet Mass", "unit": "kg", "formula": "{Sheet Length} * {Sheet Width} * {Thickness} * {Density} / 1000000000" },
+        { "name": "Mass per Part", "unit": "kg", "formula": "{Sheet Mass} / {Parts per Sheet}" },
+        { "name": "Part Mass", "unit": "kg", "formula": "{Face Area} * {Thickness} * {Density} / 1000000000" },
+        { "name": "Material Cost", "unit": "USD", "formula": "{Mass per Part} * {Price per kg}" }
+      ]
+    },
+    {
+      "key": "bar_tube.billet",
+      "name": "Bar and Tube - Extrusion billet",
+      "helper": true,
+      "operations": [],
+      "output": "Material Cost",
+      "results": ["Extrusion Ratio", "Extruded Length", "Parts per Billet", "Mass per Part", "Billet Mass"],
+      "description": "The aluminium bought per extruded part: one billet of the press (its diameter and longest billet) pushed through the die less the butt left in the container (one tenth of the billet diameter, an engineering assumption: the reference data names none), stretched by the extrusion ratio (billet over section area), never longer than the press's run-out; cut into parts with a kerf each. Priced at the material's own price per kg.",
+      "fields": [
+        { "name": "Billet Diameter", "unit": "mm", "source": { "machine": "billet_diameter_mm" } },
+        { "name": "Billet Length", "unit": "mm", "source": { "machine": "max_billet_length_mm" } },
+        { "name": "Run Out", "unit": "mm", "source": { "machine": "run_out_length_mm" } },
+        { "name": "Section Area", "unit": "mm²", "source": { "cad": "section_area" } },
+        { "name": "Cut Length", "unit": "mm", "source": { "cad": "developed_length" } },
+        { "name": "Kerf", "unit": "mm", "source": { "variable": "recipSawKerf" } },
+        { "name": "Density", "unit": "kg/m³", "source": { "material": "density_kg_m3" } },
+        { "name": "Price per kg", "unit": "USD/kg", "source": { "material": "cost" } },
+        { "name": "Billet Area", "unit": "mm²", "formula": "3.14159265 * {Billet Diameter} * {Billet Diameter} / 4" },
+        { "name": "Extrusion Ratio", "unit": null, "formula": "{Billet Area} / {Section Area}" },
+        { "name": "Butt Length", "unit": "mm", "formula": "0.1 * {Billet Diameter}" },
+        { "name": "Extruded Length", "unit": "mm", "formula": "min({Run Out}, ({Billet Length} - {Butt Length}) * {Extrusion Ratio})" },
+        { "name": "Parts per Billet", "unit": null, "formula": "max(1, floor({Extruded Length} / ({Cut Length} + {Kerf})))" },
+        { "name": "Billet Mass", "unit": "kg", "formula": "{Billet Area} * {Billet Length} * {Density} / 1000000000" },
+        { "name": "Mass per Part", "unit": "kg", "formula": "{Billet Mass} / {Parts per Billet}" },
+        { "name": "Material Cost", "unit": "USD", "formula": "{Mass per Part} * {Price per kg}" }
+      ]
+    },
+    {
+      "key": "bar_tube.saw",
+      "name": "Bar and Tube - Saw cut",
+      "operations": ["Band Saw", "Circular Saw", "Reciprocating Saw"],
+      "description": "Cutting the stock to length: the section's metal area (more on an angled cut) at the saw's cutting rate for the material's cut-code family and the section's width (lookup saw_cut_rate), the stock indexed by one part length at the saw's axial feed, the load and unload of each bundle; parts cut in bundles as the saw's capacity and maxPartsPerBundle allow share each cut.",
+      "fields": [
+        { "name": "Cut Area", "unit": "mm²", "source": { "engine": "cut_area_mm2 (the section's metal area, over the cosine of an angled cut)" } },
+        { "name": "Cutting Rate", "unit": "mm²/min", "source": { "lookup": "saw_cut_rate.Cutting Rate (mm^2 / min)" } },
+        { "name": "Cut Length", "unit": "mm", "source": { "cad": "developed_length" } },
+        { "name": "Axial Feed Rate", "unit": "mm/s", "source": { "machine": "axial_feed_rate_mm_per_s" } },
+        { "name": "Load and Unload", "unit": "s", "source": { "machine": "load_plus_unload_time_s" } },
+        { "name": "Parts per Bundle", "unit": null, "source": { "engine": "parts_per_bundle (as many as fit the saw's stock height and width, within maxPartsPerBundle)" } },
+        { "name": "Cuts per Part", "unit": null, "source": { "engine": "cuts_per_part (one; two when both ends are cut at an angle)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cut Time", "unit": "s", "formula": "{Cuts per Part} * {Cut Area} / {Cutting Rate} * 60" },
+        { "name": "Index Time", "unit": "s", "formula": "{Cut Length} / {Axial Feed Rate}" },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Cut Time} + {Index Time} + {Load and Unload}) / {Parts per Bundle} * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.shear",
+      "name": "Bar and Tube - Shear",
+      "operations": ["Shear"],
+      "description": "Shearing bar or a structural section to length on an ironworker: the stock loaded, indexed one part length at the axial feed, one stroke, the part unloaded.",
+      "fields": [
+        { "name": "Load Time", "unit": "s", "source": { "machine": "load_time_s" } },
+        { "name": "Unload Time", "unit": "s", "source": { "machine": "unload_time_s" } },
+        { "name": "Stroke Time", "unit": "s", "source": { "machine": "cycle_time_heavy_material_s" } },
+        { "name": "Cut Length", "unit": "mm", "source": { "cad": "developed_length" } },
+        { "name": "Axial Feed Rate", "unit": "mm/s", "source": { "machine": "axial_feed_rate_mm" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load Time} + {Cut Length} / {Axial Feed Rate} + {Stroke Time} + {Unload Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.tube_laser",
+      "name": "Bar and Tube - Tube laser",
+      "operations": ["Tube Laser"],
+      "description": "A tube laser cutting the part from the tube in one setup: its end cuts and openings at the large-feature feed, its round holes at the small-feature feed, one pierce per contour (lookup process_cut_rate, Tube Laser, at the machine's power and the wall's thickness), the tube indexed one part length at the axial bar feed, the index between parts, and the reload of a new tube shared by the parts one tube makes.",
+      "fields": [
+        { "name": "Large Feature Length", "unit": "mm", "source": { "engine": "large_cut_mm (end cuts, notches, slots, complex holes and cutouts)" } },
+        { "name": "Small Feature Length", "unit": "mm", "source": { "engine": "small_cut_mm (round holes)" } },
+        { "name": "Pierces", "unit": null, "source": { "engine": "pierces (one per contour)" } },
+        { "name": "Large Feature Feed", "unit": "mm/min", "source": { "lookup": "process_cut_rate.Feed Rate Large Features (mm / min)" } },
+        { "name": "Small Feature Feed", "unit": "mm/min", "source": { "lookup": "process_cut_rate.Feed Rate Small Features (mm / min)" } },
+        { "name": "Pierce Time", "unit": "s", "source": { "lookup": "process_cut_rate.Pierce Time (s)" } },
+        { "name": "Cut Length", "unit": "mm", "source": { "cad": "developed_length" } },
+        { "name": "Axial Feed Rate", "unit": "mm/s", "source": { "machine": "tube_axial_bar_feed_rate_mm_per_s" } },
+        { "name": "Indexing Time", "unit": "s", "source": { "machine": "tube_indexing_time_s" } },
+        { "name": "Reload Time", "unit": "s", "source": { "machine": "new_tube_reload_time_s" } },
+        { "name": "Parts per Stock", "unit": null, "source": { "engine": "parts_per_stock (Bar and Tube - Stock per part)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Large Feature Length} / {Large Feature Feed} * 60 + {Small Feature Length} / {Small Feature Feed} * 60 + {Pierces} * {Pierce Time} + {Cut Length} / {Axial Feed Rate} + {Indexing Time} + {Reload Time} / {Parts per Stock}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.punch",
+      "name": "Bar and Tube - Punching",
+      "operations": ["Punching"],
+      "description": "Punching the holes and openings of a bar or tube: one hit per hole or opening (a tube's on a mandrel), the stock indexed along its length between them at the axial feed, loaded and unloaded once.",
+      "fields": [
+        { "name": "Hits", "unit": null, "source": { "engine": "hits (round holes, complex holes and cutouts)" } },
+        { "name": "Punch Time", "unit": "s", "source": { "engine": "punch_time_s (the machine's mandrel punch time for a tube, its non-mandrel time otherwise)" } },
+        { "name": "Index Length", "unit": "mm", "source": { "engine": "index_mm (from the first opening to the last along the length)" } },
+        { "name": "Axial Feed Rate", "unit": "mm/s", "source": { "machine": "axial_feed_rate_mm_per_s" } },
+        { "name": "Load and Unload", "unit": "s", "source": { "machine": "load_plus_unload_time_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load and Unload} + {Hits} * {Punch Time} + {Index Length} / {Axial Feed Rate}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.end_form",
+      "name": "Bar and Tube - End forming",
+      "operations": ["Flaring", "Flanging", "Expansion", "Reduction", "Flattening", "Knurling", "Bar Forming", "Notching", "Slotting"],
+      "description": "Forming (or notching, slotting) the ends of a tube or bar on an end former: the machine's end form cycle per end so formed, and the part loaded and unloaded once.",
+      "fields": [
+        { "name": "Ends", "unit": null, "source": { "engine": "ends (the ends this operation forms)" } },
+        { "name": "End Form Cycle", "unit": "s", "source": { "machine": "end_form_cycle_time_s" } },
+        { "name": "Load and Unload", "unit": "s", "source": { "machine": "load_plus_unload_time_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load and Unload} + {Ends} * {End Form Cycle}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.rotary_draw",
+      "name": "Bar and Tube - Rotary draw bending",
+      "operations": ["Rotary Draw Bending"],
+      "description": "Rotary draw bending: each bend at the machine's mandrel bend time when its tooling needs a mandrel (lookup bending_difficulty_factor: the wall factor, outside diameter over wall, and the bend's CLR over the diameter give the tool key; a digit above 0 is a mandrel), else its non-mandrel time; a plane rotation for each bend whose clock angle is not 0; the tube fed its developed length at the axial feed; loaded and unloaded once.",
+      "fields": [
+        { "name": "Bends", "unit": null, "source": { "engine": "bends (the bends made by rotary draw)" } },
+        { "name": "Mandrel Bends", "unit": null, "source": { "engine": "mandrel_bends (of them, the bends whose tool key needs a mandrel)" } },
+        { "name": "Rotations", "unit": null, "source": { "engine": "rotations (bends after a plane rotation: clock angle not 0)" } },
+        { "name": "Feed Length", "unit": "mm", "source": { "cad": "developed_length" } },
+        { "name": "Mandrel Bend Time", "unit": "s", "source": { "machine": "mandrel_bend_time_s" } },
+        { "name": "Non Mandrel Bend Time", "unit": "s", "source": { "machine": "non_mandrel_bend_time_s" } },
+        { "name": "Rotate Time", "unit": "s", "source": { "machine": "clock_angle_rotate_time_s" } },
+        { "name": "Axial Feed Rate", "unit": "mm/s", "source": { "machine": "axial_feed_rate_mm_per_s" } },
+        { "name": "Load and Unload", "unit": "s", "source": { "machine": "load_plus_unload_time_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load and Unload} + {Mandrel Bends} * {Mandrel Bend Time} + ({Bends} - {Mandrel Bends}) * {Non Mandrel Bend Time} + {Rotations} * {Rotate Time} + {Feed Length} / {Axial Feed Rate}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.compression",
+      "name": "Bar and Tube - Compression bending",
+      "operations": ["Compression Bending"],
+      "description": "Compression bending of a small tube round a fixed die: the machine's bend time per bend, a reorientation for each bend whose clock angle is not 0, loaded and unloaded once.",
+      "fields": [
+        { "name": "Bends", "unit": null, "source": { "engine": "bends (the bends made by compression bending)" } },
+        { "name": "Rotations", "unit": null, "source": { "engine": "rotations (bends after a plane rotation)" } },
+        { "name": "Bend Time", "unit": "s", "source": { "machine": "bend_time_s" } },
+        { "name": "Reorientation Time", "unit": "s", "source": { "machine": "reorientation_time_s" } },
+        { "name": "Load and Unload", "unit": "s", "source": { "machine": "load_plus_unload_time_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load and Unload} + {Bends} * {Bend Time} + {Rotations} * {Reorientation Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.bend_brake",
+      "name": "Bar and Tube - Bar bend brake",
+      "operations": ["Bar Bend Brake"],
+      "description": "Bending a bar in a bar bend brake: the machine's bend cycle per bend, the part manipulated between bends and loaded and unloaded at the times of its weight (lookup material_handling, Bar Bend Brake).",
+      "fields": [
+        { "name": "Bends", "unit": null, "source": { "engine": "bends (the bends made in the bend brake)" } },
+        { "name": "Bend Cycle", "unit": "s", "source": { "machine": "bend_cycle_time_s" } },
+        { "name": "Load Time", "unit": "s", "source": { "lookup": "material_handling.Load Time (s)" } },
+        { "name": "Manipulation Time", "unit": "s", "source": { "lookup": "material_handling.Manipulation Time (s)" } },
+        { "name": "Unload Time", "unit": "s", "source": { "lookup": "material_handling.Unload Time (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load Time} + {Bends} * ({Bend Cycle} + {Manipulation Time}) + {Unload Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.roll",
+      "name": "Bar and Tube - Roll bending",
+      "operations": ["2 Roll Bending", "3 Roll Bending", "4 Roll Bending"],
+      "description": "Roll bending a large radius: the arc length rolled at the machine's rolling speed (slowed by rollingSpeedAdjustmentFactor when the yield is within 10 % of the tensile strength), once per pass (several above referenceTensileStrength or past rollThicknessRatio of the machine's capacity), loaded and unloaded at the times of the part's weight (lookup material_handling).",
+      "fields": [
+        { "name": "Arc Length", "unit": "mm", "source": { "engine": "arc_mm (the bends rolled, along the centreline)" } },
+        { "name": "Passes", "unit": null, "source": { "engine": "passes (1, or several for a strong or thick section)" } },
+        { "name": "Rolling Speed", "unit": "mm/s", "source": { "machine": "rolling_speed_mm_per_s" } },
+        { "name": "Speed Factor", "unit": null, "source": { "engine": "speed_factor (rollingSpeedAdjustmentFactor when the yield is within 10 % of the UTS, else 1)" } },
+        { "name": "Load Time", "unit": "s", "source": { "lookup": "material_handling.Load Time (s)" } },
+        { "name": "Unload Time", "unit": "s", "source": { "lookup": "material_handling.Unload Time (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load Time} + {Passes} * {Arc Length} / ({Rolling Speed} * {Speed Factor}) + {Unload Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.profile_roll",
+      "name": "Bar and Tube - Profile 3 roll bend",
+      "operations": ["Profile 3 Roll Bend"],
+      "description": "Bending an extruded profile in a profile 3-roll bender: both ends prebent, the arc rolled at the rolling speed once per pass, loaded and unloaded at the times of its weight (lookup material_handling).",
+      "fields": [
+        { "name": "Arc Length", "unit": "mm", "source": { "engine": "arc_mm (the bends rolled)" } },
+        { "name": "Passes", "unit": null, "source": { "engine": "passes" } },
+        { "name": "Prebend Time", "unit": "s", "source": { "machine": "prebend_time_s" } },
+        { "name": "Rolling Speed", "unit": "mm/s", "source": { "machine": "rolling_speed_mm_per_s" } },
+        { "name": "Load Time", "unit": "s", "source": { "lookup": "material_handling.Load Time (s)" } },
+        { "name": "Unload Time", "unit": "s", "source": { "lookup": "material_handling.Unload Time (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load Time} + 2 * {Prebend Time} + {Passes} * {Arc Length} / {Rolling Speed} + {Unload Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.profile_cnc",
+      "name": "Bar and Tube - Profile CNC bend",
+      "operations": ["Profile CNC Bend"],
+      "description": "Bending an extruded profile on a CNC profile bender: the profile fed its developed length at the machine's feed speed through the bending head, loaded and unloaded at the times of its weight (lookup material_handling).",
+      "fields": [
+        { "name": "Feed Length", "unit": "mm", "source": { "cad": "developed_length" } },
+        { "name": "Feed Speed", "unit": "mm/s", "source": { "machine": "feed_speed_mm_per_s" } },
+        { "name": "Load Time", "unit": "s", "source": { "lookup": "material_handling.Load Time (s)" } },
+        { "name": "Unload Time", "unit": "s", "source": { "lookup": "material_handling.Unload Time (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Load Time} + {Feed Length} / {Feed Speed} + {Unload Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.sheet_cut",
+      "name": "Bar and Tube - Plate cutting",
+      "operations": ["Sheet Laser Cut", "Sheet Plasma Cut", "Sheet OxyFuel Cut"],
+      "description": "Cutting a flat part from plate on a CNC laser, plasma or oxyfuel table: its outline and openings at the cutting feed, one pierce per contour (lookup process_cut_rate for the process, at the machine's power and the plate's thickness), shared by the machine's heads, and the sheet change shared by the parts one sheet makes.",
+      "fields": [
+        { "name": "Cut Length", "unit": "mm", "source": { "engine": "cut_mm (the flat part's outline and openings)" } },
+        { "name": "Pierces", "unit": null, "source": { "engine": "pierces (one per contour)" } },
+        { "name": "Feed Rate", "unit": "mm/min", "source": { "lookup": "process_cut_rate.Feed Rate Large Features (mm / min)" } },
+        { "name": "Pierce Time", "unit": "s", "source": { "lookup": "process_cut_rate.Pierce Time (s)" } },
+        { "name": "Heads", "unit": null, "source": { "machine": "number_of_heads" } },
+        { "name": "Shuttle Time", "unit": "s", "source": { "machine": "shuttle_time_s" } },
+        { "name": "Parts per Sheet", "unit": null, "source": { "engine": "parts_per_sheet (Bar and Tube - Plate per part)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "(({Cut Length} / {Feed Rate} * 60 + {Pierces} * {Pierce Time}) / max(1, {Heads}) + {Shuttle Time} / {Parts per Sheet}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.profile_cut",
+      "name": "Bar and Tube - Plasma and torch cutting",
+      "operations": ["Plasma CNC Cut", "Plasma Torch Cut", "Oxyfuel Torch Cut"],
+      "description": "Cutting the ends and openings of a heavy section with a plasma or oxyfuel torch, CNC or by hand: the contours at the cutting feed for the wall's thickness, one pierce per contour (lookup process_cut_rate, Plasma Cut or OxyFuel Cut), and, by hand, the marking time of each contour (manualMarkingTime).",
+      "fields": [
+        { "name": "Cut Length", "unit": "mm", "source": { "engine": "cut_mm (end cuts and openings)" } },
+        { "name": "Pierces", "unit": null, "source": { "engine": "pierces (one per contour)" } },
+        { "name": "Feed Rate", "unit": "mm/min", "source": { "lookup": "process_cut_rate.Feed Rate Large Features (mm / min)" } },
+        { "name": "Pierce Time", "unit": "s", "source": { "lookup": "process_cut_rate.Pierce Time (s)" } },
+        { "name": "Marking Time", "unit": "s", "source": { "engine": "marking_s (manualMarkingTime per contour by hand; 0 on a CNC table)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Cut Length} / {Feed Rate} * 60 + {Pierces} * ({Pierce Time} + {Marking Time})) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.extrusion",
+      "name": "Bar and Tube - Extrusion",
+      "operations": ["Extrusion"],
+      "description": "Extruding the profile: the billet pushed out at the exit speed (the material's fastest exit speed, never faster than the press's ram speed times the extrusion ratio), then the ram reset; one billet makes the parts its extruded length holds (Bar and Tube - Extrusion billet).",
+      "fields": [
+        { "name": "Extruded Length", "unit": "mm", "source": { "engine": "extruded_mm (Bar and Tube - Extrusion billet)" } },
+        { "name": "Parts per Billet", "unit": null, "source": { "engine": "parts_per_billet (Bar and Tube - Extrusion billet)" } },
+        { "name": "Extrusion Ratio", "unit": null, "source": { "engine": "extrusion_ratio (Bar and Tube - Extrusion billet)" } },
+        { "name": "Exit Speed", "unit": "mm/s", "source": { "material": "extrusion_exit_speed_max_mm_s" } },
+        { "name": "Max Ram Speed", "unit": "mm/s", "source": { "machine": "max_ram_speed_mm_per_s" } },
+        { "name": "Ram Reset", "unit": "s", "source": { "machine": "ram_reset_time_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Speed", "unit": "mm/s", "formula": "min({Exit Speed}, {Max Ram Speed} * {Extrusion Ratio})" },
+        { "name": "Billet Time", "unit": "s", "formula": "{Extruded Length} / {Speed} + {Ram Reset}" },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Billet Time} / {Parts per Billet} * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "bar_tube.billet_preheat",
+      "name": "Bar and Tube - Billet preheat",
+      "operations": ["Billet Preheat"],
+      "description": "Heating the billet to its extrusion temperature (480 C for the 6000 aluminium the reference data's flow stress is for, an engineering assumption) from room temperature (defaultRoomTemp): its mass times the specific heat times the rise, at the furnace's power at half efficiency (an engineering assumption: the reference data names none), shared by the parts one billet makes.",
+      "fields": [
+        { "name": "Billet Mass", "unit": "kg", "source": { "engine": "billet_kg (Bar and Tube - Extrusion billet)" } },
+        { "name": "Specific Heat", "unit": "J/(kg·K)", "source": { "material": "specific_heat_rt_j_kg_k" } },
+        { "name": "Room Temperature", "unit": "°C", "source": { "variable": "defaultRoomTemp" } },
+        { "name": "Billet Temperature", "unit": "°C", "source": { "engine": "billet_temp_c (480 C)" } },
+        { "name": "Power", "unit": "kW", "source": { "machine": "machine_power_kw" } },
+        { "name": "Parts per Billet", "unit": null, "source": { "engine": "parts_per_billet (Bar and Tube - Extrusion billet)" } },
+        { "name": "Heat Time", "unit": "s", "formula": "{Billet Mass} * {Specific Heat} * ({Billet Temperature} - {Room Temperature}) / ({Power} * 1000 * 0.5)" },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Heat Time} / {Parts per Billet}" }
+      ]
+    },
+    {
+      "key": "bar_tube.die_preheat",
+      "name": "Bar and Tube - Die preheat",
+      "operations": ["Die Preheat"],
+      "description": "Preheating the extrusion die once for the batch: the oven's setup time (its HR Rates setup) carried by the batch, as every line's setup is; no time per part.",
+      "fields": [
+        { "name": "Batch Size", "unit": null, "source": { "scenario": "batch_size" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "0 * {Batch Size}" }
+      ]
+    }
+  ]
+}
