@@ -610,6 +610,23 @@ export class AutoFillService {
             }])),
           } : null,
         } : {}),
+        // A bar, tube or profile (cad-engine bar_tube/feature_extractor.py): its stock form and section, the centreline's developed length, the
+        // bends, the holes and openings through the wall, the end cuts and the end forms. The bar and tube cost prices its stock and routes from it.
+        ...(family.family === 'bar_tube' ? {
+          barTubeGeometry: cadMI?.features?.extraction_version ? {
+            extractionVersion: cadMI.features.extraction_version,
+            stockForm: cadMI.features.stock_form ?? null,
+            reason: cadMI.features.reason ?? null,
+            section: cadMI.features.section ?? null,
+            developedLengthMm: cadMI.features.developed_length_mm ?? null,
+            bends: cadMI.features.bends ?? [],
+            holes: cadMI.features.holes ?? [],
+            complexHoles: cadMI.features.complex_holes ?? [],
+            cutouts: cadMI.features.cutouts ?? [],
+            ends: cadMI.features.ends ?? [],
+            forms: cadMI.features.forms ?? [],
+          } : null,
+        } : {}),
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
         // (cadMI.features). Detection + highlighting only; process routing and
         // costing are a later phase (see the Die Casting Phase 1 plan).

@@ -36,6 +36,9 @@ export const CAD_EVIDENCE_KEYS = [
   'overhang_area',
   'support_volume',
   'plate_contact_area',
+  // A bar, tube or profile (cad-engine bar_tube/feature_extractor.py): its centreline end to end and its cross-section.
+  'developed_length',
+  'section_area',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];

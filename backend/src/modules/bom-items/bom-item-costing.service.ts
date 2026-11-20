@@ -136,6 +136,10 @@ import { AdditiveCostService, type AdditiveBuildSummary } from './costing/additi
 import { buildAdditiveCostSummary } from './costing/additive/additive-cost-summary';
 import { ADDITIVE_ROUTES } from './costing/additive/additive-route';
 import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
+import { BarTubeCostService, type BarTubeGeometrySummary } from './costing/bar-tube/bar-tube-cost.service';
+import { buildBarTubeCostSummary } from './costing/bar-tube/bar-tube-cost-summary';
+import { BAR_TUBE_ROUTES } from './costing/bar-tube/bar-tube-route';
+import { barTubeRouteFor, barTubeRouteId } from './costing/bar-tube/bar-tube-route-comparison';
 import { AssemblyCostService, componentsOf, type AssemblyCostResult } from './costing/assembly/assembly-cost.service';
 import { InsertMoldingService } from './costing/plastic-molding/insert/insert-molding.service';
 import {
@@ -248,7 +252,7 @@ export function convertRouteOptions<T extends { totalCost: number | null }>(opti
 }
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === 'bar_tube' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
 /** The molding line's material reason, when the engine found the material itself cannot be molded (requiredCapability says so). */
@@ -360,6 +364,8 @@ export class BomItemCostingService {
     private readonly compositesCostService?: CompositesCostService,
     /** The additive manufacturing routes; optional for the same reason (without it an additive part is one named, uncosted line). */
     private readonly additiveCostService?: AdditiveCostService,
+    /** The bar and tube routes; optional for the same reason (without it a bar or tube part is one named, uncosted line). */
+    private readonly barTubeCostService?: BarTubeCostService,
     /** An assembly's own work; optional for the same reason (without it an assembly is one named, uncosted line). */
     private readonly assemblyCostService?: AssemblyCostService,
     /** Insert molding's reference data, calculators and loaders; optional for the same reason (without it the loading is a named gap). */
@@ -492,6 +498,7 @@ export class BomItemCostingService {
       ...(dto.forging ? { forging: { ...dto.forging, options: convertRouteOptions(dto.forging.options, conv) } } : {}),
       ...(dto.composites ? { composites: { ...dto.composites, options: convertRouteOptions(dto.composites.options, conv) } } : {}),
       ...(dto.additive ? { additive: { ...dto.additive, options: convertRouteOptions(dto.additive.options, conv) } } : {}),
+      ...(dto.barTube ? { barTube: { ...dto.barTube, options: convertRouteOptions(dto.barTube.options, conv) } } : {}),
       ...(dto.insertMolding ? { insertMolding: { ...dto.insertMolding, options: convertRouteOptions(dto.insertMolding.options, conv) } } : {}),
       ...(dto.multiShot ? { multiShot: { ...dto.multiShot, options: convertRouteOptions(dto.multiShot.options, conv) } } : {}),
       ...(dto.assembly ? {
@@ -2639,6 +2646,36 @@ export class BomItemCostingService {
         localLinesOut.localCurrency = locInfo.code;
       }
       return { ...this.normalizeCostSummaryToCurrency(additiveResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+    }
+
+    // ── Bar and Tube Fabrication ───────────────────────────────────────────────
+    // The stock measured by the cad-engine (bar_tube/feature_extractor.py, via auto-fill's barTubeGeometry: section, developed length, bends,
+    // openings, end cuts and forms) and memory/Bar and tube fab price both routes (bar-tube-route.ts): saw and punch, and tube laser.
+    if (family === 'bar_tube') {
+      const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+      const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const barTube = this.barTubeCostService
+        ? await this.barTubeCostService.price({
+          client: this.databaseService.getClient(accessToken), accessToken, location, grade,
+          geometry: (summary.barTubeGeometry ?? null) as BarTubeGeometrySummary | null,
+          ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+          overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+        })
+        : { route: null, routes: [], gaps: [], part: null, note: null, missing: ['the bar and tube cost service is not available'], warnings: [] };
+      const barTubeResult = {
+        ...buildBarTubeCostSummary({
+          barTube, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
+        }),
+        ...currencyMeta,
+        drawingCadConsistency,
+      };
+      this.overrides.applyCostOverrides(barTubeResult, costOverrides);
+      if (costOverrides.size > 0) barTubeResult.costOverrides = Object.fromEntries(costOverrides);
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(barTubeResult.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
+      return { ...this.normalizeCostSummaryToCurrency(barTubeResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
     }
 
     // ── Casting (die / sand / investment) ────────────────────────────────────
@@ -5018,6 +5055,46 @@ export class BomItemCostingService {
   }
 
   /**
+   * A bar and tube part's route comparison: saw and punch, and tube laser, each the full Cost Summary priced on that route, as the additive
+   * routes are. The recommended one is the route the quote chose.
+   */
+  private async barTubeRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = BAR_TUBE_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'bar_tube'),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'bar_tube')),
+    ]);
+    const routes = keys.map((key, i) => barTubeRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.barTube?.complete ? barTubeRouteId(quote!.barTube.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No bar and tube route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
+  /**
    * An additive part's route comparison: every build route (metal sintering, laser sintering, material jetting, stereolithography), each the
    * full Cost Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
    */
@@ -5320,6 +5397,10 @@ export class BomItemCostingService {
     }
     if (family === ASSEMBLY_FAMILY) {
       return this.assemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Bar and Tube Fabrication: saw and punch against tube laser, each the full quote on that route (bar-tube-route-comparison.ts).
+    if (family === 'bar_tube') {
+      return this.barTubeRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     if (family === 'additive') {
       return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);

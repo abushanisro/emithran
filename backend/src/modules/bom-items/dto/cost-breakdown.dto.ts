@@ -710,6 +710,8 @@ export interface CostSummaryDto {
   composites?: CompositesBreakdown;
   /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route. */
   additive?: AdditiveBreakdown;
+  /** Bar and Tube Fabrication: the stock (form, section, length, parts per stock), the bends, ends and openings, the route quoted and every route. */
+  barTube?: BarTubeBreakdown;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
   assembly?: AssemblyBreakdown;
   /** Assembly Molding (insert molding): the inserts, how they are loaded, the press and its shot, the route quoted and every route. */
@@ -882,6 +884,34 @@ export interface AssemblyBreakdown {
   consumablesCost: number;
   adhesiveKg: number;
   /** Every route: its total per assembly (summary currency) when complete, or why it is not a route for the assembly. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
+export interface BarTubeBreakdown {
+  /** The quoted route (bar-tube-route.ts BAR_TUBE_ROUTES key) and its name. */
+  route: string;
+  routeLabel: string;
+  /** The stock as the cad-engine measured it (bar_tube/feature_extractor.py): its form and section. */
+  stockForm: string;
+  sectionWidthMm: number;
+  sectionHeightMm: number;
+  wallMm: number | null;
+  sectionAreaMm2: number;
+  developedLengthMm: number;
+  partsPerStock: number | null;
+  /** The stock bought per part (its share of a stock length) and the part's own mass. */
+  materialMassKg: number;
+  partMassKg: number;
+  /** USD/kg of the stock form at the location (material_stock_prices), and why the stock is not costed when it is not. */
+  stockPricePerKg: number | null;
+  stockMissing: string | null;
+  bends: Array<{ clrMm: number; angleDeg: number }>;
+  holeCount: number;
+  openingCount: number;
+  ends: Array<{ end: string; variant: string; cutAngleDeg: number | null }>;
+  forms: Array<{ end: string; variant: string }>;
+  complete: boolean;
+  /** Every route: its total per part (summary currency) when complete, or why it is not a route for the part. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
 }
 

@@ -12,6 +12,7 @@ import { DIE_CASTING_PROCESSES, dieCastingRouteId } from '../costing/casting/die
 import { FORGING_ROUTE_IDS } from '../costing/forging/forging-route-comparison';
 import { COMPOSITES_ROUTE_IDS } from '../costing/composites/composites-route-comparison';
 import { ADDITIVE_ROUTE_IDS } from '../costing/additive/additive-route-comparison';
+import { BAR_TUBE_ROUTE_IDS } from '../costing/bar-tube/bar-tube-route-comparison';
 import { ASSEMBLY_ROUTE_IDS } from '../costing/assembly/assembly-route-comparison';
 import { INSERT_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/insert/insert-molding';
 import { MULTI_SHOT_ROUTE_IDS } from '../costing/plastic-molding/multi-shot/multi-shot';
@@ -40,6 +41,8 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   // Each composites layup route, priced by the composites engine (composites-route-comparison.ts).
   ...COMPOSITES_ROUTE_IDS,
   ...ADDITIVE_ROUTE_IDS,
+  // A bar or tube part's routes (saw and punch, tube laser), priced by the bar and tube engine (bar-tube-route-comparison.ts).
+  ...BAR_TUBE_ROUTE_IDS,
   // An assembly's routes (manual, robotic welding), priced by the assembly engine (assembly-route-comparison.ts).
   ...ASSEMBLY_ROUTE_IDS,
   // An insert-molded part's load methods (manual, 3-axis, 6-axis), priced by the insert molding engine.

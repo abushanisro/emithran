@@ -62,6 +62,8 @@ const SOURCE_BY_EVIDENCE: Record<string, Source> = {
   overhang_area: { kind: 'measurement', key: 'overhang_area', label: 'overhang needing support' },
   support_volume: { kind: 'measurement', key: 'support_volume', label: 'supported overhang' },
   plate_contact_area: { kind: 'measurement', key: 'plate_contact_area', label: 'contact with the build plate' },
+  developed_length: { kind: 'measurement', key: 'developed_length', label: 'the centreline, end to end' },
+  section_area: { kind: 'measurement', key: 'section_area', label: 'the cross-section of the stock' },
 };
 
 /** Every face of the part, from the face map: what a volume or a surface is measured over. Null without a face map (nothing to draw). */
