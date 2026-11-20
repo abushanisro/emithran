@@ -1321,6 +1321,7 @@ export default function BOMDetailPage() {
                 onEditItem={handleEditItem}
                 onViewItem={handleViewItem}
                 onAddChildItem={handleAddTreeItem}
+                {...(bomData?.totalCost !== undefined && { totalCost: bomData.totalCost })}
               />
             </CardContent>
           </Card>
