@@ -92,7 +92,8 @@ export interface MachiningCostInput {
   // bom-items.service.ts's resolveThreads() already resolves and passes
   // here. See tapThreadGroups below.
   /** Threads by size; `occurrences` = the tapped holes' feature_graph_v2 occurrences when they come from the CAD (not from a drawing). */
-  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }>;
+  /** liveCount: of count, the threads off the turning centreline, tapped with a live tool (feature-holes.ts). */
+  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[]; liveCount?: number }>;
   tightestToleranceMm: number | null;
   gdtFeatureCount: number;
   batchSize: number;

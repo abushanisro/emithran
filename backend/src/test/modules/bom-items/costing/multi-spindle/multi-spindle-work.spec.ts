@@ -13,20 +13,20 @@ const hole = (h: Partial<HoleGroupWork>): HoleGroupWork => ({ diameterMm: 6, dep
 
 // A Ø14 x 32 mm part on 5/8" round bar.
 const bar = (Math.PI / 4) * 15.875 ** 2;
-const part = { partLengthMm: 32, partVolumeMm3: (Math.PI / 4) * 14 ** 2 * 32, turnedDiameterMm: 14, turnedLengthMm: 32, barSectionAreaMm2: bar, stockLengthMm: 32.79375 };
+const part = { threads: [], partLengthMm: 32, partVolumeMm3: (Math.PI / 4) * 14 ** 2 * 32, turnedDiameterMm: 14, turnedLengthMm: 32, barSectionAreaMm2: bar, stockLengthMm: 32.79375 };
 
 describe('multiSpindleWork', () => {
-  it('turning and parting on the OD slides, tapping, reaming and rotary broaching on the end slides; the rest off the machine', () => {
+  it('turning and parting on the OD slides, reaming and rotary broaching on the end slides; the rest off the machine', () => {
     const lines = [
-      line('Rough Turning', 0.5), line('Finish Turning', 0.2), line('Parting', 0.1), line('Tapping', 0.08), line('Reaming', 0.05), line('Rotary Broaching', 0.04),
+      line('Rough Turning', 0.5), line('Finish Turning', 0.2), line('Parting', 0.1), line('Reaming', 0.05), line('Rotary Broaching', 0.04),
       line('Deburring', 0.3), line('Inspection', 0.2), line('Cylindrical Grinding', 1),
-      // replaced: the holes (by group), the index (the cycle's), the rechuck (the back-work spindle's)
-      line('Drilling', 0.4), line('Index Transfer', 0.1), line('Secondary Setup (Rechuck)', 0.2),
+      // replaced: the holes (by group) and threads (by size) on their slides, the index (the cycle's), the rechuck (the back-work spindle's)
+      line('Drilling', 0.4), line('Tapping', 0.08), line('Index Transfer', 0.1), line('Secondary Setup (Rechuck)', 0.2),
     ];
     const w = multiSpindleWork({ ...part, lines, holes: [] });
     expect(w.ops.map((o) => [o.name, o.slide, Math.round(o.seconds * 1e6) / 1e6, o.parting ?? false])).toEqual([
       ['Rough Turning', 'od', 30, false], ['Finish Turning', 'od', 12, false], ['Parting', 'od', 6, true],
-      ['Tapping', 'end', 4.8, false], ['Reaming', 'end', 3, false], ['Rotary Broaching', 'end', 2.4, false],
+      ['Reaming', 'end', 3, false], ['Rotary Broaching', 'end', 2.4, false],
     ]);
     expect(w.offMachine.map((l) => l.process)).toEqual(['Deburring', 'Inspection', 'Cylindrical Grinding']);
     expect(w.gaps).toEqual([]);
@@ -46,6 +46,22 @@ describe('multiSpindleWork', () => {
       { name: 'Drilling Ø6 mm x 2', seconds: 12, slide: 'end', splitBy: { feature: 'SimpleHole', operation: 'Drilling', ratio: 30 / 32, what: 'hole length 30 mm / part length 32 mm' } },
       { name: 'Live-tool drilling Ø6 mm x 1', seconds: 5, slide: 'live' },
     ]);
+  });
+
+  it('threads by size: tapped from an end slide on the centreline, with a live tool off it; a size the calculator cannot time is named', () => {
+    const w = multiSpindleWork({
+      ...part, lines: [], holes: [],
+      threads: [
+        { size: 'M2', endCount: 0, endSec: 0, liveCount: 2, liveSec: 3.2, missing: [] },
+        { size: 'M6', endCount: 1, endSec: 2.5, liveCount: 0, liveSec: 0, missing: [] },
+        { size: 'UNC 1/4', endCount: 1, endSec: 0, liveCount: 0, liveSec: 0, missing: ['a metric thread size (got "UNC 1/4")'] },
+      ],
+    });
+    expect(w.ops).toEqual([
+      { name: 'Live-tool tapping M2 x 2', seconds: 3.2, slide: 'live' },
+      { name: 'Tapping M6 x 1', seconds: 2.5, slide: 'end' },
+    ]);
+    expect(w.gaps).toEqual([{ process: 'Tapping UNC 1/4', reason: 'Not priced — missing real input: a metric thread size (got "UNC 1/4").' }]);
   });
 
   it('names what could not be timed, and keeps the timed part of a line', () => {

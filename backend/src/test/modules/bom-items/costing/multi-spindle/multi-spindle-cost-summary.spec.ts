@@ -27,7 +27,7 @@ function priced(chosen: string | null): MultiSpindleCostResult {
     ref: stockReferenceFromMemory(), spec: loadMultiSpindleCalculatorSpec(), calculators: multiSpindleCalculatorsByName(),
     machines: multiSpindleMachinesFromMemory(), rules: splitRulesFromMemory(), bar: bar(), part,
     material: { id: 'm1', name: 'AISI 1006', densityKgM3: 7850, pricePerKgUsd: 1.473, priceSource: 'test' },
-    engine: { lines: [turning('Rough Turning', 0.5), turning('Finish Turning', 0.2), turning('Parting', 0.1), deburr], holes: [] },
+    engine: { lines: [turning('Rough Turning', 0.5), turning('Finish Turning', 0.2), turning('Parting', 0.1), deburr], holes: [], threads: [] },
     chosen, batchSize: 1000, costContext: ZERO_CONTEXT, usdToLocal: 1,
   });
   return { quote, bar: bar(), part, missing: [], warnings: quote.warnings };

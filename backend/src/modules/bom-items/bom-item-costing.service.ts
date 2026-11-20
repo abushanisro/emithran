@@ -1,6 +1,7 @@
 import { calculatorInputSteps } from './costing/machining/process/machining-trace';
 import { inspectedOccurrences, type InspectionReference } from './costing/machining/inspection-reference';
 import { featuresRef, occurrenceByFace, occurrencesOfFaces, type FeatureOccurrenceRef } from './costing/machining/feature-occurrences';
+import { holeGroupsOfFeatures, normalizeThreadSpecs, tappedHolesOfFeatures, type ThreadEntry } from './costing/machining/feature-holes';
 import { electricityUsd, loadLocationElectricity } from './costing/shared/location-electricity';
 import { castingSourcePath } from '../sand-casting/casting-source';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
@@ -8028,25 +8029,9 @@ export class BomItemCostingService {
       const fromGraph = holeGroupsOfGraph(fg?.feature_graph_v2?.features);
       return fromGraph.length > 0 ? fromGraph : (summary?.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>;
     }
-    const DRILLED = new Set(['through', 'blind', 'threaded', 'cross', 'pcd_pattern']);
     // Each hole as the feature_graph_v2 occurrence it shares its faces with (feature-occurrences.ts): what its calculator inputs light.
     const byFace = occurrenceByFace(fg?.feature_graph_v2?.features);
-    const groups = new Map<number, { diameter_mm: number; count: number; depth_mm?: number; occurrences?: FeatureOccurrenceRef[] }>();
-    for (const f of features) {
-      if (f?.type !== 'SimpleHole' || !DRILLED.has(f.variant)) continue;
-      const diameter = Number(f.params?.diameter_mm);
-      if (!(diameter > 0)) continue;
-      const key = Math.round(diameter * 10) / 10;
-      const count = f.variant === 'pcd_pattern' ? Math.max(1, Number(f.params?.hole_count) || 1) : 1;
-      const depth = Number(f.params?.depth_mm);
-      const g = groups.get(key) ?? { diameter_mm: key, count: 0 };
-      g.count += count;
-      if (depth > 0) g.depth_mm = Math.max(g.depth_mm ?? 0, depth);
-      const occ = occurrencesOfFaces(f.face_ids, byFace);
-      if (occ.length > 0) g.occurrences = [...(g.occurrences ?? []), ...occ];
-      groups.set(key, g);
-    }
-    return [...groups.values()];
+    return holeGroupsOfFeatures(features, (faceIds) => occurrencesOfFaces(faceIds, byFace));
   }
 
   /**
@@ -8126,62 +8111,14 @@ export class BomItemCostingService {
   private resolveThreads(
     drawingThreads: Array<{ size: string; count: number; pitchMm?: number }>,
     fg: any,
-  ): Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }> {
+  ): ThreadEntry[] {
     // Drawing threads carry no geometry: they light no holes (a hole picked by size would be a guess).
-    if (drawingThreads.length > 0) return this.normalizeThreadSpecs(drawingThreads);
-    // Drawing not yet analyzed — synthesize from geometry-detected tapped holes.
-    // depth_mm/through are real, already-computed fields on the CAD engine's
-    // threaded SimpleHole feature (machining_feature_recognizer.py) — carried through here
-    // instead of discarding them down to just the spec string.
-    const cncFeatures = (fg?.machining_features?.features ?? []) as Array<{ type: string; variant: string; params: any; face_ids?: unknown[] }>;
-    const tapped = cncFeatures.filter((f) => f.type === 'SimpleHole' && f.variant === 'threaded');
-    if (tapped.length === 0) return [];
+    if (drawingThreads.length > 0) return normalizeThreadSpecs(drawingThreads);
+    // Drawing not yet analyzed: the tapped holes of the CAD engine's machining features (threaded holes and tapped bolt circles), with
+    // their real depth and through flag, and how many are off the turning centreline (tapped with a live tool).
     const byFace = occurrenceByFace(fg?.feature_graph_v2?.features);
-    const raw = tapped.map((f) => ({
-      occurrences: occurrencesOfFaces(f.face_ids, byFace),
-      // No thread spec on the feature = size unknown: tapping names it as a
-      // missing input rather than pricing an assumed size.
-      size: String(f.params?.spec ?? ''),
-      count: 1,
-      depthMm: (Number(f.params?.depth_mm) || 0) > 0 ? Number(f.params.depth_mm) : undefined,
-      isThrough: Boolean(f.params?.through),
-    }));
-    return this.normalizeThreadSpecs(raw);
-  }
-
-  // "M4×0.7" / "M4x0.7 - 6H" → "M4" so TAP_CYCLE_SEC/computeTapCycleSec lookups
-  // hit the size key instead of silently falling back to a default. Merges
-  // duplicate sizes, averaging depth and combining isThrough (true only when
-  // every merged hole in the group is through) across the merge.
-  private normalizeThreadSpecs(
-    threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }>,
-  ): Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean; occurrences?: FeatureOccurrenceRef[] }> {
-    interface Group { count: number; pitchMm?: number; depthSum: number; depthCount: number; throughCount: number; occurrences: FeatureOccurrenceRef[] }
-    const groups: Record<string, Group> = {};
-    for (const t of threads) {
-      const raw = String(t.size ?? (t as any).spec ?? '').trim().toUpperCase();
-      // "M2×0.4": the pitch the CAD engine or the drawing wrote into the size itself.
-      const metric = raw.match(/^M\s*(\d+(?:\.\d+)?)(?:\s*[×X*]\s*(\d+(?:\.\d+)?))?/);
-      const key = metric ? `M${metric[1]}` : (raw || 'size not given');
-      const count = Number(t.count) || 0;
-      if (count <= 0) continue;
-      const pitchMm = t.pitchMm ?? (metric?.[2] ? Number(metric[2]) : undefined);
-      const g: Group = groups[key] ?? { count: 0, pitchMm, depthSum: 0, depthCount: 0, throughCount: 0, occurrences: [] };
-      g.occurrences.push(...(t.occurrences ?? []));
-      g.count += count;
-      if (g.pitchMm == null && pitchMm != null) g.pitchMm = pitchMm;
-      if (t.depthMm != null) { g.depthSum += t.depthMm * count; g.depthCount += count; }
-      if (t.isThrough) g.throughCount += count;
-      groups[key] = g;
-    }
-    return Object.entries(groups).map(([size, g]) => ({
-      size,
-      count: g.count,
-      ...(g.pitchMm != null ? { pitchMm: g.pitchMm } : {}),
-      ...(g.depthCount > 0 ? { depthMm: Math.round((g.depthSum / g.depthCount) * 100) / 100 } : {}),
-      ...(g.depthCount > 0 ? { isThrough: g.throughCount === g.depthCount } : {}),
-      ...(g.occurrences.length > 0 ? { occurrences: g.occurrences } : {}),
-    }));
+    const tapped = tappedHolesOfFeatures(fg?.machining_features?.features ?? [], (faceIds) => occurrencesOfFaces(faceIds, byFace));
+    return tapped.length === 0 ? [] : normalizeThreadSpecs(tapped);
   }
 
 

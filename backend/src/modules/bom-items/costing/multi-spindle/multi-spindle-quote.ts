@@ -9,7 +9,7 @@ import {
   MULTI_SPINDLE_CALC, MULTI_SPINDLE_MACHINE_CLASS, MULTI_SPINDLE_PROCESS_GROUP, buildMultiSpindleRoutes, chooseMultiSpindleRoute, keyName,
   type MultiSpindleRoute, type SplitRules,
 } from './multi-spindle-route';
-import { multiSpindleWork, type HoleGroupWork } from './multi-spindle-work';
+import { multiSpindleWork, type HoleGroupWork, type ThreadGroupWork } from './multi-spindle-work';
 import { gap, type CostContext } from '../casting/casting-finishing';
 import { lineToLocal } from '../casting/sand/sand-cost';
 import { seedsFor, type SeedProvider } from '../casting/sand/sand-seeds';
@@ -121,8 +121,8 @@ export function quoteMultiSpindle(input: {
   bar: SelectedBar;
   part: MultiSpindlePart;
   material: MultiSpindleMaterial;
-  /** The turning engine's lines on the bar (in the location's currency) and the holes timed by diameter group. */
-  engine: { lines: readonly ProcessLineCost[]; holes: readonly HoleGroupWork[] };
+  /** The turning engine's lines on the bar (in the location's currency), the holes timed by diameter group and the threads by size. */
+  engine: { lines: readonly ProcessLineCost[]; holes: readonly HoleGroupWork[]; threads: readonly ThreadGroupWork[] };
   /** A route set by hand (Cost Guide) or priced on its own (the route comparison). */
   chosen: string | null;
   batchSize: number;
@@ -144,7 +144,7 @@ export function quoteMultiSpindle(input: {
   };
 
   const work = multiSpindleWork({
-    lines: input.engine.lines, holes: input.engine.holes, partLengthMm: part.lengthMm, partVolumeMm3: part.volumeMm3,
+    lines: input.engine.lines, holes: input.engine.holes, threads: input.engine.threads, partLengthMm: part.lengthMm, partVolumeMm3: part.volumeMm3,
     turnedDiameterMm: part.turnedDiameterMm, turnedLengthMm: part.turnedLengthMm, barSectionAreaMm2: bar.sectionAreaMm2,
     stockLengthMm: part.lengthMm + bar.facingStockMm,
   });
