@@ -16,10 +16,16 @@ const SLIM = 'id, machine_name, machine_class, location, mhr_usd_per_hour, usd_l
 export class SandMachineService {
   constructor(private readonly mhr: MHRService) {}
 
-  /** The machines of several classes, read once per request. */
-  getMachinesByClass(client: DbClient, machineClasses: readonly string[], location: string): Promise<Record<string, SandMachine[]>> {
-    return cachedRead(`sand-machines:${location}:${machineClasses.join(',')}`, async () => {
-      const { data, error } = await client.from('mhr_records').select(SLIM).in('machine_class', [...machineClasses]).eq('location', location).order('id');
+  /**
+   * The machines of several classes, read once per request. `typedColumns`: numeric mhr_records columns read with them and kept in their
+   * specs, for the steps that check a machine by one (a multi-spindle's number_spindles, bar capacity and index times).
+   */
+  getMachinesByClass(
+    client: DbClient, machineClasses: readonly string[], location: string, typedColumns: readonly string[] = [],
+  ): Promise<Record<string, SandMachine[]>> {
+    const columns = [SLIM, ...typedColumns].join(', ');
+    return cachedRead(`sand-machines:${location}:${machineClasses.join(',')}:${typedColumns.join(',')}`, async () => {
+      const { data, error } = await client.from('mhr_records').select(columns).in('machine_class', [...machineClasses]).eq('location', location).order('id');
       const out: Record<string, SandMachine[]> = Object.fromEntries(machineClasses.map((c) => [c, []]));
       if (error) return out;
       const rows = (data ?? []) as Array<Record<string, any>>;
@@ -36,7 +42,7 @@ export class SandMachineService {
           } catch {
             return null; // the engine could not price it: the machine has no rate, and a step says so
           }
-        });
+        }, typedColumns);
         (out[machine.machineClass] ??= []).push(machine);
       }
       return out;

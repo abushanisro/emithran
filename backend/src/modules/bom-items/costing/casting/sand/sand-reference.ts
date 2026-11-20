@@ -22,7 +22,8 @@ export interface StagedVariable {
 }
 export interface StagedLookup {
   key: string;
-  raw?: { rows?: unknown } | null;
+  /** The table's rows: `{ rows: [...] }`, or the bare array of rows as migration 787 staged the Multi-Spindle tables. */
+  raw?: { rows?: unknown } | readonly unknown[] | null;
 }
 
 export interface SandVariable {
@@ -128,7 +129,7 @@ export function resolveSandReference(rows: { variables: readonly StagedVariable[
   const variables = new Map(rows.variables.map((v) => [v.key, { value: v.value ?? null, unit: v.unit_type ?? null }] as const));
   const tables = new Map<string, readonly Row[]>();
   for (const l of rows.lookups) {
-    const staged = l.raw?.rows;
+    const staged = Array.isArray(l.raw) ? l.raw : (l.raw as { rows?: unknown } | null | undefined)?.rows;
     if (Array.isArray(staged)) tables.set(lookupName(l.key), staged as Row[]);
   }
   return new SandReference(variables, tables);
