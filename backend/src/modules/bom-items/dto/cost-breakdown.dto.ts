@@ -719,6 +719,8 @@ export interface CostSummaryDto {
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
   assembly?: AssemblyBreakdown;
+  /** A weldment (Process Part Assembly): its welding route, components, welds and the routes compared (costing/part-assembly). */
+  partAssembly?: PartAssemblyBreakdown;
   /** Assembly Molding (insert molding): the inserts, how they are loaded, the press and its shot, the route quoted and every route. */
   insertMolding?: InsertMoldingBreakdown;
   multiShot?: MultiShotBreakdown;
@@ -890,6 +892,32 @@ export interface AssemblyBreakdown {
   adhesiveKg: number;
   /** Every route: its total per assembly (summary currency) when complete, or why it is not a route for the assembly. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
+export interface PartAssemblyBreakdown {
+  /** The quoted route (part-assembly-route.ts PART_ASSEMBLY_ROUTES key) and its name; null when none could be built. */
+  route: string | null;
+  routeLabel: string | null;
+  complete: boolean;
+  /** Each component welded (a BOM child, or the part itself): its instances, one instance's mass and where it came from. */
+  components: { id: string; name: string; quantity: number; massKg: number | null; massSource: 'weight' | 'volume' | null; maxDimensionMm: number | null }[];
+  /** The finished weldment's mass (kg; null when a component has none), the plate thickness a weld without one takes, and the material. */
+  weldmentMassKg: number | null;
+  thicknessMm: number | null;
+  thicknessSource: string;
+  material: string | null;
+  cutCodeFamily: string | null;
+  /** Every weld of the weld table, with what it came to on the quoted route (its line's process, cycle and wire) or why it is not costed. */
+  welds: {
+    id: string; process: string; routeProcess: string | null; operation: string; feature: string; label: string; count: number | null;
+    lengthMm: number | null; sizeMm: number | null; thicknessMm: number | null; areaMm2: number | null; depthMm: number | null;
+    bevel: boolean; grind: boolean; finishGrind: boolean; wireBrush: boolean; enabled: boolean;
+    cycleSec: number | null; wireKg: number | null; reason: string | null;
+  }[];
+  /** The MIG wire on the weld lines (summary currency). */
+  wireCost: number;
+  /** Every route: its total per weldment (summary currency) when complete, or why it is not a route for the weldment. */
+  options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
 }
 
 export interface BarTubeBreakdown {

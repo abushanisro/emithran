@@ -44,7 +44,7 @@ describe('the process a part is costed as', () => {
     const r = resolve({ scenarioOverrides: { processGroup: 'Rapid Prototyping' } }, 'Generic ABS, Fittings', 'milled');
     expect(r.family).toBe('unknown');
     expect(r.familySource).toBe('process');
-    expect(r.warning).toBe('The Process "Rapid Prototyping" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Assembly Molding, Assembly Plastic Molding, Bar and Tube Fabrication, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Multi-Spindle Machining, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
+    expect(r.warning).toBe('The Process "Rapid Prototyping" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Assembly Molding, Assembly Plastic Molding, Bar and Tube Fabrication, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Multi-Spindle Machining, Part Assembly, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
   });
 
   it('a Powder Metal part is a powder metal part, whatever its material or last analysis', () => {
@@ -59,9 +59,14 @@ describe('the process a part is costed as', () => {
     expect(resolve({ scenarioOverrides: { processGroup: 'Assembly' } }, null, 'milled')).toEqual({ family: 'assembly', familySource: 'process', warning: null });
     expect(resolve({ itemType: 'assembly' as never }, null)).toEqual({ family: 'assembly', familySource: 'process', warning: null });
     expect(resolve({ itemType: 'sub_assembly' as never }, null)).toEqual({ family: 'assembly', familySource: 'process', warning: null });
-    // A Process the engineer chose wins: an assembly set to the uncosted Part Assembly says so rather than being priced as another process.
-    expect(resolve({ itemType: 'assembly' as never, scenarioOverrides: { processGroup: 'Part Assembly' } }, null).family).toBe('unknown');
+    // A Process the engineer chose wins: an assembly set to Part Assembly is costed as its welding, one set to an uncosted Process says so.
+    expect(resolve({ itemType: 'assembly' as never, scenarioOverrides: { processGroup: 'Part Assembly' } }, null)).toEqual({ family: 'part_assembly', familySource: 'process', warning: null });
+    expect(resolve({ itemType: 'assembly' as never, scenarioOverrides: { processGroup: 'Rapid Prototyping' } }, null).family).toBe('unknown');
     expect(resolve({ itemType: 'child_part' as never }, null, 'milled').family).toBe('milled');
+  });
+
+  it('a Part Assembly part is costed as its welding, whatever its material or last analysis', () => {
+    expect(resolve({ scenarioOverrides: { processGroup: 'Part Assembly' } }, 'Steel, Cold Worked, AISI 1020', 'sheet_metal')).toEqual({ family: 'part_assembly', familySource: 'process', warning: null });
   });
 
   it('a Multi-Spindle Machining part is a turned part (made from bar on a multi-spindle), even when it was last analysed as milled', () => {

@@ -1,4 +1,3 @@
-import { isMachiningFamily } from '../../../domain/part-family';
 import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
 
@@ -13,17 +12,6 @@ import { MACHINE_REGISTRY } from '../costing/shared/core/default-rates.constants
 // comment for the specific divergence this closes).
 import type { CostSummaryDto, ProcessLineCost } from '../dto/cost-breakdown.dto';
 import { RateResolutionService } from './rate-resolution.service';
-import { castingProcessOfFamily } from '../costing/casting/casting-cost-summary';
-
-/** The part families that have a cost model: machining, sheet metal, injection molding and the casting families. */
-/** A solid part's volume and three bounding-box sides were measured (all positive). */
-export function hasMeasuredGeometry(item: { volume?: number | null; maxLength?: number | null; maxWidth?: number | null; maxHeight?: number | null }): boolean {
-  return [item.volume, item.maxLength, item.maxWidth, item.maxHeight].every((v) => Number(v) > 0);
-}
-
-export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || castingProcessOfFamily(family) !== null;
-}
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
