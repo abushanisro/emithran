@@ -37,7 +37,7 @@ import { multiShotRouteKeyOf } from '@/lib/routing/multi-shot-route-id';
 import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
 import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
 import { multiSpindleRouteKeyOf } from '@/lib/routing/multi-spindle-route-id';
-import { MultiSpindleCycle, MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
+import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
 import { isAssemblyItem } from '@/lib/costing/assembly-view';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
@@ -949,13 +949,6 @@ function CostSummaryTab({
         <>
           <SectionHeader label="Multi-Shot Cycle" />
           <div className="pb-2"><MultiShotCycle multiShot={cost.multiShot} /></div>
-        </>
-      )}
-      {/* A multi-spindle part: the machine the route runs on and its station plan, the slowest station setting the cycle (the bar is in the Cost Guide). */}
-      {cost.multiSpindle && (
-        <>
-          <SectionHeader label="Multi-Spindle Cycle" />
-          <div className="pb-2"><MultiSpindleCycle multiSpindle={cost.multiSpindle} /></div>
         </>
       )}
 
