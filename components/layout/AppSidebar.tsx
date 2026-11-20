@@ -18,9 +18,9 @@ import {
   HelpCircle,
   Info,
   LogOut,
-  ChevronRight,
+  ChevronsUpDown,
 } from 'lucide-react';
-import { EmithranLogo, EmithranMark } from '@/components/brand/EmithranLogo';
+import { EmithranMark } from '@/components/brand/EmithranLogo';
 import { NavLink } from '@/components/common/nav-link';
 import { useAuth } from '@/lib/providers/auth';
 import {
@@ -34,6 +34,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
 import {
@@ -46,23 +47,41 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useProfile } from '@/lib/api/hooks/useProfile';
-import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
 
 // ─── nav config ──────────────────────────────────────────────
-const mainItems = [
-  { title: 'Dashboard',    url: '/',           icon: LayoutDashboard, exact: true },
-  { title: 'Projects',     url: '/projects',   icon: FolderKanban },
-  { title: 'Benchmarking', url: '/benchmarks', icon: GitCompare },
-  { title: 'VAVE',         url: '/vave',       icon: Lightbulb },
-];
+type NavItem = {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  exact?: boolean;
+};
 
-const databaseItems = [
-  { title: 'Vendors',       url: '/vendors',       icon: Users },
-  { title: 'Raw Materials', url: '/raw-materials', icon: Database },
-  { title: 'HR Rates',       url: '/hr-rates',      icon: Calculator },
-  { title: 'Calculators',   url: '/calculators',   icon: Sigma },
-  { title: 'Process',       url: '/process',       icon: Table },
+export const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Work',
+    items: [
+      { title: 'Dashboard', url: '/', icon: LayoutDashboard, exact: true },
+      { title: 'Projects', url: '/projects', icon: FolderKanban },
+    ],
+  },
+  {
+    label: 'Insights',
+    items: [
+      { title: 'Benchmarking', url: '/benchmarks', icon: GitCompare },
+      { title: 'VAVE', url: '/vave', icon: Lightbulb },
+    ],
+  },
+  {
+    label: 'Master Data',
+    items: [
+      { title: 'Vendors', url: '/vendors', icon: Users },
+      { title: 'Raw Materials', url: '/raw-materials', icon: Database },
+      { title: 'HR Rates', url: '/hr-rates', icon: Calculator },
+      { title: 'Process', url: '/process', icon: Table },
+      { title: 'Calculators', url: '/calculators', icon: Sigma },
+    ],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -99,28 +118,19 @@ export function AppSidebar() {
     || user?.email?.[0]?.toUpperCase()
     || 'U';
 
-  const navItem = (item: { title: string; url: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean }) => {
+  const navItem = (item: NavItem) => {
     const active = isActive(item.url, item.exact);
     return (
       <SidebarMenuItem key={item.title}>
-        <SidebarMenuButton asChild isActive={active}>
-          <NavLink
-            to={item.url}
-            end={!!item.exact}
-            className={`sidebar-item group relative flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
-              active
-                ? 'bg-primary/10 text-primary shadow-xs'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-            }`}
-            activeClassName="sidebar-item-active"
-          >
-            {active && (
-              <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
-            )}
-            <item.icon className={`h-4 w-4 shrink-0 transition-colors ${
-              active ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'
-            }`} />
-            {!collapsed && <span className="text-sm font-medium">{item.title}</span>}
+        <SidebarMenuButton
+          asChild
+          isActive={active}
+          tooltip={item.title}
+          className="data-[active=true]:[&>svg]:text-primary"
+        >
+          <NavLink to={item.url} end={!!item.exact}>
+            <item.icon />
+            <span>{item.title}</span>
           </NavLink>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -128,73 +138,70 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="border-r border-sidebar-border bg-sidebar">
-      <SidebarHeader className="p-4">
-        {!collapsed ? (
-          <div className="flex-1 min-w-0 text-sidebar-foreground">
-            <EmithranLogo />
-            <p className="mt-1 text-xs text-sidebar-foreground/50">Manufacturing intelligence</p>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center text-sidebar-foreground">
-            <EmithranMark className="h-8" />
-            <span className="sr-only">EMITHRAN</span>
-          </div>
-        )}
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              size="lg"
+              className="cursor-default hover:bg-transparent active:bg-transparent"
+            >
+              <div>
+                <div className="flex aspect-square size-8 shrink-0 items-center justify-center text-sidebar-foreground">
+                  <EmithranMark className="h-7" />
+                </div>
+                <div className="grid flex-1 text-left leading-tight">
+                  <span className="truncate font-display text-sm font-semibold tracking-tight text-sidebar-foreground">EMITHRAN</span>
+                  <span className="truncate text-xs text-sidebar-foreground/60">Manufacturing intelligence</span>
+                </div>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
-      <Separator className="bg-sidebar-border/50" />
-
-      <SidebarContent className="px-3 py-4">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/50 text-[10.5px] uppercase tracking-widest font-semibold px-2.5 mb-1.5">
-            Main
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">{mainItems.map(navItem)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup className="mt-5">
-          <SidebarGroupLabel className="text-sidebar-foreground/50 text-[10.5px] uppercase tracking-widest font-semibold px-2.5 mb-1.5">
-            Database
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">{databaseItems.map(navItem)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      <SidebarContent>
+        {navGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>{group.items.map(navItem)}</SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       {/* ── Profile footer with account dropdown ── */}
-      <SidebarFooter className="border-t border-sidebar-border p-3">
+      <SidebarFooter>
+        <SidebarMenu>
+        <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-1 py-1.5 hover:bg-sidebar-accent transition-colors outline-hidden">
-              <Avatar className="h-8 w-8 shrink-0 border border-sidebar-border">
+            <SidebarMenuButton
+              size="lg"
+              tooltip={String(getUserDisplayName())}
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <Avatar className="h-8 w-8 shrink-0 rounded-lg border border-sidebar-border">
                 <AvatarImage src={profile?.avatarUrl ?? undefined} alt={getUserDisplayName()} />
-                <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                <AvatarFallback className="rounded-lg bg-primary/10 text-primary text-sm font-medium">
                   {userInitials}
                 </AvatarFallback>
               </Avatar>
-              {!collapsed && (
-                <>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
-                      {getUserDisplayName()}
-                    </p>
-                    <p className="text-xs text-sidebar-foreground/50 truncate leading-tight">
-                      {user?.email}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-sidebar-foreground/30 shrink-0" />
-                </>
-              )}
-            </button>
+              <div className="grid flex-1 text-left leading-tight">
+                <span className="truncate text-sm font-medium text-sidebar-foreground">
+                  {getUserDisplayName()}
+                </span>
+                <span className="truncate text-xs text-sidebar-foreground/60">{user?.email}</span>
+              </div>
+              <ChevronsUpDown className="ml-auto size-4 shrink-0 text-sidebar-foreground/50" />
+            </SidebarMenuButton>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            side="top"
-            align="start"
+            side={collapsed ? 'right' : 'top'}
+            align={collapsed ? 'end' : 'start'}
             sideOffset={8}
             className="w-64 rounded-xl border border-border bg-popover shadow-xl shadow-black/15 p-1"
           >
@@ -266,7 +273,10 @@ export function AppSidebar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
