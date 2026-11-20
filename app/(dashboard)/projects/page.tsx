@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/api/hooks/useProjects';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/common/status-badge';
@@ -16,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { cn } from '@/lib/utils';
 import {
   Plus,
   FolderKanban,
@@ -23,11 +26,11 @@ import {
   Clock,
   CheckCircle2,
   Trash2,
-  Calendar,
   ArrowRight,
   Pause,
   XCircle,
-  Pencil
+  Pencil,
+  MoreHorizontal,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Country, State, City } from 'country-state-city';
@@ -335,21 +338,30 @@ export default function Projects() {
     completed: projects.filter((p) => p.status === 'completed').length,
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'draft':
-        return <Clock className="h-4 w-4 text-orange-600" />;
-      case 'completed':
-        return <CheckCircle2 className="h-4 w-4 text-primary" />;
-      case 'on_hold':
-        return <Pause className="h-4 w-4 text-yellow-600" />;
-      case 'cancelled':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <FolderKanban className="h-4 w-4" />;
-    }
+  // Project status badge: label + icon, coloured by status. The shared StatusBadge has no entries for
+  // project statuses, so they get their own clear styling here; anything else falls back to it.
+  const renderStatusBadge = (status: string) => {
+    const styles: Record<string, { icon: React.ReactNode; className: string }> = {
+      draft: { icon: <Clock className="h-3 w-3" />, className: 'border-border bg-muted text-muted-foreground' },
+      active: { icon: <CheckCircle2 className="h-3 w-3" />, className: 'border-success/30 bg-success/10 text-success' },
+      completed: { icon: <CheckCircle2 className="h-3 w-3" />, className: 'border-primary/30 bg-primary/10 text-primary' },
+      on_hold: { icon: <Pause className="h-3 w-3" />, className: 'border-warning/30 bg-warning/10 text-warning' },
+      cancelled: { icon: <XCircle className="h-3 w-3" />, className: 'border-destructive/30 bg-destructive/10 text-destructive' },
+    };
+    const style = styles[status];
+    if (!style) return <StatusBadge status={status} />;
+    const label = PROJECT_STATUSES.find((st) => st.value === status)?.label ?? status;
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+          style.className,
+        )}
+      >
+        {style.icon}
+        {label}
+      </span>
+    );
   };
 
   return (
@@ -358,80 +370,64 @@ export default function Projects() {
         title="Projects"
         description="Manage manufacturing and costing projects"
       >
-        <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
-          <Plus className="h-5 w-5" />
+        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
           New Project
         </Button>
       </PageHeader>
 
       {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-l-4 border-l-primary">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <FolderKanban className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Total Projects</p>
-                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-              </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
+              <FolderKanban className="h-4 w-4 text-muted-foreground" />
             </div>
+            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.total}</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Active Projects</p>
-                <p className="text-2xl font-bold text-foreground">{stats.active}</p>
-              </div>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
+              <CheckCircle2 className="h-4 w-4 text-success" />
             </div>
+            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.active}</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Draft Projects</p>
-                <p className="text-2xl font-bold text-foreground">{stats.draft}</p>
-              </div>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Draft Projects</p>
+              <Clock className="h-4 w-4 text-muted-foreground" />
             </div>
+            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.draft}</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Completed</p>
-                <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
-              </div>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Completed</p>
+              <TrendingUp className="h-4 w-4 text-primary" />
             </div>
+            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.completed}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Projects Grid */}
+      {/* Projects table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">All Projects</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-semibold">All Projects</CardTitle>
           <CardDescription>
             View and manage your manufacturing cost analysis projects
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className={isLoading || projects.length === 0 ? undefined : 'p-0'}>
           {isLoading ? (
             <TableSkeleton rows={5} columns={5} label="Loading projects..." />
           ) : projects.length === 0 ? (
@@ -447,101 +443,95 @@ export default function Projects() {
               </Button>
             </EmptyState>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {projects.map((project) => (
-                <Card
-                  key={project.id}
-                  className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-primary/30 hover:border-l-primary group min-h-[280px] flex flex-col"
-                  onClick={() => router.push(`/projects/${project.id}`)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        {getStatusIcon(project.status)}
-                        <CardTitle className="text-base leading-tight wrap-break-word">
-                          {project.name}
-                        </CardTitle>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditOpen(project);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProjectToDelete(project);
-                            setDeleteOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                    <StatusBadge status={project.status} />
-                  </CardHeader>
-                  <CardContent className="pb-4 flex-1 flex flex-col">
-                    {project.description && (
-                      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                        {project.description}
-                      </p>
-                    )}
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Industry</span>
-                        <span className="font-semibold">
-                          {project.industry || '-'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Annual Volume</span>
-                        <span className="font-semibold">
-                          {project.estimatedAnnualVolume
-                            ? Number(project.estimatedAnnualVolume).toLocaleString()
-                            : '-'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Target BOM Cost</span>
-                        <span className="font-semibold">
-                          {project.targetBomCost && project.targetBomCostCurrency
-                            ? `${project.targetBomCostCurrency} ${Number(project.targetBomCost).toLocaleString()}`
-                            : '-'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-                        <Calendar className="h-3 w-3" />
-                        Created {format(new Date(project.createdAt), 'MMM d, yyyy')}
-                      </div>
-                    </div>
-                    <div className="mt-auto pt-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/projects/${project.id}`);
-                        }}
-                      >
-                        Open Project
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-10 pl-6">Project</TableHead>
+                  <TableHead className="h-10">Status</TableHead>
+                  <TableHead className="h-10">Industry</TableHead>
+                  <TableHead className="h-10" data-numeric>Annual Volume</TableHead>
+                  <TableHead className="h-10" data-numeric>Target BOM Cost</TableHead>
+                  <TableHead className="h-10">Created</TableHead>
+                  <TableHead className="h-10 w-12 pr-6">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.map((project) => (
+                  <TableRow
+                    key={project.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                  >
+                    <TableCell className="max-w-80 py-3 pl-6">
+                      <p className="truncate font-medium text-foreground">{project.name}</p>
+                      {project.description && (
+                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {project.description}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3">{renderStatusBadge(project.status)}</TableCell>
+                    <TableCell className="py-3 text-sm">{project.industry || '-'}</TableCell>
+                    <TableCell className="py-3 text-sm" data-numeric>
+                      {project.estimatedAnnualVolume
+                        ? Number(project.estimatedAnnualVolume).toLocaleString()
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm whitespace-nowrap" data-numeric>
+                      {project.targetBomCost && project.targetBomCostCurrency
+                        ? `${project.targetBomCostCurrency} ${Number(project.targetBomCost).toLocaleString()}`
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm whitespace-nowrap text-muted-foreground">
+                      {format(new Date(project.createdAt), 'MMM d, yyyy')}
+                    </TableCell>
+                    <TableCell className="py-3 pr-6 text-right" onClick={(e) => {
+                      e.stopPropagation();
+                    }}>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu for {project.name}</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              router.push(`/projects/${project.id}`);
+                            }}
+                          >
+                            <ArrowRight className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Open Project
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              handleEditOpen(project);
+                            }}
+                          >
+                            <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            onSelect={() => {
+                              setProjectToDelete(project);
+                              setDeleteOpen(true);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
