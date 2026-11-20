@@ -51,6 +51,9 @@ cad-engine/
     feature_extractor.py         — closed-die forging measurements (reached through family_hint="forged")
   additive/
     feature_extractor.py         — additive build measurements: build direction of least support, height, footprint, overhang, support volume, plate contact (family_hint="additive")
+  bar_tube/
+    feature_extractor.py         — bar and tube measurements: section swept along a centreline (stock form, bends, developed length, holes, ends, end forms) or cut plate (family_hint="bar_tube")
+    centreline.py, section.py    — the centreline (bends joined by straights, section frame) and the cross-section classifier
   composites/
     feature_extractor.py         — laid-up composite laminate measurements: skins, thickness levels, outline, curvature (family_hint="composite")
   contract/
