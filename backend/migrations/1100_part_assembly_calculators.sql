@@ -195,10 +195,10 @@ BEGIN
   SELECT id INTO v_id FROM public.calculators WHERE name = $q$Part Assembly - Laser seam welding$q$ AND user_id IS NULL AND retired_at IS NULL;
   IF v_id IS NULL THEN
     INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, $q$Part Assembly - Laser seam welding$q$, 'process', 'single', false, true, true, $q$Laser seam welding of a weldment: the seam's length at the travel speed of laserSeamWeldTravelSpeed for the material's cut code family, the laser's power and the weld's depth (the table's speeds are round inches per second times 2.54: read as cm/s), plus the machine's load, unload and index times.$q$)
+    VALUES (NULL, $q$Part Assembly - Laser seam welding$q$, 'process', 'single', false, true, true, $q$Laser seam welding of a weldment: the seam's length at the travel speed of laserSeamWeldTravelSpeed for the material's cut code family, the laser's power and the weld's depth (the table's speeds are round inches per second times 2.54: read as cm/s), plus the machine's load, unload and index times, once per weldment (on its first seam; the engine reads them from the machine).$q$)
     RETURNING id INTO v_id;
   ELSE
-    UPDATE public.calculators SET calc_category = 'process', description = $q$Laser seam welding of a weldment: the seam's length at the travel speed of laserSeamWeldTravelSpeed for the material's cut code family, the laser's power and the weld's depth (the table's speeds are round inches per second times 2.54: read as cm/s), plus the machine's load, unload and index times.$q$, updated_at = now() WHERE id = v_id;
+    UPDATE public.calculators SET calc_category = 'process', description = $q$Laser seam welding of a weldment: the seam's length at the travel speed of laserSeamWeldTravelSpeed for the material's cut code family, the laser's power and the weld's depth (the table's speeds are round inches per second times 2.54: read as cm/s), plus the machine's load, unload and index times, once per weldment (on its first seam; the engine reads them from the machine).$q$, updated_at = now() WHERE id = v_id;
   END IF;
 
   DELETE FROM public.calculator_fields WHERE calculator_id = v_id;

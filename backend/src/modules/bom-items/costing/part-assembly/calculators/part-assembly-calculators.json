@@ -110,13 +110,13 @@
       "name": "Part Assembly - Laser seam welding",
       "operations": ["Laser Seam Welding"],
       "results": ["Weld Time"],
-      "description": "Laser seam welding of a weldment: the seam's length at the travel speed of laserSeamWeldTravelSpeed for the material's cut code family, the laser's power and the weld's depth (the table's speeds are round inches per second times 2.54: read as cm/s), plus the machine's load, unload and index times.",
+      "description": "Laser seam welding of a weldment: the seam's length at the travel speed of laserSeamWeldTravelSpeed for the material's cut code family, the laser's power and the weld's depth (the table's speeds are round inches per second times 2.54: read as cm/s), plus the machine's load, unload and index times, once per weldment (on its first seam; the engine reads them from the machine).",
       "fields": [
         { "name": "Weld Length", "unit": "mm", "source": { "engine": "weld_length_mm (the seam's length)" } },
         { "name": "Travel Speed", "unit": "cm/s", "source": { "lookup": "laserSeamWeldTravelSpeed.Travel Speed" } },
-        { "name": "Load Time", "unit": "s", "source": { "machine": "load_time_s" } },
-        { "name": "Unload Time", "unit": "s", "source": { "machine": "unload_time_s" } },
-        { "name": "Index Time", "unit": "s", "source": { "machine": "index_time_s" } },
+        { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (the machine's load time, once per weldment: on its first seam)" } },
+        { "name": "Unload Time", "unit": "s", "source": { "engine": "unload_time_s (the machine's unload time, once per weldment: on its first seam)" } },
+        { "name": "Index Time", "unit": "s", "source": { "engine": "index_time_s (the machine's index time, once per weldment: on its first seam)" } },
         { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
         { "name": "Weld Time", "unit": "s", "formula": "{Weld Length} / ({Travel Speed} * 10)" },
         { "name": "Cycle Time", "unit": "s", "formula": "({Weld Time} + {Load Time} + {Unload Time} + {Index Time}) * {Cycle Time Factor}" }
