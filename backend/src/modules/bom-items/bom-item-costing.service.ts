@@ -1,4 +1,4 @@
-import { calculatorInputSteps } from './costing/machining/process/machining-trace';
+import { calculatorInputSteps, groupedRunsTrace } from './costing/machining/process/machining-trace';
 import { inspectedOccurrences, type InspectionReference } from './costing/machining/inspection-reference';
 import { featuresRef, occurrenceByFace, occurrencesOfFaces, type FeatureOccurrenceRef } from './costing/machining/feature-occurrences';
 import { holeGroupsOfFeatures, normalizeThreadSpecs, tappedHolesOfFeatures, type ThreadEntry } from './costing/machining/feature-holes';
@@ -4356,6 +4356,12 @@ export class BomItemCostingService {
       const tappingLine = smResult.processLines.find((l) => l.process === 'Tapping');
       if (tappingLine) {
         tappingLine.featureBreakdown = this.buildTappingFeatureBreakdown(threads, sheetThicknessMm, grade);
+        if (smTappingCalc.trace.length) tappingLine.calculationTrace = smTappingCalc.trace;
+      }
+      // Counterboring / Countersinking: the calculation of each, one calculator run per hole diameter (resolveHoleOperationCycleTimeSec).
+      for (const [process, calc] of [['Counterboring', smCounterboreCalc], ['Countersinking', smCountersinkCalc]] as const) {
+        const holeLine = smResult.processLines.find((l) => l.process === process);
+        if (holeLine && calc.trace.length) holeLine.calculationTrace = calc.trace;
       }
       const pemLine = smResult.processLines.find((l) => l.process === 'PEM Insertion');
       if (pemLine) {
@@ -7223,6 +7229,10 @@ export class BomItemCostingService {
     // If capableRoutes is empty — all badges remain false (suppressed)
 
     if (rcLaserCalc.calculatorId) rcTraces.set(rcLaserCalc.calculatorId, rcLaserCalc.trace);
+    // The secondary hole operations and tapping: their calculation by calculator, like the cutting and forming lines above.
+    for (const calc of [rcTappingPhysics, rcSecondary.counterboreCalc, rcSecondary.countersinkCalc]) {
+      if (calc?.calculatorId && calc.trace.length) rcTraces.set(calc.calculatorId, calc.trace);
+    }
     if (rcTurretCalc.calculatorId) rcTraces.set(rcTurretCalc.calculatorId, rcTurretCalc.trace);
     if (rcWaterjetCalc.calculatorId) rcTraces.set(rcWaterjetCalc.calculatorId, rcWaterjetCalc.trace);
     for (const route of routes) {
@@ -9339,8 +9349,8 @@ export class BomItemCostingService {
     threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number }>,
     sheetThicknessMm: number,
     materialGrade: string | null,
-  ): Promise<{ cycleTimeSec: number | undefined; gap: PhysicsGap | null; calculatorId: string | null; calculatorVersion: number | null; confidence: ConfidenceLevel; resolutionStatus: ResolutionStatus }> {
-    if (threads.length === 0) return { cycleTimeSec: undefined, gap: null, calculatorId: null, calculatorVersion: null, confidence: 'unsupported', resolutionStatus: 'unsupported_operation' };
+  ): Promise<{ cycleTimeSec: number | undefined; gap: PhysicsGap | null; calculatorId: string | null; calculatorVersion: number | null; confidence: ConfidenceLevel; resolutionStatus: ResolutionStatus; trace: CalculationTraceStep[] }> {
+    if (threads.length === 0) return { cycleTimeSec: undefined, gap: null, calculatorId: null, calculatorVersion: null, confidence: 'unsupported', resolutionStatus: 'unsupported_operation', trace: [] };
 
     const fallbackDepthMm = sheetThicknessMm > 0 ? sheetThicknessMm : 3;
     let totalSec = 0;
@@ -9357,6 +9367,8 @@ export class BomItemCostingService {
     // 'unsupported_operation' just because `gap` stayed null.
     let resolutionStatus: ResolutionStatus = 'resolved';
     let failureStatus: ResolutionStatus | null = null;
+    // Each resolved group's calculator run: the line's calculation (groupedRunsTrace).
+    const groupTraces: { label: string; trace: CalculationTraceStep[] }[] = [];
 
     for (const t of threads) {
       const tapInputs = resolveTapPhysicsInputs(t.size, t.pitchMm, t.depthMm, fallbackDepthMm, materialGrade);
@@ -9396,6 +9408,7 @@ export class BomItemCostingService {
       if (groupOk) {
         totalSec += toolChangeTime + t.count * timePerUse;
         anyResolved = true;
+        groupTraces.push({ label: t.size, trace: tapCalc.trace });
         confidence = this.combineConfidence(confidence, tapCalc.confidence);
         resolutionStatus = this.combineResolutionStatus(resolutionStatus, tapCalc.resolutionStatus);
       } else {
@@ -9413,6 +9426,8 @@ export class BomItemCostingService {
       calculatorVersion,
       confidence: anyResolved ? confidence : 'unsupported',
       resolutionStatus: anyResolved ? resolutionStatus : (failureStatus ?? 'unsupported_operation'),
+      // The calculation behind the line's cycle: each thread size's run, and the unload once per operation.
+      trace: anyResolved ? groupedRunsTrace('Tapping', groupTraces, { label: 'Unload Time', sec: TAP_UNLOAD_SEC, source: 'Assumption: final clear and unload, once per operation (a fixed allowance)' }, totalSec + TAP_UNLOAD_SEC) : [],
     };
   }
 
@@ -9849,8 +9864,8 @@ export class BomItemCostingService {
       // shared method so neither operation's convention leaks into the other.
       resolveDepthMm: (diameterMm: number) => { depthMm: number; provenance: string };
     },
-  ): Promise<{ cycleTimeSec: number | undefined; gap: PhysicsGap | null; calculatorId: string | null; calculatorVersion: number | null; confidence: ConfidenceLevel; resolutionStatus: ResolutionStatus }> {
-    if (groups.length === 0) return { cycleTimeSec: undefined, gap: null, calculatorId: null, calculatorVersion: null, confidence: 'unsupported', resolutionStatus: 'unsupported_operation' };
+  ): Promise<{ cycleTimeSec: number | undefined; gap: PhysicsGap | null; calculatorId: string | null; calculatorVersion: number | null; confidence: ConfidenceLevel; resolutionStatus: ResolutionStatus; trace: CalculationTraceStep[] }> {
+    if (groups.length === 0) return { cycleTimeSec: undefined, gap: null, calculatorId: null, calculatorVersion: null, confidence: 'unsupported', resolutionStatus: 'unsupported_operation', trace: [] };
 
     const speedFeed = resolveDrillingSpeedFeed(config.materialGrade, config.speedFactor ?? 1);
     let totalSec = 0;
@@ -9862,6 +9877,8 @@ export class BomItemCostingService {
     // See resolveTappingCycleTimeSec's own comment — same two-accumulator split.
     let resolutionStatus: ResolutionStatus = 'resolved';
     let failureStatus: ResolutionStatus | null = null;
+    // Each resolved group's calculator run: the line's calculation (groupedRunsTrace).
+    const groupTraces: { label: string; trace: CalculationTraceStep[] }[] = [];
 
     for (const g of groups) {
       const { depthMm, provenance: depthProvenance } = config.resolveDepthMm(g.diameter_mm);
@@ -9894,6 +9911,7 @@ export class BomItemCostingService {
       if (groupOk) {
         totalSec += toolChangeTime + g.count * timePerUse;
         anyResolved = true;
+        groupTraces.push({ label: `Ø${g.diameter_mm} mm`, trace: calc.trace });
         confidence = this.combineConfidence(confidence, calc.confidence);
         resolutionStatus = this.combineResolutionStatus(resolutionStatus, calc.resolutionStatus);
       } else {
@@ -9911,6 +9929,8 @@ export class BomItemCostingService {
       calculatorVersion,
       confidence: anyResolved ? confidence : 'unsupported',
       resolutionStatus: anyResolved ? resolutionStatus : (failureStatus ?? 'unsupported_operation'),
+      // The calculation behind the line's cycle: each hole diameter's run, and the unload once per operation.
+      trace: anyResolved ? groupedRunsTrace(config.operation, groupTraces, { label: 'Unload Time', sec: HOLE_OP_UNLOAD_SEC, source: 'Assumption: final clear and unload, once per operation (a fixed allowance)' }, totalSec + HOLE_OP_UNLOAD_SEC) : [],
     };
   }
 }

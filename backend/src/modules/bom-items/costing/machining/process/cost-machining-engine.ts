@@ -1,3 +1,4 @@
+import { prefixTrace, sumRuns, traceCalc, traceHasAssumption, traceInput } from './machining-trace';
 import { RATES_SOURCE_LABEL, isoCoarsePitchMm, HOLE_OP_UNLOAD_SEC, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, type SurfaceTreatmentDbRate } from '../../shared/core/default-rates.constants';
 import { resolveSetupMinutes, type SetupTimeResolution } from '../../shared/core/engine-kernel';
 import type { DeepHoleCandidate } from '../operation/deep-hole-routing';
@@ -15,7 +16,6 @@ import type { MachiningCapabilityRules } from '../capability-rules';
 import { INSPECTION_TABLE, INSPECTION_TIME_COLUMN, type InspectionReference } from '../inspection-reference';
 import { lookupSeed, variableSeed } from '../calculators/machining-source-refs';
 import { featuresRef, type FeatureOccurrenceRef } from '../feature-occurrences';
-import { prefixTrace, traceCalc, traceHasAssumption, traceInput } from './machining-trace';
 import type { GearRoute } from '../operation/gear-routing';
 import { runMachiningCalculator, type CalcRun, type CalcSeed, type MachiningCalculators } from '../calculators/machining-calculator';
 import { calculationRef, resultStep, seedStep } from '../calculators/machining-source-refs';
@@ -579,24 +579,6 @@ function secondaryLine(
     makeLine(process, setupCost, runCost, runMin, rate, identity, { setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source }),
     run, setupTraceSteps(setupResolution, rate.machineName, batchSize), extraMissing,
   );
-}
-
-/** Sums several calculator runs of one operation (one per real occurrence group). */
-function sumRuns(runs: Array<{ label: string; run: CalcRun }>, total: string): CalcRun {
-  if (runs.length === 1) return runs[0]!.run;
-  const trace: CalculationTraceStep[] = [];
-  const missing: string[] = [];
-  let sec = 0;
-  let anyPriced = false;
-  for (const { label, run } of runs) {
-    trace.push(...prefixTrace(`${label} ·`, run.trace));
-    missing.push(...run.missing.map((m) => `${m} (${label})`));
-    if (run.sec != null) { sec += run.sec; anyPriced = true; }
-  }
-  if (anyPriced) trace.push(traceCalc(total, sec, 's', 'Sum of every group Cycle Time'));
-  const first = runs.find((r) => r.run.calculatorId)?.run;
-  const lookups = Object.assign({}, ...runs.map((r) => r.run.lookups));
-  return { sec: anyPriced ? sec : null, trace, missing, calculatorId: first?.calculatorId ?? null, calculatorVersion: first?.calculatorVersion ?? null, lookups };
 }
 
 function grindingSeeds(
