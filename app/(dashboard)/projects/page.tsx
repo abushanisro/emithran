@@ -1,11 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/api/hooks/useProjects';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/common/status-badge';
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,7 +22,6 @@ import { cn } from '@/lib/utils';
 import {
   Plus,
   FolderKanban,
-  TrendingUp,
   Clock,
   CheckCircle2,
   Trash2,
@@ -30,7 +29,7 @@ import {
   Pause,
   XCircle,
   Pencil,
-  MoreHorizontal,
+  MoreVertical,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Country, State, City } from 'country-state-city';
@@ -376,58 +375,30 @@ export default function Projects() {
         </Button>
       </PageHeader>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
-              <FolderKanban className="h-4 w-4 text-muted-foreground" />
+      {/* Projects section */}
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b px-6 py-4">
+          <CardTitle className="text-lg font-semibold">All Projects</CardTitle>
+          <dl className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-foreground">{stats.total}</dd>
+              <dt>Total</dt>
             </div>
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.total}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
-              <CheckCircle2 className="h-4 w-4 text-success" />
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-success">{stats.active}</dd>
+              <dt>Active</dt>
             </div>
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.active}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Draft Projects</p>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-foreground">{stats.draft}</dd>
+              <dt>Draft</dt>
             </div>
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.draft}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Completed</p>
-              <TrendingUp className="h-4 w-4 text-primary" />
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-primary">{stats.completed}</dd>
+              <dt>Completed</dt>
             </div>
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{stats.completed}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Projects table */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold">All Projects</CardTitle>
-          <CardDescription>
-            View and manage your manufacturing cost analysis projects
-          </CardDescription>
+          </dl>
         </CardHeader>
-        <CardContent className={isLoading || projects.length === 0 ? undefined : 'p-0'}>
+        <CardContent className="bg-muted/30 p-6">
           {isLoading ? (
             <TableSkeleton rows={5} columns={5} label="Loading projects..." />
           ) : projects.length === 0 ? (
@@ -435,7 +406,7 @@ export default function Projects() {
               icon={FolderKanban}
               title="No Projects Yet"
               description="Create your first manufacturing project to start managing BOMs and costs"
-              className="rounded-lg border border-dashed"
+              className="rounded-lg border border-dashed bg-card"
             >
               <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
                 <Plus className="h-5 w-5" />
@@ -443,95 +414,134 @@ export default function Projects() {
               </Button>
             </EmptyState>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="h-10 pl-6">Project</TableHead>
-                  <TableHead className="h-10">Status</TableHead>
-                  <TableHead className="h-10">Industry</TableHead>
-                  <TableHead className="h-10" data-numeric>Annual Volume</TableHead>
-                  <TableHead className="h-10" data-numeric>Target BOM Cost</TableHead>
-                  <TableHead className="h-10">Created</TableHead>
-                  <TableHead className="h-10 w-12 pr-6">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map((project) => (
-                  <TableRow
+            <ul className="space-y-4">
+              {projects.map((project) => {
+                const location = [project.city, project.state, project.country].filter(Boolean).join(', ');
+                return (
+                  <li
                     key={project.id}
-                    className="cursor-pointer"
+                    className="cursor-pointer rounded-lg border bg-card shadow-xs transition-shadow hover:shadow-sm"
                     onClick={() => router.push(`/projects/${project.id}`)}
                   >
-                    <TableCell className="max-w-80 py-3 pl-6">
-                      <p className="truncate font-medium text-foreground">{project.name}</p>
-                      {project.description && (
-                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                          {project.description}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-3">{renderStatusBadge(project.status)}</TableCell>
-                    <TableCell className="py-3 text-sm">{project.industry || '-'}</TableCell>
-                    <TableCell className="py-3 text-sm" data-numeric>
-                      {project.estimatedAnnualVolume
-                        ? Number(project.estimatedAnnualVolume).toLocaleString()
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm whitespace-nowrap" data-numeric>
-                      {project.targetBomCost && project.targetBomCostCurrency
-                        ? `${project.targetBomCostCurrency} ${Number(project.targetBomCost).toLocaleString()}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm whitespace-nowrap text-muted-foreground">
-                      {format(new Date(project.createdAt), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell className="py-3 pr-6 text-right" onClick={(e) => {
-                      e.stopPropagation();
-                    }}>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Open menu for {project.name}</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              router.push(`/projects/${project.id}`);
-                            }}
-                          >
-                            <ArrowRight className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Open Project
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              handleEditOpen(project);
-                            }}
-                          >
-                            <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                            onSelect={() => {
-                              setProjectToDelete(project);
-                              setDeleteOpen(true);
-                            }}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    {/* Project header */}
+                    <div className="flex items-center gap-3 border-b px-5 py-3.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <FolderKanban className="h-4 w-4" aria-hidden="true" />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                        <Link
+                          href={`/projects/${project.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="truncate text-base font-semibold text-primary hover:underline"
+                        >
+                          {project.name}
+                        </Link>
+                        {project.description && (
+                          <span className="line-clamp-1 text-sm text-muted-foreground">{project.description}</span>
+                        )}
+                      </div>
+                      {renderStatusBadge(project.status)}
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open menu for {project.name}</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                router.push(`/projects/${project.id}`);
+                              }}
+                            >
+                              <ArrowRight className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Open Project
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                handleEditOpen(project);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                              onSelect={() => {
+                                setProjectToDelete(project);
+                                setDeleteOpen(true);
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+
+                    {/* Metrics */}
+                    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-3 lg:grid-cols-5">
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Industry</dt>
+                        <dd className="mt-1 truncate text-xl font-semibold capitalize text-foreground">
+                          {project.industry ? project.industry.replace('-', ' ') : '-'}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Annual Volume</dt>
+                        <dd className="mt-1 truncate text-2xl font-semibold tabular-nums text-primary">
+                          {project.estimatedAnnualVolume
+                            ? Number(project.estimatedAnnualVolume).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Target BOM Cost</dt>
+                        <dd className="mt-1">
+                          {project.targetBomCost && project.targetBomCostCurrency ? (
+                            <span className="block truncate text-2xl font-semibold tabular-nums text-primary">
+                              {`${project.targetBomCostCurrency} ${Number(project.targetBomCost).toLocaleString()}`}
+                            </span>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditOpen(project);
+                              }}
+                            >
+                              Set up
+                            </Button>
+                          )}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Location</dt>
+                        <dd className="mt-1 truncate text-xl font-semibold text-foreground" title={location}>
+                          {location || '-'}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Created</dt>
+                        <dd className="mt-1 truncate text-xl font-semibold tabular-nums text-foreground">
+                          {format(new Date(project.createdAt), 'MMM d, yyyy')}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </CardContent>
       </Card>
