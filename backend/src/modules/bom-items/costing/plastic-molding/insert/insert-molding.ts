@@ -13,6 +13,7 @@ import { seedsFor, type SeedProvider } from '../../casting/sand/sand-seeds';
 import { gap } from '../../casting/casting-finishing';
 import { selectAndCost, type CostedStep } from '../../casting/sand/sand-steps';
 import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
+import { noCostFeatureLine } from '../../shared/core/engine-kernel';
 import { INSERT_MOLDING_PROCESS_GROUP } from '../../shared/core/part-family-process-group';
 
 import type { CalculationTraceStep, CostSummaryDto, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
@@ -145,10 +146,17 @@ export function insertLoading(input: {
     ...(rows[0]?.row ? { ref: { kind: 'lookup' as const, domain: kind.domain, table: kind.loadTimeTable, column: 'Load Time (s)', row: { 'Load Method': route.method, 'Weight (kg)': num(rows[0].row['Weight (kg)'])! } } } : {}),
   };
   // What the part lacks is not a machine's limit: it is said once, plainly, instead of as every loader failing ("no loader fits (X: ...)").
+  // A part with no inserts has nothing to load: the molding is priced with no loading, and the loading is a No Cost Feature saying why, never
+  // a refusal (the user's decision 2026-11-20, Apply never fails).
+  if (inserts.length === 0) {
+    const line = noCostFeatureLine({
+      reason: `${kind.process}: the part has no inserts, so none are loaded or costed. Add them under it in the BOM, or their count and weight in the Cost Guide.`,
+      processGroup: kind.processGroup,
+    });
+    return { step: { line, machine: null, outcome: null, warnings: [] }, secPerPart: 0 };
+  }
   const missingRow = rows.find((x) => !x.row);
-  const partGap = inserts.length === 0 ? 'The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.'
-    : missingRow ? `${kind.loadTimeTable} has no ${route.method} row for ${missingRow.insert.name} at ${String(missingRow.insert.massKg)} kg.`
-    : null;
+  const partGap = missingRow ? `${kind.loadTimeTable} has no ${route.method} row for ${missingRow.insert.name} at ${String(missingRow.insert.massKg)} kg.` : null;
   if (partGap) {
     return { step: { line: gap(kind.process, kind.processGroup, kind.machineClass, partGap), machine: null, outcome: null, warnings: [] }, secPerPart: null };
   }

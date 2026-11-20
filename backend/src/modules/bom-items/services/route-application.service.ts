@@ -18,32 +18,45 @@ import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDt
 import type { CalculationTraceStep, PhysicsGap } from '../dto/cost-breakdown.dto';
 import { cyclePhasesOf } from '../costing/shared/cycle-phases';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
-import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge, persistableCycleSec } from '../costing/shared/core/engine-kernel';
+import { findRouteDataGaps, isNoCostFeature, isPerPartCharge, lineDataGap, NO_COST_FEATURE, noCostFeatureLine, persistableCycleSec, selectAppliableRoute, type RouteDataGapLine } from '../costing/shared/core/engine-kernel';
 import { RouteResultDto } from '../dto/route-comparison.dto';
 import { PersistedLineCurrency, resolvePersistedCostCurrencyBasis } from '../costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from '../costing/shared/core/persisted-process-cost';
 import { PlasticReferenceService } from '../costing/plastic-molding/lookup/plastic-reference.service';
 
+/** What `lines` do not cost, each applied as a No Cost Feature: an operation that cannot be costed (its process and why), and what an engine
+ *  listed as not costed (noCostFeatureLine, its reason). */
+function noCostFeatureReasons(lines: readonly (RouteDataGapLine & { operation?: string })[]): string[] {
+  return [
+    ...lines.filter(isNoCostFeature).map((l) => l.operation ?? l.process),
+    ...findRouteDataGaps(lines).map((g) => `${g.process}: ${g.reason}`),
+  ];
+}
+
+/** process_cost_records.operation is VARCHAR(255). */
+const OPERATION_MAX = 255;
+
+/**
+ * The columns of a No Cost Feature record (NO_COST_FEATURE): an operation the route cannot cost, written at $0 as a per-part charge with no
+ * machine time, named by its process and reason. It is listed with the route and kept out of no total, because it adds nothing to it.
+ */
+function noCostFeatureColumns(operation: string): Record<string, unknown> {
+  return {
+    process_route: NO_COST_FEATURE,
+    operation: operation.length > OPERATION_MAX ? `${operation.slice(0, OPERATION_MAX - 1)}…` : operation,
+    mhr_id: null, benchmark_mhr_id: null,
+    machine_rate: 0, labor_rate: 0, direct_rate: 0, line_hourly_rate: 0, line_labour_rate: null,
+    setup_time: 0, cycle_time: null, charge_basis: 'per_part',
+    setup_cost_per_part: 0, total_cycle_cost_per_part: 0, total_cost_per_part: 0,
+    machine_cost_per_part: null, labor_cost_per_part: null, other_cost_per_part: null, cycle_phases: null,
+    setup_time_source: 'none',
+  };
+}
+
 /**
  * Writes a route (the engine's recommendation, a chosen route, or a Workflow Builder route) as the part's process cost records. The one place that does
  * it: the route-application endpoints and Apply Scenario both call it. Moved out of the controller unchanged.
  */
-/**
- * Why no route can be applied, one sentence per route: the reason it is not feasible, else its first operation with no costing data. Empty when no route says (the caller's sentence stands on its own). Routes that miss the same thing are said once.
- */
-export function whyNoRoute(routes: ReadonlyArray<Pick<RouteResultDto, 'routeLabel' | 'capability' | 'dataGaps'>>): string {
-  const byReason = new Map<string, string[]>();
-  for (const r of routes) {
-    const gap = r.dataGaps?.[0];
-    const reason = r.capability?.warnings?.[0] ?? (gap ? `${gap.process}: ${gap.reason}` : undefined);
-    if (reason) byReason.set(reason.replace(/\.+$/, ''), [...(byReason.get(reason.replace(/\.+$/, '')) ?? []), r.routeLabel]);
-  }
-  // The same reason for every route is the part's problem, not a route's: said once, without the list of routes.
-  const [only] = byReason;
-  if (byReason.size === 1 && routes.length > 1 && only![1].length === routes.length) return `${only![0]}. `;
-  return [...byReason].map(([reason, labels]) => `${labels.join(', ')}: ${reason}. `).join('');
-}
-
 @Injectable()
 export class RouteApplicationService {
   private readonly logger = new Logger(RouteApplicationService.name);
@@ -106,24 +119,19 @@ export class RouteApplicationService {
     // The batch the route was ACTUALLY costed at — persist that, not the request.
     const batchSize = comparison.resolvedInputs.batchSize;
 
-    // 2. Resolve 'auto' to the engine's own recommendation, from THIS comparison.
-    const askedFor = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
+    // 2. Resolve 'auto' to the engine's own recommendation, from THIS comparison: the cheapest route that is feasible and fully costed.
+    // Apply never fails (the user's decision 2026-11-20, memory failNotSupportedGcds false): with no such route, the best route there is
+    // (selectAppliableRoute) is applied, and whatever it cannot cost is written as a No Cost Feature.
+    const recommended = comparison.recommendedRouteId ?? selectAppliableRoute(comparison.routes)?.routeId ?? null;
+    const askedFor = dto.routeId === AUTO_ROUTE_ID ? recommended : dto.routeId;
     const replaced = !!askedFor && options.fallbackToRecommended === true && !comparison.routes.some((r) => r.routeId === askedFor);
-    const routeId = replaced ? comparison.recommendedRouteId : askedFor;
-    // No route of the part's process can be applied: the operations still saved from a route of its previous process (a forging route on a part
+    const routeId = replaced ? recommended : askedFor;
+    // The part's process has no route at all: the operations still saved from a route of its previous process (a forging route on a part
     // since moved to plastic molding) price a process the part is no longer made by, so they are removed rather than left in its total.
     const retired = routeId ? null : await this.retireRouteOfAnotherProcess(id, comparison.routes.map((r) => r.routeId), token);
     const retiredNote = retired ? ` The operations of the earlier route ${retired} were removed: they priced the part's previous process.` : '';
-    if (!routeId && comparison.noCompatibleProcessMessage) {
-      // Every route is ruled out by a feature its process cannot make: say so, with each route's reason, and choose nothing.
-      const reasons = comparison.routes.flatMap((r) => (r.compatibility?.incompatibilities ?? []).map((i) => `${r.routeLabel}: ${i.count} x ${i.featureType} (${i.reason})`));
-      throw new BadRequestException(`${`${comparison.noCompatibleProcessMessage} ${reasons.join(' ')}`.trim()}${retiredNote}`);
-    }
     if (!routeId) {
-      throw new BadRequestException(
-        // The reason leads: a short view of the message (the Cost tab, the toast) shows its first sentence.
-        `${whyNoRoute(comparison.routes) ? `No route can be applied: ${whyNoRoute(comparison.routes).trim()}` : 'No route is both feasible and fully costed.'}${retiredNote}`,
-      );
+      throw new BadRequestException(`${comparison.noCompatibleProcessMessage ?? 'The part\'s process has no route to apply.'}${retiredNote}`);
     }
 
     // 3. Find the route
@@ -135,21 +143,12 @@ export class RouteApplicationService {
       );
     }
 
-    // 4. Reject infeasible routes — the engine already did the capability check
-    if (!route.isFeasible) {
-      // Why the route is not feasible is its capability warning (what the engine found missing); its first general warning is often a
-      // note about how the quote was chosen, which does not say why this route cannot be applied.
-      const reason = route.capability.warnings[0] ?? route.warnings?.[0] ?? 'machine capability constraints not met';
-      throw new BadRequestException(
-        `Route '${routeId}' (${route.routeLabel}) is not feasible for this part: ${reason}`,
-      );
-    }
-
-    if (!route.processLines?.length) {
-      throw new BadRequestException(
-        `Route '${routeId}' returned no process lines — cannot create cost records`,
-      );
-    }
+    // 4. What the route cannot make is applied with it as No Cost Features (written below with its lines): why it is not feasible for the
+    // part, and each feature its process cannot make. Its operations that cannot be costed become No Cost Features as they are written.
+    const unmade = [
+      ...(route.isFeasible ? [] : [`${route.routeLabel} is not feasible for this part: ${route.capability.warnings[0] ?? route.warnings?.[0] ?? 'machine capability constraints not met'}`]),
+      ...(route.compatibility?.incompatibilities ?? []).map((i) => `${i.count} x ${i.featureType}: ${i.reason}`),
+    ];
 
     // P1b-iv-c: persist what the ENGINES charged, in the factory local
     // currency, not what the response was converted to for display.
@@ -159,7 +158,8 @@ export class RouteApplicationService {
     // everything else -- feasibility, warnings, the route the user picked --
     // because only the money differs between the two.
     const localRoute = localOut.routes?.find((r) => r.routeId === routeId);
-    if (!localRoute?.processLines?.length) {
+    const localLines = localRoute?.processLines ?? [];
+    if ((route.processLines ?? []).length > 0 && localLines.length === 0) {
       // Never fall back to the display-currency lines: that is precisely the
       // mislabelled money this phase removes. Fail loudly instead.
       throw new BadRequestException(
@@ -168,8 +168,13 @@ export class RouteApplicationService {
       );
     }
 
+    const processGroup = localLines.find((l) => l.processGroup)?.processGroup ?? NO_COST_FEATURE;
+    // A route with no operations (a 2-Model part its source supplies whole) is applied as one $0 record that says so: the route is on the
+    // part, and its cost is the material.
+    if (localLines.length === 0 && unmade.length === 0) unmade.push(`${route.routeLabel}: no operations to cost on this part (its cost is the material)`);
+    const lines = [...localLines, ...unmade.map((reason) => noCostFeatureLine({ reason, processGroup }))];
     const insertedOps = await this.writeProcessLinesAsRecords(
-      id, localRoute.processLines, batchSize, location, user, token, `auto_fill_from_route:${routeId}`,
+      id, lines, batchSize, location, user, token, `auto_fill_from_route:${routeId}`,
       {
         // The engines compute in the factory local currency, and these lines
         // were captured before the single conversion point, so the money is
@@ -184,6 +189,7 @@ export class RouteApplicationService {
     );
 
     this.logger.log(`[apply-route] partId=${id} route=${routeId} wrote ${insertedOps.length} ops`);
+    const noCostFeatures = noCostFeatureReasons(lines);
 
     return {
       created:    insertedOps.length,
@@ -191,6 +197,7 @@ export class RouteApplicationService {
       routeLabel: route.routeLabel,
       routeId:    routeId,
       ...(replaced ? { replacedRouteId: askedFor } : {}),
+      ...(noCostFeatures.length ? { noCostFeatures } : {}),
     };
   }, { route: dto.routeId, custom: false });
   }
@@ -399,6 +406,10 @@ export class RouteApplicationService {
     id: string,
     lines: Array<{
       process: string; machineClass: string; hostMachineClass?: string; machineName?: string | null; hourlyRate: number;
+      /** The engine's process group for the line (ProcessLineCost.processGroup): what a No Cost Feature with no machine is filed under. */
+      processGroup?: string;
+      /** ProcessLineCost.operation: a No Cost Feature line's reason. */
+      operation?: string;
       /** ProcessLineCost.rateSource: a per-part charge (isPerPartCharge) is persisted with no cycle time. */
       rateSource?: string;
       cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null; processGroup?: string | null } } };
@@ -492,19 +503,10 @@ export class RouteApplicationService {
     // ranked cheapest — because the missing operation cost $0 — and then failed
     // here when the user tried to apply it. Ranking and persistence now agree by
     // construction: any route offered as selectable is one this will accept.
-    const dataGaps = findRouteDataGaps(lines);
-    const firstGap = dataGaps[0];
-    if (firstGap) {
-      // Disclose what real data DOES exist near the failed query — never a
-      // substitute for the missing row (this still rejects the apply), just
-      // so the message isn't only "add a row" when the resolver already
-      // found real nearby rows (e.g. the lookup table's real tonnage/
-      // thickness buckets closest to the selected machine's real capacity).
-      throw new BadRequestException(
-        `Cannot apply this route — '${firstGap.process}' cycle time is unavailable: ${firstGap.reason}.` +
-        `${formatNearestRowsDisclosure(firstGap.nearestRows)} No records were written.`,
-      );
-    }
+    // An operation whose data is missing used to reject the whole apply here ("No records were written"). Apply never fails now (the user's
+    // decision 2026-11-20, memory failNotSupportedGcds false): such an operation is written as a No Cost Feature, a $0 per-part record
+    // naming it and why (noCostFeatureColumns), so the route is applied and the record says what it could not cost. The rule is still
+    // findRouteDataGaps' (lineDataGap), so ranking and persistence agree: a route with such operations is never ranked above a complete one.
 
     // P1a rollup gate (migration 707, constraint
     // ck_process_cost_records_rollup_usd_until_p1b).
@@ -627,9 +629,13 @@ export class RouteApplicationService {
       // option. The catalog row's group is used only for a line with no
       // machine. Neither = the line cannot be placed: no guessed group.
       const lineMhrId = line.machineSelection?.balanced?.candidate?.machineId ?? line.mhrId ?? null;
+      // A No Cost Feature: what the engine listed as not costed, or an operation that cannot be costed (lineDataGap), written at $0 with why.
+      const gap = lineDataGap(line);
+      const noCost = gap ? `${line.process}: ${gap.reason}` : isNoCostFeature(line) ? (line.operation ?? line.process) : null;
       const processGroup = line.machineSelection?.balanced?.candidate?.processGroup
         ?? (lineMhrId ? machineGroupById.get(lineMhrId) : undefined)
-        ?? (hierarchyRow ?? classRows[0])?.process_group;
+        ?? (hierarchyRow ?? classRows[0])?.process_group
+        ?? (noCost != null ? (line.processGroup ?? NO_COST_FEATURE) : undefined);
       if (!processGroup) {
         throw new InternalServerErrorException(
           `"${line.process}" (${hierarchyClass}) has no process group: its machine has none in HR Rates and the class has no process_calculator_mappings row.`,
@@ -801,9 +807,10 @@ export class RouteApplicationService {
         line_labour_rate:  line.labourRate ?? null,
         engine_version:    COST_ENGINE_CONTRACT_VERSION,
         setup_time_source: line.setupTimeSource ?? null,
+        ...(noCost != null ? noCostFeatureColumns(noCost) : {}),
       });
 
-      insertedOps.push(line.process);
+      insertedOps.push(noCost != null ? `${NO_COST_FEATURE}: ${noCost}` : line.process);
       opNbr += 10;
     }
 

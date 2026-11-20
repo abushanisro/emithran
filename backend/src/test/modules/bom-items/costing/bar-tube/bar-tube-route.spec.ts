@@ -1,5 +1,5 @@
 import { barTubeCalculatorsByName, loadBarTubeCalculatorSpec } from '../../../../../modules/bom-items/costing/bar-tube/calculators/bar-tube-calculator-spec';
-import { barTubePart } from '../../../../../modules/bom-items/costing/bar-tube/bar-tube-cost.service';
+import { barTubePart, enclosingBar } from '../../../../../modules/bom-items/costing/bar-tube/bar-tube-cost.service';
 import { buildBarTubeCostSummary } from '../../../../../modules/bom-items/costing/bar-tube/bar-tube-cost-summary';
 import { barTubeRouteFor } from '../../../../../modules/bom-items/costing/bar-tube/bar-tube-route-comparison';
 import {
@@ -131,10 +131,11 @@ describe('openings, end forms and bends', () => {
 });
 
 describe('what the cad-engine measured, as the routes take it', () => {
-  it('not measured, not stock, plate and extrusion each say why (never priced as something else)', () => {
+  it('not measured, not stock with no box, plate and extrusion each say why (never priced as something else)', () => {
     expect(barTubePart(null).missing[0]).toMatch(/press Refresh analysis/);
     expect(barTubePart({ extractionVersion: 'bar-tube-1', stockForm: null, reason: 'not one cross-section along a straight or bent line, and not a flat plate' }).missing[0])
       .toBe('the part is not a length of bar, tube or profile: not one cross-section along a straight or bent line, and not a flat plate');
+    expect(barTubePart({ extractionVersion: 'bar-tube-1', stockForm: null }, { sidesMm: [0, 0, 0], volumeMm3: null }).part).toBeNull();
     expect(barTubePart({ extractionVersion: 'bar-tube-1', stockForm: 'PLATE' }).missing[0]).toMatch(/the plate measurements/);
     const plate = barTubePart({ extractionVersion: 'bar-tube-1', stockForm: 'PLATE', plate: { thickness_mm: 6, cut_length_mm: 700, pierce_count: 3, blank_length_mm: 200, blank_width_mm: 100, face_area_mm2: 18000 } }).part;
     expect(plate).toMatchObject({ stockForm: 'PLATE', plate: { thicknessMm: 6, cutLengthMm: 700, pierces: 3, blankLengthMm: 200, blankWidthMm: 100, faceAreaMm2: 18000 } });
@@ -280,5 +281,37 @@ describe('the tooling a route needs, kept out of the piece cost', () => {
     const { routes } = buildBarTubeRoutes(input(PLATE, { material: ss }));
     expect(gapsOf(routes.find((r) => r.key === 'plate_oxyfuel')!).join(' ')).toMatch(/oxyfuel cuts carbon and low-alloy steel only/);
     expect(gapsOf(routes.find((r) => r.key === 'plate_laser')!)).toEqual([]);
+  });
+});
+
+/**
+ * Apply never fails (the user's decision 2026-11-20): a measured part that is not a length of stock (the Carriage Mount, a 33 x 24 x 22 mm PETG
+ * bracket) is priced as the bar that encloses it, sawn to length, and the shape it has within the bar is a No Cost Feature, never a refusal.
+ */
+describe('a part that is not a length of stock: priced as the bar that encloses it', () => {
+  const NOT_STOCK = 'not one cross-section along a straight or bent line, and not a flat plate';
+  const carriageMount = { sidesMm: [33, 24, 22], volumeMm3: 5178.74 };
+
+  it('the box\'s two shorter sides are the section (square when they are equal), the longest the length', () => {
+    const { part, missing } = barTubePart({ extractionVersion: 'bar-tube-1', stockForm: null, reason: NOT_STOCK }, carriageMount);
+    expect(missing).toEqual([]);
+    expect(part).toMatchObject({
+      stockForm: 'RECTANGULAR_BAR', developedLengthMm: 33, section: { areaMm2: 24 * 22, widthMm: 24, heightMm: 22, wallMm: null },
+      enclosing: { reason: NOT_STOCK, partVolumeMm3: 5178.74 },
+    });
+    expect(enclosingBar({ sidesMm: [20.2, 60, 20], volumeMm3: null }, NOT_STOCK)).toMatchObject({ stockForm: 'SQUARE_BAR', developedLengthMm: 60, enclosing: { partVolumeMm3: null } });
+  });
+
+  it('sawn to length, complete, and its shape a $0 No Cost Feature on the route (not a gap); the part weighs its own volume, the bar is bought', () => {
+    const part = enclosingBar(carriageMount, NOT_STOCK)!;
+    const saw = buildBarTubeRoutes({ ...input(part), material: barTubeMaterial('Aluminum, ANSI 6061', part.stockForm) }).routes.find((r) => r.key === 'saw')!;
+    expect(saw.complete).toBe(true);
+    const shape = saw.lines.find((l) => l.process === 'No Cost Feature')!;
+    expect(shape).toMatchObject({ totalCost: 0, rateSource: 'no_cost_feature', processGroup: 'Bar and Tube Fabrication' });
+    expect(shape.physicsGap).toBeUndefined();
+    expect(shape.operation).toBe(`The part's shape within the 24 x 22 mm rectangular bar it is sawn from: not a bar and tube operation (the part is not a length of bar, tube or profile: ${NOT_STOCK})`);
+    expect(saw.material.partKg).toBeCloseTo((5178.74 * 2700) / 1e9, 3);
+    expect(saw.material.massKg).toBeGreaterThan((33 * 24 * 22 * 2700) / 1e9);
+    expect(saw.totalUsd).toBeGreaterThan(0);
   });
 });

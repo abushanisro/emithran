@@ -441,7 +441,8 @@ export interface ProcessLineCost {
   // 'consumable_allowance': likewise not a machine rate — a real seeded
   // allowance (turret material handling, waterjet nozzle wear) charged as its
   // own line with hourlyRate 0.
-  rateSource: 'mhr_database' | 'no_db_rate' | 'tooling_amortization' | 'consumable_allowance';
+  /** 'no_cost_feature': what the process does not cost (engine-kernel noCostFeatureLine): $0, its reason in `operation`. */
+  rateSource: 'mhr_database' | 'no_db_rate' | 'tooling_amortization' | 'consumable_allowance' | 'no_cost_feature';
   machineClass: string;        // e.g. 'fiber_laser' — maps to MACHINE_REGISTRY key
   machineName: string | null;  // DB machine_name; null when source is 'default_rate'
   commodityCode: string | null; // DB commodity_code; null when source is 'default_rate'

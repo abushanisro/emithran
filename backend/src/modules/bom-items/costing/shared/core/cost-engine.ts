@@ -8,6 +8,8 @@ import {
 import type { NestingResult } from '../../sheet-metal/machine/sheet-metal-nesting.engine';
 import type { CostSummaryDto, ProcessLineCost, ProcessCO2, SustainabilitySummaryDto, PhysicsGap, ConfidenceLevel } from '../../../dto/cost-breakdown.dto';
 import type { SurfaceTreatmentDbRate } from './default-rates.constants';
+import { NO_COST_FEATURE } from './engine-kernel';
+
 export { eMithranTerms } from './engine-kernel';
 export type { EMithranTermsArgs, EMithranTermsResult } from './engine-kernel';
 // Platform Architecture Remediation Phase 1 (engine registry unification,
@@ -916,7 +918,9 @@ function buildLineFromAppliedRecord(
     // persisted catalog fields are the fallback only: process_route is the
     // route GROUP for some families ("Bending/Floating /Forming"), not a
     // process name, so it cannot be the primary source.
-    process: processLabelForClass[row.machine_class] ?? row.process_route ?? row.operation ?? row.machine_class,
+    // A No Cost Feature (an operation the route could not cost, written at $0 with its reason as the operation) reads as one, never as the
+    // free operation its machine class would name.
+    process: row.process_route === NO_COST_FEATURE ? NO_COST_FEATURE : processLabelForClass[row.machine_class] ?? row.process_route ?? row.operation ?? row.machine_class,
     processGroup: row.process_group ?? undefined,
     processRoute: row.process_route ?? undefined,
     operation: row.operation ?? undefined,

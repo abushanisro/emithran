@@ -64,10 +64,26 @@ describe('pouringCoefficient (by the section in inches or the pounds poured, per
     expect(pouringCoefficient(ref, 'Steel', 99.9, null)).toMatchObject({ value: 1.2 });
     expect(pouringCoefficient(ref, 'Steel', 100, null)).toMatchObject({ value: 0.4 });
   });
-  it('names what is missing: no section for a section-based material, a material with no rows, no material type', () => {
+  it('names what is missing: no section for a section-based material, a material with no rows and no rule, no material type', () => {
     expect(pouringCoefficient(ref, 'Aluminum', 20, null)).toEqual({ missing: expect.stringContaining('section thickness is not measured') });
-    expect(pouringCoefficient(ref, 'Brass', 20, 0.3)).toEqual({ missing: 'tblPouringCoefficients has no rows for Brass' });
+    expect(pouringCoefficient(ref, 'Unobtainium', 20, 0.3)).toEqual({ missing: 'tblPouringCoefficients has no rows for Unobtainium' });
     expect(pouringCoefficient(ref, null, 20, 0.3)).toEqual({ missing: expect.stringContaining('no Material Type') });
+  });
+
+  // 48 of the 117 sand materials are none of the four listed families (web research 2026-11-20, sand-pouring-research.ts).
+  it('a copper alloy pours by the published rule t = K cbrt(W kg): the coefficient gives that time at the weight poured', () => {
+    const brass = pouringCoefficient(ref, 'Brass', 20, 0.3);
+    expect(brass).toMatchObject({ source: expect.stringContaining('copper-alloy rule t = 1.9 x cbrt(W kg)') });
+    const value = (brass as { value: number }).value;
+    expect(value * Math.sqrt(20)).toBeCloseTo(1.9 * Math.cbrt(20 * 0.45359237), 9);
+    expect((pouringCoefficient(ref, 'Copper', 50, null) as { value: number }).value * Math.sqrt(50)).toBeCloseTo(1.8 * Math.cbrt(50 * 0.45359237), 9);
+  });
+
+  it('an alloy with no published constant pours as the listed family it is cast like, and says so', () => {
+    expect(pouringCoefficient(ref, 'Magnesium', 20, 0.3)).toMatchObject({ value: 0.8, source: expect.stringContaining('Magnesium is not listed: poured as Aluminum') });
+    expect(pouringCoefficient(ref, 'Zinc-Aluminum', 20, 0.5)).toMatchObject({ value: 1.43 });
+    expect(pouringCoefficient(ref, 'Stainless Steel', 150, null)).toMatchObject({ value: 0.4, source: expect.stringContaining('poured as Steel') });
+    expect(pouringCoefficient(ref, 'Malleable Cast Iron', 18, null)).toMatchObject({ value: 0.5, source: expect.stringContaining('poured as Gray Iron') });
   });
 });
 

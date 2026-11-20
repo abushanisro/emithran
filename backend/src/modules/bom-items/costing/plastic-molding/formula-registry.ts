@@ -170,15 +170,18 @@ export const PLASTIC_FORMULAS: readonly FormulaEntry[] = [
     state: 'VALIDATED', implementedIn: 'process/cost-injection-molding-engine.ts',
   },
   {
-    id: 'F-11', version: 1, name: 'Press capability',
-    expression: 'clamp >= F-01, shot >= F-02, tie bars fit part + runner, tool height within the press daylight',
+    id: 'F-11', version: 2, name: 'Press capability',
+    expression: 'clamp >= F-01, shot >= F-02, tie bars fit part + runner, tool height <= the press maximum mold height',
     outputUnit: 'capable | not capable, with reasons',
     inputs: [
       { name: 'press clamp, shot, tie bars, mold height', unit: 'kN, g, mm, mm', source: `${MEM}/machine: limits.*` },
       { name: 'estimated tool height', unit: 'mm', source: 'part longest side + 100 mm (IM_TOOL_HEIGHT_ALLOWANCE_MM)' },
     ],
     dependsOn: ['F-01', 'F-02'], referenceSource: `${MEM}/machine`,
-    assumptions: ['Tool height is the longest part side plus a 100 mm allowance (no mold design exists at quote time).'],
+    assumptions: [
+      'Tool height is the longest part side plus a 100 mm allowance (no mold design exists at quote time).',
+      'A mold thinner than the press minimum mold height is built up to it (thicker clamp plates or a riser plate): the minimum does not rule a press out (v2).',
+    ],
     state: 'ASSUMED', implementedIn: '../shared/capability/machine-selection/press-checks.ts',
   },
   {

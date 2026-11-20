@@ -214,6 +214,15 @@ describe('melting (per kg, ductile-iron basis)', () => {
     expect(Number(furnaces.find((x) => x.name === hot.line.machineName)!.specs['max_temperature_c'])).toBeGreaterThanOrEqual(1100);
   });
 
+  it('a small part\'s melt is a fraction of a cent: charged unrounded, never 0.00 (which read as no charge and refused the Apply)', () => {
+    // The Carriage Mount as a magnesium die casting: 5178.74 mm3 per part, one cavity.
+    const r = meltingLine({ ...base, densityKgM3: 1800, shotVolumeMm3: 5178.74, cavities: 1, injectionTempC: 650 });
+    expect(r.line.physicsGap).toBeUndefined();
+    expect(r.line.totalCost).toBeGreaterThan(0);
+    expect(r.line.totalCost).toBeLessThan(0.005);
+    expect(r.line.totalCost).toBeCloseTo(r.meltedKg! * v('regionConvFactor') * di, 9);
+  });
+
   it('no conversion cost on file for the location: a named gap', () => {
     const r = meltingLine({ ...base, ductileIron: null, injectionTempC: 650 });
     expect(r.line.physicsGap).toBeDefined();

@@ -907,7 +907,7 @@ export interface ProcessLineCost {
   hourlyRate: number;
   /** 'mhr_database' = a real HR Rates machine; 'no_db_rate' = no machine (not costed);
    *  'tooling_amortization' / 'consumable_allowance' = real non-machine cost lines. */
-  rateSource: 'mhr_database' | 'no_db_rate' | 'tooling_amortization' | 'consumable_allowance';
+  rateSource: 'mhr_database' | 'no_db_rate' | 'tooling_amortization' | 'consumable_allowance' | 'no_cost_feature';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;

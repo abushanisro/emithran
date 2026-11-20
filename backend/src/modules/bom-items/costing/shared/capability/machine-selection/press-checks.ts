@@ -6,7 +6,10 @@
 //   1. Clamp:    the press's tonnage covers the reference clamp force (which already carries its safety factor)
 //   2. Shot:     the press's shot size (GPPS grams) covers one cavity's shot
 //   3. Tie-bars: part + runner allowance fits between the tie-bars, the mold may be turned 90 degrees
-//   4. Daylight: the mold height fits between the press's minimum and maximum (skipped when the tool height is not estimated)
+//   4. Daylight: the mold is no taller than the press's maximum mold height (skipped when the tool height is not estimated). A mold thinner than
+//      the press's minimum is not refused: the mold maker builds it up to the press's shut height (thicker clamp plates, a riser plate), and
+//      memory/Plastic Modeling's own plate stack (top clamp 28.575 + A 85.725 + B 85.725 + support 47.625 + bottom clamp 28.575 mm, before
+//      the ejector rails) is already 276 mm for the smallest part, so a "tool shorter than the press" was the estimate, not the mold.
 // A need that cannot be derived, or a press value that is not on file, is not capable: nothing is passed unchecked.
 import { IM_TIEBAR_ADDEND_MM } from './physics';
 
@@ -84,13 +87,8 @@ export function checkPress(cap: PressCapability, need: PressNeeds): PressChecks 
     if (!fitsNormal && !fitsRotated) reasons.push(`Tie-bar: part + runner ${reqL.toFixed(0)}×${reqW.toFixed(0)}mm exceeds machine ${cap.tieBarXMm}×${cap.tieBarYMm}mm`);
   }
 
-  if (need.estimatedToolHeightMm != null) {
-    if (cap.minMoldHeightMm != null && need.estimatedToolHeightMm < cap.minMoldHeightMm) {
-      reasons.push(`Daylight: tool ${need.estimatedToolHeightMm}mm < machine min ${cap.minMoldHeightMm}mm`);
-    }
-    if (cap.maxMoldHeightMm != null && need.estimatedToolHeightMm > cap.maxMoldHeightMm) {
-      reasons.push(`Daylight: tool ${need.estimatedToolHeightMm}mm > machine max ${cap.maxMoldHeightMm}mm`);
-    }
+  if (need.estimatedToolHeightMm != null && cap.maxMoldHeightMm != null && need.estimatedToolHeightMm > cap.maxMoldHeightMm) {
+    reasons.push(`Daylight: tool ${need.estimatedToolHeightMm}mm > machine max ${cap.maxMoldHeightMm}mm`);
   }
 
   return {
