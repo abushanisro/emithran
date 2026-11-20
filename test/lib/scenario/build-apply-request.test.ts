@@ -116,4 +116,13 @@ describe("buildApplyScenarioRequest", () => {
     // A part that is not made on a multi-spindle never writes the key.
     expect(built({ processRouting: "manual", manualRoute: manual }).scenarioPatch).not.toHaveProperty("multiSpindleRoute");
   });
+
+  it("a weldment route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
+    const manual = { label: "Robotic welding", directApplyRouteId: "partassembly-robotic", partAssemblyRoute: "robotic" };
+    expect(built({ isPartAssembly: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", partAssemblyRoute: "robotic" });
+    expect(built({ isPartAssembly: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "partassembly-robotic" });
+    expect(built({ isPartAssembly: true }).scenarioPatch).toEqual({ processRouting: "auto", partAssemblyRoute: null });
+    // A part that is not a weldment never writes the key.
+    expect(built({ processRouting: "manual", manualRoute: manual }).scenarioPatch).not.toHaveProperty("partAssemblyRoute");
+  });
 });
