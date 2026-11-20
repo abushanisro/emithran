@@ -7940,6 +7940,10 @@
         "properties": {},
         "type": "object"
       },
+      "SessionStartDto": {
+        "properties": {},
+        "type": "object"
+      },
       "SetCalculatorFieldOverrideDto": {
         "properties": {
           "calculator": {
@@ -12352,6 +12356,36 @@
         "summary": "Logout: ends this session on the server, so a copied session cookie is refused from now on.",
         "tags": [
           "Session"
+        ]
+      }
+    },
+    "/api/v1/auth/sign-ins": {
+      "post": {
+        "operationId": "AuthController_startSession_v1",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionStartDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A new sign-in: restarts the inactivity clock of its Auth0 session (proven by the sign-in's ID token).",
+        "tags": [
+          "Auth"
         ]
       }
     },
