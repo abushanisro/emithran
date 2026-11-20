@@ -30,6 +30,8 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   composite: 'Composites',
   two_model: '2-Model Machining',
   additive: 'Additive Manufacturing',
+  // A length of bar, tube or profile (cad-engine bar_tube): costed by the bar and tube engine (backend costing/bar-tube).
+  bar_tube: 'Bar and Tube Fabrication',
   // An assembly's own work, costed from its BOM children (backend costing/assembly): a costed group with no CAD extractor.
   assembly: 'Assembly',
 };

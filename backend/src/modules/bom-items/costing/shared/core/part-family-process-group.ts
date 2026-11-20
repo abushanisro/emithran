@@ -28,6 +28,8 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   two_model: '2-Model Machining',
   // Built layer by layer (DMLS, SLS, material jetting, SLA): measured for its build (cad-engine additive/feature_extractor.py).
   additive: 'Additive Manufacturing',
+  // A length of bar, tube or profile, cut, punched, formed and bent (cad-engine bar_tube/feature_extractor.py: section, centreline, ends).
+  bar_tube: 'Bar and Tube Fabrication',
   // An assembly's own work: its BOM children loaded and joined (costing/assembly). An assembly has no model of its own to analyse.
   assembly: 'Assembly',
 };
