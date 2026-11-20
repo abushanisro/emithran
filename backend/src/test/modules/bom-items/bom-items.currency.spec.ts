@@ -204,7 +204,7 @@ describe('BOMItemsService.normalizeCostSummaryToCurrency', () => {
     expect(result.toUsdRate).toBeCloseTo(rate, 6);
   });
 
-  it('converts the route options of every family, and an assembly\'s consumables, with the lines (an India quote is not half in rupees)', () => {
+  it('converts the route options of every family, an assembly\'s consumables and a weldment\'s wire, with the lines (an India quote is not half in rupees)', () => {
     const service = buildService() as any;
     const rates = makeRates({ USD: 83.5 });
     const option = (route: string, totalCost: number | null) => ({ route, label: route, complete: totalCost != null, totalCost, reason: null });
@@ -213,6 +213,7 @@ describe('BOMItemsService.normalizeCostSummaryToCurrency', () => {
       composites: { options: [option('hand_layup', 167)] },
       forging: { options: [option('closed_die', 83.5)] },
       assembly: { options: [option('manual', 1670)], consumablesCost: 58.89, joints: [{ id: 'w1', consumablesCost: 58.89 }, { id: 's1', consumablesCost: null }] },
+      partAssembly: { options: [option('manual', 14588), option('robotic', null)], wireCost: 12.525 },
     } as never);
     const result = service.normalizeCostSummaryToCurrency(dto, rates, 'INR', null);
     expect(result.additive.options.map((o: { totalCost: number | null }) => o.totalCost)).toEqual([10, null]);
@@ -222,6 +223,9 @@ describe('BOMItemsService.normalizeCostSummaryToCurrency', () => {
     expect(result.assembly.consumablesCost).toBeCloseTo(58.89 / 83.5, 9);
     expect(result.assembly.joints[0].consumablesCost).toBeCloseTo(58.89 / 83.5, 9);
     expect(result.assembly.joints[1].consumablesCost).toBeNull();
+    // A weldment's route totals and MIG wire: an India weldment shown in USD had them in rupees.
+    expect(result.partAssembly.options.map((o: { totalCost: number | null }) => o.totalCost)).toEqual([14588 / 83.5, null]);
+    expect(result.partAssembly.wireCost).toBeCloseTo(0.15, 9);
   });
 
   it('converts to the scenario currency (not USD) when a matching fxSnapshot is on file', () => {
