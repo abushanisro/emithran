@@ -25,23 +25,10 @@ import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
 import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
-import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
-import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
 import { splitNote } from '@/lib/text/concise-note';
-import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
-import { barTubeRouteKeyOf } from '@/lib/routing/bar-tube-route-id';
-import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
-import { partAssemblyRouteKeyOf } from '@/lib/routing/part-assembly-route-id';
-import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
-import { isInsertMoldingItem } from '@/lib/costing/insert-molding-view';
-import { isMultiShotItem } from '@/lib/costing/multi-shot-view';
-import { multiShotRouteKeyOf } from '@/lib/routing/multi-shot-route-id';
 import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
 import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
-import { multiSpindleRouteKeyOf } from '@/lib/routing/multi-spindle-route-id';
 import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
-import { isAssemblyItem } from '@/lib/costing/assembly-view';
-import { isPartAssemblyItem } from '@/lib/costing/part-assembly-view';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -109,6 +96,7 @@ import { ModelViewer } from '@/components/ui/model-viewer';
 import { effectiveSheetThicknessMm } from '@/lib/costing/effective-sheet-thickness';
 import { splitSandRuns } from '@/lib/costing/sand-calculations';
 import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
+import { routePickKeyOf, routePicksOf } from '@/lib/routing/route-pick';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
@@ -2679,7 +2667,6 @@ function RouteSelectionDialog({
   const isInvestmentCast = partFamily === 'investment_cast';
   // Forged parts: the closed-die forging route as quoted, like sand.
   const isForged = partFamily === 'forged';
-  const isComposite = partFamily === 'composite';
   const isPowderMetal = partFamily === 'powder_metal';
   const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
@@ -3158,18 +3145,14 @@ function RouteSelectionDialog({
   // tonnage tiers, or Compression/Reaction Injection/Structural Foam
   // Molding) is already a complete, self-contained multi-line quote (Mold
   // Setup/Injection/Packing/Cooling/Ejection/Inspections all included). ═══
-  // A complete route can be set when apply-route accepts it: for plastic,
-  // one of the 3 injection tonnage tiers; for machining, any feasible
-  // catalog-machine route (apply-route.dto.ts validates against the same
-  // registered milling/turning engines the comparison priced).
+  // A complete route can be set when apply-route accepts it: for plastic, one of the 3 injection tonnage tiers (the other molding processes are
+  // compared, not set); for every other family whose comparison lists complete routes (machining, casting, forging, powder metal,
+  // composites, additive, bar and tube, an assembly, a weldment), a feasible one: an infeasible row still says why.
   const isCompleteRouteApplicable = (routeId: string | null): boolean => {
-    if (!routeId) return false;
-    if (isIM) { const dto = allRoutesForTree.find((r) => r.routeId === routeId); return !!dto && moldingRouteSelectability(dto).selectable; }
-    if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
-    // A die-casting process route: feasible ones only, the same rule apply-route
-    // enforces (an infeasible row still says why).
-    if (isDieCast || isSandCast || isInvestmentCast || isForged || isPowderMetal) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
-    return false;
+    const dto = routeId ? allRoutesForTree.find((r) => r.routeId === routeId) : undefined;
+    if (!dto) return false;
+    if (isIM) return moldingRouteSelectability(dto).selectable;
+    return isCompleteRouteFamily && dto.isFeasible;
   };
 
   function handleApplyCompleteRoute() {
@@ -3183,22 +3166,8 @@ function RouteSelectionDialog({
       processes: selected.processLines.map((l) => l.process),
       rationale: `${selected.routeLabel} route — selected in Workflow Builder`,
       directApplyRouteId: selected.routeId,
-      ...(isDieCast ? { dieCastingProcess: selected.routeLabel } : {}),
-      ...(() => { const key = isForged ? forgingRouteKeyOf(selected.routeId) : undefined; return key ? { forgingRoute: key } : {}; })(),
-      ...(() => { const key = isComposite ? compositesRouteKeyOf(selected.routeId) : undefined; return key ? { compositesRoute: key } : {}; })(),
-      ...(() => { const key = partFamily === 'additive' ? additiveRouteKeyOf(selected.routeId) : undefined; return key ? { additiveRoute: key } : {}; })(),
-      // A bar and tube route ("bar-tube-<key>"): the key is committed as the scenario's barTubeRoute.
-      ...(() => { const key = barTubeRouteKeyOf(selected.routeId); return key ? { barTubeRoute: key } : {}; })(),
-      // An assembly's route ids are its own ("assembly-<key>"): the key is committed as the scenario's assemblyRoute.
-      ...(() => { const key = assemblyRouteKeyOf(selected.routeId); return key ? { assemblyRoute: key } : {}; })(),
-      // An insert molding route ("im-insert-<method>"): its load method is committed as the scenario's insertMoldingRoute.
-      ...(() => { const key = insertMoldingRouteKeyOf(selected.routeId); return key ? { insertMoldingRoute: key } : {}; })(),
-      // A multi-shot route ("ms-<orientation>"): its orientation is committed as the scenario's multiShotRoute.
-      ...(() => { const key = multiShotRouteKeyOf(selected.routeId); return key ? { multiShotRoute: key } : {}; })(),
-      // A multi-spindle route ("multispindle-<key>"): its key (6, 8, twin) is committed as the scenario's multiSpindleRoute.
-      ...(() => { const key = multiSpindleRouteKeyOf(selected.routeId); return key ? { multiSpindleRoute: key } : {}; })(),
-      // A weldment route ("partassembly-<key>"): its key (manual, robotic) is committed as the scenario's partAssemblyRoute.
-      ...(() => { const key = partAssemblyRouteKeyOf(selected.routeId); return key ? { partAssemblyRoute: key } : {}; })(),
+      // Its family's route key ("partassembly-robotic" -> partAssemblyRoute "robotic"), or a die casting route's process.
+      routePicks: routePicksOf(selected, partFamily),
     };
     onSelectRoute(route);
     onApplied();
@@ -4922,8 +4891,8 @@ function CostGuidePanel({
                 <li>
                   Casting process:{' '}
                   <span className="text-foreground font-medium">
-                    {processRouting === 'manual' && selectedManualRoute?.dieCastingProcess
-                      ? selectedManualRoute.dieCastingProcess
+                    {processRouting === 'manual' && selectedManualRoute?.routePicks?.dieCastingProcess
+                      ? selectedManualRoute.routePicks.dieCastingProcess
                       : processRouting === 'auto'
                         ? `${cgpCostSummary.dieCastingProcess.options.filter((o) => o.feasible !== false && o.total != null).sort((a, b) => a.total! - b.total!)[0]?.process ?? 'none feasible'} (cheapest feasible)`
                         : cgpCostSummary.dieCastingProcess.chosen}
@@ -8190,15 +8159,7 @@ export default function ManufacturingIntelligencePage() {
       materialGrade: staged.materialGrade,
       processRouting,
       manualRoute: selectedManualRoute,
-      isDieCast: (item.familyClassification ?? fg?.classification?.family) === 'die_cast',
-      isForged: (item.familyClassification ?? fg?.classification?.family) === 'forged',
-      isAdditive: (item.familyClassification ?? fg?.classification?.family) === 'additive',
-      isBarTube: (item.familyClassification ?? fg?.classification?.family) === 'bar_tube',
-      isAssembly: isAssemblyItem(item),
-      isInsertMolding: isInsertMoldingItem(item),
-      isMultiShot: isMultiShotItem(item),
-      isMultiSpindle: isMultiSpindleItem(item),
-      isPartAssembly: isPartAssemblyItem(item),
+      routePickKey: routePickKeyOf(item, item.familyClassification ?? fg?.classification.family),
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });
@@ -8346,6 +8307,8 @@ export default function ManufacturingIntelligencePage() {
         processes: route.processLines.map((l) => l.process),
         rationale: 'Manual route — restored from the applied process costs after reload',
         directApplyRouteId: route.routeId,
+        // The choice it was applied with, so a re-Apply sends it again instead of clearing it.
+        routePicks: routePicksOf(route, routingFamily),
       });
       setProcessRouting('manual');
       return;
