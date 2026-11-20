@@ -14,7 +14,7 @@ const { join } = require('path');
 const { readCsv } = require('../migrations/scripts/lib/memory-machine-seed.js');
 
 const MEMORY = join(__dirname, '../../memory');
-const SOURCE = 'Machining/machine/simultaneous_turning_usa.csv';
+const SOURCE = 'machining/machine/simultaneous_turning_usa.csv';
 const OUT = join(__dirname, '../migrations/1093_multi_spindle_machine_limits.sql');
 const CLASS = 'simultaneous_turning';
 

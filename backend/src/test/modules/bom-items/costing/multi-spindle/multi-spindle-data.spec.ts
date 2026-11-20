@@ -19,7 +19,7 @@ const BACKEND = join(__dirname, '../../../../../..');
 const MIGRATIONS = join(BACKEND, 'migrations');
 const MEMORY = join(BACKEND, '../memory');
 const DIR = join(MEMORY, 'Multi-Spindle Maching');
-const MACHINES = join(MEMORY, 'Machining/machine/simultaneous_turning_usa.csv');
+const MACHINES = join(MEMORY, 'machining/machine/simultaneous_turning_usa.csv');
 const all = loadMultiSpindleCalculatorSpec().calculators;
 const byName = multiSpindleCalculatorsByName();
 
