@@ -40,6 +40,12 @@ async function main(): Promise<void> {
     const rows = await (await api('/mhr_records?machine_class=eq.surface_black_oxide&select=usd_labor_rate_per_hr,usd_lhr_total', minter.forService())).json() as { usd_labor_rate_per_hr: number | string | null; usd_lhr_total: number | string | null }[];
     must(rows.length === 1 && Number(rows[0]!.usd_labor_rate_per_hr) === 29.95 && Number(rows[0]!.usd_lhr_total) === 29.95, `rows ${JSON.stringify(rows)}`);
   });
+  await check('migration 1094 added the Multi-Spindle Machining row with Machining\'s material groups, and 1095 bound it to the cycle calculator', async () => {
+    const rows = await (await api('/process_calculator_mappings?process_group=eq.Multi-Spindle%20Machining&select=operation,calculator_name,is_active', minter.forService())).json() as { operation: string; calculator_name: string | null; is_active: boolean }[];
+    must(rows.length === 1 && rows[0]!.operation === 'Simultaneous Turning' && rows[0]!.calculator_name === 'Multi-Spindle Machining - Cycle' && rows[0]!.is_active, `rows ${JSON.stringify(rows)}`);
+    const groups = await (await api('/process_material_groups?process_group=eq.Multi-Spindle%20Machining&select=material_group&order=material_group', minter.forService())).json() as { material_group: string }[];
+    must(JSON.stringify(groups.map((g) => g.material_group)) === JSON.stringify(['Ferrous & Non-Ferrous', 'Machining']), `groups ${JSON.stringify(groups)}`);
+  });
   await check('the carried user directory is readable through migration 932 (same id as the source)', async () => {
     const res = await api('/rpc/directory_find_by_email', minter.forService(), { method: 'POST', body: JSON.stringify({ p_email: 'Alice@Example.com' }) });
     must(res.ok && (await res.json()) === '11111111-1111-4111-8111-111111111111', `HTTP ${res.status}`);

@@ -82,6 +82,16 @@ SELECT 'Assembly', n, n, false FROM unnest(ARRAY['Pick and Place','Mechanical As
 -- and the four Plastic Molding rows the older seed migrations create: migrations 975 and 976 link the molding cycle-time calculators to them and fail if one is missing
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Plastic Molding', n, n, true FROM unnest(ARRAY['Injection Molding','Structural foam molding','Compression Molding','Reaction Injection Molding']) AS n;
+-- the assembly plastic molding catalog rows migration 862 seeds: migrations 1086 and 1087 link the component loading and the injection
+-- cycle-time calculators to them, and 1086 fails if its row is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Assembly Plastic Molding', n, n, false FROM unnest(ARRAY['Multi-Shot Molding','Pick and Place']) AS n;
+-- the bar and tube catalog rows migration 862 seeds: migration 1091 links the bar and tube calculators to them and fails if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Bar and Tube Fabrication', n, n, false FROM unnest(ARRAY['Band Saw','Circular Saw','Reciprocating Saw','Shear','Tube Laser','Punching',
+  'Flaring','Flanging','Expansion','Reduction','Flattening','Knurling','Bar Forming','Notching','Slotting','Rotary Draw Bending','Compression Bending',
+  'Bar Bend Brake','2 Roll Bending','3 Roll Bending','4 Roll Bending','Profile 3 Roll Bend','Profile CNC Bend','Sheet Laser Cut','Sheet Plasma Cut',
+  'Sheet OxyFuel Cut','Plasma CNC Cut','Plasma Torch Cut','Oxyfuel Torch Cut','Extrusion','Billet Preheat','Die Preheat']) AS n;
 -- the catalog columns and the process taxonomy as the real database has them (migrations 367-371, 424, 725), and the four
 -- secondary-operation calculators the baseline holds: migration 984 restores their catalog rows and fails if a calculator is missing
 ALTER TABLE public.process_calculator_mappings ADD COLUMN machine_class varchar(100), ADD COLUMN applicable_families text[],
@@ -97,6 +107,12 @@ INSERT INTO public.calculators (id, name, is_global) VALUES
   ('72f84130-a741-425f-8fa9-9b027541801c', 'Sheet Metal - PEM Insertion', true), ('fe42139c-5675-4a82-94d5-7f2d440ae9bf', 'Machining - Tapping', true);
 -- the materials table as the real database has it (migration 352 adds cut_code): migration 978 writes the cut code of the plastics onto it
 CREATE TABLE public.raw_materials (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name varchar(255) NOT NULL, cut_code decimal(10,2));
+-- the material columns as the real database has them (migration 069 on): migrations 1090 and 1092 fill the bar and tube materials' strengths and specific heat
+ALTER TABLE public.raw_materials ADD COLUMN material_group varchar(255), ADD COLUMN shear_strength_mpa numeric, ADD COLUMN yield_strength_mpa numeric,
+  ADD COLUMN uts_mpa numeric, ADD COLUMN specific_heat_rt_j_kg_k numeric, ADD COLUMN updated_at timestamptz DEFAULT now();
+-- the material groups of each process group (migration 879): migration 1090 adds Bar and Tube Fabrication's, and 1094 gives Multi-Spindle Machining
+-- Machining's and fails if Machining has none
+\i /migrations/879_process_material_groups.sql
 INSERT INTO public.raw_materials (name) VALUES ('Generic Nylon, Type 11 40% Glass');
 -- the machine table (00_stubs.sql has it), plus the columns migration 981 reads and writes: a Black Oxide machine with no labor rate, and two machines of its wage grade that agree on one
 -- machine_name (migration 130) and updated_at as the real database has them: migration 1043 matches each turning machine by class and name
@@ -117,6 +133,11 @@ ALTER TABLE public.mhr_records ADD COLUMN process_group varchar, ADD COLUMN land
 -- the press columns as the real database has them (migration 633): migration 1080 fills them for the insert molding presses from their specs
 ALTER TABLE public.mhr_records ADD COLUMN max_tonnage numeric, ADD COLUMN shot_capacity_grams integer, ADD COLUMN press_cycle_time_s numeric,
   ADD COLUMN min_mold_height_mm integer, ADD COLUMN max_mold_height_mm integer, ADD COLUMN tie_bar_x_mm integer, ADD COLUMN tie_bar_y_mm integer;
+-- the Assembly Plastic Molding machines migration 862 seeds for the USA: migration 1085 twins each one in India and fails if one is missing.
+-- Their class and name are read from 1085's own list (an applied migration never changes) rather than copied here: 78 presses, 19 loaders.
+INSERT INTO public.mhr_records (machine_class, machine_name, location)
+SELECT m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1085_assembly_plastic_molding_machines.sql'),
+  '\(\$str\$(assembly_plastic_molding_[a-z_]+)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
 -- the machine envelope columns as the real database has them (migration 755 fills them for the lathes): migration 1093 fills them for the multi-spindle machines
 ALTER TABLE public.mhr_records ADD COLUMN max_diameter_mm numeric(10,2), ADD COLUMN max_length_mm numeric(10,2);
 -- the taxonomy columns as the real database has them (migration 609): migration 1094 adds the Multi-Spindle Machining > Simultaneous Turning row
