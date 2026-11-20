@@ -77,10 +77,22 @@ describe('MaterialCostSnapshotService.ensure', () => {
     expect(costRecords.update).toHaveBeenCalledWith('new', { unitCost: 4, notes: expect.stringContaining('the cost engine\'s price per kg (4.0000 USD)') }, 'u', 't');
   });
 
-  it('does not overwrite a price the service found', async () => {
-    const { svc, costRecords } = build([], { id: 'new', unitCost: 3.2 });
-    await svc.ensure(input(summary()));
-    expect(costRecords.update).not.toHaveBeenCalled();
+  it('carries the engine\'s price per kg when it differs from the service\'s: the price the quote used (a Bar and Tube part\'s bar stock)', async () => {
+    // The engine priced the 24 x 22 rectangular bar at 7.011 USD/kg (material_stock_prices); the lookup found 5.38, the Die Casting row's.
+    const { svc, costRecords } = build([], { id: 'new', unitCost: 5.38 });
+    await svc.ensure(input(summary({ materialCostPerKg: 7.011, materialSource: 'db' })));
+    expect(costRecords.update).toHaveBeenCalledWith('new', {
+      unitCost: 7.011, notes: 'The unit cost is the cost engine\'s price per kg (7.0110 USD), the price the quote used; raw_materials lists 5.3800 USD for "ABS" at USA.',
+    }, 'u', 't');
+  });
+
+  it('keeps the service\'s price when the engine agrees, or took only a default', async () => {
+    const same = build([], { id: 'new', unitCost: 4 });
+    await same.svc.ensure(input(summary({ materialSource: 'db' })));
+    expect(same.costRecords.update).not.toHaveBeenCalled();
+    const fallback = build([], { id: 'new', unitCost: 3.2 });
+    await fallback.svc.ensure(input(summary({ materialSource: 'default' })));
+    expect(fallback.costRecords.update).not.toHaveBeenCalled();
   });
 
   it('still writes the record when the material lookup fails: unlinked, and priced by the service from the name', async () => {
