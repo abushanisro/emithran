@@ -526,6 +526,10 @@ export class BomItemCostingService {
           joints: dto.assembly.joints.map((j) => ({ ...j, consumablesCost: j.consumablesCost != null ? conv(j.consumablesCost) : null })),
         },
       } : {}),
+      // A weldment's route options and its MIG wire, the same.
+      ...(dto.partAssembly ? {
+        partAssembly: { ...dto.partAssembly, options: convertRouteOptions(dto.partAssembly.options, conv), wireCost: conv(dto.partAssembly.wireCost) },
+      } : {}),
       currency,
       currencySymbol,
       toUsdRate: rate,
