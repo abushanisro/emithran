@@ -35,6 +35,9 @@ import { isInsertMoldingItem } from '@/lib/costing/insert-molding-view';
 import { isMultiShotItem } from '@/lib/costing/multi-shot-view';
 import { multiShotRouteKeyOf } from '@/lib/routing/multi-shot-route-id';
 import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
+import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
+import { multiSpindleRouteKeyOf } from '@/lib/routing/multi-spindle-route-id';
+import { MultiSpindleCycle, MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
 import { isAssemblyItem } from '@/lib/costing/assembly-view';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
@@ -938,6 +941,13 @@ function CostSummaryTab({
         <>
           <SectionHeader label="Multi-Shot Cycle" />
           <div className="pb-2"><MultiShotCycle multiShot={cost.multiShot} /></div>
+        </>
+      )}
+      {/* A multi-spindle part: the machine the route runs on and its station plan, the slowest station setting the cycle (the bar is in the Cost Guide). */}
+      {cost.multiSpindle && (
+        <>
+          <SectionHeader label="Multi-Spindle Cycle" />
+          <div className="pb-2"><MultiSpindleCycle multiSpindle={cost.multiSpindle} /></div>
         </>
       )}
 
@@ -3163,6 +3173,8 @@ function RouteSelectionDialog({
       ...(() => { const key = insertMoldingRouteKeyOf(selected.routeId); return key ? { insertMoldingRoute: key } : {}; })(),
       // A multi-shot route ("ms-<orientation>"): its orientation is committed as the scenario's multiShotRoute.
       ...(() => { const key = multiShotRouteKeyOf(selected.routeId); return key ? { multiShotRoute: key } : {}; })(),
+      // A multi-spindle route ("multispindle-<key>"): its key (6, 8, twin) is committed as the scenario's multiSpindleRoute.
+      ...(() => { const key = multiSpindleRouteKeyOf(selected.routeId); return key ? { multiSpindleRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -4636,6 +4648,16 @@ function CostGuidePanel({
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                   hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
+                />
+              </Section>
+            )}
+
+            {isMultiSpindleItem(item) && (
+              <Section title="Multi-Spindle Machining">
+                <MultiSpindleSection
+                  multiSpindle={cgpCostSummary?.multiSpindle}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
               </Section>
             )}
@@ -8140,6 +8162,7 @@ export default function ManufacturingIntelligencePage() {
       isAssembly: isAssemblyItem(item),
       isInsertMolding: isInsertMoldingItem(item),
       isMultiShot: isMultiShotItem(item),
+      isMultiSpindle: isMultiSpindleItem(item),
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });

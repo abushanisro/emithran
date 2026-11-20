@@ -1221,6 +1221,23 @@ export interface CostSummaryDto {
     complete: boolean;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
   };
+  /**
+   * Multi-Spindle Machining: the bar, the machine and its station plan (the slowest station sets the cycle), the route quoted and every route
+   * (backend MultiSpindleBreakdown).
+   */
+  multiSpindle?: {
+    route: string; routeLabel: string;
+    machineName: string | null; spindles: number; cycleSec: number | null; indexSec: number | null;
+    stations: Array<{ spindle: number; backWork: boolean; seconds: number; slowest: boolean; operations: Array<{ name: string; slide: string; seconds: number }> }>;
+    splits: string[];
+    bar: {
+      form: string; sizeMm: number; sizeLabel: string; unitSystem: string; snapped: boolean; requiredMm: number; allowancePerSideMm: number;
+      partingWidthMm: number; facingStockMm: number; lengthPerPartMm: number; barLengthMm: number; remnantMm: number;
+    };
+    partsPerBar: number | null; materialMassKg: number | null; partMassKg: number | null; stockPricePerKg: number | null; stockMissing: string | null;
+    complete: boolean;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
   /** Bar and tube: the tools the quoted route needs (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when unpriced. */
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   composites?: {

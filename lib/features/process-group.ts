@@ -66,6 +66,8 @@ const COSTED_AS_FAMILY: Readonly<Record<string, string>> = {
   'Assembly Molding': 'plastic_molded',
   // Multi-shot molding: a molded plastic part, each shot on a multi-shot press (backend plastic-molding/multi-shot).
   'Assembly Plastic Molding': 'plastic_molded',
+  // Multi-spindle machining: a turned part made from bar on a CNC multi-spindle or twin-spindle turning center (backend multi-spindle).
+  'Multi-Spindle Machining': 'turned',
 };
 
 /**

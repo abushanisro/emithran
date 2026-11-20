@@ -108,4 +108,12 @@ describe("buildApplyScenarioRequest", () => {
     expect(built({ isMultiShot: true, processRouting: "manual", manualRoute: ms }).scenarioPatch).toEqual({ processRouting: "manual", multiShotRoute: "vertical" });
     expect(built({ isMultiShot: true }).scenarioPatch).toEqual({ processRouting: "auto", multiShotRoute: null });
   });
+
+  it("a multi-spindle route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
+    const manual = { label: "8-spindle multi-spindle", directApplyRouteId: "multispindle-8", multiSpindleRoute: "8" };
+    expect(built({ isMultiSpindle: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", multiSpindleRoute: "8" });
+    expect(built({ isMultiSpindle: true }).scenarioPatch).toEqual({ processRouting: "auto", multiSpindleRoute: null });
+    // A part that is not made on a multi-spindle never writes the key.
+    expect(built({ processRouting: "manual", manualRoute: manual }).scenarioPatch).not.toHaveProperty("multiSpindleRoute");
+  });
 });

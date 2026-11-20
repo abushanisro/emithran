@@ -48,6 +48,8 @@ export interface ManualRouteOption {
   insertMoldingRoute?: string;
   // A multi-shot route picked in the Workflow Builder (its MULTI_SHOT_ROUTES key): committed as the scenario's multiShotRoute.
   multiShotRoute?: string;
+  // A multi-spindle route picked in the Workflow Builder (its MULTI_SPINDLE_ROUTES key): committed as the scenario's multiSpindleRoute.
+  multiSpindleRoute?: string;
   // A real, already-valid apply-route.dto.ts routeId (e.g. one of the 3 real
   // Injection Molding tonnage tiers) to apply directly via the plain
   // applyRoute mutation — for a family whose real routes are already
