@@ -3,6 +3,8 @@
 import { Suspense } from 'react';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { useBOMs, useCreateBOM, useUpdateBOM, useDeleteBOM } from '@/lib/api/hooks/useBOM';
 import { useProjects } from '@/lib/api/hooks/useProjects';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -308,17 +310,16 @@ function BOMManagementContent() {
         </CardHeader>
         <CardContent>
           {filteredBoms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-              <FileSpreadsheet className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                {searchQuery ? 'No BOMs found' : 'No BOMs Yet'}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery
+            <EmptyState
+              icon={FileSpreadsheet}
+              title={searchQuery ? 'No BOMs found' : 'No BOMs Yet'}
+              description={
+                searchQuery
                   ? 'Try adjusting your search query'
-                  : 'Create your first BOM from a project'}
-              </p>
-            </div>
+                  : 'Create your first BOM from a project'
+              }
+              className="rounded-lg border border-dashed"
+            />
           ) : (
             <div className="rounded-md border">
               <Table>
@@ -593,9 +594,7 @@ function BOMManagementContent() {
 export default function BOMManagementPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <PageSkeleton label="Loading BOM management…" />
     }>
       <BOMManagementContent />
     </Suspense>

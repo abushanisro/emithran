@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -165,20 +166,18 @@ export default function VavePage() {
         </div>
       ) : projectList.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-            <div className="p-4 bg-muted rounded-full">
-              <Lightbulb className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-lg">No VAVE projects yet</p>
-              <p className="text-muted-foreground text-sm mt-1">
-                Create your first project to start identifying cost savings
-              </p>
-            </div>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Project
-            </Button>
+          <CardContent>
+            <EmptyState
+              icon={Lightbulb}
+              title="No VAVE projects yet"
+              description="Create your first project to start identifying cost savings"
+              className="py-16"
+            >
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Project
+              </Button>
+            </EmptyState>
           </CardContent>
         </Card>
       ) : (

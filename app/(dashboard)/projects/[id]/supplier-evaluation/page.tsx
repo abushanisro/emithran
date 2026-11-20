@@ -11,6 +11,7 @@ import {
   SupplierEvaluationDashboard,
   EvaluationGroupView
 } from '@/components/features/supplier-evaluation';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { useSupplierEvaluationGroups, useSupplierEvaluationGroup } from '@/lib/api/hooks/useSupplierEvaluationGroups';
 
 export default function SupplierEvaluationPage() {
@@ -78,9 +79,7 @@ export default function SupplierEvaluationPage() {
               description="Fetching BOM parts and evaluation data"
             />
           </div>
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
+          <TableSkeleton rows={5} columns={4} label="Loading evaluation group…" />
         </div>
       );
     }

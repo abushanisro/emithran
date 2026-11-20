@@ -21,6 +21,7 @@ import { AssemblySection } from '@/components/costing/AssemblySection';
 import { InsertMoldingCycle, InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
 import { ConciseNote } from '@/components/ui/concise-note';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
 import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
@@ -1657,10 +1658,7 @@ function RouteComparisonCard({
   const gate = applyGate(analysisStatus.data);
 
   if (isLoading) return (
-    <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-      <div className="h-4 w-4 rounded-full border-2 border-primary/40 border-t-primary/40 animate-spin" />
-      <span className="text-xs">Comparing routes…</span>
-    </div>
+    <ListSkeleton rows={2} label="Comparing routes…" />
   );
   if (!comparison?.routes?.length) return null;
 

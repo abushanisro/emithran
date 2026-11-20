@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, MapPin, Building2, Send, Package, FileText, TrendingUp, Award, Mail, Box, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -747,11 +748,7 @@ We look forward to your competitive proposal and establishing a successful partn
 
                 <div className="p-6">
                   {isLoadingVendors ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-400 mx-auto mb-4"></div>
-                      <h3 className="font-medium mb-2 text-foreground">Loading vendors...</h3>
-                      <p className="text-sm">Fetching vendor database</p>
-                    </div>
+                    <ListSkeleton rows={4} label="Loading vendors..." />
                   ) : matchedVendors.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -1103,10 +1100,7 @@ We look forward to your competitive proposal and establishing a successful partn
                       </div>
                       
                       {isLoadingTracking && (
-                        <div className="text-center py-4">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400 mx-auto"></div>
-                          <p className="text-muted-foreground text-sm mt-2">Loading RFQ tracking data...</p>
-                        </div>
+                        <ListSkeleton rows={2} label="Loading RFQ tracking data..." />
                       )}
                     </div>
                   ) : (
@@ -1179,10 +1173,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                 }}
                               />
                             ) : isLoadingNominations ? (
-                              <div className="p-6 text-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary/40 mx-auto mb-4"></div>
-                                <p className="text-muted-foreground">Loading nomination data...</p>
-                              </div>
+                              <ListSkeleton rows={3} label="Loading nomination data..." className="p-6" />
                             ) : (
                               <div className="p-6 text-center">
                                 <div className="text-muted-foreground mb-4">

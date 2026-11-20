@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { EmptyState } from '@/components/ui/empty-state';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/api/hooks/useProjects';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/common/status-badge';
@@ -431,22 +433,19 @@ export default function Projects() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-              <p className="text-sm text-muted-foreground mt-4">Loading projects...</p>
-            </div>
+            <TableSkeleton rows={5} columns={5} label="Loading projects..." />
           ) : projects.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-              <FolderKanban className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Projects Yet</h3>
-              <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
-                Create your first manufacturing project to start managing BOMs and costs
-              </p>
+            <EmptyState
+              icon={FolderKanban}
+              title="No Projects Yet"
+              description="Create your first manufacturing project to start managing BOMs and costs"
+              className="rounded-lg border border-dashed"
+            >
               <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
                 <Plus className="h-5 w-5" />
                 Create First Project
               </Button>
-            </div>
+            </EmptyState>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {projects.map((project) => (

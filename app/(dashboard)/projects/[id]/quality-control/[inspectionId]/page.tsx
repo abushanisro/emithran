@@ -15,6 +15,7 @@ import { useParams, useRouter } from 'next/navigation';
 // useBOMItems and useBOMs imported but unused - kept for future use
 // import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 // import { useBOMs } from '@/lib/api/hooks/useBOM';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { useAuth } from '@/lib/providers/auth';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -723,11 +724,8 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
       {/* PDF viewer — no padding, edge-to-edge */}
       <div className="w-full overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center p-8 bg-muted/30 rounded-lg">
-            <div className="text-center">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Loading 2D Drawing...</p>
-            </div>
+          <div className="p-8 bg-muted/30 rounded-lg">
+            <ListSkeleton rows={3} label="Loading 2D Drawing..." />
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center p-8 bg-muted/30 rounded-lg">
@@ -2125,9 +2123,8 @@ export default function QualityInspectionPage() {
             </CardHeader>
             <CardContent className="p-0 overflow-hidden">
               {inspectionLoading || bomItemsLoading ? (
-                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
-                  <div className="animate-spin h-8 w-8 mb-3 text-muted-foreground">⟳</div>
-                  <p className="text-sm text-muted-foreground">Loading BOM items...</p>
+                <div className="p-8 border-2 border-dashed border-border rounded-lg">
+                  <ListSkeleton rows={3} label="Loading BOM items..." />
                 </div>
               ) : bomItemsError ? (
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">

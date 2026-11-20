@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { X, Download, FileText, Maximize2, Upload, Loader2, Box } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { apiClient } from '@/lib/api/client';
 import { apiConfig } from '@/lib/api/config';
@@ -234,9 +235,7 @@ interface ManufacturingFeature {
             {activeTab === '3d' && (
               <div className="h-full flex flex-col">
                 {loading && (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
+                  <ListSkeleton rows={4} label="Loading…" className="py-6" />
                 )}
 
                 {!loading && file3dUrl && (
@@ -267,9 +266,7 @@ interface ManufacturingFeature {
             {activeTab === '2d' && (
               <div className={`h-full ${isDxfFile ? 'overflow-hidden' : 'overflow-y-auto p-6 space-y-4'}`}>
                 {loading && (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
+                  <ListSkeleton rows={4} label="Loading…" className="py-6" />
                 )}
 
                 {!loading && file2dUrl && isDxfFile && (

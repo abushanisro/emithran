@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Settings,
@@ -496,10 +497,7 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
                     <CollapsibleContent>
                       <CardContent className="pt-0 space-y-4">
                         {processesLoading ? (
-                          <div className="text-center py-6 text-muted-foreground text-sm">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2" />
-                            Loading tasks…
-                          </div>
+                          <ListSkeleton rows={3} label="Loading tasks…" />
                         ) : section.subTasks.length === 0 ? (
                           <div className="text-center py-6 border-2 border-dashed rounded-lg text-muted-foreground">
                             <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />

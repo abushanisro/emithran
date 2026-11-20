@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -494,10 +495,7 @@ export function CreateProductionLotModal({ open, onOpenChange, projectId }: Crea
                   </CardHeader>
                   <CardContent>
                     {isLoadingBOMItems ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                        <span className="ml-2">Loading BOM items...</span>
-                      </div>
+                      <ListSkeleton rows={4} label="Loading BOM items..." />
                     ) : bomItemsData?.items && bomItemsData.items.length > 0 ? (
                       filteredBomItems.length > 0 ? (
                       <div className="space-y-3">

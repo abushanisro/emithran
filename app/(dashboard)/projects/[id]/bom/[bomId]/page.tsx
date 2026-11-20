@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { useProject } from '@/lib/api/hooks/useProjects';
 import { useBOM } from '@/lib/api/hooks/useBOM';
 import { useBOMItems, deleteBOMItem, createBOMItem, type CreateBOMItemDto } from '@/lib/api/hooks/useBOMItems';
@@ -935,9 +936,7 @@ export default function BOMDetailPage() {
 
   if (bomLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <PageSkeleton label="Loading BOM…" />
     );
   }
 

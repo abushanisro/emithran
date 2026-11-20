@@ -13,6 +13,7 @@ import {
   Package,
   Download
 } from 'lucide-react';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Dialog,
   DialogContent,
@@ -833,10 +834,7 @@ return {
 
             {/* Process Rows */}
             {loading ? (
-              <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-2 text-muted-foreground">Loading processes...</span>
-              </div>
+              <TableSkeleton rows={4} columns={4} label="Loading processes..." />
             ) : displayProcesses.length === 0 ? (
               <div className="flex items-center justify-center p-8">
                 <div className="text-center">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
   Plus,
@@ -282,29 +283,26 @@ export function SupplierNominationsDashboard({
       {/* Nominations Grid */}
       {filteredNominations.length === 0 ? (
         <Card className="border border-dashed border-border/80 bg-card/40 py-16 text-center">
-          <CardContent className="max-w-md mx-auto space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Award className="h-8 w-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-foreground">
-                {searchTerm || selectedType !== 'all' ? 'No matching supplier nominations' : 'No supplier nominations yet'}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {searchTerm || selectedType !== 'all'
+          <CardContent>
+            <EmptyState
+              icon={Award}
+              title={searchTerm || selectedType !== 'all' ? 'No matching supplier nominations' : 'No supplier nominations yet'}
+              description={
+                searchTerm || selectedType !== 'all'
                   ? 'Try adjusting your search query or category filter.'
-                  : 'Create your first nomination group to evaluate and allocate suppliers to BOM parts.'}
-              </p>
-            </div>
-            {!searchTerm && selectedType === 'all' && (
-              <Button
-                onClick={() => setCreateDialogOpen(true)}
-                className="mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Nomination
-              </Button>
-            )}
+                  : 'Create your first nomination group to evaluate and allocate suppliers to BOM parts.'
+              }
+            >
+              {!searchTerm && selectedType === 'all' && (
+                <Button
+                  onClick={() => setCreateDialogOpen(true)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Nomination
+                </Button>
+              )}
+            </EmptyState>
           </CardContent>
         </Card>
       ) : (

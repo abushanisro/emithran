@@ -22,6 +22,8 @@ import {
 import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertical, Cpu } from 'lucide-react';
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 import { toast } from 'sonner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useQueryClient } from '@tanstack/react-query';
 import { BOMItemType } from '@/lib/types/bom.types';
@@ -631,21 +633,17 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4" />
-        <p className="text-muted-foreground">Loading BOM items...</p>
-      </div>
+      <TableSkeleton rows={6} columns={5} label="Loading BOM items..." />
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">No items yet</h3>
-        <p className="text-muted-foreground max-w-md mb-4">
-          Start adding items to your BOM by clicking the "Add BOM" button above.
-        </p>
-      </div>
+      <EmptyState
+        title="No items yet"
+        description={'Start adding items to your BOM by clicking the "Add BOM" button above.'}
+        className="rounded-lg border border-dashed"
+      />
     );
   }
 

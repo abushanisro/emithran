@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Table,
   TableBody,
@@ -637,12 +638,7 @@ export default function ProcessPage() {
   // Show loading spinner during auth initialization
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
+      <ListSkeleton rows={4} label="Loading..." className="py-10" />
     );
   }
 
@@ -888,10 +884,7 @@ export default function ProcessPage() {
             </div>
             {/* GROUPED TREE VIEW */}
             {loadingMappings ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Loading...</span>
-              </div>
+              <ListSkeleton rows={4} label="Loading..." className="py-6" />
             ) : (() => {
               const allMappings = calculatorMappings?.mappings ?? [];
               const q = searchQuery.toLowerCase();

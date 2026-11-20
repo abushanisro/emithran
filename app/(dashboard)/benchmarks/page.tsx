@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -175,20 +176,18 @@ export default function BenchmarkPage() {
         </div>
       ) : sessions.length === 0 ? (
         <Card className="border-dashed" style={{ background: 'hsl(220 18% 10%)' }}>
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-            <div className="p-4 rounded-full bg-muted">
-              <BarChart2 className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-lg">No benchmark sessions yet</p>
-              <p className="text-muted-foreground text-sm mt-1">
-                Create your first session to start comparing BOMs across projects
-              </p>
-            </div>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Session
-            </Button>
+          <CardContent>
+            <EmptyState
+              icon={BarChart2}
+              title="No benchmark sessions yet"
+              description="Create your first session to start comparing BOMs across projects"
+              className="py-16"
+            >
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Session
+              </Button>
+            </EmptyState>
           </CardContent>
         </Card>
       ) : (

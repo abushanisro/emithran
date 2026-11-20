@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Check, ChevronsUpDown, Loader2, X } from 'lucide-react';
+import { Check, ChevronsUpDown, X } from 'lucide-react';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -301,9 +302,7 @@ export function DatabaseRecordPicker({
             />
             <CommandList>
               {isLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
+                <ListSkeleton rows={3} label="Loading…" className="px-3" />
               ) : error ? (
                 <div className="flex flex-col items-center justify-center py-6 px-4 text-center gap-3">
                   <div className="p-3 rounded-full bg-muted">

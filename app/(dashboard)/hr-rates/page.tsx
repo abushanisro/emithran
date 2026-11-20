@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { addAoaSheet, createWorkbook, downloadWorkbook } from '@/lib/utils/excel-browser';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import {
@@ -463,7 +464,7 @@ export default function HRRatesPage() {
         <Card>
           <CardContent className="p-0">
             {isMhrLoading ? (
-              <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>
+              <TableSkeleton rows={6} columns={5} label="Loading rates…" />
             ) : filteredMhrRecords.length > 0 ? (
               /* ─ Rate Table (simplified Combined format view) ─ */
               (

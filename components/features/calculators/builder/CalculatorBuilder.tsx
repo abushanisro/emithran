@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -563,12 +564,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center space-y-4">
-          <div className="h-12 w-12 animate-spin mx-auto border-4 border-primary border-t-transparent rounded-full" />
-          <p className="text-muted-foreground">Loading calculator...</p>
-        </div>
-      </div>
+      <PageSkeleton label="Loading calculator..." />
     );
   }
 

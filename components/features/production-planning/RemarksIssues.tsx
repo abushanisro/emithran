@@ -6,6 +6,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { ListSkeleton, PageSkeleton } from '@/components/ui/loading-skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { RemarksApi } from '@/lib/api/remarks';
@@ -40,23 +58,6 @@ import {
   Package,
   Lightbulb
 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
 interface ProcessOption {
   id: string;
   name: string;
@@ -710,9 +711,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
+      <PageSkeleton label="Loading…" />
     );
   }
 
@@ -1349,9 +1348,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
 
                 {/* Comments List */}
                 {loadingComments ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  </div>
+                  <ListSkeleton rows={2} label="Loading comments…" />
                 ) : comments.length > 0 ? (
                   <div className="space-y-4 mb-4 max-h-64 overflow-y-auto">
                     {comments.map((comment) => (

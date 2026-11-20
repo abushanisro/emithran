@@ -1,6 +1,7 @@
 'use client';
 
 import { Loader2, Calculator as CalculatorIcon, Play } from 'lucide-react';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { longestBendLineMm } from '@/lib/features/bend-line-length';
 import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
 import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
@@ -3039,10 +3040,7 @@ export function ProcessCostDialog({
 
               {/* Loading State */}
               {!hasErrors && (isLoadingMHR || isLoadingCatalog || isLoadingCalculators) && (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Loading data...</span>
-                </div>
+                <ListSkeleton rows={4} label="Loading data..." />
               )}
 
               {!hasErrors && !isLoadingMHR && !isLoadingCatalog && !isLoadingCalculators && (

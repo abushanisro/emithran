@@ -11,9 +11,9 @@ import { ProcuredPartsSection } from '@/components/features/process-planning/Pro
 import { ParentEstimatesSection } from '@/components/features/process-planning/ParentEstimatesSection';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
-import { Loader2 } from 'lucide-react';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
 import { apiClient } from '@/lib/api/client';
 
@@ -105,13 +105,8 @@ export default function ProcessPlanningPage() {
   // Show loading state
   if (isLoadingBOMs || (selectedBomId && isLoadingItems)) {
     return (
-      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-muted-foreground">
-            {isLoadingBOMs ? 'Loading BOMs...' : 'Loading Items...'}
-          </span>
-        </div>
+      <div className="min-h-screen bg-background p-6">
+        <PageSkeleton label={isLoadingBOMs ? 'Loading BOMs...' : 'Loading Items...'} />
       </div>
     );
   }

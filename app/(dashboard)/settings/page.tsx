@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -279,9 +280,7 @@ function ProfileTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <ListSkeleton rows={4} label="Loading…" className="py-10" />
     );
   }
 
@@ -625,7 +624,7 @@ function OrganizationTab() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <ListSkeleton rows={4} label="Loading…" className="py-10" />;
   }
 
   // ── No org yet — minimal create prompt ──
@@ -937,7 +936,7 @@ function WorkspacesTab() {
     });
   };
 
-  if (orgLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (orgLoading) return <ListSkeleton rows={4} label="Loading…" className="py-10" />;
 
   if (!org) {
     return (
@@ -1502,7 +1501,7 @@ function SettingsInner() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+    <Suspense fallback={<ListSkeleton rows={4} label="Loading…" className="py-10" />}>
       <SettingsInner />
     </Suspense>
   );

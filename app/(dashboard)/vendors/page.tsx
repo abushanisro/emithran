@@ -3,9 +3,11 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -842,13 +844,13 @@ export default function VendorsPage() {
                   </div>
                 </div>
               ) : isLoading ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Loading suppliers...
-                </div>
+                <TableSkeleton rows={6} columns={6} label="Loading suppliers..." />
               ) : vendors.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  No suppliers found matching your filters. Try adjusting or clearing filters.
-                </div>
+                <EmptyState
+                  icon={Search}
+                  title="No suppliers found"
+                  description="No suppliers match your filters. Try adjusting or clearing filters."
+                />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">

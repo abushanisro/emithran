@@ -3,8 +3,10 @@
 import { StockPricesCard } from '@/components/features/raw-materials/StockPricesCard';
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1020,23 +1022,22 @@ export default function RawMaterialsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">Loading materials…</span>
-                  </div>
+                <TableCell colSpan={9} className="p-0">
+                  <TableSkeleton rows={6} columns={6} label="Loading materials…" />
                 </TableCell>
               </TableRow>
             ) : displayMaterials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <FileSpreadsheet className="h-8 w-8 opacity-30" />
-                    <span className="text-sm">No materials found. Upload an Excel file to get started.</span>
+                <TableCell colSpan={9} className="p-0">
+                  <EmptyState
+                    icon={FileSpreadsheet}
+                    title="No materials found"
+                    description="Upload an Excel file to get started."
+                  >
                     <Button size="sm" variant="outline" onClick={() => setUploadDialogOpen(true)}>
                       <Upload className="h-3.5 w-3.5 mr-1.5" /> Import Excel
                     </Button>
-                  </div>
+                  </EmptyState>
                 </TableCell>
               </TableRow>
             ) : (

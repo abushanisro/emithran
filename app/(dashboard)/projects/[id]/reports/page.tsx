@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -426,10 +427,7 @@ export default function ProjectReportPage() {
           
           <TabsContent value="inspection-report">
             {isLoadingReport ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin mr-3" />
-                <span>Loading inspection report...</span>
-              </div>
+              <ListSkeleton rows={5} label="Loading inspection report..." />
             ) : inspectionReport ? (
               <InspectionReportTable report={inspectionReport} />
             ) : (
@@ -443,10 +441,7 @@ export default function ProjectReportPage() {
           
           <TabsContent value="complete-report">
             {isLoadingComplete ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin mr-3" />
-                <span>Loading complete report...</span>
-              </div>
+              <ListSkeleton rows={5} label="Loading complete report..." />
             ) : completeReport ? (
               <div className="space-y-6">
                 {completeReport.balloon_drawing && (

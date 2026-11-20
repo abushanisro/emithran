@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -285,9 +286,7 @@ export function SupplierEvaluationDashboard({
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary/40"></div>
-            </div>
+            <TableSkeleton rows={6} columns={5} label="Loading evaluations…" />
         );
     }
 

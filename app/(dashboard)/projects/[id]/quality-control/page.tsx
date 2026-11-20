@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -181,11 +182,8 @@ export default function QualityControlPage() {
 
   if (loadingInspections) {
     return (
-      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p>Loading quality inspections...</p>
-        </div>
+      <div className="min-h-screen bg-background p-6">
+        <PageSkeleton label="Loading quality inspections..." />
       </div>
     );
   }

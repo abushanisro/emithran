@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
   Package,
@@ -150,23 +151,20 @@ function SupplierNominationsGlobalContent({
         </div>
       ) : projects.length === 0 ? (
         <Card className="border border-dashed border-border/80 bg-card/40 py-16 text-center">
-          <CardContent className="max-w-md mx-auto space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Award className="h-8 w-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-foreground">No projects found</h3>
-              <p className="text-sm text-muted-foreground">
-                Create an OEM project first to start supplier nominations and allocation programs.
-              </p>
-            </div>
-            <Button
-              onClick={() => router.push('/projects')}
-              className="mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+          <CardContent>
+            <EmptyState
+              icon={Award}
+              title="No projects found"
+              description="Create an OEM project first to start supplier nominations and allocation programs."
             >
-              <FolderKanban className="h-4 w-4 mr-2" />
-              Go to Projects
-            </Button>
+              <Button
+                onClick={() => router.push('/projects')}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+              >
+                <FolderKanban className="h-4 w-4 mr-2" />
+                Go to Projects
+              </Button>
+            </EmptyState>
           </CardContent>
         </Card>
       ) : (

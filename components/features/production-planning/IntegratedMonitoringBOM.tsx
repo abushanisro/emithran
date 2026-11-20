@@ -2,6 +2,18 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+
+
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { RemarksApi } from '@/lib/api/remarks';
 import { RemarkStatus } from '@/types/remarks';
 import { productionPlanningApi } from '@/lib/api/production-planning';
@@ -48,17 +60,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-
-
 interface BOMItem {
   id: string;
   partNumber: string;
@@ -522,9 +523,7 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
+      <PageSkeleton label="Loading…" />
     );
   }
 

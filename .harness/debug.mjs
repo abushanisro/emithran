@@ -1,0 +1,14 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage({ viewport: { width: 940, height: 900 } });
+const logs = [];
+page.on('console', (m) => logs.push(`${m.type()}: ${m.text().slice(0, 400)}`));
+page.on('pageerror', (e) => logs.push(`pageerror: ${e.message.slice(0, 400)}`));
+page.on('requestfailed', (r) => logs.push(`reqfailed: ${r.url()}`));
+page.on('response', (r) => { if (r.status() >= 400) logs.push(`http ${r.status()}: ${r.url()}`); });
+await page.goto('http://localhost:5199/?sample=hollow-box');
+await page.waitForTimeout(8000);
+await page.screenshot({ path: process.argv[2] + '/debug.png' });
+console.log((await page.locator('body').innerText()).slice(0, 600));
+console.log(logs.slice(0, 25).join('\n'));
+await browser.close();

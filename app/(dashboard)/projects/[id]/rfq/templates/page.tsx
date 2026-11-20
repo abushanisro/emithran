@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 
 // The backend has no RFQ template store (no templates endpoint under
 // /rfq), so this page shows an empty state rather than sample templates.
@@ -35,11 +36,11 @@ export default function RFQTemplatesPage() {
 
         <Card className="text-center py-12">
           <CardContent>
-            <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No RFQ templates yet</h3>
-            <p className="text-muted-foreground">
-              RFQ templates are not stored by the system yet.
-            </p>
+            <EmptyState
+              icon={FileText}
+              title="No RFQ templates yet"
+              description="RFQ templates are not stored by the system yet."
+            />
           </CardContent>
         </Card>
       </div>
