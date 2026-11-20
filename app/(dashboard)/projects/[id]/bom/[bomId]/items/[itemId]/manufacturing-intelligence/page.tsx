@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
-  AlertCircle, GripVertical, GripHorizontal,
+  AlertCircle, GripVertical,
   Calculator, ShieldCheck, Flame, Loader2, Edit, X,
   FileSpreadsheet, Search, Database,
 } from 'lucide-react';
@@ -164,6 +164,7 @@ import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
 import { isBend, isExtrudedHole, isPlainHole, type FeatureGraphEntryLike } from '@/lib/features/feature-graph';
 import { cutLengthHighlight } from '@/lib/features/cut-length-highlight';
 import { CadEvidencePanel, type CadEvidence } from '@/components/features/process-planning/CadEvidencePanel';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, HoleGroup, FeatureNodeV2, DFMScoresResponse } from '@/lib/types/manufacturing';
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
@@ -2541,11 +2542,58 @@ function HResizeHandle() {
     </PanelResizeHandle>
   );
 }
-function VResizeHandle() {
+
+// Collapsible section for the middle column. The content stays mounted while
+// closed (forceMount + hidden) so a panel keeps its own state when collapsed.
+function MiCollapsible({
+  title, height, defaultOpen = true, maximizeId, maximized, onMaximize, children,
+}: {
+  title: string;
+  height: string;
+  defaultOpen?: boolean;
+  maximizeId?: PanelId;
+  maximized: PanelId | null;
+  onMaximize: (id: PanelId | null) => void;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <PanelResizeHandle className="h-1 bg-border hover:bg-brand-400 transition-colors relative group flex items-center justify-center">
-      <GripHorizontal className="h-4 w-4 text-muted-foreground group-hover:text-primary absolute" />
-    </PanelResizeHandle>
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b">
+      <div className="flex items-center bg-muted/40">
+        <CollapsibleTrigger className="flex flex-1 items-center gap-1.5 px-3 py-2 text-left hover:bg-muted/60 transition-colors">
+          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+          <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{title}</span>
+        </CollapsibleTrigger>
+        {maximizeId && (
+          <button
+            onClick={() => { onMaximize(maximized === maximizeId ? null : maximizeId); }}
+            className="mr-2 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+            title="Maximize"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <CollapsibleContent forceMount className="data-[state=closed]:hidden">
+        <div className={cn('overflow-hidden', height)}>{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// The cost breakdown on its own, for the always-visible right-hand pane.
+function CostSummaryPane({
+  item, fg, batchSize, factory, onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest,
+}: {
+  item: BOMItem; fg: FeatureGraph | null;
+  batchSize: number | undefined; factory: string;
+  onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
+  onShowEvidence?: (evidence: CadEvidence | null) => void;
+  activeEvidenceLabel?: string | null;
+  addProcessRequest?: AddProcessRequest | null;
+}) {
+  return (
+    <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} onShowEvidence={onShowEvidence} activeEvidenceLabel={activeEvidenceLabel} addProcessRequest={addProcessRequest} />
   );
 }
 
@@ -7120,8 +7168,10 @@ function AnalysisTabsPanel({
   projectId,
   item, fg, batchSize, productionLife, factory, selectedMachiningFeatureKey, onMachiningFeatureSelect,
   file3dUrl, onFile3dUrlExpired, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
-  onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest,
+  onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest, hiddenTabs,
 }: {
+  /** Tabs shown elsewhere in the layout (e.g. the always-visible cost pane); they are left out of this tab bar. */
+  hiddenTabs?: readonly RightTabKey[];
   addProcessRequest?: AddProcessRequest | null;
   projectId: string;
   item: BOMItem; fg: FeatureGraph | null;
@@ -7139,7 +7189,9 @@ function AnalysisTabsPanel({
   onShowEvidence?: (evidence: CadEvidence | null) => void;
   activeEvidenceLabel?: string | null;
 }) {
-  const tab = activeTab;
+  const visibleTabs = RIGHT_TABS.filter(({ key }) => !hiddenTabs?.includes(key));
+  // If the selected tab lives elsewhere, show the first tab that remains here.
+  const tab: RightTabKey = hiddenTabs?.includes(activeTab) ? (visibleTabs[0]?.key ?? activeTab) : activeTab;
   const setTab = onTabChange;
   // Same fix as SustainabilityTab — omitting location silently defaulted to
   // 'USA' (useCostSummary's own fallback), running a second, wasted full
@@ -7156,7 +7208,7 @@ function AnalysisTabsPanel({
     <div className="flex flex-col h-full">
       {/* Tab bar — wraps to 2 rows so all tabs stay visible at any panel width */}
       <div className="flex flex-wrap border-b shrink-0 bg-muted/20">
-        {RIGHT_TABS.map(({ key, label }) => (
+        {visibleTabs.map(({ key, label }) => (
           <button key={key} onClick={() => { setTab(key); }}
             className={`px-2.5 py-1.5 text-[11px] font-medium border-b-2 whitespace-nowrap transition-colors ${
               tab === key ? 'border-primary/40 text-primary dark:text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
@@ -9540,28 +9592,10 @@ export default function ManufacturingIntelligencePage() {
       {heatmapLegend}
 
       <div className="flex-1 overflow-hidden min-h-0">
-        <PanelGroup id="mi-root" direction="horizontal" className="h-full">
+        <PanelGroup id="mi-root-3col" direction="horizontal" className="h-full">
 
-          {/* LEFT: Cost Guide + 3D Viewer + Process Tree */}
-          <Panel defaultSize={67} minSize={40} className="flex flex-col overflow-hidden">
-            <PanelGroup id="mi-left-col" direction="vertical" className="h-full">
-
-              {/* TOP ROW — 3D viewer + Cost Guide */}
-              <Panel defaultSize={65} minSize={30}>
-                <PanelGroup id="mi-top-row" direction="horizontal" className="h-full">
-
-                  {/* Cost Guide */}
-                  <Panel defaultSize={30} minSize={18} className="flex flex-col border-r overflow-hidden">
-                    <PanelHeader title="Cost Guide" panelId="left" maximized={maximized} onMaximize={maximize} />
-                    <div className="flex-1 overflow-hidden min-h-0">
-                      <CostGuidePanel {...costGuideProps} />
-                    </div>
-                  </Panel>
-
-                  <HResizeHandle />
-
-                  {/* 3D / 2D Viewer */}
-                  <Panel defaultSize={70} minSize={30} className="flex flex-col overflow-hidden">
+          {/* LEFT: CAD viewer */}
+          <Panel defaultSize={38} minSize={22} className="flex flex-col overflow-hidden">
                     <PanelHeader title="Viewer" panelId="center" maximized={maximized} onMaximize={maximize}>
                       <div className="flex items-center gap-2 min-w-0 w-full">
                         {/* filename — truncates if needed */}
@@ -9679,41 +9713,42 @@ export default function ManufacturingIntelligencePage() {
                         )
                       )}
                     </div>
-                  </Panel>
-
-                </PanelGroup>
-              </Panel>
-
-              <VResizeHandle />
-
-              {/* BOTTOM: Process Tree + Geometric Cost Drivers */}
-              <Panel defaultSize={35} minSize={15} className="flex overflow-hidden border-t">
-                <PanelGroup id="mi-bottom-row" direction="horizontal" className="h-full w-full">
-
-                  <Panel defaultSize={55} minSize={25} className="flex flex-col overflow-hidden">
-                    <ProcessTreePanel {...treeProps} />
-                  </Panel>
-
-                  <HResizeHandle />
-
-                  <Panel defaultSize={45} minSize={18} className="flex flex-col overflow-hidden">
-                    <GeometricCostDriversPanel {...driversProps} />
-                  </Panel>
-
-                </PanelGroup>
-              </Panel>
-
-            </PanelGroup>
           </Panel>
 
           <HResizeHandle />
 
-          {/* RIGHT: Analysis — full height */}
-          <Panel defaultSize={33} minSize={18} className="flex flex-col overflow-hidden border-l">
-            <PanelHeader title="Analysis" panelId="right" maximized={maximized} onMaximize={maximize} />
+          {/* MIDDLE: inputs and analysis, each in a collapsible */}
+          <Panel defaultSize={34} minSize={22} className="flex flex-col overflow-hidden border-l">
             <div ref={rightPanelScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
               {heatmapInspectorPanel && <div className="p-2">{heatmapInspectorPanel}</div>}
-              <AnalysisTabsPanel {...analysisProps} />
+              <MiCollapsible title="Inputs & Scenario" height="h-[640px]" maximizeId="left" maximized={maximized} onMaximize={maximize}>
+                <CostGuidePanel {...costGuideProps} />
+              </MiCollapsible>
+              <MiCollapsible title="Process Tree" height="h-[420px]" maximized={maximized} onMaximize={maximize}>
+                <ProcessTreePanel {...treeProps} />
+              </MiCollapsible>
+              <MiCollapsible title="Geometric Cost Drivers" height="h-[420px]" defaultOpen={false} maximized={maximized} onMaximize={maximize}>
+                <GeometricCostDriversPanel {...driversProps} />
+              </MiCollapsible>
+              <MiCollapsible title="Analysis" height="h-[640px]" maximizeId="right" maximized={maximized} onMaximize={maximize}>
+                <AnalysisTabsPanel {...analysisProps} hiddenTabs={['cost']} />
+              </MiCollapsible>
+            </div>
+          </Panel>
+
+          <HResizeHandle />
+
+          {/* RIGHT: cost summary, a pane of its own so it stays in view while the middle scrolls */}
+          <Panel defaultSize={28} minSize={20} className="flex flex-col overflow-hidden border-l bg-card">
+            <div className="flex items-center px-3 py-2 border-b bg-muted/40 shrink-0">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cost Summary</span>
+            </div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+              <CostSummaryPane
+                item={item} fg={fg} batchSize={batchSize} factory={factory}
+                onSelectHighlight={onSelectHighlight} onShowEvidence={setCadEvidence}
+                activeEvidenceLabel={cadEvidence?.fieldLabel ?? null} addProcessRequest={addProcessRequest}
+              />
             </div>
           </Panel>
 
