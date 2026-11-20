@@ -6,6 +6,7 @@ import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
 import type { CostSummaryResponseDto } from '../dto/cost-breakdown.dto';
 import { deriveMaterialUsage, type DeriveMaterialUsageInput, type MaterialUsage } from '../costing/shared/material-usage';
 import { explainMaterialUsage, type MaterialUsageExplanation } from '../costing/shared/material-usage-explanation';
+import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
 import { TWO_MODEL_FAMILY } from '../costing/two-model/two-model-cost';
 
 export interface MaterialSnapshotInput {
@@ -89,7 +90,7 @@ export class MaterialCostSnapshotService {
       }
     }
 
-    const material = await this.findMaterial(grade, userId, token);
+    const material = await this.findMaterial(grade, processGroupOf(item, summary), userId, token);
     const usage = deriveMaterialUsage(usageInput(item, summary, material?.densityKgM3 ?? null));
 
     // unitCost 0 asks the cost-record service for the grade's price at the location (see its create()).
@@ -116,7 +117,9 @@ export class MaterialCostSnapshotService {
       organizationId,
     );
 
-    // The record carries the engine's own price per kg: the price the quote was built on, so the applied material cost is the quoted one.
+    // The record carries the engine's own price per kg: the price the quote was built on, so the applied material cost is the quoted one, and
+    // declares it USD: without a price column for the location (an India grade with no cost_india) the record was left undeclared
+    // (legacy_unverified) although the engine's price is a USD figure (material_stock_prices).
     // An engine prices a bar, tube or sheet at its stock form's price (material_stock_prices) and a casting at its alloy's; the service's
     // lookup takes the grade's base price from the first row of that name in any process group (a Bar and Tube part's rectangular bar at
     // 7.011 USD/kg was recorded at 5.38, the Die Casting row's, so the applied total was not the quote). The looked-up price stays when the
@@ -129,7 +132,7 @@ export class MaterialCostSnapshotService {
         ? `The unit cost is the cost engine's price per kg (${usdPerKg.toFixed(4)} USD), the price the quote used; raw_materials lists ${created.unitCost.toFixed(4)} USD for "${grade}" at ${location}.`
         : `No raw_materials price for "${grade}" at ${location}: the unit cost is the cost engine's price per kg (${usdPerKg.toFixed(4)} USD).`;
       this.logger.log(`Material record for "${grade}" at ${location}: the engine's ${usdPerKg.toFixed(4)} USD/kg${looked ? ` (raw_materials ${created.unitCost.toFixed(4)})` : ''}`);
-      await this.costRecords.update(created.id, { unitCost: usdPerKg, notes } as never, userId, token);
+      await this.costRecords.update(created.id, { unitCost: usdPerKg, notes } as never, userId, token, 'USD');
     }
     return { action: 'replaced', recordId: created.id, usage };
   }
@@ -180,20 +183,35 @@ export class MaterialCostSnapshotService {
    * value it read). Nothing is written: the Raw Material dialog shows it and fills its fields from it.
    */
   async explain(item: BOMItemResponseDto, grade: string, summary: CostSummaryResponseDto, userId: string, token: string): Promise<MaterialUsageExplanation> {
-    const material = grade ? await this.findMaterial(grade, userId, token) : null;
+    const material = grade ? await this.findMaterial(grade, processGroupOf(item, summary), userId, token) : null;
     return explainMaterialUsage({ ...usageInput(item, summary, material?.densityKgM3 ?? null), calculatorRuns: summary.calculatorRuns ?? null, runnerSystem: summary.injectionMolding?.runnerSystemType ?? null });
   }
 
-  /** The raw_materials row of the grade: the exact name or grade, else the ranked search's unambiguous best (the ranker the costing engine resolves with). */
-  private async findMaterial(grade: string, userId: string, token: string) {
-    try {
-      const { items } = await this.materials.findAll({ search: grade, limit: 10 } as never, userId, token);
-      const exact = (m: { material?: string; materialGrade?: string }) => m.materialGrade === grade || m.material === grade || `${m.material ?? ''} ${m.materialGrade ?? ''}`.trim() === grade;
+  /**
+   * The raw_materials row of the grade: the exact name or grade, else the ranked search's unambiguous best (the ranker the costing engine resolves
+   * with), among the materials of the part's process first (process_material_groups, as the engine prices them), else of any process. A name is a
+   * row in several material groups ("Aluminum, ANSI 6061" in nine): the first of them in any group linked a Multi-Spindle part's record to the
+   * Forging row, and its price was then derived from that row.
+   */
+  private async findMaterial(grade: string, processGroup: string | null, userId: string, token: string) {
+    const exact = (m: { material?: string; materialGrade?: string }) => m.materialGrade === grade || m.material === grade || `${m.material ?? ''} ${m.materialGrade ?? ''}`.trim() === grade;
+    const search = async (group: string | null) => {
+      const { items } = await this.materials.findAll({ search: grade, limit: 10, ...(group ? { processGroup: group } : {}) } as never, userId, token);
       return items.find(exact) ?? items.find((m) => m.matchIsBest) ?? null;
+    };
+    try {
+      return (processGroup ? await search(processGroup) : null) ?? await search(null);
     } catch {
       return null; // a failed lookup leaves the record without links, and priced by the service from the name
     }
   }
+}
+
+/** The process the part is priced as: the Process chosen for it, else the process group of the family the engine priced it as. */
+function processGroupOf(item: BOMItemResponseDto, summary: CostSummaryResponseDto): string | null {
+  const chosen = (item.scenarioOverrides as Record<string, unknown> | null | undefined)?.['processGroup'];
+  if (typeof chosen === 'string' && chosen.trim()) return chosen.trim();
+  return summary.family ? CAD_FAMILY_TO_PROCESS_GROUP[summary.family] ?? null : null;
 }
 
 /** The engine's live per-part weights; null where it reported none. */

@@ -71,10 +71,10 @@ describe('MaterialCostSnapshotService.ensure', () => {
     expect(costRecords.create.mock.calls[0]![0]).toMatchObject({ netUsage: 0.039, grossUsage: 0.041, scrap: 4.88 });
   });
 
-  it('when raw_materials has no price the record carries the engine\'s price per kg in USD, not zero', async () => {
+  it('when raw_materials has no price the record carries the engine\'s price per kg, declared USD (an India grade with no cost_india)', async () => {
     const { svc, costRecords } = build([], { id: 'new', unitCost: 0 });
     await svc.ensure(input(summary({ materialCostPerKg: 8, usdToDisplayRate: 2 })));
-    expect(costRecords.update).toHaveBeenCalledWith('new', { unitCost: 4, notes: expect.stringContaining('the cost engine\'s price per kg (4.0000 USD)') }, 'u', 't');
+    expect(costRecords.update).toHaveBeenCalledWith('new', { unitCost: 4, notes: expect.stringContaining('the cost engine\'s price per kg (4.0000 USD)') }, 'u', 't', 'USD');
   });
 
   it('carries the engine\'s price per kg when it differs from the service\'s: the price the quote used (a Bar and Tube part\'s bar stock)', async () => {
@@ -83,7 +83,7 @@ describe('MaterialCostSnapshotService.ensure', () => {
     await svc.ensure(input(summary({ materialCostPerKg: 7.011, materialSource: 'db' })));
     expect(costRecords.update).toHaveBeenCalledWith('new', {
       unitCost: 7.011, notes: 'The unit cost is the cost engine\'s price per kg (7.0110 USD), the price the quote used; raw_materials lists 5.3800 USD for "ABS" at USA.',
-    }, 'u', 't');
+    }, 'u', 't', 'USD');
   });
 
   it('keeps the service\'s price when the engine agrees, or took only a default', async () => {
@@ -93,6 +93,41 @@ describe('MaterialCostSnapshotService.ensure', () => {
     const fallback = build([], { id: 'new', unitCost: 3.2 });
     await fallback.svc.ensure(input(summary({ materialSource: 'default' })));
     expect(fallback.costRecords.update).not.toHaveBeenCalled();
+  });
+
+  describe('the material row linked is the one of the part\'s process (a name is a row in several material groups)', () => {
+    const rows: Record<string, object[]> = {
+      'Multi-Spindle Machining': [{ id: 'ferrous', material: 'Aluminum, ANSI 6061', materialGroup: 'Ferrous & Non-Ferrous', densityKgM3: 2700 }],
+      Machining: [{ id: 'ferrous', material: 'Aluminum, ANSI 6061', materialGroup: 'Ferrous & Non-Ferrous', densityKgM3: 2700 }],
+      any: [{ id: 'forging', material: 'Aluminum, ANSI 6061', materialGroup: 'Forging', densityKgM3: 2700 }],
+    };
+    const lookup = (by: Record<string, object[]>) => jest.fn((q: { processGroup?: string }) => Promise.resolve({ items: by[q.processGroup ?? 'any'] ?? [] }));
+    const aluminium = (item: object, s: object) => ({ ...(input(s) as object), item: { id: 'i1', volume: 100000, weight: 0.5, ...item }, grade: 'Aluminum, ANSI 6061' }) as never;
+
+    it('the chosen Process: a Multi-Spindle Machining part links the Ferrous & Non-Ferrous row, not the first of any group (Forging)', async () => {
+      const { svc, costRecords, materials } = build([]);
+      materials.findAll = lookup(rows);
+      await svc.ensure(aluminium({ scenarioOverrides: { processGroup: 'Multi-Spindle Machining' } }, summary({ family: 'turned' })));
+      expect(materials.findAll.mock.calls[0]![0]).toMatchObject({ search: 'Aluminum, ANSI 6061', processGroup: 'Multi-Spindle Machining' });
+      expect(costRecords.create.mock.calls[0]![0]).toMatchObject({ materialId: 'ferrous', materialGroup: 'Ferrous & Non-Ferrous' });
+    });
+
+    it('with no Process chosen, the process group of the family the engine priced the part as', async () => {
+      const { svc, costRecords, materials } = build([]);
+      materials.findAll = lookup(rows);
+      await svc.ensure(aluminium({}, summary({ family: 'turned' })));
+      expect(materials.findAll.mock.calls[0]![0]).toMatchObject({ processGroup: 'Machining' });
+      expect(costRecords.create.mock.calls[0]![0]).toMatchObject({ materialId: 'ferrous' });
+    });
+
+    it('any group when the process has no material of that name', async () => {
+      const { svc, costRecords, materials } = build([]);
+      materials.findAll = lookup({ any: rows['any']! });
+      await svc.ensure(aluminium({ scenarioOverrides: { processGroup: 'Multi-Spindle Machining' } }, summary({ family: 'turned' })));
+      expect(materials.findAll).toHaveBeenCalledTimes(2);
+      expect(materials.findAll.mock.calls[1]![0]).not.toHaveProperty('processGroup');
+      expect(costRecords.create.mock.calls[0]![0]).toMatchObject({ materialId: 'forging' });
+    });
   });
 
   it('still writes the record when the material lookup fails: unlinked, and priced by the service from the name', async () => {
