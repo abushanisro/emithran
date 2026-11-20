@@ -116,19 +116,20 @@ export class MaterialCostSnapshotService {
       organizationId,
     );
 
-    // No price for the grade in raw_materials: the engine priced the part anyway (its own tables), and that is the figure the record carries.
-    if (!(created.unitCost > 0)) {
-      const usdPerKg = (summary.materialCostPerKg ?? 0) / (summary.usdToDisplayRate ?? 1);
-      if (usdPerKg > 0) {
-        this.logger.log(`No raw_materials price for "${grade}" at ${location}: the record carries the engine's ${usdPerKg.toFixed(4)} USD/kg`);
-        // The service noted that it found no price and defaulted to 0: say what the record carries now.
-        await this.costRecords.update(
-          created.id,
-          { unitCost: usdPerKg, notes: `No raw_materials price for "${grade}" at ${location}: the unit cost is the cost engine's price per kg (${usdPerKg.toFixed(4)} USD).` } as never,
-          userId,
-          token,
-        );
-      }
+    // The record carries the engine's own price per kg: the price the quote was built on, so the applied material cost is the quoted one.
+    // An engine prices a bar, tube or sheet at its stock form's price (material_stock_prices) and a casting at its alloy's; the service's
+    // lookup takes the grade's base price from the first row of that name in any process group (a Bar and Tube part's rectangular bar at
+    // 7.011 USD/kg was recorded at 5.38, the Die Casting row's, so the applied total was not the quote). The looked-up price stays when the
+    // engine has none, or took only a default; with no looked-up price the engine's is used whatever its source.
+    const usdPerKg = (summary.materialCostPerKg ?? 0) / (summary.usdToDisplayRate ?? 1);
+    const looked = created.unitCost > 0;
+    const differs = Math.abs(usdPerKg - created.unitCost) > 1e-6 * Math.max(usdPerKg, 1e-9);
+    if (usdPerKg > 0 && differs && (!looked || summary.materialSource === 'db')) {
+      const notes = looked
+        ? `The unit cost is the cost engine's price per kg (${usdPerKg.toFixed(4)} USD), the price the quote used; raw_materials lists ${created.unitCost.toFixed(4)} USD for "${grade}" at ${location}.`
+        : `No raw_materials price for "${grade}" at ${location}: the unit cost is the cost engine's price per kg (${usdPerKg.toFixed(4)} USD).`;
+      this.logger.log(`Material record for "${grade}" at ${location}: the engine's ${usdPerKg.toFixed(4)} USD/kg${looked ? ` (raw_materials ${created.unitCost.toFixed(4)})` : ''}`);
+      await this.costRecords.update(created.id, { unitCost: usdPerKg, notes } as never, userId, token);
     }
     return { action: 'replaced', recordId: created.id, usage };
   }
