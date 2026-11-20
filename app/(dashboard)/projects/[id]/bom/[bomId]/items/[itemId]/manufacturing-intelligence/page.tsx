@@ -4665,6 +4665,7 @@ function CostGuidePanel({
               <Section title="Bar and Tube Fabrication">
                 <BarTubeSection
                   barTube={cgpCostSummary.barTube}
+                  tooling={cgpCostSummary.barTubeTooling}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />

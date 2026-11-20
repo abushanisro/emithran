@@ -64,6 +64,8 @@ export function buildBarTubeCostSummary(input: {
     ...(Object.keys(calculatorRuns).length ? { calculatorRuns } : {}),
     // The material Apply records: the part's mass and what is bought for it (its share of a stock length).
     ...(route ? { castingMetal: { partKg: route.material.partKg, chargedKg: Math.max(route.material.massKg, route.material.partKg) } } : {}),
+    // The route's tools (USD, the HR Rates and research currency): listed in the Cost Guide's tooling and written on Apply, not in the piece cost.
+    ...(route && route.tooling.length ? { barTubeTooling: route.tooling } : {}),
     ...(route && part ? {
       barTube: {
         route: route.key, routeLabel: route.label,

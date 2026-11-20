@@ -21,6 +21,7 @@ import type { SandReference } from '../casting/sand/sand-reference';
 import { seedsFor, type SeedProvider, type SeedProviders } from '../casting/sand/sand-seeds';
 import { selectAndCost, type CostedStep, type StepOutcome } from '../casting/sand/sand-steps';
 import type { CadEvidenceKey } from '../shared/cad-evidence';
+import { LASER_SPEED_SOURCE, extrusionDieUsd, laserChartOf, laserMaterialFactor, rotaryDrawDieSetUsd } from './bar-tube-research';
 
 export const BAR_TUBE_DOMAIN = 'bar_tube';
 export const BAR_TUBE_PROCESS_GROUP = 'Bar and Tube Fabrication';
@@ -91,6 +92,8 @@ export interface BarTubeSection {
   /** A tube's wall, or a profile's thickness; null for a solid bar. */
   wallMm: number | null;
   circumscribingDiameterMm: number | null;
+  /** A profile's voids (cad-engine section hollows): a hollow extrusion needs a porthole die. */
+  hollows?: number | null;
 }
 export interface BarTubeBend { clrMm: number; angleDeg: number; clockAngleDeg?: number | null; arcLengthMm?: number | null }
 export interface BarTubeHole { featureType: string; diameterMm: number; stationMm: number | null }
@@ -135,7 +138,15 @@ export interface BarTubeMaterial {
   stockPriceSource: string | null;
 }
 
-export interface BarTubeScenario { batchSize: number; route: BarTubeRouteKey | null }
+export interface BarTubeScenario {
+  batchSize: number;
+  route: BarTubeRouteKey | null;
+  /** Parts the route's tooling is spread over (annual volume x production life); null when the scenario gives none. */
+  amortizationParts?: number | null;
+}
+
+/** A tool a route needs for this part (an extrusion die, a bend die set): an investment kept out of the piece cost, spread over the job. */
+export interface BarTubeTool { key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }
 
 export interface BarTubeRouteInput {
   ref: SandReference;
@@ -158,6 +169,8 @@ export interface BarTubeRoute {
   /** The stock bought per part: its mass (the part's share of a stock length, a sheet or a billet) and the part's own mass. */
   material: { costUsd: number | null; massKg: number; partKg: number; partsPerStock: number | null; run: ReferenceCalcRun | null; missing: string | null };
   bendPlan: BarTubeBendPlan[];
+  /** The tools the route needs for this part; costUsd null for one no source prices (named, not priced). */
+  tooling: BarTubeTool[];
   totalUsd: number | null;
   complete: boolean;
   warnings: string[];
@@ -564,19 +577,49 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
   // ── The tube laser: the cut-off, the openings and the end profiles in one setup ─────────────────────────────────────────────────────
   const cutRates = ref.table('process_cut_rate');
   /** The process_cut_rate row of a machine type for the material at `t` mm on a machine of `watts` (the first thickness at or above `t`). */
+  /**
+   * A laser feed the reference does not list for the material: its steel feed (the Tube Laser table, listed under family 9, is the tube laser's
+   * steel table; the sheet Laser Cut table is steel's, family 1) times the material's speed over carbon steel's at the thickness and power
+   * (bar-tube-research.ts). Null when the machine type is not a laser or the material has no chart.
+   */
+  const derivedLaser = (machineType: string, t: number, watts: number | null): { row: Row } | { reason: string } | null => {
+    const baseFamily = machineType === 'Tube Laser' ? '9' : machineType === 'Laser Cut' ? '1' : null;
+    if (!baseFamily) return null;
+    const chart = laserChartOf(material.cutCode, material.materialType ?? null);
+    if (!chart) return { reason: `no published fiber laser chart for ${material.materialType ?? material.name} at these powers (copper is cut from about 6 kW)` };
+    const base = cutRates.filter((r) => r['Machine Type'] === machineType && String(r['Material Cut Code Family']) === baseFamily && (watts == null || Number(r['Power (Watts)']) === watts))
+      .sort((a, b) => Number(a['Thickness (mm)']) - Number(b['Thickness (mm)']));
+    const row = base.find((r) => Number(r['Thickness (mm)']) >= t - 1e-6);
+    if (!row) return { reason: `process_cut_rate's ${machineType} steel feeds stop at ${base.at(-1)?.['Thickness (mm)'] ?? 0} mm${watts != null ? ` at ${watts} W` : ''}, the material is ${r2(t)} mm` };
+    const f = laserMaterialFactor(chart.chart, t, Number(row['Power (Watts)']));
+    if ('reason' in f) return { reason: f.reason };
+    const scale = (k: string) => (row[k] == null || row[k] === '' ? row[k] : r2(Number(row[k]) * f.factor));
+    return {
+      row: {
+        ...row, 'Material Cut Code Family': material.cutCodeFamily,
+        'Feed Rate Large Features (mm / min)': scale('Feed Rate Large Features (mm / min)'), 'Feed Rate Small Features (mm / min)': scale('Feed Rate Small Features (mm / min)'),
+        Basis: `${machineType} steel feed (family ${baseFamily}) x ${r3(f.factor)}: ${chart.chart.replace('_', ' ')} over carbon steel at ${r2(t)} mm, ${f.chartWatts} W (${LASER_SPEED_SOURCE})${chart.note ? `; ${chart.note}` : ''}; pierce time as steel's`,
+      },
+    };
+  };
   const cutRate = (machineType: string, t: number, watts: number | null): { row: Row } | { reason: string } => {
     const all = cutRates.filter((r) => r['Machine Type'] === machineType);
     if (!material.cutCodeFamily) return { reason: `process_cut_rate lists no cut-code family for ${material.name}` };
+    if (machineType === 'OxyFuel Cut' && laserChartOf(material.cutCode, material.materialType ?? null)?.chart !== 'carbon_steel') {
+      return { reason: `oxyfuel cuts carbon and low-alloy steel only: ${material.materialType ?? material.name} forms an oxide that melts above the metal and stops the cut` };
+    }
     const rows = all.filter((r) => String(r['Material Cut Code Family']) === material.cutCodeFamily && (watts == null || Number(r['Power (Watts)']) === watts))
       .sort((a, b) => Number(a['Thickness (mm)']) - Number(b['Thickness (mm)']));
     if (rows.length === 0) {
+      const derived = derivedLaser(machineType, t, watts);
+      if (derived) return derived;
       const families = [...new Set(all.map((r) => String(r['Material Cut Code Family'])))].join(', ');
       return { reason: `process_cut_rate has no ${machineType} feed for cut-code family ${material.cutCodeFamily}${watts != null ? ` at ${watts} W` : ''} (it lists famil${families.includes(',') ? 'ies' : 'y'} ${families})` };
     }
     const row = rows.find((r) => Number(r['Thickness (mm)']) >= t - 1e-6);
     return row ? { row } : { reason: `process_cut_rate's ${machineType} feeds stop at ${rows[rows.length - 1]!['Thickness (mm)']} mm, the material is ${r2(t)} mm` };
   };
-  const cutId = ['Material Cut Code Family', 'Machine Type', 'Power (Watts)', 'Thickness (mm)'];
+  const cutIdOf = (row: Row) => ['Material Cut Code Family', 'Machine Type', 'Power (Watts)', 'Thickness (mm)', ...(row['Basis'] ? ['Basis'] : [])];
   const endPerimeters = part.ends.map((e) => e.cutPerimeterMm ?? sec.outerPerimeterMm);
   // One cut parts two lengths: each part pays for half of its two ends' cuts; a notched or slotted end's profile is cut in full.
   const largeCut = (endPerimeters.reduce((s, p) => s + p, 0) / 2)
@@ -596,9 +639,9 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
       pierces: seed(pierces, 'one per contour'),
       parts_per_stock: seed(partsPerStock, `${partsPerStock} parts per stock length (Bar and Tube - Stock per part)`),
     }, {
-      'process_cut_rate.Feed Rate Large Features (mm / min)': lookupSeed('process_cut_rate', rate.row, 'Feed Rate Large Features (mm / min)', cutId),
-      'process_cut_rate.Feed Rate Small Features (mm / min)': lookupSeed('process_cut_rate', rate.row, 'Feed Rate Small Features (mm / min)', cutId),
-      'process_cut_rate.Pierce Time (s)': lookupSeed('process_cut_rate', rate.row, 'Pierce Time (s)', cutId),
+      'process_cut_rate.Feed Rate Large Features (mm / min)': lookupSeed('process_cut_rate', rate.row, 'Feed Rate Large Features (mm / min)', cutIdOf(rate.row)),
+      'process_cut_rate.Feed Rate Small Features (mm / min)': lookupSeed('process_cut_rate', rate.row, 'Feed Rate Small Features (mm / min)', cutIdOf(rate.row)),
+      'process_cut_rate.Pierce Time (s)': lookupSeed('process_cut_rate', rate.row, 'Pierce Time (s)', cutIdOf(rate.row)),
     });
   }, ['The stock fits its diameter and length', 'process_cut_rate has a feed for the material at the wall thickness and its power']);
 
@@ -632,7 +675,25 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
 
   const routes: BarTubeRoute[] = [];
   const gaps: BarTubeRouteGap[] = [];
-  const finish = (key: BarTubeRouteKey, steps: CostedStep[], stock: { run: ReferenceCalcRun | null; reasons: string[] }, extra: { lines?: ProcessLineCost[]; plan?: BarTubeBendPlan[]; warnings?: string[]; priceMissing?: string | null } = {}) => {
+  const parts = scenario.amortizationParts != null && scenario.amortizationParts >= 1 ? scenario.amortizationParts : null;
+  const tool = (key: string, description: string, detail: string, costUsd: number | null): BarTubeTool => ({
+    key, description, detail, costUsd, perPartUsd: costUsd != null && parts ? Math.round((costUsd / parts) * 10000) / 10000 : null,
+  });
+  /** One rotary draw die set per tube size and CLR drawn on it; a mandrel and wiper named where a bend's tool key needs them (no price on file). */
+  const bendTooling = (plan: readonly BarTubeBendPlan[]): BarTubeTool[] => {
+    const drawn = plan.filter((p) => p.method === 'Rotary Draw Bending' || p.method === 'Compression Bending');
+    const clrs = [...new Set(drawn.map((p) => r2(p.clrMm)))];
+    const round = ROUND.has(part.stockForm);
+    const set = rotaryDrawDieSetUsd(outsideSize, round);
+    const out = clrs.map((clr) => tool(`bend-die-${clr}`, `Bend die set (${r2(outsideSize)} mm, ${clr} mm CLR)`, `Bend, clamp and pressure die for one tube size and radius: ${set.basis}.`, set.usd));
+    const mandrel = drawn.filter((p) => p.mandrel);
+    if (mandrel.length) {
+      out.push(tool('mandrel-wiper', `Mandrel and wiper (${[...new Set(mandrel.map((p) => p.toolKey))].join(', ')})`,
+        'The bends\' tool keys (bending_difficulty_factor) need a ball mandrel and a wiper die: no published price for them, so they are not in the tooling cost.', null));
+    }
+    return out;
+  };
+  const finish = (key: BarTubeRouteKey, steps: CostedStep[], stock: { run: ReferenceCalcRun | null; reasons: string[] }, extra: { lines?: ProcessLineCost[]; plan?: BarTubeBendPlan[]; warnings?: string[]; priceMissing?: string | null; tooling?: BarTubeTool[] } = {}) => {
     const lines = [
       ...steps.map((s, i) => (i === 0 ? { ...s.line, formsPartFeatures: true } : s.line)),
       ...(extra.lines ?? []), ...formLines,
@@ -647,6 +708,7 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
       key, label: BAR_TUBE_ROUTES.find((r) => r.key === key)!.label, lines,
       material: { costUsd: materialCost, massKg: r3(stock.run?.outputs['Mass per Part'] ?? partKg), partKg: r3(partKg), partsPerStock: partsKey, run: stock.run, missing: materialMissing },
       bendPlan: extra.plan ?? [],
+      tooling: [...(extra.tooling ?? []), ...bendTooling(extra.plan ?? [])],
       totalUsd: complete ? r2(materialCost! + lines.reduce((s, l) => s + l.totalCost, 0)) : null,
       complete,
       warnings: [...steps.flatMap((s) => s.warnings), ...(extra.warnings ?? []), ...elongationWarnings, ...(materialMissing ? [`The stock is not costed: ${materialMissing}.`] : [])],
@@ -677,8 +739,8 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
           cut_mm: seed(p.cutLengthMm, "the flat part's outline and openings (mm)"), pierces: seed(p.pierces, 'one per contour'),
           parts_per_sheet: seed(perSheet, `${perSheet} parts per ${num('standardSheetLength')} x ${num('standardSheetWidth')} mm sheet (Bar and Tube - Plate per part)`),
         }, {
-          'process_cut_rate.Feed Rate Large Features (mm / min)': lookupSeed('process_cut_rate', rate.row, 'Feed Rate Large Features (mm / min)', cutId),
-          'process_cut_rate.Pierce Time (s)': lookupSeed('process_cut_rate', rate.row, 'Pierce Time (s)', cutId),
+          'process_cut_rate.Feed Rate Large Features (mm / min)': lookupSeed('process_cut_rate', rate.row, 'Feed Rate Large Features (mm / min)', cutIdOf(rate.row)),
+          'process_cut_rate.Pierce Time (s)': lookupSeed('process_cut_rate', rate.row, 'Pierce Time (s)', cutIdOf(rate.row)),
         });
       }, ['Its bed takes the blank', 'process_cut_rate has a feed for the material at the plate thickness and its power']);
       finish(c.key, [s], plateStock);
@@ -728,10 +790,12 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
     const bends = bendLines([...PROFILE_BENDING]);
     const steps = [extrude, preheat, die, ...(allowedSaws.length ? [cut] : []), ...(openings > 0 ? [punchStep()] : []), ...bends.steps];
     const billetStock = billet ? { run: billet, reasons: [] } : { run: null, reasons: ['no billet: the extrusion press has no machine'] };
+    const pressBillet = press ? machineValue(press, 'billet_diameter_mm') : null;
+    const dieCost = pressBillet != null ? extrusionDieUsd(pressBillet, sec.hollows ?? 0) : null;
     finish('extrusion', steps, billetStock, {
       lines: bends.gaps, plan: bends.plan,
       priceMissing: material.costPerKgUsd == null ? `${material.name}: its price per kg (cost_usa)` : null,
-      warnings: ['The extrusion die is a tooling investment and is not in this quote: no die cost is on file.'],
+      tooling: [tool('extrusion-die', `Extrusion die (${(sec.hollows ?? 0) > 0 ? 'hollow' : 'solid'})`, dieCost ? `${dieCost.basis}.` : 'no press takes the profile, so no die size', dieCost?.usd ?? null)],
     });
     return { routes, gaps, missing: [] };
   }
