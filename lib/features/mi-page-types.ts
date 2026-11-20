@@ -40,6 +40,8 @@ export interface ManualRouteOption {
   // An additive route picked in the Workflow Builder (its ADDITIVE_ROUTES key): committed as the scenario's additiveRoute so the Cost Summary
   // quotes it, and its route applied like any complete route.
   additiveRoute?: string;
+  // A bar and tube route picked in the Workflow Builder (its BAR_TUBE_ROUTES key): committed as the scenario's barTubeRoute.
+  barTubeRoute?: string;
   // An assembly route picked in the Workflow Builder (its ASSEMBLY_ROUTES key): committed as the scenario's assemblyRoute.
   assemblyRoute?: string;
   // An insert molding route picked in the Workflow Builder (its INSERT_MOLDING_ROUTES key): committed as the scenario's insertMoldingRoute.

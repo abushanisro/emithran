@@ -17,6 +17,8 @@ export interface StagedManualRoute {
   forgingRoute?: string;
   /** An additive route picked in the Workflow Builder (additive-route.ts ADDITIVE_ROUTES key, e.g. "resin_curing"). */
   additiveRoute?: string;
+  /** A bar and tube route picked in the Workflow Builder (bar-tube-route.ts BAR_TUBE_ROUTES key: saw, laser, plate_laser, ...). */
+  barTubeRoute?: string;
   /** An assembly route picked in the Workflow Builder (assembly-route.ts ASSEMBLY_ROUTES key, "manual" or "robotic"). */
   assemblyRoute?: string;
   /** An insert molding route picked in the Workflow Builder (insert-molding.ts INSERT_MOLDING_ROUTES key: manual, 3_axis, 6_axis). */
@@ -43,6 +45,7 @@ export interface StagedScenario {
   isDieCast: boolean;
   isForged: boolean;
   isAdditive?: boolean;
+  isBarTube?: boolean;
   isAssembly?: boolean;
   isInsertMolding?: boolean;
   isMultiShot?: boolean;
@@ -113,6 +116,8 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
         ...(s.isForged ? { forgingRoute: manual?.forgingRoute ?? null } : {}),
         // Additive the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
         ...(s.isAdditive ? { additiveRoute: manual?.additiveRoute ?? null } : {}),
+        // Bar and tube the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
+        ...(s.isBarTube ? { barTubeRoute: manual?.barTubeRoute ?? null } : {}),
         // Assembly the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
         ...(s.isAssembly ? { assemblyRoute: manual?.assemblyRoute ?? null } : {}),
         // Insert molding the same: Manual quotes the load method picked; Auto clears it, so the cheapest complete one is quoted.
