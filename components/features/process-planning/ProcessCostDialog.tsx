@@ -54,6 +54,7 @@ import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
 import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
+import { calculationOfRecord, NO_CALCULATION, runOfCalculator, type LineCalculation } from '@/lib/calculators/calculator-run';
 import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
 import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, showsFeatures, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
@@ -432,6 +433,13 @@ export function ProcessCostDialog({
   // Every machining line's calculator inputs on this part, keyed by calculator
   // id — picking another machining calculator opens it with that line's inputs.
   const engineSeedsRef = useRef<Record<string, EngineCalculatorSeed>>({});
+  // The calculation behind the Cycle Time on this form: the calculator and run it was computed with (the saved line's, the live line's it
+  // was opened with, or the run "Use" took it from here); none once a cycle is typed. Saved with the line (migration 1097).
+  const [cycleCalculation, setCycleCalculation] = useState<LineCalculation | null>(null);
+  // The calculator this line's own cycle was computed with. While the line keeps its machine class and operation it is the Cycle Time
+  // calculator's default, ahead of the process catalog's, which cannot tell one class's operations of the same name apart (Simultaneous
+  // Turning is a Machining row and a Multi-Spindle Machining row of simultaneous_turning, with different calculators).
+  const [lineCalculatorId, setLineCalculatorId] = useState<string | null>(null);
   // Machining calculator inputs the database could not resolve for this part,
   // each with the reason (shown under the inputs instead of silent blanks).
   const [machiningMissing, setMachiningMissing] = useState<string[]>([]);
@@ -1015,18 +1023,27 @@ export function ProcessCostDialog({
     () => resolveCalculatorId(selectedMapping),
     [selectedMapping, resolveCalculatorId],
   );
+  // The line is still what it was saved as (its machine class, no other operation picked): the calculator its cycle was computed with is
+  // the default. Moved to another class or operation, it is that one's catalog calculator (calculatorSwitch below).
+  const savedLineClass = (editData as { machineClass?: string | null } | null | undefined)?.machineClass ?? '';
+  const keepsLineIdentity = (operationChoice == null || operationChoice === savedLiveOperation)
+    && (!savedLineClass || !selectedMachineClass || selectedMachineClass === savedLineClass);
+  const lineCalculator = keepsLineIdentity ? lineCalculatorId : null;
+  const defaultCalculatorId = lineCalculator ?? defaultCalculatorForOperation;
 
   // The real, named alternatives behind an ambiguous machine class, each paired
   // with the calculator it would apply — shown to the engineer instead of one
   // being picked for them. Empty whenever the class is unambiguous.
   const ambiguousCalculatorChoices = useMemo(() => {
-    if (selectedMapping || calculatorMappingsForClass.length < 2) return [] as { operation: string; calculatorId: string | null; calculatorName: string }[];
-    return calculatorMappingsForClass.map((m: any) => ({
-      operation: String(m.operation ?? '—'),
+    if (lineCalculator || selectedMapping || calculatorMappingsForClass.length < 2) return [] as { operation: string; calculatorId: string | null; calculatorName: string }[];
+    // An operation the class has in two process groups is named with its group, or the two read the same.
+    const repeated = new Set(calculatorMappingsForClass.map((m) => m.operation).filter((op, i, all) => all.indexOf(op) !== i));
+    return calculatorMappingsForClass.map((m) => ({
+      operation: repeated.has(m.operation) && m.processGroup ? `${m.operation} (${m.processGroup})` : m.operation,
       calculatorId: resolveCalculatorId(m),
       calculatorName: String(m.calculatorName ?? ''),
     }));
-  }, [selectedMapping, calculatorMappingsForClass, resolveCalculatorId]);
+  }, [lineCalculator, selectedMapping, calculatorMappingsForClass, resolveCalculatorId]);
 
 
 
@@ -1134,10 +1151,10 @@ export function ProcessCostDialog({
   useEffect(() => {
     if (!calculatorOpen || calculatorTarget !== 'cycleTime') return;
     if (userOverrodeCalculator) return;
-    if (defaultCalculatorForOperation && selectedCalculatorId !== defaultCalculatorForOperation) {
-      setSelectedCalculatorId(defaultCalculatorForOperation);
+    if (defaultCalculatorId && selectedCalculatorId !== defaultCalculatorId) {
+      setSelectedCalculatorId(defaultCalculatorId);
     }
-  }, [calculatorOpen, calculatorTarget, userOverrodeCalculator, defaultCalculatorForOperation, selectedCalculatorId]);
+  }, [calculatorOpen, calculatorTarget, userOverrodeCalculator, defaultCalculatorId, selectedCalculatorId]);
 
   // The line moved to another machine class (a different Category or machine), or the engineer picked another operation: the
   // calculator of what it left does not describe it. The calculator becomes the catalog's for the new class and operation (none
@@ -1176,11 +1193,37 @@ export function ProcessCostDialog({
   // to 2dp here, at the one place every "Use"/"Use as Cycle Time" click funnels
   // through, rather than relying on each input's own display formatting to hide it.
   const round2 = (n: number) => Math.round(n * 100) / 100;
+  // The open calculator's run as the line keeps it when its cycle is taken from it: every field with the value it has now, each input's
+  // source (and the CAD measurement or lookup row behind it, where it is still the one the engine read) and each calculated field's result.
+  const openCalculation = (): LineCalculation | null => {
+    if (!selectedCalculatorId || !selectedCalculator) return null;
+    const seed = engineSeedRef.current?.calculatorId === selectedCalculatorId ? engineSeedRef.current : engineSeedsRef.current[selectedCalculatorId] ?? null;
+    const fields: CalculatorField[] = selectedCalculator.fields ?? [];
+    const inputs = calculatorInputsRef.current;
+    const lookupMatches = Object.fromEntries(fields.flatMap((f) => {
+      const row = calculatorMatchedRowKeys[f.fieldName];
+      const table = seed?.lookupMatches[f.fieldName]?.table ?? f.sourceTable;
+      return row && !Array.isArray(row) && table ? [[f.fieldName, { table, row }]] : [];
+    }));
+    const version = (selectedCalculator as { version?: unknown }).version;
+    return {
+      calculatorId: selectedCalculatorId,
+      calculatorVersion: Number.isInteger(version) ? Number(version) : null,
+      calculatorRun: runOfCalculator({
+        fields, inputs, results: calculatorResults, provenance: calculatorInputProvenance, lookupMatches,
+        evidence: Object.fromEntries(Object.entries(seed?.evidence ?? {}).filter(([f]) => String(seed?.inputs[f]) === String(inputs[f]))),
+        refs: Object.fromEntries(fields.map((f) => [f.fieldName, sourceRefFor(f.fieldName) ?? null])),
+      }),
+    };
+  };
   const handleCalculatorValue = (value: number | string) => {
     if (calculatorTarget === 'setupManning') setSetupManning(round2(Number(value)));
     else if (calculatorTarget === 'setupTime') setSetupTime(round2(Number(value)));
     else if (calculatorTarget === 'batchSize') setBatchSize(round2(Number(value)));
-    else if (calculatorTarget === 'cycleTime') setCycleTime(storableCycleSec(Number(value)));
+    else if (calculatorTarget === 'cycleTime') {
+      setCycleTime(storableCycleSec(Number(value)));
+      setCycleCalculation(openCalculation());
+    }
     else if (calculatorTarget === 'partsPerCycle') setPartsPerCycle(round2(Number(value)));
     else if (calculatorTarget === 'heads') setHeads(round2(Number(value)));
     else if (calculatorTarget === 'scrap') setScrap(round2(Number(value)));
@@ -2654,6 +2697,9 @@ export function ProcessCostDialog({
         setSelectedCalculatorId(seed.calculatorId);
         setUserOverrodeCalculator(true);
       }
+      const savedCalculation = calculationOfRecord(editData as Partial<LineCalculation>);
+      setCycleCalculation(savedCalculation);
+      setLineCalculatorId(seed?.calculatorId ?? savedCalculation?.calculatorId ?? null);
       if (autoOpenCalculator) {
         setCalculatorTarget('cycleTime');
         setCalculatorOpen(true);
@@ -2661,6 +2707,8 @@ export function ProcessCostDialog({
     } else if (!editData && open) {
       engineSeedRef.current = null;
       engineSeedsRef.current = {};
+      setCycleCalculation(null);
+      setLineCalculatorId(null);
       setEditDataApplied(false);
       // Reset for new entry - suggest next operation number but user can change it
       setOpNbr(getSuggestedOpNbr()); // Suggest next operation number but user can enter any number
@@ -2905,6 +2953,8 @@ export function ProcessCostDialog({
       totalCost: totalCost + lineOtherCostUsd,
       facilityId,
       facilityRateId,
+      // The calculator and run the cycle was computed with, or none for a typed cycle (migration 1097).
+      calculation: cycleCalculation ?? NO_CALCULATION,
     });
 
     onOpenChange(false);
@@ -3438,6 +3488,8 @@ export function ProcessCostDialog({
                           value={cycleTime}
                           onChange={(e) => {
                             setCycleTime(e.target.value);
+                            // A typed cycle is not the calculator's: the run no longer describes it.
+                            setCycleCalculation(null);
                           }}
                           placeholder="Enter cycle time"
                           required

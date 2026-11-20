@@ -4391,7 +4391,8 @@ export class BomItemCostingService {
         // is how buildLineFromAppliedRecord would quietly fall back to the
         // legacy direct_rate interpretation on every row. Both halves are
         // needed, so they are added here and in the reader together.
-        .select('op_nbr, machine_class, machine_name, mhr_id, operation, process_group, process_route, cycle_time, setup_time, direct_rate, setup_cost_per_part, total_cycle_cost_per_part, total_cost_per_part, currency, cost_currency_basis, batch_size, location, notes, line_hourly_rate, line_labour_rate, engine_version, setup_time_source')
+        // calculator_id / calculator_version / calculator_run (migration 1097): the calculation behind each cycle, read back onto the line.
+        .select('op_nbr, machine_class, machine_name, mhr_id, operation, process_group, process_route, cycle_time, setup_time, direct_rate, setup_cost_per_part, total_cycle_cost_per_part, total_cost_per_part, currency, cost_currency_basis, batch_size, location, notes, line_hourly_rate, line_labour_rate, engine_version, setup_time_source, calculator_id, calculator_version, calculator_run')
         .eq('bom_item_id', id)
         .eq('is_active', true);
       // No machine_class filter. It used to be

@@ -21,6 +21,7 @@ import { computePressBrakeCost } from '../../sheet-metal/process/press-brake-eng
 import { composeFeatureDrivenOperations, composeOperationSequence } from '../../sheet-metal/operation/feature-driven-operations';
 import { computeLaserCuttingCost } from '../../sheet-metal/process/laser-cutting-engine';
 import { overlayRejectionReason, type PersistedCostCurrencyBasis } from './persisted-currency-contract';
+import { calculationOfRow } from '../calculator-run';
 
 // Where a line's labour rate came from. Labour is only ever the selected
 // machine's own usd_lhr_total (memory/-backed mhr_records row, migration 805);
@@ -741,6 +742,10 @@ export interface AppliedProcessCostRecord {
   line_labour_rate?: number | string | null;
   engine_version?: string | null;
   setup_time_source?: ProcessLineCost['setupTimeSource'] | null;
+  /** The calculation behind the cycle (migration 1097): read back onto the line as the engine line had it. NULL on older rows. */
+  calculator_id?: string | null;
+  calculator_version?: number | null;
+  calculator_run?: unknown;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -965,6 +970,9 @@ function buildLineFromAppliedRecord(
     machineClass: row.machine_class,
     machineName: row.machine_name ?? null,
     commodityCode: null,
+    // The calculator that computed the cycle and its run, as persisted from the engine line (migration 1097): a line rebuilt from its row
+    // reads the same calculation as the line it was written from.
+    ...calculationOfRow(row),
   };
 }
 

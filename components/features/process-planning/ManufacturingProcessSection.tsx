@@ -14,6 +14,7 @@ import {
   useUpdateProcessCost,
   useDeleteProcessCost,
 } from '@/lib/api/hooks/useProcessCosts';
+import type { LineCalculation } from '@/lib/calculators/calculator-run';
 import { featureMetaFromGroup } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
 
@@ -252,6 +253,8 @@ export function ManufacturingProcessSection({
             batchSize: data.batchSize,
             heads: data.heads,
             cycleTime: data.cycleTime,
+            // The calculator and run the cycle was computed with, or none for a typed cycle (migration 1097).
+            ...(data as { calculation: LineCalculation }).calculation,
             partsPerCycle: data.partsPerCycle,
             scrap: data.scrap,
             facilityId: data.facilityId,
@@ -282,6 +285,8 @@ export function ManufacturingProcessSection({
           batchSize: data.batchSize,
           heads: data.heads,
           cycleTime: data.cycleTime,
+          // The calculator and run the cycle was computed with, or none for a typed cycle (migration 1097).
+          ...(data as { calculation: LineCalculation }).calculation,
           partsPerCycle: data.partsPerCycle,
           scrap: data.scrap,
           facilityId: data.facilityId,

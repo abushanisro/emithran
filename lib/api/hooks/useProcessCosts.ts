@@ -8,6 +8,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { toast } from 'sonner';
 
+import type { CalculatorRun } from '@/lib/calculators/calculator-run';
+
 export interface ProcessCostInput {
   opNbr?: number;
   description?: string;
@@ -38,6 +40,10 @@ export interface ProcessCostInput {
   facilityId?: string;
   facilityRateId?: string;
   shiftPatternId?: string;
+  /** The calculation behind cycleTime (migration 1097): the stored calculator, its version and the run; all null for a typed cycle. */
+  calculatorId?: string | null;
+  calculatorVersion?: number | null;
+  calculatorRun?: CalculatorRun | null;
 }
 
 export interface CreateProcessCostDto extends ProcessCostInput {
@@ -116,6 +122,10 @@ export interface ProcessCostRecord {
   otherCostPerPart?: number | null;
   /** The phases of the operation cycle as its stored calculator gave them, in formula order (migration 1009); null when it has no calculator cycle. */
   cyclePhases?: { name: string; seconds: number }[] | null;
+  /** The stored calculator that computed the cycle, its version and its run (migration 1097); null when the cycle is not a calculator's. */
+  calculatorId?: string | null;
+  calculatorVersion?: number | null;
+  calculatorRun?: CalculatorRun | null;
   setupCostPerPart: number;
   totalCycleCostPerPart: number;
   totalCostBeforeScrap: number;
