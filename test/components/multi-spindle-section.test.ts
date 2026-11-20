@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { MultiSpindleCycle, MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
+import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
 import type { MultiSpindleSummary } from '@/lib/costing/multi-spindle-view';
 
 // The Lead Screw side shaft (Ø14 x 32 mm, steel) in USA as the engine quoted it: 6-spindle on the DMG Mori GMC25ISM-6, 5/8" bar.
@@ -28,7 +28,6 @@ const MS: MultiSpindleSummary = {
 };
 const panel = (overrides: Record<string, unknown> = {}, ms: MultiSpindleSummary | null = MS) =>
   renderToStaticMarkup(createElement(MultiSpindleSection, { multiSpindle: ms, overrides, onChange: () => undefined }));
-const cycle = (ms: MultiSpindleSummary = MS) => renderToStaticMarkup(createElement(MultiSpindleCycle, { multiSpindle: ms }));
 
 describe('the Multi-Spindle Machining section of the Cost Guide', () => {
   it('shows the bar (inch sizes in USA), what each part takes of it, and the routes with their totals', () => {
@@ -50,28 +49,5 @@ describe('the Multi-Spindle Machining section of the Cost Guide', () => {
 
   it('says so when the part is not costed on a multi-spindle', () => {
     expect(panel({}, null)).toContain('Not costed on a multi-spindle yet');
-  });
-});
-
-describe('the Multi-Spindle Cycle of the Cost tab', () => {
-  it('lists every station with its operations, marks the slowest, and makes the cycle of it and the index', () => {
-    const out = cycle();
-    expect(out).toContain('DMG Mori GMC25ISM-6');
-    expect(out).toContain('6-spindle multi-spindle · 6 spindles');
-    expect(out).toContain('Finish Turning (OD slide, 1.8 s)');
-    expect(out).toContain('Station 6 (back work)');
-    expect(out).toContain('takes the part off, ejects it');
-    expect(out).toContain('idle');
-    expect(out.match(/>slowest</g)).toHaveLength(1);
-    expect(out).toContain('5.7 s');
-    expect(out).toContain('8.5 s');
-    expect(out).toContain('slowest station + index');
-    expect(out).toContain('Rough Turning split over 2 stations');
-  });
-
-  it('a route with no machine says why instead of a plan', () => {
-    const out = cycle({ ...MS, route: 'twin', machineName: null, stations: [] });
-    expect(out).toContain('takes bar up to Ø76 mm');
-    expect(out).not.toContain('Station');
   });
 });

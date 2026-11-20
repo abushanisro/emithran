@@ -19,16 +19,6 @@ export function multiSpindleRouteOf(overrides: Record<string, unknown> | null | 
   return typeof v === 'string' && v ? v : null;
 }
 
-/** How the machine's cycle is made up: every station cuts at once, so it waits for the slowest station, then indexes. */
-export const MULTI_SPINDLE_CYCLE_RULE = 'slowest station + index';
-
-const SLIDE_NAMES: Readonly<Record<string, string>> = { od: 'OD slide', end: 'end slide', live: 'live tool' };
-
-/** A slide as the station plan names it. */
-export function slideName(slide: string): string {
-  return SLIDE_NAMES[slide] ?? slide;
-}
-
 const mm = (n: number) => `${Number.isInteger(n) ? String(n) : n.toFixed(2)} mm`;
 
 /** The bar in one line: its size and form, then what the part needed of it ("5/8" round bar · needs 15.62 mm"). */

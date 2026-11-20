@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  barLine, isMultiSpindleItem, lengthPerPartLine, multiSpindleRouteOf, slideName, type MultiSpindleSummary,
+  barLine, isMultiSpindleItem, lengthPerPartLine, multiSpindleRouteOf, type MultiSpindleSummary,
 } from '@/lib/costing/multi-spindle-view';
 import { isCostedProcessGroup, processGroupOptionLabel, processGroupToFamilyHint } from '@/lib/features/process-group';
 import { multiShotRouteKeyOf } from '@/lib/routing/multi-shot-route-id';
@@ -33,7 +33,6 @@ describe('a Multi-Spindle Machining part', () => {
     expect(barLine(bar)).toBe('5/8" round bar · needs 15.62 mm');
     expect(barLine({ ...bar, form: 'hex', sizeLabel: '21 mm hex bar', requiredMm: 21, snapped: false })).toBe('21 mm hex bar · needs 21 mm (as supplied)');
     expect(lengthPerPartLine(bar)).toBe('35.30 mm (parting 2.50 mm, facing 0.79 mm)');
-    expect([slideName('od'), slideName('end'), slideName('live')]).toEqual(['OD slide', 'end slide', 'live tool']);
   });
 });
 
