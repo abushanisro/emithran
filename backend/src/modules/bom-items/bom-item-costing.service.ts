@@ -165,7 +165,7 @@ import { buildForgingCostSummary } from './costing/forging/forging-cost-summary'
 import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
 import { FORGING_ROUTES } from './costing/forging/forging-route';
 import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
-import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, INSERT_MOLDING_PROCESS_GROUP, MULTI_SHOT_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
+import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, INSERT_MOLDING_PROCESS_GROUP, MULTI_SHOT_PROCESS_GROUP, MULTI_SPINDLE_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
 import {
   MULTI_SHOT_CYCLE_CALC, MULTI_SHOT_DESIGN_HOURS_FACTOR, MULTI_SHOT_PRESS_CLASS, MULTI_SHOT_ROUTE_KEY, MULTI_SHOT_ROUTES, chooseMultiShotRoute, multiShotRouteId,
   priceMultiShotRoutes, shotEntriesOf, type MultiShotShot, type ShotNeed,
@@ -174,6 +174,10 @@ import { multiShotRouteFor } from './costing/plastic-molding/multi-shot/multi-sh
 import { isMetalType } from '../raw-materials/material-moldability';
 import type { MoldInsert } from './costing/plastic-molding/insert/insert-molding';
 import { MultiShotService } from './costing/plastic-molding/multi-shot/multi-shot.service';
+import { BAR_FORM_OF_STOCK, MultiSpindleCostService, type MultiSpindleCostResult } from './costing/multi-spindle/multi-spindle-cost.service';
+import { buildMultiSpindleCostSummary } from './costing/multi-spindle/multi-spindle-cost-summary';
+import { MULTI_SPINDLE_ROUTES, type MultiSpindleRouteKey } from './costing/multi-spindle/multi-spindle-route';
+import { multiSpindleRouteFor, multiSpindleRouteId } from './costing/multi-spindle/multi-spindle-route-comparison';
 import { computeHpdc, type CastingGeometry } from './costing/casting/hpdc-engine';
 import { buildCastingCostSummary, castingProcessOfFamily } from './costing/casting/casting-cost-summary';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
@@ -266,6 +270,9 @@ const isInsertMolding = (item: { scenarioOverrides?: Record<string, unknown> | n
 
 /** Whether a part is multi-shot molded: its Process is Assembly Plastic Molding (each shot costed as a plastic molding, on a multi-shot press). */
 const isMultiShot = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === MULTI_SHOT_PROCESS_GROUP;
+
+/** Whether a part is made on a multi-spindle: its Process is Multi-Spindle Machining (a turned part, its operations laid out over the machine's stations). */
+const isMultiSpindle = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === MULTI_SPINDLE_PROCESS_GROUP;
 
 /** The material fields of a molding input, from a resolved raw_materials row (the part's, or a shot's). */
 function moldingMaterialOf(m: Awaited<ReturnType<BomItemCostingService['resolveMaterialForFamily']>>) {
@@ -371,6 +378,8 @@ export class BomItemCostingService {
     /** Insert molding's reference data, calculators and loaders; optional for the same reason (without it the loading is a named gap). */
     private readonly insertMoldingService?: InsertMoldingService,
     private readonly multiShotService?: MultiShotService,
+    /** The multi-spindle routes; optional for the same reason (without it a Multi-Spindle Machining part is one named, uncosted line). */
+    private readonly multiSpindleCostService?: MultiSpindleCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -499,6 +508,7 @@ export class BomItemCostingService {
       ...(dto.composites ? { composites: { ...dto.composites, options: convertRouteOptions(dto.composites.options, conv) } } : {}),
       ...(dto.additive ? { additive: { ...dto.additive, options: convertRouteOptions(dto.additive.options, conv) } } : {}),
       ...(dto.barTube ? { barTube: { ...dto.barTube, options: convertRouteOptions(dto.barTube.options, conv) } } : {}),
+      ...(dto.multiSpindle ? { multiSpindle: { ...dto.multiSpindle, options: convertRouteOptions(dto.multiSpindle.options, conv) } } : {}),
       ...(dto.insertMolding ? { insertMolding: { ...dto.insertMolding, options: convertRouteOptions(dto.insertMolding.options, conv) } } : {}),
       ...(dto.multiShot ? { multiShot: { ...dto.multiShot, options: convertRouteOptions(dto.multiShot.options, conv) } } : {}),
       ...(dto.assembly ? {
@@ -2401,6 +2411,55 @@ export class BomItemCostingService {
         turningParams,
         realOperationCategories,
       };
+
+      // ── Multi-Spindle Machining ──────────────────────────────────────────────
+      // A turned part made from bar on a CNC multi-spindle or twin-spindle turning center (costing/multi-spindle): its operations (the turning
+      // engine's, on the part's bar) laid out over each machine's stations, priced on the 6-spindle, 8-spindle and twin-spindle routes, the
+      // cheapest quoted unless the Cost Guide sets one. The bar is the scenario's stock form when a bar feeder takes it, else round bar.
+      if (family === 'turned' && isMultiSpindle(item)) {
+        const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+        const scenarioForm = resolveScenarioStockForm(item.scenarioOverrides);
+        const barForm = BAR_FORM_OF_STOCK[scenarioForm ?? 'round_bar'];
+        const barMaterial = barForm ? resolvedMaterial : await this.resolveMaterialForFamily({
+          accessToken, grade, family, materialCol: locInfo.materialCol, rates, locCurrencyCode: locInfo.code, location, stockForm: 'round_bar', warnings: [],
+        });
+        const formNote = barForm ? null : `A multi-spindle is fed round, hex or square bar: the ${String(scenarioForm).replace(/_/g, ' ')} stock form is priced as round bar.`;
+        const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+        const multiSpindle: MultiSpindleCostResult = this.multiSpindleCostService
+          ? await this.multiSpindleCostService.price({
+            client: this.databaseService.getClient(accessToken), accessToken, location,
+            turning: baseCncInput,
+            turningRate: mhrRates.simultaneousTurning,
+            tappingRate: this.rates.inheritCncTappingRate(mhrRates.tapping, mhrRates.simultaneousTurning),
+            liveHoles: liveToolHoles(fg?.machining_features?.features),
+            form: barForm ?? 'round',
+            material: {
+              id: barMaterial.materialRecord?.id ?? null,
+              name: barMaterial.materialRecord?.name ?? grade ?? 'the material',
+              densityKgM3: barMaterial.materialDensityKgM3 > 0 ? barMaterial.materialDensityKgM3 : null,
+              pricePerKgUsd: barMaterial.materialCostPerKg > 0 ? barMaterial.materialCostPerKg / usdToLocal : null,
+              priceSource: `${barMaterial.materialRecord?.name ?? grade ?? 'the material'}: its ${(barForm ?? 'round')} bar price at ${location} (Raw Materials)`,
+            },
+            ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+            overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+          })
+          : { quote: null, bar: null, part: null, missing: ['the multi-spindle cost service is not available'], warnings: [] };
+        const msResult = {
+          ...buildMultiSpindleCostSummary({
+            multiSpindle, materialGrade: grade, materialCostPerKg: barMaterial.materialCostPerKg, materialSource: barMaterial.materialSource, batchSize,
+            warnings: [...materialWarnings, ...unpricedOpWarnings, ...(formNote ? [formNote] : [])], ratesSource: RATES_SOURCE_LABEL,
+          }),
+          ...currencyMeta,
+          drawingCadConsistency,
+        };
+        this.overrides.applyCostOverrides(msResult, costOverrides);
+        if (costOverrides.size > 0) msResult.costOverrides = Object.fromEntries(costOverrides);
+        if (localLinesOut) {
+          localLinesOut.lines = JSON.parse(JSON.stringify(msResult.processLines)) as ProcessLineCost[];
+          localLinesOut.localCurrency = locInfo.code;
+        }
+        return { ...this.normalizeCostSummaryToCurrency(msResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+      }
 
       // Single source of truth with Route Comparison: cost every feasible route
       // and quote on the recommended one (lowest total cost among capable
@@ -4948,6 +5007,46 @@ export class BomItemCostingService {
   }
 
   /**
+   * A Multi-Spindle Machining part's route comparison: the 6-spindle, 8-spindle and twin-spindle routes, each the full Cost Summary priced on
+   * that route. The recommended one is the route the quote chose.
+   */
+  private async multiSpindleRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys: MultiSpindleRouteKey[] = MULTI_SPINDLE_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i])),
+    ]);
+    const routes = keys.map((key, i) => multiSpindleRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.multiSpindle?.complete ? multiSpindleRouteId(quote!.multiSpindle.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No multi-spindle route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
+  /**
    * An insert-molded part's route comparison: each load method the full Cost Summary priced on it. The recommended one is the route the quote chose.
    */
   private async insertMoldingRouteComparison(
@@ -5410,6 +5509,10 @@ export class BomItemCostingService {
     // Assembly Plastic Molding: one route per press orientation, each the full quote on that route (multi-shot-route-comparison.ts).
     if (family === 'plastic_molded' && isMultiShot(item)) {
       return this.multiShotRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Multi-Spindle Machining: the 6-spindle, 8-spindle and twin-spindle routes, each the full quote on that route (multi-spindle-route-comparison.ts).
+    if (family === 'turned' && isMultiSpindle(item)) {
+      return this.multiSpindleRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     if (family === ASSEMBLY_FAMILY) {
       return this.assemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);

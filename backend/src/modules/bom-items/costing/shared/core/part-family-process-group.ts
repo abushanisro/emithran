@@ -43,6 +43,9 @@ export const INSERT_MOLDING_PROCESS_GROUP = 'Assembly Molding';
 /** Multi-shot molding (memory/Assembly plastic molding): costed as a plastic molded part, each shot on a 2K/3K multi-shot press. */
 export const MULTI_SHOT_PROCESS_GROUP = 'Assembly Plastic Molding';
 
+/** Multi-spindle machining (memory/Multi-Spindle Maching, memory/Machining Simultaneous Turning): a turned part, made from bar on a CNC multi-spindle or twin-spindle turning center. */
+export const MULTI_SPINDLE_PROCESS_GROUP = 'Multi-Spindle Machining';
+
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
 /**
  * The families a CAD analysis run with a family hint may store. A hint names an extractor, and the analysis stores that family, except a
@@ -67,6 +70,8 @@ const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
   [INSERT_MOLDING_PROCESS_GROUP]: ['plastic_molded'],
   // Multi-shot molding: a molded plastic part, each shot priced on a multi-shot press (plastic-molding/multi-shot).
   [MULTI_SHOT_PROCESS_GROUP]: ['plastic_molded'],
+  // Multi-spindle machining: a turned part, its operations laid out over a multi-spindle's stations (multi-spindle/).
+  [MULTI_SPINDLE_PROCESS_GROUP]: ['turned'],
 };
 
 /**

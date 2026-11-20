@@ -713,6 +713,8 @@ export interface CostSummaryDto {
   additive?: AdditiveBreakdown;
   /** Bar and Tube Fabrication: the stock (form, section, length, parts per stock), the bends, ends and openings, the route quoted and every route. */
   barTube?: BarTubeBreakdown;
+  /** Multi-Spindle Machining: the bar, the machine and its station plan (the slowest station sets the cycle), the route quoted and every route. */
+  multiSpindle?: MultiSpindleBreakdown;
   /** Bar and tube: the tools the quoted route needs for this part (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when no source prices one. */
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
@@ -919,6 +921,36 @@ export interface BarTubeBreakdown {
   plate: { thicknessMm: number; blankLengthMm: number; blankWidthMm: number; cutLengthMm: number } | null;
   complete: boolean;
   /** Every route: its total per part (summary currency) when complete, or why it is not a route for the part. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
+export interface MultiSpindleBreakdown {
+  /** The quoted route (multi-spindle-route.ts MULTI_SPINDLE_ROUTES key: 6, 8, twin) and its name. */
+  route: string;
+  routeLabel: string;
+  /** The machine the route runs on and its spindles; its cycle is the slowest station plus the index (s). */
+  machineName: string | null;
+  spindles: number;
+  cycleSec: number | null;
+  indexSec: number | null;
+  /** Every station in order (the back-work ones last): its operations, each on its slide, and its time; the slowest sets the cycle. */
+  stations: Array<{ spindle: number; backWork: boolean; seconds: number; slowest: boolean; operations: Array<{ name: string; slide: string; seconds: number }> }>;
+  /** The operations split across stations, and why (tblMultiSpindleOpSplitting). */
+  splits: string[];
+  /** The bar (tblPreferredSizes inch sizes in USA, metric elsewhere): its form, size and the table's name for it, what the part needed. */
+  bar: {
+    form: string; sizeMm: number; sizeLabel: string; unitSystem: string; snapped: boolean; requiredMm: number; allowancePerSideMm: number;
+    partingWidthMm: number; facingStockMm: number; lengthPerPartMm: number; barLengthMm: number; remnantMm: number;
+  };
+  partsPerBar: number | null;
+  /** The bar bought per part (its share of a whole bar) and the part's own mass. */
+  materialMassKg: number | null;
+  partMassKg: number | null;
+  /** USD/kg of the bar form at the location (material_stock_prices), and why the bar is not costed when it is not. */
+  stockPricePerKg: number | null;
+  stockMissing: string | null;
+  complete: boolean;
+  /** Every route: its total per part (summary currency) when its machine fits, or why it is not a route for the part. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
 }
 

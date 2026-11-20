@@ -11,6 +11,7 @@ import { loadPowderMetalCalculatorSpec } from '../costing/powder-metal/calculato
 import { loadCompositesCalculatorSpec } from '../costing/composites/calculators/composites-calculator-spec';
 import { loadAdditiveCalculatorSpec } from '../costing/additive/calculators/additive-calculator-spec';
 import { loadBarTubeCalculatorSpec } from '../costing/bar-tube/calculators/bar-tube-calculator-spec';
+import { loadMultiSpindleCalculatorSpec } from '../costing/multi-spindle/calculators/multi-spindle-calculator-spec';
 import { loadAssemblyCalculatorSpec } from '../costing/assembly/calculators/assembly-calculator-spec';
 import { loadAssemblyMoldingCalculatorSpec } from '../costing/plastic-molding/insert/calculators/assembly-molding-calculator-spec';
 import { loadAssemblyPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/multi-shot/calculators/assembly-plastic-molding-calculator-spec';
@@ -223,6 +224,11 @@ export class CalculatorCatalogService {
   /** The bar and tube fabrication calculators (migration 1091), from the database. */
   loadBarTubeCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('bar-tube-calculators', loadBarTubeCalculatorSpec(), accessToken);
+  }
+
+  /** The Multi-Spindle Machining calculators (migration 1095), from the database. */
+  loadMultiSpindleCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('multi-spindle-calculators', loadMultiSpindleCalculatorSpec(), accessToken);
   }
 
   private loadSpecCalculators(cacheKey: string, spec: DomainCalculatorSpec, accessToken: string): Promise<ReferenceCalculators> {
