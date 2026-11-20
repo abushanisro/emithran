@@ -270,4 +270,71 @@ function readMachineTable(file) {
   };
 }
 
-module.exports = { parseCsv, readCsv, sqlStr, sqlNum, sqlJsonb, specKey, specsOf, specColumns, buildMachineRows, insertSql, readMachineTable };
+/**
+ * The SQL that adds each machine's twin at another location: a copy of its USA row (same process group, class and exact name) with that
+ * location's direct and indirect overhead (the machine hour rate is their sum, as on the USA rows) and labour rate, everything else (crew,
+ * setup, specs, price) as the USA row has it. Idempotent: a twin already present is skipped; a machine with no USA row is reported, not added.
+ *   tag           the DO block's dollar-quote tag
+ *   processGroup  the mhr_records.process_group of the USA rows
+ *   twins         [{ machineClass, machineName, location, countryCode, labour, direct, indirect, sourceKey }]
+ */
+function twinMachinesSql({ tag, processGroup, twins }) {
+  const row = (t) => `    (${sqlStr(t.location)}, ${sqlStr(t.countryCode)}, ${sqlStr(t.machineClass)}, ${sqlStr(t.machineName)}, ${sqlNum(t.labour)}, ${sqlNum(t.direct)}, ${sqlNum(t.indirect)}, ${sqlStr(t.sourceKey)})`;
+  return `DO $${tag}$
+DECLARE
+  cols text; sel text; r record; src_id uuid; n integer := 0; missing text[] := '{}';
+BEGIN
+  SELECT
+    string_agg(quote_ident(c.column_name), ', ' ORDER BY c.ordinal_position),
+    string_agg(
+      CASE c.column_name
+        WHEN 'location'                                THEN '$5'
+        WHEN 'country_code'                            THEN '$6'
+        WHEN 'direct_overhead_rate'                    THEN '$2'
+        WHEN 'indirect_overhead_rate'                  THEN '$3'
+        WHEN 'benchmark_direct_overhead_rate_usd_hr'   THEN '$2'
+        WHEN 'benchmark_indirect_overhead_rate_usd_hr' THEN '$3'
+        WHEN 'total_machine_hour_rate'                 THEN 'ROUND(($2 + $3)::numeric, 2)'
+        WHEN 'mhr_usd_per_hour'                        THEN 'ROUND(($2 + $3)::numeric, 2)'
+        WHEN 'usd_labor_rate_per_hr'                   THEN '$4'
+        WHEN 'usd_lhr_total'                           THEN '$4'
+        WHEN 'benchmark_labor_rate_usd_hr'             THEN '$4'
+        WHEN 'benchmark_source_key'                    THEN '$7'
+        WHEN 'id'                                      THEN 'gen_random_uuid()'
+        WHEN 'created_at'                              THEN 'now()'
+        WHEN 'updated_at'                              THEN 'now()'
+        ELSE 'src.' || quote_ident(c.column_name)
+      END, ', ' ORDER BY c.ordinal_position
+    )
+  INTO cols, sel
+  FROM information_schema.columns c
+  WHERE c.table_schema = 'public' AND c.table_name = 'mhr_records' AND c.is_generated = 'NEVER';
+
+  -- (location, country, machine class, machine name, labour, direct overhead, indirect overhead, source key), USD/hr
+  FOR r IN SELECT * FROM (VALUES
+${twins.map(row).join(',\n')}
+  ) AS v(location, country, machine_class, machine_name, labor, direct, indirect, source_key)
+  LOOP
+    SELECT id INTO src_id FROM mhr_records
+    WHERE process_group = ${sqlStr(processGroup)} AND location = 'USA' AND machine_class = r.machine_class AND machine_name = r.machine_name
+    LIMIT 1;
+    IF src_id IS NULL THEN
+      missing := array_append(missing, r.machine_class || ':' || r.machine_name);
+      CONTINUE;
+    END IF;
+    IF EXISTS (SELECT 1 FROM mhr_records m WHERE m.location = r.location AND m.machine_class = r.machine_class AND m.machine_name = r.machine_name) THEN
+      CONTINUE;
+    END IF;
+    EXECUTE format('INSERT INTO mhr_records (%s) SELECT %s FROM mhr_records src WHERE src.id = $1', cols, sel)
+      USING src_id, r.direct, r.indirect, r.labor, r.location, r.country, r.source_key;
+    n := n + 1;
+  END LOOP;
+
+  RAISE NOTICE '% twins inserted: %', ${sqlStr(processGroup)}, n;
+  IF array_length(missing, 1) > 0 THEN
+    RAISE NOTICE '% twins with no USA row (not inserted): %', ${sqlStr(processGroup)}, missing;
+  END IF;
+END $${tag}$;`;
+}
+
+module.exports = { parseCsv, readCsv, sqlStr, sqlNum, sqlJsonb, specKey, specsOf, specColumns, buildMachineRows, insertSql, readMachineTable, twinMachinesSql };
