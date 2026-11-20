@@ -16,6 +16,15 @@ export interface VerifiedLogin {
   expiresAt: number;
 }
 
+/** What an Auth0 ID token says about one sign-in: whose, which Auth0 session, and when the person actually authenticated. */
+export interface VerifiedSignIn {
+  sub: string;
+  /** Auth0's session id (the standard `sid` claim of the ID token). */
+  sessionId?: string;
+  /** When the person authenticated (the `auth_time` claim), ms since the epoch. A refresh keeps it; only a real sign-in moves it. */
+  authTimeMs?: number;
+}
+
 export type RejectionCode = 'malformed' | 'expired' | 'bad_signature' | 'wrong_issuer' | 'wrong_audience' | 'no_subject' | 'keys_unavailable';
 
 /** `keys_unavailable` is our problem (Auth0's key set could not be fetched): a 503, not a verdict on the caller. Everything else is a 401. */
@@ -47,6 +56,29 @@ export class Auth0TokenVerifier {
     const issuer = `https://${domain.replace(/^https?:\/\//, '').replace(/\/+$/, '')}/`;
     const keys = createRemoteJWKSet(new URL(`${issuer}.well-known/jwks.json`), { timeoutDuration: 5_000, cooldownDuration: 30_000, cacheMaxAge: 600_000 });
     return new Auth0TokenVerifier({ issuer, audience, claimNamespace, keys });
+  }
+
+  /**
+   * An ID token from the app's own sign-in: signed by the tenant, issued for the app (`clientId`), not expired. Its `auth_time` says when
+   * the person last authenticated, which a token refresh does not move: what tells a new sign-in from a renewed old one.
+   */
+  async verifyIdToken(token: string, clientId: string): Promise<VerifiedSignIn> {
+    if (typeof token !== 'string' || token.split('.').length !== 3) throw new TokenRejected('malformed', 'not a JWT');
+    try {
+      const { payload } = await jwtVerify(token, this.options.keys, {
+        issuer: this.options.issuer, audience: clientId, algorithms: ['RS256'], clockTolerance: this.options.clockToleranceSeconds ?? 5,
+      });
+      if (typeof payload.sub !== 'string' || payload.sub === '') throw new TokenRejected('no_subject', 'the token names nobody');
+      const sid = payload.sid as unknown;
+      const authTime = payload.auth_time as unknown;
+      return {
+        sub: payload.sub,
+        ...(typeof sid === 'string' && sid !== '' && { sessionId: sid }),
+        ...(typeof authTime === 'number' && Number.isFinite(authTime) && { authTimeMs: authTime * 1000 }),
+      };
+    } catch (error) {
+      throw translate(error);
+    }
   }
 
   async verify(token: string): Promise<VerifiedLogin> {

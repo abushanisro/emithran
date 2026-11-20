@@ -23,7 +23,12 @@ export interface IdentityPolicy {
    * user removed from authorized_users keeps access; 0 asks the database on every request.
    */
   decisionTtlMs: number;
+  /** The app's Auth0 client id (AUTH0_CLIENT_ID): the audience of its ID tokens. Without it a new sign-in cannot be proven (see verifyNewSignIn). */
+  clientId?: string;
 }
+
+/** A sign-in older than this is not "the sign-in that just happened": the callback reports it at once. */
+const NEW_SIGN_IN_WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * Turns an Auth0 access token into the internal user: verify locally, map `sub` to our uuid (linking by VERIFIED email from a
@@ -83,6 +88,27 @@ export class IdentityService {
    * The 503 the person sees stays generic, but an operator must be able to tell a database that is down from Auth0 being unreachable:
    * the cause is logged here (its message and code only; never the login's subject or email).
    */
+  /**
+   * Proves a sign-in that just happened, for the sign-in callback: the access token (who, and which Auth0 session), and the ID token of the
+   * same sign-in (same person, same Auth0 session) with an `auth_time` within the last minutes. Returns the login and when the person
+   * authenticated. A renewed old token cannot pass: a refresh keeps the original `auth_time`.
+   */
+  async verifyNewSignIn(accessToken: string, idToken: string): Promise<AuthenticatedRequestUser & { authTimeMs: number }> {
+    if (!this.policy.clientId) throw new ServiceUnavailableException('A new sign-in cannot be verified: AUTH0_CLIENT_ID is not set on the API');
+    const who = await this.authenticate(accessToken);
+    let access: VerifiedLogin;
+    let signIn;
+    try {
+      [access, signIn] = await Promise.all([this.verifier.verify(accessToken), this.verifier.verifyIdToken(idToken, this.policy.clientId)]);
+    } catch (error) {
+      if (error instanceof TokenRejected && error.isServiceFailure) throw this.unavailable('the Auth0 ID token could not be verified', error);
+      throw new UnauthorizedException('Invalid sign-in token');
+    }
+    if (signIn.sub !== access.sub || !signIn.sessionId || signIn.sessionId !== access.sessionId) throw new UnauthorizedException('The sign-in token is for another login');
+    if (signIn.authTimeMs == null || this.now() - signIn.authTimeMs > NEW_SIGN_IN_WINDOW_MS) throw new UnauthorizedException('Not a new sign-in');
+    return { ...who, authTimeMs: signIn.authTimeMs };
+  }
+
   private unavailable(what: string, cause: unknown): ServiceUnavailableException {
     const c = (typeof cause === 'object' && cause !== null ? cause : {}) as { message?: unknown; code?: unknown };
     const message = typeof c.message === 'string' && c.message !== '' ? c.message : String(cause);

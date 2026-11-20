@@ -1,6 +1,8 @@
 import { Auth0Client } from '@auth0/nextjs-auth0/server';
 import { NextResponse } from 'next/server';
 
+import { reportNewSignIn } from '@/lib/server/new-sign-in';
+
 let client: Auth0Client | undefined;
 
 /**
@@ -15,6 +17,9 @@ export function getAuth0(): Auth0Client {
     authorizationParameters: {
       audience,
       scope: 'openid profile email offline_access',
+      // With max_age the ID token always carries auth_time (OIDC): the API restarts the idle clock only for a sign-in it can see is new.
+      // 8 hours, the sign-in's own limit below, so nobody is asked to authenticate more often than they already are.
+      max_age: 8 * 60 * 60,
     },
     // Auth0 never offers sign-up here: people are invited (the backend allow-list decides who gets in).
     signInReturnToPath: '/',
@@ -35,14 +40,17 @@ export function getAuth0(): Auth0Client {
     // A failed sign-in returns to the sign-in page with the SDK's short error code. Auth0's own message is logged here, not shown:
     // it names the client and the API, and the SDK's default would render it as a bare 500 page.
     // On success it goes back where sign-in started, and never off the app's origin (as the SDK's own default guards).
-    onCallback: (error, ctx) => {
+    onCallback: async (error, ctx, session) => {
       const base = ctx.appBaseUrl ?? process.env.APP_BASE_URL;
       if (!error) {
+        // Auth0 keeps its session id across a sign-in, so the API would still hold the idle clock of the last visit and refuse this
+        // sign-in's first request (the person was signed out and had to sign in twice). Report the new sign-in first: the clock restarts.
+        await reportNewSignIn(session?.tokenSet.accessToken, session?.tokenSet.idToken);
         const target = new URL(ctx.returnTo ?? '/', base);
-        return Promise.resolve(NextResponse.redirect(target.origin === new URL('/', base).origin ? target : new URL('/', base)));
+        return NextResponse.redirect(target.origin === new URL('/', base).origin ? target : new URL('/', base));
       }
       console.error(`Auth0 sign-in failed (${error.code}): ${error.cause instanceof Error ? error.cause.message : error.message}`);
-      return Promise.resolve(NextResponse.redirect(new URL(`/auth?error=${encodeURIComponent(error.code)}`, base)));
+      return NextResponse.redirect(new URL(`/auth?error=${encodeURIComponent(error.code)}`, base));
     },
   });
   return client;

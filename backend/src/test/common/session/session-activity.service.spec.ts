@@ -251,3 +251,33 @@ describe('SessionActivityService with the inactivity timeout switched off', () =
     await expect(svc.assertActive('s1', 'u1', T0)).rejects.toThrow(ServiceUnavailableException);
   });
 });
+
+describe('SessionActivityService.restart: a new sign-in on an Auth0 session left idle (Auth0 keeps the session id)', () => {
+  it('the person who signs in again after the idle timeout gets a fresh clock: the first request passes, not a sign-out', async () => {
+    const { service: db } = fakeDatabase();
+    const svc = new SessionActivityService(db);
+    await svc.assertActive('s1', 'u1', T0);
+    const back = T0 + 3 * 60 * MIN; // three hours later, same Auth0 session
+    await expect(svc.assertActive('s1', 'u1', back)).rejects.toBeInstanceOf(UnauthorizedException);
+    await svc.restart('s1', 'u1', back - 10_000, back - 5_000);
+    await expect(svc.assertActive('s1', 'u1', back)).resolves.toMatchObject({ lastActivityAt: back - 5_000 });
+  });
+
+  it('clears a logout mark on the same Auth0 session for a real new sign-in', async () => {
+    const { service: db } = fakeDatabase();
+    const svc = new SessionActivityService(db);
+    await svc.assertActive('s1', 'u1', T0);
+    await svc.end('s1', 'u1', T0 + MIN);
+    await svc.restart('s1', 'u1', T0 + 2 * MIN, T0 + 2 * MIN);
+    await expect(svc.assertActive('s1', 'u1', T0 + 3 * MIN)).resolves.toBeDefined();
+  });
+
+  it('never revives a session with an authentication from before its last activity (a renewed old token)', async () => {
+    const { service: db } = fakeDatabase();
+    const svc = new SessionActivityService(db);
+    await svc.assertActive('s1', 'u1', T0);
+    await svc.recordActivity('s1', 'u1', 'user', T0 + 5 * MIN);
+    await expect(svc.restart('s1', 'u1', T0 + MIN, T0 + 60 * MIN)).rejects.toMatchObject({ response: { code: SESSION_ENDED_CODE } });
+    await expect(svc.assertActive('s1', 'u1', T0 + 60 * MIN)).rejects.toMatchObject({ response: { code: SESSION_IDLE_TIMEOUT_CODE } });
+  });
+});

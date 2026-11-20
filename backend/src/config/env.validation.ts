@@ -83,6 +83,13 @@ class EnvironmentVariables {
   @IsString()
   AUTH0_AUDIENCE!: string;
 
+  // The app's Auth0 client id (the same value as the frontend's AUTH0_CLIENT_ID): the audience of its ID tokens. With it, a new sign-in
+  // restarts the inactivity clock of its Auth0 session (POST /auth/sign-ins); without it, a sign-in that reuses an Auth0 session
+  // left idle is refused once and the person signs in twice.
+  @IsOptional()
+  @IsString()
+  AUTH0_CLIENT_ID?: string;
+
   // Namespace of the custom claims the post-login Action adds (email, email_verified, sid, connection), e.g. https://emithran.com/
   @IsString()
   AUTH0_CLAIM_NAMESPACE!: string;
