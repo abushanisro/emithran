@@ -95,6 +95,8 @@ export interface ApplyRouteResult {
   routeId: string;
   /** The route asked for, when it was no longer one of the part's routes and the recommendation was applied instead (fallbackToRecommended). */
   replacedRouteId?: string;
+  /** What the applied route could not make or cost, each written as a $0 No Cost Feature (engine-kernel NO_COST_FEATURE); absent when none. */
+  noCostFeatures?: string[];
 }
 
 // Custom, dynamically-assembled route from the Workflow Builder.

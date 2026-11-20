@@ -240,7 +240,8 @@ export function priceCoreRoute(input: CoreRouteInput): CoreRouteResult {
   else {
     lines.push({
       process: 'Core Sand', processGroup: GROUP, processRoute: 'Coremaking', operation: 'Core Sand',
-      setupCost: 0, runCost: r2(sandRun.value), totalCost: r2(sandRun.value), cycleTimeMin: 0,
+      // Unrounded, as every per-part charge: a small core's sand is a fraction of a cent, not 0.00.
+      setupCost: 0, runCost: sandRun.value, totalCost: sandRun.value, cycleTimeMin: 0,
       hourlyRate: 0, rateSource: 'consumable_allowance', machineClass: 'die_casting_coremaking', machineName: cm.m.name,
       commodityCode: null, labourRate: null,
       featureBreakdown: [{ name: `${r3(sandRun.outputs['Sand Weight']!)} kg ${cm.sandType} × $${cm.sandRow.newCostUsdPerKg}/kg (sand New Cost)`, featureType: 'Part', timeSec: 0, count: 1 }],

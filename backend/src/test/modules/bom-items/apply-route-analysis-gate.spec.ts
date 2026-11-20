@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 
-import { RouteApplicationService, whyNoRoute } from '../../../modules/bom-items/services/route-application.service';
+import { RouteApplicationService } from '../../../modules/bom-items/services/route-application.service';
 
 /** The part's active process records, by their notes; a delete removes the rows its filters match. */
 function recordsDb(notes: Array<string | null>) {
@@ -66,16 +66,22 @@ describe('applying a route requires the part to be analysed', () => {
   });
 });
 
-/** Automatic routing never falls back: with every route ruled out by an incompatible feature, it says so and chooses nothing. */
-describe('applying "auto" when every route is incompatible', () => {
+/**
+ * Apply never fails (the user's decision 2026-11-20, memory failNotSupportedGcds false): with no route both feasible and fully costed, the best route
+ * there is is applied (selectAppliableRoute) and what it cannot make or cost is written as a No Cost Feature.
+ */
+describe('applying "auto" when no route is both feasible and fully costed', () => {
   const ready = { cad: 'ready', drawing: 'not_required', casting: 'not_required', ready: true, missing: [] };
-  const incompatible = (label: string) => ({
-    routeId: label, routeLabel: label, isFeasible: true,
+  const base = { capability: { overallCapable: true, warnings: [] as string[] }, cycleTimes: { totalMin: 1 }, dataComplete: true, dataGaps: [] as unknown[] };
+  const incompatible = (label: string, totalCost: number) => ({
+    ...base, routeId: label, routeLabel: label, isFeasible: true, totalCost,
     compatibility: { status: 'incompatible', notAssessed: [], warnings: [], incompatibilities: [{ featureType: 'SlideBundle', variant: '', count: 2, featureIds: ['s'], kind: 'not_in_process_vocabulary', reason: 'The reference lists no SlideBundle for it.' }] },
   });
 
+  /** The records the apply writes: the lines it hands to the writer (the database write itself is the writer's own spec). */
   function service(comparison: object) {
     const getRouteComparison = jest.fn().mockResolvedValue(comparison);
+    const write = jest.fn().mockImplementation((_id: string, lines: Array<{ process: string }>) => Promise.resolve(lines.map((l) => l.process)));
     const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
     Object.assign(c, {
       bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }) },
@@ -83,31 +89,57 @@ describe('applying "auto" when every route is incompatible', () => {
       analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
       audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
       databaseService: recordsDb([]).databaseService,
+      logger: { log: jest.fn() },
+      writeProcessLinesAsRecords: write,
     });
-    return c;
+    return { c, write };
   }
   const dto = { routeId: 'auto', location: 'USA' } as never;
   const user = { id: 'u' } as never;
+  const written = (write: jest.Mock) => (write.mock.calls[0]![1] as Array<{ process: string; operation?: string; totalCost: number }>);
 
-  it('refuses with the product message and each route\'s exact feature and reason', async () => {
-    const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: 'No compatible manufacturing process found.', routes: [incompatible('Compression Molding'), incompatible('Other')] });
-    const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;
-    expect(error.message).toContain('No compatible manufacturing process found.');
-    expect(error.message).toContain('Compression Molding: 2 x SlideBundle (The reference lists no SlideBundle for it.)');
+  it('every route incompatible: the cheapest is applied, not refused, and the features its process cannot make are written as No Cost Features', async () => {
+    const { c, write } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: 'No compatible manufacturing process found.', routes: [incompatible('Compression Molding', 2), incompatible('Other', 1)] });
+    const r = await c.applyRoute('i', dto, user, 't');
+    expect(r.routeId).toBe('Other');
+    expect(r.noCostFeatures).toEqual(['2 x SlideBundle: The reference lists no SlideBundle for it.']);
+    expect(written(write)).toEqual([expect.objectContaining({ process: 'No Cost Feature', operation: '2 x SlideBundle: The reference lists no SlideBundle for it.', totalCost: 0 })]);
   });
 
-  it('leads with the reason no route can be applied, so its first sentence says what to fix (Cannula Holder Right: no inserts)', async () => {
-    const noInserts = 'Insert Pick and Place: The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.';
-    const route = (routeLabel: string) => ({ routeId: routeLabel, routeLabel, isFeasible: false, capability: { warnings: [noInserts] }, dataGaps: [] });
-    const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [route('Manual'), route('3-axis'), route('6-axis')] });
-    const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;
-    expect(error.message).toBe(`No route can be applied: ${noInserts}`);
+  it('no route feasible (Cannula Holder Right: no inserts): the cheapest is applied, the fewest operations not costed first', async () => {
+    const noInserts = 'Insert Pick and Place: The part has no inserts.';
+    const route = (routeLabel: string, totalCost: number, gaps: number) => ({
+      ...base, routeId: routeLabel, routeLabel, isFeasible: false, totalCost, capability: { overallCapable: true, warnings: [noInserts] }, dataComplete: gaps === 0, dataGaps: Array(gaps).fill({}),
+    });
+    const { c } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [route('Manual', 1, 2), route('3-axis', 3, 1), route('6-axis', 2, 1)] });
+    const r = await c.applyRoute('i', dto, user, 't');
+    expect(r.routeId).toBe('6-axis');
+    expect(r.noCostFeatures).toEqual([`6-axis is not feasible for this part: ${noInserts}`]);
   });
 
-  it('a null recommendation for another reason keeps its own message', async () => {
-    const c = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [] });
-    const error = await c.applyRoute('i', dto, user, 't').catch((e: unknown) => e) as Error;
-    expect(error.message).toContain('No route is both feasible and fully costed');
+  it('a feasible route is applied before an infeasible one, whatever their costs', async () => {
+    const route = (routeLabel: string, isFeasible: boolean, totalCost: number) => ({ ...base, routeId: routeLabel, routeLabel, isFeasible, totalCost, dataComplete: false, dataGaps: [{}] });
+    const { c } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [route('Cheap', false, 1), route('Feasible', true, 9)] });
+    expect((await c.applyRoute('i', dto, user, 't')).routeId).toBe('Feasible');
+  });
+
+  it('a route with no operations (a 2-Model part its source supplies whole) is applied as one $0 record that says so', async () => {
+    const { c, write } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: 'two-model-machining', noCompatibleProcessMessage: null,
+      routes: [{ ...base, routeId: 'two-model-machining', routeLabel: '2-Model Machining', isFeasible: true, totalCost: 1.32, dataComplete: true, processLines: [] }] });
+    const r = await c.applyRoute('i', dto, user, 't');
+    expect(r.routeId).toBe('two-model-machining');
+    expect(written(write)).toEqual([expect.objectContaining({ process: 'No Cost Feature', operation: '2-Model Machining: no operations to cost on this part (its cost is the material)' })]);
+  });
+
+  it('display lines with no factory-currency twin are never written in their place', async () => {
+    const { c } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: 'x', noCompatibleProcessMessage: null,
+      routes: [{ ...base, routeId: 'x', routeLabel: 'X', isFeasible: true, totalCost: 1, processLines: [{ process: 'Saw' }] }] });
+    await expect(c.applyRoute('i', dto, user, 't')).rejects.toThrow("Route 'x' produced no pre-conversion process lines");
+  });
+
+  it('only a part whose process has no route at all is refused', async () => {
+    const { c } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [] });
+    await expect(c.applyRoute('i', dto, user, 't')).rejects.toThrow("The part's process has no route to apply.");
   });
 });
 
@@ -120,7 +152,7 @@ describe('a kept route that is no longer a route for the part', () => {
   const ready = { cad: 'ready', drawing: 'not_required', casting: 'not_required', ready: true, missing: [] };
   const comparison = {
     resolvedInputs: { batchSize: 100 }, recommendedRouteId: 'sand-casting',
-    routes: [{ routeId: 'sand-casting', routeLabel: 'Sand casting', isFeasible: true, processLines: [] }],
+    routes: [{ routeId: 'sand-casting', routeLabel: 'Sand casting', isFeasible: true, processLines: [], capability: { overallCapable: true, warnings: [] } }],
   };
   function service() {
     const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
@@ -129,15 +161,16 @@ describe('a kept route that is no longer a route for the part', () => {
       costing: { getRouteComparison: jest.fn().mockResolvedValue(comparison) },
       analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
       audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
+      logger: { log: jest.fn() },
+      writeProcessLinesAsRecords: jest.fn().mockResolvedValue([]),
     });
     return c;
   }
   const user = { id: 'u' } as never;
 
   it('falls back to the recommended route when asked (keep): it goes on with sand-casting, not the old sheet-metal route', async () => {
-    // The fixture's sand route has no lines, so the apply stops right after choosing it: the message names the route it chose.
-    await expect(service().applyRoute('i', { routeId: 'sm-laser', location: 'USA' } as never, user, 't', { fallbackToRecommended: true }))
-      .rejects.toThrow("Route 'sand-casting' returned no process lines");
+    const r = await service().applyRoute('i', { routeId: 'sm-laser', location: 'USA' } as never, user, 't', { fallbackToRecommended: true });
+    expect(r).toMatchObject({ routeId: 'sand-casting', replacedRouteId: 'sm-laser' });
   });
 
   it('refuses a route chosen by id that the part does not have', async () => {
@@ -147,19 +180,18 @@ describe('a kept route that is no longer a route for the part', () => {
 });
 
 /**
- * Carriage Mount: applied as a closed-die forging, then moved to Assembly Plastic Molding, whose route cannot be applied yet (one shot). The forging
- * operations price a process the part is no longer made by: they are removed with the refusal, not left in its total. Hand-added rows stay.
+ * A part whose process has no route at all, after it changed process: the operations of its earlier process's route price a process the part is no
+ * longer made by, so they are removed with the refusal, not left in its total. Hand-added rows stay. (A part with any route has it applied, which
+ * replaces them.)
  */
 describe('a refused apply after the part changed process', () => {
   const ready = { cad: 'ready', drawing: 'not_required', casting: 'not_required', ready: true, missing: [] };
-  const twoShots = 'Multi-Shot Molding: A multi-shot part needs two shots.';
-  const ms = (routeId: string) => ({ routeId, routeLabel: routeId, isFeasible: false, capability: { warnings: [twoShots] }, dataGaps: [] });
   function service(notes: Array<string | null>) {
     const db = recordsDb(notes);
     const c = Object.create(RouteApplicationService.prototype) as RouteApplicationService;
     Object.assign(c, {
       bomItemsService: { findOne: jest.fn().mockResolvedValue({ id: 'i', file3dPath: 'p.step' }) },
-      costing: { getRouteComparison: jest.fn().mockResolvedValue({ resolvedInputs: { batchSize: 250 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [ms('ms-horizontal'), ms('ms-vertical')] }) },
+      costing: { getRouteComparison: jest.fn().mockResolvedValue({ resolvedInputs: { batchSize: 250 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [] }) },
       analysisStatusService: { forItem: jest.fn().mockResolvedValue(ready) },
       audit: { auditedRowChange: (_t: string, _id: string, _a: string, fn: () => Promise<unknown>) => fn() },
       logger: { log: jest.fn() },
@@ -172,37 +204,8 @@ describe('a refused apply after the part changed process', () => {
   it('removes the earlier route\'s operations, keeps a hand-added one, and says so after the reason', async () => {
     const { c, db } = service(['auto_fill_from_route:forging-closed_die_hammer', 'auto_fill_from_route:forging-closed_die_hammer', null]);
     const error = await c.applyRoute('i', { routeId: 'auto', location: 'USA' } as never, user, 't').catch((e: unknown) => e) as Error;
-    expect(error.message).toBe(`No route can be applied: ${twoShots} The operations of the earlier route forging-closed_die_hammer were removed: they priced the part's previous process.`);
+    expect(error.message).toBe("The part's process has no route to apply. The operations of the earlier route forging-closed_die_hammer were removed: they priced the part's previous process.");
     expect(db.deleted).toEqual(['auto_fill_from_route:forging-closed_die_hammer']);
     expect(db.rows).toEqual([{ notes: null }]);
-  });
-
-  it('keeps the operations of a route the part still has', async () => {
-    const { c, db } = service(['auto_fill_from_route:ms-vertical']);
-    const error = await c.applyRoute('i', { routeId: 'auto', location: 'USA' } as never, user, 't').catch((e: unknown) => e) as Error;
-    expect(error.message).toBe(`No route can be applied: ${twoShots}`);
-    expect(db.deleted).toEqual([]);
-  });
-});
-
-describe('why no route can be applied', () => {
-  // The Back cover part: Process Die Casting with a plastic left as its material. Both die-casting routes fail for the same reason, said once.
-  const alloy = 'Material "Generic ABS, Fittings" is not a die-casting alloy in Raw Materials (material group Die Casting).';
-  const route = (routeLabel: string, warning: string | null, gap?: { process: string; reason: string }) =>
-    ({ routeLabel, capability: { warnings: warning ? [warning] : [] }, dataGaps: gap ? [{ ...gap, machineClass: 'x' }] : [] }) as never;
-
-  it('a reason every route shares is the part\'s problem: said once, without the list of routes', () => {
-    expect(whyNoRoute([route('High Pressure Die Casting', alloy), route('Gravity Die Casting', alloy)]))
-      .toBe('Material "Generic ABS, Fittings" is not a die-casting alloy in Raw Materials (material group Die Casting). ');
-  });
-
-  it('different reasons name their routes', () => {
-    expect(whyNoRoute([route('Manual', 'Insert Pick and Place: no inserts.'), route('3-axis', 'no robot carries 25 kg')]))
-      .toBe('Manual: Insert Pick and Place: no inserts. 3-axis: no robot carries 25 kg. ');
-  });
-
-  it('falls back to the first operation with no costing data, and says nothing when no route says', () => {
-    expect(whyNoRoute([route('Laser', null, { process: 'Bending', reason: 'no press brake holds the part' })])).toBe('Laser: Bending: no press brake holds the part. ');
-    expect(whyNoRoute([route('Laser', null)])).toBe('');
   });
 });

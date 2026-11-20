@@ -5,6 +5,7 @@ import { DatabaseService } from '../../../common/database/database.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { resolveUtsMpa, isSheetFormableMaterial } from '../costing/shared/core/default-rates.constants';
 import { ASSEMBLY_FAMILY, CAD_FAMILY_TO_PROCESS_GROUP, costedProcessGroups, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
+import { isMaterialNamed, pricedGradeFor, PROCESS_OWN_MATERIAL_GROUP, type PricedGrade, type ProcessMaterial } from '../costing/shared/core/process-materials';
 import { isPlasticGrade } from '../costing/plastic-molding/process/process-tree';
 import { isDiscouragedShapeForFamily } from '../../raw-materials/constants/material-shape-ranking';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
@@ -77,6 +78,15 @@ interface MaterialMatch {
   note: string | null;
   /** Set when the query was too under-specified to pick a grade; replaces the "not found" wording. */
   ambiguityNote: string | null;
+}
+
+/** A row of a process's material group, as gradeForProcess reads it. */
+interface MaterialGroupRow {
+  name: string | null;
+  grade: string | null;
+  material_type: string | null;
+  density_kg_m3: number | string | null;
+  density: number | string | null;
 }
 
 /** The family of a part whose chosen Process has no cost model: no engine prices it. */
@@ -486,6 +496,32 @@ export class MaterialResolutionService {
         `others: ${pick.divergentAlternatives.map(fmt).join(', ')}.`;
     }
     return { row: best.row, note, ambiguityNote: null };
+  }
+
+  /**
+   * The grade `family`'s engine prices for the part's `grade` (process-materials.ts): the grade itself, or, when the process prices only its
+   * own materials and the grade is not one of them, the process's closest own material with a note saying so. The grade's own row is read
+   * with the same ranked search the quote resolves materials with.
+   */
+  async gradeForProcess(accessToken: string, grade: string, family: string): Promise<PricedGrade> {
+    const group = PROCESS_OWN_MATERIAL_GROUP[family];
+    if (!group) return { grade, note: null };
+    const client = this.databaseService.getClient(accessToken);
+    const { data, error } = await client.from('raw_materials').select('name, grade, material_type, density_kg_m3, density').eq('material_group', group).order('name');
+    if (error) throw new Error(`Failed to read the ${group} materials: ${error.message}`);
+    const rows = data as MaterialGroupRow[];
+    const materials: ProcessMaterial[] = rows.map((r) => ({
+      name: r.name ?? r.grade ?? '',
+      grade: r.grade,
+      materialType: r.material_type,
+      densityKgM3: r.density_kg_m3 != null ? Number(r.density_kg_m3) : r.density != null ? Number(r.density) * 1000 : null,
+    }));
+    if (materials.some((m) => isMaterialNamed(m, grade))) return { grade, note: null };
+    const { row } = await this.matchBestRawMaterialRow(client, grade.trim(), family, 'cost');
+    const own = row
+      ? { name: row.materialGrade, grade: row.material, materialGroup: row.materialGroup, materialType: row.materialType, densityKgM3: row.densityKgM3 }
+      : null;
+    return pricedGradeFor({ family, processLabel: CAD_FAMILY_TO_PROCESS_GROUP[family] ?? group, grade, own, materials });
   }
 
   // Real, single density lookup for a grade — used wherever a caller needs

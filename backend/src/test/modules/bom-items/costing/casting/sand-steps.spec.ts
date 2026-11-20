@@ -95,12 +95,14 @@ describe('pourStep', () => {
     const expected = (0.5 * Math.sqrt(lb) + (ref.number('defaultLadleTransportTime')! * 60) / mouldsPerLadle) / 2; // gray iron under 1000 lb: 0.50
     expect(out.ok && out.sec).toBeCloseTo(expected, 9);
   });
-  it('refuses a ladle that cannot hold one mould, and a material with no pouring rows', () => {
+  it('refuses a ladle that cannot hold one mould, and a material with no pouring rows or rule', () => {
     const small = [...ladle].sort((a, b) => spec$(a, 'ladle_weight_capacity_kg') - spec$(b, 'ladle_weight_capacity_kg'))[0]!;
     const tooBig = pourStep({ ...ctx, poured: { perCastingKg: 1e6, perMouldKg: 1e6 } }, small);
     expect(tooBig).toEqual({ ok: false, reasons: [expect.stringContaining('ladle holds')] });
-    const brass = pourStep({ ...ctx, material: { ...iron, materialType: 'Brass' } }, ladle[ladle.length - 1]!);
-    expect(brass).toEqual({ ok: false, reasons: ['tblPouringCoefficients has no rows for Brass'] });
+    const unknown = pourStep({ ...ctx, material: { ...iron, materialType: 'Unobtainium' } }, ladle[ladle.length - 1]!);
+    expect(unknown).toEqual({ ok: false, reasons: ['tblPouringCoefficients has no rows for Unobtainium'] });
+    // A brass is poured by the copper-alloy rule (sand-pouring-research.ts), not refused.
+    expect(pourStep({ ...ctx, material: { ...iron, materialType: 'Brass' } }, ladle[ladle.length - 1]!)).toMatchObject({ ok: true });
   });
 });
 

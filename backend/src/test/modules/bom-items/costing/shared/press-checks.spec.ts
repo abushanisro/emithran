@@ -23,12 +23,17 @@ describe('checkPress: the one rule for whether a press can run a part', () => {
     ['clamp too small', { ...need, clampTonnageRequired: 151 }, 'Clamp: need 151T, machine has 150T'],
     ['shot too small', { ...need, shotGppsG: 101 }, 'Shot: need 101g, machine has 100g'],
     ['part too long for the tie-bars (either orientation)', { ...need, partLengthMm: 460 }, 'Tie-bar: part + runner 505×145mm exceeds machine 500×400mm'],
-    ['tool shorter than the press minimum', { ...need, estimatedToolHeightMm: 150 }, 'Daylight: tool 150mm < machine min 200mm'],
     ['tool taller than the press maximum', { ...need, estimatedToolHeightMm: 650 }, 'Daylight: tool 650mm > machine max 600mm'],
   ])('%s: not capable, with the reason', (_name, n, reason) => {
     const r = checkPress(press, n);
     expect(r.capable).toBe(false);
     expect(r.reasons).toEqual([reason]);
+  });
+
+  it('a mold thinner than the press minimum is built up to it, not refused: a small part still gets the small press', () => {
+    const r = checkPress(press, { ...need, estimatedToolHeightMm: 150 });
+    expect(r.capable).toBe(true);
+    expect(r.reasons).toEqual([]);
   });
 
   it('the mold may be turned 90 degrees on the platen', () => {

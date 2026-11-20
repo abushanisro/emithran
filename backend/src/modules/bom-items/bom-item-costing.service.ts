@@ -101,7 +101,7 @@ import {
   pressFormingRequirement, rollBendingRequirement, deburrSecPerMm,
 } from './costing/shared/capability/machine-selection/physics';
 import { sandCastingRoute } from './costing/casting/sand/sand-route-comparison';
-import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
+import { findRouteDataGaps, noCostFeatureLine, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
   drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
@@ -2008,19 +2008,19 @@ export class BomItemCostingService {
     // text remains a visible SUGGESTION only (Material Grade section's
     // "DRAWING" badge + Apply button) — applying it is itself an explicit
     // selection and lands here the same way any other pick does.
-    const grade = item.materialGrade ?? (item as any).material ?? null;
+    const itemGrade = item.materialGrade ?? (item as any).material ?? null;
 
     // ── Assembly ────────────────────────────────────────────────────────────
     // An assembly's own work: its BOM children loaded and joined (costing/assembly). It has no material or model of its own, so it is priced
     // before the material gate; each child's own cost is added to it by the BOM roll-up, never here.
-    if ((forceFamily ?? this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm }).family) === ASSEMBLY_FAMILY) {
+    if ((forceFamily ?? this.resolveEffectiveFamily({ item, fg, grade: itemGrade, sheetThicknessMm }).family) === ASSEMBLY_FAMILY) {
       return this.assemblyCostSummary(item, costingInputs, location, accessToken, forceDieCastingProcess, localLinesOut);
     }
 
     // Scenario gate: refuse to cost without a material grade. Silently defaulting to
     // mild steel produces numbers the engineer might quote; a blocked state forces the
     // explicit Apply action and eliminates ambiguous estimates.
-    if (!grade) {
+    if (!itemGrade) {
       // All money fields below are 0 (no material grade = no scenario to price
       // yet) — nothing to convert, so this response is USD/$ directly, no FX
       // lookup needed. (Once a grade is set, the priced path below normalizes
@@ -2063,7 +2063,7 @@ export class BomItemCostingService {
 
     // Override > material > geometry — one precedence chain for both costing
     // endpoints (see resolveEffectiveFamily).
-    const familyResolution = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
+    const familyResolution = this.resolveEffectiveFamily({ item, fg, grade: itemGrade, sheetThicknessMm });
     let family = forceFamily ?? familyResolution.family;
     // 2-Model Machining (user decision 2026-11-18): priced from the part's own model, its blank derived from it (two-model/derived-blank.ts).
     // A blank that cannot be derived or costed is a named gap, said once the rates are known; never priced from bar stock instead.
@@ -2147,6 +2147,11 @@ export class BomItemCostingService {
     // numbers, never a vague "mismatch" with nothing to act on.
     materialWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
     if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
+    // The grade this process prices: the part's own, or, when the process prices only its own materials and the grade is not one of them,
+    // its closest own material, said in the warnings (process-materials.ts). Every engine below prices this grade.
+    const pricedGrade = await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family);
+    if (pricedGrade.note) materialWarnings.push(pricedGrade.note);
+    const grade = pricedGrade.grade;
     // The whole resolved material is kept: a part whose applied route is another molding process is priced by that process's engine in the route comparison, from this row.
     const resolvedMaterial = await this.resolveMaterialForFamily({
         accessToken,
@@ -2207,10 +2212,14 @@ export class BomItemCostingService {
         };
 
     if (twoModelGap) {
+      const gapSummary = { ...twoModelGapSummary(twoModelGap, { materialGrade: grade, batchSize, ratesSource: RATES_SOURCE_LABEL }), ...currencyMeta };
+      // Its lines are what Apply writes (the gap as a No Cost Feature): handed over in the factory currency like every other family's.
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(gapSummary.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
       return {
-        ...this.normalizeCostSummaryToCurrency(
-          { ...twoModelGapSummary(twoModelGap, { materialGrade: grade, batchSize, ratesSource: RATES_SOURCE_LABEL }), ...currencyMeta },
-          rates, locInfo.code, item.scenarioOverrides),
+        ...this.normalizeCostSummaryToCurrency(gapSummary, rates, locInfo.code, item.scenarioOverrides),
         resolvedInputs: costingInputs,
       };
     }
@@ -2658,6 +2667,7 @@ export class BomItemCostingService {
         ? await this.barTubeCostService.price({
           client: this.databaseService.getClient(accessToken), accessToken, location, grade,
           geometry: (summary.barTubeGeometry ?? null) as BarTubeGeometrySummary | null,
+          envelope: { sidesMm: [item.maxLength ?? 0, item.maxWidth ?? 0, item.maxHeight ?? 0], volumeMm3: item.volume ?? null },
           amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
           ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
           overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
@@ -4816,9 +4826,11 @@ export class BomItemCostingService {
       })));
       shots = extraPct > 0 && extraPct < 100 ? [part, ...extra] : childShots.length === 1 ? [part, childShots[0]!] : [part];
     }
-    if (shots.length < 2) {
-      return notPriced('A multi-shot part needs two shots: add them as BOM children (each with its CAD and material), or a second material in the Cost Guide.', shots);
-    }
+    // One shot is still molded and priced, on the multi-shot press (every press takes it), never refused (the user's decision 2026-11-20,
+    // Apply never fails): the second shot, not given, is a No Cost Feature until it is added.
+    const oneShotReason = 'Second shot: none given, so it is not costed and the part is priced as its one shot on the multi-shot press. Add the shots as '
+      + 'BOM children (each with its CAD and material), or a second material in the Cost Guide.';
+    const missingShot = shots.length < 2 ? noCostFeatureLine({ reason: oneShotReason, processGroup: MULTI_SHOT_PROCESS_GROUP }) : null;
     // What each shot needs of a press, as the injection engine derives it from its material and geometry.
     const needs: ShotNeed[] = shots.map((shot) => {
       const im = computeInjectionMoldedCostSummary(shot.input).injectionMolding;
@@ -4875,7 +4887,8 @@ export class BomItemCostingService {
     const moldGap = chosen.summary.processLines.find((l) => l.machineClass === MULTI_SHOT_PRESS_CLASS && l.physicsGap);
     return {
       ...chosen.summary,
-      warnings: [quoteNote, ...chosen.summary.warnings],
+      ...(missingShot ? { processLines: [...chosen.summary.processLines, missingShot] } : {}),
+      warnings: [quoteNote, ...(missingShot ? [oneShotReason] : []), ...chosen.summary.warnings],
       multiShot: {
         route: chosen.key, routeLabel: chosen.label, complete: chosen.complete,
         shots: shots.map((s, i) => ({
@@ -5348,11 +5361,11 @@ export class BomItemCostingService {
     // engineer's own explicit Material Grade selection only, never the
     // drawing title block. See getCostSummary's full comment for the root
     // cause this fixes.
-    const grade = item.materialGrade ?? (item as any).material ?? null;
+    const itemGrade = item.materialGrade ?? (item as any).material ?? null;
 
     // Override > material > geometry — same resolver as getCostSummary, by
     // construction (summary ≡ route invariant).
-    const familyResolutionRC = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
+    const familyResolutionRC = this.resolveEffectiveFamily({ item, fg, grade: itemGrade, sheetThicknessMm });
     const family = familyResolutionRC.family;
     // A chosen Process with no cost model has no route to compare or apply: say so, instead of listing sheet-metal routes for it.
     if (familyResolutionRC.familySource === 'process' && !hasCostModel(family)) throw new BadRequestException(familyResolutionRC.warning!);
@@ -5416,6 +5429,11 @@ export class BomItemCostingService {
       return this.forgingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
 
+    // The grade this process prices, as the cost summary does (gradeForProcess): a part whose grade is not a material of its process is
+    // compared on the process's closest own material.
+    const pricedGradeRC = itemGrade ? await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family) : null;
+    const grade = pricedGradeRC?.grade ?? null;
+
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
     const pierceCount     = (summary.pierceCount       ?? item.pierceCount      ?? 0) as number;
     const geoBendCount    = (summary.bendCount         ?? item.bendCount        ?? 0) as number;
@@ -5473,6 +5491,7 @@ export class BomItemCostingService {
     if (!grade) comparisonWarnings.push('Material grade not set — default mild steel rates applied');
     if (geo) comparisonWarnings.push(...geo.warnings);
     if (familyResolutionRC.warning) comparisonWarnings.push(familyResolutionRC.warning);
+    if (pricedGradeRC?.note) comparisonWarnings.push(pricedGradeRC.note);
     comparisonWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
     if (family === 'sheet_metal') comparisonWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
 

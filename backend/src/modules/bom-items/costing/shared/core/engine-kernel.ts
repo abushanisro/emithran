@@ -17,7 +17,7 @@
 // cost-engine.ts's own 9 call sites import it back from here too — one
 // formula core, not two.
 import type { MHRRateInput } from './cost-engine';
-import type { LookupResolution, LookupTableRow } from '../../../dto/cost-breakdown.dto';
+import type { LookupResolution, LookupTableRow, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 
 export function r2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -349,54 +349,82 @@ export function isPerPartCharge(line: { rateSource?: string | null }): boolean {
 }
 
 /**
+ * The reference data's name for what a process does not cost. Every memory/<process> variables file carries failNotSupportedGcds ("if false Not Supported
+ * GCDs will cost successfully as a No Cost Feature"); the user chose that behaviour on 2026-11-20 (Apply never fails): an operation the part's
+ * route cannot cost is written as a $0 No Cost Feature with its reason, and the rest of the route is applied.
+ */
+export const NO_COST_FEATURE = 'No Cost Feature';
+
+/** The machine class of a No Cost Feature line: it runs on no machine, so it never stands for (or is compared with) a costed line of a machine. */
+export const NO_COST_FEATURE_CLASS = 'no_cost_feature';
+
+/** True for a No Cost Feature line (noCostFeatureLine): $0 by design, never a gap. */
+export function isNoCostFeature(line: { rateSource?: string | null }): boolean {
+  return line.rateSource === 'no_cost_feature';
+}
+
+/**
+ * A line for what a process does not cost (NO_COST_FEATURE): the part's shape or feature the process cannot make, at $0 with the reason as
+ * its operation. Shown with the route and written on Apply as a $0 record; never a gap, so the route stays complete and is applied.
+ */
+export function noCostFeatureLine(input: { reason: string; processGroup: string }): ProcessLineCost {
+  return {
+    process: NO_COST_FEATURE, processGroup: input.processGroup, processRoute: NO_COST_FEATURE, operation: input.reason,
+    setupCost: 0, runCost: 0, totalCost: 0, cycleTimeMin: 0, setupTimeMin: 0, hourlyRate: 0, rateSource: 'no_cost_feature',
+    machineClass: NO_COST_FEATURE_CLASS, machineName: null, commodityCode: null, labourRate: null,
+  };
+}
+
+/** Why `line` cannot be costed or persisted as it stands, or null when it can: the rule findRouteDataGaps applies to every line. */
+export function lineDataGap(line: RouteDataGapLine): RouteDataGap | null {
+  if (isNoCostFeature(line)) return null;
+  const cycleTimeSec = persistableCycleSec(line.cycleTimeMin);
+  let reason: string | null = null;
+  let nearestRows: LookupTableRow[] | undefined;
+
+  if (line.physicsGap) {
+    if (line.physicsGap.gapType === 'missing_lookup') {
+      reason = line.physicsGap.requiredAction;
+      nearestRows = line.physicsGap.lookupResolution?.nearestRows;
+    } else {
+      reason = line.physicsGap.reason;
+    }
+  } else if (isPerPartCharge(line)) {
+    if (!(line.totalCost != null && line.totalCost > 0)) {
+      reason = 'no per-part charge was resolved for this line, so it cannot be costed or persisted';
+    }
+  } else if (cycleTimeSec < MIN_PERSISTABLE_CYCLE_SEC) {
+    // Says what is actually wrong. A cycle that rounds to 0.0000 s at the
+    // column scale means no cycle time was resolved at all -- which is what
+    // happens when no capable machine was selected -- not that the operation
+    // is too fast to store.
+    reason = 'no cycle time was resolved for this operation, so it cannot be costed or persisted';
+  } else if (line.setupTimeMin == null) {
+    // The write path used `line.setupTimeMin ?? 15`. Fifteen minutes is not a
+    // setup time anyone measured, published or chose — every real source in
+    // this system says otherwise (30min across all 8 press machines, 22.8min
+    // across all 10 shearing machines, or the machine's own setup_time_hr).
+    // A row saved at 15 disagreed with the quote that produced it, and the
+    // Cost Guide re-derives setup cost from the row.
+    reason = 'setup time was not resolved, and this system will not persist a substituted one';
+  }
+
+  if (reason === null) return null;
+  return {
+    process: line.process,
+    machineClass: line.machineClass ?? '',
+    reason,
+    ...(nearestRows && nearestRows.length > 0 ? { nearestRows } : {}),
+  };
+}
+
+/**
  * Every operation in `lines` whose required costing data is missing, in line
- * order. Empty means the route is fully costed and can be both ranked and
- * applied.
+ * order. Empty means the route is fully costed and can be ranked first; an
+ * operation listed here is applied as a No Cost Feature.
  */
 export function findRouteDataGaps(lines: readonly RouteDataGapLine[]): RouteDataGap[] {
-  const gaps: RouteDataGap[] = [];
-  for (const line of lines) {
-    const cycleTimeSec = persistableCycleSec(line.cycleTimeMin);
-    let reason: string | null = null;
-    let nearestRows: LookupTableRow[] | undefined;
-
-    if (line.physicsGap) {
-      if (line.physicsGap.gapType === 'missing_lookup') {
-        reason = line.physicsGap.requiredAction;
-        nearestRows = line.physicsGap.lookupResolution?.nearestRows;
-      } else {
-        reason = line.physicsGap.reason;
-      }
-    } else if (isPerPartCharge(line)) {
-      if (!(line.totalCost != null && line.totalCost > 0)) {
-        reason = 'no per-part charge was resolved for this line, so it cannot be costed or persisted';
-      }
-    } else if (cycleTimeSec < MIN_PERSISTABLE_CYCLE_SEC) {
-      // Says what is actually wrong. A cycle that rounds to 0.0000 s at the
-      // column scale means no cycle time was resolved at all -- which is what
-      // happens when no capable machine was selected -- not that the operation
-      // is too fast to store.
-      reason = 'no cycle time was resolved for this operation, so it cannot be costed or persisted';
-    } else if (line.setupTimeMin == null) {
-      // The write path used `line.setupTimeMin ?? 15`. Fifteen minutes is not a
-      // setup time anyone measured, published or chose — every real source in
-      // this system says otherwise (30min across all 8 press machines, 22.8min
-      // across all 10 shearing machines, or the machine's own setup_time_hr).
-      // A row saved at 15 disagreed with the quote that produced it, and the
-      // Cost Guide re-derives setup cost from the row.
-      reason = 'setup time was not resolved, and this system will not persist a substituted one';
-    }
-
-    if (reason !== null) {
-      gaps.push({
-        process: line.process,
-        machineClass: line.machineClass ?? '',
-        reason,
-        ...(nearestRows && nearestRows.length > 0 ? { nearestRows } : {}),
-      });
-    }
-  }
-  return gaps;
+  return lines.map(lineDataGap).filter((g): g is RouteDataGap => g !== null);
 }
 
 /** True when every operation on the route has the real data it needs to be costed. */
@@ -493,6 +521,21 @@ export function selectRecommendedRoute<T extends RankableRoute>(routes: readonly
     }
     return r.routeId < best.routeId ? r : best;
   });
+}
+
+/**
+ * The route Apply writes when none is recommended (no route is both feasible and fully costed): Apply never fails, so it is the best route
+ * there is. Feasible and compatible routes first, then the fewest operations that cannot be costed (each written as a No Cost Feature), then
+ * the cheapest, then the shortest cycle and the route id. Null only when the part has no route at all.
+ */
+export function selectAppliableRoute<T extends RankableRoute & { dataGaps?: readonly unknown[] | null }>(routes: readonly T[]): T | null {
+  const fit = (r: T) => Number(!(r.capability.overallCapable && r.isFeasible && r.producesBlank !== false && r.compatibility?.status !== 'incompatible'));
+  const gaps = (r: T) => r.dataGaps?.length ?? (r.dataComplete ? 0 : 1);
+  const cost = (r: T) => (typeof r.totalCost === 'number' ? r.totalCost : Infinity);
+  const compare = (a: T, b: T) =>
+    fit(a) - fit(b) || gaps(a) - gaps(b) || (cost(a) === cost(b) ? 0 : cost(a) - cost(b))
+    || a.cycleTimes.totalMin - b.cycleTimes.totalMin || (a.routeId < b.routeId ? -1 : a.routeId > b.routeId ? 1 : 0);
+  return routes.length === 0 ? null : routes.reduce((best, r) => (compare(r, best) < 0 ? r : best));
 }
 
 /**

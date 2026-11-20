@@ -42,10 +42,43 @@ export interface BarTubeGeometrySummary {
   plate?: Record<string, unknown> | null;
 }
 
-/** The part as the routes take it, or what keeps it from being priced as a bar or tube (not measured, not stock, cut from plate). */
-export function barTubePart(g: BarTubeGeometrySummary | null | undefined): { part: BarTubePart | null; missing: string[] } {
+/** The part's bounding box sides (mm, any order) and its volume (mm3): what a part that is not a length of stock is priced from. */
+export interface BarTubeEnvelope {
+  sidesMm: readonly number[];
+  volumeMm3: number | null;
+}
+
+/** Sides this close (mm) make a square bar. */
+const SQUARE_BAR_TOLERANCE_MM = 0.5;
+
+/**
+ * The bar that encloses a part that is not a length of stock: the box's two shorter sides as its section (a square bar when they are equal,
+ * else a rectangular bar) and its longest as the length. Bar and Tube Fabrication saws it to length; the shape the part has within it is
+ * not one of its operations, a No Cost Feature (bar-tube-route.ts). Never fails on a measured part (the user's decision 2026-11-20). Null
+ * when the box is not measured.
+ */
+export function enclosingBar(envelope: BarTubeEnvelope, reason: string): BarTubePart | null {
+  const [length = 0, width = 0, height = 0] = [...envelope.sidesMm].sort((a, b) => b - a);
+  if (!(length > 0 && width > 0 && height > 0)) return null;
+  return {
+    stockForm: width - height <= SQUARE_BAR_TOLERANCE_MM ? 'SQUARE_BAR' : 'RECTANGULAR_BAR',
+    section: { areaMm2: width * height, widthMm: width, heightMm: height, outerPerimeterMm: 2 * (width + height), odMm: null, wallMm: null, circumscribingDiameterMm: null, hollows: 0 },
+    developedLengthMm: length, bends: [], holes: [], complexHoles: [], cutouts: [], ends: [], forms: [],
+    enclosing: { reason, partVolumeMm3: envelope.volumeMm3 != null && envelope.volumeMm3 > 0 ? envelope.volumeMm3 : null },
+  };
+}
+
+/**
+ * The part as the routes take it, or what keeps it from being priced as a bar or tube (not measured, cut from plate without its
+ * measurements). A measured part that is not a length of stock is priced as the bar that encloses it (enclosingBar).
+ */
+export function barTubePart(g: BarTubeGeometrySummary | null | undefined, envelope?: BarTubeEnvelope | null): { part: BarTubePart | null; missing: string[] } {
   if (!g?.extractionVersion) return { part: null, missing: ['the bar and tube measurements: press Refresh analysis so the part is measured as a bar or tube'] };
-  if (!g.stockForm) return { part: null, missing: [`the part is not a length of bar, tube or profile: ${g.reason ?? 'no constant cross-section along a line'}`] };
+  if (!g.stockForm) {
+    const reason = g.reason ?? 'no constant cross-section along a line';
+    const part = envelope ? enclosingBar(envelope, reason) : null;
+    return part ? { part, missing: [] } : { part: null, missing: [`the part is not a length of bar, tube or profile: ${reason}`] };
+  }
   if (g.stockForm === 'PLATE') {
     const p = g.plate ?? {};
     const t = positive(p.thickness_mm);
@@ -98,6 +131,8 @@ export interface BarTubeCostRequest {
   location: string;
   grade: string | null;
   geometry: BarTubeGeometrySummary | null | undefined;
+  /** The part's bounding box and volume: a part that is not a length of stock is priced as the bar that encloses it. */
+  envelope?: BarTubeEnvelope | null;
   /** A route to price instead of the chosen one (the route comparison prices each). */
   forceRoute?: string;
   overrides: Record<string, unknown> | null | undefined;
@@ -193,8 +228,13 @@ export class BarTubeCostService {
   async price(req: BarTubeCostRequest): Promise<BarTubeCostResult> {
     const warnings: string[] = [];
     const none = (part: BarTubePart | null, ...missing: string[]): BarTubeCostResult => ({ route: null, routes: [], gaps: [], part, note: null, missing, warnings });
-    const { part, missing: partMissing } = barTubePart(req.geometry);
+    const { part, missing: partMissing } = barTubePart(req.geometry, req.envelope);
     if (!part) return none(null, ...partMissing);
+    if (part.enclosing) {
+      warnings.push(`The part is not a length of bar, tube or profile (${part.enclosing.reason}): priced as the ${Math.round(part.section.widthMm * 10) / 10} x `
+        + `${Math.round(part.section.heightMm * 10) / 10} mm ${part.stockForm.toLowerCase().replace(/_/g, ' ')} that encloses it, sawn to its ${Math.round(part.developedLengthMm * 10) / 10} mm `
+        + `length. Its shape within the bar is a No Cost Feature: choose Machining to price it.`);
+    }
     const o = req.overrides ?? {};
     const [{ reference, missing: refMissing }, calculators, machines] = await Promise.all([
       this.reference(),

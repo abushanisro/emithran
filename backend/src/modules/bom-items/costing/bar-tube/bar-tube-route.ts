@@ -21,6 +21,7 @@ import type { SandReference } from '../casting/sand/sand-reference';
 import { seedsFor, type SeedProvider, type SeedProviders } from '../casting/sand/sand-seeds';
 import { selectAndCost, type CostedStep, type StepOutcome } from '../casting/sand/sand-steps';
 import type { CadEvidenceKey } from '../shared/cad-evidence';
+import { noCostFeatureLine } from '../shared/core/engine-kernel';
 import { LASER_SPEED_SOURCE, extrusionDieUsd, laserChartOf, laserMaterialFactor, rotaryDrawDieSetUsd } from './bar-tube-research';
 
 export const BAR_TUBE_DOMAIN = 'bar_tube';
@@ -115,6 +116,11 @@ export interface BarTubePart {
   forms: ReadonlyArray<{ end: 'start' | 'end'; variant: string }>;
   /** Set for a part cut from plate (stock form PLATE). */
   plate?: BarTubePlate | null;
+  /**
+   * Set when the part is not a length of stock and is priced as the bar that encloses it (bar-tube-cost.service enclosingBar): why it is not
+   * stock, and its own volume (its net mass; the bar is what is bought and sawn).
+   */
+  enclosing?: { reason: string; partVolumeMm3: number | null } | null;
 }
 
 /** A bar and tube material: its cut code (saw and laser rates), properties and the price of its stock form at the location. */
@@ -293,6 +299,16 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
   const partKg = part.plate
     ? (part.plate.faceAreaMm2 * part.plate.thicknessMm * material.densityKgM3) / 1e9
     : (part.developedLengthMm * sec.areaMm2 * material.densityKgM3) / 1e9;
+  /** The part's own mass: a part priced as its enclosing bar weighs its volume, the bar is what is bought and handled. */
+  const netKg = part.enclosing?.partVolumeMm3 != null ? (part.enclosing.partVolumeMm3 * material.densityKgM3) / 1e9 : partKg;
+  /** What Bar and Tube Fabrication does not make on a part priced as its enclosing bar: its shape, a No Cost Feature on every route. */
+  const enclosedShape = part.enclosing
+    ? [noCostFeatureLine({
+      reason: `The part's shape within the ${r2(sec.widthMm)} x ${r2(sec.heightMm)} mm ${part.stockForm.toLowerCase().replace(/_/g, ' ')} it is sawn from: `
+        + `not a bar and tube operation (the part is not a length of bar, tube or profile: ${part.enclosing.reason})`,
+      processGroup: BAR_TUBE_PROCESS_GROUP,
+    })]
+    : [];
   /** The material_handling row of a process for the part's weight: the first band at or above it. */
   const handling = (process: string): Record<string, CalcSeed | undefined> => {
     const row = ref.table('material_handling').filter((r) => r['Process Name'] === process)
@@ -696,7 +712,7 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
   const finish = (key: BarTubeRouteKey, steps: CostedStep[], stock: { run: ReferenceCalcRun | null; reasons: string[] }, extra: { lines?: ProcessLineCost[]; plan?: BarTubeBendPlan[]; warnings?: string[]; priceMissing?: string | null; tooling?: BarTubeTool[] } = {}) => {
     const lines = [
       ...steps.map((s, i) => (i === 0 ? { ...s.line, formsPartFeatures: true } : s.line)),
-      ...(extra.lines ?? []), ...formLines,
+      ...(extra.lines ?? []), ...formLines, ...enclosedShape,
     ];
     const priceMissing = extra.priceMissing !== undefined ? extra.priceMissing
       : material.stockPricePerKgUsd == null ? `no ${STOCK_PRICE_FORM[part.stockForm] ?? part.stockForm} price for ${material.name} (material_stock_prices)` : null;
@@ -706,7 +722,7 @@ export function buildBarTubeRoutes(input: BarTubeRouteInput): { routes: BarTubeR
     const partsKey = stock.run?.outputs['Parts per Stock'] ?? stock.run?.outputs['Parts per Sheet'] ?? stock.run?.outputs['Parts per Billet'] ?? null;
     routes.push({
       key, label: BAR_TUBE_ROUTES.find((r) => r.key === key)!.label, lines,
-      material: { costUsd: materialCost, massKg: r3(stock.run?.outputs['Mass per Part'] ?? partKg), partKg: r3(partKg), partsPerStock: partsKey, run: stock.run, missing: materialMissing },
+      material: { costUsd: materialCost, massKg: r3(stock.run?.outputs['Mass per Part'] ?? partKg), partKg: r3(netKg), partsPerStock: partsKey, run: stock.run, missing: materialMissing },
       bendPlan: extra.plan ?? [],
       tooling: [...(extra.tooling ?? []), ...bendTooling(extra.plan ?? [])],
       totalUsd: complete ? r2(materialCost! + lines.reduce((s, l) => s + l.totalCost, 0)) : null,

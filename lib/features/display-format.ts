@@ -70,7 +70,12 @@ export function formatCell(v: unknown): string {
 // Never substitute the process route/group for a missing machine name — that
 // silently displays the process as if it were the machine (e.g. "Laser Cutting"
 // shown where a real machine like "Trumpf 3030" belongs). Say what's actually true.
-export function machineDisplayLabel(proc: { machineName?: string | null; mhrId?: string | null }): string {
+/** What a route could not cost, saved at $0 with its reason (backend engine-kernel NO_COST_FEATURE): the operation's process route. */
+export const NO_COST_FEATURE = 'No Cost Feature';
+
+export function machineDisplayLabel(proc: { machineName?: string | null; mhrId?: string | null; processRoute?: string | null }): string {
+  // A No Cost Feature runs on no machine: it is what the route did not cost, not a manually rated operation.
+  if (proc.processRoute === NO_COST_FEATURE) return 'Not costed — No Cost Feature';
   if (proc.machineName) return proc.machineName;
   if (proc.mhrId) return 'Machine name unavailable';
   return 'Manual rate — not linked to a machine';

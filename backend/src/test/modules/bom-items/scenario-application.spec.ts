@@ -12,6 +12,10 @@ function build(over: {
   /** The active records once the route step has run (the route service can remove a route of the part's previous process). */
   notesAfterRoute?: Array<{ notes: string | null }>;
   machine?: jest.Mock;
+  /** The material the cost summary priced ('' = the part's grade, as an unpriced summary says). */
+  pricedGrade?: string;
+  /** What the route could not cost, as RouteApplicationService reports it. */
+  noCostFeatures?: string[];
 } = {}) {
   const calls: string[] = [];
   const patches: Array<Record<string, unknown>> = [];
@@ -19,7 +23,7 @@ function build(over: {
     update: jest.fn().mockImplementation(() => { calls.push('item.update'); return Promise.resolve({}); }),
     patchScenarioOverrides: jest.fn().mockImplementation((_id: string, patch: Record<string, unknown>) => { calls.push('overrides'); patches.push(patch); return Promise.resolve({}); }),
     findOne: jest.fn().mockResolvedValue({ id: 'i1', volume: 10, weight: 1 }),
-    getCostSummary: jest.fn().mockImplementation(() => { calls.push('cost-summary'); return Promise.resolve({ grossWeightKg: 1 }); }),
+    getCostSummary: jest.fn().mockImplementation(() => { calls.push('cost-summary'); return Promise.resolve({ grossWeightKg: 1, materialGrade: over.pricedGrade ?? '' }); }),
     setMachineOverride: over.machine ?? jest.fn().mockResolvedValue({}),
   };
   let routeRan = false;
@@ -45,7 +49,8 @@ function build(over: {
     applyRoute: jest.fn().mockImplementation(() => {
       calls.push('route');
       routeRan = true;
-      return over.routeError ? Promise.reject(over.routeError) : Promise.resolve({ created: 5, operations: ['a'], routeLabel: 'Auto', routeId: 'im-standard-200t' });
+      return over.routeError ? Promise.reject(over.routeError)
+        : Promise.resolve({ created: 5, operations: ['a'], routeLabel: 'Auto', routeId: 'im-standard-200t', ...(over.noCostFeatures ? { noCostFeatures: over.noCostFeatures } : {}) });
     }),
     applyCustomRoute: jest.fn().mockImplementation(() => { calls.push('custom-route'); return Promise.resolve({ created: 2, operations: ['x'], routeLabel: 'Custom', needsManualCycleTime: [] }); }),
   };
@@ -70,6 +75,21 @@ describe('ScenarioApplicationService.apply', () => {
     expect(r.material).toEqual({ grade: 'ABS', action: 'replaced', recordId: 'r1' });
     expect(r.route).toMatchObject({ mode: 'auto', routeId: 'im-standard-200t', created: 5 });
     expect(r.tooling).toEqual({ action: 'replaced', items: ['Injection mold'] });
+  });
+
+  it('a grade that is not a material of the part\'s process: the record holds the material the summary priced, and the result says so', async () => {
+    const { svc, materials } = build({ pricedGrade: 'Aluminum, ANSI 6061' });
+    const r = await svc.apply(input({ materialGrade: 'Generic PETG Copol' }));
+    expect(materials.ensure).toHaveBeenCalledWith(expect.objectContaining({ grade: 'Aluminum, ANSI 6061' }));
+    expect(r.material).toEqual({ grade: 'Aluminum, ANSI 6061', action: 'replaced', recordId: 'r1' });
+    expect(r.warnings).toContain('"Generic PETG Copol" is priced as "Aluminum, ANSI 6061", a material of the part\'s process (the cost summary says why).');
+  });
+
+  it('what the route could not cost is applied as No Cost Features, each said in the warnings (Apply never fails)', async () => {
+    const { svc } = build({ noCostFeatures: ['Insert Pick and Place: the part has no inserts'] });
+    const r = await svc.apply(input({ materialGrade: 'ABS' }));
+    expect(r.scenario).toMatchObject({ status: 'applied' });
+    expect(r.warnings).toContain('No Cost Feature (not costed, $0): Insert Pick and Place: the part has no inserts');
   });
 
   it('writes every scenario key in one merge, and the grade as a manual pick', async () => {
@@ -118,11 +138,11 @@ describe('ScenarioApplicationService.apply', () => {
 
   it('a refused route that took the earlier route of another process with it takes that route\'s tooling too (Carriage Mount: forging dies)', async () => {
     const { svc, calls, toolingCosts } = build({
-      routeError: new Error('No route can be applied: two shots needed.'),
+      routeError: new Error("The part's process has no route to apply."),
       notes: [{ notes: 'auto_fill_from_route:forging-closed_die_hammer' }],
       notesAfterRoute: [],
     });
-    await expect(svc.apply(input({}))).rejects.toThrow('No route can be applied');
+    await expect(svc.apply(input({}))).rejects.toThrow("The part's process has no route to apply.");
     expect(toolingCosts.retire).toHaveBeenCalledWith({ bomItemId: 'i1', userId: 'u', token: 't' });
     expect(calls).toContain('tooling.retire');
   });

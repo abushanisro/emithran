@@ -32,9 +32,9 @@ import { escapeLikePattern, quoteFilterValue } from '../../../../common/db/postg
 /** HR Rates machine class of the High Pressure Die Casting machines (migration 845). */
 const HPDC_MACHINE_CLASS = 'die_casting_high_pressure_die_casting';
 /** raw_materials.material_group of each casting process's materials: die-casting alloys (migration 855), sand-casting materials (852). */
-const MATERIAL_GROUP = { die_casting: 'Die Casting', sand_casting: 'Sand Casting' } as const;
+export const CASTING_MATERIAL_GROUP = { die_casting: 'Die Casting', sand_casting: 'Sand Casting' } as const;
 /** The casting processes whose wall and hole limits (and materials) are staged. Investment casting has none yet. */
-export type CastabilityProcess = keyof typeof MATERIAL_GROUP;
+export type CastabilityProcess = keyof typeof CASTING_MATERIAL_GROUP;
 
 /**
  * Loads the staged memory/Die Casting rows the casting engines read and
@@ -165,7 +165,7 @@ export class CastingReferenceService {
     if (!g) return null;
     const { data: rows, error } = await client.from('raw_materials')
       .select('id, name, grade, material_type, density_kg_m3, cost_usa, cut_code')
-      .eq('material_group', MATERIAL_GROUP[process])
+      .eq('material_group', CASTING_MATERIAL_GROUP[process])
       .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`)
       .limit(2);
     if (error || !rows || rows.length !== 1) return null;

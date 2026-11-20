@@ -5,6 +5,7 @@ import { DatabaseService } from '../../../common/database/database.service';
 import { currentFeatureGraphVersion, MISSING_ANALYSIS_TEXT } from '../analysis-status';
 import { BOMItemsService } from '../bom-items.service';
 import { BomItemCostingService } from '../bom-item-costing.service';
+import { NO_COST_FEATURE } from '../costing/shared/core/engine-kernel';
 import { CostOverridesService } from './cost-overrides.service';
 import { AUTO_ROUTE_ID } from '../dto/apply-route.dto';
 import type { AppliedScenarioState, ApplyScenarioDto, ScenarioApplicationResult } from '../dto/apply-scenario.dto';
@@ -104,8 +105,12 @@ export class ScenarioApplicationService {
       if (grade) {
         const item = await this.bomItems.findOne(id, userId, token);
         const summary = await this.costing.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
-        const snapshot = await this.materials.ensure({ item, grade, location: request.location, summary, userId, organizationId, token });
-        material = { grade, action: snapshot.action, recordId: snapshot.recordId };
+        // The record holds the material the summary priced: the grade, or the process's closest own material when the grade is not one of the
+        // process's (MaterialResolutionService.gradeForProcess), so the material cost and the process costs are of the same material.
+        const priced = summary.materialGrade.trim() || grade;
+        if (priced !== grade) warnings.push(`"${grade}" is priced as "${priced}", a material of the part's process (the cost summary says why).`);
+        const snapshot = await this.materials.ensure({ item, grade: priced, location: request.location, summary, userId, organizationId, token });
+        material = { grade: priced, action: snapshot.action, recordId: snapshot.recordId };
       }
 
       // 5. The route. When it is refused and the route applied before is gone with it (it was a route of the part's previous process:
@@ -182,6 +187,8 @@ export class ScenarioApplicationService {
     if (applied.replacedRouteId) {
       warnings.push(`The applied route ${applied.replacedRouteId} is not a route for this part any more (its process changed): the recommended ${applied.routeLabel} was applied.`);
     }
+    // What the route could not make or cost was applied as a $0 No Cost Feature: said, so the quote is never read as complete without it.
+    for (const reason of applied.noCostFeatures ?? []) warnings.push(`${NO_COST_FEATURE} (not costed, $0): ${reason}`);
     return { mode, routeId: applied.routeId, routeLabel: applied.routeLabel, created: applied.created, operations: applied.operations };
   }
 

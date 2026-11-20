@@ -98,10 +98,13 @@ describe('the loading, on the cheapest loader of the method that carries the ins
     expect(JSON.stringify(byRobot.step.line.calculationTrace)).toContain('no weight given, so the lightest band (up to 0.5 kg)');
   });
 
-  it('names what it cannot do: no inserts, an insert no robot of the method carries', () => {
-    // What the part lacks is said once, plainly, not as every loader failing ("no Insert Pick and Place machine fits (Manual: ...)").
-    expect(gapOf(load('manual', []).step.line)).toBe('The part has no inserts: add them under it in the BOM, or their count and weight in the Cost Guide.');
-    expect(gapOf(load('3_axis', []).step.line)).not.toContain('machine fits');
+  it('no inserts: nothing to load, a $0 No Cost Feature that says so (never a refusal); an insert no robot of the method carries is a gap', () => {
+    // Apply never fails (the user's decision 2026-11-20): what the part lacks is said once, plainly, and the molding is still priced.
+    const none = load('manual', []);
+    expect(none.secPerPart).toBe(0);
+    expect(none.step.line).toMatchObject({ process: 'No Cost Feature', rateSource: 'no_cost_feature', totalCost: 0 });
+    expect(none.step.line.physicsGap).toBeUndefined();
+    expect(none.step.line.operation).toBe('Insert Pick and Place: the part has no inserts, so none are loaded or costed. Add them under it in the BOM, or their count and weight in the Cost Guide.');
     expect(gapOf(load('3_axis', [insert(1, 25)]).step.line)).toContain('payload does not carry the 25 kg insert');
   });
 });
@@ -179,9 +182,10 @@ describe('the routes', () => {
     expect(INSERT_MOLDING_ROUTES.map((r) => insertMoldingRouteKeyOf(insertMoldingRouteId(r.key)))).toEqual(['manual', '3_axis', '6_axis']);
   });
 
-  it('with no inserts every route is incomplete and says why', () => {
+  it('with no inserts every route is the molding alone, complete, with the loading a No Cost Feature saying why', () => {
     const routes = price([]);
-    expect(routes.every((r) => !r.complete)).toBe(true);
-    expect(gapOf(routes[0].summary.processLines.at(-1)!)).toContain('no inserts');
+    expect(routes.every((r) => r.complete)).toBe(true);
+    expect(routes[0].summary.processLines.at(-1)!).toMatchObject({ process: 'No Cost Feature', totalCost: 0 });
+    expect(routes[0].summary.processLines.at(-1)!.operation).toContain('no inserts');
   });
 });

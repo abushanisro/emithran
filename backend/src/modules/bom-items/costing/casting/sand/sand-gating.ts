@@ -10,6 +10,7 @@ import { runReferenceCalculator } from '../../shared/calculators/reference-calcu
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import { seedsFor, valuesProvider, variableProvider } from './sand-seeds';
 import type { SandReference } from './sand-reference';
+import { copperAlloyPouringCoefficient, POURS_AS } from './sand-pouring-research';
 
 const LB_PER_KG = 1 / 0.45359237;
 const MAX_ITERATIONS = 50;
@@ -63,17 +64,26 @@ export function pouringCoefficient(
   inches: number | null,
 ): { value: number; source: string } | { missing: string } {
   if (!materialType) return { missing: 'the material has no Material Type, which names its tblPouringCoefficients rows' };
-  const rows = ref.table('tblPouringCoefficients').filter((r) => r['Material Name'] === materialType);
-  if (rows.length === 0) return { missing: `tblPouringCoefficients has no rows for ${materialType}` };
+  const table = ref.table('tblPouringCoefficients');
+  const own = table.filter((r) => r['Material Name'] === materialType);
+  // An alloy the table does not list is poured by the published rule for it, else as the listed family it is cast like (sand-pouring-research.ts).
+  if (own.length === 0) {
+    const copper = copperAlloyPouringCoefficient(materialType, pounds);
+    if (copper) return copper;
+  }
+  const family = own.length > 0 ? materialType : POURS_AS[materialType];
+  const rows = own.length > 0 ? own : table.filter((r) => r['Material Name'] === family);
+  if (!family || rows.length === 0) return { missing: `tblPouringCoefficients has no rows for ${materialType}` };
+  const as = family === materialType ? '' : ` (${materialType} is not listed: poured as ${family}, sand-pouring-research.ts)`;
   const byWeight = rows.some((r) => r['Dimension'] === 'weight');
   const x = (r: Row) => (r['Dimension'] === 'weight' ? pounds : inches);
   const hit = rows.find((r) => {
     const v = x(r);
     return v != null && v >= (num(r['Min Dim']) ?? Infinity) && v < (num(r['Max Dim']) ?? -Infinity);
   });
-  if (!hit) return { missing: byWeight || inches != null ? `tblPouringCoefficients has no ${materialType} band for ${pounds.toFixed(1)} lb` : `the section thickness is not measured, which the ${materialType} pouring coefficient is read by` };
+  if (!hit) return { missing: byWeight || inches != null ? `tblPouringCoefficients has no ${family} band for ${pounds.toFixed(1)} lb` : `the section thickness is not measured, which the ${family} pouring coefficient is read by` };
   const band = hit['Dimension'] === 'weight' ? `${pounds.toFixed(1)} lb poured per mould` : `${inches!.toFixed(2)} in section`;
-  return { value: num(hit['Coefficient'])!, source: `tblPouringCoefficients ${materialType}, by ${band}` };
+  return { value: num(hit['Coefficient'])!, source: `tblPouringCoefficients ${family}, by ${band}${as}` };
 }
 
 /** What the route has decided that the design needs, each with where it came from. */

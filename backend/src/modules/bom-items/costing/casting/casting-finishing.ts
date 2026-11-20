@@ -463,7 +463,8 @@ export function meltingLine(input: {
   return {
     line: {
       process: P, processGroup: input.processGroup, processRoute: P, operation: P,
-      setupCost: 0, runCost: r2(run.value), totalCost: r2(run.value), cycleTimeMin: 0,
+      // Per-part money is never rounded here: a small part's melt is a fraction of a cent, and rounded to 0.00 it read as no charge at all.
+      setupCost: 0, runCost: run.value, totalCost: run.value, cycleTimeMin: 0,
       hourlyRate: 0, rateSource: 'consumable_allowance', machineClass: input.machineClass, machineName: chosen.f.name,
       commodityCode: null, labourRate: null, mhrId: chosen.f.id,
       machineChoice: choice,
