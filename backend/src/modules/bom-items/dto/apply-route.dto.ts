@@ -16,6 +16,7 @@ import { BAR_TUBE_ROUTE_IDS } from '../costing/bar-tube/bar-tube-route-compariso
 import { ASSEMBLY_ROUTE_IDS } from '../costing/assembly/assembly-route-comparison';
 import { INSERT_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/insert/insert-molding';
 import { MULTI_SHOT_ROUTE_IDS } from '../costing/plastic-molding/multi-shot/multi-shot';
+import { MULTI_SPINDLE_ROUTE_IDS } from '../costing/multi-spindle/multi-spindle-route-comparison';
 
 // The locations this system holds real rate and material-cost data for, taken
 // from LOCATION_INFO itself so the validator can never drift from the table
@@ -49,6 +50,8 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...INSERT_MOLDING_ROUTE_IDS,
   // A multi-shot part's press orientations (horizontal, vertical), priced by the multi-shot engine.
   ...MULTI_SHOT_ROUTE_IDS,
+  // A multi-spindle part's routes (6-spindle, 8-spindle, twin-spindle turning center), priced by the multi-spindle engine.
+  ...MULTI_SPINDLE_ROUTE_IDS,
   // The one-route processes: the cost summary as quoted, as one route (the Workflow Builder sets them like any complete route).
   SAND_CASTING_ROUTE_ID, INVESTMENT_CASTING_ROUTE_ID, POWDER_METAL_ROUTE_ID, TWO_MODEL_ROUTE_ID,
 ];
