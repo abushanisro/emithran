@@ -413,9 +413,12 @@ export interface ProcessLineCost {
   /** The cycle's cost split into machine time and operator labour, for engines that charge both. With `setupCost` (machine and labour together) they add up to `totalCost` (before rounding). */
   machineCostPerPart?: number;
   laborCostPerPart?: number;
-  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in `runCost` and `totalCost`. In USD on purpose: never
-   *  converted with the line's money, it is stored as process_cost_records.other_cost_per_part (USD, like total_cost_per_part) and added by the Cost tab. */
+  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in `runCost` and `totalCost`. In USD on purpose:
+   *  never converted with the line's money, so `otherCostDetail` can say it in USD wherever the line is shown. */
   otherCostPerPartUsd?: number;
+  /** The same charge in the line's own currency, set when the line is converted from USD (lineToLocal): what
+   *  process_cost_records.other_cost_per_part stores, in the row's currency like total_cost_per_part. A USD line's is `otherCostPerPartUsd`. */
+  otherCostPerPart?: number;
   /** What `otherCostPerPartUsd` is, e.g. "energy 0.0029 USD per casting". */
   otherCostDetail?: string;
   // local currency/hr — the MACHINE hour rate, and only that.
@@ -719,6 +722,11 @@ export interface CostSummaryDto {
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
   assembly?: AssemblyBreakdown;
+  /**
+   * The part's material is its parts': an assembly or a weldment costed from its BOM children has no material record of its own (each part's
+   * is in the BOM roll-up), so Apply keeps none and the Cost tab counts its own costs without one.
+   */
+  materialOfParts?: boolean;
   /** A weldment (Process Part Assembly): its welding route, components, welds and the routes compared (costing/part-assembly). */
   partAssembly?: PartAssemblyBreakdown;
   /** Assembly Molding (insert molding): the inserts, how they are loaded, the press and its shot, the route quoted and every route. */

@@ -69,6 +69,7 @@ import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import {
   resolveStoredProcessLines,
   selectProcessTotal,
+  isMaterialSettled,
   type StoredProcessRow,
 } from '@/lib/costing/stored-process-lines';
 import {
@@ -733,6 +734,9 @@ function CostSummaryTab({
 
   // Grand total: engine estimate (process + material) + stored records converted to factory currency
   const hasStoredMat = (storedRawMat?.records?.length ?? 0) > 0;
+  // The material side is settled: a material record, or an assembly's or a weldment's material being its parts' (the cost summary says so;
+  // each part's is in the BOM roll-up), so its own joining or welding counts without a record of its own.
+  const materialSettled = isMaterialSettled(storedRawMat?.records.length ?? 0, cost);
   const storedMatTotal = (storedRawMat?.records ?? []).reduce((s, r: { totalCost?: number | null }) => s + (r.totalCost ?? 0), 0) * fromUsd;
   const packagingTotal = (storedPackaging?.items ?? []).reduce((s, i: { totalCost?: number | null }) => s + (i.totalCost ?? 0), 0) * fromUsd;
   const procuredTotal = (storedProcured?.items ?? []).reduce((s, p: any) => {
@@ -778,7 +782,7 @@ function CostSummaryTab({
   // question, so the freshly computed engine result wins instead of being
   // silently overridden by it.
   const processTotal = selectProcessTotal({
-    hasStoredMaterial: hasStoredMat,
+    hasStoredMaterial: materialSettled,
     storedLines: storedProcessLines,
     engineTotalProcess: eff.totalProcess,
   });
@@ -881,7 +885,11 @@ function CostSummaryTab({
       <SectionHeader label="Direct Material Costs" />
 
       {/* Estimated row (shown when no DB records exist yet — gives the user context) */}
-      {!isScenarioReady ? (
+      {cost.materialOfParts ? (
+        <div className="pl-2 pb-2 text-xs text-muted-foreground">
+          Its material is its parts&apos;: each part&apos;s is costed on the part and added once by the BOM roll-up, so this has none of its own.
+        </div>
+      ) : !isScenarioReady ? (
         <div className="pl-2 pb-2">
           <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
             Apply a material grade — engine will price this part from your DB rates
@@ -947,7 +955,7 @@ function CostSummaryTab({
       <SectionHeader label="Direct Process Costs" />
 
       {/* Stale process costs warning — stored records exist but no material is applied */}
-      {!hasStoredMat && hasStoredProcs && (
+      {!materialSettled && hasStoredProcs && (
         <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 mb-2 text-xs text-amber-600 dark:text-amber-400">
           Process costs below were computed from a material that was removed — they are excluded from the total. Remove them or add a material to recalculate.
         </div>
@@ -989,7 +997,7 @@ function CostSummaryTab({
       {/* Material applied, route not. The engine can price this part, but no
           route has been applied, so nothing here is costed — see
           selectProcessTotal, which returns no process total for this state. */}
-      {hasStoredMat && !hasStoredProcs && !isLoadingProcRecords && (
+      {materialSettled && !hasStoredProcs && !isLoadingProcRecords && (
         <div className="pl-2 pb-2">
           <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
             No process route applied yet. Press <strong>Apply</strong> to

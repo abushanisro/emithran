@@ -100,17 +100,25 @@ export class ScenarioApplicationService {
         token,
       );
 
-      // 4. The material cost record, from the cost summary at this scenario.
+      // 4. The material cost record, from the cost summary at this scenario. An assembly's or a weldment's material is its parts': with parts
+      // under it in the BOM each part's record is in the roll-up, so it keeps none of its own (one written before, by an older Apply or as
+      // another process, is retired: it would count the material twice). One with no parts under it is its own one component, and keeps its own.
       let material: ScenarioApplicationResult['material'] = null;
-      if (grade) {
+      const hasParts = (await this.bomItems.findChildren(id, token)).length > 0;
+      if (grade || hasParts) {
         const item = await this.bomItems.findOne(id, userId, token);
         const summary = await this.costing.getCostSummary(id, userId, token, undefined, request.location, request.productionLifeYears);
-        // The record holds the material the summary priced: the grade, or the process's closest own material when the grade is not one of the
-        // process's (MaterialResolutionService.gradeForProcess), so the material cost and the process costs are of the same material.
-        const priced = summary.materialGrade.trim() || grade;
-        if (priced !== grade) warnings.push(`"${grade}" is priced as "${priced}", a material of the part's process (the cost summary says why).`);
-        const snapshot = await this.materials.ensure({ item, grade: priced, location: request.location, summary, userId, organizationId, token });
-        material = { grade: priced, action: snapshot.action, recordId: snapshot.recordId };
+        if (summary.materialOfParts === true) {
+          const retired = await this.materials.retireOwnMaterial(id, userId, token);
+          if (retired > 0) warnings.push(`${item.name}'s material is its parts' (each part's is in the BOM roll-up): its own material record was retired.`);
+        } else if (grade) {
+          // The record holds the material the summary priced: the grade, or the process's closest own material when the grade is not one of the
+          // process's (MaterialResolutionService.gradeForProcess), so the material cost and the process costs are of the same material.
+          const priced = summary.materialGrade.trim() || grade;
+          if (priced !== grade) warnings.push(`"${grade}" is priced as "${priced}", a material of the part's process (the cost summary says why).`);
+          const snapshot = await this.materials.ensure({ item, grade: priced, location: request.location, summary, userId, organizationId, token });
+          material = { grade: priced, action: snapshot.action, recordId: snapshot.recordId };
+        }
       }
 
       // 5. The route. When it is refused and the route applied before is gone with it (it was a route of the part's previous process:

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { loadPartAssemblyCalculatorSpec } from './calculators/part-assembly-calculator-spec';
 import {
-  PART_ASSEMBLY_PROCESS_GROUP, PART_ASSEMBLY_ROUTE_CLASSES, PART_ASSEMBLY_ROUTES, buildPartAssemblyRoutes, choosePartAssemblyRoute,
+  PART_ASSEMBLY_PROCESS_GROUP, PART_ASSEMBLY_ROUTE_CLASSES, PART_ASSEMBLY_ROUTES, buildPartAssemblyRoutes, choosePartAssemblyRoute, laserFamilyOf,
   type PartAssemblyRoute, type PartAssemblyRouteGap, type PartAssemblyRouteKey,
 } from './part-assembly-route';
 import { PART_ASSEMBLY_WELDS_KEY, weldTable, type PartAssemblyWeld } from './part-assembly-welds';
@@ -10,10 +10,10 @@ import { DatabaseService } from '../../../../common/database/database.service';
 import { escapeLikePattern, quoteFilterValue } from '../../../../common/db/postgrest-filter';
 import { CalculatorCatalogService } from '../../services/calculator-catalog.service';
 import { componentsOf, finishedAssembly } from '../assembly/assembly-cost.service';
-import { cutCodeFamilyOf } from '../bar-tube/bar-tube-route';
 import { lineToLocal } from '../casting/sand/sand-cost';
 import { SandMachineService } from '../casting/sand/sand-machine.service';
 import { readStagedReference } from '../casting/sand/sand-reference.service';
+import { preferredCutCode } from '../shared/core/cut-code';
 
 import type { DbClient } from '../../../../common/db/postgrest-client';
 import type { BOMItemResponseDto } from '../../dto/bom-item-response.dto';
@@ -46,6 +46,8 @@ export interface PartAssemblyCostRequest {
 }
 
 export interface PartAssemblyCostResult {
+  /** Its components are its BOM children, so its material is theirs (each in the BOM roll-up); false when it is its own one component. */
+  materialOfParts: boolean;
   /** The quoted route in the location's currency; null when none can be built (see `missing`). */
   route: PartAssemblyRoute | null;
   routes: PartAssemblyRoute[];
@@ -112,17 +114,19 @@ export class PartAssemblyCostService {
     return read;
   }
 
-  /** The cut code of a material (raw_materials, by name or grade; the same in every material group), or null. */
+  /** The cut code of a material (raw_materials, by name or grade; preferredCutCode across the groups listing it), or null. */
   private async cutCodeOf(client: DbClient, material: string | null): Promise<number | null> {
     const g = material?.trim();
     if (!g) return null;
     const { data, error } = await client.from('raw_materials')
-      .select('cut_code')
+      .select('cut_code, material_group')
       .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`)
       .not('cut_code', 'is', null)
-      .limit(1);
-    const v = error ? null : Number(data.at(0)?.cut_code);
-    return v != null && Number.isFinite(v) ? v : null;
+      .limit(100);
+    if (error) return null;
+    return preferredCutCode(data.map((r) => ({
+      cutCode: r.cut_code == null ? null : Number(r.cut_code), group: r.material_group == null ? null : String(r.material_group),
+    })));
   }
 
   async price(req: PartAssemblyCostRequest): Promise<PartAssemblyCostResult> {
@@ -144,9 +148,9 @@ export class PartAssemblyCostService {
     ]);
     const material = {
       name: materialName,
-      cutCodeFamily: reference ? cutCodeFamilyOf(new Set(reference.table('laserSeamWeldTravelSpeed').map((r) => String(r['Material Cut Code Family']))), cutCode) : null,
+      cutCodeFamily: reference ? laserFamilyOf(reference, cutCode) : null,
     };
-    const none = (...missing: string[]): PartAssemblyCostResult => ({ route: null, routes: [], gaps: [], components, welds, weldment, thickness, material, note: null, missing, warnings });
+    const none = (...missing: string[]): PartAssemblyCostResult => ({ materialOfParts: !self, route: null, routes: [], gaps: [], components, welds, weldment, thickness, material, note: null, missing, warnings });
     if (!reference) return none(...refMissing);
     const spec = loadPartAssemblyCalculatorSpec();
     const absent = spec.calculators.filter((c) => !Object.hasOwn(calculators, c.name)).map((c) => c.name);
@@ -163,6 +167,6 @@ export class PartAssemblyCostService {
     const { route, note } = choosePartAssemblyRoute(routes, gaps, chosen);
     if (!route) return { ...none(...gaps.map((g) => `${g.label}: ${g.reason}`)), gaps };
     const local = routes.map((r) => routeToLocal(r, req.usdToLocal));
-    return { route: local[routes.indexOf(route)], routes: local, gaps, components, welds, weldment, thickness, material, note, missing: [], warnings: [...warnings, ...route.warnings] };
+    return { materialOfParts: !self, route: local[routes.indexOf(route)], routes: local, gaps, components, welds, weldment, thickness, material, note, missing: [], warnings: [...warnings, ...route.warnings] };
   }
 }

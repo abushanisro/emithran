@@ -9,11 +9,12 @@
 // Two routes: Manual (MIG and spot welds by hand) and Robotic (on a robot). Laser seams are on the laser seam welder on both. A machine's
 // setup is charged once per batch, on its first line. A weld the data cannot time is its own named line at no cost (Apply never fails).
 import { WELD_PROCESSES, type PartAssemblyWeld, type WeldProcess } from './part-assembly-welds';
-import { spotsOf, weldMetal } from './weld-geometry';
+import { bevelledEdges, spotsOf, weldMetal } from './weld-geometry';
 import { gap, type CostContext } from '../casting/casting-finishing';
 import { machineValue, type SandMachine } from '../casting/sand/sand-machines';
 import { sumRuns } from '../machining/process/machining-trace';
 import { cell, fail, routeKit, type KitRow, type RouteKit } from '../shared/calculators/route-kit';
+import { cutCodeFamilyOf } from '../shared/core/cut-code';
 
 import type { FeatureOp, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import type { AssemblyComponent } from '../assembly/assembly-joints';
@@ -140,6 +141,15 @@ export function laserRow(ref: SandReference, family: string, powerW: number, dep
   return ref.table(LASER_TABLE)
     .filter((r) => String(r['Material Cut Code Family']) === family && cell(r, 'Power') === powerW && (cell(r, 'Weld Depth') ?? -1) >= depthMm)
     .sort((a, b) => (cell(a, 'Weld Depth') ?? 0) - (cell(b, 'Weld Depth') ?? 0))[0] ?? null;
+}
+
+/**
+ * A cut code's family in laserSeamWeldTravelSpeed (whose steel families 1 and 2 are bevelCutSpeed's too): its whole number, as memory numbers
+ * the families (1, 2 steels; 5 stainless; 51, 52 plastics): stainless 5.21 is family 5, a thermoplastic 51.21 family 51. Null when the table
+ * has no rows for it.
+ */
+export function laserFamilyOf(ref: SandReference, cutCode: number | null): string | null {
+  return cutCodeFamilyOf(new Set(ref.table(LASER_TABLE).map((r) => String(r['Material Cut Code Family']))), cutCode);
 }
 
 /** The bevelCutSpeed row for a depth of cut: the shallowest depth not below it. */
@@ -359,8 +369,12 @@ function buildRoute(inp: PartAssemblyRouteInput, route: (typeof PART_ASSEMBLY_RO
         for (const b of cut) {
           const row = bevelRow(ref, b.depthMm);
           if (!row) return fail(`${b.w.label}: ${BEVEL_TABLE} has no row for a ${b.depthMm} mm cut`);
+          // A V or U groove bevels both plates: twice the seam's length, and a pierce for each edge.
+          const edges = bevelledEdges(b.w.operation);
+          const cuts = b.count * edges;
           const r = run(calcOf('Bevel Cutting'), m, {
-            bevel_length_mm: seed(b.lengthMm * b.count, `${b.count} x ${b.lengthMm} mm bevelled`), bevel_count: seed(b.count, `${b.count} bevelled edge(s), one pierce each`),
+            bevel_length_mm: seed(b.lengthMm * cuts, `${b.count} x ${b.lengthMm} mm bevelled${edges > 1 ? `, ${edges} edges each (${b.w.operation})` : ''}`),
+            bevel_count: seed(cuts, `${cuts} bevelled edge(s), one pierce each`),
           }, {
             [`${BEVEL_TABLE}.Cut Speed (mm / min)`]: lookupSeed(BEVEL_TABLE, row, 'Cut Speed (mm / min)', ['Depth of Cut (mm)']),
             [`${BEVEL_TABLE}.Pierce Time (s)`]: lookupSeed(BEVEL_TABLE, row, 'Pierce Time (s)', ['Depth of Cut (mm)']),

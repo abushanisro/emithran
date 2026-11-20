@@ -19,6 +19,7 @@ import { machineValue, type SandMachine } from '../casting/sand/sand-machines';
 import type { SandReference } from '../casting/sand/sand-reference';
 import { seedsFor, valuesProvider, type SeedProvider, type SeedProviders } from '../casting/sand/sand-seeds';
 import { selectAndCost, type CostedStep, type SandMaterial, type StepOutcome } from '../casting/sand/sand-steps';
+import { cutCodeFamilyOf } from '../shared/core/cut-code';
 
 export const FORGING_DOMAIN = 'forging';
 export const FORGING_PROCESS_GROUP = 'Forging';
@@ -161,13 +162,6 @@ function bandRow(rows: readonly Row[], column: string, value: number): Row | und
   return sorted.find((r) => Number(r[column]) >= value) ?? sorted[sorted.length - 1];
 }
 
-/** The band saw table's material family of a cut code: its integer and first decimal ("5.21" -> "52") when the table has it, else its integer ("5"). */
-function cutCodeFamily(rows: readonly Row[], cutCode: number): string | null {
-  const families = new Set(rows.map((r) => String(r['Material Cut Code Family'])));
-  const [whole, decimals = ''] = String(cutCode).split('.');
-  return [`${whole}${decimals.slice(0, 1)}`, whole!].find((f) => families.has(f)) ?? null;
-}
-
 /**
  * A ring: round in plan (its two plan extents within 10 % of each other) with a through hole along the die direction, of at least the least
  * forgeable hole diameter, as its bore. Returns the ring's outside and bore diameters; null when the part is not one.
@@ -269,7 +263,7 @@ export function buildForgingRoutes(input: ForgingRouteInput): { routes: ForgingR
   if (bars.length === 0) return none('forging lookup roundBarSizes (not staged, migration 823)');
   const sawRows = table('bandSawCutting');
   const cutCode = material.columns['cut_code'];
-  const family = cutCode != null ? cutCodeFamily(sawRows, cutCode) : null;
+  const family = cutCodeFamilyOf(new Set(sawRows.map((r) => String(r['Material Cut Code Family']))), cutCode);
   const flashLookup = rowSeed('partComplexityBasedData', complexityRow, 'Hot Forging - Flash Percentage Volume', ['Part Complexity']);
   const spmLookup = rowSeed('partComplexityBasedData', complexityRow, 'SPM-Mechanical Press with Transfer System-High Production Volume', ['Part Complexity']);
   const complexityNote = scenario.complexity == null
