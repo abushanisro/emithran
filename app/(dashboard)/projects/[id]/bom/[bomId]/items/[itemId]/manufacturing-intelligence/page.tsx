@@ -18,6 +18,7 @@ import { CompositesSection } from '@/components/costing/CompositesSection';
 import { AdditiveSection } from '@/components/costing/AdditiveSection';
 import { BarTubeSection } from '@/components/costing/BarTubeSection';
 import { AssemblySection } from '@/components/costing/AssemblySection';
+import { PartAssemblySection } from '@/components/costing/PartAssemblySection';
 import { InsertMoldingCycle, InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
 import { ConciseNote } from '@/components/ui/concise-note';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
@@ -30,6 +31,7 @@ import { splitNote } from '@/lib/text/concise-note';
 import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
 import { barTubeRouteKeyOf } from '@/lib/routing/bar-tube-route-id';
 import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
+import { partAssemblyRouteKeyOf } from '@/lib/routing/part-assembly-route-id';
 import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
 import { isInsertMoldingItem } from '@/lib/costing/insert-molding-view';
 import { isMultiShotItem } from '@/lib/costing/multi-shot-view';
@@ -39,6 +41,7 @@ import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
 import { multiSpindleRouteKeyOf } from '@/lib/routing/multi-spindle-route-id';
 import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
 import { isAssemblyItem } from '@/lib/costing/assembly-view';
+import { isPartAssemblyItem } from '@/lib/costing/part-assembly-view';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -140,7 +143,7 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // also used by NRE and by the drawing-callout surface-treatment auto-cost).
 import { useSecondaryProcesses, useNre } from '@/lib/api/hooks/useSecondaryProcesses';
 import {
-  isCostedProcessGroup, processGroupOptionLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
+  isCostedProcessGroup, processGroupOptionLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict, routingFamilyOf,
 } from '@/lib/features/process-group';
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
@@ -3194,6 +3197,8 @@ function RouteSelectionDialog({
       ...(() => { const key = multiShotRouteKeyOf(selected.routeId); return key ? { multiShotRoute: key } : {}; })(),
       // A multi-spindle route ("multispindle-<key>"): its key (6, 8, twin) is committed as the scenario's multiSpindleRoute.
       ...(() => { const key = multiSpindleRouteKeyOf(selected.routeId); return key ? { multiSpindleRoute: key } : {}; })(),
+      // A weldment route ("partassembly-<key>"): its key (manual, robotic) is committed as the scenario's partAssemblyRoute.
+      ...(() => { const key = partAssemblyRouteKeyOf(selected.routeId); return key ? { partAssemblyRoute: key } : {}; })(),
     };
     onSelectRoute(route);
     onApplied();
@@ -4685,6 +4690,17 @@ function CostGuidePanel({
               <Section title="Assembly">
                 <AssemblySection
                   assembly={cgpCostSummary.assembly}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                  hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'part_assembly' && (
+              <Section title="Part Assembly">
+                <PartAssemblySection
+                  partAssembly={cgpCostSummary.partAssembly}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                   hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
@@ -8182,6 +8198,7 @@ export default function ManufacturingIntelligencePage() {
       isInsertMolding: isInsertMoldingItem(item),
       isMultiShot: isMultiShotItem(item),
       isMultiSpindle: isMultiSpindleItem(item),
+      isPartAssembly: isPartAssemblyItem(item),
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });
@@ -8281,6 +8298,9 @@ export default function ManufacturingIntelligencePage() {
   // third wasted full cost computation on every load/Apply regardless of the
   // real Digital Factory.
   const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize, factory);
+  // The Workflow Builder lists the routes of the family the part is costed as: an assembly or a weldment has none from CAD (or one from an
+  // analysis as another process), so its routes are the costed family's.
+  const routingFamily = routingFamilyOf(fg?.classification.family, costForHeatmap?.family);
   // costForHeatmap.processLines always reflects the cost engine's OWN default-
   // recommended route (e.g. Fiber Laser Cutting), never whatever route the
   // engineer actually applied (e.g. Waterjet Cutting) -- same root cause
@@ -9494,7 +9514,7 @@ export default function ManufacturingIntelligencePage() {
             if (!selectedManualRoute) setProcessRouting('auto');
           }}
           onApplied={() => { setRouteDialogOpen(false); }}
-          partFamily={fg?.classification?.family ?? null}
+          partFamily={routingFamily}
           currentRouteId={selectedManualRoute?.id ?? null}
           existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
           existingSteps={selectedManualRoute?.dynamicSteps}
@@ -9728,7 +9748,7 @@ export default function ManufacturingIntelligencePage() {
           if (!selectedManualRoute) setProcessRouting('auto');
         }}
         onApplied={() => { setRouteDialogOpen(false); }}
-        partFamily={fg?.classification?.family ?? null}
+        partFamily={routingFamily}
         currentRouteId={selectedManualRoute?.id ?? null}
         existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
         existingSteps={selectedManualRoute?.dynamicSteps}

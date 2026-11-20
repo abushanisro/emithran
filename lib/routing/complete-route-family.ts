@@ -3,7 +3,7 @@
  * per machining route, one route per die-casting process, and the sand-casting, investment-casting and forging routes. Sheet metal has its
  * own cut-then-form builder.
  */
-const COMPLETE_ROUTE_FAMILIES: ReadonlySet<string> = new Set(['plastic_molded', 'milled', 'turned', 'mill_turn', 'die_cast', 'sand_cast', 'investment_cast', 'forged', 'powder_metal', 'composite', 'additive', 'bar_tube', 'assembly'])
+const COMPLETE_ROUTE_FAMILIES: ReadonlySet<string> = new Set(['plastic_molded', 'milled', 'turned', 'mill_turn', 'die_cast', 'sand_cast', 'investment_cast', 'forged', 'powder_metal', 'composite', 'additive', 'bar_tube', 'assembly', 'part_assembly'])
 
 export function isCompleteRouteFamily(family: string | null | undefined): boolean {
   return !!family && COMPLETE_ROUTE_FAMILIES.has(family)

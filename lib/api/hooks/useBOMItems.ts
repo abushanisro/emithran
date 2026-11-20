@@ -1199,6 +1199,25 @@ export interface CostSummaryDto {
     adhesiveKg: number;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
   };
+  /**
+   * Part Assembly (a weldment, memory/Part Assembly): the components welded, the plate and material, every weld of the weld table with what
+   * it came to on the quoted route, the MIG wire, and every route (backend PartAssemblyBreakdown).
+   */
+  partAssembly?: {
+    route: string | null; routeLabel: string | null; complete: boolean;
+    components: { id: string; name: string; quantity: number; massKg: number | null; massSource: 'weight' | 'volume' | null; maxDimensionMm: number | null }[];
+    weldmentMassKg: number | null;
+    thicknessMm: number | null; thicknessSource: string;
+    material: string | null; cutCodeFamily: string | null;
+    welds: {
+      id: string; process: string; routeProcess: string | null; operation: string; feature: 'Edge' | 'Blank' | 'SimpleHole'; label: string; count: number | null;
+      lengthMm: number | null; sizeMm: number | null; thicknessMm: number | null; areaMm2: number | null; depthMm: number | null;
+      bevel: boolean; grind: boolean; finishGrind: boolean; wireBrush: boolean; enabled: boolean;
+      cycleSec: number | null; wireKg: number | null; reason: string | null;
+    }[];
+    wireCost: number;
+    options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+  };
   /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route (backend AdditiveBreakdown). */
   additive?: {
     route: string; routeLabel: string;

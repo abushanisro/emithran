@@ -34,13 +34,24 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   bar_tube: 'Bar and Tube Fabrication',
   // An assembly's own work, costed from its BOM children (backend costing/assembly): a costed group with no CAD extractor.
   assembly: 'Assembly',
+  // A weldment's welding, costed from its BOM children and the Cost Guide's weld table (backend costing/part-assembly): no CAD extractor either.
+  part_assembly: 'Part Assembly',
 };
 
-/** Families the cad-engine has no extractor for: an assembly is costed from its children, it has no model of its own to analyse. */
-const NO_CAD_EXTRACTOR: ReadonlySet<string> = new Set(['assembly'])
+/** Families the cad-engine has no extractor for: an assembly and a weldment are costed from their BOM children and the Cost Guide. */
+const NO_CAD_EXTRACTOR: ReadonlySet<string> = new Set(['assembly', 'part_assembly'])
 
 export function familyToProcessGroupLabel(family: string | null | undefined): string | null {
   return (family && FAMILY_HINT_TO_PROCESS_GROUP[family]) || null;
+}
+
+/**
+ * The family a part's routes are listed for (the Workflow Builder): the one it is costed as when that family has no CAD extractor (an
+ * assembly, a weldment: costed from the BOM and the Cost Guide, so its CAD family is none, or one from an analysis as another process), else
+ * its CAD family.
+ */
+export function routingFamilyOf(cadFamily: string | null | undefined, costedFamily: string | null | undefined): string | null {
+  return costedFamily && NO_CAD_EXTRACTOR.has(costedFamily) ? costedFamily : cadFamily ?? null;
 }
 
 /**

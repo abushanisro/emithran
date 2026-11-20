@@ -27,6 +27,8 @@ export interface StagedManualRoute {
   multiShotRoute?: string;
   /** A multi-spindle route picked in the Workflow Builder (multi-spindle-route.ts MULTI_SPINDLE_ROUTES key: 6, 8, twin). */
   multiSpindleRoute?: string;
+  /** A weldment route picked in the Workflow Builder (part-assembly-route.ts PART_ASSEMBLY_ROUTES key, "manual" or "robotic"). */
+  partAssemblyRoute?: string;
   machineOverrides?: { processKey: string; mhrRecordId: string }[];
 }
 
@@ -52,6 +54,7 @@ export interface StagedScenario {
   isInsertMolding?: boolean;
   isMultiShot?: boolean;
   isMultiSpindle?: boolean;
+  isPartAssembly?: boolean;
   /** Currency and ask price, already resolved by the form. */
   scenarioPatch?: Record<string, unknown>;
   /** The revision of the applied scenario the page read: another apply since then is refused, not overwritten. */
@@ -129,6 +132,8 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
         ...(s.isMultiShot ? { multiShotRoute: manual?.multiShotRoute ?? null } : {}),
         // Multi-spindle the same: Manual quotes the route picked (6-spindle, 8-spindle, twin-spindle); Auto clears it, so the cheapest complete one is quoted.
         ...(s.isMultiSpindle ? { multiSpindleRoute: manual?.multiSpindleRoute ?? null } : {}),
+        // A weldment the same: Manual quotes the route picked (manual or robotic welding); Auto clears it, so the cheapest complete one is quoted.
+        ...(s.isPartAssembly ? { partAssemblyRoute: manual?.partAssemblyRoute ?? null } : {}),
         ...(s.scenarioPatch ?? {}),
       },
       route,
