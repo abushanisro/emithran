@@ -64,6 +64,10 @@ describe('the weld table of a weldment', () => {
       .toBe('2 x 300 mm, 5 mm leg, 3 mm plate, grind, wire brush');
     expect(weldMeasures({ operation: 'Plug Welding', count: 4, lengthMm: null, sizeMm: 11, thicknessMm: null, areaMm2: null, depthMm: null, bevel: false, grind: false, finishGrind: false, wireBrush: false }))
       .toBe('4, Ø11 mm hole');
+    // Spots are counted: given by count, a length is not theirs; given by length, they are spread along it.
+    const spot = { operation: 'Spot Welding', sizeMm: null, thicknessMm: null, areaMm2: null, depthMm: null, bevel: false, grind: false, finishGrind: false, wireBrush: false };
+    expect(weldMeasures({ ...spot, count: 8, lengthMm: 500 })).toBe('8 spots');
+    expect(weldMeasures({ ...spot, count: null, lengthMm: 500 })).toBe('spots along 500 mm, one every 10 x the sheet');
   });
 
   it('an item is a weldment when its Process is Part Assembly; its route ids are "partassembly-<key>"', () => {
