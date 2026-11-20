@@ -25,6 +25,8 @@ export interface StagedManualRoute {
   insertMoldingRoute?: string;
   /** A multi-shot route picked in the Workflow Builder (multi-shot.ts MULTI_SHOT_ROUTES key: horizontal, vertical). */
   multiShotRoute?: string;
+  /** A multi-spindle route picked in the Workflow Builder (multi-spindle-route.ts MULTI_SPINDLE_ROUTES key: 6, 8, twin). */
+  multiSpindleRoute?: string;
   machineOverrides?: { processKey: string; mhrRecordId: string }[];
 }
 
@@ -49,6 +51,7 @@ export interface StagedScenario {
   isAssembly?: boolean;
   isInsertMolding?: boolean;
   isMultiShot?: boolean;
+  isMultiSpindle?: boolean;
   /** Currency and ask price, already resolved by the form. */
   scenarioPatch?: Record<string, unknown>;
   /** The revision of the applied scenario the page read: another apply since then is refused, not overwritten. */
@@ -124,6 +127,8 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
         ...(s.isInsertMolding ? { insertMoldingRoute: manual?.insertMoldingRoute ?? null } : {}),
         // Multi-shot the same: Manual quotes the press orientation picked; Auto clears it, so the cheapest complete one is quoted.
         ...(s.isMultiShot ? { multiShotRoute: manual?.multiShotRoute ?? null } : {}),
+        // Multi-spindle the same: Manual quotes the route picked (6-spindle, 8-spindle, twin-spindle); Auto clears it, so the cheapest complete one is quoted.
+        ...(s.isMultiSpindle ? { multiSpindleRoute: manual?.multiSpindleRoute ?? null } : {}),
         ...(s.scenarioPatch ?? {}),
       },
       route,
