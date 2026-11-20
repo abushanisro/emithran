@@ -3,7 +3,7 @@
 import type { CostSummaryDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import { runView } from '../casting/casting-calculator-seeds';
 import { computeSustainability } from '../shared/core/cost-engine';
-import { BAR_TUBE_CALC, BAR_TUBE_PROCESS_GROUP, type BarTubePart, type BarTubeRoute, type BarTubeRouteGap } from './bar-tube-route';
+import { BAR_TUBE_CALC, BAR_TUBE_PROCESS_GROUP, relevantBarTubeGaps, type BarTubePart, type BarTubeRoute, type BarTubeRouteGap } from './bar-tube-route';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -77,10 +77,12 @@ export function buildBarTubeCostSummary(input: {
         holeCount: part.holes.length, openingCount: part.complexHoles.length + part.cutouts.length,
         ends: part.ends.map((e) => ({ end: e.end, variant: e.variant, cutAngleDeg: e.cutAngleDeg })),
         forms: part.forms.map((f) => ({ end: f.end, variant: f.variant })),
+        bendPlan: route.bendPlan.map((b) => ({ ...b, clrMm: r2(b.clrMm), angleDeg: r2(b.angleDeg) })),
+        plate: part.plate ? { thicknessMm: part.plate.thicknessMm, blankLengthMm: r2(part.plate.blankLengthMm), blankWidthMm: r2(part.plate.blankWidthMm), cutLengthMm: r2(part.plate.cutLengthMm) } : null,
         complete: route.complete,
         options: [
           ...input.barTube.routes.map(option),
-          ...input.barTube.gaps.map((g) => ({ route: g.key, label: g.label, complete: false, totalCost: null, reason: g.reason })),
+          ...relevantBarTubeGaps(input.barTube.gaps).map((g) => ({ route: g.key, label: g.label, complete: false, totalCost: null, reason: g.reason })),
         ],
       },
     } : {}),

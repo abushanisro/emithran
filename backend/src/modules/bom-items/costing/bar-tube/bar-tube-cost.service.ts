@@ -38,14 +38,32 @@ export interface BarTubeGeometrySummary {
   cutouts?: Array<Record<string, unknown>> | null;
   ends?: Array<Record<string, unknown>> | null;
   forms?: Array<Record<string, unknown>> | null;
+  /** A flat part cut from plate (cad-engine plate_measurements). */
+  plate?: Record<string, unknown> | null;
 }
 
 /** The part as the routes take it, or what keeps it from being priced as a bar or tube (not measured, not stock, cut from plate). */
 export function barTubePart(g: BarTubeGeometrySummary | null | undefined): { part: BarTubePart | null; missing: string[] } {
   if (!g?.extractionVersion) return { part: null, missing: ['the bar and tube measurements: press Refresh analysis so the part is measured as a bar or tube'] };
   if (!g.stockForm) return { part: null, missing: [`the part is not a length of bar, tube or profile: ${g.reason ?? 'no constant cross-section along a line'}`] };
-  if (g.stockForm === 'PLATE') return { part: null, missing: ['a part cut from plate: plate cutting (laser, plasma, oxyfuel) is not costed yet'] };
-  if (g.stockForm === 'GENERIC_EXTRUSION') return { part: null, missing: ['an extruded profile: the extrusion route (billet, die and press) is not costed yet'] };
+  if (g.stockForm === 'PLATE') {
+    const p = g.plate ?? {};
+    const t = positive(p.thickness_mm);
+    const cut = positive(p.cut_length_mm);
+    const bl = positive(p.blank_length_mm);
+    const bw = positive(p.blank_width_mm);
+    const area = positive(p.face_area_mm2);
+    if (t == null || cut == null || bl == null || bw == null || area == null) return { part: null, missing: ['the plate measurements: press Refresh analysis'] };
+    return {
+      part: {
+        stockForm: 'PLATE',
+        section: { areaMm2: bw * t, widthMm: bw, heightMm: t, outerPerimeterMm: 2 * (bw + t), odMm: null, wallMm: t, circumscribingDiameterMm: null },
+        developedLengthMm: bl, bends: [], holes: [], complexHoles: [], cutouts: [], ends: [], forms: [],
+        plate: { thicknessMm: t, cutLengthMm: cut, pierces: Math.max(1, Number(p.pierce_count ?? 1)), blankLengthMm: bl, blankWidthMm: bw, faceAreaMm2: area },
+      },
+      missing: [],
+    };
+  }
   const s = g.section ?? {};
   const area = positive(s.area_mm2);
   const width = positive(s.width_mm);
@@ -61,7 +79,8 @@ export function barTubePart(g: BarTubeGeometrySummary | null | undefined): { par
         odMm: positive(s.od_mm), wallMm: positive(s.wall_mm) ?? positive(s.thickness_mm), circumscribingDiameterMm: positive(s.circumscribing_diameter_mm),
       },
       developedLengthMm: length,
-      bends: (g.bends ?? []).map((b) => ({ clrMm: Number(b.clr_mm), angleDeg: Number(b.angle_deg) })).filter((b) => Number.isFinite(b.clrMm) && Number.isFinite(b.angleDeg)),
+      bends: (g.bends ?? []).map((b) => ({ clrMm: Number(b.clr_mm), angleDeg: Number(b.angle_deg), clockAngleDeg: num(b.clock_angle_deg), arcLengthMm: positive(b.arc_length_mm) }))
+        .filter((b) => b.clrMm > 0 && b.angleDeg > 0),
       holes: (g.holes ?? []).map((h) => ({ featureType: String(h.feature_type ?? 'SimpleHole'), diameterMm: Number(h.diameter_mm), stationMm: num(h.station_mm) })).filter((h) => h.diameterMm > 0),
       complexHoles: (g.complexHoles ?? []).map((o) => ({ perimeterMm: Number(o.perimeter_mm), stationMm: num(o.station_mm) })).filter((o) => o.perimeterMm > 0),
       cutouts: (g.cutouts ?? []).map((o) => ({ perimeterMm: Number(o.perimeter_mm), stationMm: num(o.station_mm) })).filter((o) => o.perimeterMm > 0),
@@ -135,7 +154,7 @@ export class BarTubeCostService {
     const g = (name ?? '').trim();
     if (!g) return null;
     const { data, error } = await client.from('raw_materials')
-      .select('id, name, grade, cut_code, density_kg_m3')
+      .select('id, name, grade, cut_code, material_type, density_kg_m3, uts_mpa, yield_strength_mpa, cost_usa, specific_heat_rt_j_kg_k, extrusion_exit_speed_max_mm_s')
       .eq('material_group', BAR_TUBE_PROCESS_GROUP)
       .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`)
       .limit(2);
@@ -161,7 +180,10 @@ export class BarTubeCostService {
     }
     return {
       id: String(row.id), name: materialName, cutCode, cutCodeFamily: cutCodeFamilyOf(families, cutCode),
-      densityKgM3: positive(row.density_kg_m3), stockPricePerKgUsd: price, stockPriceSource: source,
+      materialType: row.material_type ? String(row.material_type) : null, densityKgM3: positive(row.density_kg_m3),
+      utsMpa: positive(row.uts_mpa), yieldMpa: positive(row.yield_strength_mpa), costPerKgUsd: positive(row.cost_usa),
+      specificHeatJKgK: positive(row.specific_heat_rt_j_kg_k), exitSpeedMaxMmS: positive(row.extrusion_exit_speed_max_mm_s),
+      stockPricePerKgUsd: price, stockPriceSource: source,
     };
   }
 

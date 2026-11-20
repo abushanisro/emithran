@@ -910,6 +910,10 @@ export interface BarTubeBreakdown {
   openingCount: number;
   ends: Array<{ end: string; variant: string; cutAngleDeg: number | null }>;
   forms: Array<{ end: string; variant: string }>;
+  /** Each bend's method (the cheapest that can make it), its tool key (rotary draw) and whether it needs a mandrel; why when no method can. */
+  bendPlan: Array<{ index: number; clrMm: number; angleDeg: number; method: string | null; toolKey: string | null; mandrel: boolean; reason: string | null }>;
+  /** A part cut from plate: its thickness and blank. */
+  plate: { thicknessMm: number; blankLengthMm: number; blankWidthMm: number; cutLengthMm: number } | null;
   complete: boolean;
   /** Every route: its total per part (summary currency) when complete, or why it is not a route for the part. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
