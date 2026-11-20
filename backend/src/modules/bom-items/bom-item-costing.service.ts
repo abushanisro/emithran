@@ -138,7 +138,7 @@ import { ADDITIVE_ROUTES } from './costing/additive/additive-route';
 import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
 import { BarTubeCostService, type BarTubeGeometrySummary } from './costing/bar-tube/bar-tube-cost.service';
 import { buildBarTubeCostSummary } from './costing/bar-tube/bar-tube-cost-summary';
-import { BAR_TUBE_ROUTES } from './costing/bar-tube/bar-tube-route';
+import { BAR_TUBE_ROUTES, type BarTubeRouteKey } from './costing/bar-tube/bar-tube-route';
 import { barTubeRouteFor, barTubeRouteId } from './costing/bar-tube/bar-tube-route-comparison';
 import { AssemblyCostService, componentsOf, type AssemblyCostResult } from './costing/assembly/assembly-cost.service';
 import { InsertMoldingService } from './costing/plastic-molding/insert/insert-molding.service';
@@ -5063,12 +5063,14 @@ export class BomItemCostingService {
     requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
     localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
   ): Promise<RouteComparisonResponseDto> {
-    const keys = BAR_TUBE_ROUTES.map((r) => r.key);
+    // The routes of the part's kind (bought stock, plate or an extruded profile), as the quote lists them; the saw and laser when it lists none.
+    const quote = await this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'bar_tube');
+    const listed = (quote.barTube?.options ?? []).map((o) => o.route).filter((k): k is BarTubeRouteKey => BAR_TUBE_ROUTES.some((r) => r.key === k));
+    const keys: BarTubeRouteKey[] = listed.length ? listed : ['saw', 'laser'];
     const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
-    const [quote, ...summaries] = await Promise.all([
-      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'bar_tube'),
-      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'bar_tube')),
-    ]);
+    const summaries = await Promise.all(
+      keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'bar_tube')),
+    );
     const routes = keys.map((key, i) => barTubeRouteFor(key, summaries[i]!));
     if (localCurrencyOut) {
       localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));

@@ -625,6 +625,7 @@ export class AutoFillService {
             cutouts: cadMI.features.cutouts ?? [],
             ends: cadMI.features.ends ?? [],
             forms: cadMI.features.forms ?? [],
+            plate: cadMI.features.plate ?? null,
           } : null,
         } : {}),
         // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output

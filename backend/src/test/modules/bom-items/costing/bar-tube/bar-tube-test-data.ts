@@ -37,14 +37,19 @@ export function allBarTubeMachines(): Record<string, SandMachine[]> {
   return out;
 }
 
+const num = (v: unknown): number | null => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 const STOCK_PRICE_COLUMN: Readonly<Record<string, string>> = {
   round_tube: 'Round Tube Unit Cost (USD / kg)', square_tube: 'Square Tube Unit Cost (USD / kg)', rectangular_tube: 'Rectangular Tube Unit Cost (USD / kg)',
   round_bar: 'Round Bar Unit Cost (USD / kg)', square_bar: 'Square Bar Unit Cost (USD / kg)', rectangular_bar: 'Rectangular Bar Unit Cost (USD / kg)',
   hex_bar: 'Hex Bar Unit Cost (USD / kg)', angle_bar: 'Angle Bar Unit Cost (USD / kg)', channel_bar: 'Channel Bar Unit Cost (USD / kg)',
-  i_beam: 'I-Beam Unit Cost (USD / kg)', t_beam: 'T-Beam Unit Cost (USD / kg)',
+  i_beam: 'I-Beam Unit Cost (USD / kg)', t_beam: 'T-Beam Unit Cost (USD / kg)', plate: 'Sheet Unit Cost (USD / kg)',
 };
-/** A material of memory/Bar and tube fab/Raw material/materials.csv as the cost service reads it, with the price of `stockForm` (USA). */
-export function barTubeMaterial(name: string, stockForm: string): BarTubeMaterial {
+/**
+ * A material of memory/Bar and tube fab/Raw material/materials.csv as the cost service reads it (raw_materials and, from migrations 1090 and
+ * 1092, its strengths, exit speed and specific heat), with the price of `stockForm` (USA). `costPerKgUsd` is the alloy's own price (cost_usa,
+ * which the file does not hold: the test names it).
+ */
+export function barTubeMaterial(name: string, stockForm: string, costPerKgUsd: number | null = null): BarTubeMaterial {
   const r = rows('Raw material/materials.csv').find((m) => m['Name'] === name);
   if (!r) throw new Error(`no bar and tube material ${name}`);
   const ref = realBarTubeReference();
@@ -54,6 +59,9 @@ export function barTubeMaterial(name: string, stockForm: string): BarTubeMateria
   const price = column && r[column] != null && r[column] !== '' ? Number(r[column]) : null;
   return {
     id: `raw-materials:${name}`, name, cutCode, cutCodeFamily: cutCodeFamilyOf(families, cutCode),
-    densityKgM3: Number(r['Density (kg / m^3)']), stockPricePerKgUsd: price, stockPriceSource: price != null ? `materials.csv ${column}` : null,
+    materialType: String(r['Material Type'] ?? ''), densityKgM3: Number(r['Density (kg / m^3)']),
+    utsMpa: num(r['Ultimate Tensile Strength (MPa)']), yieldMpa: num(r['Tensile Yield Strength (MPa)']), costPerKgUsd,
+    specificHeatJKgK: num(r['Specific Heat RT (J / kg * K)']), exitSpeedMaxMmS: num(r['Maximum Extrusion Exit Speed (mm / s)']),
+    stockPricePerKgUsd: price, stockPriceSource: price != null ? `materials.csv ${column}` : null,
   };
 }
