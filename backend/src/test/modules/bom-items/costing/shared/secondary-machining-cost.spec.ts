@@ -105,6 +105,17 @@ describe('priceSecondaryMachining (real calculators and tables)', () => {
     expect(millLine.totalCost).toBeCloseTo(((60 + 30) * (sec / 60 + setupMin)) / 60, 1);
   });
 
+  // The calculation behind the line goes on it, so a saved line reopens its calculator with the inputs it was costed from (migration 1097).
+  it('a line carries the calculator run its time is, with its inputs and their sources', () => {
+    const millLine = result.lines.find((l) => l.machineName === 'Mill A');
+    const trace = millLine?.calculationTrace ?? [];
+    expect(millLine?.calculatorId).toBeTruthy();
+    expect(trace.length).toBeGreaterThan(0);
+    expect(trace.filter((st) => st.kind === 'input').every((st) => !!st.source)).toBe(true);
+    // One feature: its own run, unprefixed (several features: one group each, summed).
+    expect(trace.some((st) => st.group)).toBe(false);
+  });
+
   it('part handling between setups joins the first line on its machine, once', () => {
     const handled = priceSecondaryMachining({
       need, instances: inst, calculators, lookupContext, machineFor, batchSize: 100, costContext,
@@ -217,6 +228,9 @@ describe('deburring after machining', () => {
       ...machiningLookupSeeds('Deburring', ctx, {})!.seeds,
     }).sec!;
     expect(line.featureBreakdown![0]!.timeSec).toBeCloseTo(expected, 2);
+    // The Deburring calculator's run is on the line: its edge length is the machined feature's.
+    expect(line.calculatorId).toBeTruthy();
+    expect(line.calculationTrace?.find((st) => st.fieldName === 'Sharp Edge Length')?.value).toBeCloseTo(2 * 18.85, 2);
   });
 });
 

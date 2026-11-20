@@ -44,9 +44,9 @@
 
 import type { CalculationTraceStep, CalculatorRunDto, FeatureOp, MachineChoiceDto, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 import { eMithranTerms, type EMithranTermsArgs } from '../shared/core/engine-kernel';
-import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
+import { runReferenceCalculator, type ReferenceCalculators, runOnLine } from '../shared/calculators/reference-calculator';
 import type { CastingMaterial, CastingReference } from './casting-reference';
-import { castingSeed, runOnLine, runView, SeedSet } from './casting-calculator-seeds';
+import { castingSeed, runView, SeedSet } from './casting-calculator-seeds';
 import { machineChoice, type ChoiceEval } from './machine-choice';
 import { selectHpdcMachines, type HpdcMachine, type MachineCheck } from './hpdc-machine';
 

@@ -32,8 +32,8 @@ import { selectHpdcMachines, type HpdcMachine, type MachineCheck } from './hpdc-
 import type { MachineChoiceDto } from '../../dto/cost-breakdown.dto';
 import { machineChoice, type ChoiceEval } from './machine-choice';
 import { resolveHpdcCavities, type CastingGeometry, type HpdcCavities, type HpdcResult, type TraceStep } from './hpdc-engine';
-import { runReferenceCalculator, type ReferenceCalculators } from '../shared/calculators/reference-calculator';
-import { castingSeed, runOnLine, SeedSet } from './casting-calculator-seeds';
+import { runReferenceCalculator, type ReferenceCalculators, runOnLine } from '../shared/calculators/reference-calculator';
+import { castingSeed, SeedSet } from './casting-calculator-seeds';
 
 export const GDC_PROCESS = 'Gravity Die Casting';
 export const GDC_MACHINE_CLASS_ID = 'die_casting_gravity_die_casting';

@@ -82,16 +82,6 @@ export class SeedSet {
   }
 }
 
-/** The fields a process line carries from the calculator that computed it. */
-export function runOnLine(run: CalcRun): Pick<ProcessLineCost, 'calculationTrace' | 'lookupMatches' | 'calculatorId' | 'calculatorVersion'> {
-  return {
-    calculationTrace: run.trace,
-    ...(Object.keys(run.lookups).length ? { lookupMatches: run.lookups } : {}),
-    ...(run.calculatorId ? { calculatorId: run.calculatorId } : {}),
-    ...(run.calculatorVersion != null ? { calculatorVersion: run.calculatorVersion } : {}),
-  };
-}
-
 /** A calculator run that is not a process line, for the summary calculatorRuns. */
 export function runView(name: string, output: string, run: ReferenceCalcRun): CalculatorRunDto {
   return {

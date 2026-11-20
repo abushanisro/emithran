@@ -3,7 +3,7 @@ import {
   normalizeFieldName,
   type CalculatorFieldRow,
 } from '../../../../calculators/calculator-formula-evaluator';
-import type { CalculationTraceStep, SourceRef } from '../../../dto/cost-breakdown.dto';
+import type { CalculationTraceStep, ProcessLineCost, SourceRef } from '../../../dto/cost-breakdown.dto';
 
 /**
  * Reference-data calculators (Machining, Die Casting, ...) are computed BY the
@@ -210,4 +210,14 @@ export function runReferenceCalculator(
 
 function round(v: number): number {
   return Math.abs(v) >= 100 ? Math.round(v * 100) / 100 : Math.round(v * 10000) / 10000;
+}
+
+/** The fields a process line carries from the calculator that computed it. */
+export function runOnLine(run: CalcRun): Pick<ProcessLineCost, 'calculationTrace' | 'lookupMatches' | 'calculatorId' | 'calculatorVersion'> {
+  return {
+    calculationTrace: run.trace,
+    ...(Object.keys(run.lookups).length ? { lookupMatches: run.lookups } : {}),
+    ...(run.calculatorId ? { calculatorId: run.calculatorId } : {}),
+    ...(run.calculatorVersion != null ? { calculatorVersion: run.calculatorVersion } : {}),
+  };
 }
