@@ -117,6 +117,10 @@ ALTER TABLE public.mhr_records ADD COLUMN process_group varchar, ADD COLUMN land
 -- the press columns as the real database has them (migration 633): migration 1080 fills them for the insert molding presses from their specs
 ALTER TABLE public.mhr_records ADD COLUMN max_tonnage numeric, ADD COLUMN shot_capacity_grams integer, ADD COLUMN press_cycle_time_s numeric,
   ADD COLUMN min_mold_height_mm integer, ADD COLUMN max_mold_height_mm integer, ADD COLUMN tie_bar_x_mm integer, ADD COLUMN tie_bar_y_mm integer;
+-- the machine envelope columns as the real database has them (migration 755 fills them for the lathes): migration 1093 fills them for the multi-spindle machines
+ALTER TABLE public.mhr_records ADD COLUMN max_diameter_mm numeric(10,2), ADD COLUMN max_length_mm numeric(10,2);
+-- the taxonomy columns as the real database has them (migration 609): migration 1094 adds the Multi-Spindle Machining > Simultaneous Turning row
+ALTER TABLE public.process_taxonomy ADD COLUMN default_machine_name varchar(200), ADD COLUMN notes text;
 -- the material cost record table as the real database has it (migration 040): migration 1041 adds the stock label to it
 CREATE TABLE public.raw_material_cost_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bom_item_id uuid NOT NULL, user_id uuid NOT NULL, is_active boolean DEFAULT true);
 -- the machining reference table as the real database has it (migration 638): migration 1026 completes its tblTapping row from its tblReaming row
