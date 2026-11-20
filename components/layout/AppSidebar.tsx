@@ -57,7 +57,7 @@ type NavItem = {
   exact?: boolean;
 };
 
-const navGroups: { label: string; items: NavItem[] }[] = [
+export const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Work',
     items: [
