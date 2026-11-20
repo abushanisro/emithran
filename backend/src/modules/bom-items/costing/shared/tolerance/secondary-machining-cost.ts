@@ -28,6 +28,9 @@ import { MACHINE_REGISTRY } from '../core/default-rates.constants';
 import { eMithranTerms, resolveSetupMinutes, type EMithranTermsArgs } from '../core/engine-kernel';
 import { runMachiningCalculator, type CalcRun, type CalcSeed, type MachiningCalculators } from '../../machining/calculators/machining-calculator';
 import { machiningLookupSeeds, type MachiningLookupContext } from '../../machining/calculators/machining-lookup-seeds';
+import { sumRuns } from '../../machining/process/machining-trace';
+import { runOnLine } from '../calculators/reference-calculator';
+
 import type { FeatureInstance } from './feature-tolerances';
 import type { MachiningNeedResult } from './machining-need';
 
@@ -218,7 +221,9 @@ export function priceSecondaryMachining(input: {
   const basisOf = new Map(input.need.features.filter((x) => x.verdict === 'needs_machining').map((x) => [x.label, machiningBasis(x)]));
   const lines: ProcessLineCost[] = [];
   const setupCharged = new Set<string>();
-  const lineFor = (machine: MHRRateInput, operation: string, sec: number, breakdown: FeatureOp[], referenceSetupTimeHr?: number | null): ProcessLineCost => {
+  // runs: the calculator runs the line's time is (one per feature it machines): their calculation goes on the line, so the saved line can
+  // reopen its calculator with the inputs it was costed from. None for a step timed from a reference time (a bench step).
+  const lineFor = (machine: MHRRateInput, operation: string, sec: number, breakdown: FeatureOp[], referenceSetupTimeHr?: number | null, runs: readonly { label: string; run: CalcRun }[] = []): ProcessLineCost => {
     const firstOnMachine = !setupCharged.has(machine.machineClass);
     setupCharged.add(machine.machineClass);
     const handling = firstOnMachine ? input.handling?.[machine.machineClass] : undefined;
@@ -264,6 +269,7 @@ export function priceSecondaryMachining(input: {
       ...(machine.selection ? { machineSelection: machine.selection } : {}),
       ...(candidate?.machineId ? { mhrId: candidate.machineId } : {}),
       featureBreakdown: breakdown,
+      ...(runs.length > 0 ? runOnLine(sumRuns(runs, `${operation} cycle time`)) : {}),
     };
   };
   const occRef = (inst: FeatureInstance | undefined) =>
@@ -272,7 +278,7 @@ export function priceSecondaryMachining(input: {
     const sec = picks.reduce((t, p) => t + p.op.sec, 0);
     lines.push(lineFor(machine, operation, sec, picks.map(({ f, op, inst }) => ({
       name: f.label, featureType: f.featureType, timeSec: r2(op.sec), count: 1, ...occRef(inst), basis: basisOf.get(f.label),
-    }))));
+    })), undefined, picks.map(({ f, op }) => ({ label: f.label, run: op.run }))));
   }
 
   // Deburring: the sharp edges machining creates -- every CAD sharp edge
@@ -282,6 +288,7 @@ export function priceSecondaryMachining(input: {
   if (machined.length > 0 && input.deburr) {
     const edges = input.instances.filter((i) => i.featureType === 'SharpEdge' && i.lengthMm != null);
     const rows: FeatureOp[] = [];
+    const runs: { label: string; run: CalcRun }[] = [];
     let sec = 0;
     const gaps: string[] = [];
     for (const inst of machined) {
@@ -295,12 +302,13 @@ export function priceSecondaryMachining(input: {
       });
       if (run.sec == null) { gaps.push(...(lookup?.missing ?? []), ...run.missing); continue; }
       sec += run.sec;
+      runs.push({ label: inst.label, run });
       rows.push({ name: inst.label, featureType: inst.featureType, timeSec: r2(run.sec), count: 1, ...occRef(inst) });
     }
     if (gaps.length) warnings.push(`Deburring after machining not fully priced: ${[...new Set(gaps)].join('; ')}.`);
     if (rows.length === 0 && gaps.length === 0) warnings.push('Deburring after machining: no CAD sharp edge touches a machined feature (re-run analysis if edges are missing).');
     if (rows.length > 0) {
-      if (input.deburr.machine.source === 'mhr_database') lines.push(lineFor(input.deburr.machine, 'Deburring', sec, rows));
+      if (input.deburr.machine.source === 'mhr_database') lines.push(lineFor(input.deburr.machine, 'Deburring', sec, rows, undefined, runs));
       else warnings.push('Deburring after machining not costed: no deburr machine in HR Rates.');
     }
   }
