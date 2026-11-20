@@ -4,7 +4,7 @@ import { buildApplyScenarioRequest, type StagedScenario } from "@/lib/scenario/b
 
 const base: StagedScenario = {
   location: "USA", batchSizeDraft: null, batchSizeAuto: false, productionLife: null, annualVolumeDraft: 1000, annualVolumeSaved: 1000,
-  materialGrade: "", processRouting: "auto", manualRoute: null, isDieCast: false, isForged: false,
+  materialGrade: "", processRouting: "auto", manualRoute: null, routePickKey: null,
 };
 const built = (over: Partial<StagedScenario>) => {
   const r = buildApplyScenarioRequest({ ...base, ...over });
@@ -67,62 +67,32 @@ describe("buildApplyScenarioRequest", () => {
   });
 
   it("die casting names the chosen process on Manual and clears it on Auto; the form's currency rides in the same patch", () => {
-    const manual = { label: "HPDC", directApplyRouteId: "dc-hpdc", dieCastingProcess: "High Pressure Die Casting" };
-    expect(built({ isDieCast: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", dieCastingProcess: "High Pressure Die Casting" });
-    expect(built({ isDieCast: true, scenarioPatch: { scenarioCurrency: "EUR" } }).scenarioPatch).toEqual({ processRouting: "auto", dieCastingProcess: null, scenarioCurrency: "EUR" });
+    const manual = { label: "HPDC", directApplyRouteId: "dc-hpdc", routePicks: { dieCastingProcess: "High Pressure Die Casting" } };
+    expect(built({ routePickKey: "dieCastingProcess", processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", dieCastingProcess: "High Pressure Die Casting" });
+    expect(built({ routePickKey: "dieCastingProcess", scenarioPatch: { scenarioCurrency: "EUR" } }).scenarioPatch).toEqual({ processRouting: "auto", dieCastingProcess: null, scenarioCurrency: "EUR" });
   });
 
-  it("a forging route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
-    const manual = { label: "Closed-die forging · die hammer", directApplyRouteId: "forging-closed_die_hammer", forgingRoute: "closed_die_hammer" };
-    expect(built({ isForged: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", forgingRoute: "closed_die_hammer" });
-    expect(built({ isForged: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "forging-closed_die_hammer" });
-    expect(built({ isForged: true }).scenarioPatch).toEqual({ processRouting: "auto", forgingRoute: null });
+  // Every family that quotes the cheapest of its complete routes keeps the one picked in the Workflow Builder under its own key.
+  it.each([
+    ["forgingRoute", "forging-closed_die_hammer", "closed_die_hammer"],
+    ["compositesRoute", "composites-atl", "atl"],
+    ["additiveRoute", "additive-resin_curing", "resin_curing"],
+    ["barTubeRoute", "bar-tube-plate_oxyfuel", "plate_oxyfuel"],
+    ["assemblyRoute", "assembly-robotic", "robotic"],
+    ["insertMoldingRoute", "im-insert-3-axis", "3_axis"],
+    ["multiShotRoute", "ms-vertical", "vertical"],
+    ["multiSpindleRoute", "multispindle-8", "8"],
+    ["partAssemblyRoute", "partassembly-robotic", "robotic"],
+  ] as const)("%s: the route picked is quoted on Manual, Auto quotes the cheapest again, and another part never writes the key", (key, routeId, pick) => {
+    const manual = { label: routeId, directApplyRouteId: routeId, routePicks: { [key]: pick } };
+    expect(built({ routePickKey: key, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", [key]: pick });
+    expect(built({ routePickKey: key, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId });
+    expect(built({ routePickKey: key }).scenarioPatch).toEqual({ processRouting: "auto", [key]: null });
+    expect(built({ processRouting: "manual", manualRoute: manual }).scenarioPatch).not.toHaveProperty(key);
   });
 
-  it("a bar and tube route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
-    const manual = { label: "Plate oxyfuel", directApplyRouteId: "bar-tube-plate_oxyfuel", barTubeRoute: "plate_oxyfuel" };
-    expect(built({ isBarTube: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", barTubeRoute: "plate_oxyfuel" });
-    expect(built({ isBarTube: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "bar-tube-plate_oxyfuel" });
-    expect(built({ isBarTube: true }).scenarioPatch).toEqual({ processRouting: "auto", barTubeRoute: null });
-  });
-
-  it("an additive route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
-    const manual = { label: "Stereolithography (SLA)", directApplyRouteId: "additive-resin_curing", additiveRoute: "resin_curing" };
-    expect(built({ isAdditive: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", additiveRoute: "resin_curing" });
-    expect(built({ isAdditive: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "additive-resin_curing" });
-    expect(built({ isAdditive: true }).scenarioPatch).toEqual({ processRouting: "auto", additiveRoute: null });
-  });
-
-  it("an assembly route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
-    const manual = { label: "Robotic welding", directApplyRouteId: "assembly-robotic", assemblyRoute: "robotic" };
-    expect(built({ isAssembly: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", assemblyRoute: "robotic" });
-    expect(built({ isAssembly: true }).scenarioPatch).toEqual({ processRouting: "auto", assemblyRoute: null });
-  });
-
-  it("an insert molding load method picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
-    const manual = { label: "Insert molding · 3-axis robot", directApplyRouteId: "im-insert-3-axis", insertMoldingRoute: "3_axis" };
-    expect(built({ isInsertMolding: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", insertMoldingRoute: "3_axis" });
-    expect(built({ isInsertMolding: true }).scenarioPatch).toEqual({ processRouting: "auto", insertMoldingRoute: null });
-    // Multi-shot the same: Manual quotes the press orientation picked; Auto clears it.
-    const ms = { label: "Multi-shot · vertical press", directApplyRouteId: "ms-vertical", multiShotRoute: "vertical" };
-    expect(built({ isMultiShot: true, processRouting: "manual", manualRoute: ms }).scenarioPatch).toEqual({ processRouting: "manual", multiShotRoute: "vertical" });
-    expect(built({ isMultiShot: true }).scenarioPatch).toEqual({ processRouting: "auto", multiShotRoute: null });
-  });
-
-  it("a multi-spindle route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
-    const manual = { label: "8-spindle multi-spindle", directApplyRouteId: "multispindle-8", multiSpindleRoute: "8" };
-    expect(built({ isMultiSpindle: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", multiSpindleRoute: "8" });
-    expect(built({ isMultiSpindle: true }).scenarioPatch).toEqual({ processRouting: "auto", multiSpindleRoute: null });
-    // A part that is not made on a multi-spindle never writes the key.
-    expect(built({ processRouting: "manual", manualRoute: manual }).scenarioPatch).not.toHaveProperty("multiSpindleRoute");
-  });
-
-  it("a weldment route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
-    const manual = { label: "Robotic welding", directApplyRouteId: "partassembly-robotic", partAssemblyRoute: "robotic" };
-    expect(built({ isPartAssembly: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", partAssemblyRoute: "robotic" });
-    expect(built({ isPartAssembly: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "partassembly-robotic" });
-    expect(built({ isPartAssembly: true }).scenarioPatch).toEqual({ processRouting: "auto", partAssemblyRoute: null });
-    // A part that is not a weldment never writes the key.
-    expect(built({ processRouting: "manual", manualRoute: manual }).scenarioPatch).not.toHaveProperty("partAssemblyRoute");
+  it("a Manual route without the part's own choice (an older restored one) clears it rather than sending another family's", () => {
+    const manual = { label: "Robotic welding", directApplyRouteId: "partassembly-robotic", routePicks: { assemblyRoute: "robotic" } };
+    expect(built({ routePickKey: "partAssemblyRoute", processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", partAssemblyRoute: null });
   });
 });

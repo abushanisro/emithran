@@ -115,12 +115,17 @@ export function weldVocabulary(plateMm: number | null): RowVocabulary<WeldField>
   };
 }
 
-/** A weld's measures as one line ("2 x 300 mm, 5 mm leg, 3 mm plate, grind"). */
+/**
+ * A weld's measures as one line ("2 x 300 mm, 5 mm leg, 3 mm plate, grind"). Spots are counted, not run: their count when given (the engine
+ * then ignores a length), else the length they are spread along (backend weld-geometry.ts spotsOf).
+ */
 export function weldMeasures(w: Pick<WeldView, 'operation' | 'count' | 'lengthMm' | 'sizeMm' | 'thicknessMm' | 'areaMm2' | 'depthMm' | 'bevel' | 'grind' | 'finishGrind' | 'wireBrush'>): string {
   const n = w.count ?? 1;
   const finish = [w.bevel ? 'bevel' : null, w.grind ? 'grind' : null, w.finishGrind ? 'finish grind' : null, w.wireBrush ? 'wire brush' : null].filter(Boolean);
+  const spots = w.operation === 'Spot Welding';
   return [
-    w.lengthMm != null ? `${n} x ${w.lengthMm} mm` : `${n}`,
+    spots ? (w.count != null ? `${w.count} spots` : `spots along ${w.lengthMm ?? 0} mm, one every 10 x the sheet`)
+      : w.lengthMm != null ? `${n} x ${w.lengthMm} mm` : `${n}`,
     w.sizeMm != null ? (w.operation === 'Plug Welding' ? `Ø${w.sizeMm} mm hole` : `${w.sizeMm} mm leg`) : null,
     w.areaMm2 != null ? `${w.areaMm2} mm²` : null,
     w.depthMm != null ? `${w.depthMm} mm deep` : null,

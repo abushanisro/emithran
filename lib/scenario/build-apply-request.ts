@@ -1,4 +1,5 @@
 import type { ApplyCustomRouteStep } from '@/lib/api/hooks/useBOMItems';
+import type { RoutePickKey, RoutePicks } from '@/lib/routing/route-pick';
 
 /**
  * What the Cost Guide has staged, turned into the one Apply Scenario request (POST /bom-items/:id/scenario-applications). Pure: the page's state
@@ -12,23 +13,8 @@ export interface StagedManualRoute {
   dynamicSteps?: { process: string; machineClass: string; isReal: boolean; processGroup?: string; processRoute?: string }[];
   /** A route applied as it is. */
   directApplyRouteId?: string;
-  dieCastingProcess?: string;
-  /** A forging route picked in the Workflow Builder (forging-route.ts FORGING_ROUTES key, e.g. "closed_die_hammer"). */
-  forgingRoute?: string;
-  /** An additive route picked in the Workflow Builder (additive-route.ts ADDITIVE_ROUTES key, e.g. "resin_curing"). */
-  additiveRoute?: string;
-  /** A bar and tube route picked in the Workflow Builder (bar-tube-route.ts BAR_TUBE_ROUTES key: saw, laser, plate_laser, ...). */
-  barTubeRoute?: string;
-  /** An assembly route picked in the Workflow Builder (assembly-route.ts ASSEMBLY_ROUTES key, "manual" or "robotic"). */
-  assemblyRoute?: string;
-  /** An insert molding route picked in the Workflow Builder (insert-molding.ts INSERT_MOLDING_ROUTES key: manual, 3_axis, 6_axis). */
-  insertMoldingRoute?: string;
-  /** A multi-shot route picked in the Workflow Builder (multi-shot.ts MULTI_SHOT_ROUTES key: horizontal, vertical). */
-  multiShotRoute?: string;
-  /** A multi-spindle route picked in the Workflow Builder (multi-spindle-route.ts MULTI_SPINDLE_ROUTES key: 6, 8, twin). */
-  multiSpindleRoute?: string;
-  /** A weldment route picked in the Workflow Builder (part-assembly-route.ts PART_ASSEMBLY_ROUTES key, "manual" or "robotic"). */
-  partAssemblyRoute?: string;
+  /** The route choice the route commits (route-pick.ts routePicksOf): its family's key with the route's key, or a die casting process. */
+  routePicks?: RoutePicks;
   machineOverrides?: { processKey: string; mhrRecordId: string }[];
 }
 
@@ -46,15 +32,8 @@ export interface StagedScenario {
   materialGrade: string;
   processRouting: 'auto' | 'manual';
   manualRoute: StagedManualRoute | null;
-  isDieCast: boolean;
-  isForged: boolean;
-  isAdditive?: boolean;
-  isBarTube?: boolean;
-  isAssembly?: boolean;
-  isInsertMolding?: boolean;
-  isMultiShot?: boolean;
-  isMultiSpindle?: boolean;
-  isPartAssembly?: boolean;
+  /** The key this part's route choice is stored under (route-pick.ts routePickKeyOf); null when its routes carry none. */
+  routePickKey: RoutePickKey | null;
   /** Currency and ask price, already resolved by the form. */
   scenarioPatch?: Record<string, unknown>;
   /** The revision of the applied scenario the page read: another apply since then is refused, not overwritten. */
@@ -116,24 +95,9 @@ export function buildApplyScenarioRequest(s: StagedScenario): BuiltRequest {
       ...(s.materialGrade.trim() ? { materialGrade: s.materialGrade.trim() } : {}),
       scenarioPatch: {
         processRouting: s.processRouting,
-        // Die casting: Manual is the process picked in the Workflow Builder; Auto clears it, so the cheapest feasible process is quoted.
-        ...(s.isDieCast ? { dieCastingProcess: manual?.dieCastingProcess ?? null } : {}),
-        // Forging the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
-        ...(s.isForged ? { forgingRoute: manual?.forgingRoute ?? null } : {}),
-        // Additive the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
-        ...(s.isAdditive ? { additiveRoute: manual?.additiveRoute ?? null } : {}),
-        // Bar and tube the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
-        ...(s.isBarTube ? { barTubeRoute: manual?.barTubeRoute ?? null } : {}),
-        // Assembly the same: Manual quotes the route picked in the Workflow Builder; Auto clears it, so the cheapest complete route is quoted.
-        ...(s.isAssembly ? { assemblyRoute: manual?.assemblyRoute ?? null } : {}),
-        // Insert molding the same: Manual quotes the load method picked; Auto clears it, so the cheapest complete one is quoted.
-        ...(s.isInsertMolding ? { insertMoldingRoute: manual?.insertMoldingRoute ?? null } : {}),
-        // Multi-shot the same: Manual quotes the press orientation picked; Auto clears it, so the cheapest complete one is quoted.
-        ...(s.isMultiShot ? { multiShotRoute: manual?.multiShotRoute ?? null } : {}),
-        // Multi-spindle the same: Manual quotes the route picked (6-spindle, 8-spindle, twin-spindle); Auto clears it, so the cheapest complete one is quoted.
-        ...(s.isMultiSpindle ? { multiSpindleRoute: manual?.multiSpindleRoute ?? null } : {}),
-        // A weldment the same: Manual quotes the route picked (manual or robotic welding); Auto clears it, so the cheapest complete one is quoted.
-        ...(s.isPartAssembly ? { partAssemblyRoute: manual?.partAssemblyRoute ?? null } : {}),
+        // The part's route choice: Manual commits the route picked in the Workflow Builder (a forging route, a weldment's robotic welding, a
+        // die casting process, ...); Auto clears it, so the cheapest complete one is quoted. Only the part's own key is written.
+        ...(s.routePickKey ? { [s.routePickKey]: manual?.routePicks?.[s.routePickKey] ?? null } : {}),
         ...(s.scenarioPatch ?? {}),
       },
       route,

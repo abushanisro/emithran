@@ -1,3 +1,4 @@
+import type { RoutePicks } from '@/lib/routing/route-pick';
 
 export type PanelId = 'left' | 'center' | 'right' | 'process' | 'drivers';
 
@@ -29,29 +30,10 @@ export interface ManualRouteOption {
   // cutting line — so this must be prepended at the call site, or the
   // cutting operation is silently missing from every applied route.
   dynamicCuttingStep?: { process: string; machineClass: string };
-  // A die-casting process (High Pressure / Gravity Die Casting) picked in the
-  // Workflow Builder: committed as the scenario's dieCastingProcess so the
-  // Cost Summary quotes it, and its route (directApplyRouteId) is applied like
-  // any complete route, so the Cost tab lists its lines.
-  dieCastingProcess?: string;
-  // A forging route picked in the Workflow Builder (its FORGING_ROUTES key): committed as the scenario's forgingRoute so the
-  // Cost Summary quotes it, and its route applied like any complete route.
-  forgingRoute?: string;
-  // An additive route picked in the Workflow Builder (its ADDITIVE_ROUTES key): committed as the scenario's additiveRoute so the Cost Summary
-  // quotes it, and its route applied like any complete route.
-  additiveRoute?: string;
-  // A bar and tube route picked in the Workflow Builder (its BAR_TUBE_ROUTES key): committed as the scenario's barTubeRoute.
-  barTubeRoute?: string;
-  // An assembly route picked in the Workflow Builder (its ASSEMBLY_ROUTES key): committed as the scenario's assemblyRoute.
-  assemblyRoute?: string;
-  // An insert molding route picked in the Workflow Builder (its INSERT_MOLDING_ROUTES key): committed as the scenario's insertMoldingRoute.
-  insertMoldingRoute?: string;
-  // A multi-shot route picked in the Workflow Builder (its MULTI_SHOT_ROUTES key): committed as the scenario's multiShotRoute.
-  multiShotRoute?: string;
-  // A multi-spindle route picked in the Workflow Builder (its MULTI_SPINDLE_ROUTES key): committed as the scenario's multiSpindleRoute.
-  multiSpindleRoute?: string;
-  // A weldment route picked in the Workflow Builder (its PART_ASSEMBLY_ROUTES key): committed as the scenario's partAssemblyRoute.
-  partAssemblyRoute?: string;
+  // The route choice this route commits as the scenario's (route-pick.ts): its family's key with its key ("partAssemblyRoute": "robotic"),
+  // or a die-casting route's process ("dieCastingProcess"), so the Cost Summary quotes the route picked in the Workflow Builder and its
+  // lines (directApplyRouteId) are applied like any complete route.
+  routePicks?: RoutePicks;
   // A real, already-valid apply-route.dto.ts routeId (e.g. one of the 3 real
   // Injection Molding tonnage tiers) to apply directly via the plain
   // applyRoute mutation — for a family whose real routes are already
