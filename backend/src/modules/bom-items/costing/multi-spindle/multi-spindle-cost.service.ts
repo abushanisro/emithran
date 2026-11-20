@@ -12,10 +12,12 @@ import { CalculatorCatalogService } from '../../services/calculator-catalog.serv
 import { SandMachineService } from '../casting/sand/sand-machine.service';
 import { readStagedReference } from '../casting/sand/sand-reference.service';
 import { MachiningLookupService } from '../machining/lookup/machining-lookup.service';
-import { computeDrillCycle, computeTurningCostSummary, type MachineClassId, type MachiningCostInput } from '../machining/process/cost-machining-engine';
+import {
+  computeDrillCycle, computeTapCycle, computeTurningCostSummary, detectMaterialClass, type MachineClassId, type MachiningCostInput,
+} from '../machining/process/cost-machining-engine';
 
 
-import type { HoleGroupWork } from './multi-spindle-work';
+import type { HoleGroupWork, ThreadGroupWork } from './multi-spindle-work';
 import type { DbClient } from '../../../../common/db/postgrest-client';
 import type { CostContext } from '../casting/casting-finishing';
 import type { SandReference } from '../casting/sand/sand-reference';
@@ -43,7 +45,8 @@ export function partOutsideMm(form: BarForm, turned: { diameterMm: number; lengt
 
 /**
  * The part's hole groups, each timed by the drilling calculator (computeDrillCycle, as the turning engine times them): its holes a live tool
- * drills (cross and off-axis, by diameter) apart from those drilled on the turning axis. A live-tool hole of no group is timed on its own.
+ * drills (cross and off-axis, by diameter) apart from those drilled on the turning axis. The holes drilled are the groups', as the turning
+ * engine's: the live-tool holes only say which slide drills them.
  */
 export function timeHoleGroups(input: {
   groups: MachiningCostInput['holeGroups'];
@@ -66,12 +69,27 @@ export function timeHoleGroups(input: {
     const tool = liveCount > 0 ? input.drill(diameterMm, depthMm, liveCount, endCount === 0 ? occurrences : undefined) : { sec: 0, missing: [] };
     return { diameterMm, depthMm, endCount, endSec: end.sec ?? 0, liveCount, liveSec: tool.sec ?? 0, missing: [...end.missing, ...tool.missing] };
   };
-  const out = input.groups.filter((g) => g.diameter_mm > 0 && g.count > 0).map((g) => {
+  return input.groups.filter((g) => g.diameter_mm > 0 && g.count > 0).map((g) => {
     const liveCount = take(g.diameter_mm, g.count);
     return timed(g.diameter_mm, g.depth_mm ?? null, g.count - liveCount, liveCount, g.occurrences);
   });
-  for (const h of live.filter((x) => x.left > 0)) out.push(timed(h.diameterMm, null, 0, h.left));
-  return out;
+}
+
+/**
+ * The part's threads, each size timed by the tapping calculator (computeTapCycle, as the turning engine taps them): those off the turning
+ * centreline (liveCount, feature-holes.ts) with a live tool, the others from an end slide.
+ */
+export function timeThreadGroups(input: {
+  threads: MachiningCostInput['threads'];
+  tap: (thread: MachiningCostInput['threads'][number], count: number) => { sec: number | null; missing: string[] };
+}): ThreadGroupWork[] {
+  return input.threads.filter((t) => t.count > 0).map((t) => {
+    const liveCount = Math.min(t.count, Math.max(0, t.liveCount ?? 0));
+    const endCount = t.count - liveCount;
+    const end = endCount > 0 ? input.tap(t, endCount) : { sec: 0, missing: [] };
+    const tool = liveCount > 0 ? input.tap(t, liveCount) : { sec: 0, missing: [] };
+    return { size: t.size, endCount, endSec: end.sec ?? 0, liveCount, liveSec: tool.sec ?? 0, missing: [...end.missing, ...tool.missing] };
+  });
 }
 
 export interface MultiSpindleCostRequest {
@@ -186,11 +204,16 @@ export class MultiSpindleCostService {
       groups: req.turning.holeGroups, liveHoles: req.liveHoles,
       drill: (d, depth, n, occurrences) => computeDrillCycle(d, req.turning.materialGrade, depth, req.turning.drillingTable, req.turning.machiningCalculators, n, occurrences),
     });
+    const matClass = detectMaterialClass(req.turning.materialGrade);
+    const threads = timeThreadGroups({
+      threads: req.turning.threads,
+      tap: (t, count) => computeTapCycle({ ...t, count }, matClass, req.turning.tappingTable, req.turning.machiningCalculators),
+    });
 
     const keyOf = (v: unknown): MultiSpindleRouteKey | null => MULTI_SPINDLE_ROUTES.find((r) => r.key === v)?.key ?? null;
     const quote = quoteMultiSpindle({
       ref: reference, spec, calculators, machines, rules, bar, part, material: req.material,
-      engine: { lines: engine.processLines, holes }, chosen: keyOf(req.forceRoute) ?? keyOf(req.overrides?.[MULTI_SPINDLE_ROUTE_KEY]),
+      engine: { lines: engine.processLines, holes, threads }, chosen: keyOf(req.forceRoute) ?? keyOf(req.overrides?.[MULTI_SPINDLE_ROUTE_KEY]),
       batchSize: req.batchSize, costContext: req.costContext, usdToLocal: req.usdToLocal,
     });
     return { quote, bar, part, missing: [], warnings: [...new Set([...engine.warnings, ...quote.warnings])] };

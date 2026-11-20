@@ -3,8 +3,9 @@
 //
 // The operation times are the turning engine's (cost-machining-engine.ts computeTurningCostSummary) on the part's bar, run raw: not
 // divided by stations and without its index line, which the station plan and the cycle calculator replace. Holes are timed per diameter
-// group with the same drilling calculator (computeDrillCycle): those a live tool drills (cross and off-axis holes, live-tooling.ts) on a
-// live-tool slide, the others on an end slide.
+// group with the same drilling calculator (computeDrillCycle), and threads per size with the same tapping calculator (computeTapCycle):
+// those a live tool makes (cross and off-axis holes and threads, live-tooling.ts, feature-holes.ts) on a live-tool slide, the others on an
+// end slide.
 //
 // Rough turning and the end-slide drilling carry the ratio their tblMultiSpindleOpSplittingThresholds row is read against: ring removed
 // volume to total removed volume (Ring, Rough Turning), and hole length to part length (SimpleHole, Drilling).
@@ -13,11 +14,14 @@ import type { PhysicsGap, ProcessLineCost } from '../../dto/cost-breakdown.dto';
 
 /** The turning engine's lines that run in the multi-spindle's cycle, by the slide that does them. */
 export const IN_CYCLE_SLIDE: Readonly<Record<string, Slide>> = {
-  'Rough Turning': 'od', 'Finish Turning': 'od', Parting: 'od', Tapping: 'end', Reaming: 'end', 'Rotary Broaching': 'end',
+  'Rough Turning': 'od', 'Finish Turning': 'od', Parting: 'od', Reaming: 'end', 'Rotary Broaching': 'end',
 };
 
-/** Its lines the multi-spindle does otherwise: the holes (per diameter group), the index (the cycle's), the rechuck (the back-work spindle's). */
-export const REPLACED_LINES: ReadonlySet<string> = new Set(['Drilling', 'Index Transfer', 'Secondary Setup (Rechuck)']);
+/**
+ * Its lines the multi-spindle does otherwise: the holes (per diameter group) and the threads (per size), each on the slide that makes
+ * them, the index (the cycle's) and the rechuck (the back-work spindle's).
+ */
+export const REPLACED_LINES: ReadonlySet<string> = new Set(['Drilling', 'Tapping', 'Index Transfer', 'Secondary Setup (Rechuck)']);
 
 export interface WorkOp extends StationOp {
   /** The tblMultiSpindleOpSplitting rule the operation is split by, and the part's ratio its threshold is read against. */
@@ -36,9 +40,21 @@ export interface HoleGroupWork {
   missing: readonly string[];
 }
 
+/** One thread size, timed by the tapping calculator: the threads tapped from an end slide, and those a live tool taps (off the centreline). */
+export interface ThreadGroupWork {
+  size: string;
+  endCount: number;
+  endSec: number;
+  liveCount: number;
+  liveSec: number;
+  /** What the tapping calculator lacked for the size; empty when it is timed. */
+  missing: readonly string[];
+}
+
 export interface MultiSpindleWorkInput {
   lines: readonly ProcessLineCost[];
   holes: readonly HoleGroupWork[];
+  threads: readonly ThreadGroupWork[];
   partLengthMm: number;
   partVolumeMm3: number;
   turnedDiameterMm: number;
@@ -103,6 +119,11 @@ export function multiSpindleWork(input: MultiSpindleWorkInput): MultiSpindleWork
       });
     }
     if (h.liveSec > 0) ops.push({ name: `Live-tool drilling ${name} x ${h.liveCount}`, seconds: h.liveSec, slide: 'live' });
+  }
+  for (const t of input.threads) {
+    if (t.missing.length) gaps.push({ process: `Tapping ${t.size}`, reason: `Not priced — missing real input: ${t.missing.join('; ')}.` });
+    if (t.endSec > 0) ops.push({ name: `Tapping ${t.size} x ${t.endCount}`, seconds: t.endSec, slide: 'end' });
+    if (t.liveSec > 0) ops.push({ name: `Live-tool tapping ${t.size} x ${t.liveCount}`, seconds: t.liveSec, slide: 'live' });
   }
   return { ops, offMachine, gaps };
 }

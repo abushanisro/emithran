@@ -1,5 +1,5 @@
 // The pure parts of MultiSpindleCostService: the part size a bar is sized from, and the hole groups timed apart for the end and live-tool slides.
-import { BAR_FORM_OF_STOCK, partOutsideMm, timeHoleGroups } from '../../../../../modules/bom-items/costing/multi-spindle/multi-spindle-cost.service';
+import { BAR_FORM_OF_STOCK, partOutsideMm, timeHoleGroups, timeThreadGroups } from '../../../../../modules/bom-items/costing/multi-spindle/multi-spindle-cost.service';
 
 describe('partOutsideMm', () => {
   // A hex part 21 mm across flats (24.25 mm across corners) and 32 mm long: its box is 32 x 24.25 x 21 in some order.
@@ -37,8 +37,27 @@ describe('timeHoleGroups', () => {
     expect(calls).toEqual([[6, 20, 2], [6, 20, 1], [10, 30, 1]]);
   });
 
-  it('times a live-tool hole of no group on its own, and names what its calculator lacks', () => {
-    const groups = timeHoleGroups({ groups: [], liveHoles: [{ diameterMm: 3, count: 2, why: 'off_axis' }], drill });
-    expect(groups).toEqual([{ diameterMm: 3, depthMm: null, endCount: 0, endSec: 0, liveCount: 2, liveSec: 0, missing: ['Hole Depth (Ø3 mm)'] }]);
+  it('drills the hole groups only: a live-tool hole of no group says which slide, it is never drilled again with no depth', () => {
+    calls.length = 0;
+    expect(timeHoleGroups({ groups: [], liveHoles: [{ diameterMm: 3, count: 2, why: 'off_axis' }], drill })).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('timeThreadGroups', () => {
+  // A stand-in tapping calculator: 1.6 s per thread.
+  const tap = (_t: unknown, count: number) => ({ sec: 1.6 * count, missing: [] as string[] });
+
+  it('taps each size\'s live-tool threads (off the centreline) apart from those tapped from an end slide', () => {
+    expect(timeThreadGroups({ threads: [{ size: 'M2', count: 2, liveCount: 2 }, { size: 'M6', count: 3, liveCount: 1 }, { size: 'M8', count: 1 }], tap })).toEqual([
+      { size: 'M2', endCount: 0, endSec: 0, liveCount: 2, liveSec: 3.2, missing: [] },
+      { size: 'M6', endCount: 2, endSec: 3.2, liveCount: 1, liveSec: 1.6, missing: [] },
+      { size: 'M8', endCount: 1, endSec: 1.6, liveCount: 0, liveSec: 0, missing: [] },
+    ]);
+  });
+
+  it('names what the tapping calculator lacks for a size', () => {
+    const groups = timeThreadGroups({ threads: [{ size: 'size not given', count: 2 }], tap: () => ({ sec: null, missing: ['a metric thread size (got "size not given")'] }) });
+    expect(groups).toEqual([{ size: 'size not given', endCount: 2, endSec: 0, liveCount: 0, liveSec: 0, missing: ['a metric thread size (got "size not given")'] }]);
   });
 });
