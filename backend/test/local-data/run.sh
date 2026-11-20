@@ -92,6 +92,11 @@ SELECT 'Bar and Tube Fabrication', n, n, false FROM unnest(ARRAY['Band Saw','Cir
   'Flaring','Flanging','Expansion','Reduction','Flattening','Knurling','Bar Forming','Notching','Slotting','Rotary Draw Bending','Compression Bending',
   'Bar Bend Brake','2 Roll Bending','3 Roll Bending','4 Roll Bending','Profile 3 Roll Bend','Profile CNC Bend','Sheet Laser Cut','Sheet Plasma Cut',
   'Sheet OxyFuel Cut','Plasma CNC Cut','Plasma Torch Cut','Oxyfuel Torch Cut','Extrusion','Billet Preheat','Die Preheat']) AS n;
+-- the part assembly catalog rows migration 790 seeds: migration 1099 gives them a machine class and 1100 links the part assembly
+-- calculators to them and fails if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Part Assembly', n, n, false FROM unnest(ARRAY['Bevel Cutting','Finish Grinding','Grinding','Laser Seam Welding','Manual MIG Welding',
+  'Manual Spot Welding','Robotic MIG Welding','Robotic Spot Welding','Wire Brushing']) AS n;
 -- the catalog columns and the process taxonomy as the real database has them (migrations 367-371, 424, 725), and the four
 -- secondary-operation calculators the baseline holds: migration 984 restores their catalog rows and fails if a calculator is missing
 ALTER TABLE public.process_calculator_mappings ADD COLUMN machine_class varchar(100), ADD COLUMN applicable_families text[],
