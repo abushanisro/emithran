@@ -12,6 +12,7 @@ import { loadCompositesCalculatorSpec } from '../costing/composites/calculators/
 import { loadAdditiveCalculatorSpec } from '../costing/additive/calculators/additive-calculator-spec';
 import { loadBarTubeCalculatorSpec } from '../costing/bar-tube/calculators/bar-tube-calculator-spec';
 import { loadMultiSpindleCalculatorSpec } from '../costing/multi-spindle/calculators/multi-spindle-calculator-spec';
+import { loadPartAssemblyCalculatorSpec } from '../costing/part-assembly/calculators/part-assembly-calculator-spec';
 import { loadAssemblyCalculatorSpec } from '../costing/assembly/calculators/assembly-calculator-spec';
 import { loadAssemblyMoldingCalculatorSpec } from '../costing/plastic-molding/insert/calculators/assembly-molding-calculator-spec';
 import { loadAssemblyPlasticMoldingCalculatorSpec } from '../costing/plastic-molding/multi-shot/calculators/assembly-plastic-molding-calculator-spec';
@@ -229,6 +230,11 @@ export class CalculatorCatalogService {
   /** The Multi-Spindle Machining calculators (migration 1095), from the database. */
   loadMultiSpindleCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('multi-spindle-calculators', loadMultiSpindleCalculatorSpec(), accessToken);
+  }
+
+  /** The Part Assembly calculators (migration 1100), from the database. */
+  loadPartAssemblyCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('part-assembly-calculators', loadPartAssemblyCalculatorSpec(), accessToken);
   }
 
   private loadSpecCalculators(cacheKey: string, spec: DomainCalculatorSpec, accessToken: string): Promise<ReferenceCalculators> {

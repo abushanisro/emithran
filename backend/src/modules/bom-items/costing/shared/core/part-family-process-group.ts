@@ -32,10 +32,19 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   bar_tube: 'Bar and Tube Fabrication',
   // An assembly's own work: its BOM children loaded and joined (costing/assembly). An assembly has no model of its own to analyse.
   assembly: 'Assembly',
+  // A weldment's welding (memory/Part Assembly): its BOM children (or the part itself) loaded and welded by the Cost Guide's weld table
+  // (costing/part-assembly). Nothing of it is read from a model: no extractor analyses a part as one.
+  part_assembly: 'Part Assembly',
 };
 
 /** An assembly's family: its own work (loading and joining its BOM children), costed by costing/assembly. */
 export const ASSEMBLY_FAMILY = 'assembly';
+
+/** A weldment's family: its welding (memory/Part Assembly), costed by costing/part-assembly. */
+export const PART_ASSEMBLY_FAMILY = 'part_assembly';
+
+/** The families costed from the BOM and the Cost Guide alone: the cad-engine has no extractor for them, so no analysis is run as one. */
+export const NO_CAD_EXTRACTOR_FAMILIES: ReadonlySet<string> = new Set([ASSEMBLY_FAMILY, PART_ASSEMBLY_FAMILY]);
 
 /** Insert molding (memory/Assembly molding): costed as a plastic molded part on the insert presses. */
 export const INSERT_MOLDING_PROCESS_GROUP = 'Assembly Molding';

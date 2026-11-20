@@ -22,7 +22,7 @@ import { REFERENCE_FEATURE_OPERATIONS } from '../costing/shared/reference-featur
 import { MachiningLookupService } from '../costing/machining/lookup/machining-lookup.service';
 import { requiredMilledClassFromToolAxes } from '../costing/machining/setup-axis-rule';
 import { machiningFeatureCounts } from '../costing/machining/operation/machining-feature-counts';
-import { ASSEMBLY_FAMILY, CAD_FAMILY_TO_PROCESS_GROUP, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
+import { CAD_FAMILY_TO_PROCESS_GROUP, familiesOfProcessGroup, NO_CAD_EXTRACTOR_FAMILIES } from '../costing/shared/core/part-family-process-group';
 import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 import { currentFeatureGraphVersion } from '../analysis-status';
 import { plasticCostDrivers } from '../costing/plastic-molding/plastic-cost-drivers';
@@ -1286,13 +1286,13 @@ export class AutoFillService {
    * milled/turned/mill_turn; the first entry (milled) is the general one; Sand
    * Casting is sand_cast; Casting is analysed as a die casting. A group with no
    * cost model (Part Assembly, ...), or whose family the cad-engine has no
-   * extractor for (Assembly: an assembly is costed from its children, it has no
-   * model of its own), returns undefined: there is no extractor to force, so
-   * the real classifier chain runs.
+   * extractor for (Assembly and Part Assembly: costed from the BOM children and
+   * the Cost Guide, with no model of their own to read), returns undefined: there
+   * is no extractor to force, so the real classifier chain runs.
    */
   familyHintForProcessGroup(processGroup: string | null | undefined): string | undefined {
     if (!processGroup) return undefined;
-    return familiesOfProcessGroup(processGroup).find((family) => family !== ASSEMBLY_FAMILY);
+    return familiesOfProcessGroup(processGroup).find((family) => !NO_CAD_EXTRACTOR_FAMILIES.has(family));
   }
 
   /**

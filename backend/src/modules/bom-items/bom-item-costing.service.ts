@@ -153,6 +153,10 @@ import { gap as gapLine } from './costing/casting/casting-finishing';
 import { buildAssemblyCostSummary } from './costing/assembly/assembly-cost-summary';
 import { ASSEMBLY_ROUTES } from './costing/assembly/assembly-route';
 import { assemblyRouteFor, assemblyRouteId } from './costing/assembly/assembly-route-comparison';
+import { PartAssemblyCostService, type PartAssemblyCostResult } from './costing/part-assembly/part-assembly-cost.service';
+import { buildPartAssemblyCostSummary } from './costing/part-assembly/part-assembly-cost-summary';
+import { PART_ASSEMBLY_ROUTES } from './costing/part-assembly/part-assembly-route';
+import { partAssemblyRouteFor, partAssemblyRouteId } from './costing/part-assembly/part-assembly-route-comparison';
 import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, isMachiningLine, BLANK_FAMILY, BLANK_PROCESS, type DerivedBlankOut } from './costing/two-model/derived-blank';
 import { twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, TWO_MODEL_SOURCE_VERSION } from './costing/two-model/two-model-cost';
 import { twoModelRoute } from './costing/two-model/two-model-route-comparison';
@@ -166,7 +170,7 @@ import { buildForgingCostSummary } from './costing/forging/forging-cost-summary'
 import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
 import { FORGING_ROUTES } from './costing/forging/forging-route';
 import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
-import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, INSERT_MOLDING_PROCESS_GROUP, MULTI_SHOT_PROCESS_GROUP, MULTI_SPINDLE_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
+import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, PART_ASSEMBLY_FAMILY, INSERT_MOLDING_PROCESS_GROUP, MULTI_SHOT_PROCESS_GROUP, MULTI_SPINDLE_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
 import {
   MULTI_SHOT_CYCLE_CALC, MULTI_SHOT_DESIGN_HOURS_FACTOR, MULTI_SHOT_PRESS_CLASS, MULTI_SHOT_ROUTE_KEY, MULTI_SHOT_ROUTES, chooseMultiShotRoute, multiShotRouteId,
   priceMultiShotRoutes, shotEntriesOf, type MultiShotShot, type ShotNeed,
@@ -257,7 +261,7 @@ export function convertRouteOptions<T extends { totalCost: number | null }>(opti
 }
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === 'bar_tube' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === 'bar_tube' || family === ASSEMBLY_FAMILY || family === PART_ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
 /** The molding line's material reason, when the engine found the material itself cannot be molded (requiredCapability says so). */
@@ -381,6 +385,8 @@ export class BomItemCostingService {
     private readonly multiShotService?: MultiShotService,
     /** The multi-spindle routes; optional for the same reason (without it a Multi-Spindle Machining part is one named, uncosted line). */
     private readonly multiSpindleCostService?: MultiSpindleCostService,
+    /** A weldment's welding (Part Assembly); optional for the same reason (without it a Part Assembly part is one named, uncosted line). */
+    private readonly partAssemblyCostService?: PartAssemblyCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -2024,8 +2030,15 @@ export class BomItemCostingService {
     // ── Assembly ────────────────────────────────────────────────────────────
     // An assembly's own work: its BOM children loaded and joined (costing/assembly). It has no material or model of its own, so it is priced
     // before the material gate; each child's own cost is added to it by the BOM roll-up, never here.
-    if ((forceFamily ?? this.resolveEffectiveFamily({ item, fg, grade: itemGrade, sheetThicknessMm }).family) === ASSEMBLY_FAMILY) {
+    const ownWorkFamily = forceFamily ?? this.resolveEffectiveFamily({ item, fg, grade: itemGrade, sheetThicknessMm }).family;
+    if (ownWorkFamily === ASSEMBLY_FAMILY) {
       return this.assemblyCostSummary(item, costingInputs, location, accessToken, forceDieCastingProcess, localLinesOut);
+    }
+    // ── Part Assembly ───────────────────────────────────────────────────────
+    // A weldment's welding (costing/part-assembly): its components welded as the Cost Guide's weld table says. Like an assembly it is
+    // priced before the material gate, and its components' own costs are the BOM roll-up's.
+    if (ownWorkFamily === PART_ASSEMBLY_FAMILY) {
+      return this.partAssemblyCostSummary(item, costingInputs, location, accessToken, forceDieCastingProcess, localLinesOut);
     }
 
     // Scenario gate: refuse to cost without a material grade. Silently defaulting to
@@ -5176,6 +5189,88 @@ export class BomItemCostingService {
   }
 
   /**
+   * A weldment's cost summary (Process Part Assembly): its components (the BOM children, or the part itself) welded as the Cost Guide's weld
+   * table says, on the cheapest complete route or the one set (costing/part-assembly).
+   */
+  private async partAssemblyCostSummary(
+    item: BOMItemResponseDto, costingInputs: ReturnType<typeof resolveCostingInputs>, location: string, accessToken: string,
+    forceRoute?: string, localLinesOut?: { lines?: ProcessLineCost[]; localCurrency?: string },
+  ): Promise<CostSummaryResponseDto> {
+    const { batchSize } = costingInputs;
+    const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO.Other;
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, await this.items.organizationOfItem(item.id, accessToken));
+    const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+    const [costOverrides, children] = await Promise.all([
+      this.overrides.fetchCostOverrides(item.id, accessToken, location),
+      this.items.findChildren(item.id, accessToken),
+    ]);
+    const partAssembly: PartAssemblyCostResult = this.partAssemblyCostService
+      ? await this.partAssemblyCostService.price({
+        client: this.databaseService.getClient(accessToken), accessToken, location, item, children,
+        // The density the rest of costing weighs a part by (material_density_lookup, then the caller's raw materials), g/cm³ to kg/m³.
+        densityOf: async (grade) => {
+          const d = await this.items.materialDensity(grade, accessToken);
+          return d.density_g_cm3 != null && d.density_g_cm3 > 0 ? d.density_g_cm3 * 1000 : null;
+        },
+        ...(forceRoute ? { forceRoute } : {}),
+        overrides: item.scenarioOverrides, batchSize, usdToLocal,
+        costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
+      })
+      : {
+        route: null, routes: [], gaps: [], components: [], welds: [], weldment: { massKg: null }, thickness: { mm: null, source: '' },
+        material: { name: null, cutCodeFamily: null }, note: null, missing: ['the Part Assembly cost service is not available'], warnings: [],
+      };
+    const result = {
+      ...buildPartAssemblyCostSummary({ partAssembly, batchSize, warnings: [], ratesSource: RATES_SOURCE_LABEL }),
+      currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate: 1,
+    } as CostSummaryDto & { costOverrides?: Record<string, unknown> };
+    this.overrides.applyCostOverrides(result, costOverrides);
+    if (costOverrides.size > 0) result.costOverrides = Object.fromEntries(costOverrides);
+    if (localLinesOut) {
+      localLinesOut.lines = JSON.parse(JSON.stringify(result.processLines)) as ProcessLineCost[];
+      localLinesOut.localCurrency = locInfo.code;
+    }
+    return { ...this.normalizeCostSummaryToCurrency(result, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+  }
+
+  /** A weldment's route comparison: each route (manual, robotic welding) the full Cost Summary priced on that route, as an assembly's are. */
+  private async partAssemblyRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = PART_ASSEMBLY_ROUTES.map((r) => r.key);
+    const locals: { lines?: ProcessLineCost[]; localCurrency?: string }[] = keys.map(() => ({}));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, PART_ASSEMBLY_FAMILY),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], PART_ASSEMBLY_FAMILY)),
+    ]);
+    const routes = keys.map((key, i) => partAssemblyRouteFor(key, summaries[i]));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i].lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0].localCurrency;
+    }
+    const recommended = quote.partAssembly?.complete && quote.partAssembly.route ? partAssemblyRouteId(quote.partAssembly.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: 0,
+      materialGrade: quote.materialGrade,
+      grossWeightKg: 0,
+      materialCostPerKg: 0,
+      materialSource: quote.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No weldment route is both feasible and fully costed.'],
+      currency: quote.currency ?? 'USD',
+      currencySymbol: quote.currencySymbol ?? '$',
+      ...(quote.toUsdRate != null ? { toUsdRate: quote.toUsdRate } : {}),
+      ...(quote.usdToDisplayRate != null ? { usdToDisplayRate: quote.usdToDisplayRate } : {}),
+      resolvedInputs: quote.resolvedInputs,
+    };
+  }
+
+  /**
    * A bar and tube part's route comparison: saw and punch, and tube laser, each the full Cost Summary priced on that route, as the additive
    * routes are. The recommended one is the route the quote chose.
    */
@@ -5524,6 +5619,9 @@ export class BomItemCostingService {
     }
     if (family === ASSEMBLY_FAMILY) {
       return this.assemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    if (family === PART_ASSEMBLY_FAMILY) {
+      return this.partAssemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     // Bar and Tube Fabrication: saw and punch against tube laser, each the full quote on that route (bar-tube-route-comparison.ts).
     if (family === 'bar_tube') {

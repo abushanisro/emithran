@@ -14,6 +14,7 @@ import { COMPOSITES_ROUTE_IDS } from '../costing/composites/composites-route-com
 import { ADDITIVE_ROUTE_IDS } from '../costing/additive/additive-route-comparison';
 import { BAR_TUBE_ROUTE_IDS } from '../costing/bar-tube/bar-tube-route-comparison';
 import { ASSEMBLY_ROUTE_IDS } from '../costing/assembly/assembly-route-comparison';
+import { PART_ASSEMBLY_ROUTE_IDS } from '../costing/part-assembly/part-assembly-route-comparison';
 import { INSERT_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/insert/insert-molding';
 import { MULTI_SHOT_ROUTE_IDS } from '../costing/plastic-molding/multi-shot/multi-shot';
 import { MULTI_SPINDLE_ROUTE_IDS } from '../costing/multi-spindle/multi-spindle-route-comparison';
@@ -46,6 +47,7 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...BAR_TUBE_ROUTE_IDS,
   // An assembly's routes (manual, robotic welding), priced by the assembly engine (assembly-route-comparison.ts).
   ...ASSEMBLY_ROUTE_IDS,
+  ...PART_ASSEMBLY_ROUTE_IDS,
   // An insert-molded part's load methods (manual, 3-axis, 6-axis), priced by the insert molding engine.
   ...INSERT_MOLDING_ROUTE_IDS,
   // A multi-shot part's press orientations (horizontal, vertical), priced by the multi-shot engine.
