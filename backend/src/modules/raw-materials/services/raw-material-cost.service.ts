@@ -350,6 +350,11 @@ export class RawMaterialCostService {
     updateDto: UpdateRawMaterialCostDto,
     userId: string,
     accessToken: string,
+    /**
+     * The currency the updated unit cost is in, when the caller knows it (the cost engine's price per kg, in USD): recorded as the row's
+     * currency provenance (migration 708), as create() records the conversion it makes. Not part of the request DTO.
+     */
+    declaredCurrency?: string,
   ): Promise<RawMaterialCostResponseDto> {
     this.logger.log(`Updating raw material cost: ${id}`, 'RawMaterialCostService');
 
@@ -412,6 +417,7 @@ export class RawMaterialCostService {
     if (updateDto.overhead !== undefined) updateData.overhead = updateDto.overhead;
     if (updateDto.isActive !== undefined) updateData.is_active = updateDto.isActive;
     if (updateDto.notes !== undefined) updateData.notes = updateDto.notes;
+    if (declaredCurrency) Object.assign(updateData, declareCostRecordCurrency({ declaredCurrency }));
     if (updateDto.grossUsageIsOverridden !== undefined) {
       updateData.gross_usage_is_overridden = updateDto.grossUsageIsOverridden;
       updateData.gross_usage_override_reason = updateDto.grossUsageIsOverridden ? (updateDto.grossUsageOverrideReason ?? null) : null;
