@@ -84,6 +84,28 @@ export class SessionActivityService {
     }
   }
 
+  /**
+   * A new sign-in on an Auth0 session the app already tracked (Auth0 keeps its session id across a re-authentication, and across days):
+   * the idle clock restarts and a logout mark is cleared, but only when the person authenticated after the session's last activity, so
+   * an idle or signed-out session is never revived by a renewed old token (`authTimeMs` comes from a verified ID token's `auth_time`).
+   */
+  async restart(sessionId: string, userId: string, authTimeMs: number, now = Date.now()): Promise<SessionActivityTimes> {
+    let stored: StoredTimes | null;
+    try {
+      stored = await this.read(sessionId);
+      if (stored && authTimeMs <= Math.max(stored.lastActivityAt, stored.lastJobAt ?? 0)) {
+        throw new UnauthorizedException({ message: 'Not a new sign-in: the session was active after it.', code: SESSION_ENDED_CODE });
+      }
+      stored = await this.write(sessionId, userId, { last_activity_at: new Date(now).toISOString(), last_job_at: null, ended_at: null });
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      return this.unenforcedOrThrow(error, now);
+    }
+    this.cache.delete(sessionId);
+    this.remember(sessionId, stored);
+    return times(stored);
+  }
+
   /** Records a heartbeat. Call only after assertActive, so an expired session can never be revived. */
   async recordActivity(sessionId: string, userId: string, kind: ActivityKind, now = Date.now()): Promise<SessionActivityTimes> {
     const at = new Date(now).toISOString();
@@ -119,7 +141,7 @@ export class SessionActivityService {
     return data ? toTimes(data) : null;
   }
 
-  private async write(sessionId: string, userId: string, columns: Record<string, string>): Promise<StoredTimes> {
+  private async write(sessionId: string, userId: string, columns: Record<string, string | null>): Promise<StoredTimes> {
     const { data, error } = await this.db
       .from(TABLE)
       .upsert({ session_id: sessionId, user_id: userId, ...columns }, { onConflict: 'session_id' })

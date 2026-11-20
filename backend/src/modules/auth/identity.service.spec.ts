@@ -179,3 +179,34 @@ describe('IdentityService', () => {
     expect(b.rpc.mock.calls.filter(([f]) => f === 'link_identity')).toHaveLength(2);
   });
 });
+
+describe('IdentityService.verifyNewSignIn: a sign-in that just happened, proven by its ID token', () => {
+  const NOW = 1_800_000_000_000;
+  function make(signIn: { sub?: string; sessionId?: string; authTimeMs?: number } | TokenRejected, clientId: string | null = 'app-client') {
+    const verify = jest.fn(async () => login());
+    const verifyIdToken = jest.fn(async () => { if (signIn instanceof TokenRejected) throw signIn; return { sub: 'auth0|a', sessionId: 's1', ...signIn }; });
+    const rpc = jest.fn(async (fn: string) => ({ data: fn === 'link_identity' ? USER : 'a@x.com', error: null }));
+    const db = { getPrivilegedClient: jest.fn(() => ({ rpc })), mintDbUserToken: jest.fn(() => 'db') };
+    const service = new IdentityService({ verify, verifyIdToken } as unknown as Auth0TokenVerifier, db as never,
+      { trustedConnections: TRUSTED, decisionTtlMs: 0, ...(clientId ? { clientId } : {}) }, () => NOW);
+    return { service, verifyIdToken };
+  }
+
+  it('accepts the same person and Auth0 session, authenticated a moment ago, and checks the ID token against the app\'s client id', async () => {
+    const { service, verifyIdToken } = make({ authTimeMs: NOW - 30_000 });
+    await expect(service.verifyNewSignIn('access', 'id')).resolves.toMatchObject({ user: { id: USER }, authTimeMs: NOW - 30_000 });
+    expect(verifyIdToken).toHaveBeenCalledWith('id', 'app-client');
+  });
+
+  it('refuses a renewed old sign-in (auth_time older than 10 minutes, as a refresh keeps it), another person or another session', async () => {
+    await expect(make({ authTimeMs: NOW - 11 * 60_000 }).service.verifyNewSignIn('a', 'i')).rejects.toThrow('Not a new sign-in');
+    await expect(make({ authTimeMs: undefined }).service.verifyNewSignIn('a', 'i')).rejects.toThrow('Not a new sign-in');
+    await expect(make({ sub: 'auth0|b', authTimeMs: NOW }).service.verifyNewSignIn('a', 'i')).rejects.toThrow('another login');
+    await expect(make({ sessionId: 's2', authTimeMs: NOW }).service.verifyNewSignIn('a', 'i')).rejects.toThrow('another login');
+    await expect(make(new TokenRejected('bad_signature', 'x')).service.verifyNewSignIn('a', 'i')).rejects.toThrow('Invalid sign-in token');
+  });
+
+  it('cannot verify anything without the app\'s client id (503, not a silent pass)', async () => {
+    await expect(make({ authTimeMs: NOW }, null).service.verifyNewSignIn('a', 'i')).rejects.toThrow('AUTH0_CLIENT_ID is not set');
+  });
+});

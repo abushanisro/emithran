@@ -14,7 +14,7 @@ function database(roles: string[], platformAdmin: boolean): DatabaseService {
 
 describe('AuthController', () => {
   it('returns the id, email, organization role and platform-admin flag of the authorised user, nothing else', async () => {
-    const controller = new AuthController(new AccessService(database(['admin'], false)));
+    const controller = new AuthController(new AccessService(database(['admin'], false)), {} as never, {} as never);
     await expect(controller.me({ id: 'u1', email: 'a@x.com', role: 'authenticated', secret: 'x' }, 'token')).resolves.toEqual({
       id: 'u1',
       email: 'a@x.com',
@@ -24,9 +24,9 @@ describe('AuthController', () => {
   });
 
   it('reports the lowest role across memberships, and no role without one', async () => {
-    await expect(new AuthController(new AccessService(database(['owner', 'viewer'], true))).me({ id: 'u1', email: 'a@x.com' }, 't'))
+    await expect(new AuthController(new AccessService(database(['owner', 'viewer'], true)), {} as never, {} as never).me({ id: 'u1', email: 'a@x.com' }, 't'))
       .resolves.toMatchObject({ organizationRole: 'viewer', platformAdmin: true });
-    await expect(new AuthController(new AccessService(database([], false))).me({ id: 'u1', email: 'a@x.com' }, 't'))
+    await expect(new AuthController(new AccessService(database([], false)), {} as never, {} as never).me({ id: 'u1', email: 'a@x.com' }, 't'))
       .resolves.toMatchObject({ organizationRole: null });
   });
 });

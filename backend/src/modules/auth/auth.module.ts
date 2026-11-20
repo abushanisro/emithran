@@ -25,6 +25,7 @@ import { IdentityService } from './identity.service';
         return new IdentityService(verifier, db, {
           trustedConnections: config.getOrThrow<string>('AUTH0_TRUSTED_CONNECTIONS').split(','),
           decisionTtlMs: config.getOrThrow<number>('AUTH_DECISION_CACHE_SECONDS') * 1000,
+          ...(config.get<string>('AUTH0_CLIENT_ID') ? { clientId: config.get<string>('AUTH0_CLIENT_ID')! } : {}),
         });
       },
     },
