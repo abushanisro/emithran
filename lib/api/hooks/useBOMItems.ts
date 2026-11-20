@@ -1207,6 +1207,20 @@ export interface CostSummaryDto {
     partsPerBuild: number | null; layers: number | null; materialMassKg: number; complete: boolean;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
   };
+  /** Bar and Tube Fabrication: the stock, the bends (each one's method), ends, forms and openings, the route quoted and every route. */
+  barTube?: {
+    route: string; routeLabel: string;
+    stockForm: string; sectionWidthMm: number; sectionHeightMm: number; wallMm: number | null; sectionAreaMm2: number; developedLengthMm: number;
+    partsPerStock: number | null; materialMassKg: number; partMassKg: number; stockPricePerKg: number | null; stockMissing: string | null;
+    bends: Array<{ clrMm: number; angleDeg: number }>;
+    holeCount: number; openingCount: number;
+    ends: Array<{ end: string; variant: string; cutAngleDeg: number | null }>;
+    forms: Array<{ end: string; variant: string }>;
+    bendPlan: Array<{ index: number; clrMm: number; angleDeg: number; method: string | null; toolKey: string | null; mandrel: boolean; reason: string | null }>;
+    plate: { thicknessMm: number; blankLengthMm: number; blankWidthMm: number; cutLengthMm: number } | null;
+    complete: boolean;
+    options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  };
   composites?: {
     route: string; routeLabel: string;
     /** The laminate at its thickest (core excluded) and the cured ply thickness it is divided by. */

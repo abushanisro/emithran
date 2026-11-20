@@ -16,6 +16,7 @@ import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { CompositesSection } from '@/components/costing/CompositesSection';
 import { AdditiveSection } from '@/components/costing/AdditiveSection';
+import { BarTubeSection } from '@/components/costing/BarTubeSection';
 import { AssemblySection } from '@/components/costing/AssemblySection';
 import { InsertMoldingCycle, InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
 import { ConciseNote } from '@/components/ui/concise-note';
@@ -27,6 +28,7 @@ import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
 import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
 import { splitNote } from '@/lib/text/concise-note';
 import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
+import { barTubeRouteKeyOf } from '@/lib/routing/bar-tube-route-id';
 import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
 import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
 import { isInsertMoldingItem } from '@/lib/costing/insert-molding-view';
@@ -3153,6 +3155,8 @@ function RouteSelectionDialog({
       ...(() => { const key = isForged ? forgingRouteKeyOf(selected.routeId) : undefined; return key ? { forgingRoute: key } : {}; })(),
       ...(() => { const key = isComposite ? compositesRouteKeyOf(selected.routeId) : undefined; return key ? { compositesRoute: key } : {}; })(),
       ...(() => { const key = partFamily === 'additive' ? additiveRouteKeyOf(selected.routeId) : undefined; return key ? { additiveRoute: key } : {}; })(),
+      // A bar and tube route ("bar-tube-<key>"): the key is committed as the scenario's barTubeRoute.
+      ...(() => { const key = barTubeRouteKeyOf(selected.routeId); return key ? { barTubeRoute: key } : {}; })(),
       // An assembly's route ids are its own ("assembly-<key>"): the key is committed as the scenario's assemblyRoute.
       ...(() => { const key = assemblyRouteKeyOf(selected.routeId); return key ? { assemblyRoute: key } : {}; })(),
       // An insert molding route ("im-insert-<method>"): its load method is committed as the scenario's insertMoldingRoute.
@@ -4651,6 +4655,16 @@ function CostGuidePanel({
               <Section title="Additive Manufacturing">
                 <AdditiveSection
                   additive={cgpCostSummary.additive}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'bar_tube' && (
+              <Section title="Bar and Tube Fabrication">
+                <BarTubeSection
+                  barTube={cgpCostSummary.barTube}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
@@ -8121,6 +8135,7 @@ export default function ManufacturingIntelligencePage() {
       isDieCast: (item.familyClassification ?? fg?.classification?.family) === 'die_cast',
       isForged: (item.familyClassification ?? fg?.classification?.family) === 'forged',
       isAdditive: (item.familyClassification ?? fg?.classification?.family) === 'additive',
+      isBarTube: (item.familyClassification ?? fg?.classification?.family) === 'bar_tube',
       isAssembly: isAssemblyItem(item),
       isInsertMolding: isInsertMoldingItem(item),
       isMultiShot: isMultiShotItem(item),

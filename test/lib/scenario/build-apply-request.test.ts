@@ -79,6 +79,13 @@ describe("buildApplyScenarioRequest", () => {
     expect(built({ isForged: true }).scenarioPatch).toEqual({ processRouting: "auto", forgingRoute: null });
   });
 
+  it("a bar and tube route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
+    const manual = { label: "Plate oxyfuel", directApplyRouteId: "bar-tube-plate_oxyfuel", barTubeRoute: "plate_oxyfuel" };
+    expect(built({ isBarTube: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", barTubeRoute: "plate_oxyfuel" });
+    expect(built({ isBarTube: true, processRouting: "manual", manualRoute: manual }).route).toEqual({ mode: "route", routeId: "bar-tube-plate_oxyfuel" });
+    expect(built({ isBarTube: true }).scenarioPatch).toEqual({ processRouting: "auto", barTubeRoute: null });
+  });
+
   it("an additive route picked in the Workflow Builder is quoted on Manual, and Auto quotes the cheapest again", () => {
     const manual = { label: "Stereolithography (SLA)", directApplyRouteId: "additive-resin_curing", additiveRoute: "resin_curing" };
     expect(built({ isAdditive: true, processRouting: "manual", manualRoute: manual }).scenarioPatch).toEqual({ processRouting: "manual", additiveRoute: "resin_curing" });
