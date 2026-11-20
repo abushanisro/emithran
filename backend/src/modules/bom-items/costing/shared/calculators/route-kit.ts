@@ -1,19 +1,19 @@
 // The calculator plumbing of a domain's routes (Assembly, Part Assembly): a stored calculator's inputs seeded from the domain's variables,
 // its lookup rows, the step's machine and the route's own values, each with where it came from; the calculator run; and a step priced on
 // the cheapest capable machine of its class (selectAndCost). One kit, so every domain built on it traces its inputs the same way. Pure.
+import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from './reference-calculator';
 import { machineValue, type SandMachine } from '../../casting/sand/sand-machines';
 import { seedsFor, type SeedProvider, type SeedProviders } from '../../casting/sand/sand-seeds';
 import { selectAndCost, type CostedStep, type StepOutcome } from '../../casting/sand/sand-steps';
-import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from './reference-calculator';
 
+import type { DomainCalculatorSpec } from './domain-calculator-spec';
 import type { CostContext } from '../../casting/casting-finishing';
 import type { SandReference } from '../../casting/sand/sand-reference';
-import type { DomainCalculatorSpec } from './domain-calculator-spec';
 
 export type KitRow = Readonly<Record<string, unknown>>;
 
 /** A number in a lookup row's column; null when the row or the value is missing. */
-export const cell = (row: KitRow | undefined, col: string): number | null =>
+export const cell = (row: KitRow | null | undefined, col: string): number | null =>
   (row?.[col] != null && Number.isFinite(Number(row[col])) ? Number(row[col]) : null);
 
 /** A step that cannot be priced, with why. */
@@ -36,7 +36,8 @@ export interface RouteKitInput {
   partName: string;
 }
 
-export type KitRun = { run: ReferenceCalcRun } | { reasons: string[] };
+/** A calculator run with its result (`sec`: the run's finite Cycle Time, or its declared output), or why it has none. */
+export type KitRun = { run: ReferenceCalcRun; sec: number } | { reasons: string[] };
 
 export interface RouteKit {
   /** A domain variable as a seed, with its unit and where it came from; null when the domain has none of that name. */
@@ -62,7 +63,7 @@ export function routeKit(inp: RouteKitInput): RouteKit {
     return value == null ? null : { value, source: `${inp.domainLabel} variable ${name}${unit ? ` (${unit})` : ''}`, ref: { kind: 'variable', domain: inp.domain, name } };
   };
   // A spec source names its key with a description ("weld_length_mm (the weld's length)"): the key is the part before " (".
-  const named = (values: Readonly<Record<string, CalcSeed | undefined>>): SeedProvider => (key) => values[key] ?? values[key.split(' (')[0]!.trim()] ?? null;
+  const named = (values: Readonly<Record<string, CalcSeed | undefined>>): SeedProvider => (key) => values[key] ?? values[key.split(' (')[0].trim()] ?? null;
   const run: RouteKit['run'] = (calculator, machine, engine, lookups = {}) => {
     const calc = inp.spec.calculators.find((c) => c.name === calculator);
     if (!calc) return { reasons: [`${calculator} is not in the calculator spec`] };
@@ -79,11 +80,11 @@ export function routeKit(inp: RouteKitInput): RouteKit {
     const { seeds, missing } = seedsFor(calc, providers);
     if (missing.length) return { reasons: missing.map((m) => `${calculator}: ${m}`) };
     const result = runReferenceCalculator(inp.calculators, calculator, seeds, calc.output ?? 'Cycle Time');
-    return result.value == null || !Number.isFinite(result.value) ? { reasons: result.missing.length ? result.missing : [`${calculator}: no finite result`] } : { run: result };
+    return result.value == null || !Number.isFinite(result.value) ? { reasons: result.missing.length ? result.missing : [`${calculator}: no finite result`] } : { run: result, sec: result.value };
   };
   const seed: RouteKit['seed'] = (value, source) => ({ value, source });
   const lookupSeed: RouteKit['lookupSeed'] = (table, row, column, identity) => {
-    const value = cell(row ?? undefined, column);
+    const value = cell(row, column);
     if (!row || value == null) return undefined;
     const id = Object.fromEntries(identity.map((c) => [c, row[c] as string | number]));
     return {
@@ -94,10 +95,10 @@ export function routeKit(inp: RouteKitInput): RouteKit {
   const calcOf: RouteKit['calcOf'] = (process) => inp.spec.calculators.find((c) => c.operations.includes(process))?.name ?? `${inp.domainLabel} - ${process}`;
   const timed: RouteKit['timed'] = (process, m, engine, lookups = {}, extra = {}) => {
     const r = run(calcOf(process), m, engine, lookups);
-    return 'run' in r ? { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: 0, notes: [], ...extra } : fail(...r.reasons);
+    return 'run' in r ? { ok: true, sec: r.sec, run: r.run, energyCostUsd: 0, notes: [], ...extra } : fail(...r.reasons);
   };
   const step: RouteKit['step'] = (process, evaluate, criteria) => {
-    const machineClass = inp.processClass[process]!;
+    const machineClass = inp.processClass[process];
     return selectAndCost({
       process, machineClass, machines: inp.machinesByClass[machineClass] ?? [], evaluate, criteria,
       batchSize, costContext: inp.costContext, ref, partName: inp.partName, processGroup: inp.processGroup,

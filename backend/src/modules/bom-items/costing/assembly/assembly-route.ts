@@ -313,7 +313,7 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
               }, sprayLookups);
               if ('reasons' in c) return fail(...c.reasons);
               runs[`${j.id} consumables`] = c.run;
-              return { ...t, materialCostUsd: c.run.value! };
+              return { ...t, materialCostUsd: c.sec };
             };
             criteria.push(`A ${kind} welder (arc time standard, tacks, gun times${route.key === 'robotic' ? ', programming and weld heads' : ''}) and its wire cost`);
           }
@@ -349,7 +349,7 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
           if (j.process === 'Adhesive Bonding') {
             const mass = run(BOND_MATERIAL_CALC, null, { bond_area_mm2: area, sealant_volume_mm3: seed(0, 'no sealant on a bonded joint') });
             if ('run' in mass) {
-              adhesiveKg += mass.run.value!;
+              adhesiveKg += mass.sec;
               runs[`${j.id} adhesive`] = mass.run;
             }
             evaluate = (m) => timed(process, m, { bond_area_mm2: area });
