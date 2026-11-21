@@ -155,6 +155,7 @@ export class HydroformingCostService {
     const none = (part: HydroformPart | null, ...missing: string[]): HydroformingCostResult => ({ route: null, routes: [], rule: null, part, nest: null, note: null, missing, warnings });
     const { part, missing: partMissing } = hydroformPart(req.geometry);
     if (!part) return none(null, ...partMissing);
+    for (const what of part.unmeasured) warnings.push(`The cad-engine could not measure ${what}.`);
     const o = req.overrides ?? {};
     const [{ reference, missing: refMissing }, calculators, machines, toolShop] = await Promise.all([
       this.reference(),
