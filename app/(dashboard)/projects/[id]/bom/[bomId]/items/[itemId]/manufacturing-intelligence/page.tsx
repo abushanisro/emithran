@@ -24,11 +24,11 @@ import { ConciseNote } from '@/components/ui/concise-note';
 import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { ForgingSection } from '@/components/costing/ForgingSection';
-import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
 import { splitNote } from '@/lib/text/concise-note';
 import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
 import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
 import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
+import { PowderMetalSection, powderMetalUncostedReason } from '@/components/costing/PowderMetalSection';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -896,7 +896,7 @@ function CostSummaryTab({
             Apply a material grade — engine will price this part from your DB rates
           </div>
         </div>
-      ) : cost.materialSource === 'default' && !matRateOverride ? (
+      ) : cost.materialSource === 'default' && !matRateOverride && !materialSettled ? (
         <div className="pl-5 pb-2">
           <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
             <span className="text-amber-500">(est.)</span>
@@ -4489,12 +4489,18 @@ function CostGuidePanel({
                   so this value and the stored column can no longer diverge the
                   way they used to (a CAD-import-written generic grade like
                   "Generic CuZn39Pb3" silently beating a real drawing/selection). */}
-              {cgpCostSummary?.materialGrade && (
+              {/* A grade the engine found no raw_materials row for (materialSource 'default') is costed at no price and no weight: said, not ticked. */}
+              {cgpCostSummary?.materialGrade && (cgpCostSummary.materialSource === 'default' ? (
+                <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 mb-1.5 px-0.5">
+                  <span>!</span>
+                  <span>Costed as <strong>{cgpCostSummary.materialGrade}</strong>, which is not in Raw Materials: no material price or weight</span>
+                </div>
+              ) : (
                 <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 mb-1.5 px-0.5">
                   <span>✓</span>
                   <span>Currently costed as <strong>{cgpCostSummary.materialGrade}</strong></span>
                 </div>
-              )}
+              ))}
 
               {/* Drawing / CAD suggestion — shown only when it is NOT already the
                   grade being costed. Never applied immediately: this only stages
@@ -4616,6 +4622,7 @@ function CostGuidePanel({
               <Section title="Powder Metal">
                 <PowderMetalSection
                   powderMetal={cgpCostSummary.powderMetal}
+                  uncostedReason={powderMetalUncostedReason(cgpCostSummary)}
                   greenDensity={typeof item.scenarioOverrides?.powderMetalGreenDensity === 'number' ? item.scenarioOverrides.powderMetalGreenDensity : null}
                   onChange={(v) => { patchScenarioOverrides.mutate({ id: item.id, patch: { powderMetalGreenDensity: v } }); }}
                 />

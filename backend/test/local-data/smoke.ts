@@ -51,6 +51,13 @@ async function main(): Promise<void> {
     const bad = rows.filter((r) => !r.machine_class || !r.is_active || !r.calculator_name?.startsWith('Part Assembly - '));
     must(rows.length === 9 && bad.length === 0, `rows ${JSON.stringify(rows)}`);
   });
+  await check('migration 1101 twinned the 16 Powder Metal machines in India at memory\'s crews, and 1102 linked the process to its powders', async () => {
+    const rows = await (await api('/mhr_records?process_group=eq.Powder%20Metal&location=eq.India&select=machine_name,operators,usd_labor_rate_per_hr', minter.forService())).json() as { machine_name: string; operators: number | string; usd_labor_rate_per_hr: number | string }[];
+    const press = rows.find((r) => r.machine_name === 'Gasbarre DSP - 100 ton');
+    must(rows.length === 16 && Number(press?.operators) === 0.5 && rows.every((r) => Number(r.usd_labor_rate_per_hr) === 2.3), `rows ${JSON.stringify(rows)}`);
+    const groups = await (await api('/process_material_groups?process_group=eq.Powder%20Metal&select=material_group', minter.forService())).json() as { material_group: string }[];
+    must(JSON.stringify(groups) === JSON.stringify([{ material_group: 'Powder Metal' }]), `groups ${JSON.stringify(groups)}`);
+  });
   await check('the carried user directory is readable through migration 932 (same id as the source)', async () => {
     const res = await api('/rpc/directory_find_by_email', minter.forService(), { method: 'POST', body: JSON.stringify({ p_email: 'Alice@Example.com' }) });
     must(res.ok && (await res.json()) === '11111111-1111-4111-8111-111111111111', `HTTP ${res.status}`);
