@@ -42,6 +42,22 @@ describe('deriveAnalysisStatus', () => {
     expect(deriveAnalysisStatus(part({ chosenFamilyHint: 'two_model', featureGraph: analysed('sand_cast') }), 'none', CURRENT).cad).toBe('stale');
   });
 
+  it('a part set to a process priced from a measurement its analysis predates is stale until Refresh analysis measures it', () => {
+    // Cannula Holder bottom: Process Sheet Metal - Hydroforming, analysed as sheet metal (feature graph v4) before the hydroform measurement
+    // existed. It was taken as analysed: Apply wrote $0 "press Refresh analysis" lines and the page never asked for the refresh.
+    const sheet = (summary: Record<string, unknown> | undefined) => ({ ...analysed('sheet_metal'), ...(summary ? { summary } : {}) });
+    const hydro = (summary: Record<string, unknown> | undefined) => part({ featureGraph: sheet(summary), chosenFamilyHint: 'sheet_metal', chosenProcessGroup: 'Sheet Metal - Hydroforming' });
+    expect(deriveAnalysisStatus(hydro({ bendCount: 6 }), 'none', CURRENT)).toMatchObject({ cad: 'stale', ready: false, missing: ['cad_features'] });
+    expect(deriveAnalysisStatus(hydro(undefined), 'none', CURRENT).cad).toBe('stale');
+    expect(deriveAnalysisStatus(hydro({ hydroformGeometry: { extractionVersion: 'hf_v0' } }), 'none', CURRENT).cad).toBe('stale');
+    expect(deriveAnalysisStatus(hydro({ hydroformGeometry: { extractionVersion: 'hf_v1' } }), 'none', CURRENT)).toMatchObject({ cad: 'ready', ready: true });
+    // The current engine found no sheet to measure: analysing again gives the same, so it is current (the quote says what is missing).
+    expect(deriveAnalysisStatus(hydro({ hydroformGeometry: null }), 'none', CURRENT).cad).toBe('ready');
+    // A plain sheet-metal part (or no Process) needs no such measurement.
+    expect(deriveAnalysisStatus(part({ featureGraph: sheet({ bendCount: 6 }), chosenProcessGroup: 'Sheet Metal' }), 'none', CURRENT).cad).toBe('ready');
+    expect(deriveAnalysisStatus(part({ featureGraph: sheet({ bendCount: 6 }) }), 'none', CURRENT).cad).toBe('ready');
+  });
+
   it('a part with no 3D file is not blocked: there is nothing to extract', () => {
     expect(deriveAnalysisStatus({ file3dPath: null, featureGraph: null }, 'none', CURRENT)).toMatchObject({ cad: 'not_required', ready: true });
   });

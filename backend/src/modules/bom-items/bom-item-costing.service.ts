@@ -2843,7 +2843,8 @@ export class BomItemCostingService {
             costPerKgUsd: materialCostPerKg > 0 ? materialCostPerKg / usdToLocal : null,
             utsMpa: utsSource === 'db' ? utsMpa : null, shearStrengthMpa,
           },
-          thicknessMm: sheetThicknessMm, geometry: (summary.hydroformGeometry ?? null) as Record<string, unknown> | null, summary,
+          // Absent (an analysis from before the measurement) and null (nothing the engine could measure) are told apart.
+          thicknessMm: sheetThicknessMm, geometry: summary.hydroformGeometry as Record<string, unknown> | null | undefined, summary,
           amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
           ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
           overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
