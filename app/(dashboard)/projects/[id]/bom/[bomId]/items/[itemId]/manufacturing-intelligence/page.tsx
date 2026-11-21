@@ -160,6 +160,7 @@ import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { calculationOfLine, calculationOfRecord, NO_CALCULATION, seedOfCalculation, tracedLineOf, type LineCalculation } from '@/lib/calculators/calculator-run';
+import { additiveSectionTitle } from '@/lib/costing/additive-view';
 import { useAuth } from '@/lib/providers/auth-context';
 import type { PanelId, ManualRouteOption, AddProcessRequest } from '@/lib/features/mi-page-types';
 import { fmt, materialLabel, splitMaterialDisplay, fmtInt, formatCell, machineDisplayLabel, familyLabel, confidenceCls, formatEstCycleTime, money, partProcessBadge } from '@/lib/features/display-format';
@@ -4686,7 +4687,7 @@ function CostGuidePanel({
             )}
 
             {cgpCostSummary?.family === 'additive' && (
-              <Section title="Additive Manufacturing">
+              <Section title={additiveSectionTitle(cgpCostSummary.additive, item.scenarioOverrides?.processGroup)}>
                 <AdditiveSection
                   additive={cgpCostSummary.additive}
                   overrides={item.scenarioOverrides}

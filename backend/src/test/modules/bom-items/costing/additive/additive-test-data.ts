@@ -4,7 +4,8 @@ import { readdirSync } from 'fs';
 import { join } from 'path';
 import { resolveSandReference } from '../../../../../modules/bom-items/costing/casting/sand/sand-reference';
 import { sandMachineFromRow, type SandMachine } from '../../../../../modules/bom-items/costing/casting/sand/sand-machines';
-import { ADDITIVE_CLASS, type AdditiveMaterial } from '../../../../../modules/bom-items/costing/additive/additive-route';
+import { ADDITIVE_CLASS } from '../../../../../modules/bom-items/costing/additive/additive-domain';
+import type { AdditiveMaterial } from '../../../../../modules/bom-items/costing/additive/additive-route';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { readCsv, specKey } = require('../../../../../../migrations/scripts/lib/memory-machine-seed.js');
@@ -24,7 +25,7 @@ const stagedLookups = [
 export const realAdditiveReference = () => resolveSandReference({ variables: stagedVariables, lookups: stagedLookups });
 
 const TOP_LEVEL = new Set(['name', 'labor_rate_usd_per_hr', 'direct_overhead_rate_usd_per_hr', 'indirect_overhead_rate_usd_per_hr', 'number_of_operators', 'setup_time_hr', 'machine_power_kw']);
-function machineOf(row: Record<string, any>, machineClass: string, i: number): SandMachine {
+export function machineOf(row: Record<string, any>, machineClass: string, i: number): SandMachine {
   const overhead = Number(row['direct_overhead_rate_usd_per_hr']) + Number(row['indirect_overhead_rate_usd_per_hr']);
   const specs = Object.fromEntries(Object.entries(row).filter(([k]) => !TOP_LEVEL.has(k)).map(([k, v]) => [k, v === 'true' || v === 'TRUE' ? true : v === 'false' || v === 'FALSE' ? false : v]));
   return sandMachineFromRow({

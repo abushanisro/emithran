@@ -2,6 +2,7 @@ import { additiveCalculatorsByName, loadAdditiveCalculatorSpec } from '../../../
 import { additivePart } from '../../../../../modules/bom-items/costing/additive/additive-cost.service';
 import { buildAdditiveCostSummary } from '../../../../../modules/bom-items/costing/additive/additive-cost-summary';
 import { additiveRouteFor } from '../../../../../modules/bom-items/costing/additive/additive-route-comparison';
+import { ADDITIVE } from '../../../../../modules/bom-items/costing/additive/additive-domain';
 import {
   buildAdditiveRoutes, chooseAdditiveRoute, chooseBuild, selfSupportingAngle, type AdditivePart, type AdditiveRoute, type AdditiveRouteInput, type BuildCandidate,
 } from '../../../../../modules/bom-items/costing/additive/additive-route';
@@ -16,7 +17,7 @@ const angles = (overhang: number, support: number, contact: number, regions: num
 // The tee of the cad-engine tests (test_additive_measurements.py): a 10 x 10 x 30 stem under a 50 x 10 x 5 flange. Upright (+z) its flange
 // hangs 400 mm² over the plate, 30 mm up; on its side (+y) it needs no support and is 10 mm tall.
 const TEE: AdditivePart = {
-  partVolumeMm3: 10 * 10 * 30 + 50 * 10 * 5, surfaceAreaMm2: 3400, measuredAxis: '+y',
+  partVolumeMm3: 10 * 10 * 30 + 50 * 10 * 5, surfaceAreaMm2: 3400, measuredAxis: '+y', cleaningFeatures: null,
   candidates: {
     '+z': { buildHeightMm: 35, footprintMm: [50, 10], byAngle: angles(400, 12000, 500, 2) },
     '-z': { buildHeightMm: 35, footprintMm: [50, 10], byAngle: angles(0, 0, 500, 0) },
@@ -24,7 +25,7 @@ const TEE: AdditivePart = {
   },
 };
 const input = (material: string, over: Partial<AdditiveRouteInput> = {}): AdditiveRouteInput => ({
-  ref: realAdditiveReference(), spec: loadAdditiveCalculatorSpec(), calculators: additiveCalculatorsByName(), material: additiveMaterial(material),
+  domain: ADDITIVE, ref: realAdditiveReference(), spec: loadAdditiveCalculatorSpec(), calculators: additiveCalculatorsByName(), material: additiveMaterial(material),
   part: TEE, machinesByClass: allAdditiveMachines(), scenario: { batchSize: 100, route: null, buildAxis: null }, costContext: ZERO, ...over,
 });
 const only = (material: string, over: Partial<AdditiveRouteInput> = {}): AdditiveRoute => {
@@ -105,8 +106,8 @@ describe('the routes on the real memory/Additive Manufacturing data', () => {
 
   it('the route quoted is the Cost Guide\'s when it is one, else the cheapest complete one', () => {
     const { routes, gaps } = buildAdditiveRoutes(input('Duraform EX'));
-    expect(chooseAdditiveRoute(routes, gaps, null).note).toContain('Laser sintering (SLS) is quoted');
-    expect(chooseAdditiveRoute(routes, gaps, 'metal_sintering').route!.key).toBe('laser_sintering');
+    expect(chooseAdditiveRoute(ADDITIVE, routes, gaps, null).note).toContain('Laser sintering (SLS) is quoted');
+    expect(chooseAdditiveRoute(ADDITIVE, routes, gaps, 'metal_sintering').route!.key).toBe('laser_sintering');
   });
 });
 
@@ -124,9 +125,9 @@ describe('the build measurements as auto-fill promotes them', () => {
 describe('the cost summary and the route comparison', () => {
   const routeInput = input('Stainless Steel, 17-4PH');
   const { routes, gaps } = buildAdditiveRoutes(routeInput);
-  const { route, note } = chooseAdditiveRoute(routes, gaps, null);
+  const { route, note } = chooseAdditiveRoute(ADDITIVE, routes, gaps, null);
   const summary = buildAdditiveCostSummary({
-    additive: { route, routes, gaps, note, missing: [], warnings: [] }, materialGrade: 'Generic Stainless Steel, 17-4PH', materialCostPerKg: 0,
+    additive: { domain: ADDITIVE, route, routes, gaps, note, missing: [], warnings: [] }, materialGrade: 'Generic Stainless Steel, 17-4PH', materialCostPerKg: 0,
     materialSource: 'db', batchSize: 100, warnings: [], ratesSource: 'test',
   });
 
@@ -144,13 +145,13 @@ describe('the cost summary and the route comparison', () => {
 
   it('a route not for the part is not feasible and says why; the quoted one carries the lines', () => {
     const s = summary as unknown as CostSummaryResponseDto;
-    expect(additiveRouteFor('metal_sintering', s)).toMatchObject({ routeId: 'additive-metal_sintering', isFeasible: true });
-    expect(additiveRouteFor('printing', s)).toMatchObject({ isFeasible: false, processLines: [] });
+    expect(additiveRouteFor(ADDITIVE, 'metal_sintering', s)).toMatchObject({ routeId: 'additive-metal_sintering', isFeasible: true });
+    expect(additiveRouteFor(ADDITIVE, 'printing', s)).toMatchObject({ isFeasible: false, processLines: [] });
   });
 
   it('a part that cannot be costed is one named line, never priced as another process', () => {
     const none = buildAdditiveCostSummary({
-      additive: { route: null, routes: [], gaps: [], note: null, missing: ['the build measurements'], warnings: [] }, materialGrade: null, materialCostPerKg: 0,
+      additive: { domain: ADDITIVE, route: null, routes: [], gaps: [], note: null, missing: ['the build measurements'], warnings: [] }, materialGrade: null, materialCostPerKg: 0,
       materialSource: 'default', batchSize: 1, warnings: [], ratesSource: 'test',
     });
     expect(none.totalCost).toBe(0);

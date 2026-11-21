@@ -79,6 +79,8 @@ const COSTED_AS_FAMILY: Readonly<Record<string, string>> = {
   'Assembly Plastic Molding': 'plastic_molded',
   // Multi-spindle machining: a turned part made from bar on a CNC multi-spindle or twin-spindle turning center (backend multi-spindle).
   'Multi-Spindle Machining': 'turned',
+  // Rapid prototyping: analysed for its build as an additive part, priced in its own domain (backend additive/additive-domain.ts).
+  'Rapid Prototyping': 'additive',
 };
 
 /**

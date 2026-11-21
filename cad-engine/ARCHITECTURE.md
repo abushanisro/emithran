@@ -50,7 +50,8 @@ cad-engine/
   forging/
     feature_extractor.py         — closed-die forging measurements (reached through family_hint="forged")
   additive/
-    feature_extractor.py         — additive build measurements: build direction of least support, height, footprint, overhang, support volume, plate contact (family_hint="additive")
+    feature_extractor.py         — additive build measurements: build direction of least support, height, footprint, overhang, support volume, plate contact, holes (RingedHole: a grooved bore) (family_hint="additive"; Additive Manufacturing and Rapid Prototyping)
+    voids.py                     — the voids cleaning clears, on a voxel grid: pockets, ring pockets, enclosed cavities, non-round holes, each with its volume and depth
   bar_tube/
     feature_extractor.py         — bar and tube measurements: section swept along a centreline (stock form, bends, developed length, holes, ends, end forms) or cut plate (family_hint="bar_tube")
     centreline.py, section.py    — the centreline (bends joined by straights, section frame) and the cross-section classifier

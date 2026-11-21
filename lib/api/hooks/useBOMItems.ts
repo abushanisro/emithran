@@ -1225,11 +1225,15 @@ export interface CostSummaryDto {
   };
   /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route (backend AdditiveBreakdown). */
   additive?: {
+    /** Additive Manufacturing or Rapid Prototyping (backend additive-domain.ts). */
+    processGroup: string;
     route: string; routeLabel: string;
     buildDirection: string; buildDirectionSource: 'engineer' | 'least_support'; selfSupportingDeg: number;
     buildHeightMm: number; footprintMm: number[]; overhangAreaMm2: number; supportVolumeMm3: number; plateContactAreaMm2: number;
     partsPerBuild: number | null; layers: number | null; materialMassKg: number; complete: boolean;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+    /** Rapid Prototyping: each hole and void cleaning timed (size: a diameter in mm or a volume in mm³, as `measure` says). */
+    cleaning: { id: string; type: string; label: string; measure: 'diameter' | 'volume'; size: number; depthMm: number; timeSec: number }[];
   };
   /** Bar and Tube Fabrication: the stock, the bends (each one's method), ends, forms and openings, the route quoted and every route. */
   barTube?: {

@@ -41,10 +41,10 @@ describe('the process a part is costed as', () => {
   });
 
   it('is not costed when the chosen Process has no cost model, and names the processes that have one', () => {
-    const r = resolve({ scenarioOverrides: { processGroup: 'Rapid Prototyping' } }, 'Generic ABS, Fittings', 'milled');
+    const r = resolve({ scenarioOverrides: { processGroup: 'Roto & Blow Molding' } }, 'Generic ABS, Fittings', 'milled');
     expect(r.family).toBe('unknown');
     expect(r.familySource).toBe('process');
-    expect(r.warning).toBe('The Process "Rapid Prototyping" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Assembly Molding, Assembly Plastic Molding, Bar and Tube Fabrication, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Multi-Spindle Machining, Part Assembly, Plastic Molding, Powder Metal, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
+    expect(r.warning).toBe('The Process "Roto & Blow Molding" has no cost model yet, so this part is not costed. Set its Process to one that has: 2-Model Machining, Additive Manufacturing, Assembly, Assembly Molding, Assembly Plastic Molding, Bar and Tube Fabrication, Casting, Casting Investment, Composites, Die Casting, Forging, Machining, Multi-Spindle Machining, Part Assembly, Plastic Molding, Powder Metal, Rapid Prototyping, Sand Casting, Sheet Metal, Sheet Metal - Hydroforming.');
   });
 
   it('a Powder Metal part is a powder metal part, whatever its material or last analysis', () => {
@@ -61,7 +61,7 @@ describe('the process a part is costed as', () => {
     expect(resolve({ itemType: 'sub_assembly' as never }, null)).toEqual({ family: 'assembly', familySource: 'process', warning: null });
     // A Process the engineer chose wins: an assembly set to Part Assembly is costed as its welding, one set to an uncosted Process says so.
     expect(resolve({ itemType: 'assembly' as never, scenarioOverrides: { processGroup: 'Part Assembly' } }, null)).toEqual({ family: 'part_assembly', familySource: 'process', warning: null });
-    expect(resolve({ itemType: 'assembly' as never, scenarioOverrides: { processGroup: 'Rapid Prototyping' } }, null).family).toBe('unknown');
+    expect(resolve({ itemType: 'assembly' as never, scenarioOverrides: { processGroup: 'Roto & Blow Molding' } }, null).family).toBe('unknown');
     expect(resolve({ itemType: 'child_part' as never }, null, 'milled').family).toBe('milled');
   });
 
@@ -80,6 +80,10 @@ describe('the process a part is costed as', () => {
 
   it('an Additive Manufacturing part is a printed part, whatever its material or last analysis', () => {
     expect(resolve({ scenarioOverrides: { processGroup: 'Additive Manufacturing' } }, 'Generic Stainless Steel, 17-4PH', 'milled')).toEqual({ family: 'additive', familySource: 'process', warning: null });
+  });
+
+  it('a Rapid Prototyping part is a part built layer by layer (priced in the Rapid Prototyping domain), whatever its material or last analysis', () => {
+    expect(resolve({ scenarioOverrides: { processGroup: 'Rapid Prototyping' } }, 'Accura 25', 'milled')).toEqual({ family: 'additive', familySource: 'process', warning: null });
   });
 
   it('a Composites part is a composite laminate, whatever its material or last analysis', () => {

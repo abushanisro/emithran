@@ -10,6 +10,7 @@ import { loadInvestmentCastingCalculatorSpec } from '../costing/casting/investme
 import { loadPowderMetalCalculatorSpec } from '../costing/powder-metal/calculators/powder-metal-calculator-spec';
 import { loadCompositesCalculatorSpec } from '../costing/composites/calculators/composites-calculator-spec';
 import { loadAdditiveCalculatorSpec } from '../costing/additive/calculators/additive-calculator-spec';
+import { loadRapidPrototypingCalculatorSpec } from '../costing/additive/calculators/rapid-prototyping-calculator-spec';
 import { loadBarTubeCalculatorSpec } from '../costing/bar-tube/calculators/bar-tube-calculator-spec';
 import { loadMultiSpindleCalculatorSpec } from '../costing/multi-spindle/calculators/multi-spindle-calculator-spec';
 import { loadPartAssemblyCalculatorSpec } from '../costing/part-assembly/calculators/part-assembly-calculator-spec';
@@ -220,6 +221,11 @@ export class CalculatorCatalogService {
   /** The additive manufacturing calculators (migration 1073), from the database. */
   loadAdditiveCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('additive-calculators', loadAdditiveCalculatorSpec(), accessToken);
+  }
+
+  /** The Rapid Prototyping calculators (migration 1105), from the database. */
+  loadRapidPrototypingCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('rapid-prototyping-calculators', loadRapidPrototypingCalculatorSpec(), accessToken);
   }
 
   /** The bar and tube fabrication calculators (migration 1091), from the database. */

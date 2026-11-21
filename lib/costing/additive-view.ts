@@ -17,6 +17,21 @@ export function buildDirectionOf(overrides: Record<string, unknown> | null | und
   return typeof v === 'string' && (BUILD_DIRECTIONS as readonly string[]).includes(v) ? v : null;
 }
 
+const RAPID_PROTOTYPING = 'Rapid Prototyping';
+
+/**
+ * The Cost Guide section's title: the process group the part is priced in (backend additive-domain.ts), from the quote; before one exists,
+ * the part's own Process when it is Rapid Prototyping, else Additive Manufacturing.
+ */
+export function additiveSectionTitle(additive: AdditiveSummary | null | undefined, processGroup: unknown): string {
+  return additive?.processGroup ?? (processGroup === RAPID_PROTOTYPING ? RAPID_PROTOTYPING : 'Additive Manufacturing');
+}
+
+/** A cleaned hole's or void's size as the engineer reads it: a hole by its diameter, a void by its volume. */
+export function cleaningSizeLabel(f: Pick<AdditiveSummary['cleaning'][number], 'measure' | 'size'>): string {
+  return f.measure === 'diameter' ? `Ø ${Math.round(f.size * 10) / 10} mm` : `${Math.round(f.size).toLocaleString('en-US')} mm³`;
+}
+
 /** A direction as the engineer reads it: "+z (Z up)". */
 export function directionLabel(axis: string): string {
   const sign = axis.startsWith('-') ? 'down' : 'up';

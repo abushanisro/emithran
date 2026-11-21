@@ -991,7 +991,9 @@ export interface MultiSpindleBreakdown {
 }
 
 export interface AdditiveBreakdown {
-  /** The quoted route (additive-route.ts ADDITIVE_ROUTES key) and its name. */
+  /** The process group it is priced in: Additive Manufacturing or Rapid Prototyping (additive-domain.ts). */
+  processGroup: string;
+  /** The quoted route (an additive-domain.ts route key) and its name. */
   route: string;
   routeLabel: string;
   /** The build direction (+z, -z, +x, ...), set in the Cost Guide or the one of least support at the material's self-supporting angle. */
@@ -1010,6 +1012,8 @@ export interface AdditiveBreakdown {
   complete: boolean;
   /** Every route: its total per part (summary currency) when complete, or why it is not a route for the part. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  /** Rapid Prototyping: each hole and void cleaning timed (size: a diameter in mm or a volume in mm³, as `measure` says). Empty for Additive Manufacturing. */
+  cleaning: Array<{ id: string; type: string; label: string; measure: 'diameter' | 'volume'; size: number; depthMm: number; timeSec: number }>;
 }
 
 export interface CompositesBreakdown {

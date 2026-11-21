@@ -17,8 +17,10 @@ it is chosen here:
   support_volume     each overhanging triangle's area seen from below times its height above the plate: the support columns, down to the
                      plate (a column landing on the part below is not detected: an upper bound).
   plate_contact      the part's faces on the plate plus the overhang seen from below: what is broken off the plate after the build.
-  features           holes, voids, planar faces, curved walls and surfaces (as built, the catalog's "As Sintered / As Printed / As Cured"),
-                     the support structure (the overhang faces) and the build direction (the plate faces).
+  features           holes (SimpleHole, MultiStepHole, RingedHole: a bore with a groove), voids (additive/voids.py: pockets, ring pockets,
+                     enclosed cavities and non-round holes, each with its volume and depth), planar faces, curved walls and surfaces (as built,
+                     the catalog's "As Sintered / As Printed / As Cured"), the support structure (the overhang faces) and the build direction
+                     (the plate faces). The holes and voids are what cleaning clears (memory/Rapid prototyping cleaning* variables).
 
 These are measurements only. Route, layers, nesting, cycle times and cost are decided in the backend from the staged additive reference data.
 """
@@ -33,10 +35,11 @@ from injection_molding.recognition.mesh import FaceMesh, tessellate_faces
 from injection_molding.recognition.vec import Vec, dot, unit
 from shared.stable_face_id import build_stable_face_id_map
 from forging.feature_extractor import extreme_faces, face_features, hole_features, solid_volume
+from additive.voids import find_voids
 
 logger = logging.getLogger(__name__)
 
-VERSION = "additive-1"
+VERSION = "additive-2"
 
 # The six directions a part can be built along: the plate is below, layers stack along the direction.
 AXES: Tuple[Tuple[str, Vec], ...] = (
@@ -175,6 +178,29 @@ def build_features(chosen: Dict[str, Any], stable: Dict[int, str]) -> List[Dict[
     return out
 
 
+def is_ringed(hole: Dict[str, Any]) -> bool:
+    """A bore with a groove inside it: along its axis, a wider cylinder step lies between two narrower ones (the catalog's RingedHole)."""
+    radii = [float(s["diameter_mm"]) for s in sorted(hole.get("steps", []), key=lambda s: s.get("t_min", 0.0)) if s.get("kind") == "cylinder"]
+    return any(radii[i] > radii[i - 1] and radii[i] > radii[i + 1] for i in range(1, len(radii) - 1))
+
+
+def void_features(voids: Sequence[Dict[str, Any]], stable: Dict[int, str]) -> List[Dict[str, Any]]:
+    """
+    Each void (additive/voids.py) as a feature_graph_v2 feature of its own, under the void's id (as each hole is under its own): Void (simple,
+    complex), Ring (a pocket around a boss), ComplexHole. The cleaning step names the features it times by these ids.
+    """
+    out: List[Dict[str, Any]] = []
+    for v in voids:
+        occ: Dict[str, Any] = {"face_ids": list(v["face_ids"]), "centroid": v["centroid"], "volume_mm3": v["volume_mm3"], "depth_mm": v["depth_mm"]}
+        if v.get("equivalent_diameter_mm") is not None:
+            occ["diameter_mm"] = v["equivalent_diameter_mm"]
+        s = [stable.get(i) for i in occ["face_ids"]]
+        if s and all(s):
+            occ["source_face_stable_ids"] = s
+        out.append({"id": v["id"], "feature_type": v["feature_type"], "variant": v["variant"], "occurrences": [occ]})
+    return out
+
+
 class AdditiveFeatureExtractor:
     def extract(
         self,
@@ -203,8 +229,17 @@ class AdditiveFeatureExtractor:
         except Exception as e:  # the ids only serve highlighting; a part that cannot be hashed is still measured
             logger.warning(f"[Additive] stable_face_id build failed: {e}")
         holes = recognize_holes(meshes, build)
-        hole_face_ids = [i for h in holes["holes"] for i in h["face_ids"]]
-        features = hole_features(holes["holes"], stable) + face_features(shape, bbox_dims, build, hole_face_ids, stable) + build_features(chosen, stable)
+        for h in holes["holes"]:
+            if is_ringed(h):
+                h["feature_type"] = "RingedHole"
+        try:
+            found = find_voids(shape, meshes, holes["holes"])
+        except Exception as e:  # cleaning then has no void to time; the build is still measured
+            logger.warning(f"[Additive] void recognition failed: {e}")
+            found = {"voids": [], "cell_mm": None, "skipped_columns": 0, "open_recesses": 0}
+        claimed = [i for h in holes["holes"] for i in h["face_ids"]] + [i for v in found["voids"] for i in v["face_ids"]]
+        features = (hole_features(holes["holes"], stable) + void_features(found["voids"], stable)
+                    + face_features(shape, bbox_dims, build, claimed, stable, voids=False) + build_features(chosen, stable))
 
         at = chosen["by_angle"][str(int(DEFAULT_SELF_SUPPORTING_DEG))]
         logger.info(
@@ -225,9 +260,14 @@ class AdditiveFeatureExtractor:
             "plate_contact_area_mm2": at["plate_contact_area_mm2"],
             "overhang_regions": at["overhang_regions"],
             "holes": [
-                {"id": h["id"], "variant": h["variant"], "diameter_mm": h["diameter_mm"], "depth_mm": h["depth_mm"], "face_ids": h["face_ids"]}
+                {"id": h["id"], "feature_type": h["feature_type"], "variant": h["variant"], "diameter_mm": h["diameter_mm"], "depth_mm": h["depth_mm"],
+                 "face_ids": h["face_ids"]}
                 for h in holes["holes"]
             ],
+            # The pockets, ring pockets, enclosed cavities and non-round holes (additive/voids.py): what cleaning clears besides the holes.
+            "voids": [{k: v[k] for k in ("id", "feature_type", "variant", "volume_mm3", "depth_mm", "open_axis", "equivalent_diameter_mm", "face_ids") if k in v}
+                      for v in found["voids"]],
+            "void_cell_mm": found["cell_mm"],
             "feature_graph_v2": {
                 "metadata": {"face_map": face_map or [], "stl_tri_total": face_map_tri_total or None, "stable_face_ids": stable},
                 "features": features,

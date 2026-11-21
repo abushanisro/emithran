@@ -1,24 +1,26 @@
-// An additive part's entries in the route comparison: one per build route (metal sintering, laser sintering, material jetting, stereolithography), each its cost summary priced on that route (the same lines, the
-// same totals, the same code path as the quote, so the comparison cannot disagree with it). Apply saves a route's lines as the item's process
-// records. Pure.
+// A part built layer by layer: its entries in the route comparison, one per build route of its domain (Additive Manufacturing: metal sintering,
+// laser sintering, material jetting, stereolithography; Rapid Prototyping: laser sintering, 3D printing, stereolithography), each its cost
+// summary priced on that route (the same lines, the same totals, the same code path as the quote, so the comparison cannot disagree with it).
+// Apply saves a route's lines as the item's process records. Pure.
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
 import { findRouteDataGaps } from '../shared/core/engine-kernel';
-import { ADDITIVE_ROUTES, type AdditiveRouteKey } from './additive-route';
+import { ADDITIVE_DOMAINS, type AdditiveDomain, type AdditiveRouteKey } from './additive-domain';
+import { notCostedPrefix } from './additive-cost-summary';
 
 /** The route id of an additive route ("additive-metal_sintering"). */
 export const additiveRouteId = (key: string) => `additive-${key}`;
-export const ADDITIVE_ROUTE_IDS: readonly string[] = ADDITIVE_ROUTES.map((r) => additiveRouteId(r.key));
+export const ADDITIVE_ROUTE_IDS: readonly string[] = [...new Set(ADDITIVE_DOMAINS.flatMap((d) => d.routes.map((r) => additiveRouteId(r.key))))];
 
 /** The route of `key` from the summary priced on it; a summary that quotes another route (this one is not a route for the part) says why. */
-export function additiveRouteFor(key: AdditiveRouteKey, summary: CostSummaryResponseDto): RouteResultDto {
+export function additiveRouteFor(domain: AdditiveDomain, key: AdditiveRouteKey, summary: CostSummaryResponseDto): RouteResultDto {
   const additive = summary.additive;
-  const label = ADDITIVE_ROUTES.find((r) => r.key === key)!.label;
+  const label = domain.routes.find((r) => r.key === key)!.label;
   const isThis = additive?.route === key;
   const feasible = isThis && additive!.complete && summary.totalCost != null;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const option = additive?.options.find((o) => o.route === key);
-  const why = !additive ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith('Additive Manufacturing cannot be costed')) ?? 'the part could not be costed'
+  const why = !additive ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith(notCostedPrefix(domain))) ?? 'the part could not be costed'
     : !isThis ? option?.reason ?? 'not a route for this part'
     : 'the build route is incomplete: a step has no capable machine or data';
   return {

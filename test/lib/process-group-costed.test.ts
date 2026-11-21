@@ -5,12 +5,12 @@ import { isCostedProcessGroup, processGroupOptionLabel, processGroupToFamilyHint
 // A Process with no cost model is not costed (the backend's familiesOfProcessGroup), so the Process fields mark it instead of offering it blind:
 // a part whose Process had none was priced as whatever it was last analysed as.
 describe('process groups with a cost model', () => {
-  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal', 'Additive Manufacturing', 'Bar and Tube Fabrication', 'Assembly', 'Assembly Molding', 'Part Assembly'])('%s is costed', (group) => {
+  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal', 'Additive Manufacturing', 'Bar and Tube Fabrication', 'Assembly', 'Assembly Molding', 'Part Assembly', 'Rapid Prototyping'])('%s is costed', (group) => {
     expect(isCostedProcessGroup(group)).toBe(true);
     expect(processGroupOptionLabel(group)).toBe(group);
   });
 
-  it.each(['Rapid Prototyping', 'Roto & Blow Molding'])('%s is not, and its option says so', (group) => {
+  it.each(['Roto & Blow Molding', 'Sheet Plastic'])('%s is not, and its option says so', (group) => {
     expect(isCostedProcessGroup(group)).toBe(false);
     expect(processGroupOptionLabel(group)).toBe(`${group} (not costed yet)`);
   });
@@ -29,7 +29,9 @@ describe('process groups with a cost model', () => {
     expect(processGroupToFamilyHint('Composites')).toBe('composite');
     expect(processGroupToFamilyHint('Additive Manufacturing')).toBe('additive');
     expect(processGroupToFamilyHint('Bar and Tube Fabrication')).toBe('bar_tube');
-    expect(processGroupToFamilyHint('Rapid Prototyping')).toBeUndefined();
+    // Rapid Prototyping is analysed for its build as an additive part.
+    expect(processGroupToFamilyHint('Rapid Prototyping')).toBe('additive');
+    expect(processGroupToFamilyHint('Roto & Blow Molding')).toBeUndefined();
     // An assembly and a weldment are costed from their children and the Cost Guide: there is no CAD extractor to force for them.
     expect(processGroupToFamilyHint('Assembly')).toBeUndefined();
     expect(processGroupToFamilyHint('Part Assembly')).toBeUndefined();
