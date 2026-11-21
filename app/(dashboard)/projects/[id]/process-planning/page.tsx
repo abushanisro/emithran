@@ -11,6 +11,7 @@ import { ManufacturingProcessSection } from '@/components/features/process-plann
 import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
 import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, FileSpreadsheet, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from '@/components/ui/icons';
 import { Mark } from '@/components/ui/status-mark';
@@ -886,6 +887,9 @@ function ProcessPlanningPageContent() {
             </PageHeader>
           </div>
         </div>
+
+        {/* Project sections: shared tab bar, Process Planning is the active tab */}
+        <ProjectNav projectId={projectId} />
 
         {/* TAB INTERFACE */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">

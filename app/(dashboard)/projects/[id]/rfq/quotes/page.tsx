@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, AlertCircle } from '@/components/ui/icons';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
 import { useVendors } from '@/lib/api/hooks/useVendors';
@@ -83,16 +85,7 @@ export default function QuoteComparisonPage() {
 
   if (trackingLoading || vendorsLoading) {
     return (
-      <div className="animate-fade-in">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 w-1/3 rounded bg-muted"></div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            {[1,2,3,4].map(i => (
-              <div key={i} className="h-20 rounded bg-muted"></div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <PageSkeleton label="Loading quotes…" />
     );
   }
 
@@ -120,6 +113,9 @@ export default function QuoteComparisonPage() {
             />
           </div>
         </div>
+
+        {/* Project sections: shared tab bar, RFQ is the active tab */}
+        <ProjectNav projectId={projectId} />
 
         {/* Overview statistics */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

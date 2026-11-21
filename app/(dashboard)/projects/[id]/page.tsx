@@ -1,11 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
 import { StatusBadge } from '@/components/common/status-badge';
 import { ProjectDetailsCard } from '@/components/features/projects/ProjectDetailsCard';
 import { ProjectModules } from '@/components/features/projects/ProjectModules';
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -116,17 +116,6 @@ export default function ProjectDetail() {
     );
   }
 
-  const tabs = [
-    { label: 'BOM', href: `/bom?projectId=${id}` },
-    { label: 'Process Planning', href: `/projects/${id}/process-planning` },
-    { label: 'RFQ', href: `/projects/${id}/rfq` },
-    { label: 'Supplier Evaluation', href: `/projects/${id}/supplier-evaluation` },
-    { label: 'Nomination', href: `/projects/${id}/supplier-nomination` },
-    { label: 'Production', href: `/projects/${id}/production-planning` },
-    { label: 'Quality', href: `/projects/${id}/quality-control` },
-    { label: 'Reports', href: `/projects/${id}/reports` },
-  ];
-
   const stats = [
     {
       label: 'Target Cost',
@@ -168,21 +157,8 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      {/* Workflow tabs: each links to the existing sub-page */}
-      <nav aria-label="Project workflow" className="-mb-2 overflow-x-auto border-b">
-        <ul className="flex min-w-max items-center gap-1">
-          {tabs.map((tab) => (
-            <li key={tab.label}>
-              <Link
-                href={tab.href}
-                className="inline-flex h-10 items-center border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {tab.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      {/* Workflow tabs: shared project tab bar, same links as before plus Overview */}
+      <ProjectNav projectId={id} className="-mb-2" />
 
       {/* Cost overview */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,6 +28,9 @@ export default function RFQTemplatesPage() {
           <PageHeader title="RFQ Templates" description="Standard templates for RFQ requests" />
         </div>
       </div>
+
+      {/* Project sections: shared tab bar, RFQ is the active tab */}
+      <ProjectNav projectId={projectId} />
 
       <Card>
         <CardContent>
