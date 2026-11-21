@@ -502,9 +502,10 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
     const isBeingDragged = draggedItem?.id === item.id;
     const childType      = getChildType(item.itemType);
     const style          = typeStyleOf(item.itemType);
-    // A line is drawn in the colour of the item it comes down from: a guide column in its ancestor's, the connector in the parent's.
-    const lineOf         = (ancestor: TreeNode | undefined) => typeStyleOf(ancestor?.itemType ?? '').line;
-    const parent         = path[path.length - 1];
+    // Every line takes the colour of the items it leads to: this row's connector its own type's (a child part's yellow, a sub-assembly's
+    // blue), a line running past it the colour of the branch it joins (path[i + 1], the ancestor whose next sibling it reaches), and the
+    // line down from an open parent its children's.
+    const lineOf         = (node: TreeNode | undefined) => typeStyleOf(node?.itemType ?? '').line;
 
     return (
       <tr
@@ -547,13 +548,13 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             {/* Tree guides: a line under each ancestor with more children below, then this row's connector (├ or └). */}
             {guides.map((continues, i) => (
               <span key={i} className="relative w-5 shrink-0" aria-hidden="true">
-                {continues && <span className={`absolute inset-y-0 left-1/2 border-l-2 ${lineOf(path[i])}`} />}
+                {continues && <span className={`absolute inset-y-0 left-1/2 border-l-2 ${lineOf(path[i + 1])}`} />}
               </span>
             ))}
             {depth > 0 && (
               <span className="relative w-5 shrink-0" aria-hidden="true">
-                <span className={`absolute left-1/2 top-0 border-l-2 ${lineOf(parent)} ${isLast ? 'h-[calc(50%+1px)]' : 'h-full'}`} />
-                <span className={`absolute left-1/2 top-1/2 w-2.5 border-t-2 ${lineOf(parent)}`} />
+                <span className={`absolute left-1/2 top-0 border-l-2 ${style.line} ${isLast ? 'h-[calc(50%+1px)]' : 'h-full'}`} />
+                <span className={`absolute left-1/2 top-1/2 w-2.5 border-t-2 ${style.line}`} />
               </span>
             )}
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -570,7 +571,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                     >
                       {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     </Button>
-                    {isExpanded && <span className={`absolute bottom-0 left-1/2 top-[calc(50%+10px)] border-l-2 ${style.line}`} aria-hidden="true" />}
+                    {isExpanded && <span className={`absolute bottom-0 left-1/2 top-[calc(50%+10px)] border-l-2 ${lineOf(item.children[0])}`} aria-hidden="true" />}
                   </>
                 ) : null}
               </span>

@@ -8,8 +8,8 @@ export interface TreeRow<T> {
   /** The last of its parent's children: its connector ends here (└) instead of going on (├). */
   isLast: boolean;
   /**
-   * Its ancestors, root first, parent last. The line in guide column k belongs to path[k] (its trunk), the connector to the parent: each is
-   * drawn in that ancestor's colour.
+   * Its ancestors, root first, parent last. The line in guide column k runs on to the next sibling of path[k + 1] (the branch it joins), so
+   * the table draws it in that item's colour; the row's own connector is drawn in its own.
    */
   path: T[];
 }
