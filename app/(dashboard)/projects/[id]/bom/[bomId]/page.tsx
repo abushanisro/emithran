@@ -288,16 +288,15 @@ export default function BOMDetailPage() {
   const [defaultItemType, setDefaultItemType] = useState<BOMItemType | undefined>(undefined);
   const [viewingItem, setViewingItem] = useState<BOMItem | null>(null);
   const [preferredView, setPreferredView] = useState<'2d' | '3d'>('3d');
-  // The page's open tab: the list first. A BOM with nothing in it yet opens on the CAD upload, its first step; chosen once, when the items
-  // first load, so an upload that adds items does not switch the tab under it.
-  const [pageTab, setPageTab] = useState<string | null>(null);
-  if (pageTab === null && bomItemsData) setPageTab(bomItemsData.items.length > 0 ? 'items' : 'cad');
-  const bomTab = pageTab ?? 'items';
+  // The page's open tab, the list first.
+  const [pageTab, setPageTab] = useState('items');
 
   // -------------------------------------------------------------------------
   // 3D viewer state
   // -------------------------------------------------------------------------
   const [uploadedAssembly3D, setUploadedAssembly3D] = useState<Assembly3DState | null>(null);
+  // The 3D Assembly tab exists only while an assembly is loaded; after Re-upload its page falls back to the list.
+  const bomTab = pageTab === 'cad' && !uploadedAssembly3D ? 'items' : pageTab;
   const [isExplodedView, setIsExplodedView] = useState(false);
   const [explodeDistance, setExplodeDistance] = useState(85);
 
@@ -1063,7 +1062,25 @@ export default function BOMDetailPage() {
         </Card>
       )}
 
-      {/* The list first, right under the header (as Gmail's inbox); the tree view and the CAD upload or the assembly's 3D model one click away. */}
+      {/* The CAD upload on top, above the list: a .zip of STEP files or an assembly becomes BOM items. Hidden once an assembly is loaded
+          (its 3D model has its own tab; Re-upload there brings this back). */}
+      {!uploadedAssembly3D && (
+        <Card>
+          <CardHeader>
+            <CardTitle>CAD Processing Pipeline</CardTitle>
+            <CardDescription>
+              Upload a .zip of STEP files, or one assembly — parts and quantities become BOM items ready for costing
+            </CardDescription>
+          </CardHeader>
+          <AssemblyTreeGenerator
+            bomId={bomId}
+            projectId={projectId}
+            onUploaded={() => { void refetchBOMItems(); }}
+          />
+        </Card>
+      )}
+
+      {/* The list (as Gmail's inbox), the tree view and, once an assembly is loaded, its 3D model. */}
       <Tabs value={bomTab} onValueChange={setPageTab} className="space-y-3">
         <TabsList>
           <TabsTrigger value="items">
@@ -1071,10 +1088,12 @@ export default function BOMDetailPage() {
             Items & Parts
           </TabsTrigger>
           <TabsTrigger value="tree">Tree View</TabsTrigger>
-          <TabsTrigger value="cad">
-            {uploadedAssembly3D ? <Box className="h-4 w-4 mr-2" /> : <UploadCloud className="h-4 w-4 mr-2" />}
-            {uploadedAssembly3D ? '3D Assembly' : 'CAD Upload'}
-          </TabsTrigger>
+          {uploadedAssembly3D && (
+            <TabsTrigger value="cad">
+              <Box className="h-4 w-4 mr-2" />
+              3D Assembly
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="items" className="mt-0">
@@ -1115,27 +1134,9 @@ export default function BOMDetailPage() {
           </Card>
         </TabsContent>
 
-        {/* Kept mounted while another tab is open, as the upload card always was: an upload in progress goes on. */}
-        <TabsContent value="cad" forceMount className="mt-0 data-[state=inactive]:hidden">
-        {/* STEP / assembly upload — hidden once an assembly is loaded */}
-        {!uploadedAssembly3D && (
-          <Card>
-            <CardHeader>
-              <CardTitle>CAD Processing Pipeline</CardTitle>
-              <CardDescription>
-                Upload a .zip of STEP files, or one assembly — parts and quantities become BOM items ready for costing
-              </CardDescription>
-            </CardHeader>
-            <AssemblyTreeGenerator
-              bomId={bomId}
-              projectId={projectId}
-              onUploaded={refetchBOMItems}
-            />
-          </Card>
-        )}
-
+        <TabsContent value="cad" className="mt-0">
         {/* 3D Assembly viewer */}
-        {uploadedAssembly3D && bomTab === 'cad' && (
+        {uploadedAssembly3D && (
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
