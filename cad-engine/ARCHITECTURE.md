@@ -42,6 +42,13 @@ cad-engine/
   sheet_metal/
     feature_extractor.py         — SheetMetalFeatureExtractor (+ _annotate_tap_candidates)
     bend_relationships.py        — bend-to-bend/flange relationship extraction
+    features/drawn_shell.py      — the one pass over a sheet part's faces (types, areas, offset twins, adjacency) and the drawn
+                                   shell (deep draw / fluid cell): depth, opening width, developed and form areas; a drawn
+                                   part's flat pattern is its developed sheet
+    features/hydroform.py        — what every sheet part is measured for hydroforming ("hydroform", hf_v1): press axis, forming
+                                   depth, plan, projected and developed area, main surface, the drawn form, the blank (unfolded,
+                                   drawn equal-area or flat), straight and curved flanges, holes (pierced in the flat or not,
+                                   edge distance to the main surface)
     nesting.py                   — real-polygon 2D nesting (Nest View)
   injection_molding/
     feature_extractor.py         — InjectionMoldedFeatureExtractor

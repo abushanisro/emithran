@@ -154,6 +154,46 @@ export interface RawGeometry {
   featureSource: 'step_topology' | 'mesh_inference';
 }
 
+/**
+ * What a sheet-metal part is measured for hydroforming (cad-engine sheet_metal/features/hydroform.py, its "hydroform" result), as
+ * feature_graph.summary.hydroformGeometry: the top-level keys camelCase, the objects inside (plan, mainSurface, drawn, blank, flanges,
+ * holes) as the engine writes them, snake_case -- as rotoBlowGeometry carries its engine objects. null when the engine did not measure
+ * the part (an analysis from before hf_v1, or a part with no sheet frame).
+ */
+export function hydroformGeometry(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const hf = raw as HydroformMeasurement;
+  if (typeof hf.version !== 'string') return null;
+  return {
+    extractionVersion: hf.version,
+    normal: hf.normal ?? null,
+    formingDepthMm: hf.forming_depth_mm ?? null,
+    plan: hf.plan ?? null,
+    projectedAreaMm2: hf.projected_area_mm2 ?? null,
+    developedAreaMm2: hf.developed_area_mm2 ?? null,
+    mainSurface: hf.main_surface ?? null,
+    drawn: hf.drawn ?? null,
+    blank: hf.blank ?? null,
+    flanges: hf.flanges ?? null,
+    holes: hf.holes ?? null,
+  };
+}
+
+/** The engine's "hydroform" result as it arrives (its values are passed on as measured). */
+interface HydroformMeasurement {
+  version?: unknown;
+  normal?: unknown;
+  forming_depth_mm?: unknown;
+  plan?: unknown;
+  projected_area_mm2?: unknown;
+  developed_area_mm2?: unknown;
+  main_surface?: unknown;
+  drawn?: unknown;
+  blank?: unknown;
+  flanges?: unknown;
+  holes?: unknown;
+}
+
 @Injectable()
 export class AutoFillService {
   private readonly logger = new Logger(AutoFillService.name);
@@ -630,6 +670,13 @@ export class AutoFillService {
             holes: cadMI.features.holes ?? null,
             voids: cadMI.features.voids ?? null,
           } : null,
+        } : {}),
+        // What every sheet-metal part is measured for hydroforming (cad-engine sheet_metal/features/hydroform.py): the press axis, forming
+        // depth, plan, projected and developed area, the main surface, the drawn form, the blank, the straight and curved flanges and the
+        // holes. The Sheet Metal - Hydroforming cost routes and prices from it; null until the part is analysed by an engine that measures
+        // it (press Refresh analysis). See hydroformGeometry().
+        ...(isSheetMetal ? {
+          hydroformGeometry: hydroformGeometry((cadMI as { features?: { hydroform?: unknown } } | undefined)?.features?.hydroform),
         } : {}),
         // A bar, tube or profile (cad-engine bar_tube/feature_extractor.py): its stock form and section, the centreline's developed length, the
         // bends, the holes and openings through the wall, the end cuts and the end forms. The bar and tube cost prices its stock and routes from it.
