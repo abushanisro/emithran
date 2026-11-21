@@ -183,13 +183,6 @@ export interface BarTubeRoute {
 }
 export interface BarTubeRouteGap { key: BarTubeRouteKey; label: string; reason: string }
 
-/** The cut-code family the rate lookups list for a material's cut code ("33.30": "333" when listed, else "33"); null when neither is. */
-export function cutCodeFamilyOf(families: ReadonlySet<string>, cutCode: number | null): string | null {
-  if (cutCode == null) return null;
-  const [whole, decimals = ''] = String(cutCode).split('.');
-  return [`${whole}${decimals.slice(0, 1)}`, whole!].find((f) => families.has(f)) ?? null;
-}
-
 /**
  * A rotary draw bender's largest tube, from its name (the machine files carry no diameter column): "Rotary Draw Bender - 150mm Max Tube
  * Diameter", "Silfax SE 32" (32 mm), "Pines Model 1 1/4" (a Pines model number is its largest tube OD in inches). Null when the name says none.

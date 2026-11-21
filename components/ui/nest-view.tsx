@@ -3,13 +3,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useState } from 'react';
 
-import { ReanalyzeButton } from '@/components/features/bom/ReanalyzeButton';
 import { Button } from '@/components/ui/button';
 import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-pattern-drawing';
-import { Loader2 } from '@/components/ui/icons';
+import { Loader2, RefreshCw } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { useSvgPanZoom } from '@/components/ui/use-svg-pan-zoom';
-import { useTrueNest, type TrueNestResultDto } from '@/lib/api/hooks/useBOMItems';
+import { useReanalyzeBOMItem, useTrueNest, type TrueNestResultDto } from '@/lib/api/hooks/useBOMItems';
 import { recommendSheets, type CandidateSheet } from '@/lib/costing/sheet-recommendation';
 import { shoelaceAreaMm2, boundingBoxMm } from '@/lib/geometry/polygon2d';
 
@@ -19,6 +18,8 @@ interface NestViewProps {
   sheetWidthMm?: number | undefined;
   sheetLengthMm?: number | undefined;
   kerfMm?: number | undefined;
+  /** Where the costed kerf comes from, when not sheet metal's part-spacing table (a hydroformed blank: memory's spacing and addendum). */
+  kerfSource?: string | undefined;
   edgeMarginMm?: number | undefined;
   materialLabel?: string | undefined;
   gradeLabel?: string | undefined;
@@ -27,8 +28,32 @@ interface NestViewProps {
   sheetSource?: string | undefined;
   /** Stock sheets to rank and recommend from (backend blankSpec.candidateSheets). */
   candidateSheets?: CandidateSheet[] | undefined;
-  /** The chosen process and the geometry disagree: no Reanalyze (it cannot produce an outline), the conflict says what to do. */
-  processConflict?: string | null | undefined;
+}
+
+/** What a nest's outline is, as the panel names it (backend nest-blank-source.ts). */
+export const OUTLINE_SOURCE_LABEL: Readonly<Record<TrueNestResultDto['outlineSource'], string>> = {
+  wire_walk: 'verified geometry (the unfolded flat pattern)',
+  hydroform_blank: 'the hydroform blank (measured)',
+  blank_rectangle: "the flat pattern's rectangle (its outline was not measured)",
+  part_footprint: "the part's footprint (an estimate: no flat pattern was measured)",
+};
+
+/**
+ * Computes the flat pattern (a fresh CAD analysis of the part's stored file), then nests again: the analysis refreshes the true-nest query.
+ * The nest itself never fails: until there is an outline, the panel nests the best blank there is and says which.
+ */
+function ComputeFlatPatternButton({ bomItemId }: { bomItemId: string }) {
+  const reanalyze = useReanalyzeBOMItem(bomItemId);
+  return (
+    <Button
+      size="sm" variant="outline" disabled={reanalyze.isPending} onClick={() => { reanalyze.mutate(); }}
+      className="h-7 shrink-0 bg-transparent text-white border-white/30 hover:bg-white/10 text-[11px]"
+      title="Runs the CAD analysis on the part's file again to build its flat pattern, then nests it."
+    >
+      {reanalyze.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+      {reanalyze.isPending ? 'Computing flat pattern…' : 'Compute flat pattern'}
+    </Button>
+  );
 }
 
 function extractErrorDetail(error: unknown): string | null {
@@ -56,7 +81,7 @@ function placementTransform(xMm: number, yMm: number, rotationDeg: number): stri
 
 export function NestView({
   bomItemId, quantity, sheetWidthMm, sheetLengthMm, kerfMm, edgeMarginMm,
-  materialLabel, gradeLabel, thicknessMm, sheetSource, candidateSheets, processConflict,
+  materialLabel, gradeLabel, thicknessMm, sheetSource, candidateSheets, kerfSource,
 }: NestViewProps) {
   // Starts from what the cost engine nested with (the selected laser's sheet,
   // the part-spacing kerf for this thickness, the edge allowance); every
@@ -193,7 +218,9 @@ export function NestView({
               ? 'this part has not been nested by costing yet — pick a sheet below and enter kerf and edge margin'
               : <>
                   {costed.width && costed.length ? `${costed.width} × ${costed.length} mm` : 'no costed sheet'}
-                  {costed.kerf ? ` · kerf ${costed.kerf} mm (part-spacing table${thicknessMm ? `, ${thicknessMm} mm sheet` : ''})` : ' · kerf: no part-spacing row for this thickness'}
+                  {costed.kerf
+                    ? ` · kerf ${costed.kerf} mm (${kerfSource ?? `part-spacing table${thicknessMm ? `, ${thicknessMm} mm sheet` : ''}`})`
+                    : ' · kerf: no part-spacing row for this thickness'}
                 </>}
             {costed.margin ? ` · edge margin ${costed.margin} mm` : ''}
           </p>
@@ -214,6 +241,17 @@ export function NestView({
                 Blank {i + 1}
               </Button>
             ))}
+          </div>
+        )}
+
+        {/* Not the true outline: what was nested and why, and the way to a real flat pattern. */}
+        {data?.outlineNote && (
+          <div role="status" className="flex items-start justify-between gap-3 rounded border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+            <p className="leading-snug">
+              <span className="font-medium">Nested: {OUTLINE_SOURCE_LABEL[data.outlineSource]}{data.placementSource === 'rectangle_grid' ? ', on a grid' : ''}.</span>{' '}
+              {data.outlineNote}
+            </p>
+            <ComputeFlatPatternButton bomItemId={bomItemId} />
           </div>
         )}
 
@@ -280,8 +318,8 @@ export function NestView({
         ) : isError || !data ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/70 text-sm text-center px-6">
             <p>{extractErrorDetail(error) ?? 'Real flat-pattern outline unavailable for this part — true nesting could not be computed.'}</p>
-            {/* The nest needs the outline from the last CAD analysis; a fresh analysis is the one thing that can supply it. */}
-            {!processConflict && <ReanalyzeButton bomItemId={bomItemId} className="bg-transparent text-white border-white/30 hover:bg-white/10" />}
+            {/* Only a part with no measured size at all gets here: computing the flat pattern (a fresh analysis) measures it. */}
+            <ComputeFlatPatternButton bomItemId={bomItemId} />
           </div>
         ) : (
           <>
@@ -401,7 +439,8 @@ function SheetDetail({ data, materialLabel, gradeLabel, thicknessMm, quantity, o
       <Row label={multiBlank ? 'Copies of this blank / sheet' : 'Parts / sheet (this view)'} value={data.partsPerSheet} />
       <Row label="Sheets required (this view)" value={data.sheetsRequired ?? '—'} />
       <Row label="True-shape nest utilization" value={`${data.utilizationPct.toString()}%`} />
-      <Row label="Outline source" value={data.outlineSource === 'wire_walk' ? 'verified geometry' : 'unavailable'} />
+      <Row label="Outline source" value={OUTLINE_SOURCE_LABEL[data.outlineSource]} />
+      {data.placementSource === 'rectangle_grid' && <Row label="Placement" value="grid of its rectangle (the cad-engine could not nest it)" />}
       <p className="text-[10px] text-white/40 mt-2 leading-snug">
         This is a heuristic (bottom-left-fill) placement, not a globally optimal packing — a different nester could report a different figure for the same part and sheet. "True-shape nest utilization" is computed from the real part silhouette area, not a bounding rectangle.
       </p>

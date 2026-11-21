@@ -352,6 +352,14 @@ export interface ProcessTotalSelection {
  *   snapshot priced against another location answers a different question and
  *   must not override a calculation made under the current inputs.
  */
+/**
+ * Whether a part's material side is settled, so its saved process costs count: it has a material record, or its material is its parts' (an
+ * assembly's or a weldment's: the cost summary says so, each part's material is in the BOM roll-up and it keeps no record of its own).
+ */
+export function isMaterialSettled(materialRecords: number, summary: { materialOfParts?: boolean } | null | undefined): boolean {
+  return materialRecords > 0 || summary?.materialOfParts === true;
+}
+
 export function selectProcessTotal(args: {
   hasStoredMaterial: boolean;
   storedLines: readonly ResolvedStoredLine[];

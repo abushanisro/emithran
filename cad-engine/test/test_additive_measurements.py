@@ -89,5 +89,5 @@ def test_the_family_hint_measures_an_additive_part():
 
     mi = AdvancedCADMemoryOptimizer().analyze_and_optimize(tee(), family_hint=ADDITIVE).geometry_features.manufacturing_features["manufacturing_intelligence"]
     assert mi["detected_family"] == ADDITIVE
-    assert mi["features"]["extraction_version"] == "additive-1"
+    assert mi["features"]["extraction_version"] == "additive-2"
     assert mi["features"]["feature_graph_v2"]["measurements"]["build_height"]["value"] > 0

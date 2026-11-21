@@ -28,6 +28,7 @@ import { PLASTIC_REFERENCE_SOURCE_VERSION } from '../plastic-molding/plastic-ref
 import { CORE_LOOKUP_KEYS, CORE_TEXT_VARIABLE_KEYS, CORE_VARIABLE_KEYS, resolveCoreReference, type CoreReference } from './coremaking';
 import type { FinishingMachine } from './casting-finishing';
 import { escapeLikePattern, quoteFilterValue } from '../../../../common/db/postgrest-filter';
+import { resolveToolShop, type ToolShop } from './tool-shop';
 
 /** HR Rates machine class of the High Pressure Die Casting machines (migration 845). */
 const HPDC_MACHINE_CLASS = 'die_casting_high_pressure_die_casting';
@@ -98,6 +99,7 @@ export class CastingReferenceService {
 
   private cachedTooling: { reference: DieToolingReference | null; missing: string[] } | null = null;
   private cachedCores: { reference: CoreReference | null; missing: string[] } | null = null;
+  private cachedToolShop: { shop: ToolShop | null; missing: string[] } | null = null;
 
   /** The sand-core reference (coremaking.ts): memory/Die Casting variables and lookups. */
   async getCoreReference(): Promise<{ reference: CoreReference | null; missing: string[] }> {
@@ -151,6 +153,25 @@ export class CastingReferenceService {
       toolShop: rowsOf(shop.data),
     });
     if (resolved.reference) this.cachedTooling = resolved;
+    return resolved;
+  }
+
+  /**
+   * The Digital Factory USA Default tool shop on its own (tool-shop.ts): its rates and its default tool steel, for a tool priced at a tool shop
+   * that is not a die-casting die (a hydroform tool). Read once; a read error or a missing value is reported, not cached.
+   */
+  async getToolShop(): Promise<{ shop: ToolShop | null; missing: string[] }> {
+    if (this.cachedToolShop) return this.cachedToolShop;
+    const { data, error } = await this.referenceDb.from('machining_reference_data').select('key, raw')
+      .eq('category', 'lookup_table').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION).in('key', [...TOOL_SHOP_LOOKUP_KEYS]);
+    if (error) return { shop: null, missing: [`the tool shop (${error.message})`] };
+    const tableRows = (raw: unknown): Record<string, unknown>[] | undefined => {
+      const inner: unknown = raw != null && typeof raw === 'object' && 'rows' in raw ? raw.rows : raw;
+      return Array.isArray(inner) ? (inner as Record<string, unknown>[]) : undefined;
+    };
+    const rows = Object.fromEntries((data as { key: string; raw: unknown }[]).map((r) => [r.key, tableRows(r.raw)]));
+    const resolved = resolveToolShop(rows);
+    if (resolved.shop) this.cachedToolShop = resolved;
     return resolved;
   }
 

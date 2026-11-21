@@ -413,9 +413,12 @@ export interface ProcessLineCost {
   /** The cycle's cost split into machine time and operator labour, for engines that charge both. With `setupCost` (machine and labour together) they add up to `totalCost` (before rounding). */
   machineCostPerPart?: number;
   laborCostPerPart?: number;
-  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in `runCost` and `totalCost`. In USD on purpose: never
-   *  converted with the line's money, it is stored as process_cost_records.other_cost_per_part (USD, like total_cost_per_part) and added by the Cost tab. */
+  /** What the line charges beyond machine and crew time (energy, a consumable), USD per part, in `runCost` and `totalCost`. In USD on purpose:
+   *  never converted with the line's money, so `otherCostDetail` can say it in USD wherever the line is shown. */
   otherCostPerPartUsd?: number;
+  /** The same charge in the line's own currency, set when the line is converted from USD (lineToLocal): what
+   *  process_cost_records.other_cost_per_part stores, in the row's currency like total_cost_per_part. A USD line's is `otherCostPerPartUsd`. */
+  otherCostPerPart?: number;
   /** What `otherCostPerPartUsd` is, e.g. "energy 0.0029 USD per casting". */
   otherCostDetail?: string;
   // local currency/hr — the MACHINE hour rate, and only that.
@@ -715,10 +718,29 @@ export interface CostSummaryDto {
   barTube?: BarTubeBreakdown;
   /** Multi-Spindle Machining: the bar, the machine and its station plan (the slowest station sets the cycle), the route quoted and every route. */
   multiSpindle?: MultiSpindleBreakdown;
+  /** Roto & Blow Molding: the shell (envelope, wall, inside, spout), its features' operations, parts per shot or arm, the route quoted and every route. */
+  rotoBlow?: RotoBlowBreakdown;
+  /** Roto & Blow Molding: the molds and trim tooling the quoted route needs, USD, kept out of the piece cost; costUsd null when its calculator cannot price it. */
+  rotoBlowTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
+  /** Sheet Metal - Hydroforming: memory's route rule, the draws, the blank and its nest, the press, the tray, the route quoted and every route. */
+  hydroforming?: HydroformingBreakdown;
+  /**
+   * Sheet Metal - Hydroforming: the hydroform tool and the offline blanking die, USD, kept out of the piece cost. costUsd is the tools the job
+   * wears out (one tool x tools a set x sets), what Apply writes, spread over amortizationParts; toolCostUsd one tool. Both null when not costed
+   * (costUsd and amortizationParts also with no volume).
+   */
+  hydroformingTooling?: { key: string; description: string; detail: string; costUsd: number | null; toolCostUsd: number | null; perPartUsd: number | null; amortizationParts: number | null }[];
   /** Bar and tube: the tools the quoted route needs for this part (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when no source prices one. */
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
   assembly?: AssemblyBreakdown;
+  /**
+   * The part's material is its parts': an assembly or a weldment costed from its BOM children has no material record of its own (each part's
+   * is in the BOM roll-up), so Apply keeps none and the Cost tab counts its own costs without one.
+   */
+  materialOfParts?: boolean;
+  /** A weldment (Process Part Assembly): its welding route, components, welds and the routes compared (costing/part-assembly). */
+  partAssembly?: PartAssemblyBreakdown;
   /** Assembly Molding (insert molding): the inserts, how they are loaded, the press and its shot, the route quoted and every route. */
   insertMolding?: InsertMoldingBreakdown;
   multiShot?: MultiShotBreakdown;
@@ -892,6 +914,79 @@ export interface AssemblyBreakdown {
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
 }
 
+export interface PartAssemblyBreakdown {
+  /** The quoted route (part-assembly-route.ts PART_ASSEMBLY_ROUTES key) and its name; null when none could be built. */
+  route: string | null;
+  routeLabel: string | null;
+  complete: boolean;
+  /** Each component welded (a BOM child, or the part itself): its instances, one instance's mass and where it came from. */
+  components: { id: string; name: string; quantity: number; massKg: number | null; massSource: 'weight' | 'volume' | null; maxDimensionMm: number | null }[];
+  /** The finished weldment's mass (kg; null when a component has none), the plate thickness a weld without one takes, and the material. */
+  weldmentMassKg: number | null;
+  thicknessMm: number | null;
+  thicknessSource: string;
+  material: string | null;
+  cutCodeFamily: string | null;
+  /** Every weld of the weld table, with what it came to on the quoted route (its line's process, cycle and wire) or why it is not costed. */
+  welds: {
+    id: string; process: string; routeProcess: string | null; operation: string; feature: string; label: string; count: number | null;
+    lengthMm: number | null; sizeMm: number | null; thicknessMm: number | null; areaMm2: number | null; depthMm: number | null;
+    bevel: boolean; grind: boolean; finishGrind: boolean; wireBrush: boolean; enabled: boolean;
+    cycleSec: number | null; wireKg: number | null; reason: string | null;
+  }[];
+  /** The MIG wire on the weld lines (summary currency). */
+  wireCost: number;
+  /** Every route: its total per weldment (summary currency) when complete, or why it is not a route for the weldment. */
+  options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+}
+
+/** A hydroformed part's Cost Summary section (costing/hydroforming). Lengths in mm, areas in mm², masses in kg, money in the summary's currency. */
+export interface HydroformingBreakdown {
+  /** The quoted route (hydroforming-route.ts HYDROFORMING_ROUTES key: deep-draw, fluid-cell) and its name. */
+  route: string;
+  routeLabel: string;
+  /** Memory's rule: depth over width against fluidCellFormingRatioThreshold, and the route it gives. */
+  rule: { route: string; ratio: number; depthMm: number; widthMm: number; threshold: number; basis: string };
+  draws: number;
+  drawRatiosPct: number[];
+  blank: { method: string; areaMm2: number; addendumMm: number; massKg: number };
+  nest: { method: string; partsPerSheet: number; utilizationPct: number; sheetLengthMm: number; sheetWidthMm: number } | null;
+  press: { name: string; formingCycleTimeS: number } | null;
+  /** Fluid Cell: the parts formed a cycle, the Cost Guide's ask (null: the data's default) and how many fit the tray; null on Deep Draw. */
+  partsPerTray: { value: number; requested: number | null; max: number | null } | null;
+  handAdjustingLengthMm: number;
+  throwPadAreaMm2: number;
+  cappingTools: number;
+  /** Every hole is pierced with the blank (memory's Offline Blank); inFormedWalls of them go through a wall the forming then shapes. */
+  holes: { pierced: number; inFormedWalls: number };
+  intensifier: boolean;
+  complete: boolean;
+  options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+}
+
+export interface RotoBlowBreakdown {
+  /** The quoted route (roto-blow-route.ts ROTO_BLOW_ROUTES key: blow, roto) and its name. */
+  route: string;
+  routeLabel: string;
+  /** The part's envelope across the parting plane (long, short) and along the pull (mm). */
+  envelopeMm: number[];
+  wallMm: number;
+  /** The air the shell closes in (mm³). */
+  insideVolumeMm3: number;
+  partingLineMm: number | null;
+  spouts: Array<{ id: string; diameterMm: number }>;
+  /** Parts per shot (blow: cavities x stations) or per carousel arm (roto); null when no machine takes the part. */
+  partsPerCycle: number | null;
+  coolingTimeS: number | null;
+  materialMassKg: number;
+  partMassKg: number;
+  /** Every feature's operation on the quoted route (roto-blow-features.ts) and why. */
+  features: Array<{ id: string; featureType: string; operation: string; process: string; reason: string }>;
+  complete: boolean;
+  /** Both routes: the total per part (summary currency) when complete, or why it is not a route for the part. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+}
+
 export interface BarTubeBreakdown {
   /** The quoted route (bar-tube-route.ts BAR_TUBE_ROUTES key) and its name. */
   route: string;
@@ -955,7 +1050,9 @@ export interface MultiSpindleBreakdown {
 }
 
 export interface AdditiveBreakdown {
-  /** The quoted route (additive-route.ts ADDITIVE_ROUTES key) and its name. */
+  /** The process group it is priced in: Additive Manufacturing or Rapid Prototyping (additive-domain.ts). */
+  processGroup: string;
+  /** The quoted route (an additive-domain.ts route key) and its name. */
   route: string;
   routeLabel: string;
   /** The build direction (+z, -z, +x, ...), set in the Cost Guide or the one of least support at the material's self-supporting angle. */
@@ -974,6 +1071,8 @@ export interface AdditiveBreakdown {
   complete: boolean;
   /** Every route: its total per part (summary currency) when complete, or why it is not a route for the part. */
   options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+  /** Rapid Prototyping: each hole and void cleaning timed (size: a diameter in mm or a volume in mm³, as `measure` says). Empty for Additive Manufacturing. */
+  cleaning: Array<{ id: string; type: string; label: string; measure: 'diameter' | 'volume'; size: number; depthMm: number; timeSec: number }>;
 }
 
 export interface CompositesBreakdown {

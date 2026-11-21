@@ -220,7 +220,8 @@ def recognize_holes(meshes: Sequence[FaceMesh], pull: Vec) -> Dict[str, Any]:
         radii = sorted({round(c.radius_mm, 2) for c in cyl_steps})
         steps = [
             {"kind": c.kind, "diameter_mm": round(2 * c.radius_mm, 3), **({"small_diameter_mm": round(2 * c.small_radius_mm, 3)} if c.kind == "cone" else {}),
-             "length_mm": round(c.t_max - c.t_min, 3)}
+             "length_mm": round(c.t_max - c.t_min, 3), "radius_mm": round(c.radius_mm, 4), "t_min": round(c.t_min, 4), "t_max": round(c.t_max, 4),
+             "face_ids": sorted(c.face_ids)}
             for c in s
         ]
         smallest = min(c.radius_mm for c in cyl_steps) if cyl_steps else widest
@@ -232,6 +233,8 @@ def recognize_holes(meshes: Sequence[FaceMesh], pull: Vec) -> Dict[str, Any]:
             "depth_to_diameter": round((hi - lo) / (2 * smallest), 2),
             "steps": steps,
             "axis": [round(x, 5) for x in axis],
+            # Where the bore lies: a point on its axis; each step's t_min/t_max are measured along `axis` from the world origin.
+            "axis_point": [round(x, 4) for x in point],
             "angle_to_pull_deg": round(angle_between_axes_deg(axis, pull), 2),
             "face_ids": sorted({fid for c in s for fid in c.face_ids}),
         })

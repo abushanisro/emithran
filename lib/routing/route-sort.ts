@@ -152,13 +152,15 @@ export function groupRouteNodes(
   // Sheet Metal pass real copy for their own family instead of inheriting
   // sheet-metal-specific wording; omitting this keeps Sheet Metal unchanged.
   cuttingMetaOverride?: { title: string; description: string },
+  // A family whose own routes are forming routes (a hydroformed part: blanked, then formed on the press) says what they are.
+  formingMetaOverride?: { title: string; description: string },
 ): RouteGroup[] {
   const meta: Record<RouteGroup['family'], { title: string; description: string }> = {
     cutting: cuttingMetaOverride ?? {
       title: 'Cut, then form and finish',
       description: 'Alternative cutting methods for the same downstream chain. Pick one.',
     },
-    forming: {
+    forming: formingMetaOverride ?? {
       title: 'Single-operation forming',
       description: 'Produces the finished part in one press or roll — bending happens in-process, so there is no separate Press Brake step.',
     },

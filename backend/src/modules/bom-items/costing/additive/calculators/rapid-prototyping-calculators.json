@@ -1,0 +1,868 @@
+{
+ "domain": "rapid_prototyping",
+ "processGroup": "Rapid Prototyping",
+ "calculators": [
+  {
+   "key": "rapid_prototyping.nesting",
+   "name": "Rapid Prototyping - Parts per build",
+   "helper": true,
+   "operations": [],
+   "output": "Parts per Build",
+   "results": [
+    "Parts per Layer",
+    "Parts Stacked"
+   ],
+   "description": "How many parts one build takes: the part's footprint on the plate, with the nesting allowance (nestingAllowance, 0.75 mm in memory/Rapid prototyping) on each side, laid in rows on the machine's bed, the better of the two ways round; a powder bed (SLS) also stacks them in height. Rapid Prototyping holds no base layers under the stack. Capped by the batch.",
+   "fields": [
+    {
+     "name": "Bed Length",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_length_mm"
+     }
+    },
+    {
+     "name": "Bed Width",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_width_mm"
+     }
+    },
+    {
+     "name": "Bed Height",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_height_mm"
+     }
+    },
+    {
+     "name": "Part Length",
+     "unit": "mm",
+     "source": {
+      "cad": "footprint_length"
+     }
+    },
+    {
+     "name": "Part Width",
+     "unit": "mm",
+     "source": {
+      "cad": "footprint_width"
+     }
+    },
+    {
+     "name": "Build Height",
+     "unit": "mm",
+     "source": {
+      "engine": "build_height_mm (the part's height along the build direction)"
+     }
+    },
+    {
+     "name": "Nesting Allowance",
+     "unit": "mm",
+     "source": {
+      "variable": "nestingAllowance"
+     }
+    },
+    {
+     "name": "Stacks",
+     "unit": null,
+     "source": {
+      "engine": "stacks (1 for a laser sintered build, which needs no plate, else 0)"
+     }
+    },
+    {
+     "name": "Batch Size",
+     "unit": null,
+     "source": {
+      "scenario": "batch_size"
+     }
+    },
+    {
+     "name": "Parts per Layer",
+     "unit": null,
+     "formula": "max(floor({Bed Length} / ({Part Length} + 2 * {Nesting Allowance})) * floor({Bed Width} / ({Part Width} + 2 * {Nesting Allowance})), floor({Bed Length} / ({Part Width} + 2 * {Nesting Allowance})) * floor({Bed Width} / ({Part Length} + 2 * {Nesting Allowance})))"
+    },
+    {
+     "name": "Parts Stacked",
+     "unit": null,
+     "formula": "{Stacks} > 0 ? max(1, floor({Bed Height} / ({Build Height} + 2 * {Nesting Allowance}))) : 1"
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "formula": "max(1, min({Batch Size}, {Parts per Layer} * {Parts Stacked}))"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.sls_material",
+   "name": "Rapid Prototyping - SLS powder",
+   "helper": true,
+   "operations": [],
+   "output": "Material Cost",
+   "results": [
+    "Part Mass",
+    "Spent Powder Mass"
+   ],
+   "description": "The powder one laser sintered part takes: the part itself, and its share of the bed's unfused powder that cannot be used again. The bed (its area times the stacked build's height) holds the powder at the material's density (memory/Rapid prototyping holds no tapped density); of what the parts do not fuse, the recoverable share (slsRecoveryPercentage) is used again and the rest is spent.",
+   "fields": [
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Density",
+     "unit": "kg/m³",
+     "source": {
+      "material": "density_kg_m3"
+     }
+    },
+    {
+     "name": "Bed Length",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_length_mm"
+     }
+    },
+    {
+     "name": "Bed Width",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_width_mm"
+     }
+    },
+    {
+     "name": "Bed Fill Height",
+     "unit": "mm",
+     "source": {
+      "engine": "bed_fill_height_mm (the stack of parts in the bed)"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Rapid Prototyping - Parts per build)"
+     }
+    },
+    {
+     "name": "Recovery Fraction",
+     "unit": null,
+     "source": {
+      "variable": "slsRecoveryPercentage"
+     }
+    },
+    {
+     "name": "Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "material": "cost"
+     }
+    },
+    {
+     "name": "Part Mass",
+     "unit": "kg",
+     "formula": "{Part Volume} * {Density} / 1000000000"
+    },
+    {
+     "name": "Bed Powder Mass",
+     "unit": "kg",
+     "formula": "{Bed Length} * {Bed Width} * {Bed Fill Height} * {Density} / 1000000000"
+    },
+    {
+     "name": "Spent Powder Mass",
+     "unit": "kg",
+     "formula": "max(0, {Bed Powder Mass} - {Parts per Build} * {Part Mass}) * (1 - {Recovery Fraction}) / max({Parts per Build}, 1)"
+    },
+    {
+     "name": "Material Cost",
+     "unit": "USD",
+     "formula": "({Part Mass} + {Spent Powder Mass}) * {Unit Cost}"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.resin_material",
+   "name": "Rapid Prototyping - Resin and support material",
+   "helper": true,
+   "operations": [],
+   "output": "Material Cost",
+   "results": [
+    "Part Mass",
+    "Support Mass"
+   ],
+   "description": "The material one printed or stereolithography part takes: the part at its density and price, and its supports. 3D printing prints them in a support material of its own (printingSupportMaterialDensity, printingSupportMaterialCost), solid: memory/Rapid prototyping holds no lattice spacing factor; stereolithography builds them of the part's resin, as solid as slaSupportVolumeFraction.",
+   "fields": [
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Support Volume",
+     "unit": "mm³",
+     "source": {
+      "engine": "support_volume_mm3"
+     }
+    },
+    {
+     "name": "Density",
+     "unit": "kg/m³",
+     "source": {
+      "material": "density_kg_m3"
+     }
+    },
+    {
+     "name": "Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "material": "cost"
+     }
+    },
+    {
+     "name": "Support Fill",
+     "unit": null,
+     "source": {
+      "engine": "support_fill (1 when printing, slaSupportVolumeFraction for stereolithography)"
+     }
+    },
+    {
+     "name": "Support Density",
+     "unit": "kg/m³",
+     "source": {
+      "engine": "support_density (printingSupportMaterialDensity when printing, the resin's density for stereolithography)"
+     }
+    },
+    {
+     "name": "Support Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "engine": "support_unit_cost (printingSupportMaterialCost when printing, the resin's price for stereolithography)"
+     }
+    },
+    {
+     "name": "Part Mass",
+     "unit": "kg",
+     "formula": "{Part Volume} * {Density} / 1000000000"
+    },
+    {
+     "name": "Support Mass",
+     "unit": "kg",
+     "formula": "{Support Volume} * {Support Fill} * {Support Density} / 1000000000"
+    },
+    {
+     "name": "Material Cost",
+     "unit": "USD",
+     "formula": "{Part Mass} * {Unit Cost} + {Support Mass} * {Support Unit Cost}"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.nitrogen",
+   "name": "Rapid Prototyping - Build gas",
+   "helper": true,
+   "operations": [],
+   "output": "Gas Cost",
+   "description": "The nitrogen a laser sintering build consumes, at the machine's rate over the build's time, shared by its parts (the machine's nitrogen cost per litre; a machine that needs no external nitrogen pays nothing here).",
+   "fields": [
+    {
+     "name": "Nitrogen Rate",
+     "unit": "L/hr",
+     "source": {
+      "machine": "nitrogen_rate_l_per_hr"
+     }
+    },
+    {
+     "name": "Nitrogen Cost",
+     "unit": "USD/L",
+     "source": {
+      "machine": "nitrogen_cost_usd_per_l"
+     }
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "source": {
+      "engine": "build_time_s (the build step's Build Time)"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Rapid Prototyping - Parts per build)"
+     }
+    },
+    {
+     "name": "Gas Cost",
+     "unit": "USD",
+     "formula": "{Nitrogen Rate} * {Build Time} / 3600 * {Nitrogen Cost} / max({Parts per Build}, 1)"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.laser",
+   "name": "Rapid Prototyping - Laser use",
+   "helper": true,
+   "operations": [],
+   "output": "Laser Cost",
+   "description": "The laser a sintering or stereolithography build wears, at the machine's laser cost per hour (memory/Rapid prototyping Lookup laser_cost_per_hour for the sinterers, laser_replacement for the stereolithography machines) over the build's time, shared by its parts.",
+   "fields": [
+    {
+     "name": "Laser Cost per Hour",
+     "unit": "USD/hr",
+     "source": {
+      "machine": "laser_cost_per_hour_usd_per_hr"
+     }
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "source": {
+      "engine": "build_time_s (the build step's Build Time)"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Rapid Prototyping - Parts per build)"
+     }
+    },
+    {
+     "name": "Laser Cost",
+     "unit": "USD",
+     "formula": "{Laser Cost per Hour} * {Build Time} / 3600 / max({Parts per Build}, 1)"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.laser_sintering",
+   "name": "Rapid Prototyping - Laser sintering",
+   "operations": [
+    "Laser Sintering"
+   ],
+   "results": [
+    "Layers",
+    "Build Time",
+    "Scan Time"
+   ],
+   "description": "Laser sintering on a polymer powder bed (SLS), per part. The parts need no supports and are stacked in the bed: every layer at slsLayerThickness waits the machine's layer delay (the recoat), and each part is scanned at the machine's speed and beam. The build's preprocessing (slsPreprocessingTime) is shared by its parts. memory/Rapid prototyping holds no chamber heat-up or cool-down times, so none are charged.",
+   "fields": [
+    {
+     "name": "Bed Fill Height",
+     "unit": "mm",
+     "source": {
+      "engine": "bed_fill_height_mm (the stack of parts in the bed)"
+     }
+    },
+    {
+     "name": "Layer Thickness",
+     "unit": "mm",
+     "source": {
+      "variable": "slsLayerThickness"
+     }
+    },
+    {
+     "name": "Layer Delay",
+     "unit": "s",
+     "source": {
+      "machine": "layer_delay_s"
+     }
+    },
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Scanning Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "scanning_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Beam Diameter",
+     "unit": "mm",
+     "source": {
+      "machine": "beam_diameter_mm"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Rapid Prototyping - Parts per build)"
+     }
+    },
+    {
+     "name": "Preprocessing Time",
+     "unit": "s",
+     "source": {
+      "variable": "slsPreprocessingTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Layers",
+     "unit": null,
+     "formula": "ceil({Bed Fill Height} / {Layer Thickness})"
+    },
+    {
+     "name": "Scan Time",
+     "unit": "s",
+     "formula": "{Part Volume} / ({Scanning Speed} * {Beam Diameter} * {Layer Thickness})"
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "formula": "{Layers} * {Layer Delay} + {Parts per Build} * {Scan Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Build Time} + {Preprocessing Time}) / {Parts per Build} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.printing",
+   "name": "Rapid Prototyping - 3D printing",
+   "operations": [
+    "Printing"
+   ],
+   "results": [
+    "Layers",
+    "Build Time"
+   ],
+   "description": "3D printing (ProJet, Eden, V-Flash), per part. Each layer at the machine's layer thickness is printed by the head in strips along the bed: as many strips as the machine's scanning width takes to cover the nested parts' width, each crossed once at the machine's layer speed over the nested length (memory/Rapid prototyping holds no print head passes). The build's preprocessing (printingPreprocessingTime) is shared by its parts.",
+   "fields": [
+    {
+     "name": "Build Height",
+     "unit": "mm",
+     "source": {
+      "cad": "build_height"
+     }
+    },
+    {
+     "name": "Layer Thickness",
+     "unit": "mm",
+     "source": {
+      "machine": "layer_thickness_mm"
+     }
+    },
+    {
+     "name": "Nested Length",
+     "unit": "mm",
+     "source": {
+      "engine": "nested_length_mm (the bed length the nested parts take)"
+     }
+    },
+    {
+     "name": "Nested Width",
+     "unit": "mm",
+     "source": {
+      "engine": "nested_width_mm (the bed width the nested parts take)"
+     }
+    },
+    {
+     "name": "Scanning Width",
+     "unit": "mm",
+     "source": {
+      "machine": "scanning_width_mm"
+     }
+    },
+    {
+     "name": "Layer Speed",
+     "unit": "m/s",
+     "source": {
+      "machine": "layer_speed_m_per_s"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Rapid Prototyping - Parts per build)"
+     }
+    },
+    {
+     "name": "Preprocessing Time",
+     "unit": "s",
+     "source": {
+      "variable": "printingPreprocessingTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Layers",
+     "unit": null,
+     "formula": "ceil({Build Height} / {Layer Thickness})"
+    },
+    {
+     "name": "Strips",
+     "unit": null,
+     "formula": "max(1, ceil({Nested Width} / {Scanning Width}))"
+    },
+    {
+     "name": "Layer Time",
+     "unit": "s",
+     "formula": "{Strips} * {Nested Length} / ({Layer Speed} * 1000)"
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "formula": "{Layers} * {Layer Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Build Time} + {Preprocessing Time}) / {Parts per Build} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.resin_curing",
+   "name": "Rapid Prototyping - Stereolithography",
+   "operations": [
+    "Resin Curing"
+   ],
+   "results": [
+    "Layers",
+    "Build Time",
+    "Scan Time"
+   ],
+   "description": "Stereolithography (SLA), per part. Every layer at slaStandardLayerResolution is wiped across the bed (the bed length at the machine's wiper speed) and waits the machine's layer delay; each part and its supports (slaSupportVolumeFraction of the support volume) are cured by the laser at the machine's speed and beam. The build's preprocessing (slaPreprocessingTime) is shared by its parts.",
+   "fields": [
+    {
+     "name": "Build Height",
+     "unit": "mm",
+     "source": {
+      "cad": "build_height"
+     }
+    },
+    {
+     "name": "Layer Thickness",
+     "unit": "mm",
+     "source": {
+      "variable": "slaStandardLayerResolution"
+     }
+    },
+    {
+     "name": "Bed Length",
+     "unit": "mm",
+     "source": {
+      "machine": "bed_length_mm"
+     }
+    },
+    {
+     "name": "Wiper Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "wiper_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Layer Delay",
+     "unit": "s",
+     "source": {
+      "machine": "layer_delay_s"
+     }
+    },
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Support Volume",
+     "unit": "mm³",
+     "source": {
+      "engine": "support_volume_mm3"
+     }
+    },
+    {
+     "name": "Support Fraction",
+     "unit": null,
+     "source": {
+      "variable": "slaSupportVolumeFraction"
+     }
+    },
+    {
+     "name": "Scanning Speed",
+     "unit": "mm/s",
+     "source": {
+      "machine": "scanning_speed_mm_per_s"
+     }
+    },
+    {
+     "name": "Beam Diameter",
+     "unit": "mm",
+     "source": {
+      "machine": "beam_diameter_mm"
+     }
+    },
+    {
+     "name": "Parts per Build",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_build (Rapid Prototyping - Parts per build)"
+     }
+    },
+    {
+     "name": "Preprocessing Time",
+     "unit": "s",
+     "source": {
+      "variable": "slaPreprocessingTime"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Layers",
+     "unit": null,
+     "formula": "ceil({Build Height} / {Layer Thickness})"
+    },
+    {
+     "name": "Layer Time",
+     "unit": "s",
+     "formula": "{Bed Length} / {Wiper Speed} + {Layer Delay}"
+    },
+    {
+     "name": "Scan Time",
+     "unit": "s",
+     "formula": "({Part Volume} + {Support Volume} * {Support Fraction}) / ({Scanning Speed} * {Beam Diameter} * {Layer Thickness})"
+    },
+    {
+     "name": "Build Time",
+     "unit": "s",
+     "formula": "{Layers} * {Layer Time} + {Parts per Build} * {Scan Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Build Time} + {Preprocessing Time}) / {Parts per Build} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.part_curing",
+   "name": "Rapid Prototyping - Part curing",
+   "operations": [
+    "Part Curing"
+   ],
+   "description": "Post-curing in an oven (a stereolithography part in a ProCure or AaroCure oven, a LaserForm part in the LaserForm oven): one cure (curingMaxCureTime) per oven load, shared by the parts the oven's bed takes (Rapid Prototyping - Parts per build on the oven).",
+   "fields": [
+    {
+     "name": "Cure Time",
+     "unit": "s",
+     "source": {
+      "variable": "curingMaxCureTime"
+     }
+    },
+    {
+     "name": "Parts per Load",
+     "unit": null,
+     "source": {
+      "engine": "parts_per_load (Rapid Prototyping - Parts per build, on the oven's bed)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Cure Time} / max({Parts per Load}, 1) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.feature_cleaning",
+   "name": "Rapid Prototyping - Feature cleaning",
+   "helper": true,
+   "operations": [],
+   "output": "Cleaning Time",
+   "results": [
+    "Size Multiplier",
+    "Depth Multiplier"
+   ],
+   "description": "The time to clear the loose powder or uncured resin from one hole or void (memory/Rapid prototyping cleaning* variables): its type's base time, times a multiplier of its size (a hole's diameter, a void's volume: below the Small limit the Small multiplier, above the Large limit the Large one, else the Medium one) and one of its depth (likewise). The engine seeds each input from the variable of the feature's type (simple, multi-step, ringed and complex holes; simple, ringed and complex voids).",
+   "fields": [
+    {
+     "name": "Base Time",
+     "unit": "s",
+     "source": {
+      "engine": "base_time_s (the type's cleaning base time)"
+     }
+    },
+    {
+     "name": "Size",
+     "unit": null,
+     "source": {
+      "engine": "size (a hole's diameter in mm, a void's volume in mm³)"
+     }
+    },
+    {
+     "name": "Small Size Limit",
+     "unit": null,
+     "source": {
+      "engine": "size_small_limit"
+     }
+    },
+    {
+     "name": "Large Size Limit",
+     "unit": null,
+     "source": {
+      "engine": "size_large_limit"
+     }
+    },
+    {
+     "name": "Small Size Multiplier",
+     "unit": null,
+     "source": {
+      "engine": "size_small_multiplier"
+     }
+    },
+    {
+     "name": "Medium Size Multiplier",
+     "unit": null,
+     "source": {
+      "engine": "size_medium_multiplier"
+     }
+    },
+    {
+     "name": "Large Size Multiplier",
+     "unit": null,
+     "source": {
+      "engine": "size_large_multiplier"
+     }
+    },
+    {
+     "name": "Depth",
+     "unit": "mm",
+     "source": {
+      "engine": "depth_mm"
+     }
+    },
+    {
+     "name": "Small Depth Limit",
+     "unit": "mm",
+     "source": {
+      "engine": "depth_small_limit"
+     }
+    },
+    {
+     "name": "Large Depth Limit",
+     "unit": "mm",
+     "source": {
+      "engine": "depth_large_limit"
+     }
+    },
+    {
+     "name": "Small Depth Multiplier",
+     "unit": null,
+     "source": {
+      "engine": "depth_small_multiplier"
+     }
+    },
+    {
+     "name": "Medium Depth Multiplier",
+     "unit": null,
+     "source": {
+      "engine": "depth_medium_multiplier"
+     }
+    },
+    {
+     "name": "Large Depth Multiplier",
+     "unit": null,
+     "source": {
+      "engine": "depth_large_multiplier"
+     }
+    },
+    {
+     "name": "Size Multiplier",
+     "unit": null,
+     "formula": "{Size} < {Small Size Limit} ? {Small Size Multiplier} : ({Size} > {Large Size Limit} ? {Large Size Multiplier} : {Medium Size Multiplier})"
+    },
+    {
+     "name": "Depth Multiplier",
+     "unit": null,
+     "formula": "{Depth} < {Small Depth Limit} ? {Small Depth Multiplier} : ({Depth} > {Large Depth Limit} ? {Large Depth Multiplier} : {Medium Depth Multiplier})"
+    },
+    {
+     "name": "Cleaning Time",
+     "unit": "s",
+     "formula": "{Base Time} * {Size Multiplier} * {Depth Multiplier}"
+    }
+   ]
+  },
+  {
+   "key": "rapid_prototyping.cleaning",
+   "name": "Rapid Prototyping - Cleaning",
+   "operations": [
+    "Cleaning"
+   ],
+   "description": "Cleaning the built part: the base time every part takes (cleaningBaseTime), plus the time of each of its holes and voids (Rapid Prototyping - Feature cleaning, summed by the engine over the holes and voids the cad-engine recognised).",
+   "fields": [
+    {
+     "name": "Base Time",
+     "unit": "s",
+     "source": {
+      "variable": "cleaningBaseTime"
+     }
+    },
+    {
+     "name": "Feature Time",
+     "unit": "s",
+     "source": {
+      "engine": "feature_time_s (every hole's and void's cleaning time)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Base Time} + {Feature Time}) * {Cycle Time Factor}"
+    }
+   ]
+  }
+ ]
+}

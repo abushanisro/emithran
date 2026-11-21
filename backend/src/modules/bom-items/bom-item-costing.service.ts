@@ -1,18 +1,24 @@
+import { buildHydroformingCostSummary } from './costing/hydroforming/hydroforming-cost-summary';
+import { HydroformingCostService } from './costing/hydroforming/hydroforming-cost.service';
+import { HYDROFORMING_KEYS, HYDROFORMING_ROUTES, type HydroformingRouteKey } from './costing/hydroforming/hydroforming-route';
+import { hydroformingRouteFor, hydroformingRouteId } from './costing/hydroforming/hydroforming-route-comparison';
 import { calculatorInputSteps, groupedRunsTrace } from './costing/machining/process/machining-trace';
 import { inspectedOccurrences, type InspectionReference } from './costing/machining/inspection-reference';
 import { featuresRef, occurrenceByFace, occurrencesOfFaces, type FeatureOccurrenceRef } from './costing/machining/feature-occurrences';
 import { holeGroupsOfFeatures, normalizeThreadSpecs, tappedHolesOfFeatures, type ThreadEntry } from './costing/machining/feature-holes';
+import {
+  ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, HYDROFORMING_PROCESS_GROUP, PART_ASSEMBLY_FAMILY, INSERT_MOLDING_PROCESS_GROUP, MULTI_SHOT_PROCESS_GROUP,
+  MULTI_SPINDLE_PROCESS_GROUP, familiesOfProcessGroup,
+} from './costing/shared/core/part-family-process-group';
 import { electricityUsd, loadLocationElectricity } from './costing/shared/location-electricity';
 import { castingSourcePath } from '../sand-casting/casting-source';
-import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { liveToolHoles, liveToolingVerdict } from './costing/machining/capability/live-tooling';
 import { applySustainabilityFactors } from './costing/shared/physics/sustainability';
 import { gridCarbonFactor, materialCarbonFactor, stockOf } from './costing/shared/physics/carbon-factors';
-import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
-import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
 import { PlasticCatalogOperationsService, type PlasticFeatureGraph } from './costing/plastic-molding/operation/plastic-catalog-operations.service';
 import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
+
 import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-operation-resolver';
 import { Injectable, Logger, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
@@ -103,7 +109,8 @@ import {
 } from './costing/shared/capability/machine-selection/physics';
 import { sandCastingRoute } from './costing/casting/sand/sand-route-comparison';
 import { findRouteDataGaps, noCostFeatureLine, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
-  drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
+  drawnShellNeedsDrawing, drawnShellFromFeatures, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate,
+  hardToolingVolumeCapability, isAutoRoutable, routesTakingSecondary, unpricedReason, r2 } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
 import {
@@ -135,9 +142,13 @@ import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost
 import { CompositesCostService, type CompositeLaminateSummary } from './costing/composites/composites-cost.service';
 import { AdditiveCostService, type AdditiveBuildSummary } from './costing/additive/additive-cost.service';
 import { buildAdditiveCostSummary } from './costing/additive/additive-cost-summary';
-import { ADDITIVE_ROUTES } from './costing/additive/additive-route';
+import { ADDITIVE, additiveDomainOf } from './costing/additive/additive-domain';
 import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
 import { BarTubeCostService, type BarTubeGeometrySummary } from './costing/bar-tube/bar-tube-cost.service';
+import { RotoBlowCostService, type RotoBlowGeometrySummary } from './costing/roto-blow/roto-blow-cost.service';
+import { buildRotoBlowCostSummary } from './costing/roto-blow/roto-blow-cost-summary';
+import { ROTO_BLOW_ROUTES, type RotoBlowRouteKey } from './costing/roto-blow/roto-blow-route';
+import { rotoBlowRouteFor, rotoBlowRouteId } from './costing/roto-blow/roto-blow-route-comparison';
 import { buildBarTubeCostSummary } from './costing/bar-tube/bar-tube-cost-summary';
 import { BAR_TUBE_ROUTES, type BarTubeRouteKey } from './costing/bar-tube/bar-tube-route';
 import { barTubeRouteFor, barTubeRouteId } from './costing/bar-tube/bar-tube-route-comparison';
@@ -153,6 +164,10 @@ import { gap as gapLine } from './costing/casting/casting-finishing';
 import { buildAssemblyCostSummary } from './costing/assembly/assembly-cost-summary';
 import { ASSEMBLY_ROUTES } from './costing/assembly/assembly-route';
 import { assemblyRouteFor, assemblyRouteId } from './costing/assembly/assembly-route-comparison';
+import { PartAssemblyCostService, type PartAssemblyCostResult } from './costing/part-assembly/part-assembly-cost.service';
+import { buildPartAssemblyCostSummary } from './costing/part-assembly/part-assembly-cost-summary';
+import { PART_ASSEMBLY_ROUTES } from './costing/part-assembly/part-assembly-route';
+import { partAssemblyRouteFor, partAssemblyRouteId } from './costing/part-assembly/part-assembly-route-comparison';
 import { allowanceVolume, asPrimaryFaceIds, deriveBlankSource, isMachiningLine, BLANK_FAMILY, BLANK_PROCESS, type DerivedBlankOut } from './costing/two-model/derived-blank';
 import { twoModelGapSummary, withSourceComponent, TWO_MODEL_FAMILY, TWO_MODEL_SOURCE_VERSION } from './costing/two-model/two-model-cost';
 import { twoModelRoute } from './costing/two-model/two-model-route-comparison';
@@ -166,7 +181,6 @@ import { buildForgingCostSummary } from './costing/forging/forging-cost-summary'
 import { forgingRouteFor, forgingRouteId } from './costing/forging/forging-route-comparison';
 import { FORGING_ROUTES } from './costing/forging/forging-route';
 import { castingFamilyOption, chooseCastingFamily } from './costing/casting/casting-process-choice';
-import { ASSEMBLY_FAMILY, CASTING_PROCESS_GROUP, INSERT_MOLDING_PROCESS_GROUP, MULTI_SHOT_PROCESS_GROUP, MULTI_SPINDLE_PROCESS_GROUP, familiesOfProcessGroup } from './costing/shared/core/part-family-process-group';
 import {
   MULTI_SHOT_CYCLE_CALC, MULTI_SHOT_DESIGN_HOURS_FACTOR, MULTI_SHOT_PRESS_CLASS, MULTI_SHOT_ROUTE_KEY, MULTI_SHOT_ROUTES, chooseMultiShotRoute, multiShotRouteId,
   priceMultiShotRoutes, shotEntriesOf, type MultiShotShot, type ShotNeed,
@@ -257,7 +271,7 @@ export function convertRouteOptions<T extends { totalCost: number | null }>(opti
 }
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === 'bar_tube' || family === ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === 'bar_tube' || family === 'roto_blow' || family === ASSEMBLY_FAMILY || family === PART_ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
 /** The molding line's material reason, when the engine found the material itself cannot be molded (requiredCapability says so). */
@@ -274,6 +288,13 @@ const isMultiShot = (item: { scenarioOverrides?: Record<string, unknown> | null 
 
 /** Whether a part is made on a multi-spindle: its Process is Multi-Spindle Machining (a turned part, its operations laid out over the machine's stations). */
 const isMultiSpindle = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === MULTI_SPINDLE_PROCESS_GROUP;
+/** Whether a part is hydroformed: its Process is Sheet Metal - Hydroforming (a sheet-metal part, blanked and formed on a hydroform press). */
+const isHydroforming = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.processGroup === HYDROFORMING_PROCESS_GROUP;
+/** The part's Process as the user chose it (scenarioOverrides.processGroup); null when none is chosen. */
+const processGroupOf = (item: { scenarioOverrides?: Record<string, unknown> | null }): string | null => {
+  const g = item.scenarioOverrides?.['processGroup'];
+  return typeof g === 'string' && g ? g : null;
+};
 
 /** The material fields of a molding input, from a resolved raw_materials row (the part's, or a shot's). */
 function moldingMaterialOf(m: Awaited<ReturnType<BomItemCostingService['resolveMaterialForFamily']>>) {
@@ -314,6 +335,7 @@ function convertLineMoney(l: ProcessLineCost, conv: (n: number) => number) {
     labourRate: l.labourRate != null ? conv(l.labourRate) : l.labourRate,
     ...(l.machineCostPerPart != null ? { machineCostPerPart: conv(l.machineCostPerPart) } : {}),
     ...(l.laborCostPerPart != null ? { laborCostPerPart: conv(l.laborCostPerPart) } : {}),
+    ...(l.otherCostPerPart != null ? { otherCostPerPart: conv(l.otherCostPerPart) } : {}),
   };
 }
 
@@ -321,7 +343,6 @@ import { BOMItemsService } from './bom-items.service';
 import { MachineRateService } from './services/machine-rate.service';
 import { CostOverridesService } from './services/cost-overrides.service';
 import { GdtAnalysisService } from './services/gdt-analysis.service';
-import { r2 } from './costing/shared/core/engine-kernel';
 import { NestingCostService } from './services/nesting-cost.service';
 
 /**
@@ -357,7 +378,6 @@ export class BomItemCostingService {
     private readonly featureToleranceService: FeatureToleranceService,
     private readonly smCatalogOperations: SheetMetalCatalogOperationsService,
     private readonly plasticCatalogOperations: PlasticCatalogOperationsService,
-    private readonly hydroformingReference: HydroformingReferenceService,
     /** The sand-casting report on the route's lines (display only); optional so the hand-built services in tests need not pass it. */
     private readonly sandCatalogOperations?: SandCatalogOperationsService,
     /** The machining allowance of a sand casting (display only); optional for the same reason. */
@@ -381,6 +401,12 @@ export class BomItemCostingService {
     private readonly multiShotService?: MultiShotService,
     /** The multi-spindle routes; optional for the same reason (without it a Multi-Spindle Machining part is one named, uncosted line). */
     private readonly multiSpindleCostService?: MultiSpindleCostService,
+    /** A weldment's welding (Part Assembly); optional for the same reason (without it a Part Assembly part is one named, uncosted line). */
+    private readonly partAssemblyCostService?: PartAssemblyCostService,
+    /** The blow and roto molding routes; optional for the same reason (without it a Roto & Blow Molding part is one named, uncosted line). */
+    private readonly rotoBlowCostService?: RotoBlowCostService,
+    /** The hydroforming routes; optional for the same reason (without it a Sheet Metal - Hydroforming part is one named, uncosted line). */
+    private readonly hydroformingCostService?: HydroformingCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -509,6 +535,8 @@ export class BomItemCostingService {
       ...(dto.composites ? { composites: { ...dto.composites, options: convertRouteOptions(dto.composites.options, conv) } } : {}),
       ...(dto.additive ? { additive: { ...dto.additive, options: convertRouteOptions(dto.additive.options, conv) } } : {}),
       ...(dto.barTube ? { barTube: { ...dto.barTube, options: convertRouteOptions(dto.barTube.options, conv) } } : {}),
+      ...(dto.rotoBlow ? { rotoBlow: { ...dto.rotoBlow, options: convertRouteOptions(dto.rotoBlow.options, conv) } } : {}),
+      ...(dto.hydroforming ? { hydroforming: { ...dto.hydroforming, options: convertRouteOptions(dto.hydroforming.options, conv) } } : {}),
       ...(dto.multiSpindle ? { multiSpindle: { ...dto.multiSpindle, options: convertRouteOptions(dto.multiSpindle.options, conv) } } : {}),
       ...(dto.insertMolding ? { insertMolding: { ...dto.insertMolding, options: convertRouteOptions(dto.insertMolding.options, conv) } } : {}),
       ...(dto.multiShot ? { multiShot: { ...dto.multiShot, options: convertRouteOptions(dto.multiShot.options, conv) } } : {}),
@@ -519,6 +547,10 @@ export class BomItemCostingService {
           consumablesCost: conv(dto.assembly.consumablesCost),
           joints: dto.assembly.joints.map((j) => ({ ...j, consumablesCost: j.consumablesCost != null ? conv(j.consumablesCost) : null })),
         },
+      } : {}),
+      // A weldment's route options and its MIG wire, the same.
+      ...(dto.partAssembly ? {
+        partAssembly: { ...dto.partAssembly, options: convertRouteOptions(dto.partAssembly.options, conv), wireCost: conv(dto.partAssembly.wireCost) },
       } : {}),
       currency,
       currencySymbol,
@@ -2024,8 +2056,15 @@ export class BomItemCostingService {
     // ── Assembly ────────────────────────────────────────────────────────────
     // An assembly's own work: its BOM children loaded and joined (costing/assembly). It has no material or model of its own, so it is priced
     // before the material gate; each child's own cost is added to it by the BOM roll-up, never here.
-    if ((forceFamily ?? this.resolveEffectiveFamily({ item, fg, grade: itemGrade, sheetThicknessMm }).family) === ASSEMBLY_FAMILY) {
+    const ownWorkFamily = forceFamily ?? this.resolveEffectiveFamily({ item, fg, grade: itemGrade, sheetThicknessMm }).family;
+    if (ownWorkFamily === ASSEMBLY_FAMILY) {
       return this.assemblyCostSummary(item, costingInputs, location, accessToken, forceDieCastingProcess, localLinesOut);
+    }
+    // ── Part Assembly ───────────────────────────────────────────────────────
+    // A weldment's welding (costing/part-assembly): its components welded as the Cost Guide's weld table says. Like an assembly it is
+    // priced before the material gate, and its components' own costs are the BOM roll-up's.
+    if (ownWorkFamily === PART_ASSEMBLY_FAMILY) {
+      return this.partAssemblyCostSummary(item, costingInputs, location, accessToken, forceDieCastingProcess, localLinesOut);
     }
 
     // Scenario gate: refuse to cost without a material grade. Silently defaulting to
@@ -2157,10 +2196,12 @@ export class BomItemCostingService {
     // Every real disagreement, in every branch's own warnings — the real
     // numbers, never a vague "mismatch" with nothing to act on.
     materialWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
-    if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
+    // The checks of the numbers the sheet-metal quote prices from (bend and hole counts, cut length: geometry-reconciliation.ts). A hydroformed
+    // part is priced from its hydroform measurement instead, so they say nothing about its quote (and would name a press brake line it has not).
+    if (family === 'sheet_metal' && !isHydroforming(item)) materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
     // The grade this process prices: the part's own, or, when the process prices only its own materials and the grade is not one of them,
     // its closest own material, said in the warnings (process-materials.ts). Every engine below prices this grade.
-    const pricedGrade = await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family);
+    const pricedGrade = await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family, processGroupOf(item));
     if (pricedGrade.note) materialWarnings.push(pricedGrade.note);
     const grade = pricedGrade.grade;
     // The whole resolved material is kept: a part whose applied route is another molding process is priced by that process's engine in the route comparison, from this row.
@@ -2686,21 +2727,24 @@ export class BomItemCostingService {
       return { ...this.normalizeCostSummaryToCurrency(compositesResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
     }
 
-    // ── Additive Manufacturing ──────────────────────────────────────────────
+    // ── Additive Manufacturing and Rapid Prototyping ────────────────────────
     // The build measured by the cad-engine (additive/feature_extractor.py, via auto-fill's additiveBuild: each build direction's height,
-    // footprint, overhang and supports) and memory/Additive Manufacturing price every route (additive-route.ts): metal sintering, laser
-    // sintering, material jetting and stereolithography, each with its post steps, on the machines that build the material.
+    // footprint, overhang and supports, and the holes and voids cleaning clears) priced in the part's domain (additive-domain.ts): memory/
+    // Additive Manufacturing (metal sintering, laser sintering, material jetting, stereolithography) or, when its Process is Rapid
+    // Prototyping, memory/Rapid prototyping (laser sintering, 3D printing, stereolithography), each route with its post steps, on the
+    // machines that build the material.
     if (family === 'additive') {
       const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
       const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const domain = additiveDomainOf(processGroupOf(item));
       const additive = this.additiveCostService
         ? await this.additiveCostService.price({
-          client: this.databaseService.getClient(accessToken), accessToken, location, grade,
+          domain, client: this.databaseService.getClient(accessToken), accessToken, location, grade,
           build: (summary.additiveBuild ?? null) as AdditiveBuildSummary | null,
           ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
           overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
         })
-        : { route: null, routes: [], gaps: [], note: null, missing: ['the additive cost service is not available'], warnings: [] };
+        : { domain, route: null, routes: [], gaps: [], note: null, missing: ['the additive cost service is not available'], warnings: [] };
       const additiveResult = {
         ...buildAdditiveCostSummary({
           additive, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
@@ -2747,6 +2791,86 @@ export class BomItemCostingService {
         localLinesOut.localCurrency = locInfo.code;
       }
       return { ...this.normalizeCostSummaryToCurrency(barTubeResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+    }
+
+    // ── Roto & Blow Molding ───────────────────────────────────────────────────
+    // The shell measured by the cad-engine (roto_blow/feature_extractor.py, via auto-fill's rotoBlowGeometry: wall, inside, spout, parting line,
+    // envelope, holes and voids) and memory/Roto & blow molding price both routes (roto-blow-route.ts): extrusion blow molding and rotational
+    // molding, each with the operations its features take, on the machines that make the part; the molds are tooling.
+    if (family === 'roto_blow') {
+      const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+      const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const rotoBlow = this.rotoBlowCostService
+        ? await this.rotoBlowCostService.price({
+          client: this.databaseService.getClient(accessToken), accessToken, location, grade,
+          geometry: (summary.rotoBlowGeometry ?? null) as RotoBlowGeometrySummary | null,
+          amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
+          ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+          overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+        })
+        : { route: null, routes: [], gaps: [], part: null, note: null, missing: ['the Roto & Blow Molding cost service is not available'], warnings: [] };
+      const rotoBlowResult = {
+        ...buildRotoBlowCostSummary({
+          rotoBlow, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
+        }),
+        ...currencyMeta,
+        drawingCadConsistency,
+      };
+      this.overrides.applyCostOverrides(rotoBlowResult, costOverrides);
+      if (costOverrides.size > 0) rotoBlowResult.costOverrides = Object.fromEntries(costOverrides);
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(rotoBlowResult.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
+      return { ...this.normalizeCostSummaryToCurrency(rotoBlowResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+    }
+
+    // ── Sheet Metal - Hydroforming ────────────────────────────────────────────
+    // A sheet-metal part whose Process is Sheet Metal - Hydroforming: measured by the cad-engine for hydroforming (sheet_metal/features/
+    // hydroform.py, via auto-fill's hydroformGeometry) and priced by memory/Sheetmetal Hydroforming (hydroforming-route.ts): the blank cut on
+    // the offline blanking press and formed by Deep Draw or Fluid Cell, as memory's rule picks unless the Cost Guide sets one; the tool is tooling.
+    if (family === 'sheet_metal' && isHydroforming(item)) {
+      const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+      const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const o = item.scenarioOverrides ?? {};
+      const tray = Number(o[HYDROFORMING_KEYS.partsPerTray]);
+      const hydroforming = this.hydroformingCostService
+        ? await this.hydroformingCostService.price({
+          client: this.databaseService.getClient(accessToken), accessToken, itemId: id, userId, location,
+          material: {
+            id: materialRecord?.id ?? null, name: materialRecord?.name ?? grade, materialType: materialType ?? null,
+            densityKgM3: materialDensityKgM3 > 0 ? materialDensityKgM3 : null,
+            costPerKgUsd: materialCostPerKg > 0 ? materialCostPerKg / usdToLocal : null,
+            utsMpa: utsSource === 'db' ? utsMpa : null, shearStrengthMpa,
+          },
+          // Absent (an analysis from before the measurement) and null (nothing the engine could measure) are told apart.
+          thicknessMm: sheetThicknessMm, geometry: summary.hydroformGeometry as Record<string, unknown> | null | undefined, summary,
+          partVolumeMm3: Number(item.volume) > 0 ? Number(item.volume) : null,
+          // The features each step's catalog rows name (the process tree highlights them).
+          graphFeatures: Array.isArray(fg?.feature_graph_v2?.features) ? fg.feature_graph_v2.features : [],
+          amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
+          ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+          overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+        })
+        : { route: null, routes: [], rule: null, part: null, nest: null, note: null, missing: [`the ${HYDROFORMING_PROCESS_GROUP} cost service is not available`], warnings: [] };
+      const hydroformingResult = {
+        ...buildHydroformingCostSummary({
+          hydroforming, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
+          scenario: {
+            partsPerTray: Number.isFinite(tray) && tray >= 1 ? Math.floor(tray) : null,
+            intensifier: o[HYDROFORMING_KEYS.intensifier] === true || o[HYDROFORMING_KEYS.intensifier] === 'true',
+          },
+        }),
+        ...currencyMeta,
+        drawingCadConsistency,
+      };
+      this.overrides.applyCostOverrides(hydroformingResult, costOverrides);
+      if (costOverrides.size > 0) hydroformingResult.costOverrides = Object.fromEntries(costOverrides);
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(hydroformingResult.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
+      return { ...this.normalizeCostSummaryToCurrency(hydroformingResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
     }
 
     // ── Casting (die / sand / investment) ────────────────────────────────────
@@ -4616,7 +4740,9 @@ export class BomItemCostingService {
     const routes: RouteResultDto[] = processes.map((p, i) => {
       const s = summaries[i]!;
       const option = s.dieCastingProcess?.options.find((o) => o.process === p) ?? null;
-      const feasible = option?.feasible !== false;
+      // A summary that priced nothing (no material grade) has no process options: not feasible, and the missing input is the reason.
+      const unpriced = unpricedReason(s);
+      const feasible = !unpriced && option?.feasible !== false;
       const gaps = findRouteDataGaps(s.processLines);
       return {
         routeId: dieCastingRouteId(p),
@@ -4636,7 +4762,7 @@ export class BomItemCostingService {
         badges: { lowestCost: auto?.chosen === p && auto.chosenBy === 'auto', fastest: false, bestQuality: false },
         capability: {
           cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-          estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [option?.detail ?? 'not feasible'],
+          estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? option?.detail ?? 'not feasible'],
         },
         warnings: [...(option ? [`${p}: ${option.detail}`] : []), ...s.warnings],
         ratesSource: s.ratesSource,
@@ -5121,7 +5247,7 @@ export class BomItemCostingService {
         overrides: item.scenarioOverrides, batchSize, usdToLocal,
         costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
       })
-      : { route: null, routes: [], gaps: [], components: [], joints: [], note: null, missing: ['the assembly cost service is not available'], warnings: [] };
+      : { materialOfParts: false, route: null, routes: [], gaps: [], components: [], joints: [], note: null, missing: ['the assembly cost service is not available'], warnings: [] };
     const result = {
       ...buildAssemblyCostSummary({ assembly, batchSize, warnings: [], ratesSource: RATES_SOURCE_LABEL }),
       currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate: 1,
@@ -5176,6 +5302,88 @@ export class BomItemCostingService {
   }
 
   /**
+   * A weldment's cost summary (Process Part Assembly): its components (the BOM children, or the part itself) welded as the Cost Guide's weld
+   * table says, on the cheapest complete route or the one set (costing/part-assembly).
+   */
+  private async partAssemblyCostSummary(
+    item: BOMItemResponseDto, costingInputs: ReturnType<typeof resolveCostingInputs>, location: string, accessToken: string,
+    forceRoute?: string, localLinesOut?: { lines?: ProcessLineCost[]; localCurrency?: string },
+  ): Promise<CostSummaryResponseDto> {
+    const { batchSize } = costingInputs;
+    const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO.Other;
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, await this.items.organizationOfItem(item.id, accessToken));
+    const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+    const [costOverrides, children] = await Promise.all([
+      this.overrides.fetchCostOverrides(item.id, accessToken, location),
+      this.items.findChildren(item.id, accessToken),
+    ]);
+    const partAssembly: PartAssemblyCostResult = this.partAssemblyCostService
+      ? await this.partAssemblyCostService.price({
+        client: this.databaseService.getClient(accessToken), accessToken, location, item, children,
+        // The density the rest of costing weighs a part by (material_density_lookup, then the caller's raw materials), g/cm³ to kg/m³.
+        densityOf: async (grade) => {
+          const d = await this.items.materialDensity(grade, accessToken);
+          return d.density_g_cm3 != null && d.density_g_cm3 > 0 ? d.density_g_cm3 * 1000 : null;
+        },
+        ...(forceRoute ? { forceRoute } : {}),
+        overrides: item.scenarioOverrides, batchSize, usdToLocal,
+        costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
+      })
+      : {
+        materialOfParts: false, route: null, routes: [], gaps: [], components: [], welds: [], weldment: { massKg: null }, thickness: { mm: null, source: '' },
+        material: { name: null, cutCodeFamily: null }, note: null, missing: ['the Part Assembly cost service is not available'], warnings: [],
+      };
+    const result = {
+      ...buildPartAssemblyCostSummary({ partAssembly, batchSize, warnings: [], ratesSource: RATES_SOURCE_LABEL }),
+      currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate: 1,
+    } as CostSummaryDto & { costOverrides?: Record<string, unknown> };
+    this.overrides.applyCostOverrides(result, costOverrides);
+    if (costOverrides.size > 0) result.costOverrides = Object.fromEntries(costOverrides);
+    if (localLinesOut) {
+      localLinesOut.lines = JSON.parse(JSON.stringify(result.processLines)) as ProcessLineCost[];
+      localLinesOut.localCurrency = locInfo.code;
+    }
+    return { ...this.normalizeCostSummaryToCurrency(result, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+  }
+
+  /** A weldment's route comparison: each route (manual, robotic welding) the full Cost Summary priced on that route, as an assembly's are. */
+  private async partAssemblyRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys = PART_ASSEMBLY_ROUTES.map((r) => r.key);
+    const locals: { lines?: ProcessLineCost[]; localCurrency?: string }[] = keys.map(() => ({}));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, PART_ASSEMBLY_FAMILY),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], PART_ASSEMBLY_FAMILY)),
+    ]);
+    const routes = keys.map((key, i) => partAssemblyRouteFor(key, summaries[i]));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i].lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0].localCurrency;
+    }
+    const recommended = quote.partAssembly?.complete && quote.partAssembly.route ? partAssemblyRouteId(quote.partAssembly.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: 0,
+      materialGrade: quote.materialGrade,
+      grossWeightKg: 0,
+      materialCostPerKg: 0,
+      materialSource: quote.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No weldment route is both feasible and fully costed.'],
+      currency: quote.currency ?? 'USD',
+      currencySymbol: quote.currencySymbol ?? '$',
+      ...(quote.toUsdRate != null ? { toUsdRate: quote.toUsdRate } : {}),
+      ...(quote.usdToDisplayRate != null ? { usdToDisplayRate: quote.usdToDisplayRate } : {}),
+      resolvedInputs: quote.resolvedInputs,
+    };
+  }
+
+  /**
    * A bar and tube part's route comparison: saw and punch, and tube laser, each the full Cost Summary priced on that route, as the additive
    * routes are. The recommended one is the route the quote chose.
    */
@@ -5218,21 +5426,104 @@ export class BomItemCostingService {
   }
 
   /**
-   * An additive part's route comparison: every build route (metal sintering, laser sintering, material jetting, stereolithography), each the
-   * full Cost Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
+   * A blow molded or rotomolded part's route comparison: extrusion blow molding and rotational molding, each the full Cost Summary priced on
+   * that route, as the additive routes are. The recommended one is the route the quote chose.
+   */
+  private async rotoBlowRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys: RotoBlowRouteKey[] = ROTO_BLOW_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'roto_blow'),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'roto_blow')),
+    ]);
+    const routes = keys.map((key, i) => rotoBlowRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.rotoBlow?.complete ? rotoBlowRouteId(quote!.rotoBlow.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No Roto & Blow Molding route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
+  /**
+   * A hydroformed part's route comparison: Hydroform Deep Draw and Hydroform Fluid Cell, each the full Cost Summary priced on that route. The
+   * recommended one is the route the quote chose (memory's rule, unless the Cost Guide sets one); the cheapest complete one is badged.
+   */
+  private async hydroformingRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys: HydroformingRouteKey[] = HYDROFORMING_ROUTES.map((r) => r.key);
+    const locals = keys.map((): { lines?: ProcessLineCost[]; localCurrency?: string } => ({}));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'sheet_metal'),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'sheet_metal')),
+    ]);
+    const routes = keys.map((key, i) => hydroformingRouteFor(key, summaries[i]));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i].lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0].localCurrency;
+    }
+    const recommended = quote.hydroforming?.complete ? hydroformingRouteId(quote.hydroforming.route) : null;
+    const cheapest = routes.filter((r) => r.isFeasible && r.totalCost != null).sort((a, b) => (a.totalCost ?? 0) - (b.totalCost ?? 0))[0]?.routeId ?? null;
+    return {
+      bomItemId: id,
+      batchSize: quote.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote.materialCost,
+      materialGrade: quote.materialGrade,
+      grossWeightKg: quote.grossWeightKg,
+      materialCostPerKg: quote.materialCostPerKg,
+      materialSource: quote.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === cheapest } })),
+      comparisonWarnings: recommended ? [] : [`No ${HYDROFORMING_PROCESS_GROUP} route is both feasible and fully costed for this part.`],
+      currency: quote.currency ?? 'USD',
+      currencySymbol: quote.currencySymbol ?? '$',
+      ...(quote.toUsdRate != null ? { toUsdRate: quote.toUsdRate } : {}),
+      ...(quote.usdToDisplayRate != null ? { usdToDisplayRate: quote.usdToDisplayRate } : {}),
+      resolvedInputs: quote.resolvedInputs,
+    };
+  }
+
+  /**
+   * A part built layer by layer: its route comparison, every build route of its domain (Additive Manufacturing: metal sintering, laser
+   * sintering, material jetting, stereolithography; Rapid Prototyping: laser sintering, 3D printing, stereolithography), each the full Cost
+   * Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
    */
   private async additiveRouteComparison(
     id: string, userId: string, accessToken: string,
     requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
     localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+    domain = ADDITIVE,
   ): Promise<RouteComparisonResponseDto> {
-    const keys = ADDITIVE_ROUTES.map((r) => r.key);
+    const keys = domain.routes.map((r) => r.key);
     const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
     const [quote, ...summaries] = await Promise.all([
       this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'additive'),
       ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'additive')),
     ]);
-    const routes = keys.map((key, i) => additiveRouteFor(key, summaries[i]!));
+    const routes = keys.map((key, i) => additiveRouteFor(domain, key, summaries[i]!));
     if (localCurrencyOut) {
       localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
       localCurrencyOut.localCurrency = locals[0]!.localCurrency;
@@ -5360,19 +5651,22 @@ export class BomItemCostingService {
     const item = await this.items.findOne(id, userId, accessToken);
     const sec = await this.resolveSecondaryOperations(item, cmp.resolvedInputs.location ?? requestedLocation, cmp.resolvedInputs.batchSize, accessToken, cmp.toUsdRate ?? 1);
     if (sec.lines.length === 0) return cmp;
-    // apply-route persists the local-currency routes: they carry the same selected lines.
+    // The selected lines go on every route the part has (routesTakingSecondary); apply-route persists the local-currency routes, which carry
+    // the same lines.
     if (localCurrencyOut?.routes) {
-      localCurrencyOut.routes = localCurrencyOut.routes.map((r) => ({ ...r, processLines: [...r.processLines, ...sec.localLines] }));
+      const takesLocal = routesTakingSecondary(localCurrencyOut.routes);
+      localCurrencyOut.routes = localCurrencyOut.routes.map((r) => (takesLocal(r) ? { ...r, processLines: [...r.processLines, ...sec.localLines] } : r));
     }
+    const takes = routesTakingSecondary(cmp.routes);
     const extra = sec.lines.reduce((t, l) => t + l.totalCost, 0);
     return {
       ...cmp,
-      routes: cmp.routes.map((r) => ({
+      routes: cmp.routes.map((r) => (takes(r) ? {
         ...r,
         processLines: [...r.processLines, ...sec.lines],
         totalProcessCost: r.totalProcessCost + extra,
         totalCost: r.totalCost != null ? r.totalCost + extra : null,
-      })),
+      } : r)),
     };
   }
 
@@ -5525,12 +5819,24 @@ export class BomItemCostingService {
     if (family === ASSEMBLY_FAMILY) {
       return this.assemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
+    if (family === PART_ASSEMBLY_FAMILY) {
+      return this.partAssemblyRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
     // Bar and Tube Fabrication: saw and punch against tube laser, each the full quote on that route (bar-tube-route-comparison.ts).
     if (family === 'bar_tube') {
       return this.barTubeRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
+    // Roto & Blow Molding: extrusion blow molding and rotational molding, each the full quote on that route (roto-blow-route-comparison.ts).
+    if (family === 'roto_blow') {
+      return this.rotoBlowRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Sheet Metal - Hydroforming: Deep Draw and Fluid Cell, each the full quote on that route (hydroforming-route-comparison.ts).
+    if (family === 'sheet_metal' && isHydroforming(item)) {
+      return this.hydroformingRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
     if (family === 'additive') {
-      return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+      return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut,
+        additiveDomainOf(processGroupOf(item)));
     }
     if (family === 'composite') {
       return this.compositesRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
@@ -5542,7 +5848,7 @@ export class BomItemCostingService {
 
     // The grade this process prices, as the cost summary does (gradeForProcess): a part whose grade is not a material of its process is
     // compared on the process's closest own material.
-    const pricedGradeRC = itemGrade ? await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family) : null;
+    const pricedGradeRC = itemGrade ? await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family, processGroupOf(item)) : null;
     const grade = pricedGradeRC?.grade ?? null;
 
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
@@ -7153,30 +7459,8 @@ export class BomItemCostingService {
       ));
     }
 
-    // ── Hydroforming (Offline Blank + Hydroform press) for a drawn shell ─────
-    if (rcDrawnShell) {
-      const [{ reference: hfReference, missing: hfMissing }, hfPresses] = await Promise.all([
-        this.hydroformingReference.getReference(accessToken),
-        this.hydroformingReference.getPresses(accessToken, location),
-      ]);
-      const { dlrPerHr: _routeLabour, ...hfCostContext } = rcEMithranCtx;
-      const hf = computeHydroforming({
-        shell: rcDrawnShell,
-        thicknessMm: sheetThicknessMm,
-        densityKgM3: materialDensityKgM3,
-        utsMpa: utsMpa ?? null,
-        shearStrengthMpa: rcShearStrengthMpa ?? null,
-        batchSize,
-        reference: hfReference,
-        hydroformPresses: hfPresses.hydroform,
-        blankPresses: hfPresses.blank,
-        costContext: hfCostContext,
-      });
-      if (hfMissing.length > 0) {
-        hf.warnings.push(`Hydroforming reference data not staged: ${hfMissing.join(', ')} (migration 823).`);
-      }
-      routes.push(buildHydroformRoute({ result: hf, materialCost, ratesSource: RATES_SOURCE_LABEL }));
-    }
+    // A drawn shell is not cut and bent: its routes above are infeasible (drawnShellNeedsDrawing says to set the Process to Sheet Metal -
+    // Hydroforming, whose own comparison prices the drawing: hydroformingRouteComparison).
 
     // ── Badges — only assigned among capable, fully-costed routes ─────────────
     // dataComplete is part of the gate, not just capability: a route whose

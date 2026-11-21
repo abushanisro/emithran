@@ -46,6 +46,44 @@ async function main(): Promise<void> {
     const groups = await (await api('/process_material_groups?process_group=eq.Multi-Spindle%20Machining&select=material_group&order=material_group', minter.forService())).json() as { material_group: string }[];
     must(JSON.stringify(groups.map((g) => g.material_group)) === JSON.stringify(['Ferrous & Non-Ferrous', 'Machining']), `groups ${JSON.stringify(groups)}`);
   });
+  await check('migration 1099 gave the 9 Part Assembly rows their machine classes, and 1100 bound each one to its calculator', async () => {
+    const rows = await (await api('/process_calculator_mappings?process_group=eq.Part%20Assembly&select=operation,machine_class,calculator_name,is_active&order=operation', minter.forService())).json() as { operation: string; machine_class: string | null; calculator_name: string | null; is_active: boolean }[];
+    const bad = rows.filter((r) => !r.machine_class || !r.is_active || !r.calculator_name?.startsWith('Part Assembly - '));
+    must(rows.length === 9 && bad.length === 0, `rows ${JSON.stringify(rows)}`);
+  });
+  await check('migration 1101 twinned the 16 Powder Metal machines in India at memory\'s crews, and 1102 linked the process to its powders', async () => {
+    const rows = await (await api('/mhr_records?process_group=eq.Powder%20Metal&location=eq.India&select=machine_name,operators,usd_labor_rate_per_hr', minter.forService())).json() as { machine_name: string; operators: number | string; usd_labor_rate_per_hr: number | string }[];
+    const press = rows.find((r) => r.machine_name === 'Gasbarre DSP - 100 ton');
+    must(rows.length === 16 && Number(press?.operators) === 0.5 && rows.every((r) => Number(r.usd_labor_rate_per_hr) === 2.3), `rows ${JSON.stringify(rows)}`);
+    const groups = await (await api('/process_material_groups?process_group=eq.Powder%20Metal&select=material_group', minter.forService())).json() as { material_group: string }[];
+    must(JSON.stringify(groups) === JSON.stringify([{ material_group: 'Powder Metal' }]), `groups ${JSON.stringify(groups)}`);
+  });
+  await check('migrations 1103 and 1106 twinned every Rapid Prototyping and Roto & Blow Molding machine in India, and 1105 and 1108 bound their calculators', async () => {
+    for (const group of ['Rapid Prototyping', 'Roto & Blow Molding']) {
+      const q = encodeURIComponent(group);
+      const machines = await (await api(`/mhr_records?process_group=eq.${q}&select=location`, minter.forService())).json() as { location: string }[];
+      const usa = machines.filter((m) => m.location === 'USA').length;
+      must(usa > 0 && machines.filter((m) => m.location === 'India').length === usa, `${group} machines ${JSON.stringify(machines)}`);
+      const rows = await (await api(`/process_calculator_mappings?process_group=eq.${q}&select=operation,calculator_name`, minter.forService())).json() as { operation: string; calculator_name: string | null }[];
+      must(rows.length === 5 && rows.every((r) => r.calculator_name?.startsWith(`${group} - `)), `${group} catalog ${JSON.stringify(rows)}`);
+    }
+  });
+  await check('migration 1109 rated the hydroform presses (Netherlands overheads, 36.30 labour, forming time) and twinned all 56 Hydroforming machines in India', async () => {
+    const q = encodeURIComponent('Sheet Metal - Hydroforming');
+    const rows = await (await api(`/mhr_records?process_group=eq.${q}&select=location,machine_class,machine_name,mhr_usd_per_hour,usd_labor_rate_per_hr,specs`, minter.forService())).json() as
+      { location: string; machine_class: string; machine_name: string; mhr_usd_per_hour: number | string | null; usd_labor_rate_per_hr: number | string | null; specs: Record<string, unknown> | null }[];
+    const press = (location: string) => rows.find((r) => r.location === location && r.machine_name === 'Hydroform Press - Deep Draw - 456 Dia');
+    must(rows.filter((r) => r.location === 'India').length === 56, `India rows ${rows.filter((r) => r.location === 'India').length}`);
+    must(Number(press('USA')?.mhr_usd_per_hour) === 87.9 && Number(press('USA')?.usd_labor_rate_per_hr) === 36.3 && Number(press('USA')?.specs?.machine_forming_cycle_time_s) === 45,
+      `USA press ${JSON.stringify(press('USA'))}`);
+    must(Number(press('India')?.mhr_usd_per_hour) === 54.02 && Number(press('India')?.usd_labor_rate_per_hr) === 1.73, `India press ${JSON.stringify(press('India'))}`);
+  });
+  await check('migration 1110 bound the Hydroform and Offline Blank catalog rows to their hydroforming calculators', async () => {
+    const q = encodeURIComponent('Sheet Metal - Hydroforming');
+    const rows = await (await api(`/process_calculator_mappings?process_group=eq.${q}&select=operation,calculator_name&order=operation`, minter.forService())).json() as { operation: string; calculator_name: string | null }[];
+    must(JSON.stringify(rows.map((r) => [r.operation, r.calculator_name])) === JSON.stringify([['Hydroform', 'Hydroforming - Hydroform'], ['Offline Blank', 'Hydroforming - Offline blank']]),
+      `rows ${JSON.stringify(rows)}`);
+  });
   await check('the carried user directory is readable through migration 932 (same id as the source)', async () => {
     const res = await api('/rpc/directory_find_by_email', minter.forService(), { method: 'POST', body: JSON.stringify({ p_email: 'Alice@Example.com' }) });
     must(res.ok && (await res.json()) === '11111111-1111-4111-8111-111111111111', `HTTP ${res.status}`);

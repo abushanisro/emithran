@@ -19,7 +19,8 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 
 from sheet_metal.features.perforation import detect_perforation_patterns
-from sheet_metal.features.drawn_shell import detect_drawn_shell, is_drawn_cylinder
+from sheet_metal.features.drawn_shell import analyse_sheet_faces, detect_drawn_shell, is_drawn_cylinder
+from sheet_metal.features.hydroform import measure_hydroform
 from sheet_metal.features.rolled_form import detect_rolled_forms, count_recognized as count_recognized_rolled_forms
 from sheet_metal.features.formed_feature import detect_formed_features, count_recognized as count_recognized_formed_features
 from sheet_metal.features.lance import detect_lances, count_recognized as count_recognized_lances
@@ -152,10 +153,19 @@ class SheetMetalFeatureExtractor:
         # box's corner and bottom radii -- are not bends, holes or rolled
         # forms, so they are taken out of the shared cylinder list every one
         # of those detectors reads, and out of the bend set below. See
-        # sheet_metal/features/drawn_shell.py.
+        # sheet_metal/features/drawn_shell.py. The faces are read once
+        # (types, areas, offset twins, adjacency) for it and for the
+        # hydroforming measurement below.
+        sheet_faces: Optional[Dict[str, Any]] = None
+        if sheet_thickness > 0:
+            try:
+                sheet_faces = analyse_sheet_faces(shape, sheet_thickness)
+            except Exception as e:
+                logger.warning(f"[SheetMetal] sheet face analysis failed: {e}")
         drawn_shell: Optional[Dict[str, Any]] = None
         try:
-            drawn_shell = detect_drawn_shell(shape, sheet_thickness, dominant_normal)
+            if sheet_faces is not None:
+                drawn_shell = detect_drawn_shell(shape, sheet_thickness, dominant_normal, faces=sheet_faces)
         except Exception as e:
             logger.warning(f"[SheetMetal] drawn-shell detection failed: {e}")
         if drawn_shell and raw_cylinders_full:
@@ -228,6 +238,9 @@ class SheetMetalFeatureExtractor:
         bend_lengths_mm: List[float] = []
         bend_angles_deg: List[float] = []
         dedup_bends_for_count: List[Dict[str, Any]] = []
+        # Every deduplicated bend, the drawn shell's own cylinders included: the
+        # hydroforming measurement keeps the ones outside the drawn form.
+        all_dedup_bends: List[Dict[str, Any]] = []
         try:
             # Prefer _collect_dedup_bends: the SAME clustering already trusted for
             # flat-pattern area / cut length / the 2D unfold solver, so bend_count
@@ -236,8 +249,9 @@ class SheetMetalFeatureExtractor:
             # length/angle -- needed for per-bend press-brake tonnage instead of
             # the flat-pattern's overall-dimension proxy.
             if dominant_normal is not None:
+                all_dedup_bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness)
                 dedup_bends_for_count = [
-                    b for b in self._collect_dedup_bends(shape, dominant_normal, sheet_thickness)
+                    b for b in all_dedup_bends
                     if not is_drawn_cylinder(drawn_shell, b["dir"], b["axis_point"], b["radius"], sheet_thickness)
                 ]
             if dedup_bends_for_count:
@@ -291,7 +305,8 @@ class SheetMetalFeatureExtractor:
         # part is a flat blank/plate and every "bend" candidate is edge-fillet
         # noise (e.g. rounded slot walls on a machined bronze plate).
         min_bbox = min(bbox_dims) if bbox_dims else 0.0
-        if bends["count"] > 0 and sheet_thickness > 0 and min_bbox <= sheet_thickness * 1.5:
+        flat_part = sheet_thickness > 0 and min_bbox <= sheet_thickness * 1.5
+        if bends["count"] > 0 and flat_part:
             logger.info(
                 f"[SheetMetal] flat-part guard: zeroing {bends['count']} bend candidate(s) — "
                 f"min bbox {min_bbox:.1f}mm ~ thickness {sheet_thickness:.1f}mm (flat blank)"
@@ -302,7 +317,10 @@ class SheetMetalFeatureExtractor:
 
         holes: Dict[str, Any] = {"count": 0, "diameters": [], "all_diameters": []}
         try:
-            if raw_cylinders_full and bbox_minmax:
+            # `is not None`, not truthiness (as for bends above): an empty list is
+            # real data -- every cylinder belongs to a drawn shell -- and must not
+            # fall back to the unfiltered list, which counts a cup's own walls as holes.
+            if raw_cylinders_full is not None and bbox_minmax:
                 holes = self._count_holes_with_location(raw_cylinders_full, bbox_minmax, panels, sheet_thickness, dominant_normal)
             else:
                 holes = self._count_holes_from_list(raw_cylinders)
@@ -434,7 +452,7 @@ class SheetMetalFeatureExtractor:
         bodies = _sheet_bodies(shape)
         if len(bodies) <= 1:
             blanks = [self._flat_pattern_of_body(shape, sheet_thickness, dominant_face, panels, dominant_normal,
-                                                 bends["count"], holes.get("centroids_mm", []))]
+                                                 bends["count"], holes.get("centroids_mm", []), drawn_shell=drawn_shell)]
         else:
             blanks = []
             for body in bodies:
@@ -443,6 +461,31 @@ class SheetMetalFeatureExtractor:
                 except Exception as e:
                     logger.warning(f"[SheetMetal] flat pattern of one body failed: {e}")
                     blanks.append({"area_mm2": 0.0, "method": "failed", "bounding_rect": None, "outline": None})
+
+        # What hydroforming the part rests on (sheet_metal/features/hydroform.py): the press axis, forming depth, plan,
+        # projected and developed area, the drawn form, the blank, the flanges and the holes. Measured for every sheet
+        # part; a failure here leaves it None and never fails the extraction.
+        hydroform: Optional[Dict[str, Any]] = None
+        try:
+            hydroform = measure_hydroform(
+                shape, sheet_thickness, dominant_face, dominant_normal, sheet_faces, drawn_shell,
+                [] if flat_part else all_dedup_bends,
+                blanks[0] if len(blanks) == 1 else None,
+                bends["count"],
+            )
+        except Exception as e:
+            logger.warning(f"[SheetMetal] hydroform measurement failed: {e}")
+        # A drawn part's blank cannot be unfolded: its flat pattern is the developed sheet (_flat_pattern_of_body), laid out
+        # as the hydroforming measurement's equal-area blank. Its holes are not placed in that layout (counted, never guessed).
+        if drawn_shell and len(blanks) == 1 and blanks[0]["method"] == "drawn_developed":
+            hb = (hydroform or {}).get("blank") or {}
+            if hb.get("outline_points_mm"):
+                blanks[0]["bounding_rect"] = {"length_mm": hb["length_mm"], "width_mm": hb["width_mm"]}
+                blanks[0]["outline"] = {
+                    "outline_points_mm": hb["outline_points_mm"],
+                    "holes_mm": [],
+                    "holes_unplaced": len(holes.get("centroids_mm", []) or []),
+                }
         flat_pattern_area_mm2 = round(sum(b["area_mm2"] for b in blanks), 1)
         if len(blanks) == 1:
             flat_pattern_area_method = blanks[0]["method"]
@@ -647,6 +690,7 @@ class SheetMetalFeatureExtractor:
                         bend_count=bends["count"],
                         flat_pattern_area_mm2=flat_pattern_area_mm2,
                         flat_pattern_area_method=flat_pattern_area_method,
+                        sheet_face_ids=sorted(sheet_faces["twinned"]) if sheet_faces else None,
                     )
                 except Exception as e:
                     logger.warning(f"[SheetMetal] measurements failed: {e}")
@@ -853,6 +897,9 @@ class SheetMetalFeatureExtractor:
             # outline and holes in its own unfolded frame. One entry for an ordinary sheet part, equal to the fields
             # above; several for a weldment / multi-body file, whose blanks are nested together.
             "flat_pattern_blanks": flat_pattern_blanks,
+            # The hydroforming measurements (sheet_metal/features/hydroform.py, "hf_v1"): measured for every sheet part,
+            # None when the part has no sheet frame or the measurement failed.
+            "hydroform": hydroform,
             "sheet_geometry_debug": {**geom_debug, **validation_debug},
             "feature_graph_v2": feature_graph_v2,
         }
@@ -866,12 +913,25 @@ class SheetMetalFeatureExtractor:
         dominant_normal: Optional[Tuple[float, float, float]],
         bend_count: int,
         hole_centroids_mm: List[Any],
+        drawn_shell: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         One blank's flat pattern: {"area_mm2", "method", "bounding_rect", "outline"} for a single sheet body (`shape`
         is that body, `panels` and `dominant_face` are its own). Failures leave a field None or the area on the
         dominant-face method, never a guess -- the same contract the single-body extraction always had.
+
+        A drawn body (drawn_shell) cannot be unfolded: drawing stretches the sheet, so its blank is the sheet it is
+        made of, the developed area (half the area of every face with an offset twin, drawn_shell.py), method
+        "drawn_developed". The main face alone, which the unbent branch below would take, is only the drawn part's
+        bottom. Its rectangle and outline are left to the caller (the hydroforming measurement's equal-area blank).
         """
+        if drawn_shell and drawn_shell.get("developed_area_mm2"):
+            return {
+                "area_mm2": float(drawn_shell["developed_area_mm2"]),
+                "method": "drawn_developed",
+                "bounding_rect": None,
+                "outline": None,
+            }
         flat_pattern_area_mm2 = 0.0
         flat_pattern_area_method = "dominant_face_only"
         flat_pattern_bounding_rect: Optional[Dict[str, float]] = None
@@ -1597,6 +1657,7 @@ class SheetMetalFeatureExtractor:
         bend_count: int,
         flat_pattern_area_mm2: float,
         flat_pattern_area_method: str,
+        sheet_face_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
         """
         The faces behind each CAD-derived costing number, so an engineer can see
@@ -1654,6 +1715,9 @@ class SheetMetalFeatureExtractor:
         panel_faces = [p["face"] for p in (panels or [])] or ([dominant_face] if dominant_face is not None else [])
         area_ids = sorted({face_index.FindIndex(fc) - 1 for fc in panel_faces if face_index.FindIndex(fc) > 0})
         area_ids = sorted(set(area_ids) | {fid for o in bend_occ for fid in o["face_ids"]})
+        if flat_pattern_area_method == "drawn_developed" and sheet_face_ids:
+            # A drawn part's blank is its whole developed sheet: every face with an offset twin.
+            area_ids = list(sheet_face_ids)
         if area_ids and flat_pattern_area_mm2 > 0:
             out["flat_pattern_area"] = {
                 "value": round(flat_pattern_area_mm2, 1), "unit": "mm2",
@@ -1661,7 +1725,7 @@ class SheetMetalFeatureExtractor:
                 "occurrences": [{"face_ids": area_ids}],
                 # Only the true unfold accounts for every panel and bend; the dominant-face
                 # fallback of a bent part covers part of the blank, so it must not read as verified.
-                "reconciles": flat_pattern_area_method.startswith("true_unfold") or not bend_occ,
+                "reconciles": flat_pattern_area_method.startswith("true_unfold") or flat_pattern_area_method == "drawn_developed" or not bend_occ,
             }
         return out
 
@@ -3430,6 +3494,8 @@ class SheetMetalFeatureExtractor:
                 "axial_length": inner["axial_length"],
                 "allowance_mm": allowance_mm,
                 "thickness_mm": sheet_thickness,
+                # The bend's own cylinder faces (inner and outer, or the one found).
+                "faces": bend_faces,
                 # The faces the bend's cylinders share a B-rep edge with: the panels it joins, read from the
                 # topology rather than inferred from distances (_bend_panel_adjacency).
                 "neighbor_faces": _edge_neighbor_faces(edge_faces, bend_faces),

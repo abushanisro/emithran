@@ -145,8 +145,12 @@ export class RouteApplicationService {
 
     // 4. What the route cannot make is applied with it as No Cost Features (written below with its lines): why it is not feasible for the
     // part, and each feature its process cannot make. Its operations that cannot be costed become No Cost Features as they are written.
+    // A route not priced because an input is missing (INPUT_MISSING: no material grade) is not costed yet, not infeasible: said as such.
+    const notMade = route.capability.warnings[0] ?? route.warnings?.[0] ?? 'machine capability constraints not met';
     const unmade = [
-      ...(route.isFeasible ? [] : [`${route.routeLabel} is not feasible for this part: ${route.capability.warnings[0] ?? route.warnings?.[0] ?? 'machine capability constraints not met'}`]),
+      ...(route.isFeasible ? [] : [route.capability.reasonCodes.includes('INPUT_MISSING')
+        ? `${route.routeLabel} is not costed: ${notMade}`
+        : `${route.routeLabel} is not feasible for this part: ${notMade}`]),
       ...(route.compatibility?.incompatibilities ?? []).map((i) => `${i.count} x ${i.featureType}: ${i.reason}`),
     ];
 
@@ -452,8 +456,10 @@ export class RouteApplicationService {
       /** The cycle's machine / labour split when the engine states it (ProcessLineCost); persisted into machine_cost_per_part / labor_cost_per_part (migration 970). */
       machineCostPerPart?: number;
       laborCostPerPart?: number;
-      /** What the line charges beyond machine and crew time, USD (ProcessLineCost.otherCostPerPartUsd); persisted into other_cost_per_part (migration 1005). */
+      /** What the line charges beyond machine and crew time: in USD (ProcessLineCost.otherCostPerPartUsd), and in the line's own currency when it was
+       *  converted (otherCostPerPart); persisted into other_cost_per_part in the row's currency (migration 1005). */
       otherCostPerPartUsd?: number;
+      otherCostPerPart?: number;
       /** The versions the line was calculated with (ProcessLineCost.calculationSnapshot); persisted into calculation_breakdown (migration 972). */
       calculationSnapshot?: object;
       /**
@@ -793,8 +799,10 @@ export class RouteApplicationService {
         calculation_breakdown:     line.calculationSnapshot ?? null,
         machine_cost_per_part:     line.machineCostPerPart ?? null,
         labor_cost_per_part:       line.laborCostPerPart ?? null,
-        // What the line charges beyond machine and crew time (energy, a consumable), USD like total_cost_per_part (migration 1005).
-        other_cost_per_part:       line.otherCostPerPartUsd ?? null,
+        // What the line charges beyond machine and crew time (energy, a consumable), in the row's currency like total_cost_per_part
+        // (migration 1005): the line's own-currency figure; a USD line's is its USD one. A line in another currency that states only USD
+        // stores none, rather than a USD figure every reader would take for the row's currency.
+        other_cost_per_part:       line.otherCostPerPart ?? (currencyContext.lineCurrency === 'USD' ? line.otherCostPerPartUsd ?? null : null),
         // The calculation behind the cycle: the stored calculator, its run and the cycle's phases (migrations 1097, 1009); nulls when the
         // line has no calculator cycle. What lets the saved line reopen its own calculator with the inputs it was costed from.
         ...calculatorRunColumns(line),

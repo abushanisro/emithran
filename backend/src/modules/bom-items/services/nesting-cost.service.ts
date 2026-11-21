@@ -1,4 +1,3 @@
-import { isMachiningFamily } from '../../../domain/part-family';
 import { Injectable, Logger } from '@nestjs/common';
 import type { MHRRateInput } from '../costing/shared/core/cost-engine';
 import { processChoiceConflict } from '../costing/shared/core/part-family-process-group';
@@ -6,6 +5,7 @@ import { SheetMetalLookupService } from '../costing/sheet-metal/lookup/sheet-met
 import { EDGE_ALLOWANCE_MM, type NestingSheet, isTrueNestCostingCacheValid, trueNestInputFingerprint, computePartAllowanceMm, GROSS_USAGE_SPACING_PROCESS } from '../costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { combineBlankNests, selectBestTrueNestCandidate } from '../costing/sheet-metal/machine/true-nest-costing.engine';
 import type { FlatPatternBlank } from '../costing/sheet-metal/machine/flat-pattern-blanks';
+import { chooseNestBlank, gridNest } from '../costing/sheet-metal/machine/nest-blank-source';
 import type { TrueNestCandidate, TrueNestCostingSelection } from '../costing/sheet-metal/machine/true-nest-costing.engine';
 
 /** Lookup tables read by the generic spec resolver (specLookupSeeds), not by a resolver of their own. */
@@ -19,17 +19,6 @@ const SPEC_RESOLVED_TABLES: ReadonlySet<string> = new Set(['tblRotarySurfaceGrin
 import type { CostSummaryDto, ProcessLineCost } from '../dto/cost-breakdown.dto';
 import type { TrueNestResultDto } from '../dto/true-nest.dto';
 import { CADAnalysisService } from './cad-analysis.service';
-import { castingProcessOfFamily } from '../costing/casting/casting-cost-summary';
-
-/** The part families that have a cost model: machining, sheet metal, injection molding and the casting families. */
-/** A solid part's volume and three bounding-box sides were measured (all positive). */
-export function hasMeasuredGeometry(item: { volume?: number | null; maxLength?: number | null; maxWidth?: number | null; maxHeight?: number | null }): boolean {
-  return [item.volume, item.maxLength, item.maxWidth, item.maxHeight].every((v) => Number(v) > 0);
-}
-
-export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || castingProcessOfFamily(family) !== null;
-}
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
@@ -65,6 +54,19 @@ import { BOMItemsService } from '../bom-items.service';
 
 
 
+
+/** The feature_graph.summary key the true-shape nest of a part's own flat pattern is cached under. */
+export const TRUE_NEST_CACHE_KEY = 'trueNestCostingCache';
+
+/**
+ * A blank to nest that is not the part's own flat pattern (a hydroformed part's blank: its developed outline), with the summary key its nest
+ * is cached under, so it never overwrites the flat pattern's (a part switched between processes keeps both).
+ */
+export interface NestBlankSource {
+  outlinePointsMm: number[][];
+  holesMm?: unknown;
+  cacheKey: string;
+}
 
 /** Nesting of a sheet-metal part on its sheet: the sheet it is costed on, the true-shape nest and its cached result, and the gross material usage a calculator asks for. */
 @Injectable()
@@ -186,30 +188,35 @@ export class NestingCostService {
     sheet: NestingSheet,
     // featureGraph.classification: when the chosen process and the geometry disagree, that is why there is no outline.
     classification?: { family?: string | null; geometricFamily?: string | null },
+    /** A blank other than the part's flat pattern (a hydroform blank), nested and cached under its own key; the flat pattern when absent. */
+    blank?: NestBlankSource,
   ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
     // A part cut from several blanks (a multi-body file: a channel and its end plate) is nested blank by blank.
     const blanks: FlatPatternBlank[] | undefined = Array.isArray(summary?.flatPatternBlanks) ? summary.flatPatternBlanks : undefined;
-    if (blanks && blanks.length > 1) {
+    if (!blank && blanks && blanks.length > 1) {
       return this.resolveMultiBlankNestCosting(itemId, blanks, netWeightKg, densityKgM3, thicknessMm, kerfMm, edgeMarginMm, userId, accessToken, sheet, summary);
     }
 
-    const outlinePointsMm = summary?.flatPatternOutlinePointsMm;
+    const outlinePointsMm = blank ? blank.outlinePointsMm : summary?.flatPatternOutlinePointsMm;
     if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
       const conflict = processChoiceConflict(classification);
       return {
         selection: null,
-        reason: conflict
-          ? `no flat-pattern outline: ${conflict}`
-          : "no real flat-pattern outline available for this part yet -- re-run Reanalyze",
+        reason: blank
+          ? 'the blank has no outline -- re-run Reanalyze'
+          : conflict
+            ? `no flat-pattern outline: ${conflict}`
+            : "no real flat-pattern outline available for this part yet -- re-run Reanalyze",
       };
     }
 
-    const holesForFingerprint = summary?.flatPatternHolesMm;
+    const holesForFingerprint = blank ? blank.holesMm : summary?.flatPatternHolesMm;
+    const cacheKey = blank?.cacheKey ?? TRUE_NEST_CACHE_KEY;
     const inputFingerprint = trueNestInputFingerprint({
       outlinePointsMm, holesMm: holesForFingerprint, thicknessMm, densityKgM3, netWeightKg,
     });
 
-    const cache = summary?.trueNestCostingCache;
+    const cache = summary?.[cacheKey];
     if (isTrueNestCostingCacheValid(cache, kerfMm, edgeMarginMm, inputFingerprint, sheet)) {
       return {
         selection: {
@@ -232,13 +239,13 @@ export class NestingCostService {
     // only share a computation that would have produced the same answer. The
     // entry is removed on settle, so a later request with changed geometry (a
     // different fingerprint) never joins a stale flight.
-    const flightKey = `${itemId}|${inputFingerprint}|${kerfMm}|${edgeMarginMm}|${sheet.widthMm}x${sheet.lengthMm}`;
+    const flightKey = `${itemId}|${cacheKey}|${inputFingerprint}|${kerfMm}|${edgeMarginMm}|${sheet.widthMm}x${sheet.lengthMm}`;
     const inFlight = this.trueNestInFlight.get(flightKey);
     if (inFlight) return inFlight;
 
     const flight = this.computeTrueShapeNestCosting(
-      itemId, summary, netWeightKg, densityKgM3, thicknessMm, kerfMm, edgeMarginMm,
-      userId, accessToken, outlinePointsMm, inputFingerprint, sheet,
+      itemId, netWeightKg, densityKgM3, thicknessMm, kerfMm, edgeMarginMm,
+      userId, accessToken, outlinePointsMm, holesForFingerprint, inputFingerprint, sheet, cacheKey,
     ).finally(() => this.trueNestInFlight.delete(flightKey));
     this.trueNestInFlight.set(flightKey, flight);
     return flight;
@@ -300,7 +307,7 @@ export class NestingCostService {
       if (!best) {
         return { selection: null, reason: `a set of this part's ${blanks.length} blanks needs more than one ${sheet.widthMm}x${sheet.lengthMm}mm sheet` };
       }
-      await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken);
+      await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken, TRUE_NEST_CACHE_KEY);
       this.logger.log(
         `[true-nest-costing] ${blanks.length} blanks on ${best.sheetWidthMm}x${best.sheetLengthMm}mm: ${perBlank.join('+')} per sheet, ` +
         `${best.partsPerSheet} sets/sheet, ${best.utilisationPct}% utilization for item ${itemId}`,
@@ -311,7 +318,7 @@ export class NestingCostService {
     return flight;
   }
 
-  /** Stores the selected true-shape nest on the item, so every later request with the same inputs gets the same answer. */
+  /** Stores the selected true-shape nest on the item (under `cacheKey`), so every later request with the same inputs gets the same answer. */
   private async persistTrueNestCostingCache(
     itemId: string,
     best: TrueNestCostingSelection,
@@ -320,6 +327,7 @@ export class NestingCostService {
     inputFingerprint: string,
     userId: string,
     accessToken: string,
+    cacheKey: string,
   ): Promise<void> {
     const fresh = await this.items.findOne(itemId, userId, accessToken);
     const freshFg = (fresh.featureGraph as any) ?? {};
@@ -329,7 +337,7 @@ export class NestingCostService {
         ...freshFg,
         summary: {
           ...freshSummary,
-          trueNestCostingCache: {
+          [cacheKey]: {
             sheetWidthMm: best.sheetWidthMm, sheetLengthMm: best.sheetLengthMm,
             kerfMm, edgeMarginMm,
             partsPerSheet: best.partsPerSheet, utilizationPct: best.utilisationPct,
@@ -351,7 +359,6 @@ export class NestingCostService {
   /** The expensive half of resolveTrueShapeNestCosting — see its doc comment. */
   private async computeTrueShapeNestCosting(
     itemId: string,
-    summary: any,
     netWeightKg: number,
     densityKgM3: number,
     thicknessMm: number,
@@ -360,10 +367,12 @@ export class NestingCostService {
     userId: string,
     accessToken: string,
     outlinePointsMm: number[][],
+    rawHolesMm: unknown,
     inputFingerprint: string,
     sheet: NestingSheet,
+    cacheKey: string,
   ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
-    const holesMm = this.toNestHoles(summary.flatPatternHolesMm);
+    const holesMm = this.toNestHoles(rawHolesMm);
 
     // Evaluate EVERY viable candidate sheet -- sequentially (cad-engine's
     // /nest endpoint is not thread-pool-wrapped, see cad-engine/main.py, so
@@ -396,7 +405,7 @@ export class NestingCostService {
 
     // Persist BEFORE returning -- this is what makes the result
     // deterministic for every subsequent request, not just an optimization.
-    await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken);
+    await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken, cacheKey);
     this.logger.log(
       `[true-nest-costing] selected ${best.sheetWidthMm}x${best.sheetLengthMm}mm: ${best.partsPerSheet} parts/sheet, ` +
       `${best.utilisationPct}% utilization for item ${itemId}`,
@@ -538,34 +547,30 @@ export class NestingCostService {
     const fg = item.featureGraph as any;
     const summary = fg?.summary ?? {};
 
+    // Why the analysis has no outline, said with whatever is nested instead. When the user's chosen process and the geometry disagree, that is
+    // the reason (a machined part has no flat pattern).
+    const conflict = processChoiceConflict(fg?.classification);
+    const whyNoOutline = conflict
+      ? `No flat pattern for this part: ${conflict}`
+      : summary.flatPatternOutlineSource === 'unavailable'
+        ? "The flat pattern's outline could not be built on the last analysis (the unfold's boundary did not close or did not reconcile)."
+        : 'No flat-pattern outline is stored for this part.';
+    const hf = (item.scenarioOverrides as Record<string, unknown> | null | undefined)?.processGroup === 'Sheet Metal - Hydroforming'
+      ? summary.hydroformGeometry?.blank : null;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     const blanks: FlatPatternBlank[] | undefined = Array.isArray(summary.flatPatternBlanks) && summary.flatPatternBlanks.length > 1
       ? summary.flatPatternBlanks : undefined;
-    const blankCount = blanks ? blanks.length : 1;
-    const blank = blanks ? blanks[Math.min(Math.max(0, Math.floor(blankIndex)), blankCount - 1)]! : undefined;
-    const shownBlank = blanks ? blanks.indexOf(blank!) : 0;
-    const outlinePointsMm = blank ? blank.outlinePointsMm : summary.flatPatternOutlinePointsMm;
-    const outlineSource: 'wire_walk' | 'unavailable' = (blank ? blank.outlineSource : summary.flatPatternOutlineSource) === 'wire_walk' ? 'wire_walk' : 'unavailable';
-    if (blank && (!outlinePointsMm || outlinePointsMm.length < 3)) {
-      return { result: null, reason: `Blank ${shownBlank + 1} of the ${blankCount} this part is cut from has no flat-pattern outline. Re-run Reanalyze to retry extraction.` };
-    }
-    if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
-      // No real outline resolved for this part -- honest gap, not a guess. When the user's chosen process and the
-      // geometry disagree, that is the reason (a machined part has no flat pattern), and reanalyzing cannot help.
-      const conflict = processChoiceConflict(fg?.classification);
-      const reason = conflict
-        ? `No flat pattern for this part. ${conflict}`
-        : outlineSource === 'unavailable'
-        ? `No real flat-pattern outline is stored for this part (featureGraph.summary.flatPatternOutlineSource = 'unavailable'). ` +
-          `cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis ` +
-          `(fragmentation, self-intersection, or area-reconciliation failure). Re-run Reanalyze to retry extraction.`
-        : `featureGraph.summary.flatPatternOutlinePointsMm is missing or has fewer than 3 points ` +
-          `(source is reported as '${outlineSource}', but the point array itself is empty/absent) -- ` +
-          `this part has not had CAD analysis run since the true-nest feature was added, or the stored ` +
-          `featureGraph predates it. Re-run Reanalyze.`;
-      return { result: null, reason };
-    }
-    const holesMm = this.toNestHoles(blank ? blank.holesMm : summary.flatPatternHolesMm);
+    const choice = chooseNestBlank({
+      blanks, blankIndex,
+      flatOutline: summary.flatPatternOutlinePointsMm, flatHoles: this.toNestHoles(summary.flatPatternHolesMm),
+      flatRect: { lengthMm: num(summary.flatPatternBoundingLengthMm), widthMm: num(summary.flatPatternBoundingWidthMm) },
+      hydroformBlank: hf ? { outline: hf.outline_points_mm ?? null, lengthMm: num(hf.length_mm), widthMm: num(hf.width_mm) } : null,
+      partSizesMm: [num(item.maxLength), num(item.maxWidth), num(item.maxHeight)],
+      whyNoOutline,
+    });
+    if (!choice) return { result: null, reason: `${whyNoOutline} The part has no measured size either, so there is nothing to nest: press Refresh analysis.` };
 
+    const { outlinePointsMm, holesMm } = choice;
     const { result: cadResult, reason: cadReason } = await this.cadAnalysisService.computeTrueNest({
       outlinePointsMm,
       holesMm,
@@ -575,15 +580,25 @@ export class NestingCostService {
       kerfMm,
       edgeMarginMm,
     });
+    const common = { holesMm, outlineSource: choice.source, blankIndex: choice.blankIndex, blankCount: choice.blankCount };
     if (!cadResult) {
-      return { result: null, reason: `Outline was extracted (${outlinePointsMm.length} points, source '${outlineSource}'), but cad-engine could not nest it on the ${sheetWidthMm}x${sheetLengthMm}mm sheet: ${cadReason}` };
+      // The view still shows a nest: the blank on a grid of its rectangle, and why.
+      const grid = gridNest(outlinePointsMm, sheetWidthMm, sheetLengthMm, kerfMm ?? 0, edgeMarginMm ?? 0, quantity);
+      return {
+        result: {
+          ...common, holesMm: [], outlinePointsMm: grid.outlinePointsMm, sheetWidthMm, sheetLengthMm, partsPerSheet: grid.partsPerSheet,
+          placements: grid.placements, utilizationPct: grid.utilizationPct, sheetsRequired: grid.sheetsRequired, capped: grid.capped,
+          placementSource: 'rectangle_grid',
+          outlineNote: [choice.note, `The cad-engine could not nest it (${cadReason}), so it is placed on a grid of its rectangle.`].filter(Boolean).join(' '),
+        },
+        reason: '',
+      };
     }
 
     return {
       result: {
+        ...common,
         outlinePointsMm,
-        holesMm,
-        outlineSource,
         sheetWidthMm: cadResult.sheetWidthMm,
         sheetLengthMm: cadResult.sheetLengthMm,
         partsPerSheet: cadResult.partsPerSheet,
@@ -591,8 +606,8 @@ export class NestingCostService {
         utilizationPct: cadResult.utilizationPct,
         sheetsRequired: cadResult.sheetsRequired,
         capped: cadResult.capped,
-        blankIndex: shownBlank,
-        blankCount,
+        outlineNote: choice.note,
+        placementSource: 'cad_engine',
       },
       reason: '',
     };

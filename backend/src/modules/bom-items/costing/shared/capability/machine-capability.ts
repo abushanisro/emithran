@@ -92,7 +92,9 @@ export type CapabilityReasonCode =
   | "THICKNESS_EXCEEDED"
   | "BED_LENGTH_EXCEEDED"
   | "BED_WIDTH_EXCEEDED"
-  | "TONNAGE_EXCEEDED";
+  | "TONNAGE_EXCEEDED"
+  // Not a limit of the part or machine: an input the quote needs is missing (the material grade), so the route was not priced (unpricedReason).
+  | "INPUT_MISSING";
 
 export interface CapabilityCheck {
   capable: boolean;

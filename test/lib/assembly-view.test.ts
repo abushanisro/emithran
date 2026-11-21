@@ -1,25 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isAssemblyItem, jointMeasures, jointTableOf, jointTablePatch, missingMeasures, newJointId, withDerivedEnabled, withJoint, withoutJoint, type JointRow,
-} from '@/lib/costing/assembly-view';
+import { ASSEMBLY_JOINTS, ASSEMBLY_SCENARIO_KEYS, isAssemblyItem, jointMeasures, withDerivedEnabled, type JointField, type JointRow } from '@/lib/costing/assembly-view';
+import { missingMeasures, newRowId, tableOf, tablePatch, withRow, withoutRow } from '@/lib/costing/joint-table';
 import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
 
 const screw = { id: 'screw:housing:hole-1', process: 'Mechanical Assembly', operation: 'Screw Tighten - Manual', count: 4 };
 
 describe('the assembly Cost Guide', () => {
   it('reads the joint table set in the Cost Guide, and nothing else as a row', () => {
-    expect(jointTableOf({ assemblyJoints: [{ id: 'joint-1', process: 'MIG Welding' }, { process: 'no id' }, 'text'] })).toEqual([{ id: 'joint-1', process: 'MIG Welding' }]);
-    expect(jointTableOf(undefined)).toEqual([]);
+    expect(tableOf<JointField>(ASSEMBLY_SCENARIO_KEYS.joints, { assemblyJoints: [{ id: 'joint-1', process: 'MIG Welding' }, { process: 'no id' }, 'text'] })).toEqual([{ id: 'joint-1', process: 'MIG Welding' }]);
+    expect(tableOf(ASSEMBLY_SCENARIO_KEYS.joints, undefined)).toEqual([]);
   });
 
   it('adds a joint, replaces it by its id, removes it; an empty table clears the key', () => {
     const weld: JointRow = { id: 'joint-1', process: 'MIG Welding', count: 1, lengthMm: 300, throatMm: 4 };
-    const t = withJoint([], weld);
-    expect(withJoint(t, { ...weld, lengthMm: 200 })).toEqual([{ ...weld, lengthMm: 200 }]);
-    expect(withoutJoint(t, 'joint-1')).toEqual([]);
-    expect(jointTablePatch([])).toEqual({ assemblyJoints: null });
-    expect(newJointId(t)).toBe('joint-2');
+    const t = withRow([], weld);
+    expect(withRow(t, { ...weld, lengthMm: 200 })).toEqual([{ ...weld, lengthMm: 200 }]);
+    expect(withoutRow(t, 'joint-1')).toEqual([]);
+    expect(tablePatch(ASSEMBLY_SCENARIO_KEYS.joints, [])).toEqual({ assemblyJoints: null });
+    expect(newRowId(t, 'joint')).toBe('joint-2');
   });
 
   it('switches a derived screw off and back on; back on keeps an edit, and drops a row that only switched it off', () => {
@@ -31,9 +30,9 @@ describe('the assembly Cost Guide', () => {
   });
 
   it('names the measures a joint still needs for its process', () => {
-    expect(missingMeasures({ id: 'j', process: 'MIG Welding', count: 1, lengthMm: 300 })).toEqual(['throatMm']);
-    expect(missingMeasures({ id: 'j', process: 'Rivet', count: 8 })).toEqual(['timeS']);
-    expect(missingMeasures({ id: 'j', process: 'Cap Sealing', count: 6 })).toEqual([]);
+    expect(missingMeasures(ASSEMBLY_JOINTS, { id: 'j', process: 'MIG Welding', count: 1, lengthMm: 300 })).toEqual(['throatMm']);
+    expect(missingMeasures(ASSEMBLY_JOINTS, { id: 'j', process: 'Rivet', count: 8 })).toEqual(['timeS']);
+    expect(missingMeasures(ASSEMBLY_JOINTS, { id: 'j', process: 'Cap Sealing', count: 6 })).toEqual([]);
   });
 
   it('says a joint\'s measures in one line', () => {

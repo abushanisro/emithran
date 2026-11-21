@@ -43,6 +43,8 @@ export interface AssemblyCostRequest {
 }
 
 export interface AssemblyCostResult {
+  /** Its components are its BOM children, so its material is theirs (each in the BOM roll-up); false when it is its own one component. */
+  materialOfParts: boolean;
   /** The quoted route in the location's currency; null when none can be built (see `missing`). */
   route: AssemblyRoute | null;
   routes: AssemblyRoute[];
@@ -119,7 +121,7 @@ export class AssemblyCostService {
     const components = await componentsOf(parts, req.densityOf);
     const { joints, ignored } = mergeJoints(deriveJoints(components), o[ASSEMBLY_JOINTS_KEY]);
     const warnings = [...ignored, ...(self ? [`${req.item.name} has no parts under it in the BOM: it is costed as the one component, loaded and screwed into its own threaded holes.`] : [])];
-    const none = (...missing: string[]): AssemblyCostResult => ({ route: null, routes: [], gaps: [], components, joints, note: null, missing, warnings });
+    const none = (...missing: string[]): AssemblyCostResult => ({ materialOfParts: !self, route: null, routes: [], gaps: [], components, joints, note: null, missing, warnings });
     const [{ reference, missing: refMissing }, calculators, machines] = await Promise.all([
       this.reference(),
       this.catalog.loadAssemblyCalculators(req.accessToken),
@@ -141,6 +143,6 @@ export class AssemblyCostService {
     const { route, note } = chooseAssemblyRoute(routes, gaps, chosen);
     if (!route) return { ...none(...gaps.map((g) => `${g.label}: ${g.reason}`)), gaps };
     const local = routes.map((r) => routeToLocal(r, req.usdToLocal));
-    return { route: local[routes.indexOf(route)], routes: local, gaps, components, joints, note, missing: [], warnings: [...warnings, ...route.warnings] };
+    return { materialOfParts: !self, route: local[routes.indexOf(route)], routes: local, gaps, components, joints, note, missing: [], warnings: [...warnings, ...route.warnings] };
   }
 }

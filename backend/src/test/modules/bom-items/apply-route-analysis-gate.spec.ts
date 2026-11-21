@@ -109,12 +109,24 @@ describe('applying "auto" when no route is both feasible and fully costed', () =
   it('no route feasible (Cannula Holder Right: no inserts): the cheapest is applied, the fewest operations not costed first', async () => {
     const noInserts = 'Insert Pick and Place: The part has no inserts.';
     const route = (routeLabel: string, totalCost: number, gaps: number) => ({
-      ...base, routeId: routeLabel, routeLabel, isFeasible: false, totalCost, capability: { overallCapable: true, warnings: [noInserts] }, dataComplete: gaps === 0, dataGaps: Array(gaps).fill({}),
+      ...base, routeId: routeLabel, routeLabel, isFeasible: false, totalCost, capability: { overallCapable: true, reasonCodes: [], warnings: [noInserts] }, dataComplete: gaps === 0, dataGaps: Array(gaps).fill({}),
     });
     const { c } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [route('Manual', 1, 2), route('3-axis', 3, 1), route('6-axis', 2, 1)] });
     const r = await c.applyRoute('i', dto, user, 't');
     expect(r.routeId).toBe('6-axis');
     expect(r.noCostFeatures).toEqual([`6-axis is not feasible for this part: ${noInserts}`]);
+  });
+
+  it('no material grade (Linear Bracket, Roto & Blow Molding): the route is applied as not costed for the missing grade, not as infeasible', async () => {
+    const noGrade = 'the part has no material grade (choose one in Material Grade, then Apply)';
+    const route = (routeLabel: string) => ({
+      ...base, routeId: routeLabel, routeLabel, isFeasible: false, totalCost: null,
+      capability: { overallCapable: false, reasonCodes: ['INPUT_MISSING'], warnings: [noGrade] }, dataComplete: true, dataGaps: [], processLines: [],
+    });
+    const { c, write } = service({ resolvedInputs: { batchSize: 1 }, recommendedRouteId: null, noCompatibleProcessMessage: null, routes: [route('Extrusion blow molding'), route('Rotational molding')] });
+    const r = await c.applyRoute('i', dto, user, 't');
+    expect(r.noCostFeatures).toEqual([`Extrusion blow molding is not costed: ${noGrade}`]);
+    expect(written(write)).toEqual([expect.objectContaining({ process: 'No Cost Feature', operation: `Extrusion blow molding is not costed: ${noGrade}`, totalCost: 0 })]);
   });
 
   it('a feasible route is applied before an infeasible one, whatever their costs', async () => {

@@ -218,6 +218,7 @@ export function buildPowderMetalRoute(input: PowderMetalRouteInput): { route: Po
     ...(belt ? [`Sintering: the belt runs at ${belt.speedMmPerMin} mm/min (the heat zone over the soak time, within the belt's speed range read as inches per minute), carrying ${belt.partsAcross} across and ${belt.partsPerMetre} per metre.`] : []),
     `The powder is bought at the material utilization ${utilization ?? '?'} (defaultUtilization).`,
     'The compaction tooling (die, punches, core rods) is not costed: the data gives its life (toolLifeNumberOfParts) and the tool shop rate, but no tooling cost or hours.',
+    'Whether the part can be pressed (no undercut across the press direction, walls and height a die can fill) is not checked: the data has no pressability rules.',
   ];
   return {
     route: {

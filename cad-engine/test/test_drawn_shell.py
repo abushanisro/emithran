@@ -7,6 +7,7 @@ and its effect on the full production extract():
   - a drawn rectangular box (120 x 80 x 30, t 1.2, 8 mm radii): recognised,
     and its corner/bottom radii no longer counted as press-brake bends
   - a press-brake U-channel and a flat plate: not drawn
+  - the cup's flat pattern is its developed sheet, not its bottom alone
 """
 import pytest
 
@@ -109,6 +110,8 @@ def test_extract_reports_the_cup_as_drawn_not_rolled_or_holed():
     assert ("Form", "rolled") not in kinds
     assert ("SimpleHole", "through") not in kinds
     assert result["rolled_form_count"] == 0
+    # Its walls are not holes either: the hole count reads the cylinders left after the drawn shell's are taken out.
+    assert result["hole_count"] == 0
     assert result["drawn_shell"]["opening_width_mm"] == pytest.approx(80.0, rel=0.002)
 
 
@@ -123,3 +126,19 @@ def test_press_brake_part_is_unchanged():
     result = _extract(make_bent_sheet(seg_lens=[30.0, 20.0, 30.0], angles_deg=[90.0, 90.0]))
     assert result["drawn_shell"] is None
     assert result["bend_count"] >= 2
+
+
+def test_the_cup_flat_pattern_is_its_developed_area():
+    """A drawn part cannot be unfolded: its blank is the sheet it is made of (half the area of every face with an offset twin),
+    not its main face (the bottom, a fifth of it), laid out as the hydroforming measurement's equal-area blank."""
+    result = _extract(_cup())
+    shell = detect_drawn_shell(_cup(), 1.0, UP)
+    assert result["flat_pattern_area_method"] == "drawn_developed"
+    assert result["flat_pattern_area_mm2"] == pytest.approx(shell["developed_area_mm2"], abs=0.1)
+    assert result["flat_pattern_area_mm2"] > 4 * 3600  # the bottom disc alone is ~3632
+    d0 = (4 * shell["developed_area_mm2"] / 3.141592653589793) ** 0.5
+    assert result["flat_pattern_bounding_length_mm"] == pytest.approx(d0, rel=0.005)
+    assert result["flat_pattern_bounding_width_mm"] == pytest.approx(d0, rel=0.005)
+    assert result["flat_pattern_outline_points_mm"] == result["hydroform"]["blank"]["outline_points_mm"]
+    assert result["flat_pattern_blanks"][0]["method"] == "drawn_developed"
+    assert result["feature_graph_v2"]["measurements"]["flat_pattern_area"]["reconciles"] is True

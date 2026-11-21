@@ -8,9 +8,9 @@
 // on its first line.
 import { gap, type CostContext } from '../casting/casting-finishing';
 import { machineValue, type SandMachine } from '../casting/sand/sand-machines';
-import { seedsFor, type SeedProvider, type SeedProviders } from '../casting/sand/sand-seeds';
-import { selectAndCost, type CostedStep, type StepOutcome } from '../casting/sand/sand-steps';
-import { runReferenceCalculator, type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from '../shared/calculators/reference-calculator';
+import { type CostedStep, type StepOutcome } from '../casting/sand/sand-steps';
+import { type CalcSeed, type ReferenceCalcRun, type ReferenceCalculatorDef } from '../shared/calculators/reference-calculator';
+import { cell as n, fail, routeKit } from '../shared/calculators/route-kit';
 
 import type { AssemblyComponent, AssemblyJoint } from './assembly-joints';
 import type { FeatureOp, ProcessLineCost } from '../../dto/cost-breakdown.dto';
@@ -54,11 +54,9 @@ const TRAVEL_TABLE = 'tblWeldTravelSpeed_part1';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
-const fail = (...reasons: string[]): StepOutcome => ({ ok: false, reasons });
 const isGap = (l: ProcessLineCost) => l.physicsGap != null;
 const gapReason = (l: ProcessLineCost): string | null => (l.physicsGap && 'reason' in l.physicsGap ? l.physicsGap.reason : l.physicsGap ? 'not costed' : null);
 type Row = Readonly<Record<string, unknown>>;
-const n = (row: Row | undefined, col: string): number | null => (row?.[col] != null && Number.isFinite(Number(row[col])) ? Number(row[col]) : null);
 
 export interface AssemblyRouteInput {
   ref: SandReference;
@@ -151,52 +149,10 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
   function buildRoute(inp: AssemblyRouteInput, route: (typeof ASSEMBLY_ROUTES)[number], enabled: readonly AssemblyJoint[]): AssemblyRoute {
     const warnings: string[] = [];
     const runs: Record<string, ReferenceCalcRun> = {};
-    const variable: SeedProvider = (name) => {
-      const value = ref.number(name);
-      return value == null ? null : { value, source: `Assembly variable ${name}${ref.unit(name) ? ` (${ref.unit(name)})` : ''}`, ref: { kind: 'variable', domain: ASSEMBLY_DOMAIN, name } };
-    };
-    const named = (values: Readonly<Record<string, CalcSeed | undefined>>): SeedProvider => (key) => values[key] ?? values[key.split(' (')[0].trim()] ?? null;
-    type Run = { run: ReferenceCalcRun } | { reasons: string[] };
-    const run = (calculator: string, machine: SandMachine | null, engine: Record<string, CalcSeed | undefined>, lookups: Record<string, CalcSeed | undefined> = {}): Run => {
-      const calc = inp.spec.calculators.find((c) => c.name === calculator);
-      if (!calc) return { reasons: [`${calculator} is not in the calculator spec`] };
-      const providers: SeedProviders = {
-        variable, engine: named(engine), lookup: named(lookups), scenario: named({ batch_size: { value: batchSize, source: 'batch size' } }),
-        machine: (key) => {
-          const value = machine ? machineValue(machine, key) : null;
-          return value == null || !machine ? null : {
-            value, source: `machine ${machine.name}: ${key}`,
-            ref: { kind: 'machine', machineId: machine.id, machineName: machine.name, machineClass: machine.machineClass, location: machine.location, column: key },
-          };
-        },
-      };
-      const { seeds, missing } = seedsFor(calc, providers);
-      if (missing.length) return { reasons: missing.map((m) => `${calculator}: ${m}`) };
-      const result = runReferenceCalculator(inp.calculators, calculator, seeds, calc.output ?? 'Cycle Time');
-      return result.value == null || !Number.isFinite(result.value) ? { reasons: result.missing.length ? result.missing : [`${calculator}: no finite result`] } : { run: result };
-    };
-    const seed = (value: number, source: string): CalcSeed => ({ value, source });
-    const lookupSeed = (table: string, row: Row | null | undefined, column: string, identity: readonly string[]): CalcSeed | undefined => {
-      const value = n(row ?? undefined, column);
-      if (!row || value == null) return undefined;
-      const id = Object.fromEntries(identity.map((c) => [c, row[c] as string | number]));
-      return {
-        value, source: `${table} (${identity.map((c) => `${c} ${String(row[c])}`).join(', ')}): ${column}`, lookup: true, match: { table, row: id },
-        ref: { kind: 'lookup', domain: ASSEMBLY_DOMAIN, table, column, row: id },
-      };
-    };
-    const calcOf = (process: string) => inp.spec.calculators.find((c) => c.operations.includes(process))?.name ?? `Assembly - ${process}`;
-    const timed = (process: string, m: SandMachine, engine: Record<string, CalcSeed | undefined>, lookups: Record<string, CalcSeed | undefined> = {}, extra: Partial<Extract<StepOutcome, { ok: true }>> = {}): StepOutcome => {
-      const r = run(calcOf(process), m, engine, lookups);
-      return 'run' in r ? { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: 0, notes: [], ...extra } : fail(...r.reasons);
-    };
-    const step = (process: string, evaluate: (m: SandMachine) => StepOutcome, criteria: string[]): CostedStep => {
-      const machineClass = ASSEMBLY_PROCESS_CLASS[process];
-      return selectAndCost({
-        process, machineClass, machines: inp.machinesByClass[machineClass] ?? [], evaluate, criteria,
-        batchSize, costContext: inp.costContext, ref, partName: 'assembly', processGroup: ASSEMBLY_PROCESS_GROUP,
-      });
-    };
+    const { variable, run, seed, lookupSeed, calcOf, timed, step } = routeKit({
+      ref, spec: inp.spec, calculators: inp.calculators, machinesByClass: inp.machinesByClass, batchSize, costContext: inp.costContext,
+      domain: ASSEMBLY_DOMAIN, domainLabel: 'Assembly', processGroup: ASSEMBLY_PROCESS_GROUP, processClass: ASSEMBLY_PROCESS_CLASS, partName: 'assembly',
+    });
     const lines: ProcessLineCost[] = [];
     const jointResults: AssemblyJointResult[] = [];
     const add = (s: CostedStep, ops: FeatureOp[], wholePart = false) => {
@@ -357,7 +313,7 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
               }, sprayLookups);
               if ('reasons' in c) return fail(...c.reasons);
               runs[`${j.id} consumables`] = c.run;
-              return { ...t, materialCostUsd: c.run.value! };
+              return { ...t, materialCostUsd: c.sec };
             };
             criteria.push(`A ${kind} welder (arc time standard, tacks, gun times${route.key === 'robotic' ? ', programming and weld heads' : ''}) and its wire cost`);
           }
@@ -393,7 +349,7 @@ export function buildAssemblyRoutes(input: AssemblyRouteInput): { routes: Assemb
           if (j.process === 'Adhesive Bonding') {
             const mass = run(BOND_MATERIAL_CALC, null, { bond_area_mm2: area, sealant_volume_mm3: seed(0, 'no sealant on a bonded joint') });
             if ('run' in mass) {
-              adhesiveKg += mass.run.value!;
+              adhesiveKg += mass.sec;
               runs[`${j.id} adhesive`] = mass.run;
             }
             evaluate = (m) => timed(process, m, { bond_area_mm2: area });

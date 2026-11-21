@@ -1,4 +1,5 @@
 import { castingProcessOfFamily } from './costing/casting/casting-cost-summary';
+import { HYDROFORM_EXTRACTION_VERSION } from './costing/hydroforming/hydroforming-part';
 import { familiesAnalysedForHint } from './costing/shared/core/part-family-process-group';
 
 // The one place that says whether a BOM item has been analysed well enough to cost. It is derived from what is already stored
@@ -42,6 +43,29 @@ export function castingStatusOf(rowStatuses: readonly string[]): AnalysisKindSta
   return 'none';
 }
 
+/**
+ * Processes priced from a measurement made inside a CAD family other processes share: a hydroformed part is analysed as sheet metal, and its
+ * measurement (feature_graph.summary.hydroformGeometry, hf_v1) came with a later engine. The feature-graph version and the family say nothing
+ * about it, so an analysis of that family made before it is otherwise current.
+ */
+const PROCESS_MEASUREMENT: Readonly<Record<string, { key: string; version: string }>> = {
+  'Sheet Metal - Hydroforming': { key: 'hydroformGeometry', version: HYDROFORM_EXTRACTION_VERSION },
+};
+
+/**
+ * Whether the stored analysis predates the measurement the chosen process is priced from: the summary has no such key, or another version of
+ * it. A key the current engine wrote as null (it found nothing to measure) is current: analysing again gives the same.
+ */
+export function predatesProcessMeasurement(summary: Readonly<Record<string, unknown>> | null | undefined, processGroup: string | null | undefined): boolean {
+  const need = processGroup ? PROCESS_MEASUREMENT[processGroup] : undefined;
+  if (!need) return false;
+  if (!summary || !(need.key in summary)) return true;
+  const measured = summary[need.key];
+  if (measured === null) return false;
+  const m = (typeof measured === 'object' ? measured : {}) as Record<string, unknown>;
+  return (m.extractionVersion ?? m.extraction_version ?? m.version) !== need.version;
+}
+
 /** The feature-graph version the CAD engine currently writes. */
 export function currentFeatureGraphVersion(): number {
   return parseInt(process.env.FEATURE_GRAPH_VERSION ?? '4', 10);
@@ -50,7 +74,11 @@ export function currentFeatureGraphVersion(): number {
 export interface AnalysisStatusInput {
   file3dPath?: string | null;
   file2dPath?: string | null;
-  featureGraph?: { classification?: { family?: string | null } | null; feature_graph_version?: number | null } | null;
+  featureGraph?: {
+    classification?: { family?: string | null } | null;
+    feature_graph_version?: number | null;
+    summary?: Readonly<Record<string, unknown>> | null;
+  } | null;
   drawingIntelligence?: unknown;
   familyClassification?: string | null;
   manufacturingFamilyOverride?: string | null;
@@ -59,6 +87,8 @@ export interface AnalysisStatusInput {
    * extractor of its own. When it differs from the family the stored features came from, those features are the wrong ones for the process.
    */
   chosenFamilyHint?: string | null;
+  /** The user's chosen process (scenario_overrides.processGroup): a process priced from a measurement of its own needs that measurement. */
+  chosenProcessGroup?: string | null;
 }
 
 /**
@@ -90,6 +120,9 @@ export function deriveAnalysisStatus(
     const analysedFamily = item.featureGraph?.classification?.family;
     // A 2-Model Machining part (hint two_model) is stored as the machining family it was analysed as: that is its own analysis, not another's.
     if (cad === 'ready' && item.chosenFamilyHint && analysedFamily && !familiesAnalysedForHint(item.chosenFamilyHint).includes(analysedFamily)) cad = 'stale';
+    // The chosen process is priced from a measurement this analysis predates (a part set to Sheet Metal - Hydroforming, analysed as sheet
+    // metal before the hydroform measurement existed): Refresh analysis measures it. Without this, Apply took the part as analysed.
+    if (cad === 'ready' && predatesProcessMeasurement(item.featureGraph?.summary, item.chosenProcessGroup)) cad = 'stale';
   }
 
   const needsCasting = castingWorker && hasModel && !!family && castingProcessOfFamily(family) === 'sand_casting';

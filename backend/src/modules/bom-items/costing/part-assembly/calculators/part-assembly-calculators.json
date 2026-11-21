@@ -1,0 +1,176 @@
+{
+  "domain": "part_assembly",
+  "processGroup": "Part Assembly",
+  "calculators": [
+    {
+      "key": "part_assembly.manual_mig",
+      "name": "Part Assembly - Manual MIG welding",
+      "operations": ["Manual MIG Welding"],
+      "results": ["Arc Time", "Tack Time", "Wire Mass"],
+      "description": "Manual MIG welding of a weldment, per weld: the wire the machine feeds deposits weld metal at its feed rate over the wire's section, times arcEfficency (the share of the wire that ends up in the weld, memory/Part Assembly: 0.5); the arc time is the weld's metal (its length over its cross-section) at that rate, times the machine's arc time standard. A seam is tacked first, a tack every tack pitch; the gun is placed for each weld and cleaned for its share of the arc. The components are loaded first (componentLoadTime_manual_mig_welding, by each one's weight) and the weldment unloaded (unloadWeldmentAllowance_manual_mig_welding, by its weight). The wire it uses (its metal over arcEfficency) is the weld's material.",
+      "fields": [
+        { "name": "Weld Length", "unit": "mm", "source": { "engine": "weld_length_mm (the weld's length; a plug weld: its plate thickness per plug)" } },
+        { "name": "Weld Metal Area", "unit": "mm²", "source": { "engine": "weld_area_mm2 (the weld's cross-section, from its joint type and size)" } },
+        { "name": "Welds", "unit": null, "source": { "engine": "weld_count (the welds, one arc each)" } },
+        { "name": "Tacked", "unit": null, "source": { "engine": "tacked (1 for a seam, tacked before it is welded; 0 for a plug or a tack weld)" } },
+        { "name": "Wire Feed Rate", "unit": "mm/s", "source": { "machine": "wire_feed_rate_mm_s" } },
+        { "name": "Wire Diameter", "unit": "mm", "source": { "machine": "wire_diameter_mm" } },
+        { "name": "Arc Efficiency", "unit": null, "source": { "variable": "arcEfficency" } },
+        { "name": "Arc Time Standard", "unit": null, "source": { "machine": "arc_time_std" } },
+        { "name": "Tack Length", "unit": "mm", "source": { "machine": "tack_length_mm" } },
+        { "name": "Tack Pitch", "unit": "mm", "source": { "machine": "tack_pitch_mm" } },
+        { "name": "Gun Placement Time", "unit": "s", "source": { "machine": "gun_placement_time_s" } },
+        { "name": "Gun Clean Per Arc", "unit": "s", "source": { "machine": "gun_clean_time_per_arc_s" } },
+        { "name": "Weld Density", "unit": "kg/m³", "source": { "machine": "weld_density_kg_per_m3" } },
+        { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (componentLoadTime_manual_mig_welding: each component by its weight; 0 when an earlier welding step loaded them)" } },
+        { "name": "Unload Allowance", "unit": "s", "source": { "lookup": "unloadWeldmentAllowance_manual_mig_welding.Allowance (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Wire Area", "unit": "mm²", "formula": "pi * {Wire Diameter} ^ 2 / 4" },
+        { "name": "Deposition Rate", "unit": "mm³/s", "formula": "{Wire Feed Rate} * {Wire Area} * {Arc Efficiency}" },
+        { "name": "Arc Time", "unit": "s", "formula": "{Weld Length} * {Weld Metal Area} / {Deposition Rate} * {Arc Time Standard}" },
+        { "name": "Tack Time", "unit": "s", "formula": "{Tacked} * {Weld Length} / max({Tack Pitch}, 1) * {Tack Length} * {Weld Metal Area} / {Deposition Rate}" },
+        { "name": "Gun Time", "unit": "s", "formula": "{Welds} * {Gun Placement Time} + {Arc Time} * {Gun Clean Per Arc}" },
+        { "name": "Wire Mass", "unit": "kg", "formula": "{Weld Length} * (1 + {Tacked} * {Tack Length} / max({Tack Pitch}, 1)) * {Weld Metal Area} / {Arc Efficiency} * {Weld Density} / 1000000000" },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Arc Time} + {Tack Time} + {Gun Time} + {Load Time} + {Unload Allowance}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "part_assembly.robotic_mig",
+      "name": "Part Assembly - Robotic MIG welding",
+      "operations": ["Robotic MIG Welding"],
+      "results": ["Arc Time", "Tack Time", "Wire Mass", "Programming Per Part"],
+      "description": "Robotic MIG welding of a weldment, per weld: the deposition of Part Assembly - Manual MIG welding (wire feed rate over the wire's section, times arcEfficency; the weld's metal at that rate, times the machine's arc time standard), tacks every tack pitch, the gun placed and cleaned, shared by the machine's weld heads. The components are loaded (componentLoadTime_robotic_mig_welding) and the weldment unloaded (unloadWeldmentAllowance_robotic_mig_welding); each weld's program (the machine's programming time per weld) is shared by the batch.",
+      "fields": [
+        { "name": "Weld Length", "unit": "mm", "source": { "engine": "weld_length_mm (the weld's length; a plug weld: its plate thickness per plug)" } },
+        { "name": "Weld Metal Area", "unit": "mm²", "source": { "engine": "weld_area_mm2 (the weld's cross-section, from its joint type and size)" } },
+        { "name": "Welds", "unit": null, "source": { "engine": "weld_count (the welds, one arc each)" } },
+        { "name": "Tacked", "unit": null, "source": { "engine": "tacked (1 for a seam, tacked before it is welded; 0 for a plug or a tack weld)" } },
+        { "name": "Wire Feed Rate", "unit": "mm/s", "source": { "machine": "wire_feed_rate_mm_s" } },
+        { "name": "Wire Diameter", "unit": "mm", "source": { "machine": "wire_diameter_mm" } },
+        { "name": "Arc Efficiency", "unit": null, "source": { "variable": "arcEfficency" } },
+        { "name": "Arc Time Standard", "unit": null, "source": { "machine": "arc_time_std" } },
+        { "name": "Tack Length", "unit": "mm", "source": { "machine": "tack_length_mm" } },
+        { "name": "Tack Pitch", "unit": "mm", "source": { "machine": "tack_pitch_mm" } },
+        { "name": "Gun Placement Time", "unit": "s", "source": { "machine": "gun_placement_time_s" } },
+        { "name": "Gun Clean Per Arc", "unit": "s", "source": { "machine": "gun_clean_time_per_arc_s" } },
+        { "name": "Weld Density", "unit": "kg/m³", "source": { "machine": "weld_density_kg_per_m3" } },
+        { "name": "Weld Heads", "unit": null, "source": { "machine": "weld_heads" } },
+        { "name": "Programming Time Per Weld", "unit": "s", "source": { "machine": "programming_time_per_weld_s" } },
+        { "name": "Batch Size", "unit": null, "source": { "scenario": "batch_size" } },
+        { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (componentLoadTime_robotic_mig_welding: each component by its weight; 0 when an earlier welding step loaded them)" } },
+        { "name": "Unload Allowance", "unit": "s", "source": { "lookup": "unloadWeldmentAllowance_robotic_mig_welding.Allowance (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Wire Area", "unit": "mm²", "formula": "pi * {Wire Diameter} ^ 2 / 4" },
+        { "name": "Deposition Rate", "unit": "mm³/s", "formula": "{Wire Feed Rate} * {Wire Area} * {Arc Efficiency}" },
+        { "name": "Arc Time", "unit": "s", "formula": "{Weld Length} * {Weld Metal Area} / {Deposition Rate} * {Arc Time Standard}" },
+        { "name": "Tack Time", "unit": "s", "formula": "{Tacked} * {Weld Length} / max({Tack Pitch}, 1) * {Tack Length} * {Weld Metal Area} / {Deposition Rate}" },
+        { "name": "Gun Time", "unit": "s", "formula": "{Welds} * {Gun Placement Time} + {Arc Time} * {Gun Clean Per Arc}" },
+        { "name": "Wire Mass", "unit": "kg", "formula": "{Weld Length} * (1 + {Tacked} * {Tack Length} / max({Tack Pitch}, 1)) * {Weld Metal Area} / {Arc Efficiency} * {Weld Density} / 1000000000" },
+        { "name": "Programming Per Part", "unit": "s", "formula": "{Welds} * {Programming Time Per Weld} / max({Batch Size}, 1)" },
+        { "name": "Cycle Time", "unit": "s", "formula": "(({Arc Time} + {Tack Time} + {Gun Time}) / max({Weld Heads}, 1) + {Load Time} + {Unload Allowance}) * {Cycle Time Factor} + {Programming Per Part}" }
+      ]
+    },
+    {
+      "key": "part_assembly.manual_spot",
+      "name": "Part Assembly - Manual spot welding",
+      "operations": ["Manual Spot Welding"],
+      "description": "Manual resistance spot welding of a weldment: each spot takes the machine's spot weld time and a gun placement. The components are loaded (componentLoadTime_unlabelled, the one load table memory/Part Assembly gives no other welding process: manual spot welding) and the weldment unloaded (memory has no unload table for manual spot welding; the three it has are identical, the manual MIG one is read).",
+      "fields": [
+        { "name": "Spots", "unit": null, "source": { "engine": "spot_count (the spot welds)" } },
+        { "name": "Spot Weld Time", "unit": "s", "source": { "machine": "spot_weld_time_s" } },
+        { "name": "Gun Placement Time", "unit": "s", "source": { "machine": "gun_placement_time_s" } },
+        { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (componentLoadTime_unlabelled: each component by its weight; 0 when an earlier welding step loaded them)" } },
+        { "name": "Unload Allowance", "unit": "s", "source": { "lookup": "unloadWeldmentAllowance_manual_mig_welding.Allowance (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Spots} * ({Spot Weld Time} + {Gun Placement Time}) + {Load Time} + {Unload Allowance}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "part_assembly.robotic_spot",
+      "name": "Part Assembly - Robotic spot welding",
+      "operations": ["Robotic Spot Welding"],
+      "results": ["Programming Per Part"],
+      "description": "Robotic resistance spot welding of a weldment: each spot takes the machine's spot weld time and a gun placement, shared by its weld heads. The components are loaded (componentLoadTime_robotic_spot_welding) and the weldment unloaded (unloadWeldmentAllowance_robotic_spot_welding); each spot's program (the machine's programming time per weld) is shared by the batch.",
+      "fields": [
+        { "name": "Spots", "unit": null, "source": { "engine": "spot_count (the spot welds)" } },
+        { "name": "Spot Weld Time", "unit": "s", "source": { "machine": "spot_weld_time_s" } },
+        { "name": "Gun Placement Time", "unit": "s", "source": { "machine": "gun_placement_time_s" } },
+        { "name": "Weld Heads", "unit": null, "source": { "machine": "weld_heads" } },
+        { "name": "Programming Time Per Weld", "unit": "s", "source": { "machine": "programming_time_per_weld_s" } },
+        { "name": "Batch Size", "unit": null, "source": { "scenario": "batch_size" } },
+        { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (componentLoadTime_robotic_spot_welding: each component by its weight; 0 when an earlier welding step loaded them)" } },
+        { "name": "Unload Allowance", "unit": "s", "source": { "lookup": "unloadWeldmentAllowance_robotic_spot_welding.Allowance (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Programming Per Part", "unit": "s", "formula": "{Spots} * {Programming Time Per Weld} / max({Batch Size}, 1)" },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Spots} * ({Spot Weld Time} + {Gun Placement Time}) / max({Weld Heads}, 1) + {Load Time} + {Unload Allowance}) * {Cycle Time Factor} + {Programming Per Part}" }
+      ]
+    },
+    {
+      "key": "part_assembly.laser_seam",
+      "name": "Part Assembly - Laser seam welding",
+      "operations": ["Laser Seam Welding"],
+      "results": ["Weld Time"],
+      "description": "Laser seam welding of a weldment: the seam's length at the travel speed of laserSeamWeldTravelSpeed for the material's cut code family, the laser's power and the weld's depth (the table's speeds are round inches per second times 2.54: read as cm/s), plus the machine's load, unload and index times, once per weldment (on its first seam; the engine reads them from the machine).",
+      "fields": [
+        { "name": "Weld Length", "unit": "mm", "source": { "engine": "weld_length_mm (the seam's length)" } },
+        { "name": "Travel Speed", "unit": "cm/s", "source": { "lookup": "laserSeamWeldTravelSpeed.Travel Speed" } },
+        { "name": "Load Time", "unit": "s", "source": { "engine": "load_time_s (the machine's load time, once per weldment: on its first seam)" } },
+        { "name": "Unload Time", "unit": "s", "source": { "engine": "unload_time_s (the machine's unload time, once per weldment: on its first seam)" } },
+        { "name": "Index Time", "unit": "s", "source": { "engine": "index_time_s (the machine's index time, once per weldment: on its first seam)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Weld Time", "unit": "s", "formula": "{Weld Length} / ({Travel Speed} * 10)" },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Weld Time} + {Load Time} + {Unload Time} + {Index Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "part_assembly.bevel_cutting",
+      "name": "Part Assembly - Bevel cutting",
+      "operations": ["Bevel Cutting"],
+      "description": "The bevel cut before a groove weld: its length at the cut speed of bevelCutSpeed for the bevel's depth (an oxy-fuel table for steel), plus a pierce per bevelled edge.",
+      "fields": [
+        { "name": "Bevel Length", "unit": "mm", "source": { "engine": "bevel_length_mm (the length of the bevelled edges)" } },
+        { "name": "Bevels", "unit": null, "source": { "engine": "bevel_count (the bevelled edges, one pierce each)" } },
+        { "name": "Cut Speed", "unit": "mm/min", "source": { "lookup": "bevelCutSpeed.Cut Speed (mm / min)" } },
+        { "name": "Pierce Time", "unit": "s", "source": { "lookup": "bevelCutSpeed.Pierce Time (s)" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Bevel Length} / ({Cut Speed} / 60) + {Bevels} * {Pierce Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "part_assembly.grinding",
+      "name": "Part Assembly - Grinding",
+      "operations": ["Grinding"],
+      "description": "Grinding the welds of a weldment along their length at the machine's grinding speed.",
+      "fields": [
+        { "name": "Ground Length", "unit": "mm", "source": { "engine": "ground_length_mm (the length of the welds ground)" } },
+        { "name": "Grinding Speed", "unit": "mm/s", "source": { "machine": "grinding_speed_mm_per_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Ground Length} / {Grinding Speed} * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "part_assembly.finish_grinding",
+      "name": "Part Assembly - Finish grinding",
+      "operations": ["Finish Grinding"],
+      "description": "Finish grinding the welds of a weldment along their length at the machine's grinding speed (memory/Part Assembly gives it the grinding machine's speed).",
+      "fields": [
+        { "name": "Ground Length", "unit": "mm", "source": { "engine": "ground_length_mm (the length of the welds finish ground)" } },
+        { "name": "Grinding Speed", "unit": "mm/s", "source": { "machine": "grinding_speed_mm_per_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Ground Length} / {Grinding Speed} * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "part_assembly.wire_brushing",
+      "name": "Part Assembly - Wire brushing",
+      "operations": ["Wire Brushing"],
+      "description": "Wire brushing the welds of a weldment along their length at the machine's brushing speed.",
+      "fields": [
+        { "name": "Brushed Length", "unit": "mm", "source": { "engine": "brushed_length_mm (the length of the welds brushed)" } },
+        { "name": "Brushing Speed", "unit": "mm/s", "source": { "machine": "wire_brushing_speed_mm_per_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Brushed Length} / {Brushing Speed} * {Cycle Time Factor}" }
+      ]
+    }
+  ]
+}
