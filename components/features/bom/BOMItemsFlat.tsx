@@ -32,6 +32,7 @@ import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { dropIntent, type DropIntent } from '@/lib/bom/drop-intent';
+import { rowFacts } from '@/lib/bom/row-summary';
 import { filterTree, highlightParts, matchesQuery, visibleTreeRows } from '@/lib/bom/tree-rows';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -49,6 +50,8 @@ interface BOMItemsFlatProps {
   onAddChildItem?: (parentId: string, childType: BOMItemType) => void;
   /** BOM totals exactly as the server reports them; shown in the fixed footer row. */
   totalCost?: number;
+  /** The page's own buttons (add an item), shown at the right of the list's toolbar, as Gmail keeps its actions above the list. */
+  toolbarActions?: React.ReactNode;
 }
 
 interface TreeNode extends BOMItem {
@@ -89,6 +92,12 @@ function sortNodes(nodes: TreeNode[]): void {
   nodes.forEach(node => {
     if (node.children.length > 0) sortNodes(node.children);
   });
+}
+
+/** The BOM level a row shows: its own, or its type's default when it has none. */
+function levelOf(item: { bomLevel?: string; itemType: string }): string {
+  const own = item.bomLevel?.trim() ?? '';
+  return own.length > 0 ? own : getDefaultBomLevel(item.itemType);
 }
 
 function getDefaultBomLevel(itemType: string): string {
@@ -163,7 +172,7 @@ function getErrorMessage(error: unknown): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, totalCost }: BOMItemsFlatProps) {
+export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, totalCost, toolbarActions }: BOMItemsFlatProps) {
   const { data, isLoading, refetch } = useBOMItems(bomId);
   const queryClient = useQueryClient();
 
@@ -409,9 +418,16 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Render helpers
   // -------------------------------------------------------------------------
 
-  const numCell = 'px-3 py-1 text-right text-xs tabular-nums whitespace-nowrap';
-  const textCell = 'px-3 py-1 text-xs whitespace-nowrap';
-  const actionButton = 'h-7 w-7 text-muted-foreground hover:text-foreground';
+  // Round icon buttons, as Gmail's; their hover a shade darker than the row's (the row is already the hover colour).
+  const actionButton = 'h-7 w-7 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground';
+  const formatCost = (cost: number | undefined): string =>
+    typeof cost === 'number' ? cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+  // Gmail's hover: the row's actions take the place of its cost while the pointer is on the row (or a key has focus in it); a touch screen,
+  // with no hover, shows them all the time. Not while dragging: then the rows show where a drop would go.
+  const costHidden   = isDragging ? '' : 'group-hover:invisible group-focus-within:invisible pointer-coarse:invisible';
+  const actionsShown = isDragging
+    ? ''
+    : 'group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100';
 
   /**
    * One row of the tree. `guides`: for each ancestor level below the root, whether its line continues past this row (that ancestor has
@@ -424,6 +440,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
     const isBeingDragged = draggedItem?.id === item.id;
     const childType      = getChildType(item.itemType);
     const style          = typeStyleOf(item.itemType);
+    const facts          = rowFacts(item, levelOf(item));
     // Every line takes the colour of the items it leads to: this row's connector its own type's (a child part's yellow, a sub-assembly's
     // blue), a line running past it the colour of the branch it joins (path[i + 1], the ancestor whose next sibling it reaches), and the
     // line down from an open parent its children's.
@@ -456,7 +473,8 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
         }}
         className={[
           'group border-b transition-colors',
-          isDragging ? '' : 'hover:bg-muted/50',
+          // Opaque, so the actions shown over the end of the row's details on hover (same colour) cover them cleanly.
+          isDragging ? '' : 'hover:bg-accent',
           // The row being dragged stays in place, faded, so you see where it came from.
           isBeingDragged ? 'bg-muted/40 opacity-40' : '',
           dropClass,
@@ -465,7 +483,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
         ].join(' ')}
       >
         <td className={`p-0 ${style.accent}`}>
-          <div className="flex min-h-14 min-w-0 items-stretch pr-3">
+          <div className="flex h-14 min-w-0 items-stretch pr-2">
             {/* Drag handle: the whole row is draggable; the grip shows where to take it. */}
             <span className="flex w-6 shrink-0 items-center justify-center">
               <GripVertical
@@ -516,7 +534,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                   <style.Icon className={`h-5 w-5 ${style.icon}`} />
                 </span>
               )}
-              <div className="min-w-0 py-1">
+              <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate text-[13px] font-medium leading-5 text-foreground" title={item.name}>{marked(item.name)}</span>
                   {getItemTypeBadge(item.itemType)}
@@ -539,32 +557,22 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                     <Badge variant="destructive" className="h-4 shrink-0 px-1.5 text-[10px]">Circular Ref</Badge>
                   )}
                 </div>
-                {item.description && (
-                  <p className="truncate text-[11px] leading-4 text-muted-foreground" title={item.description}>{item.description}</p>
-                )}
               </div>
             </div>
           </div>
         </td>
-        <td className={`${textCell} font-mono text-[11px] text-muted-foreground`}>{item.partNumber ? marked(item.partNumber) : '—'}</td>
-        <td className="px-3 py-1">
-          <Badge variant="outline" className="h-4 px-1.5 text-[10px] font-medium">
-            {item.bomLevel || getDefaultBomLevel(item.itemType)}
-          </Badge>
+        {/* Gmail's subject and snippet: the part number, then the row's details in one line, cut short at the edge (all of it on hover). */}
+        <td className="max-w-0 px-2 py-0">
+          <div className="truncate text-[13px] leading-5" title={[item.partNumber, ...facts].filter(Boolean).join(' · ')}>
+            {item.partNumber && <span className="text-foreground">{marked(item.partNumber)}</span>}
+            {item.partNumber && facts.length > 0 && <span className="text-muted-foreground"> — </span>}
+            <span className="text-muted-foreground">{facts.join(' · ')}</span>
+          </div>
         </td>
-        <td className={textCell}>{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</td>
-        <td className={`${textCell} max-w-[220px] truncate`} title={item.materialGrade ? item.materialGrade : undefined}>{item.materialGrade ? item.materialGrade : '—'}</td>
-        <td className={numCell}>{item.quantity}</td>
-        <td className={`${textCell} text-muted-foreground`}>{item.unit}</td>
-        <td className={numCell}>{item.annualVolume?.toLocaleString() ?? '—'}</td>
-        <td className={numCell}>
-          {typeof item.unitCost === 'number'
-            ? item.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : '—'}
-        </td>
-        <td className={numCell}>{item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : '—'}</td>
-        <td className="px-2 py-1">
-          <div className="flex items-center justify-end gap-0.5">
+        {/* Gmail's date: the unit cost, which the row's actions replace on hover. */}
+        <td className="relative whitespace-nowrap py-0 pl-2 pr-3 text-right">
+          <span className={`text-[13px] font-medium tabular-nums ${costHidden}`}>{formatCost(item.unitCost)}</span>
+          <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center justify-end gap-0.5 bg-accent pl-2 pr-2 opacity-0 transition-opacity pointer-coarse:bg-card ${actionsShown}`}>
             {item.file2dPath && (
               <Button variant="ghost" size="icon" className={actionButton} onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing" aria-label="View 2D Drawing">
                 <FileText className="h-3.5 w-3.5" />
@@ -581,7 +589,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 rounded-full hover:bg-foreground/10"
               onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
               title="Manufacturing Intelligence"
               aria-label="Manufacturing Intelligence"
@@ -599,7 +607,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              className="h-7 w-7 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={() => handleDeleteClick(item)}
               title="Delete"
               aria-label="Delete"
@@ -622,19 +630,35 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Loading / empty states
   // -------------------------------------------------------------------------
 
+  // Gmail's toolbar: one row on top of the list, the list's own tools at the left and the page's actions at the right.
+  const toolbarClass = 'flex flex-wrap items-center gap-2 border-b px-3 py-2';
+  const actionsOnly  = toolbarActions
+    ? <div className={toolbarClass}><div className="ml-auto flex flex-wrap items-center gap-2">{toolbarActions}</div></div>
+    : null;
+
   if (isLoading) {
     return (
-      <TableSkeleton rows={6} columns={5} label="Loading BOM items..." />
+      <>
+        {actionsOnly}
+        <div className="p-3">
+          <TableSkeleton rows={6} columns={5} label="Loading BOM items..." />
+        </div>
+      </>
     );
   }
 
   if (items.length === 0) {
     return (
-      <EmptyState
-        title="No items yet"
-        description={'Start adding items to your BOM by clicking the "Add BOM" button above.'}
-        className="rounded-lg border border-dashed"
-      />
+      <>
+        {actionsOnly}
+        <div className="p-4">
+          <EmptyState
+            title="No items yet"
+            description={'Start adding items to your BOM by clicking the "Add BOM" button above.'}
+            className="rounded-lg border border-dashed"
+          />
+        </div>
+      </>
     );
   }
 
@@ -655,14 +679,11 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Main render
   // -------------------------------------------------------------------------
 
-  const th = 'border-b bg-muted/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
-  const thNum = `${th} text-right`;
-
   return (
     <>
-      {/* Search by name or part number; the item types, as the rows colour them; the whole tree opened or closed at once. */}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      {/* Search by name or part number; the whole tree opened or closed at once; the page's add buttons at the right. */}
+      <div className={toolbarClass}>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="relative w-full sm:w-80">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -693,23 +714,15 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             </span>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          {LEGEND_TYPES.map((t) => (
-            <span key={t} className="inline-flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-full ${typeStyleOf(t).dot}`} aria-hidden="true" />
-              {typeStyleOf(t).label}
-              <span className="tabular-nums text-muted-foreground/70">{items.filter((i) => i.itemType === t).length}</span>
-            </span>
-          ))}
-        </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={expandAll}>
+          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={expandAll}>
             <ChevronDown className="h-3.5 w-3.5" /> Expand all
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={collapseAll}>
+          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={collapseAll}>
             <ChevronRight className="h-3.5 w-3.5" /> Collapse all
           </Button>
         </div>
+        {toolbarActions && <div className="ml-auto flex flex-wrap items-center gap-2">{toolbarActions}</div>}
       </div>
       {/* The drag image: a card of the item being dragged, drawn off screen for the browser to take under the cursor (handleDragStart). */}
       <div
@@ -733,32 +746,32 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           );
         })()}
       </div>
-      {/* No height of its own: the table grows with the page (one scroll, the page's); it scrolls sideways only on a narrow screen. */}
+      {/*
+        No height of its own: the list grows with the page (one scroll, the page's). Three columns of fixed share, as Gmail's sender, subject
+        and date, so the list always fits the card's width (no sideways scroll); only a phone-narrow screen scrolls it sideways.
+      */}
       <div
-        className="overflow-x-auto rounded-md border"
+        className="overflow-x-auto"
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOverItem(null); }}
       >
-        <table role="treegrid" aria-label="BOM items" className="w-full caption-bottom border-collapse text-sm">
-          <thead>
-            <tr className="text-left">
-              <th scope="col" className={`${th} min-w-[320px] text-left`}>Item</th>
-              <th scope="col" className={`${th} text-left`}>Part No</th>
-              <th scope="col" className={`${th} text-left`}>Level</th>
-              <th scope="col" className={`${th} text-left`}>Type</th>
-              <th scope="col" className={`${th} text-left`}>Material</th>
-              <th scope="col" className={thNum}>Qty</th>
-              <th scope="col" className={`${th} text-left`}>UOM</th>
-              <th scope="col" className={thNum}>Annual Vol.</th>
-              <th scope="col" className={thNum}>Unit Cost</th>
-              <th scope="col" className={thNum}>Weight</th>
-              <th scope="col" className={`${th} text-right`}><span className="sr-only">Actions</span></th>
+        <table role="treegrid" aria-label="BOM items" className="w-full min-w-[720px] table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-[44%]" />
+            <col />
+            <col className="w-32" />
+          </colgroup>
+          <thead className="sr-only">
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col">Part number and details</th>
+              <th scope="col">Unit cost and actions</th>
             </tr>
           </thead>
           <tbody>
             {visibleRows(rowsTree, rowsExpanded)}
             {filtered?.matches.size === 0 && (
               <tr>
-                <td colSpan={11} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                <td colSpan={3} className="px-3 py-6 text-center text-xs text-muted-foreground">
                   No item matches &ldquo;{search}&rdquo; by name or part number.{' '}
                   <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setQuery(''); }}>Clear search</button>
                 </td>
@@ -767,7 +780,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             {orphanedItems.length > 0 && (
               <>
                 <tr>
-                  <td colSpan={11} className="bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                  <td colSpan={3} className="bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
                     Orphaned Items (Missing Parent Reference)
                   </td>
                 </tr>
@@ -775,21 +788,26 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
               </>
             )}
           </tbody>
+          {/* The total under the costs; the item types, as the rows colour them, with how many of each. */}
           <tfoot>
-            <tr className="font-medium">
-              <td colSpan={5} className="border-t bg-muted/60 px-3 py-1.5 text-xs">
-                Total <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
+            <tr>
+              <td colSpan={2} className="border-t bg-muted/60 px-3 py-2 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium">
+                    Total <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
+                  </span>
+                  {LEGEND_TYPES.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1.5 text-muted-foreground">
+                      <span className={`h-2 w-2 rounded-full ${typeStyleOf(t).dot}`} aria-hidden="true" />
+                      {typeStyleOf(t).label}
+                      <span className="tabular-nums text-muted-foreground/70">{items.filter((i) => i.itemType === t).length}</span>
+                    </span>
+                  ))}
+                </div>
               </td>
-              <td className="border-t bg-muted/60" />
-              <td className="border-t bg-muted/60" />
-              <td className="border-t bg-muted/60" />
-              <td className="border-t bg-muted/60 px-3 py-1.5 text-right text-xs tabular-nums whitespace-nowrap">
-                {typeof totalCost === 'number'
-                  ? totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                  : '—'}
+              <td className="whitespace-nowrap border-t bg-muted/60 py-2 pl-2 pr-3 text-right text-xs font-medium tabular-nums">
+                {formatCost(totalCost)}
               </td>
-              <td className="border-t bg-muted/60" />
-              <td className="border-t bg-muted/60" />
             </tr>
           </tfoot>
         </table>
