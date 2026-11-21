@@ -43,3 +43,19 @@ describe('routeToolingItems: casting', () => {
     expect(routeToolingItems({ family: 'die_casting', dieTooling: { ...die, perPartUsd: 0.0123 } } as never)).toEqual([]);
   });
 });
+
+describe('routeToolingItems: hydroforming', () => {
+  // The E2E cup: 5,244.69 USD over 10,000 parts is 0.524469 a part, reported as 0.5245, which alone would recover 9,999 parts.
+  const tool = { key: 'hydroform-deep-draw', description: 'Hydroform deep draw tool (punch and draw ring)', detail: '2 tool(s) a set', costUsd: 5244.69, toolCostUsd: 2622.35, perPartUsd: 0.5245, amortizationParts: 10000 };
+  const die = { key: 'offline-blanking-die', description: 'Offline blanking die', detail: 'Not costed', costUsd: null, toolCostUsd: null, perPartUsd: null, amortizationParts: null };
+
+  it('the hydroform tool is written over the parts the engine spread it over, not a count recovered from the rounded per-part cost', () => {
+    expect(routeToolingItems({ family: 'sheet_metal', hydroformingTooling: [tool, die] })).toEqual([{
+      key: 'hydroforming-hydroform-deep-draw', toolingType: 'die', description: tool.description, specifications: tool.detail, investmentUsd: 5244.69, amortizationParts: 10000,
+    }]);
+  });
+
+  it('a hydroform tool with no volume to spread over, or not costed, is not written', () => {
+    expect(routeToolingItems({ family: 'sheet_metal', hydroformingTooling: [{ ...tool, costUsd: null, perPartUsd: null, amortizationParts: null }, die] })).toEqual([]);
+  });
+});

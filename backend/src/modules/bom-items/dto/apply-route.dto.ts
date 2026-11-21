@@ -1,5 +1,6 @@
 import { SAND_CASTING_ROUTE_ID } from '../costing/casting/sand/sand-route-comparison';
 import { INVESTMENT_CASTING_ROUTE_ID } from '../costing/casting/investment/investment-route-comparison';
+import { HYDROFORMING_ROUTE_IDS } from '../costing/hydroforming/hydroforming-route-comparison';
 import { POWDER_METAL_ROUTE_ID } from '../costing/powder-metal/powder-metal-route-comparison';
 import { TWO_MODEL_ROUTE_ID } from '../costing/two-model/two-model-route-comparison';
 import { OTHER_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/molding-route-projection';
@@ -47,6 +48,8 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   // A bar or tube part's routes (saw and punch, tube laser), priced by the bar and tube engine (bar-tube-route-comparison.ts).
   ...BAR_TUBE_ROUTE_IDS,
   ...ROTO_BLOW_ROUTE_IDS,
+  // A hydroformed part's routes (Deep Draw, Fluid Cell), priced by the hydroforming engine (hydroforming-route-comparison.ts).
+  ...HYDROFORMING_ROUTE_IDS,
   // An assembly's routes (manual, robotic welding), priced by the assembly engine (assembly-route-comparison.ts).
   ...ASSEMBLY_ROUTE_IDS,
   ...PART_ASSEMBLY_ROUTE_IDS,

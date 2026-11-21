@@ -54,6 +54,19 @@ import { BOMItemsService } from '../bom-items.service';
 
 
 
+/** The feature_graph.summary key the true-shape nest of a part's own flat pattern is cached under. */
+export const TRUE_NEST_CACHE_KEY = 'trueNestCostingCache';
+
+/**
+ * A blank to nest that is not the part's own flat pattern (a hydroformed part's blank: its developed outline), with the summary key its nest
+ * is cached under, so it never overwrites the flat pattern's (a part switched between processes keeps both).
+ */
+export interface NestBlankSource {
+  outlinePointsMm: number[][];
+  holesMm?: unknown;
+  cacheKey: string;
+}
+
 /** Nesting of a sheet-metal part on its sheet: the sheet it is costed on, the true-shape nest and its cached result, and the gross material usage a calculator asks for. */
 @Injectable()
 export class NestingCostService {
@@ -174,30 +187,35 @@ export class NestingCostService {
     sheet: NestingSheet,
     // featureGraph.classification: when the chosen process and the geometry disagree, that is why there is no outline.
     classification?: { family?: string | null; geometricFamily?: string | null },
+    /** A blank other than the part's flat pattern (a hydroform blank), nested and cached under its own key; the flat pattern when absent. */
+    blank?: NestBlankSource,
   ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
     // A part cut from several blanks (a multi-body file: a channel and its end plate) is nested blank by blank.
     const blanks: FlatPatternBlank[] | undefined = Array.isArray(summary?.flatPatternBlanks) ? summary.flatPatternBlanks : undefined;
-    if (blanks && blanks.length > 1) {
+    if (!blank && blanks && blanks.length > 1) {
       return this.resolveMultiBlankNestCosting(itemId, blanks, netWeightKg, densityKgM3, thicknessMm, kerfMm, edgeMarginMm, userId, accessToken, sheet, summary);
     }
 
-    const outlinePointsMm = summary?.flatPatternOutlinePointsMm;
+    const outlinePointsMm = blank ? blank.outlinePointsMm : summary?.flatPatternOutlinePointsMm;
     if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
       const conflict = processChoiceConflict(classification);
       return {
         selection: null,
-        reason: conflict
-          ? `no flat-pattern outline: ${conflict}`
-          : "no real flat-pattern outline available for this part yet -- re-run Reanalyze",
+        reason: blank
+          ? 'the blank has no outline -- re-run Reanalyze'
+          : conflict
+            ? `no flat-pattern outline: ${conflict}`
+            : "no real flat-pattern outline available for this part yet -- re-run Reanalyze",
       };
     }
 
-    const holesForFingerprint = summary?.flatPatternHolesMm;
+    const holesForFingerprint = blank ? blank.holesMm : summary?.flatPatternHolesMm;
+    const cacheKey = blank?.cacheKey ?? TRUE_NEST_CACHE_KEY;
     const inputFingerprint = trueNestInputFingerprint({
       outlinePointsMm, holesMm: holesForFingerprint, thicknessMm, densityKgM3, netWeightKg,
     });
 
-    const cache = summary?.trueNestCostingCache;
+    const cache = summary?.[cacheKey];
     if (isTrueNestCostingCacheValid(cache, kerfMm, edgeMarginMm, inputFingerprint, sheet)) {
       return {
         selection: {
@@ -220,13 +238,13 @@ export class NestingCostService {
     // only share a computation that would have produced the same answer. The
     // entry is removed on settle, so a later request with changed geometry (a
     // different fingerprint) never joins a stale flight.
-    const flightKey = `${itemId}|${inputFingerprint}|${kerfMm}|${edgeMarginMm}|${sheet.widthMm}x${sheet.lengthMm}`;
+    const flightKey = `${itemId}|${cacheKey}|${inputFingerprint}|${kerfMm}|${edgeMarginMm}|${sheet.widthMm}x${sheet.lengthMm}`;
     const inFlight = this.trueNestInFlight.get(flightKey);
     if (inFlight) return inFlight;
 
     const flight = this.computeTrueShapeNestCosting(
-      itemId, summary, netWeightKg, densityKgM3, thicknessMm, kerfMm, edgeMarginMm,
-      userId, accessToken, outlinePointsMm, inputFingerprint, sheet,
+      itemId, netWeightKg, densityKgM3, thicknessMm, kerfMm, edgeMarginMm,
+      userId, accessToken, outlinePointsMm, holesForFingerprint, inputFingerprint, sheet, cacheKey,
     ).finally(() => this.trueNestInFlight.delete(flightKey));
     this.trueNestInFlight.set(flightKey, flight);
     return flight;
@@ -288,7 +306,7 @@ export class NestingCostService {
       if (!best) {
         return { selection: null, reason: `a set of this part's ${blanks.length} blanks needs more than one ${sheet.widthMm}x${sheet.lengthMm}mm sheet` };
       }
-      await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken);
+      await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken, TRUE_NEST_CACHE_KEY);
       this.logger.log(
         `[true-nest-costing] ${blanks.length} blanks on ${best.sheetWidthMm}x${best.sheetLengthMm}mm: ${perBlank.join('+')} per sheet, ` +
         `${best.partsPerSheet} sets/sheet, ${best.utilisationPct}% utilization for item ${itemId}`,
@@ -299,7 +317,7 @@ export class NestingCostService {
     return flight;
   }
 
-  /** Stores the selected true-shape nest on the item, so every later request with the same inputs gets the same answer. */
+  /** Stores the selected true-shape nest on the item (under `cacheKey`), so every later request with the same inputs gets the same answer. */
   private async persistTrueNestCostingCache(
     itemId: string,
     best: TrueNestCostingSelection,
@@ -308,6 +326,7 @@ export class NestingCostService {
     inputFingerprint: string,
     userId: string,
     accessToken: string,
+    cacheKey: string,
   ): Promise<void> {
     const fresh = await this.items.findOne(itemId, userId, accessToken);
     const freshFg = (fresh.featureGraph as any) ?? {};
@@ -317,7 +336,7 @@ export class NestingCostService {
         ...freshFg,
         summary: {
           ...freshSummary,
-          trueNestCostingCache: {
+          [cacheKey]: {
             sheetWidthMm: best.sheetWidthMm, sheetLengthMm: best.sheetLengthMm,
             kerfMm, edgeMarginMm,
             partsPerSheet: best.partsPerSheet, utilizationPct: best.utilisationPct,
@@ -339,7 +358,6 @@ export class NestingCostService {
   /** The expensive half of resolveTrueShapeNestCosting — see its doc comment. */
   private async computeTrueShapeNestCosting(
     itemId: string,
-    summary: any,
     netWeightKg: number,
     densityKgM3: number,
     thicknessMm: number,
@@ -348,10 +366,12 @@ export class NestingCostService {
     userId: string,
     accessToken: string,
     outlinePointsMm: number[][],
+    rawHolesMm: unknown,
     inputFingerprint: string,
     sheet: NestingSheet,
+    cacheKey: string,
   ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
-    const holesMm = this.toNestHoles(summary.flatPatternHolesMm);
+    const holesMm = this.toNestHoles(rawHolesMm);
 
     // Evaluate EVERY viable candidate sheet -- sequentially (cad-engine's
     // /nest endpoint is not thread-pool-wrapped, see cad-engine/main.py, so
@@ -384,7 +404,7 @@ export class NestingCostService {
 
     // Persist BEFORE returning -- this is what makes the result
     // deterministic for every subsequent request, not just an optimization.
-    await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken);
+    await this.persistTrueNestCostingCache(itemId, best, kerfMm, edgeMarginMm, inputFingerprint, userId, accessToken, cacheKey);
     this.logger.log(
       `[true-nest-costing] selected ${best.sheetWidthMm}x${best.sheetLengthMm}mm: ${best.partsPerSheet} parts/sheet, ` +
       `${best.utilisationPct}% utilization for item ${itemId}`,

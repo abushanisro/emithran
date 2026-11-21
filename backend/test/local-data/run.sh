@@ -103,6 +103,9 @@ INSERT INTO public.process_calculator_mappings (process_group, process_route, op
 SELECT 'Rapid Prototyping', n, n, false FROM unnest(ARRAY['Laser Sintering','Printing','Resin Curing','Part Curing','Cleaning']) AS n;
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Roto & Blow Molding', n, n, false FROM unnest(ARRAY['Extrusion Blow Mold','Rotational Mold','Grind','Router','Saw']) AS n;
+-- the hydroforming catalog rows migration 792 seeds: migration 1110 links the Hydroform and Offline Blank calculators to them and fails if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Sheet Metal - Hydroforming', n, n, false FROM unnest(ARRAY['Hydroform','Offline Blank']) AS n;
 -- the catalog columns and the process taxonomy as the real database has them (migrations 367-371, 424, 725), and the four
 -- secondary-operation calculators the baseline holds: migration 984 restores their catalog rows and fails if a calculator is missing
 ALTER TABLE public.process_calculator_mappings ADD COLUMN machine_class varchar(100), ADD COLUMN applicable_families text[],

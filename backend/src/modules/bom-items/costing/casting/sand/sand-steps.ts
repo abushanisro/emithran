@@ -275,6 +275,8 @@ export function selectAndCost(input: {
   processGroup?: string;
   /** What one part of the route is called in the line's breakdown ("12 s per casting"); a casting when absent, a forging for the forging route. */
   partName?: string;
+  /** The line's process route when it is not the process itself (memory's Hydroform:Hydroform Deep Draw); the process when absent. */
+  processRoute?: string;
 }): CostedStep {
   const processGroup = input.processGroup ?? SAND_PROCESS_GROUP;
   const warnings: string[] = [];
@@ -283,7 +285,7 @@ export function selectAndCost(input: {
     const outcome = input.evaluate(m);
     if (!outcome.ok) return { m, outcome, costed: null };
     const base = line({
-      process: input.process, processGroup, processRoute: input.process, machineClass: input.machineClass,
+      process: input.process, processGroup, processRoute: input.processRoute ?? input.process, machineClass: input.machineClass,
       machine: asFinishingMachine(m), sec: outcome.sec, batchSize: input.batchSize, costContext: input.costContext, warnings: [], run: outcome.run,
       breakdown: `${input.process}: ${roundSec(outcome.sec)} s per ${input.partName ?? 'casting'}${m.rateSource === 'engine' ? ' (machine hour rate from the HR Rates engine)' : ''}`,
     });
@@ -315,7 +317,10 @@ export function selectAndCost(input: {
   if (!best) {
     const first = evaluated.find((e) => !e.outcome.ok);
     const why = first && !first.outcome.ok ? `${first.m.name}: ${first.outcome.reasons.join('; ')}` : `no machines of class ${input.machineClass}`;
-    return { line: { ...gap(input.process, processGroup, input.machineClass, `no ${input.process} machine fits (${why})`), machineChoice: choice }, machine: null, outcome: null, warnings };
+    return {
+      line: { ...gap(input.process, processGroup, input.machineClass, `no ${input.process} machine fits (${why})`), processRoute: input.processRoute ?? input.process, machineChoice: choice },
+      machine: null, outcome: null, warnings,
+    };
   }
   const outcome = best.outcome as Extract<StepOutcome, { ok: true }>;
   warnings.push(...outcome.notes);

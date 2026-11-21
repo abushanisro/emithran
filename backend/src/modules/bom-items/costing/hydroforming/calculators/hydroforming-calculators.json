@@ -1,0 +1,228 @@
+{
+  "domain": "hydroforming",
+  "processGroup": "Sheet Metal - Hydroforming",
+  "calculators": [
+    {
+      "key": "hydroforming.hydroform",
+      "name": "Hydroforming - Hydroform",
+      "operations": ["Hydroform"],
+      "results": ["Handling Time", "Press Time"],
+      "description": "Hydroforming on the press, per part: Loading, Deep Draw / Fluid Cell Forming, Clean Tooling, Hand Adjusting, Visual Inspection and Unloading (memory/Sheetmetal Hydroforming operations). Deep Draw handles, forms and cleans the tool once per draw (one press cycle each); Fluid Cell forms the parts on its tray together, so the press cycle, the cleaning and the throw pad are shared by the parts per tray. Hand adjusting and the inspection are once per part.",
+      "fields": [
+        { "name": "Loading Time", "unit": "s", "source": { "engine": "loading_time_s (tblMaterialHandling at the blank's weight)" } },
+        { "name": "Unloading Time", "unit": "s", "source": { "engine": "unloading_time_s (tblMaterialHandling at the formed part's weight)" } },
+        { "name": "Forming Cycle Time", "unit": "s", "source": { "machine": "machine_forming_cycle_time_s" } },
+        { "name": "Draws", "unit": null, "source": { "engine": "draws (Deep Draw: the draws drawReductionPercentage needs; Fluid Cell: 1)" } },
+        { "name": "Parts per Cycle", "unit": null, "source": { "engine": "parts_per_cycle (Fluid Cell: Hydroforming - Parts per tray; Deep Draw: 1)" } },
+        { "name": "Clean Tooling Time", "unit": "s", "source": { "engine": "clean_tooling_time_s (Hydroforming - Clean tooling)" } },
+        { "name": "Throw Pad Time", "unit": "s", "source": { "engine": "throw_pad_time_s (Hydroforming - Throw pad; Deep Draw: 0)" } },
+        { "name": "Hand Adjusting Time", "unit": "s", "source": { "engine": "hand_adjusting_time_s (Hydroforming - Hand adjusting)" } },
+        { "name": "Inspection Time", "unit": "s", "source": { "variable": "defaultInspectionTime" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Handling Time", "unit": "s", "formula": "({Loading Time} + {Unloading Time}) * {Draws}" },
+        { "name": "Press Time", "unit": "s", "formula": "({Forming Cycle Time} + {Clean Tooling Time} + {Throw Pad Time}) * {Draws} / {Parts per Cycle}" },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Handling Time} + {Press Time} + {Hand Adjusting Time} + {Inspection Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "hydroforming.offline_blank",
+      "name": "Hydroforming - Offline blank",
+      "operations": ["Offline Blank"],
+      "results": ["Stroke Time"],
+      "description": "Offline Blank, per blank: one stroke blanks the outline and pierces the holes in the flat (memory operations Blanking//Blank, Piercing//SimpleHole, Piercing//ComplexHole). A stroke is the press's own cycle or the time the strip takes to advance one blank (pressMaterialAdvanceRate by the blank's feed length), whichever is longer, plus the press's handling of the blank (its handling coefficients, from the reference exports).",
+      "fields": [
+        { "name": "Press Cycle Time", "unit": "s", "source": { "machine": "press_cycle_time_s" } },
+        { "name": "Strokes per Minute", "unit": "1/min", "source": { "engine": "strokes_per_minute (pressMaterialAdvanceRate at the blank's feed length)" } },
+        { "name": "Blank Mass", "unit": "kg", "source": { "engine": "blank_mass_kg (Hydroforming - Blank)" } },
+        { "name": "Mass Handling Coefficient", "unit": "s/kg", "source": { "machine": "mass_coeff_handling_time_s_per_kg" } },
+        { "name": "Constant Handling Time", "unit": "s", "source": { "machine": "const_coeff_handling_time_s" } },
+        { "name": "Cycle Time Factor", "unit": null, "source": { "variable": "cycleTimeAdjustmentFactor" } },
+        { "name": "Stroke Time", "unit": "s", "formula": "max({Press Cycle Time}, 60 / {Strokes per Minute})" },
+        { "name": "Cycle Time", "unit": "s", "formula": "({Stroke Time} + {Mass Handling Coefficient} * {Blank Mass} + {Constant Handling Time}) * {Cycle Time Factor}" }
+      ]
+    },
+    {
+      "key": "hydroforming.clean_tooling",
+      "name": "Hydroforming - Clean tooling",
+      "operations": [],
+      "helper": true,
+      "output": "Clean Time",
+      "description": "Clean Tooling, per press cycle: the tool's surface (the part's developed area, the surface it is formed against) at the manual clean rate of tblCleanRate for that area, never under minimumToolCleanTime.",
+      "fields": [
+        { "name": "Tool Area", "unit": "mm²", "source": { "cad": "tool_area_mm2 (the part's developed area)" } },
+        { "name": "Clean Rate", "unit": "mm²/s", "source": { "engine": "clean_rate (tblCleanRate at the tool area)" } },
+        { "name": "Minimum Clean Time", "unit": "s", "source": { "variable": "minimumToolCleanTime" } },
+        { "name": "Clean Time", "unit": "s", "formula": "max({Tool Area} / {Clean Rate}, {Minimum Clean Time})" }
+      ]
+    },
+    {
+      "key": "hydroforming.throw_pad",
+      "name": "Hydroforming - Throw pad",
+      "operations": [],
+      "helper": true,
+      "output": "Throw Pad Time",
+      "results": ["Pad Area"],
+      "description": "The Fluid Cell throw pad, per press cycle: laid over the part's plan grown by throwPadAddendum on each side, applied and removed at their rates; used when requiredThrowPadDefault says so (not on Deep Draw).",
+      "fields": [
+        { "name": "Part Length", "unit": "mm", "source": { "cad": "plan_length_mm (the part's plan, long side)" } },
+        { "name": "Part Width", "unit": "mm", "source": { "cad": "plan_width_mm (the part's plan, short side)" } },
+        { "name": "Throw Pad Addendum", "unit": "mm", "source": { "variable": "throwPadAddendum" } },
+        { "name": "Application Rate", "unit": "mm²/s", "source": { "variable": "throwPadApplicationRate" } },
+        { "name": "Removal Rate", "unit": "mm²/s", "source": { "variable": "throwPadRemovalRate" } },
+        { "name": "Throw Pad Used", "unit": null, "source": { "engine": "throw_pad_used (requiredThrowPadDefault on Fluid Cell: 1 or 0)" } },
+        { "name": "Pad Area", "unit": "mm²", "formula": "({Part Length} + 2 * {Throw Pad Addendum}) * ({Part Width} + 2 * {Throw Pad Addendum})" },
+        { "name": "Throw Pad Time", "unit": "s", "formula": "{Throw Pad Used} * ({Pad Area} / {Application Rate} + {Pad Area} / {Removal Rate})" }
+      ]
+    },
+    {
+      "key": "hydroforming.hand_adjusting",
+      "name": "Hydroforming - Hand adjusting",
+      "operations": [],
+      "helper": true,
+      "output": "Hand Adjusting Time",
+      "description": "Hand Adjusting, per part: the flanges the press cannot form (curved flanges turned beyond bendAngleFormingThreshold, or curved beyond excessiveCurvedFormThreshold) are formed by hand at defaultManualFormFormingRate along their length.",
+      "fields": [
+        { "name": "Manual Form Length", "unit": "mm", "source": { "cad": "manual_form_length_mm (the flanges formed by hand)" } },
+        { "name": "Manual Forming Rate", "unit": "mm/min", "source": { "variable": "defaultManualFormFormingRate" } },
+        { "name": "Hand Adjusting Time", "unit": "s", "formula": "{Manual Form Length} / {Manual Forming Rate} * 60" }
+      ]
+    },
+    {
+      "key": "hydroforming.parts_per_tray",
+      "name": "Hydroforming - Parts per tray",
+      "operations": [],
+      "helper": true,
+      "output": "Parts per Tray",
+      "results": ["Parts That Fit"],
+      "description": "Fluid Cell parts per tray: each part sits in its hydroform holder (hydroformHolderGap and thicknessOfHydroformHolder around its plan); as many as the press's forming area holds, in either orientation, and no more than asked for (defaultNumPartPerFluidCellTray unless the Cost Guide sets more).",
+      "fields": [
+        { "name": "Tray Length", "unit": "mm", "source": { "engine": "tray_length_mm (the press's forming area; a round one, its inscribed square)" } },
+        { "name": "Tray Width", "unit": "mm", "source": { "engine": "tray_width_mm (the press's forming area; a round one, its inscribed square)" } },
+        { "name": "Part Length", "unit": "mm", "source": { "cad": "plan_length_mm (the part's plan, long side)" } },
+        { "name": "Part Width", "unit": "mm", "source": { "cad": "plan_width_mm (the part's plan, short side)" } },
+        { "name": "Holder Gap", "unit": "mm", "source": { "variable": "hydroformHolderGap" } },
+        { "name": "Holder Thickness", "unit": "mm", "source": { "variable": "thicknessOfHydroformHolder" } },
+        { "name": "Requested Parts", "unit": null, "source": { "engine": "requested_parts (the Cost Guide's parts per tray, else defaultNumPartPerFluidCellTray)" } },
+        { "name": "Footprint Length", "unit": "mm", "formula": "{Part Length} + 2 * ({Holder Gap} + {Holder Thickness})" },
+        { "name": "Footprint Width", "unit": "mm", "formula": "{Part Width} + 2 * ({Holder Gap} + {Holder Thickness})" },
+        { "name": "Parts That Fit", "unit": null, "formula": "max(floor({Tray Length} / {Footprint Length}) * floor({Tray Width} / {Footprint Width}), floor({Tray Length} / {Footprint Width}) * floor({Tray Width} / {Footprint Length}))" },
+        { "name": "Parts per Tray", "unit": null, "formula": "min({Requested Parts}, {Parts That Fit})" }
+      ]
+    },
+    {
+      "key": "hydroforming.blanking_force",
+      "name": "Hydroforming - Blanking force",
+      "operations": [],
+      "helper": true,
+      "output": "Blanking Force",
+      "description": "The force of the offline blanking stroke: the blank's outline and the holes pierced with it, sheared through the sheet at the material's shear strength.",
+      "fields": [
+        { "name": "Blank Perimeter", "unit": "mm", "source": { "cad": "blank_perimeter_mm (the blank's outline)" } },
+        { "name": "Pierced Hole Perimeter", "unit": "mm", "source": { "cad": "pierced_hole_perimeter_mm (the holes pierced in the flat)" } },
+        { "name": "Sheet Thickness", "unit": "mm", "source": { "cad": "thickness_mm (the sheet)" } },
+        { "name": "Shear Strength", "unit": "MPa", "source": { "material": "shear_strength_mpa" } },
+        { "name": "Blanking Force", "unit": "kN", "formula": "({Blank Perimeter} + {Pierced Hole Perimeter}) * {Sheet Thickness} * {Shear Strength} / 1000" }
+      ]
+    },
+    {
+      "key": "hydroforming.blank",
+      "name": "Hydroforming - Blank",
+      "operations": [],
+      "helper": true,
+      "output": "Blank Mass",
+      "results": ["Blank Area"],
+      "description": "The blank: the part's measured blank (its unfolded flat pattern, or a drawn part's developed area on its plan outline), grown on every side by blankAddendumWidth at the drawn depth for a drawn part (trimmed after forming); a part cut to its net shape has none.",
+      "fields": [
+        { "name": "Measured Blank Area", "unit": "mm²", "source": { "cad": "blank_area_mm2 (the measured blank)" } },
+        { "name": "Blank Perimeter", "unit": "mm", "source": { "cad": "blank_perimeter_mm (the blank's outline)" } },
+        { "name": "Addendum", "unit": "mm", "source": { "engine": "addendum_mm (blankAddendumWidth at the drawn depth; 0 for a blank cut to net shape)" } },
+        { "name": "Sheet Thickness", "unit": "mm", "source": { "cad": "thickness_mm (the sheet)" } },
+        { "name": "Density", "unit": "kg/m³", "source": { "material": "density_kg_m3" } },
+        { "name": "Blank Area", "unit": "mm²", "formula": "{Measured Blank Area} + {Blank Perimeter} * {Addendum} + pi * {Addendum} ^ 2" },
+        { "name": "Blank Mass", "unit": "kg", "formula": "{Blank Area} * {Sheet Thickness} * {Density} / 1000000000" }
+      ]
+    },
+    {
+      "key": "hydroforming.material",
+      "name": "Hydroforming - Material",
+      "operations": [],
+      "helper": true,
+      "output": "Material Cost",
+      "description": "The material of one part: the sheet its blank is nested on (true-shape, defaultUtilizationMethod TRUE_PART), shared by the blanks the sheet holds, at the material's price.",
+      "fields": [
+        { "name": "Gross Mass per Part", "unit": "kg", "source": { "engine": "gross_kg (the sheet's mass over the blanks nested on it)" } },
+        { "name": "Material Price", "unit": "USD/kg", "source": { "material": "cost" } },
+        { "name": "Material Cost", "unit": "USD", "formula": "{Gross Mass per Part} * {Material Price}" }
+      ]
+    },
+    {
+      "key": "hydroforming.tool",
+      "name": "Hydroforming - Hydroform tool",
+      "operations": [],
+      "helper": true,
+      "output": "Tool Cost",
+      "results": ["Design Cost", "Spotting Cost", "Machining Cost", "Tryout Cost", "Steel Cost", "Capping Cost"],
+      "description": "One hydroform tool (memory/Sheetmetal Hydroforming): its design hours, the spotting of its form and non-form areas (hours per square inch, sqmmPerSqin) and the machining of its form (cncMillingRates profiling, tblFinishingRate finishing), the tryout quality loops (numQualityLoops, each loop's setup, press demount, disassembly, inspection and reassembly hours; more for a high-strength material), the tool steel (a deep draw punch and draw ring, or a fluid cell form block and its holder) with its coating and heat treatment, and its capping tools; with the intensifier when the Cost Guide includes it, and profit and SG&A. Shop rates and tool steel: the Digital Factory USA Default tool shop.",
+      "fields": [
+        { "name": "Design Prep Hours", "unit": "hr", "source": { "variable": "hydroformToolDesignPrepHours" } },
+        { "name": "Form Design Hours", "unit": "hr", "source": { "variable": "hydroformToolFormDesignHours" } },
+        { "name": "Modify Adjust Hours", "unit": "hr", "source": { "variable": "hydroformToolModifyAdjustHours" } },
+        { "name": "Design Rate", "unit": "USD/hr", "source": { "engine": "design_rate (the tool shop's designRateUsdPerHr)" } },
+        { "name": "Form Area", "unit": "mm²", "source": { "engine": "form_area_mm2 (the formed region's plan)" } },
+        { "name": "Non-Form Area", "unit": "mm²", "source": { "engine": "non_form_area_mm2 (the rest of the blank)" } },
+        { "name": "Square Millimetres per Square Inch", "unit": "mm²", "source": { "variable": "sqmmPerSqin" } },
+        { "name": "Form Spotting Rate", "unit": "hr/in²", "source": { "variable": "hydroformToolSpottingTimePerAreaFormStation" } },
+        { "name": "Non-Form Spotting Rate", "unit": "hr/in²", "source": { "variable": "hydroformToolSpottingTimePerAreaNonForm" } },
+        { "name": "Stations", "unit": null, "source": { "variable": "hydroformToolNumBlankingAreaStations" } },
+        { "name": "Assembly Rate", "unit": "USD/hr", "source": { "engine": "assembly_rate (the tool shop's assemblyRateUsdPerHr)" } },
+        { "name": "Profiling Rate", "unit": "mm²/hr", "source": { "engine": "profiling_rate (cncMillingRates at the form area)" } },
+        { "name": "Finishing Hours per Square Inch", "unit": "hr/in²", "source": { "engine": "finishing_hours (tblFinishingRate at the form area)" } },
+        { "name": "Machining Rate", "unit": "USD/hr", "source": { "engine": "machining_rate (the tool shop's machiningRateUsdPerHr)" } },
+        { "name": "Quality Loops", "unit": null, "source": { "engine": "quality_loops (numQualityLoops by the sheet's thickness and the material's type)" } },
+        { "name": "Loop Setup Hours", "unit": "hr", "source": { "variable": "hydroformQualityLoopSetupHours" } },
+        { "name": "Loop Demount Hours", "unit": "hr", "source": { "variable": "hydroformQualityLoopPressDemountTime" } },
+        { "name": "Loop Disassembly Hours", "unit": "hr", "source": { "variable": "hydroformQualityLoopDisassyHours" } },
+        { "name": "Loop Inspection Hours", "unit": "hr", "source": { "variable": "hydroformQualityLoopInspectionHours" } },
+        { "name": "Loop Reassembly Hours", "unit": "hr", "source": { "variable": "hydroformQualityLoopReassemblyHours" } },
+        { "name": "Tryout Multiplier", "unit": null, "source": { "engine": "tryout_multiplier (1 + highStrengthMaterialTryoutMultiplierPercentage / 100 for a high-strength material, else 1)" } },
+        { "name": "Tryout Rate", "unit": "USD/hr", "source": { "engine": "tryout_rate (the tool shop's tryoutRateUsdPerHr)" } },
+        { "name": "Steel Mass", "unit": "kg", "source": { "engine": "steel_kg (the tool's steel at steelDensity)" } },
+        { "name": "Steel Price", "unit": "USD/kg", "source": { "engine": "steel_price (the tool shop's default tool material)" } },
+        { "name": "Coating Cost Factor", "unit": "USD/kg", "source": { "engine": "coating_cost (tblToolCoating for the tool's coating)" } },
+        { "name": "Coating Dial", "unit": null, "source": { "variable": "compCoatingCost" } },
+        { "name": "Heat Treat Cost", "unit": "USD/kg", "source": { "variable": "stdHeatTreatCostPerKgTransferDie" } },
+        { "name": "Heat Treat Dial", "unit": null, "source": { "variable": "compHeatTreatCost" } },
+        { "name": "Capping Tools", "unit": null, "source": { "engine": "capping_tools (holes the rubber is kept out of)" } },
+        { "name": "Capping Tool Cost", "unit": "USD", "source": { "variable": "cappingToolCost" } },
+        { "name": "Intensifier", "unit": null, "source": { "engine": "intensifier (the Cost Guide's intensifier: 1 or 0)" } },
+        { "name": "Intensifier Share", "unit": null, "source": { "variable": "intensifierPercentageMultiplier" } },
+        { "name": "Profit", "unit": null, "source": { "variable": "percentProfit" } },
+        { "name": "SG and A", "unit": null, "source": { "variable": "percentSGandA" } },
+        { "name": "Design Cost", "unit": "USD", "formula": "({Design Prep Hours} + {Form Design Hours} + {Modify Adjust Hours}) * {Design Rate}" },
+        { "name": "Spotting Hours", "unit": "hr", "formula": "({Form Area} * {Form Spotting Rate} + {Non-Form Area} * {Non-Form Spotting Rate}) / {Square Millimetres per Square Inch} * {Stations}" },
+        { "name": "Spotting Cost", "unit": "USD", "formula": "{Spotting Hours} * {Assembly Rate}" },
+        { "name": "Machining Hours", "unit": "hr", "formula": "{Form Area} / {Profiling Rate} + {Finishing Hours per Square Inch} * {Form Area} / {Square Millimetres per Square Inch}" },
+        { "name": "Machining Cost", "unit": "USD", "formula": "{Machining Hours} * {Machining Rate}" },
+        { "name": "Tryout Hours", "unit": "hr", "formula": "{Quality Loops} * ({Loop Setup Hours} + {Loop Demount Hours} + {Loop Disassembly Hours} + {Loop Inspection Hours} + {Loop Reassembly Hours}) * {Tryout Multiplier}" },
+        { "name": "Tryout Cost", "unit": "USD", "formula": "{Tryout Hours} * {Tryout Rate}" },
+        { "name": "Steel Cost", "unit": "USD", "formula": "{Steel Mass} * ({Steel Price} + {Coating Cost Factor} * {Coating Dial} + {Heat Treat Cost} * {Heat Treat Dial})" },
+        { "name": "Capping Cost", "unit": "USD", "formula": "{Capping Tools} * {Capping Tool Cost}" },
+        { "name": "Tool Subtotal", "unit": "USD", "formula": "{Design Cost} + {Spotting Cost} + {Machining Cost} + {Tryout Cost} + {Steel Cost} + {Capping Cost}" },
+        { "name": "Tool Cost", "unit": "USD", "formula": "{Tool Subtotal} * (1 + {Intensifier} * {Intensifier Share}) * (1 + {Profit} + {SG and A})" }
+      ]
+    },
+    {
+      "key": "hydroforming.tool_life",
+      "name": "Hydroforming - Tool life",
+      "operations": [],
+      "helper": true,
+      "output": "Tool Life",
+      "description": "Parts one hydroform tool forms: tblToolLife by the material's type (defaultToolLife when the type is not listed), times the life its coating gives (tblToolCoating; defaultToolingCoatingType, or highStrengthMatlToolingCoatingType for a material above highStrengthMatlThreshold).",
+      "fields": [
+        { "name": "Parts per Tool", "unit": null, "source": { "engine": "parts_per_tool (tblToolLife by the material's type, else defaultToolLife)" } },
+        { "name": "Coating Life Factor", "unit": null, "source": { "engine": "coating_life_factor (tblToolCoating for the tool's coating)" } },
+        { "name": "Tool Life", "unit": null, "formula": "{Parts per Tool} * {Coating Life Factor}" }
+      ]
+    }
+  ]
+}

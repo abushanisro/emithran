@@ -712,8 +712,20 @@ export function drawnShellNeedsDrawing(drawnShell: { depthMm: number; openingWid
   if (!drawnShell) return null;
   return (
     `This part is a drawn shell (${drawnShell.depthMm} mm deep, ${drawnShell.openingWidthMm} mm wide opening) `
-    + `— it cannot be produced by cutting a blank and bending it. This route does not include a drawing operation.`
+    + `— it cannot be produced by cutting a blank and bending it. This route does not include a drawing operation: `
+    + `set its Process to Sheet Metal - Hydroforming to cost it drawn.`
   );
+}
+
+/** The part's drawn shell from its feature graph (the cad-engine's Form feature, variant drawn), or null when it has none. */
+export function drawnShellFromFeatures(features: readonly Record<string, any>[] | null | undefined): { depthMm: number; openingWidthMm: number; developedAreaMm2: number } | null {
+  const entry = (features ?? []).find((f) => f.feature_type === 'Form' && f.variant === 'drawn');
+  const occ = entry?.occurrences?.[0];
+  if (!occ) return null;
+  const depthMm = Number(occ.depth_mm);
+  const openingWidthMm = Number(occ.opening_width_mm);
+  const developedAreaMm2 = Number(occ.developed_area_mm2);
+  return [depthMm, openingWidthMm, developedAreaMm2].every((n) => Number.isFinite(n) && n > 0) ? { depthMm, openingWidthMm, developedAreaMm2 } : null;
 }
 
 export function rolledFormNeedsRollBender(
