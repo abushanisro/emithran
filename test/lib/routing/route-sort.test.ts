@@ -124,6 +124,13 @@ describe('groupRouteNodes', () => {
   it('returns nothing for an empty route list', () => {
     expect(groupRouteNodes([])).toEqual([]);
   });
+
+  it('a family whose own routes are forming routes (a hydroformed part) names them; sheet metal keeps its own copy', () => {
+    const nodes = [node({ id: 'hydroform-deep-draw', processFamily: 'forming' }), node({ id: 'hydroform-fluid-cell', processFamily: 'forming' })];
+    const meta = { title: 'Hydroforming', description: 'Blanked, then formed.' };
+    expect(groupRouteNodes(nodes, undefined, meta)).toEqual([{ family: 'forming', ...meta, nodes }]);
+    expect(groupRouteNodes(nodes).at(0)?.title).toBe('Single-operation forming');
+  });
 });
 
 describe('selectTopRoutes', () => {

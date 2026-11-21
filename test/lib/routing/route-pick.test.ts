@@ -16,6 +16,7 @@ describe('the route choice a complete route carries', () => {
     ['ms-vertical', { multiShotRoute: 'vertical' }],
     ['multispindle-twin', { multiSpindleRoute: 'twin' }],
     ['partassembly-robotic', { partAssemblyRoute: 'robotic' }],
+    ['hydroform-fluid-cell', { hydroformRoute: 'fluid-cell' }],
   ])('%s is its family\'s choice, and no other family\'s', (routeId, picks) => {
     expect(routePicksOf(route(routeId), null)).toEqual(picks);
   });
@@ -35,6 +36,9 @@ describe('the key a part keeps its route choice under', () => {
     expect(routePickKeyOf({ itemType: 'child_part', scenarioOverrides: { processGroup: 'Assembly Plastic Molding' } }, 'plastic_molded')).toBe('multiShotRoute');
     expect(routePickKeyOf({ itemType: 'child_part', scenarioOverrides: { processGroup: 'Assembly Molding' } }, 'plastic_molded')).toBe('insertMoldingRoute');
     expect(routePickKeyOf({ itemType: 'child_part', scenarioOverrides: { processGroup: 'Assembly' } }, 'die_cast')).toBe('assemblyRoute');
+    // A hydroformed part is analysed as sheet metal, whose own routes carry no choice; its engine reads hydroformRoute.
+    expect(routePickKeyOf({ itemType: 'child_part', scenarioOverrides: { processGroup: 'Sheet Metal - Hydroforming' } }, 'sheet_metal')).toBe('hydroformRoute');
+    expect(routePickKeyOf({ itemType: 'child_part' }, 'sheet_metal')).toBeNull();
   });
 
   it('an assembly or sub-assembly with no Process of its own is costed as an assembly; one set to another Process is not', () => {
