@@ -29,6 +29,7 @@ import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShot
 import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
 import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
 import { PowderMetalSection, powderMetalUncostedReason } from '@/components/costing/PowderMetalSection';
+import { HydroformingSection } from '@/components/costing/HydroformingSection';
 import { RotoBlowSection } from '@/components/costing/RotoBlowSection';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
@@ -162,6 +163,7 @@ import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { calculationOfLine, calculationOfRecord, NO_CALCULATION, seedOfCalculation, tracedLineOf, type LineCalculation } from '@/lib/calculators/calculator-run';
 import { additiveSectionTitle } from '@/lib/costing/additive-view';
+import { isHydroformingItem } from '@/lib/costing/hydroforming-view';
 import { useAuth } from '@/lib/providers/auth-context';
 import type { PanelId, ManualRouteOption, AddProcessRequest } from '@/lib/features/mi-page-types';
 import { fmt, materialLabel, splitMaterialDisplay, fmtInt, formatCell, machineDisplayLabel, familyLabel, confidenceCls, formatEstCycleTime, money, partProcessBadge } from '@/lib/features/display-format';
@@ -2680,6 +2682,8 @@ function RouteSelectionDialog({
   // Forged parts: the closed-die forging route as quoted, like sand.
   const isForged = partFamily === 'forged';
   const isPowderMetal = partFamily === 'powder_metal';
+  // Hydroformed parts: Hydroform Deep Draw and Hydroform Fluid Cell, each the full quote (process-group.ts routingFamilyOf).
+  const isHydroforming = partFamily === 'hydroforming';
   const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
@@ -2773,7 +2777,8 @@ function RouteSelectionDialog({
       // real constraint on the node (the exact purpose of RouteNode.selectable /
       // selectionNote) states it up front instead.
       return adaptRoutesToTree(allRoutesForTree).map((node) => {
-        if (node.processFamily === 'forming') {
+        // Only the sheet-metal builder stages cutting routes; a hydroformed part's routes are forming routes set as they are.
+        if (isSheetMetal && node.processFamily === 'forming') {
           return {
             ...node,
             selectable: false,
@@ -3322,6 +3327,10 @@ function RouteSelectionDialog({
                 title: 'Machine',
                 description: 'One real, priced route per catalog machine for this part. Machines that cannot produce it stay listed with the reason.',
               }}
+              {...(isHydroforming ? { formingGroupMeta: {
+                title: 'Hydroforming',
+                description: 'Each route blanks and pierces the blank on the offline press, then forms it: Deep Draw on a round tool, draw by draw, or Fluid Cell on a tray of form blocks. The quoted one follows memory\'s depth / width rule unless the Cost Guide sets a route; a press that cannot take the part says why.',
+              } } : {})}
             />
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
               {/* Machining: add any catalog process and operation by hand. It opens as a new line on the Cost tab,
@@ -4660,6 +4669,17 @@ function CostGuidePanel({
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                   hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
+                />
+              </Section>
+            )}
+
+            {isHydroformingItem(item) && (
+              <Section title="Sheet Metal - Hydroforming">
+                <HydroformingSection
+                  hydroforming={cgpCostSummary?.hydroforming}
+                  tooling={cgpCostSummary?.hydroformingTooling}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
               </Section>
             )}
@@ -8290,8 +8310,8 @@ export default function ManufacturingIntelligencePage() {
   // real Digital Factory.
   const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize, factory);
   // The Workflow Builder lists the routes of the family the part is costed as: an assembly or a weldment has none from CAD (or one from an
-  // analysis as another process), so its routes are the costed family's.
-  const routingFamily = routingFamilyOf(fg?.classification.family, costForHeatmap?.family);
+  // analysis as another process), so its routes are the costed family's; a hydroformed part's are its Process's two complete routes.
+  const routingFamily = routingFamilyOf(fg?.classification.family, costForHeatmap?.family, item?.scenarioOverrides?.processGroup);
   // costForHeatmap.processLines always reflects the cost engine's OWN default-
   // recommended route (e.g. Fiber Laser Cutting), never whatever route the
   // engineer actually applied (e.g. Waterjet Cutting) -- same root cause

@@ -1280,6 +1280,33 @@ export interface CostSummaryDto {
   };
   /** Roto & Blow Molding: the molds and trim tooling (USD), kept out of the piece cost. */
   rotoBlowTooling?: { key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }[];
+  /**
+   * Sheet Metal - Hydroforming: memory's route rule, the draws, the blank and its nest, the press, the tray, the route quoted and both routes
+   * (backend HydroformingBreakdown).
+   */
+  hydroforming?: {
+    route: string; routeLabel: string;
+    rule: { route: string; ratio: number; depthMm: number; widthMm: number; threshold: number; basis: string };
+    draws: number; drawRatiosPct: number[];
+    blank: { method: string; areaMm2: number; addendumMm: number; massKg: number };
+    nest: { method: string; partsPerSheet: number; utilizationPct: number; sheetLengthMm: number; sheetWidthMm: number } | null;
+    press: { name: string; formingCycleTimeS: number } | null;
+    /** Fluid Cell: the parts formed a cycle, the Cost Guide's ask (null: the data's default) and how many fit the tray; null on Deep Draw. */
+    partsPerTray: { value: number; requested: number | null; max: number | null } | null;
+    handAdjustingLengthMm: number; throwPadAreaMm2: number; cappingTools: number;
+    /** Holes pierced with the blank, and those through a formed wall (pierced after forming: a No Cost Feature). */
+    holes: { inFlat: number; afterForming: number };
+    intensifier: boolean;
+    complete: boolean;
+    options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+  };
+  /**
+   * Sheet Metal - Hydroforming: the hydroform tool and the offline blanking die (USD), kept out of the piece cost. costUsd is the tools the job
+   * wears out, spread over amortizationParts; toolCostUsd one tool. Both null when not costed (the blanking die is listed, not costed).
+   */
+  hydroformingTooling?: {
+    key: string; description: string; detail: string; costUsd: number | null; toolCostUsd: number | null; perPartUsd: number | null; amortizationParts: number | null;
+  }[];
   composites?: {
     route: string; routeLabel: string;
     /** The laminate at its thickest (core excluded) and the cured ply thickness it is divided by. */

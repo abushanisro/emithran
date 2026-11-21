@@ -50,4 +50,10 @@ describe('process groups with a cost model', () => {
     expect(routingFamilyOf('milled', undefined)).toBe('milled');
     expect(routingFamilyOf(undefined, undefined)).toBeNull();
   });
+
+  it('a hydroformed part (analysed as sheet metal) lists its Process\'s complete routes, not the sheet-metal cut-then-form builder', () => {
+    expect(routingFamilyOf('sheet_metal', 'sheet_metal', 'Sheet Metal - Hydroforming')).toBe('hydroforming');
+    expect(routingFamilyOf('sheet_metal', 'sheet_metal', 'Sheet Metal')).toBe('sheet_metal');
+    expect(routingFamilyOf('sheet_metal', 'sheet_metal', null)).toBe('sheet_metal');
+  });
 });

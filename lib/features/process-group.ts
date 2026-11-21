@@ -48,11 +48,20 @@ export function familyToProcessGroupLabel(family: string | null | undefined): st
 }
 
 /**
- * The family a part's routes are listed for (the Workflow Builder): the one it is costed as when that family has no CAD extractor (an
- * assembly, a weldment: costed from the BOM and the Cost Guide, so its CAD family is none, or one from an analysis as another process), else
- * its CAD family.
+ * Processes whose routes are complete alternatives inside a CAD family that has a builder of its own: a hydroformed part is analysed as sheet
+ * metal, but its routes (Hydroform Deep Draw, Hydroform Fluid Cell, each an offline blank then the press) are not cut-then-form routes.
  */
-export function routingFamilyOf(cadFamily: string | null | undefined, costedFamily: string | null | undefined): string | null {
+const ROUTES_AS_FAMILY: Readonly<Record<string, string>> = {
+  'Sheet Metal - Hydroforming': 'hydroforming',
+};
+
+/**
+ * The family a part's routes are listed for (the Workflow Builder): its Process's when that process lists complete routes inside its CAD
+ * family (a hydroformed part); the one it is costed as when that family has no CAD extractor (an assembly, a weldment: costed from the BOM and
+ * the Cost Guide, so its CAD family is none, or one from an analysis as another process); else its CAD family.
+ */
+export function routingFamilyOf(cadFamily: string | null | undefined, costedFamily: string | null | undefined, processGroup?: unknown): string | null {
+  if (typeof processGroup === 'string' && processGroup in ROUTES_AS_FAMILY) return ROUTES_AS_FAMILY[processGroup] ?? null;
   return costedFamily && NO_CAD_EXTRACTOR.has(costedFamily) ? costedFamily : cadFamily ?? null;
 }
 
