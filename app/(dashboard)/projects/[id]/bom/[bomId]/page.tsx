@@ -8,10 +8,8 @@ import { BOMItemsFlat, BOMItemDialog, BOMTreeView, BOMItemDetailPanel } from '@/
 import { AssemblyTreeGenerator } from '@/components/features/bom/AssemblyTreeGenerator';
 import { HierarchicalBOMTree } from '@/components/features/bom/HierarchicalBOMTree';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   ArrowLeft,
@@ -288,11 +286,15 @@ export default function BOMDetailPage() {
   const [defaultItemType, setDefaultItemType] = useState<BOMItemType | undefined>(undefined);
   const [viewingItem, setViewingItem] = useState<BOMItem | null>(null);
   const [preferredView, setPreferredView] = useState<'2d' | '3d'>('3d');
+  // The page's open tab, the list first.
+  const [pageTab, setPageTab] = useState('items');
 
   // -------------------------------------------------------------------------
   // 3D viewer state
   // -------------------------------------------------------------------------
   const [uploadedAssembly3D, setUploadedAssembly3D] = useState<Assembly3DState | null>(null);
+  // The 3D Assembly tab exists only while an assembly is loaded; after Re-upload its page falls back to the list.
+  const bomTab = pageTab === 'cad' && !uploadedAssembly3D ? 'items' : pageTab;
   const [isExplodedView, setIsExplodedView] = useState(false);
   const [explodeDistance, setExplodeDistance] = useState(85);
 
@@ -935,6 +937,10 @@ export default function BOMDetailPage() {
   // Render
   // -------------------------------------------------------------------------
 
+  // Gmail's round icon buttons: muted, a soft circle on hover.
+  const iconAction = 'h-10 w-10 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground';
+  const gmailTab   = 'h-12 min-w-[11rem] justify-start gap-3 border-b-[3px] px-4 pb-0 pt-0 hover:bg-accent data-[state=active]:border-primary data-[state=active]:text-primary';
+
   if (bomLoading) {
     return (
       <PageSkeleton label="Loading BOM…" />
@@ -958,51 +964,77 @@ export default function BOMDetailPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title={bom.name} description={bom.description ?? ''}>
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-5">
+      {/*
+        Gmail's top bar, part of the page (no box): back, the BOM's name with its project and dates; the page's actions as round icons at
+        the right, each named on hover and for screen readers.
+      */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-1">
           <Button
-            variant="outline"
+            variant="ghost"
+            size="icon"
+            className={`${iconAction} -ml-2 shrink-0`}
             onClick={() => router.push(`/bom?projectId=${projectId}`)}
-            className="gap-2"
+            title="Back to BOM Management"
+            aria-label="Back to BOM Management"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to BOM Management
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+          <div className="min-w-0 pt-0.5">
+            <h1 className="truncate text-2xl font-semibold leading-9 tracking-tight text-foreground" title={bom.name}>{bom.name}</h1>
+            {bom.description && <p className="truncate text-sm text-muted-foreground" title={bom.description}>{bom.description}</p>}
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span>Project <span className="font-medium text-foreground">{project?.name ?? 'Loading…'}</span></span>
+              <span aria-hidden="true">·</span>
+              <span>Created <span className="font-medium text-foreground">{new Date(bom.createdAt).toLocaleDateString()}</span></span>
+              <span aria-hidden="true">·</span>
+              <span>Last updated <span className="font-medium text-foreground">{new Date(bom.updatedAt).toLocaleDateString()}</span></span>
+            </p>
+          </div>
+        </div>
 
-          <Button variant="outline" className="gap-2" onClick={() => { void handleDownloadTemplate(); }}>
-            <FileDown className="h-4 w-4" />
-            Excel Template
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" className={iconAction} onClick={() => { void handleDownloadTemplate(); }} title="Excel Template" aria-label="Excel Template">
+            <FileDown className="h-5 w-5" />
           </Button>
-
-          <Button variant="outline" className="gap-2" onClick={handleImport} disabled={isImporting}>
-            {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {isImporting ? 'Importing…' : 'Import'}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={iconAction}
+            onClick={handleImport}
+            disabled={isImporting}
+            title={isImporting ? 'Importing…' : 'Import'}
+            aria-label={isImporting ? 'Importing…' : 'Import'}
+          >
+            {isImporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
           </Button>
-
-          <Button variant="outline" className="gap-2" onClick={handleExport}>
-            <Download className="h-4 w-4" />
-            Export
+          <Button variant="ghost" size="icon" className={iconAction} onClick={handleExport} title="Export" aria-label="Export">
+            <Download className="h-5 w-5" />
           </Button>
-
           {!!bomItemsData?.items?.length && (
             <Button
-              variant="destructive"
-              className="gap-2"
+              variant="ghost"
+              size="icon"
+              className={`${iconAction} hover:bg-destructive/10 hover:text-destructive`}
               onClick={() => setShowBulkDeleteConfirm(true)}
               disabled={isBulkDeleting}
+              title={isBulkDeleting ? 'Deleting…' : 'Delete All'}
+              aria-label={isBulkDeleting ? 'Deleting…' : 'Delete All'}
             >
-              {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              {isBulkDeleting ? 'Deleting…' : 'Delete All'}
+              {isBulkDeleting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />}
             </Button>
           )}
+          <span className="mx-1 h-6 w-px bg-border" aria-hidden="true" />
+          <Button variant="ghost" size="icon" className={iconAction} title="Settings" aria-label="Settings">
+            <Settings className="h-5 w-5" />
+          </Button>
         </div>
-      </PageHeader>
+      </div>
 
       {/* Import progress / summary banner */}
       {(isImporting || importSummary) && (
-        <Card>
-          <CardContent className="pt-6 space-y-3">
+        <div className="space-y-3 rounded-lg border px-4 py-3">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">
                 {isImporting ? 'Import Progress' : 'Import Summary'}
@@ -1039,312 +1071,277 @@ export default function BOMDetailPage() {
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
       )}
 
-      {/* BOM metadata strip */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
-            <div>
-              <p className="text-sm font-semibold">BOM Information</p>
-              <p className="text-xs text-muted-foreground">Assembly BOM</p>
-            </div>
-            <div className="hidden md:block h-8 w-px bg-border" />
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Project</p>
-              <p className="text-sm font-medium">{project?.name ?? 'Loading…'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Created</p>
-              <p className="text-sm font-medium">{new Date(bom.createdAt).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Last Updated</p>
-              <p className="text-sm font-medium">{new Date(bom.updatedAt).toLocaleDateString()}</p>
-            </div>
-            <div className="ml-auto">
-              <Button variant="outline" size="icon">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* STEP / assembly upload — hidden once an assembly is loaded */}
+      {/* The CAD upload on top, above the list: a .zip of STEP files or an assembly becomes BOM items. Hidden once an assembly is loaded
+          (its 3D model has its own tab; Re-upload there brings this back). */}
       {!uploadedAssembly3D && (
-        <Card>
-          <CardHeader>
-            <CardTitle>CAD Processing Pipeline</CardTitle>
-            <CardDescription>
+        <section aria-labelledby="cad-pipeline-title" className="space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <h2 id="cad-pipeline-title" className="text-sm font-semibold">CAD Processing Pipeline</h2>
+            <p className="text-xs text-muted-foreground">
               Upload a .zip of STEP files, or one assembly — parts and quantities become BOM items ready for costing
-            </CardDescription>
-          </CardHeader>
+            </p>
+          </div>
           <AssemblyTreeGenerator
+            className="space-y-3 p-0"
             bomId={bomId}
             projectId={projectId}
-            onUploaded={refetchBOMItems}
+            onUploaded={() => { void refetchBOMItems(); }}
           />
-        </Card>
+        </section>
       )}
 
-      {/* 3D Assembly viewer */}
-      {uploadedAssembly3D && (
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
-              <CardTitle>Assembly 3D Model</CardTitle>
-              <CardDescription>
-                3D visualization — {uploadedAssembly3D.fileName}
-              </CardDescription>
+      {/* The list (as Gmail's inbox), the tree view and, once an assembly is loaded, its 3D model. */}
+      <Tabs value={bomTab} onValueChange={setPageTab} className="space-y-4">
+        {/* Gmail's tabs: wide, an icon and a name, the open one underlined in the brand colour. */}
+        <TabsList className="h-auto w-full justify-start gap-0">
+          <TabsTrigger value="items" className={gmailTab}>
+            <FileSpreadsheet className="h-4 w-4" />
+            Items & Parts
+          </TabsTrigger>
+          <TabsTrigger value="tree" className={gmailTab}>
+            <Layers3 className="h-4 w-4" />
+            Tree View
+          </TabsTrigger>
+          {uploadedAssembly3D && (
+            <TabsTrigger value="cad" className={gmailTab}>
+              <Box className="h-4 w-4" />
+              3D Assembly
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="items" className="mt-0">
+          <BOMItemsFlat
+            bomId={bomId}
+            onEditItem={handleEditItem}
+            onViewItem={handleViewItem}
+            onAddChildItem={handleAddTreeItem}
+            {...(bomData?.totalCost !== undefined && { totalCost: bomData.totalCost })}
+            toolbarActions={
+              <>
+                <Button size="sm" className="h-9 gap-2 rounded-full px-4" onClick={handleAddItem}>
+                  <Plus className="h-4 w-4" />
+                  Add BOM Item
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-2 rounded-full px-3 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                  onClick={() => { handleAddTreeItem(null, BOMItemType.SUB_ASSEMBLY); }}
+                >
+                  <Layers3 className="h-4 w-4" />
+                  Add Sub-Assembly
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-2 rounded-full px-3 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                  onClick={() => { handleAddTreeItem(null, BOMItemType.CHILD_PART); }}
+                >
+                  <Box className="h-4 w-4" />
+                  Add Child Part
+                </Button>
+              </>
+            }
+          />
+        </TabsContent>
+
+        <TabsContent value="cad" className="mt-0">
+        {/* 3D Assembly viewer */}
+        {uploadedAssembly3D && (
+          <section className="space-y-4">
+            <div className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold">Assembly 3D Model</h2>
+                <p className="text-sm text-muted-foreground">
+                  3D visualization — {uploadedAssembly3D.fileName}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5"
+                onClick={() => setUploadedAssembly3D(null)}
+              >
+                <UploadCloud className="h-3.5 w-3.5" />
+                Re-upload
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5"
-              onClick={() => setUploadedAssembly3D(null)}
-            >
-              <UploadCloud className="h-3.5 w-3.5" />
-              Re-upload
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-12 gap-6 min-h-[800px]">
+            <div>
+              <div className="grid grid-cols-12 gap-6 min-h-[800px]">
 
-              {/* Left panel — BOM tree */}
-              <div className="col-span-3 border-r pr-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Assembly Parts</h3>
-                </div>
-
-                <div className="max-h-[700px] overflow-y-auto space-y-2">
-                  {USE_3D_PARTS ? (
-                    detectedParts.length > 0 ? (
-                      <HierarchicalBOMTree
-                        items={detectedParts}
-                        selectedItems={selectedBOMItems}
-                        onItemSelect={handleBOMItemSelect}
-                        onItemHover={handleBOMItemHover}
-                        onEditItem={handleEditItem}
-                      />
-                    ) : (
-                      <div className="text-center text-muted-foreground py-8">
-                        <Box className="h-12 w-12 mx-auto opacity-50 mb-2" />
-                        <p>No 3D parts detected</p>
-                        <p className="text-sm mt-2">Upload assembly to analyse parts</p>
-                      </div>
-                    )
-                  ) : (
-                    bomItemsData?.items?.length ? (
-                      <HierarchicalBOMTree
-                        items={bomItemsData.items}
-                        selectedItems={selectedBOMItems}
-                        onItemSelect={handleBOMItemSelect}
-                        onItemHover={handleBOMItemHover}
-                        onEditItem={handleEditItem}
-                      />
-                    ) : (
-                      <div className="text-center text-muted-foreground py-8">
-                        <p>No BOM items found</p>
-                      </div>
-                    )
-                  )}
-                </div>
-
-                {/* Selection controls */}
-                <div className="flex flex-col gap-2 pt-4 border-t">
+                {/* Left panel — BOM tree */}
+                <div className="col-span-3 border-r pr-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showOnlySelected}
-                        onChange={e => {
-                          setShowOnlySelected(e.target.checked);
-                          if (!e.target.checked) setSelectedBOMItems([]);
-                        }}
-                        className="rounded"
-                      />
-                      <span>Show Only Selected</span>
-                    </label>
+                    <h3 className="text-lg font-semibold">Assembly Parts</h3>
+                  </div>
 
-                    {selectedBOMItems.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setSelectedBOMItems([]); setShowOnlySelected(false); }}
-                        className="h-7 px-2 text-xs"
-                      >
-                        Clear ({selectedBOMItems.length})
-                      </Button>
+                  <div className="max-h-[700px] overflow-y-auto space-y-2">
+                    {USE_3D_PARTS ? (
+                      detectedParts.length > 0 ? (
+                        <HierarchicalBOMTree
+                          items={detectedParts}
+                          selectedItems={selectedBOMItems}
+                          onItemSelect={handleBOMItemSelect}
+                          onItemHover={handleBOMItemHover}
+                          onEditItem={handleEditItem}
+                        />
+                      ) : (
+                        <div className="text-center text-muted-foreground py-8">
+                          <Box className="h-12 w-12 mx-auto opacity-50 mb-2" />
+                          <p>No 3D parts detected</p>
+                          <p className="text-sm mt-2">Upload assembly to analyse parts</p>
+                        </div>
+                      )
+                    ) : (
+                      bomItemsData?.items?.length ? (
+                        <HierarchicalBOMTree
+                          items={bomItemsData.items}
+                          selectedItems={selectedBOMItems}
+                          onItemSelect={handleBOMItemSelect}
+                          onItemHover={handleBOMItemHover}
+                          onEditItem={handleEditItem}
+                        />
+                      ) : (
+                        <div className="text-center text-muted-foreground py-8">
+                          <p>No BOM items found</p>
+                        </div>
+                      )
                     )}
                   </div>
 
-                  {selectedBOMItems.length > 1 && (
-                    <p className="text-xs text-muted-foreground bg-primary/10 p-2 rounded">
-                      {selectedBOMItems.length} parts selected. Click a part to toggle it.
-                    </p>
-                  )}
-                </div>
-              </div>
+                  {/* Selection controls */}
+                  <div className="flex flex-col gap-2 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showOnlySelected}
+                          onChange={e => {
+                            setShowOnlySelected(e.target.checked);
+                            if (!e.target.checked) setSelectedBOMItems([]);
+                          }}
+                          className="rounded"
+                        />
+                        <span>Show Only Selected</span>
+                      </label>
 
-              {/* Right panel — 3D viewer */}
-              <div className="col-span-9 space-y-4">
-                <div className="h-[750px] rounded-lg overflow-hidden border">
-                  <ModelViewer
-                    fileUrl={uploadedAssembly3D.modelUrl}
-                    fileName={uploadedAssembly3D.fileName}
-                    fileType="stl"
-                    bomItemId={uploadedAssembly3D.bomItemId}
-                    isExploded={isExplodedView}
-                    explodeDistance={explodeDistance}
-                    selectedBOMItems={selectedBOMItems}
-                    showOnlySelected={showOnlySelected}
-                    hoveredBOMItem={hoveredBOMItem}
-                    onPartsDetected={handlePartsDetected}
-                    dfmAnalysisData={assemblyDFMData}
-                    showFeatures
-                  />
-                </div>
-
-                {/* View controls */}
-                <div className="flex flex-wrap items-center gap-4">
-                  <Button
-                    variant={isExplodedView ? 'default' : 'outline'}
-                    onClick={() => setIsExplodedView(v => !v)}
-                    className="gap-2"
-                  >
-                    <Layers3 className="h-4 w-4" />
-                    {isExplodedView ? 'Normal View' : 'Exploded View'}
-                  </Button>
-
-                  {isExplodedView && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Explode Distance:</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={explodeDistance}
-                        onChange={e => setExplodeDistance(parseInt(e.target.value))}
-                        className="w-32 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-sm text-muted-foreground w-8">{explodeDistance}</span>
+                      {selectedBOMItems.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setSelectedBOMItems([]); setShowOnlySelected(false); }}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Clear ({selectedBOMItems.length})
+                        </Button>
+                      )}
                     </div>
-                  )}
 
-                  <Button variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Download STL
-                  </Button>
+                    {selectedBOMItems.length > 1 && (
+                      <p className="text-xs text-muted-foreground bg-primary/10 p-2 rounded">
+                        {selectedBOMItems.length} parts selected. Click a part to toggle it.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {/* Assembly metadata */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg text-center">
-                  <div>
-                    <p className="text-sm text-muted-foreground">File Name</p>
-                    <p className="font-semibold">{uploadedAssembly3D.fileName}</p>
+                {/* Right panel — 3D viewer */}
+                <div className="col-span-9 space-y-4">
+                  <div className="h-[750px] rounded-lg overflow-hidden border">
+                    <ModelViewer
+                      fileUrl={uploadedAssembly3D.modelUrl}
+                      fileName={uploadedAssembly3D.fileName}
+                      fileType="stl"
+                      bomItemId={uploadedAssembly3D.bomItemId}
+                      isExploded={isExplodedView}
+                      explodeDistance={explodeDistance}
+                      selectedBOMItems={selectedBOMItems}
+                      showOnlySelected={showOnlySelected}
+                      hoveredBOMItem={hoveredBOMItem}
+                      onPartsDetected={handlePartsDetected}
+                      dfmAnalysisData={assemblyDFMData}
+                      showFeatures
+                    />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Volume</p>
-                    <p className="font-semibold">
-                      {uploadedAssembly3D.volume > 0
-                        ? `${uploadedAssembly3D.volume.toLocaleString()} mm³`
-                        : 'Processing…'}
-                    </p>
+
+                  {/* View controls */}
+                  <div className="flex flex-wrap items-center gap-4">
+                    <Button
+                      variant={isExplodedView ? 'default' : 'outline'}
+                      onClick={() => setIsExplodedView(v => !v)}
+                      className="gap-2"
+                    >
+                      <Layers3 className="h-4 w-4" />
+                      {isExplodedView ? 'Normal View' : 'Exploded View'}
+                    </Button>
+
+                    {isExplodedView && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Explode Distance:</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={explodeDistance}
+                          onChange={e => setExplodeDistance(parseInt(e.target.value))}
+                          className="w-32 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-sm text-muted-foreground w-8">{explodeDistance}</span>
+                      </div>
+                    )}
+
+                    <Button variant="outline" className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Download STL
+                    </Button>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Material</p>
-                    <p className="font-semibold">{uploadedAssembly3D.material}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <Badge variant="outline" className="text-green-600 border-green-600">
-                      Ready
-                    </Badge>
+
+                  {/* Assembly metadata */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg text-center">
+                    <div>
+                      <p className="text-sm text-muted-foreground">File Name</p>
+                      <p className="font-semibold">{uploadedAssembly3D.fileName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Volume</p>
+                      <p className="font-semibold">
+                        {uploadedAssembly3D.volume > 0
+                          ? `${uploadedAssembly3D.volume.toLocaleString()} mm³`
+                          : 'Processing…'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Material</p>
+                      <p className="font-semibold">{uploadedAssembly3D.material}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        Ready
+                      </Badge>
+                    </div>
                   </div>
                 </div>
+
               </div>
-
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* BOM items tabs */}
-      <Tabs defaultValue="items" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="items">
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Items & Parts
-          </TabsTrigger>
-          <TabsTrigger value="tree">Tree View</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="items" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <CardTitle>BOM Items</CardTitle>
-                  <CardDescription>Manage parts, materials, and components</CardDescription>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => handleAddTreeItem(null, BOMItemType.SUB_ASSEMBLY)}
-                  >
-                    <Layers3 className="h-4 w-4" />
-                    Add Sub-Assembly
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => handleAddTreeItem(null, BOMItemType.CHILD_PART)}
-                  >
-                    <Box className="h-4 w-4" />
-                    Add Child Part
-                  </Button>
-                  <Button size="sm" className="gap-2" onClick={handleAddItem}>
-                    <Plus className="h-4 w-4" />
-                    Add BOM Item
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <BOMItemsFlat
-                bomId={bomId}
-                onEditItem={handleEditItem}
-                onViewItem={handleViewItem}
-                onAddChildItem={handleAddTreeItem}
-                {...(bomData?.totalCost !== undefined && { totalCost: bomData.totalCost })}
-              />
-            </CardContent>
-          </Card>
+          </section>
+        )}
         </TabsContent>
 
-        <TabsContent value="tree" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>BOM Tree Structure</CardTitle>
-              <CardDescription>Hierarchical view of assemblies and sub-assemblies</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <BOMTreeView
-                items={bomItems}
-                projectName={project?.name ?? ''}
-                projectId={projectId}
-                onAddItem={handleAddTreeItem}
-                onEditItem={handleEditItem}
-                onDeleteItem={handleDeleteItem}
-              />
-            </CardContent>
-          </Card>
+        <TabsContent value="tree" className="mt-0">
+          <BOMTreeView
+            items={bomItems}
+            projectName={project?.name ?? ''}
+            projectId={projectId}
+            onAddItem={handleAddTreeItem}
+            onEditItem={handleEditItem}
+            onDeleteItem={(id) => { void handleDeleteItem(id); }}
+          />
         </TabsContent>
       </Tabs>
 

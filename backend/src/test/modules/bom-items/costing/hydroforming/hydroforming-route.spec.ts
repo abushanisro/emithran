@@ -2,7 +2,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { allHydroformingMachines, MILD_STEEL, realHydroformingReference, realToolShop } from './hydroforming-test-data';
+import { allHydroformingMachines, MILD_STEEL, realHydroformingCatalog, realHydroformingReference, realToolShop } from './hydroforming-test-data';
 import { hydroformingCalculatorsByName, loadHydroformingCalculatorSpec } from '../../../../../modules/bom-items/costing/hydroforming/calculators/hydroforming-calculator-spec';
 import { buildHydroformingCalculatorsMigrationSql } from '../../../../../modules/bom-items/costing/hydroforming/calculators/hydroforming-calculators-migration';
 import { buildHydroformingCostSummary, HYDROFORMING_NOT_COSTED } from '../../../../../modules/bom-items/costing/hydroforming/hydroforming-cost-summary';
@@ -47,8 +47,8 @@ const PLATE: HydroformPart = {
     { kind: 'curved', angleDeg: 90, lengthMm: 50, heightMm: 20, edgeRadiusMm: 30 },
   ],
   holes: [
-    { featureType: 'SimpleHole', diameterMm: 10, perimeterMm: 31.4, areaMm2: 78.5, inFlat: true, onMainSurface: true, edgeDistanceMm: 10 },
-    { featureType: 'SimpleHole', diameterMm: 10, perimeterMm: 31.4, areaMm2: 78.5, inFlat: true, onMainSurface: true, edgeDistanceMm: 2 },
+    { featureType: 'SimpleHole', diameterMm: 10, perimeterMm: 31.4, areaMm2: 78.5, inFlat: true, onMainSurface: true, edgeDistanceMm: 10, faceIds: [] },
+    { featureType: 'SimpleHole', diameterMm: 10, perimeterMm: 31.4, areaMm2: 78.5, inFlat: true, onMainSurface: true, edgeDistanceMm: 2, faceIds: [] },
   ],
   unmeasured: [],
 };
@@ -194,7 +194,7 @@ describe('Fluid Cell: the flanged plate', () => {
 
 describe('what cannot be made or measured', () => {
   it("a hole through a formed wall is pierced in the flat blank with the others, as memory's Offline Blank pierces every hole", () => {
-    const wall = { ...CUP, holes: [{ featureType: 'SimpleHole', diameterMm: 6, perimeterMm: 18.8, areaMm2: 28.3, inFlat: false, onMainSurface: false, edgeDistanceMm: null }] };
+    const wall = { ...CUP, holes: [{ featureType: 'SimpleHole', diameterMm: 6, perimeterMm: 18.8, areaMm2: 28.3, inFlat: false, onMainSurface: false, edgeDistanceMm: null, faceIds: [] }] };
     const plain = route(input(CUP), 'deep-draw');
     const deep = route(input(wall, { thicknessMm: 1 }), 'deep-draw');
     // No $0 line: the Offline Blank's one stroke pierces it, so its cut joins the blanking force (cut x 1 mm x 250 MPa shear).
@@ -236,6 +236,19 @@ describe('what cannot be made or measured', () => {
     const deep = route(input(CUP, { toolShop: null }), 'deep-draw');
     expect(deep.complete).toBe(true);
     expect(deep.tooling[0]).toMatchObject({ costUsd: null, investmentUsd: null });
+  });
+});
+
+describe('the process tree rows of each line (memory\'s catalog, the part\'s features)', () => {
+  it('the Offline Blank and the press lines carry their catalog rows, and their breakdown rows the features they act on', () => {
+    const graph = [{ id: 'blank_0', feature_type: 'Blank' }, { id: 'bend_0', feature_type: 'StraightBend' }, { id: 'hole_0', feature_type: 'SimpleHole' }];
+    const plate = { ...PLATE, holes: PLATE.holes.map((h, i) => ({ ...h, faceIds: [40 + i] })) };
+    const fluid = route(input(plate, { catalog: realHydroformingCatalog(), graphFeatures: graph }), 'fluid-cell');
+    const [blankLine, pressLine] = fluid.lines;
+    expect(blankLine.catalogOperations?.map((o) => `${o.operations[0]} // ${o.featureType} x${o.count}`)).toEqual(['Blanking // Blank x1', 'Piercing // SimpleHole x2']);
+    expect(blankLine.featureBreakdown?.[0]).toMatchObject({ name: 'Blanking // Blank', featureIds: ['blank_0'] });
+    expect(pressLine.catalogOperations?.[0]).toMatchObject({ operations: ['Fluid Cell Forming'], featureType: 'StraightBend', featureIds: ['bend_0'] });
+    expect(pressLine.featureBreakdown?.find((o) => o.name.startsWith('Loading'))?.featureIds).toEqual(['bend_0', 'hole_0']);
   });
 });
 
@@ -286,7 +299,7 @@ describe('the part as the cad-engine measures it (hf_v1)', () => {
     expect(missing).toEqual([]);
     expect(part).toMatchObject({
       depthMm: 21.5, planLengthMm: 200, planWidthMm: 100, developedAreaMm2: 28000, mainSurface: { areaMm2: 20000 }, drawn: null,
-      blank: { method: 'true_unfold', piercedHoleAreaMm2: 157.1 }, holes: [{ onMainSurface: true, edgeDistanceMm: 10 }],
+      blank: { method: 'true_unfold', piercedHoleAreaMm2: 157.1 }, holes: [{ onMainSurface: true, edgeDistanceMm: 10, faceIds: [] }],
     });
     expect(part?.blank.outlinePointsMm).toHaveLength(4);
   });

@@ -1,7 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { flushSync } from 'react-dom';
 
 const BOMItemThumbnail = dynamic(
   () => import('./BOMItemThumbnail').then((m) => m.BOMItemThumbnail),
@@ -22,13 +23,17 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info } from '@/components/ui/icons';
+import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info, Layers, Layers3, Package, Search, X } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { dropIntent, type DropIntent } from '@/lib/bom/drop-intent';
+import { rowFacts } from '@/lib/bom/row-summary';
+import { filterTree, highlightParts, matchesQuery, visibleTreeRows } from '@/lib/bom/tree-rows';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -45,6 +50,8 @@ interface BOMItemsFlatProps {
   onAddChildItem?: (parentId: string, childType: BOMItemType) => void;
   /** BOM totals exactly as the server reports them; shown in the fixed footer row. */
   totalCost?: number;
+  /** The page's own buttons (add an item), shown at the right of the list's toolbar, as Gmail keeps its actions above the list. */
+  toolbarActions?: React.ReactNode;
 }
 
 interface TreeNode extends BOMItem {
@@ -87,6 +94,12 @@ function sortNodes(nodes: TreeNode[]): void {
   });
 }
 
+/** The BOM level a row shows: its own, or its type's default when it has none. */
+function levelOf(item: { bomLevel?: string; itemType: string }): string {
+  const own = item.bomLevel?.trim() ?? '';
+  return own.length > 0 ? own : getDefaultBomLevel(item.itemType);
+}
+
 function getDefaultBomLevel(itemType: string): string {
   switch (itemType) {
     case 'assembly':    return 'L0';
@@ -96,18 +109,44 @@ function getDefaultBomLevel(itemType: string): string {
   }
 }
 
-function getItemTypeBadge(type: string): React.ReactElement {
-  const typeConfig: Record<string, { label: string; className: string }> = {
-    assembly:     { label: 'Assembly',     className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
-    sub_assembly: { label: 'Sub-Assembly', className: 'bg-primary/10 text-primary border-primary/20' },
-    child_part:   { label: 'Child Part',   className: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
+/**
+ * Each item type's colour: assembly green, sub-assembly blue, child part yellow. The row's left bar, its tree lines (an assembly's lines down
+ * to its sub-assemblies are green, a sub-assembly's down to its parts blue), a faint tint on the parent rows, the type badge (its text a
+ * shade darker in light mode, so it reads on white), the icon of a part with no file, and the legend's dot. Static class names: Tailwind
+ * cannot build them at runtime.
+ */
+interface TypeStyle {
+  label: string; Icon: React.ComponentType<{ className?: string }>;
+  accent: string; line: string; tint: string; badge: string; icon: string; dot: string;
+}
+const TYPE_STYLE: Record<string, TypeStyle> = {
+  assembly: {
+    label: 'Assembly', Icon: Layers, accent: 'border-l-4 border-l-emerald-500', line: 'border-emerald-500', tint: 'bg-emerald-500/[0.04]',
+    badge: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', icon: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500',
+  },
+  sub_assembly: {
+    label: 'Sub-Assembly', Icon: Layers3, accent: 'border-l-4 border-l-blue-500', line: 'border-blue-500', tint: 'bg-blue-500/[0.04]',
+    badge: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400', icon: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500',
+  },
+  child_part: {
+    label: 'Child Part', Icon: Box, accent: 'border-l-4 border-l-yellow-400', line: 'border-yellow-400', tint: '',
+    badge: 'border-yellow-500/50 bg-yellow-400/15 text-yellow-800 dark:text-yellow-300', icon: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-400',
+  },
+};
+const LEGEND_TYPES = ['assembly', 'sub_assembly', 'child_part'] as const;
+
+function typeStyleOf(type: string): TypeStyle {
+  return TYPE_STYLE[type] ?? {
+    label: type, Icon: Package, accent: 'border-l-4 border-l-border', line: 'border-border', tint: '',
+    badge: 'border-border bg-muted text-muted-foreground', icon: 'text-muted-foreground', dot: 'bg-muted-foreground',
   };
+}
 
-  const config = typeConfig[type] ?? { label: type, className: 'bg-muted text-muted-foreground border-muted' };
-
+function getItemTypeBadge(type: string): React.ReactElement {
+  const style = typeStyleOf(type);
   return (
-    <Badge variant="outline" className={`font-medium text-xs ${config.className}`}>
-      {config.label}
+    <Badge variant="outline" className={`h-4 shrink-0 px-1.5 text-[10px] font-medium leading-none ${style.badge}`}>
+      {style.label}
     </Badge>
   );
 }
@@ -133,7 +172,7 @@ function getErrorMessage(error: unknown): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, totalCost }: BOMItemsFlatProps) {
+export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, totalCost, toolbarActions }: BOMItemsFlatProps) {
   const { data, isLoading, refetch } = useBOMItems(bomId);
   const queryClient = useQueryClient();
 
@@ -142,7 +181,6 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   const [expandedItems, setExpandedItems]       = useState<Set<string>>(new Set());
   const [draggedItem, setDraggedItem]           = useState<BOMItem | null>(null);
   const [dragOverItem, setDragOverItem]         = useState<string | null>(null);
-  const [isDragging, setIsDragging]             = useState(false);
   const [isUpdating, setIsUpdating]             = useState(false);
   const [detailItem, setDetailItem]             = useState<BOMItem | null>(null);
 
@@ -196,6 +234,32 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
     ],
   );
 
+  // Search by name or part number: the matches with their ancestors (their place in the BOM), the branches to them opened.
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+  const search = query.trim();
+  const filtered = useMemo(
+    () => (search ? filterTree(treeData, (n) => matchesQuery(search, n.name, n.partNumber)) : null),
+    [treeData, search],
+  );
+  // "/" puts the cursor in the search box, unless one is already typing somewhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); };
+  }, []);
+  // The matched words, marked in a name or a part number.
+  const marked = (text: string): React.ReactNode =>
+    search
+      ? highlightParts(text, search).map(([part, hit], i) => (hit ? <mark key={i} className="rounded-sm bg-yellow-200 px-0.5 text-foreground dark:bg-yellow-500/40">{part}</mark> : part))
+      : text;
+
   // Auto-expand root assemblies on first load
   useEffect(() => {
     if (items.length === 0) return;
@@ -215,6 +279,13 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // -------------------------------------------------------------------------
   // UI actions
   // -------------------------------------------------------------------------
+
+  // Every item that has children, opened or closed at once.
+  const expandAll = () => {
+    const parents = new Set(items.map(i => i.parentItemId?.trim()).filter((id): id is string => !!id));
+    setExpandedItems(new Set(items.filter(i => parents.has(i.id)).map(i => i.id)));
+  };
+  const collapseAll = () => { setExpandedItems(new Set()); };
 
   const toggleExpand = (itemId: string) => {
     setExpandedItems(prev => {
@@ -255,170 +326,91 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Drag & Drop
   // -------------------------------------------------------------------------
 
-  const resetDrag = () => { setDraggedItem(null); setDragOverItem(null); setIsDragging(false); };
+  // The browser's own drag and drop, done properly: the image under the cursor is a small card of the dragged item (drawn below, off
+  // screen), not a snapshot of the whole table row; only the row under the cursor shows what dropping there does (lib/bom/drop-intent.ts),
+  // and a row where the move is not allowed is no drop target, so the browser shows its not-allowed cursor.
+  const dragCardRef = useRef<HTMLDivElement>(null);
+  const expandTimer = useRef<number | null>(null);
+  // A drop ends on a row; the click the browser may send after it must not open that row.
+  const lastDropAt  = useRef(0);
+  const isDragging  = draggedItem !== null;
+
+  const clearExpandTimer = () => {
+    if (expandTimer.current !== null) { window.clearTimeout(expandTimer.current); expandTimer.current = null; }
+  };
+  const resetDrag = () => { clearExpandTimer(); setDraggedItem(null); setDragOverItem(null); };
 
   const handleDragStart = (e: React.DragEvent, item: BOMItem) => {
+    if (isUpdating) { e.preventDefault(); return; }
     e.stopPropagation();
-    setDraggedItem(item);
-    setIsDragging(true);
+    // Draw the drag card for this item now, so the browser takes it (not the row) as the drag image, held where the cursor grabbed it.
+    flushSync(() => { setDraggedItem(item); setDragOverItem(null); });
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', item.id);
-
-    const el    = e.currentTarget as HTMLElement;
-    const clone = el.cloneNode(true) as HTMLElement;
-    clone.style.cssText = `opacity:0.8;transform:rotate(2deg);width:${el.offsetWidth}px`;
-    document.body.appendChild(clone);
-    e.dataTransfer.setDragImage(clone, el.offsetWidth / 2, 20);
-    setTimeout(() => document.body.contains(clone) && document.body.removeChild(clone), 0);
+    if (dragCardRef.current) e.dataTransfer.setDragImage(dragCardRef.current, 16, 16);
   };
 
-  const handleDragEnd   = () => resetDrag();
+  const handleDragEnd = () => { resetDrag(); };
 
-  const handleDragOver  = (e: React.DragEvent, targetItem: BOMItem) => {
+  const handleDragOver = (e: React.DragEvent, target: BOMItem) => {
+    if (!draggedItem) return;
+    const intent = dropIntent(draggedItem, target, items);
+    if (dragOverItem !== target.id) {
+      setDragOverItem(target.id);
+      clearExpandTimer();
+      // Resting on a closed parent it can go into opens it, so a part deeper down can be reached.
+      if (intent.kind === 'into' && !expandedItems.has(target.id) && items.some(c => c.parentItemId === target.id)) {
+        expandTimer.current = window.setTimeout(() => { setExpandedItems(prev => new Set(prev).add(target.id)); }, 700);
+      }
+    }
+    // Only a real move is a drop target; elsewhere the browser shows the not-allowed cursor and a drop does nothing.
+    if (intent.kind === 'none' || intent.kind === 'invalid') return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (draggedItem && draggedItem.id !== targetItem.id) setDragOverItem(targetItem.id);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverItem(null);
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetItem: BOMItem) => {
+  const handleDrop = async (e: React.DragEvent, target: BOMItem) => {
     e.preventDefault();
     e.stopPropagation();
+    lastDropAt.current = Date.now();
+    const dragged = draggedItem;
+    resetDrag();
+    if (!dragged || isUpdating || dragged.id !== e.dataTransfer.getData('text/plain')) return;
 
-    if (!draggedItem || draggedItem.id === targetItem.id || isUpdating) { resetDrag(); return; }
-    if (draggedItem.id !== e.dataTransfer.getData('text/plain'))        { resetDrag(); return; }
-
-    // Circular reference guard
-    const wouldCreateCircle = (currentId: string, searchId: string, visited = new Set<string>()): boolean => {
-      if (visited.has(currentId) || currentId === searchId) return currentId === searchId;
-      visited.add(currentId);
-      return items
-        .filter(i => i.parentItemId === currentId)
-        .some(child => child.id === searchId || wouldCreateCircle(child.id, searchId, new Set(visited)));
-    };
-
-    if (targetItem.itemType !== 'child_part' && wouldCreateCircle(draggedItem.id, targetItem.id)) {
-      toast.error('Invalid move', { description: 'Cannot move an item into its own sub-components', duration: 4000 });
-      resetDrag();
-      return;
-    }
-
-    const isSameParentReorder =
-      draggedItem.parentItemId === targetItem.parentItemId &&
-      draggedItem.itemType     === targetItem.itemType;
+    const intent: DropIntent = dropIntent(dragged, target, items);
+    if (intent.kind === 'none') return;
+    if (intent.kind === 'invalid') { toast.error('Not moved', { description: intent.label, duration: 4000 }); return; }
 
     try {
       setIsUpdating(true);
 
-      if (isSameParentReorder) {
-        // ── Same-parent reorder ──────────────────────────────────────────────
+      if (intent.kind === 'reorder') {
+        // Same parent, same type: the dragged item takes the target's place.
         const siblings = items
-          .filter(i => i.parentItemId === draggedItem.parentItemId && i.itemType === draggedItem.itemType)
+          .filter(i => i.parentItemId === dragged.parentItemId && i.itemType === dragged.itemType)
           .sort((a, b) => a.sortOrder - b.sortOrder);
-
-        const withoutDragged = siblings.filter(i => i.id !== draggedItem.id);
-        const targetIndex    = withoutDragged.findIndex(i => i.id === targetItem.id);
-        withoutDragged.splice(targetIndex, 0, draggedItem);
-
-        const updatePayloads = withoutDragged.map((item, index) => ({ id: item.id, sortOrder: index }));
-
-        if (typeof updateBOMItemsSortOrder === 'function') {
-          await updateBOMItemsSortOrder(updatePayloads);
-        } else {
-          for (const payload of updatePayloads) {
-            if (payload.sortOrder !== items.find(i => i.id === payload.id)?.sortOrder) {
-              await updateBOMItem(payload.id, { sortOrder: payload.sortOrder });
-            }
-          }
-        }
-
-        toast.success(`Reordered "${draggedItem.name}"`, { duration: 3000 });
-
+        const withoutDragged = siblings.filter(i => i.id !== dragged.id);
+        withoutDragged.splice(withoutDragged.findIndex(i => i.id === target.id), 0, dragged);
+        await updateBOMItemsSortOrder(withoutDragged.map((item, index) => ({ id: item.id, sortOrder: index })));
+        toast.success(`Reordered “${dragged.name}”`, { description: `now before “${target.name}”`, duration: 3000 });
+      } else if (intent.kind === 'swap') {
+        await updateBOMItem(dragged.id, { sortOrder: target.sortOrder });
+        await updateBOMItem(target.id,  { sortOrder: dragged.sortOrder });
+        toast.success('Assemblies reordered', { description: `${dragged.name} ↔ ${target.name}`, duration: 3000 });
       } else {
-        // ── Cross-hierarchy move ─────────────────────────────────────────────
-        const bothRootAssemblies =
-          draggedItem.itemType === 'assembly' && !draggedItem.parentItemId?.trim() &&
-          targetItem.itemType  === 'assembly' && !targetItem.parentItemId?.trim();
-
-        if (bothRootAssemblies) {
-          await updateBOMItem(draggedItem.id, { sortOrder: targetItem.sortOrder });
-          await updateBOMItem(targetItem.id,  { sortOrder: draggedItem.sortOrder });
-          toast.success('Assemblies reordered', { description: `${draggedItem.name} ↔ ${targetItem.name}`, duration: 3000 });
-
-        } else {
-          // Validate move legality
-          const isValidMove = (): boolean => {
-            const { itemType: d } = draggedItem;
-            const { itemType: t } = targetItem;
-            if (d === 'assembly' && (t === 'sub_assembly' || t === 'child_part')) return false;
-            if (d === 'sub_assembly' && t === 'child_part') return false;
-            if (d === 'child_part'   && (t === 'sub_assembly' || t === 'assembly')) return true;
-            if (d === 'sub_assembly' && t === 'assembly') return true;
-            return false;
-          };
-
-          if (!isValidMove()) {
-            toast.error('Invalid move', {
-              description: `Cannot move ${draggedItem.itemType.replace('_', ' ')} to ${targetItem.itemType.replace('_', ' ')}`,
-              duration: 4000,
-            });
-            resetDrag();
-            setIsUpdating(false);
-            return;
-          }
-
-          // Compute new parent & bomLevel for the dragged item
-          let newParentId: string | undefined;
-          let newBomLevel: string;
-
-          if (targetItem.itemType === 'assembly') {
-            newParentId = targetItem.id;
-            newBomLevel = draggedItem.itemType === 'sub_assembly' ? 'L1' : 'L2';
-          } else if (targetItem.itemType === 'sub_assembly') {
-            newParentId = targetItem.id;
-            newBomLevel = 'L2';
-          } else {
-            // child_part → become sibling
-            // ✅ Fix 2345: use `undefined` instead of `null` to match UpdateBOMItemDto
-            newParentId = targetItem.parentItemId ?? undefined;
-            newBomLevel = targetItem.bomLevel || 'L2';
-          }
-
-          const noChange =
-            draggedItem.parentItemId === (newParentId ?? null) &&
-            draggedItem.bomLevel     === newBomLevel           &&
-            draggedItem.itemType     === draggedItem.itemType;   // always same
-
-          if (!noChange) {
-            await updateBOMItem(draggedItem.id, {
-              parentItemId: newParentId,   // ✅ undefined, not null
-              bomLevel:     newBomLevel,
-              itemType:     draggedItem.itemType,
-            });
-
-            const desc =
-              targetItem.itemType === 'assembly'    ? `moved under assembly "${targetItem.name}"` :
-              targetItem.itemType === 'sub_assembly' ? `moved under sub-assembly "${targetItem.name}"` :
-              `moved to same level as "${targetItem.name}"`;
-
-            toast.success(`Moved "${draggedItem.name}"`, { description: desc, duration: 3000 });
-          }
-        }
+        await updateBOMItem(dragged.id, { parentItemId: intent.parentId, bomLevel: intent.bomLevel, itemType: dragged.itemType });
+        // Open the new parent, so the moved item is in view where it landed.
+        setExpandedItems(prev => new Set(prev).add(intent.parentId));
+        toast.success(`Moved “${dragged.name}”`, { description: `into “${target.name}”`, duration: 3000 });
       }
 
-      queryClient.invalidateQueries({ queryKey: ['bom-items'] });
+      void queryClient.invalidateQueries({ queryKey: ['bom-items'] });
       await refetch();
-
     } catch (error: unknown) {
-      // ✅ Fix 2339: getErrorMessage handles unknown type safely
       const msg = getErrorMessage(error);
       toast.error('Failed to move item', { description: msg || 'Please try again.', duration: 5000 });
     } finally {
       setIsUpdating(false);
-      resetDrag();
     }
   };
 
@@ -426,28 +418,53 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Render helpers
   // -------------------------------------------------------------------------
 
-  const numCell = 'px-3 py-2 text-right tabular-nums whitespace-nowrap';
+  // Round icon buttons, as Gmail's; their hover a shade darker than the row's (the row is already the hover colour).
+  const actionButton = 'h-7 w-7 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground';
+  const formatCost = (cost: number | undefined): string =>
+    typeof cost === 'number' ? cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+  // Gmail's hover: the row's actions take the place of its cost while the pointer is on the row (or a key has focus in it); a touch screen,
+  // with no hover, shows them all the time. Not while dragging: then the rows show where a drop would go.
+  const costHidden   = isDragging ? '' : 'group-hover:invisible group-focus-within:invisible pointer-coarse:invisible';
+  const actionsShown = isDragging
+    ? ''
+    : 'group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100';
 
-  const renderRow = (item: TreeNode, depth: number): React.ReactElement => {
+  /**
+   * One row of the tree. `guides`: for each ancestor level below the root, whether its line continues past this row (that ancestor has
+   * more children below); `isLast`: this row is the last of its parent's children, so its connector ends here (└) instead of going on (├).
+   */
+  const renderRow = (item: TreeNode, depth: number, guides: boolean[] = [], isLast = true, path: TreeNode[] = []): React.ReactElement => {
     const hasChildren    = item.children.length > 0;
     const isExpanded     = expandedItems.has(item.id);
     const isDraggedOver  = dragOverItem === item.id;
     const isBeingDragged = draggedItem?.id === item.id;
     const childType      = getChildType(item.itemType);
+    const style          = typeStyleOf(item.itemType);
+    const facts          = rowFacts(item, levelOf(item));
+    // Every line takes the colour of the items it leads to: this row's connector its own type's (a child part's yellow, a sub-assembly's
+    // blue), a line running past it the colour of the branch it joins (path[i + 1], the ancestor whose next sibling it reaches), and the
+    // line down from an open parent its children's.
+    const lineOf         = (node: TreeNode | undefined) => typeStyleOf(node?.itemType ?? '').line;
+    // What dropping the dragged item here would do: shown on this row only, while it is under the cursor.
+    const overIntent     = isDraggedOver && draggedItem ? dropIntent(draggedItem, item, items) : null;
+    const dropClass      = !overIntent ? ''
+      : overIntent.kind === 'into' ? 'bg-primary/10 [&>td]:shadow-[inset_0_2px_0_0_hsl(var(--primary)),inset_0_-2px_0_0_hsl(var(--primary))]'
+      : overIntent.kind === 'reorder' || overIntent.kind === 'swap' ? '[&>td]:shadow-[inset_0_3px_0_0_hsl(var(--primary))]'
+      : overIntent.kind === 'invalid' ? 'bg-destructive/5 [&>td]:shadow-[inset_0_2px_0_0_hsl(var(--destructive)),inset_0_-2px_0_0_hsl(var(--destructive))]'
+      : '';
 
     return (
       <tr
         key={item.id}
         aria-level={depth + 1}
         aria-expanded={hasChildren ? isExpanded : undefined}
-        draggable
-        onDragStart={e => handleDragStart(e, item)}
+        draggable={!isUpdating}
+        onDragStart={e => { handleDragStart(e, item); }}
         onDragEnd={handleDragEnd}
-        onDragOver={e => handleDragOver(e, item)}
-        onDragLeave={handleDragLeave}
-        onDrop={e => handleDrop(e, item)}
+        onDragOver={e => { handleDragOver(e, item); }}
+        onDrop={e => { void handleDrop(e, item); }}
         onClick={e => {
-          if (isDragging) { e.preventDefault(); e.stopPropagation(); return; }
+          if (isDragging || Date.now() - lastDropAt.current < 300) { e.preventDefault(); e.stopPropagation(); return; }
           // Clicking a row opens Manufacturing Intelligence -- the same
           // destination as the Cpu button. Explicit controls keep their own meaning.
           if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return;
@@ -455,115 +472,148 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           onViewItem?.(item, 'intelligence');
         }}
         className={[
-          'group border-b transition-colors hover:bg-muted/50',
-          isBeingDragged ? 'opacity-50' : '',
-          isDraggedOver ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',
+          'group border-b transition-colors',
+          // Gmail's hover: the row lifts (a soft shadow) in an opaque colour, so the actions shown over the end of its details (same colour)
+          // cover them cleanly.
+          isDragging ? '' : 'hover:relative hover:z-[1] hover:bg-accent hover:shadow-[inset_1px_0_0_hsl(var(--border)),inset_-1px_0_0_hsl(var(--border)),0_1px_2px_0_rgb(60_64_67/0.3),0_1px_3px_1px_rgb(60_64_67/0.15)]',
+          // The row being dragged stays in place, faded, so you see where it came from.
+          isBeingDragged ? 'bg-muted/40 opacity-40' : '',
+          dropClass,
           isUpdating ? 'cursor-wait opacity-75' : 'cursor-pointer',
+          dropClass ? '' : style.tint,
         ].join(' ')}
       >
-        <td className="px-3 py-2">
-          <div className="flex min-w-0 items-center gap-1" style={{ paddingLeft: `${depth * 20}px` }}>
-            <GripVertical
-              className={`h-4 w-4 shrink-0 cursor-grab active:cursor-grabbing ${
-                isBeingDragged ? 'text-primary' : isDraggedOver ? 'text-success' : 'text-muted-foreground/60 group-hover:text-muted-foreground'
-              }`}
-              aria-hidden="true"
-            />
-            {hasChildren ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0"
-                aria-label={isExpanded ? `Collapse ${item.name}` : `Expand ${item.name}`}
-                onClick={() => toggleExpand(item.id)}
-              >
-                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            ) : (
-              <span className="inline-block h-6 w-6 shrink-0" aria-hidden="true" />
-            )}
-            {(item.file3dPath || item.file2dPath) && (
-              <BOMItemThumbnail
-                item={item}
-                onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
+        <td className={`p-0 ${style.accent}`}>
+          <div className="flex h-14 min-w-0 items-stretch pr-2">
+            {/* Drag handle: the whole row is draggable; the grip shows where to take it. */}
+            <span className="flex w-6 shrink-0 items-center justify-center">
+              <GripVertical
+                className={`h-3.5 w-3.5 cursor-grab active:cursor-grabbing transition-opacity ${
+                  isBeingDragged ? 'text-primary' : 'text-muted-foreground/60 opacity-0 group-hover:opacity-100'
+                }`}
+                aria-hidden="true"
               />
+            </span>
+            {/* Tree guides: a line under each ancestor with more children below, then this row's connector (├ or └). */}
+            {guides.map((continues, i) => (
+              <span key={i} className="relative w-5 shrink-0" aria-hidden="true">
+                {continues && <span className={`absolute inset-y-0 left-1/2 border-l-2 ${lineOf(path[i + 1])}`} />}
+              </span>
+            ))}
+            {depth > 0 && (
+              <span className="relative w-5 shrink-0" aria-hidden="true">
+                <span className={`absolute left-1/2 top-0 border-l-2 ${style.line} ${isLast ? 'h-[calc(50%+1px)]' : 'h-full'}`} />
+                <span className={`absolute left-1/2 top-1/2 w-2.5 border-t-2 ${style.line}`} />
+              </span>
             )}
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="truncate text-sm font-medium text-foreground">{item.name}</span>
-                {getItemTypeBadge(item.itemType)}
-                {isDragging && !isBeingDragged && draggedItem && (
-                  <Badge variant="outline" className="text-xs">Drop to swap ↔</Badge>
-                )}
-                {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
-                  <Badge variant="destructive" className="text-xs">Circular Ref</Badge>
-                )}
-              </div>
-              {item.description && (
-                <p className="truncate text-xs text-muted-foreground" title={item.description}>{item.description}</p>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {/* Expand / collapse, with the line down to the first child when open. */}
+              <span className="relative flex w-5 shrink-0 items-center justify-center self-stretch">
+                {hasChildren ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative z-[1] h-5 w-5 rounded-sm"
+                      aria-label={isExpanded ? `Collapse ${item.name}` : `Expand ${item.name}`}
+                      onClick={() => { toggleExpand(item.id); }}
+                    >
+                      {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </Button>
+                    {isExpanded && <span className={`absolute bottom-0 left-1/2 top-[calc(50%+10px)] border-l-2 ${lineOf(item.children[0])}`} aria-hidden="true" />}
+                  </>
+                ) : null}
+              </span>
+              {(item.file3dPath || item.file2dPath) ? (
+                <BOMItemThumbnail
+                  item={item}
+                  size="sm"
+                  onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
+                />
+              ) : (
+                <span className="flex h-12 w-16 shrink-0 items-center justify-center" aria-hidden="true">
+                  <style.Icon className={`h-5 w-5 ${style.icon}`} />
+                </span>
               )}
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-[13px] font-medium leading-5 text-foreground" title={item.name}>{marked(item.name)}</span>
+                  {getItemTypeBadge(item.itemType)}
+                  {hasChildren && (
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {item.children.length} {item.children.length === 1 ? 'item' : 'items'}
+                    </span>
+                  )}
+                  {overIntent && overIntent.kind !== 'none' && (
+                    <span
+                      role="status"
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none shadow-sm ${
+                        overIntent.kind === 'invalid' ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'
+                      }`}
+                    >
+                      {overIntent.label}
+                    </span>
+                  )}
+                  {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
+                    <Badge variant="destructive" className="h-4 shrink-0 px-1.5 text-[10px]">Circular Ref</Badge>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.partNumber || '—'}</td>
-        <td className="px-3 py-2">
-          <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-medium">
-            {item.bomLevel || getDefaultBomLevel(item.itemType)}
-          </Badge>
+        {/* Gmail's subject and snippet: the part number, then the row's details in one line, cut short at the edge (all of it on hover). */}
+        <td className="max-w-0 px-2 py-0">
+          <div className="truncate text-[13px] leading-5" title={[item.partNumber, ...facts].filter(Boolean).join(' · ')}>
+            {item.partNumber && <span className="text-foreground">{marked(item.partNumber)}</span>}
+            {item.partNumber && facts.length > 0 && <span className="text-muted-foreground"> — </span>}
+            <span className="text-muted-foreground">{facts.join(' · ')}</span>
+          </div>
         </td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.materialGrade || '—'}</td>
-        <td className={numCell}>{item.quantity}</td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">{item.unit}</td>
-        <td className={numCell}>{item.annualVolume?.toLocaleString() ?? '—'}</td>
-        <td className={numCell}>
-          {typeof item.unitCost === 'number'
-            ? item.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : '—'}
-        </td>
-        <td className={numCell}>{item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : '—'}</td>
-        <td className="px-3 py-2">
-          <div className="flex items-center justify-end gap-1">
+        {/* Gmail's date: the unit cost, which the row's actions replace on hover. */}
+        <td className="relative whitespace-nowrap py-0 pl-2 pr-4 text-right">
+          <span className={`text-[13px] font-medium tabular-nums ${costHidden}`} title="Unit cost">{formatCost(item.unitCost)}</span>
+          <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center justify-end gap-0.5 bg-accent pl-2 pr-2 opacity-0 transition-opacity pointer-coarse:bg-card ${actionsShown}`}>
             {item.file2dPath && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing" aria-label="View 2D Drawing">
-                <FileText className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className={actionButton} onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing" aria-label="View 2D Drawing">
+                <FileText className="h-3.5 w-3.5" />
               </Button>
             )}
             {item.file3dPath && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '3d')} title="View 3D Model" aria-label="View 3D Model">
-                <Box className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className={actionButton} onClick={() => onViewItem?.(item, '3d')} title="View 3D Model" aria-label="View 3D Model">
+                <Box className="h-3.5 w-3.5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDetailItem(item); }} title="Part details" aria-label="Part details">
-              <Info className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className={actionButton} onClick={() => { setDetailItem(item); }} title="Part details" aria-label="Part details">
+              <Info className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7 rounded-full hover:bg-foreground/10"
               onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
               title="Manufacturing Intelligence"
               aria-label="Manufacturing Intelligence"
             >
-              <Cpu className="h-4 w-4 text-primary" />
+              <Cpu className="h-3.5 w-3.5 text-primary" />
             </Button>
             {childType && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddChild(item)} title="Add Component" aria-label="Add Component">
-                <Plus className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className={actionButton} onClick={() => { handleAddChild(item); }} title="Add Component" aria-label="Add Component">
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditItem(item)} title="Edit" aria-label="Edit">
-              <Edit2 className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className={actionButton} onClick={() => { onEditItem(item); }} title="Edit" aria-label="Edit">
+              <Edit2 className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              className="h-7 w-7 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={() => handleDeleteClick(item)}
               title="Delete"
               aria-label="Delete"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </td>
@@ -571,30 +621,47 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
     );
   };
 
-  // Flatten the hierarchy into the rows that are currently visible.
-  const visibleRows = (nodes: TreeNode[], depth = 0): React.ReactElement[] =>
-    nodes.flatMap(node => [
-      renderRow(node, depth),
-      ...(expandedItems.has(node.id) && node.children.length > 0 ? visibleRows(node.children, depth + 1) : []),
-    ]);
+  // The rows currently visible, with the tree each draws (lib/bom/tree-rows.ts).
+  const visibleRows = (nodes: TreeNode[], expanded: ReadonlySet<string>): React.ReactElement[] =>
+    visibleTreeRows(nodes, expanded).map((r) => renderRow(r.node, r.depth, r.guides, r.isLast, r.path));
+  const rowsTree     = filtered ? filtered.nodes : treeData;
+  const rowsExpanded = filtered ? new Set([...expandedItems, ...filtered.expand]) : expandedItems;
 
   // -------------------------------------------------------------------------
   // Loading / empty states
   // -------------------------------------------------------------------------
 
+  // Gmail's toolbar: one flat row on top of the list (no box of its own: it is part of the page), the page's add buttons and the list's own
+  // tools at the left, the count and the total cost at the right, in line with the costs below (the same right padding, pr-4).
+  const toolbarClass = 'flex flex-wrap items-center gap-1 border-b py-1.5 pr-4';
+  const actionsOnly  = toolbarActions
+    ? <div className={toolbarClass}><div className="flex flex-wrap items-center gap-1">{toolbarActions}</div></div>
+    : null;
+  const totalLabel   = formatCost(totalCost);
+
   if (isLoading) {
     return (
-      <TableSkeleton rows={6} columns={5} label="Loading BOM items..." />
+      <>
+        {actionsOnly}
+        <div className="p-3">
+          <TableSkeleton rows={6} columns={5} label="Loading BOM items..." />
+        </div>
+      </>
     );
   }
 
   if (items.length === 0) {
     return (
-      <EmptyState
-        title="No items yet"
-        description={'Start adding items to your BOM by clicking the "Add BOM" button above.'}
-        className="rounded-lg border border-dashed"
-      />
+      <>
+        {actionsOnly}
+        <div className="p-4">
+          <EmptyState
+            title="No items yet"
+            description={'Start adding items to your BOM by clicking the "Add BOM" button above.'}
+            className="rounded-lg border border-dashed"
+          />
+        </div>
+      </>
     );
   }
 
@@ -615,34 +682,110 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Main render
   // -------------------------------------------------------------------------
 
-  const th = 'sticky top-0 z-10 bg-muted px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_hsl(var(--border))]';
-  const thNum = `${th} text-right`;
-
   return (
     <>
-      <div className="max-h-[70vh] overflow-auto rounded-md border">
-        <table role="treegrid" aria-label="BOM items" className="w-full caption-bottom border-collapse text-sm">
-          <thead>
-            <tr className="text-left">
-              <th scope="col" className={`${th} min-w-[280px] text-left`}>Item</th>
-              <th scope="col" className={`${th} text-left`}>Part No</th>
-              <th scope="col" className={`${th} text-left`}>Level</th>
-              <th scope="col" className={`${th} text-left`}>Type</th>
-              <th scope="col" className={`${th} text-left`}>Material</th>
-              <th scope="col" className={thNum}>Qty</th>
-              <th scope="col" className={`${th} text-left`}>UOM</th>
-              <th scope="col" className={thNum}>Annual Vol.</th>
-              <th scope="col" className={thNum}>Unit Cost</th>
-              <th scope="col" className={thNum}>Weight</th>
-              <th scope="col" className={`${th} text-right`}><span className="sr-only">Actions</span></th>
+      {/* Gmail's search box: a wide, soft pill, white with a shadow while typing. "/" puts the cursor in it. */}
+      <div className="flex flex-wrap items-center gap-3 pb-3">
+        <div className="relative w-full max-w-2xl">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); }}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
+            placeholder="Search by name or part no."
+            aria-label="Search the BOM by name or part number"
+            className="h-11 rounded-full border-transparent bg-muted pl-11 pr-14 text-sm shadow-none transition-shadow focus-visible:border-transparent focus-visible:bg-card focus-visible:shadow-md focus-visible:ring-0"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => { setQuery(''); searchRef.current?.focus(); }}
+              className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <kbd className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded border bg-card px-1.5 font-mono text-[10px] text-muted-foreground">/</kbd>
+          )}
+        </div>
+        {filtered && (
+          <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+            {filtered.matches.size} of {items.length} {items.length === 1 ? 'item' : 'items'}
+          </span>
+        )}
+      </div>
+      {/* The page's add buttons, the whole tree opened or closed at once; the count and total cost at the right (Gmail's "1–50 of 283"). */}
+      <div className={toolbarClass}>
+        {toolbarActions && <div className="flex flex-wrap items-center gap-1">{toolbarActions}</div>}
+        {toolbarActions && <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />}
+        <Button variant="ghost" size="sm" className="h-9 gap-1 rounded-full px-3 text-xs text-muted-foreground hover:bg-foreground/10 hover:text-foreground" onClick={expandAll}>
+          <ChevronDown className="h-3.5 w-3.5" /> Expand all
+        </Button>
+        <Button variant="ghost" size="sm" className="h-9 gap-1 rounded-full px-3 text-xs text-muted-foreground hover:bg-foreground/10 hover:text-foreground" onClick={collapseAll}>
+          <ChevronRight className="h-3.5 w-3.5" /> Collapse all
+        </Button>
+        <span className="ml-auto whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+          {items.length} {items.length === 1 ? 'item' : 'items'} · Total cost <span className="font-semibold text-foreground">{totalLabel}</span>
+        </span>
+      </div>
+      {/*
+        The drag image: a card of the item being dragged, drawn off screen for the browser to take under the cursor (handleDragStart). Only
+        while dragging, so no empty box is ever left on the page.
+      */}
+      {draggedItem && (() => {
+        const s = typeStyleOf(draggedItem.itemType);
+        return (
+          <div
+            ref={dragCardRef}
+            aria-hidden="true"
+            className={`pointer-events-none fixed left-0 top-[-1000px] flex w-72 items-center gap-2.5 rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-lg ${s.accent}`}
+          >
+            <s.Icon className={`h-4 w-4 shrink-0 ${s.icon}`} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{draggedItem.name}</span>
+              <span className="block truncate font-mono text-[11px] text-muted-foreground">{(draggedItem.partNumber ?? '') === '' ? s.label : draggedItem.partNumber}</span>
+            </span>
+            {getItemTypeBadge(draggedItem.itemType)}
+          </div>
+        );
+      })()}
+      {/*
+        No height or box of its own: the list is part of the page (one scroll, the page's). Three columns of fixed share, as Gmail's sender,
+        subject and date, so the list always fits the page's width (no sideways scroll); only a phone-narrow screen scrolls it sideways.
+      */}
+      <div
+        className="overflow-x-auto"
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOverItem(null); }}
+      >
+        <table role="treegrid" aria-label="BOM items" className="w-full min-w-[720px] table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-[44%]" />
+            <col />
+            <col className="w-32" />
+          </colgroup>
+          <thead className="sr-only">
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col">Part number and details</th>
+              <th scope="col">Unit cost and actions</th>
             </tr>
           </thead>
           <tbody>
-            {visibleRows(treeData)}
+            {visibleRows(rowsTree, rowsExpanded)}
+            {filtered?.matches.size === 0 && (
+              <tr>
+                <td colSpan={3} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  No item matches &ldquo;{search}&rdquo; by name or part number.{' '}
+                  <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setQuery(''); }}>Clear search</button>
+                </td>
+              </tr>
+            )}
             {orphanedItems.length > 0 && (
               <>
                 <tr>
-                  <td colSpan={11} className="bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                  <td colSpan={3} className="bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
                     Orphaned Items (Missing Parent Reference)
                   </td>
                 </tr>
@@ -650,21 +793,26 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
               </>
             )}
           </tbody>
+          {/* The total under the costs; the item types, as the rows colour them, with how many of each. */}
           <tfoot>
-            <tr className="font-medium">
-              <td colSpan={5} className="sticky bottom-0 z-10 bg-muted px-3 py-2 text-sm shadow-[inset_0_1px_0_hsl(var(--border))]">
-                Total <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
+            <tr>
+              <td colSpan={2} className="border-t py-2.5 pl-3 pr-3 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium">
+                    Total cost <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
+                  </span>
+                  {LEGEND_TYPES.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1.5 text-muted-foreground">
+                      <span className={`h-2 w-2 rounded-full ${typeStyleOf(t).dot}`} aria-hidden="true" />
+                      {typeStyleOf(t).label}
+                      <span className="tabular-nums text-muted-foreground/70">{items.filter((i) => i.itemType === t).length}</span>
+                    </span>
+                  ))}
+                </div>
               </td>
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted px-3 py-2 text-right text-sm tabular-nums whitespace-nowrap shadow-[inset_0_1px_0_hsl(var(--border))]">
-                {typeof totalCost === 'number'
-                  ? totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                  : '—'}
+              <td className="whitespace-nowrap border-t py-2.5 pl-2 pr-4 text-right text-xs font-semibold tabular-nums">
+                {totalLabel}
               </td>
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
             </tr>
           </tfoot>
         </table>

@@ -60,11 +60,14 @@ function blankPresses(): SandMachine[] {
 
 export const allHydroformingMachines = (): Record<string, SandMachine[]> => ({ [HYDROFORMING_CLASS.press]: presses(), [HYDROFORMING_CLASS.blank]: blankPresses() });
 
-/** The Digital Factory USA Default tool shop (memory/Plastic Modeling/process), as CastingReferenceService.getToolShop reads it. */
+/**
+ * The Digital Factory USA Default tool shop (memory/plastic modeling/process), as CastingReferenceService.getToolShop reads it. The folder is
+ * spelled as the reference-data repository has it (lowercase): CI checks that repository out on a case-sensitive file system.
+ */
 export function realToolShop(): ToolShop {
   const { shop, missing } = resolveToolShop({
-    digital_factory_settings_usa: rows(join(MEMORY, 'Plastic Modeling/process/digital_factory_settings_usa.csv')),
-    digital_factory_tool_materials_usa: rows(join(MEMORY, 'Plastic Modeling/process/digital_factory_tool_materials_usa.csv')),
+    digital_factory_settings_usa: rows(join(MEMORY, 'plastic modeling/process/digital_factory_settings_usa.csv')),
+    digital_factory_tool_materials_usa: rows(join(MEMORY, 'plastic modeling/process/digital_factory_tool_materials_usa.csv')),
   });
   if (!shop) throw new Error(missing.join('; '));
   return shop;
@@ -74,3 +77,7 @@ export function realToolShop(): ToolShop {
 export const MILD_STEEL: HydroformingMaterial = {
   id: 'raw-materials:steel-cr-1010', name: 'Steel, Cold Rolled, AISI 1010', materialType: 'Steel', densityKgM3: 7850, costPerKgUsd: 1.75, utsMpa: 330, shearStrengthMpa: 250,
 };
+
+/** Memory's catalog of the process (memory/Sheetmetal Hydroforming/operations, staged as process_taxonomy_operations): each row once. */
+export const realHydroformingCatalog = (): string[] =>
+  [...new Set(rows(join(DIR, 'operations (6).csv')).map((r) => (typeof r['Process Name'] === 'string' ? r['Process Name'].trim() : '')).filter((s) => s.includes('//')))];
