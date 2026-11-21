@@ -114,14 +114,43 @@ export class CalculatorsServiceV2 {
     // Retired calculators (calculators.retired_at, migration 804) stay in the
     // table so a saved reference still opens, but are never offered again.
     const active = (data || []).filter((c: any) => !c.retired_at);
+    const groups = await this.processGroupsOf(client, active as unknown as Array<{ id: string; name: string }>);
     return {
-      calculators: active,
+      calculators: active.map((c: any) => ({ ...c, process_groups: groups.get(String(c.id)) ?? [] })),
       total: Math.max((count || 0) - ((data || []).length - active.length), 0),
       page,
       limit,
       // Rows after this page, retired ones included: a page can be short of its active rows and still not be the last.
       hasMore: from + (data || []).length < (count ?? 0),
     };
+  }
+
+  /**
+   * The process groups each calculator computes an operation of (process_calculator_mappings): linked by its id, or, on the seeded rows
+   * that name their calculator without linking it, by its name. A calculator no catalog row maps to (a helper the engine runs) has none.
+   */
+  private async processGroupsOf(client: ReturnType<DatabaseService['getClient']>, calculators: Array<{ id: string; name: string }>): Promise<Map<string, string[]>> {
+    const out = new Map<string, string[]>();
+    if (calculators.length === 0) return out;
+    const select = 'calculator_id, calculator_name, process_group';
+    const [byId, byName] = await Promise.all([
+      client.from('process_calculator_mappings').select(select).in('calculator_id', calculators.map((c) => c.id)),
+      client.from('process_calculator_mappings').select(select).is('calculator_id', null).in('calculator_name', calculators.map((c) => c.name)),
+    ]);
+    if (byId.error || byName.error) {
+      this.logger.error(`Failed to read the calculators' process groups: ${(byId.error ?? byName.error)!.message}`, 'CalculatorsServiceV2');
+      return out;
+    }
+    const idOfName = new Map(calculators.map((c) => [c.name, c.id]));
+    for (const m of [...(byId.data ?? []), ...(byName.data ?? [])] as Array<{ calculator_id: string | null; calculator_name: string | null; process_group: string | null }>) {
+      const id = m.calculator_id ?? (m.calculator_name ? idOfName.get(m.calculator_name) : undefined);
+      if (!id || !m.process_group) continue;
+      const list = out.get(id) ?? [];
+      if (!list.includes(m.process_group)) list.push(m.process_group);
+      out.set(id, list);
+    }
+    for (const list of out.values()) list.sort();
+    return out;
   }
 
   /**
