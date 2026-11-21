@@ -18,6 +18,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -2096,6 +2097,9 @@ export default function QualityInspectionPage() {
             />
           </div>
         </div>
+
+        {/* Project sections: shared tab bar, Quality is the active tab */}
+        <ProjectNav projectId={projectId} className="mb-3 sm:mb-4" />
 
         {/* 2D Drawing Display */}
         <div className="w-full min-w-0">

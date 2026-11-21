@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { RfqStatusBadge } from '@/components/features/rfq/RfqStatusBadge';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Mail, Clock, CheckCircle, AlertCircle, MessageSquare } from '@/components/ui/icons';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
 
 // Supplier communications are the RFQs the backend has recorded as sent
@@ -62,28 +64,31 @@ export default function RFQCommunicationsPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="-mb-2 flex items-center gap-1 overflow-x-auto border-b" role="tablist" aria-label="Communication views">
-          {(['active', 'templates', 'history'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={selectedTab === tab}
-              className={`-mb-px inline-flex h-10 items-center gap-2 border-b-2 px-3 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                selectedTab === tab
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-              }`}
-              onClick={() => { setSelectedTab(tab); }}
-            >
-              {tab === 'active' && <Mail className="h-4 w-4" />}
-              {tab === 'templates' && <MessageSquare className="h-4 w-4" />}
-              {tab === 'history' && <Clock className="h-4 w-4" />}
-              {tab}
-            </button>
-          ))}
-        </div>
+        {/* Project sections: shared tab bar, RFQ is the active tab */}
+        <ProjectNav projectId={projectId} />
+
+        {/* Tabs (shadcn Tabs: same selectedTab state, adds arrow-key navigation) */}
+        <Tabs
+          value={selectedTab}
+          onValueChange={(value) => {
+            if (value === 'active' || value === 'templates' || value === 'history') setSelectedTab(value);
+          }}
+        >
+          <TabsList aria-label="Communication views" className="w-full overflow-x-auto">
+            <TabsTrigger value="active" className="gap-2">
+              <Mail className="h-4 w-4" aria-hidden="true" />
+              Active
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="gap-2">
+              <MessageSquare className="h-4 w-4" aria-hidden="true" />
+              Templates
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              <Clock className="h-4 w-4" aria-hidden="true" />
+              History
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* ACTIVE COMMUNICATIONS */}
         {selectedTab === 'active' && (

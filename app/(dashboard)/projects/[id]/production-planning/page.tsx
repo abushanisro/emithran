@@ -7,7 +7,9 @@ import { useState } from 'react';
 import { CreateProductionLotModal } from '@/components/features/production-planning/CreateProductionLotModal';
 import { ProductionDashboard } from '@/components/features/production-planning/ProductionDashboard';
 import { ProductionLotsTable } from '@/components/features/production-planning/ProductionLotsTable';
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,34 +64,30 @@ export default function ProjectProductionPlanningPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-[1800px] mx-auto space-y-6">
-        {/* BREADCRUMB & HEADER */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Link
-                href={`/projects/${projectId}`}
-                className="flex items-center gap-1 hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-3 w-3" />
-                Back to Project
-              </Link>
-              <span>/</span>
-              <span>Production Planning</span>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Production Planning - {project?.name || 'Project'}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Manage production lots for {project?.name || 'this project'}
-            </p>
-          </div>
-          <Button onClick={() => setCreateDialogOpen(true)} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create Production Lot
+    <div className="animate-fade-in">
+      <div className="space-y-6">
+        {/* HEADER: same back action, title and button as before, in the shared PageHeader */}
+        <div className="flex items-start gap-3">
+          <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to project" asChild>
+            <Link href={`/projects/${projectId}`}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
+          <div className="min-w-0 flex-1">
+            <PageHeader
+              title={`Production Planning - ${project?.name || 'Project'}`}
+              description={`Manage production lots for ${project?.name || 'this project'}`}
+            >
+              <Button onClick={() => setCreateDialogOpen(true)} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Create Production Lot
+              </Button>
+            </PageHeader>
+          </div>
         </div>
+
+        {/* Project sections: shared tab bar, Production is the active tab */}
+        <ProjectNav projectId={projectId} />
 
         {/* PROJECT INFO CARD */}
         {project && (

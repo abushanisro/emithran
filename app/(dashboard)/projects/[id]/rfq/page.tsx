@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { RfqStatusBadge } from '@/components/features/rfq/RfqStatusBadge';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -16,6 +17,7 @@ import { ArrowLeft, FileText, Send, Users, Calendar, Clock, CheckCircle, Mail, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mark } from '@/components/ui/status-mark';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { apiConfig } from '@/lib/api/config';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
@@ -193,6 +195,9 @@ export default function RFQPage() {
             </PageHeader>
           </div>
         </div>
+
+        {/* Project sections: shared tab bar, RFQ is the active tab */}
+        <ProjectNav projectId={projectId} />
 
         {/* Overview cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -401,28 +406,28 @@ export default function RFQPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {/* Email Management Tabs */}
-              <div className="flex items-center gap-1 overflow-x-auto border-b" role="tablist" aria-label="Email management">
-                {['overview', 'compose', 'history'].map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    role="tab"
-                    aria-selected={emailView === tab}
-                    className={`-mb-px inline-flex h-10 items-center gap-2 border-b-2 px-3 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      emailView === tab
-                        ? 'border-primary text-foreground'
-                        : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                    }`}
-                    onClick={() => { setEmailView(tab as any); }}
-                  >
-                    {tab === 'overview' && <Users className="h-4 w-4" />}
-                    {tab === 'compose' && <Send className="h-4 w-4" />}
-                    {tab === 'history' && <Clock className="h-4 w-4" />}
-                    {tab}
-                  </button>
-                ))}
-              </div>
+              {/* Email Management Tabs (shadcn Tabs: same emailView state, adds arrow-key navigation) */}
+              <Tabs
+                value={emailView}
+                onValueChange={(value) => {
+                  if (value === 'overview' || value === 'compose' || value === 'history') setEmailView(value);
+                }}
+              >
+                <TabsList aria-label="Email management" className="w-full overflow-x-auto">
+                  <TabsTrigger value="overview" className="gap-2">
+                    <Users className="h-4 w-4" aria-hidden="true" />
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="compose" className="gap-2">
+                    <Send className="h-4 w-4" aria-hidden="true" />
+                    Compose
+                  </TabsTrigger>
+                  <TabsTrigger value="history" className="gap-2">
+                    <Clock className="h-4 w-4" aria-hidden="true" />
+                    History
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
 
               {/* Overview - RFQ with BOM Details */}
               {emailView === 'overview' && (

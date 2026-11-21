@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import BalloonDiagramViewer from '@/components/features/project-reports/BalloonDiagramViewer';
 import InspectionReportTable from '@/components/features/project-reports/InspectionReportTable';
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -327,6 +328,9 @@ export default function ProjectReportPage() {
         projectName={currentProject.name}
         inspectionReport={inspectionReport}
       />
+
+      {/* Project sections: shared tab bar, Reports is the active tab (hidden when printing the report) */}
+      <ProjectNav projectId={projectId} className="print:hidden" />
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="h-10 w-full justify-start overflow-x-auto sm:w-fit">

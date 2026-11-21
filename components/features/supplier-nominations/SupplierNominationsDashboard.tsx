@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import React, { useState, useMemo } from 'react';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -167,6 +168,9 @@ export function SupplierNominationsDashboard({
           </PageHeader>
         </div>
       </div>
+
+      {/* Project sections: shared tab bar, Nomination is the active tab */}
+      <ProjectNav projectId={projectId} />
 
       {/* Currently selected BOM */}
       {selectedBomId && (

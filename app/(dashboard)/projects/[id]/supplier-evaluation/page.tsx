@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useCallback } from 'react';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import {
   NewEvaluationDialog,
   SupplierEvaluationDashboard,
@@ -72,7 +73,7 @@ export default function SupplierEvaluationPage() {
       return (
         <div className="space-y-6">
           <div className="flex items-start gap-3">
-            <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back" onClick={() => setCurrentView('dashboard')}>
+            <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to evaluations" onClick={() => setCurrentView('dashboard')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0 flex-1">
@@ -115,7 +116,7 @@ export default function SupplierEvaluationPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-start gap-3">
-          <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back" onClick={() => router.push(`/projects/${projectId}`)}>
+          <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to project" onClick={() => router.push(`/projects/${projectId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
@@ -125,6 +126,9 @@ export default function SupplierEvaluationPage() {
             />
           </div>
         </div>
+
+        {/* Project sections: shared tab bar, Supplier Evaluation is the active tab */}
+        <ProjectNav projectId={projectId} />
 
         <SupplierEvaluationDashboard
           projectId={projectId}
@@ -154,7 +158,7 @@ export default function SupplierEvaluationPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
-        <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back" onClick={() => router.push(`/projects/${projectId}`)}>
+        <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to project" onClick={() => router.push(`/projects/${projectId}`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="min-w-0 flex-1">

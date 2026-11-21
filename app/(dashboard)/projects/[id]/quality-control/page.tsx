@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { Fragment, useState, useEffect } from 'react';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
@@ -220,6 +221,9 @@ export default function QualityControlPage() {
           </PageHeader>
         </div>
       </div>
+
+      {/* Project sections: shared tab bar, Quality is the active tab */}
+      <ProjectNav projectId={projectId} />
 
       {/* Search */}
       <div className="relative w-full sm:max-w-sm">
