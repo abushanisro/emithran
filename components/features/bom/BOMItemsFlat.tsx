@@ -112,8 +112,8 @@ function getDefaultBomLevel(itemType: string): string {
 
 /**
  * Each item type's colour: assembly green, sub-assembly blue, child part yellow. The row's left bar, its tree lines (an assembly's lines down
- * to its sub-assemblies are green, a sub-assembly's down to its parts blue), a faint tint on the parent rows, the type badge (its text a
- * shade darker in light mode, so it reads on white), the icon of a part with no file, and the legend's dot. Static class names: Tailwind
+ * to its sub-assemblies are green, a sub-assembly's down to its parts blue), a faint tint on the parent rows, the type's name (coloured text,
+ * no box; a shade darker in light mode, so it reads on white), the icon of a part with no file, and the legend's dot. Static class names: Tailwind
  * cannot build them at runtime.
  */
 interface TypeStyle {
@@ -123,15 +123,15 @@ interface TypeStyle {
 const TYPE_STYLE: Record<string, TypeStyle> = {
   assembly: {
     label: 'Assembly', Icon: Layers, accent: 'border-l-4 border-l-emerald-500', line: 'border-emerald-500', tint: 'bg-emerald-500/[0.04]',
-    badge: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', icon: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500',
+    badge: 'text-emerald-700 dark:text-emerald-400', icon: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500',
   },
   sub_assembly: {
     label: 'Sub-Assembly', Icon: Layers3, accent: 'border-l-4 border-l-blue-500', line: 'border-blue-500', tint: 'bg-blue-500/[0.04]',
-    badge: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400', icon: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500',
+    badge: 'text-blue-700 dark:text-blue-400', icon: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500',
   },
   child_part: {
     label: 'Child Part', Icon: Box, accent: 'border-l-4 border-l-yellow-400', line: 'border-yellow-400', tint: '',
-    badge: 'border-yellow-500/50 bg-yellow-400/15 text-yellow-800 dark:text-yellow-300', icon: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-400',
+    badge: 'text-yellow-800 dark:text-yellow-300', icon: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-400',
   },
 };
 const LEGEND_TYPES = ['assembly', 'sub_assembly', 'child_part'] as const;
@@ -139,17 +139,14 @@ const LEGEND_TYPES = ['assembly', 'sub_assembly', 'child_part'] as const;
 function typeStyleOf(type: string): TypeStyle {
   return TYPE_STYLE[type] ?? {
     label: type, Icon: Package, accent: 'border-l-4 border-l-border', line: 'border-border', tint: '',
-    badge: 'border-border bg-muted text-muted-foreground', icon: 'text-muted-foreground', dot: 'bg-muted-foreground',
+    badge: 'text-muted-foreground', icon: 'text-muted-foreground', dot: 'bg-muted-foreground',
   };
 }
 
+/** The item's type as a word in its type's colour: no box around it (the row's bar and tree lines already carry the colour). */
 function getItemTypeBadge(type: string): React.ReactElement {
   const style = typeStyleOf(type);
-  return (
-    <Badge variant="outline" className={`h-4 shrink-0 px-1.5 text-[10px] font-medium leading-none ${style.badge}`}>
-      {style.label}
-    </Badge>
-  );
+  return <span className={`shrink-0 text-[11px] font-medium leading-none ${style.badge}`}>{style.label}</span>;
 }
 
 function getChildType(parentType: string): BOMItemType | null {
