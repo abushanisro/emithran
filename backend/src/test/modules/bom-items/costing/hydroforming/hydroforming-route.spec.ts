@@ -9,7 +9,7 @@ import { buildHydroformingCostSummary, HYDROFORMING_NOT_COSTED } from '../../../
 import { rectangleNest, type HydroformingCostResult } from '../../../../../modules/bom-items/costing/hydroforming/hydroforming-cost.service';
 import { hydroformPart, type HydroformPart } from '../../../../../modules/bom-items/costing/hydroforming/hydroforming-part';
 import {
-  blankAddendum, buildHydroformingRoutes, chooseHydroformingRoute, drawCount, hydroformingRule, manualFormLength,
+  blankAddendum, buildHydroformingRoutes, chooseHydroformingRoute, drawCount, hydroformingRule, manualFormLength, sheetMeasure,
   type HydroformingNest, type HydroformingRouteInput,
 } from '../../../../../modules/bom-items/costing/hydroforming/hydroforming-route';
 import { hydroformingRouteFor } from '../../../../../modules/bom-items/costing/hydroforming/hydroforming-route-comparison';
@@ -103,6 +103,13 @@ describe('Deep Draw: the cup', () => {
     while (dia > 80) { dia *= Number(row[`Draw Punch Ratio0${Math.min(draws, 3)}`]) / 100; draws += 1; }
     expect(deep.draws).toBe(draws);
     expect(drawCount(ref, blankDia, 80, 1, false)?.draws).toBe(draws);
+  });
+
+  it('lists the ratio of each draw made, not every column of the table row (LEAD NUT HOUSING: 2 draws listed 52 > 70 > 75 > 75)', () => {
+    // A 1 mm row (52, 70, 75, 75): a 100 mm blank to a 40 mm opening is 52 then 36.4 mm, two draws.
+    expect(drawCount(ref, 100, 40, 1, false)).toEqual({ draws: 2, ratiosPct: [52, 70] });
+    // Past the row's columns the last ratio repeats: 100 -> 52 -> 36.4 -> 27.3 -> 20.5 -> 15.4 mm is five draws.
+    expect(drawCount(ref, 100, 16, 1, false)).toEqual({ draws: 5, ratiosPct: [52, 70, 75, 75, 75] });
   });
 
   it('the blank carries blankAddendumWidth at the 60 mm drawn depth on each side (trimmed after drawing)', () => {
@@ -229,6 +236,29 @@ describe('what cannot be made or measured', () => {
     const deep = route(input(CUP, { toolShop: null }), 'deep-draw');
     expect(deep.complete).toBe(true);
     expect(deep.tooling[0]).toMatchObject({ costUsd: null, investmentUsd: null });
+  });
+});
+
+describe('a part that is not one sheet (the user\'s limits, 2026-11-21: refused above 2x, warned above 1.25x)', () => {
+  // The real parts' volumes and the sheet the cad-engine measured on them.
+  const measured = (developedAreaMm2: number) => ({ ...PLATE, developedAreaMm2 });
+
+  it('a sheet part (its volume about its developed area x thickness) passes', () => {
+    expect(sheetMeasure(CUP, 1, CUP_AREA * 1.02)).toMatchObject({ refuse: null, warn: null });
+  });
+
+  it('a machined block measured as a thin sheet is refused, naming both causes (R_M-0230-032 LEAD NUT HOUSING: 7.3x; FusionComponent: 4.7x)', () => {
+    const housing = sheetMeasure(measured(756.8), 1, 5506.91);
+    expect(housing?.ratio).toBeCloseTo(7.28, 2);
+    expect(housing?.refuse).toBe("the part is not hydroformed from one sheet: the cad-engine found 14 % of the part's 5,507 mm³ as a 1 mm sheet (757 mm² developed, 7.28x); it is not a sheet part, or its sheet was not all measured (a curved sheet of B-spline faces is not found)");
+    expect(sheetMeasure(measured(88.4), 5, 2055.51)?.refuse).toMatch(/^the part is not hydroformed from one sheet/);
+  });
+
+  it('a part partly sheet is quoted with a warning (Cannula Holder bottom: 1.57x); no volume, no check', () => {
+    const cannula = sheetMeasure(measured(2051), 3.5, 11274.25);
+    expect(cannula).toMatchObject({ refuse: null });
+    expect(cannula?.warn).toMatch(/^Not all of the part is sheet: the cad-engine found 64 % of the part's 11,274 mm³ as a 3.5 mm sheet/);
+    expect(sheetMeasure(PLATE, 1.5, null)).toBeNull();
   });
 });
 

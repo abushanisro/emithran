@@ -85,6 +85,27 @@ export interface HydroformingRouteInput {
   toolShop: HydroformToolShop | null;
 }
 
+/**
+ * How much of the part is the sheet it is hydroformed from: its volume over the sheet the cad-engine measured (developed area x thickness).
+ * A sheet part is about 1. Memory has no rule for this; the limits are the user's decision (2026-11-21): above NOT_A_SHEET_RATIO the part is not
+ * hydroformed from one sheet (a machined block measured as a thin sheet: R_M-0230-032 LEAD NUT HOUSING, 7.3x), above SHEET_WARN_RATIO it is
+ * quoted with a warning. A curved sheet of B-spline faces is not found by the cad-engine's twin search either, so the reason names both causes.
+ */
+export const NOT_A_SHEET_RATIO = 2;
+export const SHEET_WARN_RATIO = 1.25;
+
+export function sheetMeasure(part: HydroformPart, thicknessMm: number, partVolumeMm3: number | null | undefined): { ratio: number; refuse: string | null; warn: string | null } | null {
+  const sheetMm3 = part.developedAreaMm2 * thicknessMm;
+  if (!(partVolumeMm3 != null && partVolumeMm3 > 0 && sheetMm3 > 0)) return null;
+  const ratio = partVolumeMm3 / sheetMm3;
+  const found = `the cad-engine found ${Math.round((100 * sheetMm3) / partVolumeMm3)} % of the part's ${Math.round(partVolumeMm3).toLocaleString('en-US')} mm³ `
+    + `as a ${r2(thicknessMm)} mm sheet (${Math.round(part.developedAreaMm2).toLocaleString('en-US')} mm² developed, ${r2(ratio)}x)`;
+  const causes = 'it is not a sheet part, or its sheet was not all measured (a curved sheet of B-spline faces is not found)';
+  if (ratio > NOT_A_SHEET_RATIO) return { ratio, refuse: `the part is not hydroformed from one sheet: ${found}; ${causes}`, warn: null };
+  if (ratio > SHEET_WARN_RATIO) return { ratio, refuse: null, warn: `Not all of the part is sheet: ${found}. The quote prices that sheet; ${causes}.` };
+  return { ratio, refuse: null, warn: null };
+}
+
 /** Which route memory's rule gives the part: depth over width at or above fluidCellFormingRatioThreshold is Deep Draw, below it Fluid Cell. */
 export interface HydroformingRule {
   route: HydroformingRouteKey;
@@ -166,7 +187,8 @@ export function drawCount(ref: SandReference, blankDiaMm: number, openingMm: num
   let dia = blankDiaMm;
   for (let n = 1; n <= 20; n++) {
     dia *= ratios[Math.min(n - 1, ratios.length - 1)] / 100;
-    if (dia <= openingMm) return { draws: n, ratiosPct: ratios.map(r2) };
+    // The ratio of each draw made (the table's last one repeats past its columns), not every column of the row.
+    if (dia <= openingMm) return { draws: n, ratiosPct: Array.from({ length: n }, (_, i) => r2(ratios[Math.min(i, ratios.length - 1)] ?? 0)) };
   }
   return null;
 }

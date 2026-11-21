@@ -4,7 +4,7 @@ import { loadHydroformingCalculatorSpec } from './calculators/hydroforming-calcu
 import { hydroformPart, type HydroformGeometrySummary, type HydroformPart } from './hydroforming-part';
 import {
   blankAddendum, buildHydroformingRoutes, chooseHydroformingRoute, hydroformingRule, HYDROFORMING_CLASS, HYDROFORMING_KEYS, HYDROFORMING_PROCESS_GROUP,
-  HYDROFORMING_ROUTE_CLASSES, HYDROFORMING_ROUTES, type HydroformingMaterial, type HydroformingNest, type HydroformingRoute, type HydroformingRouteKey,
+  HYDROFORMING_ROUTE_CLASSES, HYDROFORMING_ROUTES, sheetMeasure, type HydroformingMaterial, type HydroformingNest, type HydroformingRoute, type HydroformingRouteKey,
   type HydroformingRule,
 } from './hydroforming-route';
 import { DatabaseService } from '../../../../common/database/database.service';
@@ -32,6 +32,8 @@ export interface HydroformingCostRequest {
   material: HydroformingMaterial;
   thicknessMm: number;
   geometry: HydroformGeometrySummary | null | undefined;
+  /** The part's volume (mm³): how much of it is the sheet measured (sheetMeasure). */
+  partVolumeMm3?: number | null;
   /** The part's feature_graph.summary: where the blank's nest is cached. */
   summary: Record<string, unknown>;
   forceRoute?: string;
@@ -156,6 +158,10 @@ export class HydroformingCostService {
     const { part, missing: partMissing } = hydroformPart(req.geometry);
     if (!part) return none(null, ...partMissing);
     for (const what of part.unmeasured) warnings.push(`The cad-engine could not measure ${what}.`);
+    // A part that is not one sheet (a machined block) is not hydroformed: said before its blank is nested.
+    const sheet = sheetMeasure(part, req.thicknessMm, req.partVolumeMm3);
+    if (sheet?.refuse) return none(part, sheet.refuse);
+    if (sheet?.warn) warnings.push(sheet.warn);
     const o = req.overrides ?? {};
     const [{ reference, missing: refMissing }, calculators, machines, toolShop] = await Promise.all([
       this.reference(),
