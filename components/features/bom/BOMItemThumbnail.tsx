@@ -21,6 +21,17 @@ import { isWebGLAvailable } from '@/lib/utils/webgl';
 const thumbnailCache = new Map<string, string>(); // `${item.id}:${file3dPath}` → dataUrl
 const cacheKeyOf = (item: BOMItem) => `${item.id}:${item.file3dPath ?? item.file2dPath ?? ''}`;
 
+/**
+ * Pictures are drawn on a transparent background (PNG), so the part blends with the page. Those stored before 2026-11-22 are JPEGs on a
+ * dark background: such a picture counts as out of date, and the part is drawn again (once: the new picture replaces it on the item),
+ * the old one staying on screen until then, or for good if the model cannot be drawn. PNG and not WebP: the Excel and PDF reports
+ * embed the stored picture and take JPEG or PNG.
+ */
+const isDarkPicture = (url: string | undefined): boolean => url?.startsWith('data:image/jpeg') === true;
+const knownPictureOf = (item: BOMItem): string | null =>
+  (isDarkPicture(item.thumbnailUrl) ? undefined : item.thumbnailUrl) ?? thumbnailCache.get(cacheKeyOf(item)) ?? null;
+const darkPictureOf = (item: BOMItem): string | null => (isDarkPicture(item.thumbnailUrl) ? (item.thumbnailUrl ?? null) : null);
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -122,7 +133,7 @@ function STLScene({ url, onCapture, onError }: STLCaptureProps) {
         cam.lookAt(0, 0, 0);
         cam.updateProjectionMatrix();
 
-        scene.background = new THREE.Color(0x1c1c1c);
+        // No background: the canvas is transparent (alpha), so the picture is the part alone.
         readyRef.current = true;
         invalidate();
       },
@@ -137,7 +148,6 @@ function STLScene({ url, onCapture, onError }: STLCaptureProps) {
         (meshRef.current.material as THREE.Material).dispose();
         meshRef.current = null;
       }
-      scene.background = null;
       readyRef.current = false;
       capturedRef.current = false;
     };
@@ -150,7 +160,7 @@ function STLScene({ url, onCapture, onError }: STLCaptureProps) {
       // useFrame runs before R3F's implicit render — call explicitly so the
       // canvas has the model on it when we screenshot it.
       gl.render(scene, camera);
-      const dataUrl = gl.domElement.toDataURL('image/jpeg', 0.8);
+      const dataUrl = gl.domElement.toDataURL('image/png');
       onCaptureRef.current(dataUrl);
     } catch {
       onErrorRef.current();
@@ -176,11 +186,11 @@ export function BOMItemThumbnail({ item, onClick, size = 'md' }: BOMItemThumbnai
   const containerRef = useRef<HTMLDivElement>(null);
   // The thumbnail stored on the item comes first: drawing one means
   // downloading the whole 3D model, which is the costliest thing this list
-  // could do on every visit.
-  const cached = item.thumbnailUrl ?? thumbnailCache.get(cacheKeyOf(item)) ?? null;
+  // could do on every visit. An old dark picture is shown until the part is drawn again.
+  const cached = knownPictureOf(item);
   const [phase, setPhase] = useState<Phase>(cached ? 'done' : 'idle');
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [dataUrl, setDataUrl] = useState<string | null>(cached);
+  const [dataUrl, setDataUrl] = useState<string | null>(cached ?? darkPictureOf(item));
 
   const fileCategory = item.file3dPath
     ? classifyFile(item.file3dPath)
@@ -194,12 +204,12 @@ export function BOMItemThumbnail({ item, onClick, size = 'md' }: BOMItemThumbnai
   // old part's picture must not stay on screen.
   const cacheKey = cacheKeyOf(item);
   useEffect(() => {
-    const known = item.thumbnailUrl ?? thumbnailCache.get(cacheKey) ?? null;
+    const known = knownPictureOf(item);
     resolvedCategory.current = fileCategory;
     setFileUrl(null);
-    setDataUrl(known);
+    setDataUrl(known ?? darkPictureOf(item));
     setPhase(known ? 'done' : 'idle');
-  }, [cacheKey, item.thumbnailUrl, fileCategory]);
+  }, [cacheKey, item.thumbnailUrl, fileCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lazy trigger via IntersectionObserver — skip if already cached
   useEffect(() => {
@@ -275,8 +285,8 @@ export function BOMItemThumbnail({ item, onClick, size = 'md' }: BOMItemThumbnai
       title={compact ? `${item.name}: open the viewer` : undefined}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
-      {/* Skeleton during load */}
-      {(phase === 'idle' || phase === 'fetching' || phase === 'rendering') && (
+      {/* Skeleton during load (not while an old picture is up) */}
+      {(phase === 'idle' || phase === 'fetching' || phase === 'rendering') && !dataUrl && (
         <Skeleton className="w-full h-full rounded-md" />
       )}
 
@@ -284,7 +294,7 @@ export function BOMItemThumbnail({ item, onClick, size = 'md' }: BOMItemThumbnai
       {phase === 'rendering' && fileUrl && (
         <div className="absolute inset-0 opacity-0 pointer-events-none overflow-hidden">
           <Canvas
-            gl={{ preserveDrawingBuffer: true, antialias: true, alpha: false, powerPreference: 'low-power' }}
+            gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, powerPreference: 'low-power' }}
             dpr={2}
             frameloop="demand"
             style={{ width: 120, height: 90 }}
@@ -294,12 +304,12 @@ export function BOMItemThumbnail({ item, onClick, size = 'md' }: BOMItemThumbnai
         </div>
       )}
 
-      {/* Captured 3D image */}
-      {phase === 'done' && dataUrl && (
+      {/* Captured 3D image: the part alone on a transparent background, so it blends with the page (no box behind it) */}
+      {dataUrl && (
         <img
           src={dataUrl}
           alt={item.name}
-          className="w-full h-full object-cover rounded-md border border-border/40 group-hover:ring-2 group-hover:ring-primary/50 transition-all"
+          className="w-full h-full object-contain rounded-md group-hover:ring-2 group-hover:ring-primary/50 transition-all"
         />
       )}
 
@@ -326,7 +336,7 @@ export function BOMItemThumbnail({ item, onClick, size = 'md' }: BOMItemThumbnai
       )}
 
       {/* Error state */}
-      {phase === 'error' && (
+      {phase === 'error' && !dataUrl && (
         <div className="w-full h-full flex items-center justify-center bg-muted rounded-md border border-border/40">
           <Box className={compact ? 'h-5 w-5 text-muted-foreground' : 'h-8 w-8 text-muted-foreground'} />
         </div>
