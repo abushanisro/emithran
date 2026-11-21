@@ -24,6 +24,8 @@ export interface HydroformHole {
   onMainSurface: boolean;
   /** From the hole's edge to the main face's outer boundary; null when not on the main surface. */
   edgeDistanceMm: number | null;
+  /** Its faces on the part (face_map ids, the feature graph's numbering), for the 3D highlight; empty when not measured. */
+  faceIds: number[];
 }
 
 export interface HydroformPart {
@@ -131,6 +133,7 @@ export function hydroformPart(g: HydroformGeometrySummary | null | undefined): {
     inFlat: get(h, 'in_flat') !== false,
     onMainSurface: get(h, 'on_main_surface') === true,
     edgeDistanceMm: num(get(h, 'edge_distance_mm')),
+    faceIds: (Array.isArray(get(h, 'face_ids')) ? get(h, 'face_ids') as unknown[] : []).map(num).filter((n): n is number => n != null && n >= 0),
   }));
   const blankLength = positive(get(blank, 'length_mm')) ?? length;
   const blankWidth = positive(get(blank, 'width_mm')) ?? width;

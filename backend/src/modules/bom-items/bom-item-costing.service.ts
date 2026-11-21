@@ -2846,6 +2846,8 @@ export class BomItemCostingService {
           // Absent (an analysis from before the measurement) and null (nothing the engine could measure) are told apart.
           thicknessMm: sheetThicknessMm, geometry: summary.hydroformGeometry as Record<string, unknown> | null | undefined, summary,
           partVolumeMm3: Number(item.volume) > 0 ? Number(item.volume) : null,
+          // The features each step's catalog rows name (the process tree highlights them).
+          graphFeatures: Array.isArray(fg?.feature_graph_v2?.features) ? fg.feature_graph_v2.features : [],
           amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
           ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
           overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
