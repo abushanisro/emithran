@@ -27,6 +27,8 @@ export type Calculator = {
   templateCategory?: string;
   displayConfig: Record<string, any>;
   associatedProcessId?: string;
+  /** The process groups it computes an operation of (process_calculator_mappings); empty for a helper no catalog row maps to. */
+  processGroups?: string[];
   createdAt: string;
   updatedAt: string;
   createdBy?: string;
