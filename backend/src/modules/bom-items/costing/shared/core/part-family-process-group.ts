@@ -55,6 +55,9 @@ export const MULTI_SHOT_PROCESS_GROUP = 'Assembly Plastic Molding';
 /** Multi-spindle machining (memory/Multi-Spindle Maching, memory/Machining Simultaneous Turning): a turned part, made from bar on a CNC multi-spindle or twin-spindle turning center. */
 export const MULTI_SPINDLE_PROCESS_GROUP = 'Multi-Spindle Machining';
 
+/** Rapid prototyping (memory/Rapid prototyping): a part built layer by layer (laser sintering, 3D printing, stereolithography), priced by the additive engine in its own domain. */
+export const RAPID_PROTOTYPING_PROCESS_GROUP = 'Rapid Prototyping';
+
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
 /**
  * The families a CAD analysis run with a family hint may store. A hint names an extractor, and the analysis stores that family, except a
@@ -81,6 +84,9 @@ const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
   [MULTI_SHOT_PROCESS_GROUP]: ['plastic_molded'],
   // Multi-spindle machining: a turned part, its operations laid out over a multi-spindle's stations (multi-spindle/).
   [MULTI_SPINDLE_PROCESS_GROUP]: ['turned'],
+  // Rapid prototyping: a part built layer by layer, analysed for its build as an additive part and priced in the Rapid Prototyping domain
+  // (additive/additive-domain.ts: its own machines, materials, reference data and per-feature cleaning).
+  [RAPID_PROTOTYPING_PROCESS_GROUP]: ['additive'],
 };
 
 /**

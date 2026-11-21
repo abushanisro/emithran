@@ -63,7 +63,7 @@ def hole_features(holes: Sequence[Dict[str, Any]], stable_face_ids: Dict[int, st
             "face_ids": list(h["face_ids"]), "diameter_mm": h["diameter_mm"], "depth_mm": h["depth_mm"], "axis": h["axis"],
             "angle_to_die_deg": h["angle_to_pull_deg"],
         }
-        if h["feature_type"] == "MultiStepHole":
+        if h["feature_type"] in ("MultiStepHole", "RingedHole"):
             occ["steps"] = [{"diameter_mm": st["diameter_mm"], "depth_mm": st["length_mm"]} for st in h["steps"] if st["kind"] == "cylinder"]
         stable = [stable_face_ids.get(f) for f in h["face_ids"]]
         if stable and all(stable):
@@ -75,12 +75,15 @@ def hole_features(holes: Sequence[Dict[str, Any]], stable_face_ids: Dict[int, st
     return out
 
 
-def face_features(shape: Any, bbox_dims: Sequence[float], die: Vec, hole_face_ids: Sequence[int], stable_face_ids: Dict[int, str]) -> List[Dict[str, Any]]:
+def face_features(
+    shape: Any, bbox_dims: Sequence[float], die: Vec, hole_face_ids: Sequence[int], stable_face_ids: Dict[int, str], voids: bool = True,
+) -> List[Dict[str, Any]]:
     """
     Every other face of the part as a feature, for the process tree and the 3D highlight: the voids a die closing along `die` leaves (pockets,
     cavities), then the planar faces, curved walls, curved surfaces and sharp edges, each occurrence with its faces. Recognised as a die casting's
     are (die_casting/features: combo_void, surfaces): a closed die forms the same shapes, and the forging reference data has no feature catalog of
-    its own. The faces the holes claimed are not listed again.
+    its own. The faces the holes claimed are not listed again. voids=False: the caller recognised its own voids (their faces are in
+    hole_face_ids), so no die-direction voids are looked for.
     """
     out: List[Dict[str, Any]] = []
 
@@ -89,15 +92,16 @@ def face_features(shape: Any, bbox_dims: Sequence[float], die: Vec, hole_face_id
         return {**occ, "source_face_stable_ids": ids} if ids and all(ids) else occ
 
     claimed = set(hole_face_ids)
-    try:
-        voids = detect_voids(shape, list(bbox_dims), list(die))
-    except Exception as e:
-        logger.warning(f"[forging] void recognition failed: {e}")
-        voids = {"void_candidates": [], "claimed_face_ids": []}
-    if voids.get("void_candidates"):
+    found: Dict[str, Any] = {"void_candidates": [], "claimed_face_ids": []}
+    if voids:
+        try:
+            found = detect_voids(shape, list(bbox_dims), list(die))
+        except Exception as e:
+            logger.warning(f"[forging] void recognition failed: {e}")
+    if found.get("void_candidates"):
         out.append({"id": "void", "feature_type": "Void", "variant": "default", "occurrences": [
-            stable({"centroid": o["centroid_mm"], "face_ids": list(o["face_ids"])}) for o in voids["void_candidates"]]})
-    claimed |= set(voids.get("claimed_face_ids", []))
+            stable({"centroid": o["centroid_mm"], "face_ids": list(o["face_ids"])}) for o in found["void_candidates"]]})
+    claimed |= set(found.get("claimed_face_ids", []))
     try:
         surfaces = classify_surfaces(shape, claimed_face_ids=claimed)
     except Exception as e:

@@ -595,9 +595,12 @@ export class AutoFillService {
         } : {}),
         // An additive build (cad-engine additive/feature_extractor.py): each of the six build directions with its height, footprint and, at each
         // self-supporting angle, the overhang, supports and plate contact; the additive cost picks the direction at the material's own angle.
+        // The holes and voids (additive/voids.py) are what Rapid Prototyping's cleaning is timed by; an analysis before them has no voids.
         ...(family.family === 'additive' ? {
           additiveBuild: cadMI?.features?.extraction_version ? {
             extractionVersion: cadMI.features.extraction_version,
+            holes: cadMI.features.holes ?? null,
+            voids: cadMI.features.voids ?? null,
             axis: cadMI.features.build_direction?.axis ?? null,
             partVolumeMm3: cadMI.features.part_volume_mm3 ?? null,
             surfaceAreaMm2: cadMI.features.surface_area_mm2 ?? null,

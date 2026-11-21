@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDirectionOf, directionLabel, BUILD_DIRECTIONS } from '@/lib/costing/additive-view';
+import { additiveSectionTitle, buildDirectionOf, cleaningSizeLabel, directionLabel, BUILD_DIRECTIONS, type AdditiveSummary } from '@/lib/costing/additive-view';
 import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
 
 describe('the additive Cost Guide', () => {
@@ -20,5 +20,17 @@ describe('the additive Cost Guide', () => {
     expect(additiveRouteKeyOf('additive-resin_curing')).toBe('resin_curing');
     expect(additiveRouteKeyOf('composites-hand_layup')).toBeUndefined();
     expect(additiveRouteKeyOf('additive-')).toBeUndefined();
+  });
+
+  it('titles the section with the process group the part is priced in', () => {
+    expect(additiveSectionTitle({ processGroup: 'Rapid Prototyping' } as AdditiveSummary, 'Additive Manufacturing')).toBe('Rapid Prototyping');
+    // Before a quote: the part's own Process.
+    expect(additiveSectionTitle(undefined, 'Rapid Prototyping')).toBe('Rapid Prototyping');
+    expect(additiveSectionTitle(undefined, undefined)).toBe('Additive Manufacturing');
+  });
+
+  it('names a cleaned hole by its diameter and a void by its volume', () => {
+    expect(cleaningSizeLabel({ measure: 'diameter', size: 5.04 })).toBe('Ø 5 mm');
+    expect(cleaningSizeLabel({ measure: 'volume', size: 3000.4 })).toBe('3,000 mm³');
   });
 });

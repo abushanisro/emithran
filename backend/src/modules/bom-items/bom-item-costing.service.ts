@@ -136,7 +136,7 @@ import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost
 import { CompositesCostService, type CompositeLaminateSummary } from './costing/composites/composites-cost.service';
 import { AdditiveCostService, type AdditiveBuildSummary } from './costing/additive/additive-cost.service';
 import { buildAdditiveCostSummary } from './costing/additive/additive-cost-summary';
-import { ADDITIVE_ROUTES } from './costing/additive/additive-route';
+import { ADDITIVE, additiveDomainOf } from './costing/additive/additive-domain';
 import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
 import { BarTubeCostService, type BarTubeGeometrySummary } from './costing/bar-tube/bar-tube-cost.service';
 import { buildBarTubeCostSummary } from './costing/bar-tube/bar-tube-cost-summary';
@@ -279,6 +279,11 @@ const isMultiShot = (item: { scenarioOverrides?: Record<string, unknown> | null 
 
 /** Whether a part is made on a multi-spindle: its Process is Multi-Spindle Machining (a turned part, its operations laid out over the machine's stations). */
 const isMultiSpindle = (item: { scenarioOverrides?: Record<string, unknown> | null }) => item.scenarioOverrides?.['processGroup'] === MULTI_SPINDLE_PROCESS_GROUP;
+/** The part's Process as the user chose it (scenarioOverrides.processGroup); null when none is chosen. */
+const processGroupOf = (item: { scenarioOverrides?: Record<string, unknown> | null }): string | null => {
+  const g = item.scenarioOverrides?.['processGroup'];
+  return typeof g === 'string' && g ? g : null;
+};
 
 /** The material fields of a molding input, from a resolved raw_materials row (the part's, or a shot's). */
 function moldingMaterialOf(m: Awaited<ReturnType<BomItemCostingService['resolveMaterialForFamily']>>) {
@@ -2179,7 +2184,7 @@ export class BomItemCostingService {
     if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
     // The grade this process prices: the part's own, or, when the process prices only its own materials and the grade is not one of them,
     // its closest own material, said in the warnings (process-materials.ts). Every engine below prices this grade.
-    const pricedGrade = await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family);
+    const pricedGrade = await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family, processGroupOf(item));
     if (pricedGrade.note) materialWarnings.push(pricedGrade.note);
     const grade = pricedGrade.grade;
     // The whole resolved material is kept: a part whose applied route is another molding process is priced by that process's engine in the route comparison, from this row.
@@ -2705,21 +2710,24 @@ export class BomItemCostingService {
       return { ...this.normalizeCostSummaryToCurrency(compositesResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
     }
 
-    // ── Additive Manufacturing ──────────────────────────────────────────────
+    // ── Additive Manufacturing and Rapid Prototyping ────────────────────────
     // The build measured by the cad-engine (additive/feature_extractor.py, via auto-fill's additiveBuild: each build direction's height,
-    // footprint, overhang and supports) and memory/Additive Manufacturing price every route (additive-route.ts): metal sintering, laser
-    // sintering, material jetting and stereolithography, each with its post steps, on the machines that build the material.
+    // footprint, overhang and supports, and the holes and voids cleaning clears) priced in the part's domain (additive-domain.ts): memory/
+    // Additive Manufacturing (metal sintering, laser sintering, material jetting, stereolithography) or, when its Process is Rapid
+    // Prototyping, memory/Rapid prototyping (laser sintering, 3D printing, stereolithography), each route with its post steps, on the
+    // machines that build the material.
     if (family === 'additive') {
       const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
       const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const domain = additiveDomainOf(processGroupOf(item));
       const additive = this.additiveCostService
         ? await this.additiveCostService.price({
-          client: this.databaseService.getClient(accessToken), accessToken, location, grade,
+          domain, client: this.databaseService.getClient(accessToken), accessToken, location, grade,
           build: (summary.additiveBuild ?? null) as AdditiveBuildSummary | null,
           ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
           overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
         })
-        : { route: null, routes: [], gaps: [], note: null, missing: ['the additive cost service is not available'], warnings: [] };
+        : { domain, route: null, routes: [], gaps: [], note: null, missing: ['the additive cost service is not available'], warnings: [] };
       const additiveResult = {
         ...buildAdditiveCostSummary({
           additive, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
@@ -5319,21 +5327,23 @@ export class BomItemCostingService {
   }
 
   /**
-   * An additive part's route comparison: every build route (metal sintering, laser sintering, material jetting, stereolithography), each the
-   * full Cost Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
+   * A part built layer by layer: its route comparison, every build route of its domain (Additive Manufacturing: metal sintering, laser
+   * sintering, material jetting, stereolithography; Rapid Prototyping: laser sintering, 3D printing, stereolithography), each the full Cost
+   * Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
    */
   private async additiveRouteComparison(
     id: string, userId: string, accessToken: string,
     requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
     localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+    domain = ADDITIVE,
   ): Promise<RouteComparisonResponseDto> {
-    const keys = ADDITIVE_ROUTES.map((r) => r.key);
+    const keys = domain.routes.map((r) => r.key);
     const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
     const [quote, ...summaries] = await Promise.all([
       this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'additive'),
       ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'additive')),
     ]);
-    const routes = keys.map((key, i) => additiveRouteFor(key, summaries[i]!));
+    const routes = keys.map((key, i) => additiveRouteFor(domain, key, summaries[i]!));
     if (localCurrencyOut) {
       localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
       localCurrencyOut.localCurrency = locals[0]!.localCurrency;
@@ -5637,7 +5647,8 @@ export class BomItemCostingService {
       return this.barTubeRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     if (family === 'additive') {
-      return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+      return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut,
+        additiveDomainOf(processGroupOf(item)));
     }
     if (family === 'composite') {
       return this.compositesRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
@@ -5649,7 +5660,7 @@ export class BomItemCostingService {
 
     // The grade this process prices, as the cost summary does (gradeForProcess): a part whose grade is not a material of its process is
     // compared on the process's closest own material.
-    const pricedGradeRC = itemGrade ? await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family) : null;
+    const pricedGradeRC = itemGrade ? await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family, processGroupOf(item)) : null;
     const grade = pricedGradeRC?.grade ?? null;
 
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
