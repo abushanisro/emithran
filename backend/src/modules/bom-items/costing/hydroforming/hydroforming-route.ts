@@ -199,12 +199,17 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
 
   const seed = (value: number, source: string): CalcSeed => ({ value, source });
   const handLength = manualFormLength(ref, part);
+  const addendum = blankAddendum(ref, part);
+  // The blank grows by its outline x the addendum. An outline the cad-engine declined (an unfolded blank) adds nothing when there is no
+  // addendum to grow it by; with an addendum it is missing, and the Blank calculator says so.
+  const perimeter = part.blank.perimeterMm != null ? seed(part.blank.perimeterMm, `the blank's outline (${part.blank.method}, mm)`)
+    : addendum.mm === 0 ? seed(0, "the blank's outline was not measured; with no addendum it adds nothing to the blank") : undefined;
   const cad: Record<string, CalcSeed | undefined> = {
     tool_area_mm2: seed(part.developedAreaMm2, "the part's developed area (mm²)"),
     plan_length_mm: seed(part.planLengthMm, "the part's plan along the press axis, long side (mm)"),
     plan_width_mm: seed(part.planWidthMm, "the part's plan along the press axis, short side (mm)"),
     manual_form_length_mm: seed(handLength, 'the curved flanges the press cannot form (mm)'),
-    blank_perimeter_mm: seed(part.blank.perimeterMm, `the blank's outline (${part.blank.method}, mm)`),
+    blank_perimeter_mm: perimeter,
     pierced_hole_perimeter_mm: seed(part.blank.piercedHolePerimeterMm, 'the holes pierced in the flat (mm)'),
     thickness_mm: seed(input.thicknessMm, 'the sheet thickness (mm)'),
     blank_area_mm2: seed(part.blank.areaMm2, `the measured blank (${part.blank.method}, mm²)`),
@@ -222,7 +227,6 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
   });
 
   // ── The blank and its material ─────────────────────────────────────────────────────────────────────────────────────────────────────
-  const addendum = blankAddendum(ref, part);
   const blankRun = kit.run(HYDRO_CALC.blankSize, null, {
     addendum_mm: addendum.row ? kit.lookupSeed('blankAddendumWidth', addendum.row, 'Addendum Width (mm)', ['Total Form Depth (mm)']) : seed(0, addendum.source),
   });
@@ -240,9 +244,9 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
 
   // ── Offline Blank: one stroke blanks and pierces, on a press with the force and the room for the strip ──────────────────────────────
   const shear = material.shearStrengthMpa;
-  const force = shear != null && shear > 0 ? kit.run(HYDRO_CALC.force, null, {}) : null;
+  const force = shear != null && shear > 0 && part.blank.perimeterMm != null ? kit.run(HYDRO_CALC.force, null, {}) : null;
   const forceKn = force && 'run' in force ? force.sec : null;
-  if (forceKn == null) warnings.push(`The blanking press's force is not checked: ${material.name} has no shear strength on file.`);
+  if (forceKn == null && !(shear != null && shear > 0)) warnings.push(`The blanking press's force is not checked: ${material.name} has no shear strength on file.`);
   const blankLong = Math.max(part.blank.lengthMm, part.blank.widthMm) + 2 * addendum.mm;
   const blankShort = Math.min(part.blank.lengthMm, part.blank.widthMm) + 2 * addendum.mm;
   const advance = stepRow(ref.table('pressMaterialAdvanceRate'), 'Part Length (mm)', blankLong);

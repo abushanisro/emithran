@@ -33,7 +33,7 @@ const CUP: HydroformPart = {
     method: 'drawn_equal_area', areaMm2: CUP_AREA, perimeterMm: Math.PI * CUP_D0, lengthMm: CUP_D0, widthMm: CUP_D0, circumscribedDiameterMm: CUP_D0,
     outlinePointsMm: null, piercedHoleAreaMm2: 0, piercedHolePerimeterMm: 0,
   },
-  flanges: [], holes: [],
+  flanges: [], holes: [], unmeasured: [],
 };
 // A 200 x 100 plate, 1.5 mm, with two 90° straight flanges 20 mm high along its long sides, a curved flange turned 90° along 50 mm of a
 // rounded corner, and two holes in the flat: one 10 mm and one 2 mm from the main surface's edge.
@@ -50,6 +50,7 @@ const PLATE: HydroformPart = {
     { featureType: 'SimpleHole', diameterMm: 10, perimeterMm: 31.4, areaMm2: 78.5, inFlat: true, onMainSurface: true, edgeDistanceMm: 10 },
     { featureType: 'SimpleHole', diameterMm: 10, perimeterMm: 31.4, areaMm2: 78.5, inFlat: true, onMainSurface: true, edgeDistanceMm: 2 },
   ],
+  unmeasured: [],
 };
 
 const input = (part: HydroformPart, over: Partial<HydroformingRouteInput> = {}, scenario: Partial<HydroformingRouteInput['scenario']> = {}): HydroformingRouteInput => ({
@@ -253,6 +254,34 @@ describe('the part as the cad-engine measures it (hf_v1)', () => {
       blank: { method: 'true_unfold', piercedHoleAreaMm2: 157.1 }, holes: [{ onMainSurface: true, edgeDistanceMm: 10 }],
     });
     expect(part?.blank.outlinePointsMm).toHaveLength(4);
+  });
+
+  it('a value the current measurement left null is named as not measurable (analysing again gives the same), never as "press Refresh analysis"', () => {
+    const base = {
+      extractionVersion: 'hf_v1', formingDepthMm: 21.5, plan: { length_mm: 200, width_mm: 100 }, projectedAreaMm2: 20000, developedAreaMm2: 28000,
+      mainSurface: { area_mm2: 20000, perimeter_mm: 600 }, drawn: null, flanges: [], holes: [],
+    };
+    const several = hydroformPart({ ...base, blank: null });
+    expect(several.part).toBeNull();
+    expect(several.missing).toEqual(['the blank (a part of several bodies, or bends the unfold could not lay flat): the cad-engine could not measure it on this part']);
+    // The unfold declined the outline: the part is still costed; only the blanking force goes unchecked, and the holes and flanges not measured are said.
+    const declined = hydroformPart({
+      ...base, holes: null, flanges: null,
+      blank: { method: 'true_unfold', area_mm2: 28000, perimeter_mm: null, length_mm: 200, width_mm: 140, circumscribed_diameter_mm: null, outline_points_mm: null },
+    });
+    expect(declined.part?.blank).toMatchObject({ perimeterMm: null, circumscribedDiameterMm: Math.hypot(200, 140) });
+    expect(declined.part?.unmeasured).toEqual([
+      "the blank's outline (its cut length), so the blanking press's force is not checked",
+      'the holes, so none is costed (no capping tool, no hole through a formed wall)',
+      'the flanges, so no hand adjusting is costed',
+    ]);
+  });
+
+  it('a blank with no outline is still blanked: the Offline Blank line is costed with no force check', () => {
+    const plate = { ...PLATE, blank: { ...PLATE.blank, perimeterMm: null } };
+    const r = route(input(plate), 'fluid-cell');
+    expect(r.lines.find((l) => l.process === 'Offline Blank')?.physicsGap ?? null).toBeNull();
+    expect(r.complete).toBe(true);
   });
 });
 

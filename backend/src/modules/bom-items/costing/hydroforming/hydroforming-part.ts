@@ -40,7 +40,8 @@ export interface HydroformPart {
   blank: {
     method: string;
     areaMm2: number;
-    perimeterMm: number;
+    /** The blank's outer cut length; null when the cad-engine declined its outline (the blanking force is then not checked). */
+    perimeterMm: number | null;
     lengthMm: number;
     widthMm: number;
     circumscribedDiameterMm: number;
@@ -50,6 +51,8 @@ export interface HydroformPart {
   };
   flanges: HydroformFlange[];
   holes: HydroformHole[];
+  /** What the cad-engine could not measure on this part, each said on the quote (holes or flanges not measured are not read as none). */
+  unmeasured: string[];
 }
 
 const camel = (k: string) => k.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
@@ -76,7 +79,10 @@ export function formAreaMm2(part: HydroformPart): number {
 export const HYDROFORM_EXTRACTION_VERSION = 'hf_v1';
 const REFRESH = 'press Refresh analysis so the part is measured for hydroforming';
 
-/** The part, or what its measurement lacks (each named; a part analysed before the measurement existed is asked to be analysed again). */
+/**
+ * The part, or what its measurement lacks, each named. A part analysed before the measurement existed is asked to be analysed again; a value a
+ * current measurement left null is one the cad-engine could not measure on this part (analysing it again gives the same), so it is named as that.
+ */
 export function hydroformPart(g: HydroformGeometrySummary | null | undefined): { part: HydroformPart | null; missing: string[] } {
   const version = get(g, 'extraction_version') ?? get(g, 'version');
   if (!g || version !== HYDROFORM_EXTRACTION_VERSION) return { part: null, missing: [`the hydroforming measurements: ${REFRESH}`] };
@@ -90,14 +96,14 @@ export function hydroformPart(g: HydroformGeometrySummary | null | undefined): {
   const blankArea = positive(get(blank, 'area_mm2'));
   const blankPerimeter = positive(get(blank, 'perimeter_mm'));
   const developed = positive(get(g, 'developed_area_mm2'));
-  if (depth == null || length == null || width == null || blankArea == null || blankPerimeter == null || developed == null) {
+  if (depth == null || length == null || width == null || blankArea == null || developed == null) {
     const missing = [
       ...(depth == null ? ['the forming depth'] : []),
       ...(length == null || width == null ? ['the plan along the press axis'] : []),
-      ...(blankArea == null || blankPerimeter == null ? ['the blank (its area and outline)'] : []),
+      ...(blankArea == null ? [blank ? "the blank's area" : 'the blank (a part of several bodies, or bends the unfold could not lay flat)'] : []),
       ...(developed == null ? ['the developed area'] : []),
     ];
-    return { part: null, missing: missing.map((m) => `${m}: ${REFRESH}`) };
+    return { part: null, missing: missing.map((m) => `${m}: the cad-engine could not measure it on this part`) };
   }
 
   const outline = get(blank, 'outline_points_mm');
@@ -110,6 +116,11 @@ export function hydroformPart(g: HydroformGeometrySummary | null | undefined): {
     if ((kind !== 'straight' && kind !== 'curved') || angle == null || len == null) return [];
     return [{ kind, angleDeg: angle, lengthMm: len, heightMm: positive(get(f, 'height_mm')), edgeRadiusMm: positive(get(f, 'edge_radius_mm')) }];
   });
+  const unmeasured = [
+    ...(blankPerimeter == null ? ["the blank's outline (its cut length), so the blanking press's force is not checked"] : []),
+    ...(Array.isArray(get(g, 'holes')) ? [] : ['the holes, so none is costed (no capping tool, no hole through a formed wall)']),
+    ...(Array.isArray(get(g, 'flanges')) ? [] : ['the flanges, so no hand adjusting is costed']),
+  ];
   const holes = (Array.isArray(get(g, 'holes')) ? get(g, 'holes') as unknown[] : []).map(obj).filter((h): h is Obj => h != null).map((h): HydroformHole => ({
     featureType: text(get(h, 'feature_type'), 'SimpleHole'),
     diameterMm: positive(get(h, 'diameter_mm')),
@@ -119,6 +130,8 @@ export function hydroformPart(g: HydroformGeometrySummary | null | undefined): {
     onMainSurface: get(h, 'on_main_surface') === true,
     edgeDistanceMm: num(get(h, 'edge_distance_mm')),
   }));
+  const blankLength = positive(get(blank, 'length_mm')) ?? length;
+  const blankWidth = positive(get(blank, 'width_mm')) ?? width;
   return {
     part: {
       depthMm: depth, planLengthMm: Math.max(length, width), planWidthMm: Math.min(length, width),
@@ -132,13 +145,14 @@ export function hydroformPart(g: HydroformGeometrySummary | null | undefined): {
       } : null,
       blank: {
         method: text(get(blank, 'method'), 'unknown'), areaMm2: blankArea, perimeterMm: blankPerimeter,
-        lengthMm: positive(get(blank, 'length_mm')) ?? length, widthMm: positive(get(blank, 'width_mm')) ?? width,
-        circumscribedDiameterMm: positive(get(blank, 'circumscribed_diameter_mm')) ?? Math.hypot(length, width),
+        lengthMm: blankLength, widthMm: blankWidth,
+        // Not measured (the outline was declined): the blank's rectangle's own circle, which encloses the blank (the fit check stays safe).
+        circumscribedDiameterMm: positive(get(blank, 'circumscribed_diameter_mm')) ?? Math.hypot(blankLength, blankWidth),
         outlinePointsMm: Array.isArray(outline) && outline.length >= 3 ? outline as number[][] : null,
         piercedHoleAreaMm2: nonNegative(get(blank, 'pierced_hole_area_mm2')) ?? 0,
         piercedHolePerimeterMm: nonNegative(get(blank, 'pierced_hole_perimeter_mm')) ?? 0,
       },
-      flanges, holes,
+      flanges, holes, unmeasured,
     },
     missing: [],
   };
