@@ -9483,6 +9483,7 @@ export default function ManufacturingIntelligencePage() {
                       nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
                       nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}
                       nestKerfMm={costForHeatmap?.blankSpec?.kerfMm}
+                      nestKerfSource={costForHeatmap?.blankSpec?.kerfSource}
                       nestEdgeMarginMm={costForHeatmap?.blankSpec?.edgeMarginMm}
                       nestSheetSource={costForHeatmap?.blankSpec?.sheetSource}
                       nestCandidateSheets={costForHeatmap?.blankSpec?.candidateSheets}
@@ -9660,6 +9661,7 @@ export default function ManufacturingIntelligencePage() {
                             nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
                             nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}
                             nestKerfMm={costForHeatmap?.blankSpec?.kerfMm}
+                            nestKerfSource={costForHeatmap?.blankSpec?.kerfSource}
                             nestEdgeMarginMm={costForHeatmap?.blankSpec?.edgeMarginMm}
                             nestSheetSource={costForHeatmap?.blankSpec?.sheetSource}
                             nestCandidateSheets={costForHeatmap?.blankSpec?.candidateSheets}

@@ -59,6 +59,13 @@ export interface HydroformingNest {
   method: 'true_shape' | 'rectangle';
   /** Why the true-shape nest was not used, when it was not. */
   note: string | null;
+  /** The nest's setup, for the Nest view to start from: the gap between blanks and the edge margin (mm), where the sheet comes from, and
+   * the stock sheets it can rank. */
+  kerfMm?: number;
+  kerfSource?: string;
+  edgeMarginMm?: number;
+  sheetSource?: string;
+  candidateSheets?: { widthMm: number; lengthMm: number; source: string }[];
 }
 
 export interface HydroformingScenario {

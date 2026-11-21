@@ -29,6 +29,8 @@ export interface BlankSpecDto {
   // edge margin it was nested with — what the Nest view opens with.
   sheetSource?: string;
   kerfMm?: number;
+  /** Where kerfMm comes from, when it is not sheet metal's part-spacing table (a hydroformed blank: memory's spacing and its addendum). */
+  kerfSource?: string;
   edgeMarginMm?: number;
   // Stock sheets the Nest view ranks and recommends from (see
   // BOMItemsService.resolveNestCandidateSheets).
