@@ -606,7 +606,7 @@ export function ManufacturingProcessSection({
                                 Override
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-success/100/15 text-success border border-success/30">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-success/15 text-success border border-success/30">
                                 Auto
                               </span>
                             )}

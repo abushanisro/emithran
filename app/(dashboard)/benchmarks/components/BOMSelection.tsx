@@ -1,11 +1,15 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { ArrowLeft, ArrowRight, Package } from "lucide-react";
-import type { SelectedBOM, SelectedProject } from "../types";
+
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+
 import { formatDate } from "../utils";
+
+import type { SelectedBOM, SelectedProject } from "../types";
 
 interface MultiProjectBOM {
   projectId: string;
@@ -102,7 +106,7 @@ export function BOMSelection({
                   <p className="text-xs text-muted-foreground mt-1">
                     {bom.status}
                   </p>
-                  <p className="text-xs text-green-600 mt-1">
+                  <p className="text-xs text-success mt-1">
                     Parts: {bomItemCounts[idx] ?? 0}
                   </p>
                 </div>

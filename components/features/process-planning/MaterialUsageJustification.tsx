@@ -15,7 +15,7 @@ function Working({ label, justification }: { label: string; justification: Usage
         <span className="text-[11px] font-semibold text-foreground">{label}</span>
         <span className="text-[11px] text-muted-foreground min-w-0 truncate" title={justification.title}>{justification.title}</span>
         {justification.calculatorId && <span className="text-[10px] text-muted-foreground/70 shrink-0">Calculator v{justification.calculatorVersion ?? 1}</span>}
-        {justification.estimate && <span className="text-[9px] font-semibold px-1.5 py-px rounded shrink-0 bg-warning/100/15 text-warning">Estimate</span>}
+        {justification.estimate && <span className="text-[9px] font-semibold px-1.5 py-px rounded shrink-0 bg-warning/15 text-warning">Estimate</span>}
       </div>
       {inputs.map((step, i) => (
         <div key={`i${i}`} className="text-[11px] pl-2">

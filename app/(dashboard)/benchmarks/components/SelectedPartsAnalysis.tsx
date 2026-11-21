@@ -1,9 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Download, Info, TriangleAlert, Zap } from "lucide-react";
 import {
   AreaChart,
@@ -19,8 +15,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { BOMMetricEntry, EnrichedBOMItem, HighCostPart } from "../types";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+
 import { itemCost, itemWeight, safeNum, formatPrice } from "../utils";
+
+import type { BOMMetricEntry, EnrichedBOMItem, HighCostPart } from "../types";
 
 type ResolvedBOMMetricEntry = Omit<BOMMetricEntry, 'items'> & { items: EnrichedBOMItem[] };
 
@@ -41,7 +45,7 @@ export function SelectedPartsAnalysis({ bomMetrics, selectedParts, onBack }: Pro
   }));
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="animate-fade-in space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -241,21 +245,21 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: Resolve
                     <div className="text-sm text-foreground">Total Parts</div>
                   </div>
                   <div className="text-center p-4 bg-muted rounded border border-border">
-                    <div className="text-2xl font-bold text-green-400">{costedParts}</div>
+                    <div className="text-2xl font-bold text-success">{costedParts}</div>
                     <div className="text-sm text-foreground">With Cost Data</div>
                   </div>
                   <div className="text-center p-4 bg-muted rounded border border-border">
-                    <div className="text-2xl font-bold text-red-400">{missing}</div>
+                    <div className="text-2xl font-bold text-destructive">{missing}</div>
                     <div className="text-sm text-foreground">Missing Cost Data</div>
                   </div>
                 </div>
                 {missing > 0 && (
-                  <div className="bg-amber-900 border border-amber-600 rounded p-4">
+                  <div className="bg-warning/10 border border-warning/40 rounded p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <TriangleAlert className="h-4 w-4 text-amber-400" />
-                      <span className="text-sm font-semibold text-amber-100">Cost Data Required</span>
+                      <TriangleAlert className="h-4 w-4 text-warning" />
+                      <span className="text-sm font-semibold text-warning">Cost Data Required</span>
                     </div>
-                    <p className="text-xs text-amber-200">
+                    <p className="text-xs text-muted-foreground">
                       {missing} parts are missing unit cost information.
                     </p>
                   </div>
@@ -306,7 +310,7 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: Resolve
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={70} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v) => [`$${Number(v).toFixed(0)}`, "Total Cost"]} />
-                <Bar dataKey="cost" fill="hsl(220, 70%, 45%)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cost" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -422,7 +426,7 @@ function PartDetailsTable({ filteredBomMetrics }: { filteredBomMetrics: Resolved
             return (
               <tr
                 key={idx}
-                className={`border-b hover:bg-muted/25 ${!hasAnyCost ? "bg-red-900/20" : ""}`}
+                className={`border-b hover:bg-muted/25 ${!hasAnyCost ? "bg-destructive/10" : ""}`}
               >
                 <td className="py-3 px-2 font-medium">{part.name}</td>
                 <td className="py-3 px-2 text-muted-foreground">{part.partNumber ?? "-"}</td>
@@ -453,11 +457,11 @@ function PartDetailsTable({ filteredBomMetrics }: { filteredBomMetrics: Resolved
                       <div className="space-y-1">
                         <div className="text-sm font-medium">{item.quantity}</div>
                         {safeNum(item.unitCost) > 0 ? (
-                          <div className="text-xs text-green-600">
+                          <div className="text-xs text-success">
                             {formatPrice(safeNum(item.unitCost))}
                           </div>
                         ) : (
-                          <div className="text-xs text-red-500">Need cost</div>
+                          <div className="text-xs text-destructive">Need cost</div>
                         )}
                       </div>
                     ) : (
@@ -797,9 +801,9 @@ function VAVEContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMe
 
   if (highCostParts.length > 0) {
     opportunities.push(
-      <Card key="high-cost" className="p-4 bg-red-900/20 border-red-600">
-        <h4 className="text-sm font-semibold mb-2 text-red-100">High Cost Parts Review</h4>
-        <p className="text-xs text-red-200 mb-3">
+      <Card key="high-cost" className="p-4 bg-destructive/10 border-destructive/40">
+        <h4 className="text-sm font-semibold mb-2 text-destructive">High Cost Parts Review</h4>
+        <p className="text-xs text-muted-foreground mb-3">
           {highCostParts.length} parts with cost &gt; $500
         </p>
         <div className="space-y-2">
@@ -841,12 +845,12 @@ function VAVEContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMe
 
   if (makeCount > buyCount * 2) {
     opportunities.push(
-      <Card key="makebuy" className="p-4 bg-yellow-50 border-yellow-200">
-        <h4 className="text-sm font-semibold mb-2 text-yellow-800">Make vs Buy Review</h4>
-        <p className="text-xs text-yellow-700 mb-3">
+      <Card key="makebuy" className="p-4 bg-warning/10 border-warning/40">
+        <h4 className="text-sm font-semibold mb-2 text-warning">Make vs Buy Review</h4>
+        <p className="text-xs text-warning mb-3">
           {makeCount} make parts vs {buyCount} buy parts
         </p>
-        <div className="text-xs text-yellow-600">
+        <div className="text-xs text-warning">
           Consider outsourcing some make parts for cost optimization
         </div>
       </Card>

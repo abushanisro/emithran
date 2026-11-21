@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { BarChart2, Plus, Activity, Layers, CalendarDays, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBenchmarkSessions, useCreateBenchmarkSession } from '@/lib/api/hooks/useBenchmarkSessions';
+import { Textarea } from '@/components/ui/textarea';
 import type { BenchmarkSession } from '@/lib/api/benchmark-sessions';
+import { useBenchmarkSessions, useCreateBenchmarkSession } from '@/lib/api/hooks/useBenchmarkSessions';
+
 import { BenchmarkSessionDetail } from './components/BenchmarkSessionDetail';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -25,9 +28,9 @@ const STATUS_LABELS: Record<BenchmarkSession['status'], string> = {
 };
 
 const STATUS_COLORS: Record<BenchmarkSession['status'], string> = {
-  draft: 'bg-muted text-muted-foreground border-muted',
-  active: 'bg-primary/10 text-primary border-primary/30',
-  archived: 'bg-muted/60 text-muted-foreground/60 border-border',
+  draft: 'bg-warning/10 text-warning border-warning/30',
+  active: 'bg-success/10 text-success border-success/30',
+  archived: 'bg-muted text-muted-foreground border-border',
 };
 
 function formatDate(dateString: string): string {
@@ -105,107 +108,78 @@ export default function BenchmarkPage() {
   }
 
   // ── List view ────────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: 'Active Sessions', icon: Activity, value: activeSessions },
+    { label: 'Total BOMs Compared', icon: Layers, value: totalBOMsCompared },
+    { label: 'Sessions This Month', icon: CalendarDays, value: sessionsThisMonth },
+  ];
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart2 className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Benchmark Sessions</h1>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            Compare BOMs across projects, identify cost drivers and VAVE opportunities
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+    <div className="animate-fade-in space-y-6">
+      <PageHeader
+        title="Benchmark Sessions"
+        description="Compare BOMs across projects, identify cost drivers and VAVE opportunities"
+      >
+        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
           New Session
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card style={{ background: 'hsl(220 18% 10%)' }}>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--primary) / 0.12)' }}>
-                <Activity className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {kpis.map(({ label, icon: Icon, value }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{activeSessions}</p>
-                <p className="text-xs text-muted-foreground">Active Sessions</p>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" aria-hidden="true" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card style={{ background: 'hsl(220 18% 10%)' }}>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--primary) / 0.12)' }}>
-                <Layers className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalBOMsCompared}</p>
-                <p className="text-xs text-muted-foreground">Total BOMs Compared</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card style={{ background: 'hsl(220 18% 10%)' }}>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--primary) / 0.12)' }}>
-                <CalendarDays className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{sessionsThisMonth}</p>
-                <p className="text-xs text-muted-foreground">Sessions This Month</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Session cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48 rounded-xl" />
+            <Skeleton key={i} className="h-48 rounded-lg" />
           ))}
         </div>
       ) : sessions.length === 0 ? (
-        <Card className="border-dashed" style={{ background: 'hsl(220 18% 10%)' }}>
+        <Card>
           <CardContent>
             <EmptyState
               icon={BarChart2}
               title="No benchmark sessions yet"
               description="Create your first session to start comparing BOMs across projects"
-              className="py-16"
             >
-              <Button onClick={() => setCreateOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
+              <Button onClick={() => setCreateOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
                 Create First Session
               </Button>
             </EmptyState>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {sessions.map((session) => (
             <Card
               key={session.id}
-              className="cursor-pointer transition-shadow group hover:shadow-lg"
-              style={{ background: 'hsl(220 18% 10%)' }}
+              className="group cursor-pointer transition-colors hover:border-primary/50"
               onClick={() => {
                 setSelectedSessionId(session.id);
                 setStep('detail');
               }}
             >
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate">{session.name}</CardTitle>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="truncate text-base group-hover:text-primary">{session.name}</CardTitle>
                     {session.description && (
                       <CardDescription className="mt-0.5 line-clamp-2">
                         {session.description}
@@ -214,40 +188,41 @@ export default function BenchmarkPage() {
                   </div>
                   <Badge
                     variant="outline"
-                    className={`shrink-0 ml-2 text-[10px] ${STATUS_COLORS[session.status] ?? ''}`}
+                    className={`shrink-0 text-[10px] ${STATUS_COLORS[session.status] ?? ''}`}
                   >
                     {STATUS_LABELS[session.status] ?? session.status}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-2 text-center mb-3">
-                  <div className="rounded-lg bg-muted/40 py-2">
-                    <p className="text-lg font-bold">{session.selectedProjects?.length ?? 0}</p>
-                    <p className="text-[10px] text-muted-foreground">Projects</p>
+                <dl className="mb-3 grid grid-cols-2 divide-x rounded-md border bg-muted/30 text-center">
+                  <div className="py-2">
+                    <dd className="text-lg font-semibold tabular-nums">{session.selectedProjects?.length ?? 0}</dd>
+                    <dt className="text-[11px] text-muted-foreground">Projects</dt>
                   </div>
-                  <div className="rounded-lg bg-muted/40 py-2">
-                    <p className="text-lg font-bold">{session.bomCount ?? 0}</p>
-                    <p className="text-[10px] text-muted-foreground">BOMs</p>
+                  <div className="py-2">
+                    <dd className="text-lg font-semibold tabular-nums">{session.bomCount ?? 0}</dd>
+                    <dt className="text-[11px] text-muted-foreground">BOMs</dt>
                   </div>
+                </dl>
+                <div className="flex items-center justify-between gap-2 border-t pt-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    Updated {formatDate(session.updatedAt)}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSessionId(session.id);
+                      setStep('detail');
+                    }}
+                  >
+                    Open
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground mb-3">
-                  Updated {formatDate(session.updatedAt)}
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full group-hover:bg-primary/10 transition-colors"
-                  style={{ color: 'hsl(var(--primary))' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedSessionId(session.id);
-                    setStep('detail');
-                  }}
-                >
-                  Open
-                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
               </CardContent>
             </Card>
           ))}
@@ -256,7 +231,7 @@ export default function BenchmarkPage() {
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md" style={{ background: 'hsl(220 18% 10%)' }}>
+        <DialogContent className="sm:max-w-md" style={{ background: 'hsl(var(--popover))' }}>
           <DialogHeader>
             <DialogTitle>New Benchmark Session</DialogTitle>
           </DialogHeader>

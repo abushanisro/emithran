@@ -177,7 +177,7 @@ export function MaterialsTab({ bomMetrics }: Props) {
                                     Qty: {a.quantities[bIdx]}
                                   </div>
                                   {(a.costs[bIdx] ?? 0) > 0 && (
-                                    <div className="text-xs text-green-600">
+                                    <div className="text-xs text-success">
                                       {formatPrice(a.costs[bIdx] ?? 0)}
                                     </div>
                                   )}

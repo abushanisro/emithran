@@ -22,9 +22,9 @@ export type CalculationTraceLine = {
 // as RiskBadge/ComplexityBadge (bg-x-500/15 text-x-700 span), just a new enum.
 function CalculatorConfidenceBadge({ level }: { level: ConfidenceLevel }) {
   const cls =
-    level === 'verified' ? 'bg-success/100/15 text-success' :
-    level === 'derived' ? 'bg-warning/100/15 text-warning' :
-    'bg-destructive/100/15 text-destructive';
+    level === 'verified' ? 'bg-success/15 text-success' :
+    level === 'derived' ? 'bg-warning/15 text-warning' :
+    'bg-destructive/15 text-destructive';
   const label = level === 'verified' ? 'Verified' : level === 'derived' ? 'Derived' : 'Unsupported';
   const title =
     level === 'verified' ? 'Every input was real CAD/BOM data or an exact lookup hit — nothing assumed.' :
@@ -44,7 +44,7 @@ function LookupTableRowChip({ row }: { row: LookupTableRow }) {
     <div className="text-[10px] font-mono text-muted-foreground/80 flex items-baseline gap-1.5">
       <span>{cols}</span>
       {hasMatchInfo && (
-        <span className="text-[9px] font-sans font-semibold px-1 py-px rounded bg-warning/100/15 text-warning shrink-0">
+        <span className="text-[9px] font-sans font-semibold px-1 py-px rounded bg-warning/15 text-warning shrink-0">
           matches {row.matchedDimensions}/{row.totalDimensions}
         </span>
       )}
@@ -60,7 +60,7 @@ function LookupTableRowChip({ row }: { row: LookupTableRow }) {
 // one actionable next step?), not one blob of text.
 function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
   return (
-    <div className="rounded border border-destructive/30 bg-destructive/100/5 p-2.5 space-y-2">
+    <div className="rounded border border-destructive/30 bg-destructive/5 p-2.5 space-y-2">
       <div className="text-[11px] font-semibold text-destructive">
         Result Unavailable — {gap.gapType === 'missing_lookup' ? 'Missing Lookup Data' : 'Unsupported Operation'}
       </div>

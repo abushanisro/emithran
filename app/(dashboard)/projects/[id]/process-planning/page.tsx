@@ -1029,7 +1029,7 @@ function ProcessPlanningPageContent() {
                                   </h3>
                                   <Badge
                                     variant="outline"
-                                    className={`text-xs ${item.itemType === 'assembly' ? 'bg-success/100/10 text-success border-success/20' :
+                                    className={`text-xs ${item.itemType === 'assembly' ? 'bg-success/10 text-success border-success/20' :
                                       item.itemType === 'sub_assembly' ? 'bg-primary/10 text-primary border-primary/20' :
                                         'bg-warning/10 text-warning border-warning/20'
                                       }`}
@@ -1547,7 +1547,7 @@ function ProcessPlanningPageContent() {
                       )}
                       <button
                         onClick={() => setValidationDialogOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-success/100/20 hover:bg-success/100/30 text-success border border-success/30 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-success/20 hover:bg-success/30 text-success border border-success/30 transition-colors"
                       >
                         <CheckCircle2 className="h-3 w-3" />
                         Validation

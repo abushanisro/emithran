@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
 import { Zap, Loader2, Trash2, Table2, Columns, LayoutGrid, CheckSquare } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   useVaveIdeas, useVaveBom,
   useBulkCreateVaveIdeas, useUpdateVaveIdea, useDeleteVaveIdea,
 } from '@/lib/api/hooks/useVave';
 import { vaveApi, type VaveIdea, type VaveBomItem } from '@/lib/api/vave';
-import { toast } from 'sonner';
+
 
 interface Props {
   projectId: string;
@@ -24,29 +26,29 @@ type IdeaView = 'table' | 'kanban' | 'cards';
 const FRAMEWORK_COLORS: Record<string, string> = {
   SCAMPER: 'bg-primary/10 text-primary border-primary/30',
   TRIZ:    'bg-primary/10 text-primary border-primary/30',
-  FAST:    'bg-amber-500/10 text-amber-400 border-amber-500/30',
+  FAST:    'bg-warning/10 text-warning border-warning/30',
   Manual:  'bg-muted/60 text-muted-foreground border-border',
 };
 
 type StatusStyle = { badge: string; dot: string; header: string; border: string };
 const STATUS_STYLES: Record<string, StatusStyle> = {
   draft:        { badge: 'bg-muted text-muted-foreground',                                         dot: 'bg-muted-foreground',  header: 'text-muted-foreground', border: 'border-muted'        },
-  approved:     { badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',               dot: 'bg-emerald-400',       header: 'text-emerald-400',      border: 'border-emerald-500/30' },
+  approved:     { badge: 'bg-success/10 text-success border-success/30',               dot: 'bg-success',       header: 'text-success',      border: 'border-success/30' },
   'in-progress':{ badge: 'bg-primary/10 text-primary border-primary/30', dot: 'bg-brand-400', header: 'text-primary', border: 'border-primary/30' },
   done:         { badge: 'bg-primary/10 text-primary border-primary/30',                           dot: 'bg-primary',           header: 'text-primary',          border: 'border-primary/30'   },
 };
 const FALLBACK_STYLE: StatusStyle = { badge: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground', header: 'text-muted-foreground', border: 'border-muted' };
 
 const FEASIBILITY_DOTS: Record<string, string> = {
-  High:   'bg-emerald-400',
-  Medium: 'bg-amber-400',
-  Low:    'bg-red-400',
+  High:   'bg-success',
+  Medium: 'bg-warning',
+  Low:    'bg-destructive',
 };
 
 const RISK_COLORS: Record<string, string> = {
-  High:   'text-red-400',
-  Medium: 'text-amber-400',
-  Low:    'text-emerald-400',
+  High:   'text-destructive',
+  Medium: 'text-warning',
+  Low:    'text-success',
 };
 
 const KANBAN_COLUMNS: { status: VaveIdea['status']; label: string }[] = [
@@ -157,7 +159,7 @@ function TableView({ ideas, selected, onToggleSelect, onUpdate, onDelete }: Tabl
                   <p className="text-[9px] text-muted-foreground mt-0.5">{idea.scamperType}</p>
                 )}
               </td>
-              <td className="px-3 py-2.5 text-right font-semibold text-emerald-400">
+              <td className="px-3 py-2.5 text-right font-semibold text-success">
                 {formatUSD(idea.estSavingsUsd)}
               </td>
               <td className="px-3 py-2.5 text-center">
@@ -223,7 +225,7 @@ function KanbanView({ ideas, onUpdate, onDelete }: KanbanViewProps) {
                 </span>
               </div>
               {colSavings > 0 && (
-                <span className="text-[10px] text-emerald-400 font-medium">{formatUSD(colSavings)}</span>
+                <span className="text-[10px] text-success font-medium">{formatUSD(colSavings)}</span>
               )}
             </div>
 
@@ -260,7 +262,7 @@ function KanbanView({ ideas, onUpdate, onDelete }: KanbanViewProps) {
 
                   {/* Metrics row */}
                   <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-emerald-400 font-semibold">{formatUSD(idea.estSavingsUsd)}</span>
+                    <span className="text-success font-semibold">{formatUSD(idea.estSavingsUsd)}</span>
                     <div className="flex items-center gap-1">
                       <span className={`h-1.5 w-1.5 rounded-full ${FEASIBILITY_DOTS[idea.feasibility] ?? 'bg-muted-foreground'}`} />
                       <span className="text-muted-foreground">{idea.feasibility}</span>
@@ -328,9 +330,9 @@ function CardsView({ ideas, onUpdate, onDelete }: CardsViewProps) {
 
               {/* Metrics grid */}
               <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-1.5">
+                <div className="rounded-md bg-success/10 border border-success/20 px-2 py-1.5">
                   <p className="text-muted-foreground text-[9px] mb-0.5">Savings</p>
-                  <p className="text-emerald-400 font-semibold">{formatUSD(idea.estSavingsUsd)}</p>
+                  <p className="text-success font-semibold">{formatUSD(idea.estSavingsUsd)}</p>
                 </div>
                 <div className="rounded-md bg-muted/40 border border-border px-2 py-1.5">
                   <p className="text-muted-foreground text-[9px] mb-0.5">Feasibility</p>
@@ -549,7 +551,7 @@ export function IdeaRepository({ projectId }: Props) {
       {allIdeas.length > 0 && (
         <div className="flex items-center gap-6 px-4 py-2.5 rounded-lg bg-muted/30 text-sm flex-wrap">
           <span><strong>{allIdeas.length}</strong> ideas</span>
-          <span className="text-emerald-400"><strong>{formatUSD(totalSavings)}</strong> est. savings (filtered)</span>
+          <span className="text-success"><strong>{formatUSD(totalSavings)}</strong> est. savings (filtered)</span>
           <div className="flex gap-2 text-xs">
             {Object.entries(statusCounts).map(([status, count]) => {
               const style = STATUS_STYLES[status] ?? FALLBACK_STYLE;
@@ -607,7 +609,7 @@ export function IdeaRepository({ projectId }: Props) {
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+            className="h-7 text-xs border-success/40 text-success hover:bg-success/10"
             onClick={handleBulkApprove}
           >
             Approve Selected

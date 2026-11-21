@@ -3672,7 +3672,7 @@ export function ProcessCostDialog({
                   alternatives are named here so the choice is the engineer's and is
                   visible. */}
               {ambiguousCalculatorChoices.length > 0 && (
-                <div className="rounded-md border border-warning/40 bg-warning/100/5 p-2 space-y-1">
+                <div className="rounded-md border border-warning/40 bg-warning/5 p-2 space-y-1">
                   <p className="text-xs text-warning">
                     Machine class <span className="font-medium">{selectedMachineClass}</span> is used by{' '}
                     {ambiguousCalculatorChoices.length} different operations, which are priced by different

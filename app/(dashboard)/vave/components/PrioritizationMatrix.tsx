@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
 import { Wand2, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useRef } from 'react';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useVaveIdeas, useUpdateVaveIdea } from '@/lib/api/hooks/useVave';
 import type { VaveIdea } from '@/lib/api/vave';
-import { toast } from 'sonner';
+
 
 interface Props {
   projectId: string;
@@ -31,9 +33,9 @@ const QUADRANT_CONFIG: Record<Quadrant, {
   bg: string; border: string; headerText: string; countText: string;
   barColor: string;
 }> = {
-  QuickWin:  { label: 'Quick Wins',     subLabel: 'High savings · Low effort',  bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', headerText: 'text-emerald-400', countText: 'text-emerald-300', barColor: 'bg-emerald-500' },
+  QuickWin:  { label: 'Quick Wins',     subLabel: 'High savings · Low effort',  bg: 'bg-success/10', border: 'border-success/30', headerText: 'text-success', countText: 'text-success', barColor: 'bg-success/100' },
   Strategic: { label: 'Strategic Bets', subLabel: 'High savings · High effort', bg: 'bg-primary/10', border: 'border-primary/30', headerText: 'text-primary', countText: 'text-primary', barColor: 'bg-brand-500' },
-  FillIn:    { label: 'Fill-ins',       subLabel: 'Low savings · Low effort',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   headerText: 'text-amber-400',   countText: 'text-amber-300',  barColor: 'bg-amber-500' },
+  FillIn:    { label: 'Fill-ins',       subLabel: 'Low savings · Low effort',   bg: 'bg-warning/10',   border: 'border-warning/30',   headerText: 'text-warning',   countText: 'text-warning',  barColor: 'bg-warning/100' },
   Avoid:     { label: 'Avoid',          subLabel: 'Low savings · High effort',  bg: 'bg-muted/40',       border: 'border-border',         headerText: 'text-muted-foreground', countText: 'text-muted-foreground', barColor: 'bg-muted-foreground' },
 };
 
@@ -45,9 +47,9 @@ const VIEW_OPTIONS: { value: ViewType; label: string; description: string }[] = 
 ];
 
 const FEASIBILITY_DOTS: Record<string, string> = {
-  High:   'bg-emerald-500',
-  Medium: 'bg-amber-500',
-  Low:    'bg-red-500',
+  High:   'bg-success/100',
+  Medium: 'bg-warning/100',
+  Low:    'bg-destructive/100',
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -81,15 +83,15 @@ function computeWeightedScore(idea: VaveIdea, maxSavings: number): number {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 7) return 'text-emerald-400';
-  if (score >= 4) return 'text-amber-400';
-  return 'text-red-400';
+  if (score >= 7) return 'text-success';
+  if (score >= 4) return 'text-warning';
+  return 'text-destructive';
 }
 
 function scoreBg(score: number): string {
-  if (score >= 7) return 'bg-emerald-500';
-  if (score >= 4) return 'bg-amber-500';
-  return 'bg-red-500';
+  if (score >= 7) return 'bg-success/100';
+  if (score >= 4) return 'bg-warning/100';
+  return 'bg-destructive/100';
 }
 
 function truncate(s: string, n: number): string {
@@ -165,7 +167,7 @@ function MatrixView({ projectId, ideas }: { projectId: string; ideas: VaveIdea[]
                     >
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xs font-medium line-clamp-2 flex-1">{idea.title}</p>
-                        <span className="text-xs font-bold text-emerald-400 shrink-0">{formatUSD(idea.estSavingsUsd)}</span>
+                        <span className="text-xs font-bold text-success shrink-0">{formatUSD(idea.estSavingsUsd)}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
                         <span className={`h-1.5 w-1.5 rounded-full ${FEASIBILITY_DOTS[idea.feasibility] ?? 'bg-muted-foreground'}`} />
@@ -198,7 +200,7 @@ function MatrixView({ projectId, ideas }: { projectId: string; ideas: VaveIdea[]
                   onDragEnd={() => setDraggingId(null)}
                   className="bg-muted rounded-lg border border-border/60 px-3 py-1.5 cursor-grab text-xs font-medium hover:shadow-xs"
                 >
-                  {idea.title} · <span className="text-emerald-400">{formatUSD(idea.estSavingsUsd)}</span>
+                  {idea.title} · <span className="text-success">{formatUSD(idea.estSavingsUsd)}</span>
                 </div>
               ))}
             </div>
@@ -320,10 +322,10 @@ function ScoringView({ projectId, ideas }: { projectId: string; ideas: VaveIdea[
 
                     {/* Savings */}
                     <td className="px-3 py-2.5">
-                      <span className="text-xs font-semibold text-emerald-400">{formatUSD(idea.estSavingsUsd)}</span>
+                      <span className="text-xs font-semibold text-success">{formatUSD(idea.estSavingsUsd)}</span>
                       <div className="w-16 h-1 bg-muted/60 rounded-full mt-1 overflow-hidden">
                         <div
-                          className="h-full bg-emerald-500 rounded-full"
+                          className="h-full bg-success/100 rounded-full"
                           style={{ width: `${(idea.savingsScore / 10) * 100}%` }}
                         />
                       </div>
@@ -419,9 +421,9 @@ function ScoringView({ projectId, ideas }: { projectId: string; ideas: VaveIdea[
       {/* Score legend */}
       <div className="px-4 py-2 bg-muted/20 border-t border-border flex items-center gap-4 text-[10px] text-muted-foreground">
         <span className="font-medium">Score Legend:</span>
-        <span><span className="text-emerald-400 font-semibold">≥7.0</span> — High Priority</span>
-        <span><span className="text-amber-400 font-semibold">4.0–6.9</span> — Medium Priority</span>
-        <span><span className="text-red-400 font-semibold">&lt;4.0</span> — Low Priority</span>
+        <span><span className="text-success font-semibold">≥7.0</span> — High Priority</span>
+        <span><span className="text-warning font-semibold">4.0–6.9</span> — Medium Priority</span>
+        <span><span className="text-destructive font-semibold">&lt;4.0</span> — Low Priority</span>
         <span className="ml-auto">Weights: Savings 40% · Feasibility 25% · Risk 20% · Complexity 15%</span>
       </div>
     </div>
