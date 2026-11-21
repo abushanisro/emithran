@@ -1,30 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ListSkeleton } from '@/components/ui/loading-skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
 import { 
   FileText, 
   Download, 
@@ -32,13 +7,43 @@ import {
   Edit, 
   Printer,
   Settings,
+  ArrowLeft,
+  ChevronDown,
   Loader2,
   AlertTriangle,
   CheckCircle,
 } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 import BalloonDiagramViewer from '@/components/features/project-reports/BalloonDiagramViewer';
 import InspectionReportTable from '@/components/features/project-reports/InspectionReportTable';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBOMs } from '@/lib/api/hooks/useBOM';
 import {
   useBalloonDiagrams,
   useCreateBalloonDiagram,
@@ -49,7 +54,6 @@ import {
   useDeleteAnnotation,
 } from '@/lib/api/hooks/useProjectReports';
 import { useProjects } from '@/lib/api/hooks/useProjects';
-import { useBOMs } from '@/lib/api/hooks/useBOM';
 
 interface CreateDiagramFormData {
   name: string;
@@ -176,6 +180,10 @@ function ReportHeader({
   projectName: string;
   inspectionReport: any;
 }) {
+  const router = useRouter();
+  const params = useParams();
+  const projectId = params.id as string;
+
   const handlePrint = () => {
     window.print();
   };
@@ -189,36 +197,53 @@ function ReportHeader({
   };
 
   return (
-    <div className="flex items-center justify-between p-6 border-b">
-      <div>
-        <h1 className="text-2xl font-bold">Project Report</h1>
-        <p className="text-muted-foreground mt-1">{projectName}</p>
-        {inspectionReport && (
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className="bg-green-100 text-green-800">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Report Generated
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {inspectionReport.inspection_date}
-            </span>
-          </div>
-        )}
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Button variant="outline" size="sm" onClick={handlePrint}>
-          <Printer className="h-4 w-4 mr-2" />
-          Print
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleExportPDF}>
-          <Download className="h-4 w-4 mr-2" />
-          PDF
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleExportExcel}>
-          <Download className="h-4 w-4 mr-2" />
-          Excel
-        </Button>
+    <div className="flex items-start gap-3">
+      <Button
+        variant="outline"
+        size="icon"
+        className="mt-0.5 h-8 w-8 shrink-0"
+        aria-label="Back to project"
+        onClick={() => { router.push(`/projects/${projectId}`); }}
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <div className="min-w-0 flex-1">
+        <PageHeader title="Project Report" description={projectName}>
+          {inspectionReport && (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="gap-1 border-success/30 bg-success/10 text-success">
+                <CheckCircle className="h-3 w-3" />
+                Report Generated
+              </Badge>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {inspectionReport.inspection_date}
+              </span>
+            </div>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Export
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onSelect={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleExportPDF}>
+                <Download className="mr-2 h-4 w-4" />
+                PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleExportExcel}>
+                <Download className="mr-2 h-4 w-4" />
+                Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </PageHeader>
       </div>
     </div>
   );
@@ -280,94 +305,79 @@ export default function ProjectReportPage() {
 
   if (!currentProject) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Project Not Found</h3>
-          <p className="text-muted-foreground">The requested project could not be found.</p>
-        </div>
-      </div>
+      <Card>
+        <EmptyState
+          icon={AlertTriangle}
+          title="Project Not Found"
+          description="The requested project could not be found."
+        />
+      </Card>
     );
   }
 
+  const overviewStats = [
+    { label: 'Balloon Diagrams', icon: FileText, value: balloonDiagrams?.length || 0, tone: 'bg-primary/10 text-primary' },
+    { label: 'Inspections', icon: CheckCircle, value: inspectionReport?.inspection_details?.length || 0, tone: 'bg-success/10 text-success' },
+    { label: 'Annotations', icon: Settings, value: balloonDiagrams?.reduce((sum, d) => sum + (d.annotations?.length || 0), 0) || 0, tone: 'bg-primary/10 text-primary' },
+  ];
+
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="animate-fade-in space-y-6">
       <ReportHeader 
         projectName={currentProject.name}
         inspectionReport={inspectionReport}
       />
-      
-      <div className="p-6">
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="balloon-diagram">Balloon Diagram</TabsTrigger>
-            <TabsTrigger value="inspection-report">Inspection Report</TabsTrigger>
-            <TabsTrigger value="complete-report">Complete Report</TabsTrigger>
-          </TabsList>
-          
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="h-10 w-full justify-start overflow-x-auto sm:w-fit">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="balloon-diagram">Balloon Diagram</TabsTrigger>
+          <TabsTrigger value="inspection-report">Inspection Report</TabsTrigger>
+          <TabsTrigger value="complete-report">Complete Report</TabsTrigger>
+        </TabsList>
+
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="p-6">
-                <div className="flex items-center">
-                  <FileText className="h-8 w-8 text-primary mr-3" />
-                  <div>
-                    <h3 className="text-lg font-semibold">Balloon Diagrams</h3>
-                    <p className="text-2xl font-bold text-primary">
-                      {balloonDiagrams?.length || 0}
-                    </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {overviewStats.map(({ label, icon: Icon, value, tone }) => (
+                <Card key={label}>
+                  <div className="flex items-center justify-between gap-3 p-4">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+                    </div>
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${tone}`}>
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </div>
                   </div>
-                </div>
-              </Card>
-              
-              <Card className="p-6">
-                <div className="flex items-center">
-                  <CheckCircle className="h-8 w-8 text-green-500 mr-3" />
-                  <div>
-                    <h3 className="text-lg font-semibold">Inspections</h3>
-                    <p className="text-2xl font-bold text-green-600">
-                      {inspectionReport?.inspection_details?.length || 0}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-              
-              <Card className="p-6">
-                <div className="flex items-center">
-                  <Settings className="h-8 w-8 text-primary mr-3" />
-                  <div>
-                    <h3 className="text-lg font-semibold">Annotations</h3>
-                    <p className="text-2xl font-bold text-primary">
-                      {balloonDiagrams?.reduce((sum, d) => sum + (d.annotations?.length || 0), 0) || 0}
-                    </p>
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              ))}
             </div>
-            
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b">
+
+            <Card className="overflow-hidden">
+              <div className="border-b bg-muted/40 px-6 py-3">
+                <h3 className="text-sm font-semibold">Recent Activity</h3>
+              </div>
+              <ul className="divide-y text-sm">
+                <li className="flex items-center justify-between gap-3 px-6 py-3">
                   <span>Project report generated</span>
                   <Badge variant="outline">{inspectionReport?.inspection_date || 'N/A'}</Badge>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b">
+                </li>
+                <li className="flex items-center justify-between gap-3 px-6 py-3">
                   <span>Balloon diagrams created</span>
                   <Badge variant="outline">{balloonDiagrams?.length || 0} diagrams</Badge>
-                </div>
-                <div className="flex items-center justify-between py-2">
+                </li>
+                <li className="flex items-center justify-between gap-3 px-6 py-3">
                   <span>Quality inspections completed</span>
                   <Badge variant="outline">Latest: {inspectionReport?.inspection_date || 'N/A'}</Badge>
-                </div>
-              </div>
+                </li>
+              </ul>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="balloon-diagram" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <h2 className="text-xl font-semibold">Balloon Diagrams</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-4">
+                <h2 className="text-lg font-semibold">Balloon Diagrams</h2>
                 {balloonDiagrams && balloonDiagrams.length > 1 && (
                   <Select value={selectedDiagramId || ''} onValueChange={setSelectedDiagramId}>
                     <SelectTrigger className="w-64">
@@ -384,7 +394,7 @@ export default function ProjectReportPage() {
                 )}
               </div>
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <Button
                   variant={isEditingDiagram ? "default" : "outline"}
                   size="sm"
@@ -410,16 +420,17 @@ export default function ProjectReportPage() {
                   isEditing={isEditingDiagram}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Balloon Diagrams</h3>
-                    <p className="text-muted-foreground mb-4">Create your first balloon diagram to get started.</p>
+                <div className="flex h-full items-center justify-center">
+                  <EmptyState
+                    icon={FileText}
+                    title="No Balloon Diagrams"
+                    description="Create your first balloon diagram to get started."
+                  >
                     <CreateBalloonDiagramDialog
                       projectId={projectId}
                       onSuccess={refetchDiagrams}
                     />
-                  </div>
+                  </EmptyState>
                 </div>
               )}
             </Card>
@@ -431,10 +442,12 @@ export default function ProjectReportPage() {
             ) : inspectionReport ? (
               <InspectionReportTable report={inspectionReport} />
             ) : (
-              <Card className="p-8 text-center">
-                <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Inspection Report</h3>
-                <p className="text-muted-foreground">Complete quality inspections to generate the report.</p>
+              <Card>
+                <EmptyState
+                  icon={AlertTriangle}
+                  title="No Inspection Report"
+                  description="Complete quality inspections to generate the report."
+                />
               </Card>
             )}
           </TabsContent>
@@ -446,21 +459,25 @@ export default function ProjectReportPage() {
               <div className="space-y-6">
                 {completeReport.balloon_drawing && (
                   <Card className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">1.3 BALLOON DRAWING</h2>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h2 className="mb-4 text-lg font-semibold">1.3 BALLOON DRAWING</h2>
+                    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
                       <div>
-                        <strong>Material:</strong> {completeReport.balloon_drawing.material}
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Material</dt>
+                        <dd className="mt-1 font-medium">{completeReport.balloon_drawing.material}</dd>
                       </div>
                       <div>
-                        <strong>Surface Treatment:</strong> {completeReport.balloon_drawing.surface_treatment}
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Surface Treatment</dt>
+                        <dd className="mt-1 font-medium">{completeReport.balloon_drawing.surface_treatment}</dd>
                       </div>
                       <div>
-                        <strong>Part Name:</strong> {completeReport.balloon_drawing.part_name}
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Part Name</dt>
+                        <dd className="mt-1 font-medium">{completeReport.balloon_drawing.part_name}</dd>
                       </div>
                       <div>
-                        <strong>Drawing No.:</strong> {completeReport.balloon_drawing.drawing_no}
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Drawing No.</dt>
+                        <dd className="mt-1 font-medium">{completeReport.balloon_drawing.drawing_no}</dd>
                       </div>
-                    </div>
+                    </dl>
                   </Card>
                 )}
                 
@@ -469,15 +486,16 @@ export default function ProjectReportPage() {
                 )}
               </div>
             ) : (
-              <Card className="p-8 text-center">
-                <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Complete Report Not Available</h3>
-                <p className="text-muted-foreground">Complete balloon diagrams and inspections to generate the full report.</p>
+              <Card>
+                <EmptyState
+                  icon={AlertTriangle}
+                  title="Complete Report Not Available"
+                  description="Complete balloon diagrams and inspections to generate the full report."
+                />
               </Card>
             )}
           </TabsContent>
-        </Tabs>
-      </div>
+      </Tabs>
     </div>
   );
 }
