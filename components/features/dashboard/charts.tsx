@@ -65,24 +65,24 @@ export function CostChart({ projects }: CostChartProps) {
           data={chartData}
           margin={{ top: 20, right: 60, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.7} />
           <XAxis
             dataKey="name"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
           />
           <YAxis
             yAxisId="cost"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
             tickFormatter={(v) => `$${(v / 100000).toFixed(1)}L`}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
           />
           <YAxis
             yAxisId="percent"
             orientation="right"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
             tickFormatter={(v) => `${v.toFixed(1)}%`}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
           />
           <Tooltip
             contentStyle={{
@@ -97,8 +97,8 @@ export function CostChart({ projects }: CostChartProps) {
             }}
           />
           <Legend />
-          <Bar yAxisId="cost" dataKey="targetPrice" name="Target Price" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-          <Bar yAxisId="cost" dataKey="shouldCost" name="Should Cost" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+          <Bar yAxisId="cost" dataKey="targetPrice" name="Target Price" fill="hsl(var(--chart-1))" radius={[8, 8, 8, 8]} maxBarSize={14} />
+          <Bar yAxisId="cost" dataKey="shouldCost" name="Should Cost" fill="hsl(var(--chart-2))" radius={[8, 8, 8, 8]} maxBarSize={14} />
           <Line yAxisId="percent" type="monotone" dataKey="savingsPercent" name="Savings %" stroke="hsl(var(--chart-3))" strokeWidth={3} dot={{ fill: 'hsl(var(--chart-3))', strokeWidth: 2, r: 4 }} />
         </ComposedChart>
       </ResponsiveContainer>
@@ -129,9 +129,11 @@ export function StatusPieChart({ statusDistribution }: StatusPieChartProps) {
               data={dataWithPercentage}
               cx="50%"
               cy="50%"
-              innerRadius={35}
-              outerRadius={65}
-              paddingAngle={2}
+              innerRadius={52}
+              outerRadius={72}
+              paddingAngle={3}
+              cornerRadius={6}
+              stroke="none"
               dataKey="count"
               nameKey="label"
             >
@@ -160,7 +162,7 @@ export function StatusPieChart({ statusDistribution }: StatusPieChartProps) {
           <div key={item.label} className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <div 
-                className="w-3 h-3 rounded-full" 
+                className="h-2.5 w-2.5 rounded-full" 
                 style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
               />
               <span className="text-muted-foreground">{item.label}</span>
@@ -198,45 +200,61 @@ export function ProjectTrendChart({ projects }: { projects: any[] }) {
     };
   });
 
+  const firstDay = trendData[0]?.date;
+  const lastIndex = trendData.length - 1;
+  const lastDay = trendData[lastIndex]?.date;
+
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <AreaChart data={trendData} margin={{ top: 16, right: 48, left: 8, bottom: 5 }}>
           <defs>
             <linearGradient id="colorProjects" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
-            </linearGradient>
-            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0}/>
+              <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity={0.22}/>
+              <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity={0.04}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis 
-            dataKey="date" 
+          <CartesianGrid horizontal={false} vertical={false} />
+          <XAxis
+            dataKey="date"
+            ticks={[firstDay ?? 0, lastDay ?? 0]}
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false}
+            tickLine={false}
+            padding={{ left: 4, right: 4 }}
           />
-          <YAxis 
-            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
-          />
-          <Tooltip 
+          <YAxis hide />
+          <Tooltip
+            cursor={{ stroke: 'hsl(var(--border))' }}
             contentStyle={{
               backgroundColor: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
               borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
             }}
           />
-          <Area 
-            type="monotone" 
-            dataKey="projects" 
-            stroke="hsl(var(--chart-1))" 
-            fillOpacity={1} 
+          <Area
+            type="linear"
+            dataKey="projects"
+            stroke="hsl(var(--chart-1))"
+            strokeWidth={2}
+            fillOpacity={1}
             fill="url(#colorProjects)"
             name="New Projects"
+            dot={false}
+            activeDot={{ r: 4 }}
+            label={(props: { index?: number; x?: number; y?: number; value?: number }) =>
+              props.index === lastIndex && props.x !== undefined && props.y !== undefined ? (
+                <g key="end-marker">
+                  <circle cx={props.x} cy={props.y} r={5} fill="hsl(var(--card))" stroke="hsl(var(--chart-1))" strokeWidth={2.5} />
+                  <text x={props.x + 10} y={props.y + 4} fontSize={12} fontWeight={600} fill="hsl(var(--foreground))">
+                    {props.value}
+                  </text>
+                </g>
+              ) : (
+                <g key={`m-${props.index ?? 0}`} />
+              )
+            }
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -290,11 +308,11 @@ export function ManufacturingPerformanceChart({ modules }: { modules: any[] }) {
           data={performanceData}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.7} />
           <XAxis 
             dataKey="name" 
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
             angle={-45}
             textAnchor="end"
             height={80}
@@ -302,14 +320,14 @@ export function ManufacturingPerformanceChart({ modules }: { modules: any[] }) {
           <YAxis 
             yAxisId="count"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
           />
           <YAxis 
             yAxisId="percent"
             orientation="right"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
             tickFormatter={(v) => `${v.toFixed(0)}%`}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
           />
           <Tooltip
             contentStyle={{
@@ -325,8 +343,8 @@ export function ManufacturingPerformanceChart({ modules }: { modules: any[] }) {
             }}
           />
           <Legend />
-          <Bar yAxisId="count" dataKey="active" name="Active" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
-          <Bar yAxisId="count" dataKey="total" name="Total" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />
+          <Bar yAxisId="count" dataKey="active" name="Active" fill="hsl(var(--chart-1))" radius={[8, 8, 8, 8]} maxBarSize={14} />
+          <Bar yAxisId="count" dataKey="total" name="Total" fill="hsl(var(--chart-2))" radius={[8, 8, 8, 8]} maxBarSize={14} />
           <Line yAxisId="percent" type="monotone" dataKey="efficiency" name="Efficiency" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={{ fill: 'hsl(var(--chart-3))', strokeWidth: 2, r: 3 }} />
         </ComposedChart>
       </ResponsiveContainer>
@@ -382,18 +400,18 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
         </div>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={placeholderData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.7} />
             <XAxis 
               dataKey="name" 
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-              axisLine={{ stroke: 'hsl(var(--border))' }}
+              axisLine={false} tickLine={false}
             />
             <YAxis 
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
               tickFormatter={() => '$0'}
-              axisLine={{ stroke: 'hsl(var(--border))' }}
+              axisLine={false} tickLine={false}
             />
-            <Bar dataKey="savings" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="savings" fill="hsl(var(--muted))" radius={[8, 8, 8, 8]} maxBarSize={14} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -421,11 +439,11 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
           data={savingsData}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.7} />
           <XAxis 
             dataKey="name" 
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
           />
           <YAxis 
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
@@ -435,7 +453,7 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
               if (absV >= 1000) return `$${(v / 1000).toFixed(1)}K`;
               return `$${v.toFixed(0)}`;
             }}
-            axisLine={{ stroke: 'hsl(var(--border))' }}
+            axisLine={false} tickLine={false}
           />
           <Tooltip
             contentStyle={{
@@ -458,7 +476,7 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
             dataKey="savings" 
             name="Cost Savings" 
             fill="hsl(var(--chart-3))"
-            radius={[4, 4, 0, 0]}
+            radius={[8, 8, 8, 8]} maxBarSize={14}
           >
             {savingsData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.fillColor} />

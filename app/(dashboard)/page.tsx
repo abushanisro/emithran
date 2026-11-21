@@ -240,20 +240,20 @@ export default function DashboardPage() {
       </PageHeader>
 
       {/* Row 1: KPI cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="p-5">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
-              <FolderKanban className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-semibold text-foreground">Total Projects</p>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary"><FolderKanban className="h-5 w-5" /></span>
             </div>
-            <div className="mt-2 flex items-end justify-between gap-4">
+            <div className="mt-4 flex items-end justify-between gap-4">
               <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">{projects.length}</p>
               <div className="flex h-10 items-end gap-1" aria-hidden="true">
                 {projectTrendData.map((data, i) => (
                   <div
                     key={i}
-                    className="w-2 rounded-sm bg-primary/60"
+                    className="w-2 rounded-full bg-primary/70"
                     style={{
                       height: `${Math.max(8, (data.value / Math.max(...projectTrendData.map(d => d.value), 1)) * 40)}px`,
                     }}
@@ -265,16 +265,16 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-5">
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">System Efficiency</p>
-              <Gauge className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-semibold text-foreground">System Efficiency</p>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-success"><Gauge className="h-5 w-5" /></span>
             </div>
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{systemEfficiency.toFixed(1)}%</p>
-            <div className="mt-3 h-1.5 w-full rounded-full bg-secondary">
+            <p className="mt-4 text-3xl font-bold tabular-nums tracking-tight text-foreground">{systemEfficiency.toFixed(1)}%</p>
+            <div className="mt-4 h-2 w-full rounded-full bg-secondary">
               <div
-                className="h-1.5 rounded-full bg-success transition-all duration-300"
+                className="h-2 rounded-full bg-success transition-all duration-300"
                 style={{ width: `${systemEfficiency}%` }}
               />
             </div>
@@ -293,13 +293,13 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-5">
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Total Vendors</p>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-semibold text-foreground">Total Vendors</p>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-info/15 text-info"><Users className="h-5 w-5" /></span>
             </div>
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{vendorsData?.total || vendors.length}</p>
+            <p className="mt-4 text-3xl font-bold tabular-nums tracking-tight text-foreground">{vendorsData?.total || vendors.length}</p>
             <div className="mt-3 flex gap-5 text-xs">
               <p>
                 <span className="font-semibold tabular-nums text-foreground">{vendorsData?.total || vendors.filter(v => v.status === 'active').length}</span>{' '}
@@ -317,14 +317,14 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-5">
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Cost Savings</p>
-              <PiggyBank className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-semibold text-foreground">Cost Savings</p>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/15 text-warning"><PiggyBank className="h-5 w-5" /></span>
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <p className="text-3xl font-semibold tabular-nums tracking-tight text-success">
+            <div className="mt-4 flex items-baseline gap-2">
+              <p className="text-3xl font-bold tabular-nums tracking-tight text-success">
                 {savings != null && savings >= 0 ? '+' : ''}{formatProjectMoney(savings)}
               </p>
               <p className="text-sm font-medium tabular-nums text-success">{savingsLabel}</p>
@@ -339,13 +339,13 @@ export default function DashboardPage() {
       )}
 
       {/* Row 2: charts and action list */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2">
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:col-span-2">
+          <Card className="rounded-2xl shadow-sm md:col-span-2">
+            <CardHeader className="p-6 pb-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <CardTitle className="text-base font-semibold">Module Performance & Efficiency</CardTitle>
+                  <CardTitle className="text-lg font-bold">Module Performance & Efficiency</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Active vs total projects across manufacturing modules
                   </p>
@@ -358,62 +358,62 @@ export default function DashboardPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6 pt-2">
               <ManufacturingPerformanceChart modules={manufacturingModules} />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="rounded-2xl shadow-sm">
+            <CardHeader className="p-6 pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold">Project Trend</CardTitle>
+                <CardTitle className="text-lg font-bold">Project Trend</CardTitle>
                 <Badge variant="outline">Last 30 Days</Badge>
               </div>
               <p className="text-sm text-muted-foreground">Project creation trends and volume</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6 pt-2">
               <ProjectTrendChart projects={projects} />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Cost Savings</CardTitle>
+          <Card className="rounded-2xl shadow-sm">
+            <CardHeader className="p-6 pb-2">
+              <CardTitle className="text-lg font-bold">Cost Savings</CardTitle>
               <p className="text-sm text-muted-foreground">Target BOM cost vs actual BOM cost, by project</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6 pt-2">
               <CostSavingsChart projects={projectsForCharts} />
             </CardContent>
           </Card>
 
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Manufacturing Cost Analysis</CardTitle>
+          <Card className="rounded-2xl shadow-sm md:col-span-2">
+            <CardHeader className="p-6 pb-2">
+              <CardTitle className="text-lg font-bold">Manufacturing Cost Analysis</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Target BOM cost vs actual BOM cost derived from process-planned items
               </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6 pt-2">
               {projects.length > 0 ? (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 divide-y rounded-lg border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                    <div className="p-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-muted/60 p-4">
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Target</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+                      <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
                         {formatProjectMoney(totalTarget)}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">from {projects.filter(p => (p.targetBomCost ?? 0) > 0).length} projects with targets</p>
                     </div>
-                    <div className="p-4">
+                    <div className="rounded-xl bg-muted/60 p-4">
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Actual BOM Cost</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+                      <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
                         {formatProjectMoney(totalActual)}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">{totalBomItems} items across all BOMs</p>
                     </div>
-                    <div className="p-4">
+                    <div className="rounded-xl bg-muted/60 p-4">
                       <p className="text-xs font-medium uppercase tracking-wide text-success">Savings</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-success">
+                      <p className="mt-1 text-xl font-bold tabular-nums text-success">
                         {formatProjectMoney(savings)}
                       </p>
                       <p className="mt-1 text-xs text-success">{savingsLabel} reduction</p>
@@ -440,13 +440,13 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Project Status</CardTitle>
+        <div className="space-y-6">
+          <Card className="rounded-2xl shadow-sm">
+            <CardHeader className="p-6 pb-2">
+              <CardTitle className="text-lg font-bold">Project Status</CardTitle>
               <p className="text-sm text-muted-foreground">Current breakdown by status</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6 pt-2">
               {statusDistribution.length > 0 ? (
                 <StatusPieChart statusDistribution={statusDistribution} />
               ) : (
@@ -459,12 +459,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Modules</CardTitle>
+          <Card className="rounded-2xl shadow-sm">
+            <CardHeader className="p-6 pb-2">
+              <CardTitle className="text-lg font-bold">Modules</CardTitle>
               <p className="text-sm text-muted-foreground">Jump to a manufacturing module</p>
             </CardHeader>
-            <CardContent className="p-2 pt-0">
+            <CardContent className="p-3 pt-1">
               <ul className="divide-y">
                 {manufacturingModules.map((module) => {
                   const row = (
@@ -483,11 +483,11 @@ export default function DashboardPage() {
                   return (
                     <li key={module.id}>
                       {MODULES_WITHOUT_PAGE.has(module.id) ? (
-                        <div className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5">{row}</div>
+                        <div className="flex items-center justify-between gap-3 rounded-xl px-4 py-3">{row}</div>
                       ) : (
                         <Link
                           href={module.path}
-                          className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-accent"
+                          className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 transition-colors hover:bg-accent"
                         >
                           {row}
                         </Link>
@@ -502,11 +502,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Row 3: recent projects */}
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="rounded-2xl shadow-sm">
+        <CardHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold">Recent Projects</CardTitle>
-            <Link href="/projects" className="flex items-center gap-1 text-sm text-primary hover:underline">
+            <CardTitle className="text-lg font-bold">Recent Projects</CardTitle>
+            <Link href="/projects" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
               View all <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
