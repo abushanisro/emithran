@@ -11,9 +11,13 @@ press-brake bend is a single-curved cylinder. One such twin pair is the
 recognition.
 
 The drawn region is then the connected network of curved faces (cylinders,
-cones, tori, spheres) that contains a twin pair: the cup wall, its bottom and
-flange radii, a box's corner and bottom radii. Those faces are not bends,
-holes or rolled forms, and the extractor removes them from those detectors.
+cones, tori, spheres) that contains a twin pair and is itself sheet: every face
+of it has an offset twin (it is one skin of the sheet). The cup wall, its
+bottom and flange radii, a box's corner and bottom radii are; the bore of a
+hole pierced through a drawn wall is not (it crosses the sheet, it has no
+twin), so the region stops at it and the hole stays a hole. The region's faces
+are not bends, holes or rolled forms, and the extractor removes them from those
+detectors.
 
 Measured, never assumed:
   draw axis          the base panel normal the extractor already computed
@@ -23,10 +27,20 @@ Measured, never assumed:
   developed_area_mm2 half the area of every face that has an offset twin
                      (inner + outer skin of the sheet), the blank's area by
                      constant-volume drawing
+  form_projected_area_mm2  the area inside the outer outline of the drawn
+                     region seen along the axis (the footprint the form
+                     covers; openings inside it are counted in)
+  form_developed_area_mm2  half the area of the drawn region's own faces (all
+                     of them twinned): the sheet the form is made of
 
 depth_to_width is reported for routing (the hydroforming variable
 fluidCellFormingRatioThreshold separates Fluid Cell from Deep Draw); this
 module does not route.
+
+analyse_sheet_faces() is the one pass over the faces (surface type, area, offset
+twins, adjacency) that detect_drawn_shell and the hydroforming measurement
+(sheet_metal/features/hydroform.py) both read, so the twin search runs once
+per part.
 """
 from __future__ import annotations
 
@@ -180,60 +194,154 @@ def _min_width_2d(points: List[Tuple[float, float]]) -> float:
 
 
 _CURVED = ("cylinder", "cone", "torus", "sphere")
+# The extent of a face's sample grid used for the part's depth (as before: the corners and middles of its UV box).
+_DEPTH_SAMPLES = 2
+# The silhouette's mesh: the one the engine already builds for the 3D view (memory_optimizer: 0.1 mm linear,
+# 0.5 rad angular), so measuring it never re-meshes the part.
+SILHOUETTE_DEFLECTION_MM = 0.1
 
 
-def detect_drawn_shell(shape: Any, thickness: float, base_normal: Optional[Vec]) -> Optional[Dict[str, Any]]:
-    """The drawn shell of a sheet part, or None when the part has none."""
+def _twin_partners(records: List[Dict[str, Any]], t: float) -> Dict[int, List[int]]:
+    """Every face with the faces that are its offset twin (_twins, evaluated for all pairs at once per surface
+    kind: the same tests and tolerances, without a Python call per pair, so a part with thousands of faces stays
+    fast). A face may have more than one twin: the opposite skin split into several faces."""
+    import numpy as np  # type: ignore
+
+    partners: Dict[int, List[int]] = {}
+    gap_tol = max(0.1 * t, 0.02)  # _thickness_match / the plane test
+
+    def link(a: int, b: int) -> None:
+        partners.setdefault(a, []).append(b)
+        partners.setdefault(b, []).append(a)
+
+    by_kind: Dict[str, List[Dict[str, Any]]] = {}
+    for r in records:
+        by_kind.setdefault(r["kind"], []).append(r)
+    for kind, recs in by_kind.items():
+        if kind not in ("plane", "cylinder", "cone", "torus", "sphere") or len(recs) < 2:
+            continue
+        idx = [r["index"] for r in recs]
+        pts = np.array([r["point"] for r in recs], dtype=float)
+        dirs = np.array([r["dir"] for r in recs], dtype=float) if kind != "sphere" else None
+        for i in range(len(recs) - 1):
+            rest = slice(i + 1, None)
+            if kind == "sphere":
+                ok = np.linalg.norm(pts[rest] - pts[i], axis=1) <= _POS_TOL
+                ok &= np.abs(np.abs(recs[i]["radius"] - np.array([r["radius"] for r in recs[i + 1:]])) - t) <= gap_tol
+            else:
+                parallel = np.abs(np.abs(dirs[rest] @ dirs[i]) - 1.0) <= _ANG_TOL
+                off = pts[rest] - pts[i]
+                if kind == "plane":
+                    ok = parallel & (np.abs(np.abs(off @ dirs[i]) - t) <= gap_tol)
+                else:
+                    on_axis = np.linalg.norm(np.cross(off, dirs[i]), axis=1) < _POS_TOL
+                    ok = parallel & on_axis
+                    if kind == "torus":
+                        ok &= np.abs(np.array([r["major"] for r in recs[i + 1:]]) - recs[i]["major"]) <= _POS_TOL
+                        ok &= np.abs(np.abs(np.array([r["minor"] for r in recs[i + 1:]]) - recs[i]["minor"]) - t) <= gap_tol
+                    else:
+                        ok &= np.abs(np.abs(np.array([r["radius"] for r in recs[i + 1:]]) - recs[i]["radius"]) - t) <= gap_tol
+            for j in np.nonzero(ok)[0]:
+                link(idx[i], idx[i + 1 + int(j)])
+    return partners
+
+
+def analyse_sheet_faces(shape: Any, thickness: float) -> Dict[str, Any]:
+    """The faces of a sheet part, read once: each face's record (_face_records), its offset twins, the set of faces
+    that have one (the sheet's two skins: everything else crosses the sheet -- its cut edges and hole bores), and
+    the face adjacency (faces sharing an edge)."""
+    from sheet_metal.bend_relationships import _build_edge_face_adjacency
+
+    records = _face_records(shape)
+    partners = _twin_partners(records, thickness) if thickness > 0 else {}
+    _faces, adjacency = _build_edge_face_adjacency(shape)
+    return {
+        "thickness": thickness,
+        "records": records,
+        "by_index": {r["index"]: r for r in records},
+        "partners": partners,
+        "twinned": set(partners),
+        "adjacency": adjacency,
+    }
+
+
+def _basis(axis: Vec) -> Tuple[Vec, Vec]:
+    ref = (1.0, 0.0, 0.0) if abs(axis[0]) < 0.9 else (0.0, 1.0, 0.0)
+    u = _unit(_cross(axis, ref))
+    return u, _cross(axis, u)
+
+
+def region_measures(shape: Any, sheet_faces: Dict[str, Any], region: Sequence[int], axis: Vec) -> Dict[str, Any]:
+    """What the drawn region (or any part of it) measures across the draw axis: its narrowest width, the area
+    inside its outer outline seen along the axis, the sheet it is made of, and its centroid."""
+    from shared.casting_geometry import projected_outline
+
+    by_index = sheet_faces["by_index"]
+    axis = _unit(axis)
+    u, v = _basis(axis)
+    # Fine sampling: a full circle sampled at n points reads as a polygon
+    # whose narrowest width is D*cos(pi/n) -- 64 keeps that under 0.13%.
+    region_pts = [p for i in region for p in _sample_points(by_index[i], 64)]
+    width = _min_width_2d([(_dot(p, u), _dot(p, v)) for p in region_pts])
+    centroid = tuple(sum(c) / len(region_pts) for c in zip(*region_pts))
+    footprint = None
+    geometry = projected_outline(shape, axis, SILHOUETTE_DEFLECTION_MM, face_ids=region)["geometry"]
+    if geometry is not None and not geometry.is_empty:
+        from shapely.geometry import Polygon  # type: ignore
+        parts = list(geometry.geoms) if hasattr(geometry, "geoms") else [geometry]
+        footprint = sum(Polygon(p.exterior).area for p in parts if hasattr(p, "exterior"))
+    return {
+        "opening_width_mm": width,
+        "form_projected_area_mm2": footprint,
+        "form_developed_area_mm2": sum(by_index[i]["area"] for i in region) / 2.0,
+        "centroid": centroid,
+    }
+
+
+def detect_drawn_shell(shape: Any, thickness: float, base_normal: Optional[Vec],
+                       faces: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """The drawn shell of a sheet part, or None when the part has none. faces: analyse_sheet_faces(shape, thickness)
+    when the caller already has it."""
     if thickness <= 0 or base_normal is None:
         return None
-    records = _face_records(shape)
-    by_index = {r["index"]: r for r in records}
+    sheet = faces if faces is not None else analyse_sheet_faces(shape, thickness)
+    records, by_index, twinned, adj = sheet["records"], sheet["by_index"], sheet["twinned"], sheet["adjacency"]
 
-    twin_of: Dict[int, int] = {}
-    for i, a in enumerate(records):
-        for b in records[i + 1:]:
-            if a["index"] not in twin_of and b["index"] not in twin_of and _twins(a, b, thickness):
-                twin_of[a["index"]] = b["index"]
-                twin_of[b["index"]] = a["index"]
-    seeds = [i for i in twin_of if by_index[i]["kind"] in ("torus", "sphere")]
+    seeds = [i for i in twinned if by_index[i]["kind"] in ("torus", "sphere")]
     if not seeds:
         return None
 
-    from sheet_metal.bend_relationships import _build_edge_face_adjacency
-    _faces, adj = _build_edge_face_adjacency(shape)
+    # Grown through the sheet only: a curved face with no offset twin crosses the sheet (a hole's bore through a
+    # drawn wall) and is not part of the form.
     region: set = set()
     stack = list(seeds)
     while stack:
         i = stack.pop()
-        if i in region or by_index[i]["kind"] not in _CURVED:
+        if i in region or i not in twinned or by_index[i]["kind"] not in _CURVED:
             continue
         region.add(i)
         stack.extend(adj.get(i, ()))
 
     axis = _unit(base_normal)
-    ref = (1.0, 0.0, 0.0) if abs(axis[0]) < 0.9 else (0.0, 1.0, 0.0)
-    u = _unit(_cross(axis, ref))
-    v = _cross(axis, u)
-    # Fine sampling: a full circle sampled at n points reads as a polygon
-    # whose narrowest width is D*cos(pi/n) -- 64 keeps that under 0.13%.
-    region_pts = [p for i in region for p in _sample_points(by_index[i], 64)]
-    all_pts = [p for r in records for p in _sample_points(r, 2)]
+    all_pts = [p for r in records for p in _sample_points(r, _DEPTH_SAMPLES)]
     along = [_dot(p, axis) for p in all_pts]
     depth = max(along) - min(along)
-    width = _min_width_2d([(_dot(p, u), _dot(p, v)) for p in region_pts])
-    developed = sum(by_index[i]["area"] for i in twin_of) / 2.0
-    centroid = tuple(sum(c) / len(region_pts) for c in zip(*region_pts))
+    measures = region_measures(shape, sheet, sorted(region), axis)
+    width = measures["opening_width_mm"]
+    developed = sum(by_index[i]["area"] for i in twinned) / 2.0
 
     return {
         "recognition_status": "recognized",
         "face_ids": sorted(region),
-        "twin_pairs": len(twin_of) // 2,
+        "twin_pairs": sum(len(p) for p in sheet["partners"].values()) // 2,
         "draw_axis": [round(c, 4) for c in axis],
         "depth_mm": round(depth, 2),
         "opening_width_mm": round(width, 2),
         "depth_to_width": round(depth / width, 3) if width > 0 else None,
         "developed_area_mm2": round(developed, 1),
-        "centroid_mm": [round(c, 2) for c in centroid],
+        "form_projected_area_mm2": round(measures["form_projected_area_mm2"], 1) if measures["form_projected_area_mm2"] is not None else None,
+        "form_developed_area_mm2": round(measures["form_developed_area_mm2"], 1),
+        "centroid_mm": [round(c, 2) for c in measures["centroid"]],
         "curved_faces": [
             {"kind": by_index[i]["kind"], "dir": list(by_index[i].get("dir", ())), "point": list(by_index[i]["point"]),
              "radius": by_index[i].get("radius")}
