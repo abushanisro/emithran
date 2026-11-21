@@ -1,8 +1,10 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -11,8 +13,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -21,7 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCalculateChildPartCost } from '@/lib/api/hooks/useChildPartCost';
-import { Loader2 } from 'lucide-react';
 
 interface ChildPartDialogProps {
   open: boolean;
@@ -277,7 +278,7 @@ export function ChildPartDialog({
             {/* Purchased Part Fields */}
             {makeBuy === 'buy' && (
               <>
-                <div className="border-l-4 border-l-blue-500 pl-4 bg-primary/10 dark:bg-primary/20 py-3 rounded">
+                <div className="border-l-4 border-l-primary pl-4 bg-primary/10 dark:bg-primary/20 py-3 rounded">
                   <h4 className="font-semibold text-sm mb-3">Purchased Part Costs</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -338,7 +339,7 @@ export function ChildPartDialog({
             {/* Manufactured Part Fields */}
             {makeBuy === 'make' && (
               <>
-                <div className="border-l-4 border-l-green-500 pl-4 bg-green-50 dark:bg-green-950/20 py-3 rounded">
+                <div className="border-l-4 border-l-success pl-4 bg-success/10 py-3 rounded">
                   <h4 className="font-semibold text-sm mb-3">Manufactured Part Costs</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">

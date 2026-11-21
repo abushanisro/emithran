@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import React from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -123,7 +123,7 @@ export const CalculatorInputField = React.memo(function CalculatorInputField({
 
       {provenance && <div className="text-xs text-muted-foreground">Why: {provenance}</div>}
       {gap && (value ?? '') === '' && (
-        <div className="text-xs text-amber-600 dark:text-amber-400">Missing: {gap}</div>
+        <div className="text-xs text-warning">Missing: {gap}</div>
       )}
       {tonnageCheck && <TonnageCheckNote check={tonnageCheck} />}
     </div>
@@ -140,7 +140,7 @@ function TonnageCheckNote({ check: { required, theoretical, selected } }: { chec
         <span className="font-semibold text-foreground">Recommended {required.toFixed(2)} T</span>
       </div>
       {ok !== null && (
-        <div className={`font-medium ${ok ? 'text-emerald-600' : 'text-destructive'}`}>
+        <div className={`font-medium ${ok ? 'text-success' : 'text-destructive'}`}>
           Required {required.toFixed(2)} T (Recommended Force) {ok ? '≤' : '>'} selected {selected.toFixed(1)} T
           {ok ? ' — machine has enough capacity' : ' — machine is undersized for this bend'}
         </div>

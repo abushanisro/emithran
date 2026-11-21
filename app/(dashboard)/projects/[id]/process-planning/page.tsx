@@ -1,24 +1,32 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, FileSpreadsheet, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+import { BomCostReportWrapper } from '@/components/features/cost-analysis/BomCostReportWrapper';
+import { CostAnalysisEngine } from '@/components/features/cost-analysis/CostAnalysisEngine';
+import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
+import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
+import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
+import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Viewer2D } from '@/components/ui/viewer-2d';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useProcessPlanningSpecsByBomItem } from '@/lib/api/hooks/useProcessPlanningSpecs';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
-import { Viewer2D } from '@/components/ui/viewer-2d';
 import { apiClient } from '@/lib/api/client';
 import { bomItemsApi } from '@/lib/api/bom-items';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, FileSpreadsheet, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from 'lucide-react';
 import { useRouteComparison, useApplyRoute } from '@/lib/api/hooks/useBOMItems';
 import type { RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 
@@ -30,22 +38,16 @@ if (typeof window !== 'undefined') {
     // Could not reset circuit breaker
   }
 }
-import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
-import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
 import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
-import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
-import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
 import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
 import { CostDataProvider } from '@/lib/providers/cost-data-provider';
-import { CostAnalysisEngine } from '@/components/features/cost-analysis/CostAnalysisEngine';
-import { BomCostReportWrapper } from '@/components/features/cost-analysis/BomCostReportWrapper';
 import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
-import { generateEMithranPdf } from '@/lib/utils/generate-emithran-pdf';
-import { generateEMithranImage } from '@/lib/utils/generate-emithran-image';
 import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
-import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { toViewerFeature, FEATURE_GROUP_META } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
+import { generateEMithranImage } from '@/lib/utils/generate-emithran-image';
+import { generateEMithranPdf } from '@/lib/utils/generate-emithran-pdf';
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 
 // ── Dimension Validation Dialog ───────────────────────────────────────────────
 // Shows the actual 3D CAD model with live-extracted measurements (eMithran-style).
@@ -309,7 +311,7 @@ function RouteSelectionButton({ bomItemId, location }: { bomItemId: string | nul
         size="sm"
         onClick={() => bomItemId && setOpen(true)}
         disabled={!bomItemId}
-        className="h-6 px-2 text-xs text-foreground hover:bg-card/20 disabled:opacity-50"
+        className="h-6 px-2 text-xs text-foreground hover:bg-accent disabled:opacity-50"
       >
         Auto-Fill from CAD
       </Button>
@@ -853,35 +855,34 @@ function ProcessPlanningPageContent() {
   }));
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-[1800px] mx-auto space-y-6">
+    <div className="animate-fade-in">
+      <div className="space-y-6">
         {/* PAGE HEADER */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/projects/${projectId}`)}
-              className="flex items-center gap-2"
+        <div className="flex items-start gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            className="mt-0.5 h-8 w-8 shrink-0"
+            aria-label="Back to project"
+            onClick={() => router.push(`/projects/${projectId}`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <PageHeader
+              title="Manufacturing Engineering Platform"
+              description="Integrated workflow for process planning, costing, and project management"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Manufacturing Engineering Platform</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Integrated workflow for process planning, costing, and project management
-              </p>
-            </div>
+              {selectedPartNumber && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Active Part:</span>
+                  <Badge variant="default" className="text-xs">
+                    {selectedPartNumber}
+                  </Badge>
+                </div>
+              )}
+            </PageHeader>
           </div>
-          {selectedPartNumber && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Active Part:</span>
-              <Badge variant="default" className="text-xs">
-                {selectedPartNumber}
-              </Badge>
-            </div>
-          )}
         </div>
 
         {/* TAB INTERFACE */}
@@ -922,32 +923,32 @@ function ProcessPlanningPageContent() {
           {/* TAB 1: PROJECT OVERVIEW - For OEM Engineers */}
           <TabsContent value="overview" className="space-y-6">
             {/* Project Stats Cards - Compact */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-              <Card className="border-l-4 border-l-blue-500">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Card>
                 <CardContent className="p-3">
                   <p className="text-xs text-muted-foreground">Total BOMs</p>
-                  <p className="text-lg font-bold">{boms.length}</p>
+                  <p className="text-xl font-semibold tabular-nums">{boms.length}</p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-green-500">
+              <Card>
                 <CardContent className="p-3">
                   <p className="text-xs text-muted-foreground">Parts Ready</p>
-                  <p className="text-lg font-bold">{bomItems.length}</p>
+                  <p className="text-xl font-semibold tabular-nums">{bomItems.length}</p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-yellow-500">
+              <Card>
                 <CardContent className="p-3">
                   <p className="text-xs text-muted-foreground">In Progress</p>
-                  <p className="text-lg font-bold">0</p>
+                  <p className="text-xl font-semibold tabular-nums">0</p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-primary">
+              <Card>
                 <CardContent className="p-3">
                   <p className="text-xs text-muted-foreground">Project Progress</p>
-                  <p className="text-lg font-bold">0%</p>
+                  <p className="text-xl font-semibold tabular-nums">0%</p>
                 </CardContent>
               </Card>
             </div>
@@ -1013,8 +1014,8 @@ function ProcessPlanningPageContent() {
                     {bomItems.map((item, index) => (
                       <div
                         key={item.id}
-                        className={`rounded-lg border bg-card text-card-foreground shadow-xs border-l-4 ${item.itemType === 'assembly' ? 'border-l-emerald-500' :
-                          item.itemType === 'sub_assembly' ? 'border-l-blue-500' : 'border-l-amber-500'
+                        className={`rounded-lg border bg-card text-card-foreground shadow-xs border-l-4 ${item.itemType === 'assembly' ? 'border-l-success' :
+                          item.itemType === 'sub_assembly' ? 'border-l-primary' : 'border-l-warning'
                           }`}
                       >
                         <div className="p-4">
@@ -1028,9 +1029,9 @@ function ProcessPlanningPageContent() {
                                   </h3>
                                   <Badge
                                     variant="outline"
-                                    className={`text-xs ${item.itemType === 'assembly' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' :
+                                    className={`text-xs ${item.itemType === 'assembly' ? 'bg-success/100/10 text-success border-success/20' :
                                       item.itemType === 'sub_assembly' ? 'bg-primary/10 text-primary border-primary/20' :
-                                        'bg-amber-500/10 text-amber-700 border-amber-500/20'
+                                        'bg-warning/10 text-warning border-warning/20'
                                       }`}
                                   >
                                     {item.itemType === 'assembly' ? 'Assembly' :
@@ -1132,17 +1133,17 @@ function ProcessPlanningPageContent() {
             {selectedPartNumber && selectedItem ? (
               <>
                 {/* Selected Part Details Card - Compact & Editable */}
-                <Card className="border-l-4 border-l-green-500">
-                  <CardHeader className="bg-green-500 py-2 px-3">
+                <Card className="overflow-hidden">
+                  <CardHeader className="border-b bg-muted/40 py-2.5 px-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-white text-sm font-semibold">
+                      <CardTitle className="text-sm font-semibold text-foreground">
                         Complete BOM Details & Process Planning
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <select
                           value={location}
                           onChange={(e) => setLocation(e.target.value)}
-                          className="h-6 text-xs bg-card text-foreground font-medium border border-green-300 rounded px-1.5 focus:outline-hidden focus:ring-2 focus:ring-white/60 shadow-xs [&>option]:bg-card [&>option]:text-foreground"
+                          className="h-6 text-xs bg-card text-foreground font-medium border border-input rounded px-1.5 focus:outline-hidden focus:ring-2 focus:ring-ring shadow-xs [&>option]:bg-card [&>option]:text-foreground"
                         >
                           <option value="India">India</option>
                           <option value="USA">USA</option>
@@ -1161,7 +1162,7 @@ function ProcessPlanningPageContent() {
                             variant="ghost"
                             size="sm"
                             onClick={handleEditPartDetails}
-                            className="h-6 px-2 text-xs text-foreground hover:bg-card/20"
+                            className="h-6 px-2 text-xs text-foreground hover:bg-accent"
                           >
                             Edit All
                           </Button>
@@ -1171,7 +1172,7 @@ function ProcessPlanningPageContent() {
                               variant="ghost"
                               size="sm"
                               onClick={handleSavePartDetails}
-                              className="h-6 px-2 text-xs text-foreground hover:bg-card/20"
+                              className="h-6 px-2 text-xs text-foreground hover:bg-accent"
                             >
                               Save
                             </Button>
@@ -1179,7 +1180,7 @@ function ProcessPlanningPageContent() {
                               variant="ghost"
                               size="sm"
                               onClick={handleCancelEdit}
-                              className="h-6 px-2 text-xs text-foreground hover:bg-card/20"
+                              className="h-6 px-2 text-xs text-foreground hover:bg-accent"
                             >
                               Cancel
                             </Button>
@@ -1302,7 +1303,7 @@ function ProcessPlanningPageContent() {
                               />
                               {cadDerivedWeightKg != null && (
                                 <div className="flex items-center gap-1 flex-wrap">
-                                  <span className="text-xs text-amber-600">CAD est: {cadDerivedWeightKg.toFixed(4)} kg</span>
+                                  <span className="text-xs text-warning">CAD est: {cadDerivedWeightKg.toFixed(4)} kg</span>
                                   <button
                                     type="button"
                                     onClick={() => setEditablePartData(prev => ({ ...prev, unitWeight: cadDerivedWeightKg.toFixed(4) }))}
@@ -1318,7 +1319,7 @@ function ProcessPlanningPageContent() {
                               <p className="text-xs font-medium">{editablePartData.unitWeight || '—'}</p>
                               {cadWeightMismatch && cadDerivedWeightKg != null && (
                                 <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                  <span className="text-xs bg-amber-100 text-amber-700 px-1 py-0.5 rounded">
+                                  <span className="text-xs bg-warning/15 text-warning px-1 py-0.5 rounded">
                                     ⚠ CAD: {cadDerivedWeightKg.toFixed(4)} kg ({cadWeightDiffPct}% diff)
                                   </span>
                                   <button
@@ -1535,18 +1536,18 @@ function ProcessPlanningPageContent() {
                 </Card>
 
                 {/* 3D MODEL VIEWER — full height with all tools */}
-                <div ref={modelViewerRef} className="border border-border rounded-lg overflow-hidden shadow-md">
-                  <div className="bg-primary p-3 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-primary-foreground">3D Model Viewer</h2>
+                <div ref={modelViewerRef} className="border border-border rounded-lg overflow-hidden shadow-xs">
+                  <div className="border-b bg-muted/40 p-3 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-foreground">3D Model Viewer</h2>
                     <div className="flex items-center gap-2">
                       {selectedItem.file3dPath && (
-                        <span className="text-xs text-primary-foreground/70 font-mono">
+                        <span className="text-xs text-muted-foreground font-mono">
                           {selectedItem.file3dPath.split('.').pop()?.toUpperCase()}
                         </span>
                       )}
                       <button
                         onClick={() => setValidationDialogOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-success/100/20 hover:bg-success/100/30 text-success border border-success/30 transition-colors"
                       >
                         <CheckCircle2 className="h-3 w-3" />
                         Validation
@@ -1597,8 +1598,8 @@ function ProcessPlanningPageContent() {
 
                 {/* 2D DRAWING VIEWER */}
                 {selectedItem.file2dPath && (
-                  <div className="border border-border rounded-lg overflow-hidden shadow-md">
-                    <div className="bg-muted p-3">
+                  <div className="border border-border rounded-lg overflow-hidden shadow-xs">
+                    <div className="border-b bg-muted/40 p-3">
                       <h2 className="text-sm font-semibold">2D Drawing</h2>
                     </div>
                     <div className="bg-card p-4">

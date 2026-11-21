@@ -15,7 +15,7 @@ function Working({ label, justification }: { label: string; justification: Usage
         <span className="text-[11px] font-semibold text-foreground">{label}</span>
         <span className="text-[11px] text-muted-foreground min-w-0 truncate" title={justification.title}>{justification.title}</span>
         {justification.calculatorId && <span className="text-[10px] text-muted-foreground/70 shrink-0">Calculator v{justification.calculatorVersion ?? 1}</span>}
-        {justification.estimate && <span className="text-[9px] font-semibold px-1.5 py-px rounded shrink-0 bg-amber-500/15 text-amber-700 dark:text-amber-400">Estimate</span>}
+        {justification.estimate && <span className="text-[9px] font-semibold px-1.5 py-px rounded shrink-0 bg-warning/100/15 text-warning">Estimate</span>}
       </div>
       {inputs.map((step, i) => (
         <div key={`i${i}`} className="text-[11px] pl-2">
@@ -73,7 +73,7 @@ export function MaterialUsageJustification({ usage, loading, fields, onUse }: {
         )}
       </div>
       {drift.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300">
+        <div className="rounded border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning">
           {drift.map((d) => `${d.field} here is ${formatKg(d.recorded)} kg; the costing now calculates ${formatKg(d.calculated)} kg.`).join(' ')}
         </div>
       )}

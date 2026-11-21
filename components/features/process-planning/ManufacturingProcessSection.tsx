@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
 
-import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical } from 'lucide-react';
+import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { ProcessCostDialog } from './ProcessCostDialog';
+
+import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api/client';
 import {
   useProcessCosts,
@@ -17,6 +17,8 @@ import {
 import type { LineCalculation } from '@/lib/calculators/calculator-run';
 import { featureMetaFromGroup } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
+
+import { ProcessCostDialog } from './ProcessCostDialog';
 
 interface ManufacturingProcessSectionProps {
   bomItemId?: string;
@@ -38,7 +40,7 @@ function BRow({ label, value, sub, highlight, icon }: {
   const ico =
     icon === 'db' ? <Database className="h-2.5 w-2.5 text-primary inline mr-1" /> :
     icon === 'calc'    ? <Calculator  className="h-2.5 w-2.5 text-primary inline mr-1" /> :
-    icon === 'formula' ? <FlaskConical className="h-2.5 w-2.5 text-amber-500 inline mr-1" /> : null;
+    icon === 'formula' ? <FlaskConical className="h-2.5 w-2.5 text-warning inline mr-1" /> : null;
   return (
     <div className={`flex items-start justify-between py-0.5 ${highlight ? 'font-semibold text-foreground border-t border-border mt-0.5 pt-1' : 'text-muted-foreground'}`}>
       <span className="text-[10px] leading-tight pr-2">
@@ -379,7 +381,7 @@ export function ManufacturingProcessSection({
                                 ? 'bg-primary/15 text-primary dark:text-primary'
                                 : proc.timingSource === 'calculator'
                                 ? 'bg-primary/15 text-primary dark:text-primary'
-                                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                : 'bg-warning/15 text-warning'
                             }`}>
                               {proc.timingSource === 'feature_geometry' ? 'CAD'
                                : proc.timingSource === 'machining_rules' ? 'Physics'
@@ -462,9 +464,9 @@ export function ManufacturingProcessSection({
 
   if (isLoading) {
     return (
-      <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-        <div className="bg-primary py-3 px-4">
-          <h6 className="m-0 font-semibold text-primary-foreground">Manufacturing Processes</h6>
+      <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+        <div className="border-b bg-muted/40 py-3 px-4">
+          <h6 className="m-0 text-sm font-semibold text-foreground">Manufacturing Processes</h6>
         </div>
         <div className="bg-card p-8 text-center">
           <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
@@ -479,18 +481,18 @@ export function ManufacturingProcessSection({
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-primary text-primary-foreground">
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-16">Op#</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">Process / Machine</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">Machine Rate</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">Labor Rate</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-24">Setup (min)</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-20">Batch</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">Cycle (s)</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">Parts/Cycle</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-20">Scrap %</th>
-                  <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-36">Total Cost ({currencySymbol})</th>
-                  <th className="p-3 text-center text-xs font-semibold border-r border-primary-foreground/20 w-24">Source</th>
+                <tr className="bg-muted/40 text-muted-foreground">
+                  <th className="p-3 text-left text-xs font-semibold w-16">Op#</th>
+                  <th className="p-3 text-left text-xs font-semibold">Process / Machine</th>
+                  <th className="p-3 text-left text-xs font-semibold w-28">Machine Rate</th>
+                  <th className="p-3 text-left text-xs font-semibold w-28">Labor Rate</th>
+                  <th className="p-3 text-left text-xs font-semibold w-24">Setup (min)</th>
+                  <th className="p-3 text-left text-xs font-semibold w-20">Batch</th>
+                  <th className="p-3 text-left text-xs font-semibold w-28">Cycle (s)</th>
+                  <th className="p-3 text-left text-xs font-semibold w-28">Parts/Cycle</th>
+                  <th className="p-3 text-left text-xs font-semibold w-20">Scrap %</th>
+                  <th className="p-3 text-left text-xs font-semibold w-36">Total Cost ({currencySymbol})</th>
+                  <th className="p-3 text-center text-xs font-semibold w-24">Source</th>
                   <th className="p-3 text-center text-xs font-semibold w-28">Actions</th>
                 </tr>
               </thead>
@@ -508,9 +510,9 @@ export function ManufacturingProcessSection({
                   <>
                     {sortedProcesses.map((process) => (
                       <React.Fragment key={process.id}>
-                        <tr className="hover:bg-secondary/50">
-                          <td className="p-3 border-r border-border text-xs">{process.opNbr || 0}</td>
-                          <td className="p-3 border-r border-border text-xs">
+                        <tr className="hover:bg-muted/40">
+                          <td className="p-3 text-xs">{process.opNbr || 0}</td>
+                          <td className="p-3 text-xs">
                             <div className="flex items-start gap-1.5">
                               <div className="space-y-0.5 flex-1 min-w-0">
                                 {process.processGroup && (
@@ -554,22 +556,22 @@ export function ManufacturingProcessSection({
                               })()}
                             </div>
                           </td>
-                          <td className="p-3 border-r border-border text-xs text-right">
+                          <td className="p-3 text-xs text-right">
                             {currencySymbol}{((process.machineRate || 0) * conversionRate).toFixed(2)}/hr
                           </td>
-                          <td className="p-3 border-r border-border text-xs text-right">
+                          <td className="p-3 text-xs text-right">
                             {currencySymbol}{((process.laborRate || 0) * conversionRate).toFixed(2)}/hr
                           </td>
-                          <td className="p-3 border-r border-border text-xs text-right">{process.setupTime || 0}</td>
-                          <td className="p-3 border-r border-border text-xs text-right">{process.batchSize || 0}</td>
-                          <td className="p-3 border-r border-border text-xs text-right">
+                          <td className="p-3 text-xs text-right">{process.setupTime || 0}</td>
+                          <td className="p-3 text-xs text-right">{process.batchSize || 0}</td>
+                          <td className="p-3 text-xs text-right">
                             <div className="flex flex-col items-end gap-0.5">
                               <span>{process.cycleTime || 0}</span>
                               {process.timingSource && process.timingSource !== 'default' && (
                                 <span className={`text-[9px] px-1 rounded font-mono ${
                                   process.timingSource === 'feature_geometry' || process.timingSource === 'machining_rules' ? 'bg-primary/15 text-primary dark:text-primary' :
                                   process.timingSource === 'calculator' ? 'bg-primary/15 text-primary dark:text-primary' :
-                                  'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                  'bg-warning/15 text-warning'
                                 }`}>
                                   {process.timingSource === 'feature_geometry' ? 'CAD' :
                                    process.timingSource === 'machining_rules' ? 'Physics' :
@@ -579,9 +581,9 @@ export function ManufacturingProcessSection({
                               )}
                             </div>
                           </td>
-                          <td className="p-3 border-r border-border text-xs text-right">{process.partsPerCycle || 0}</td>
-                          <td className="p-3 border-r border-border text-xs text-right">{process.scrap || 0}%</td>
-                          <td className="p-3 border-r border-border text-xs text-right font-semibold">
+                          <td className="p-3 text-xs text-right">{process.partsPerCycle || 0}</td>
+                          <td className="p-3 text-xs text-right">{process.scrap || 0}%</td>
+                          <td className="p-3 text-xs text-right font-semibold">
                             <div className="flex items-center justify-end gap-1.5">
                               <span>{currencySymbol}{(computeProcCost(process) * conversionRate).toFixed(2)}</span>
                               <button
@@ -598,13 +600,13 @@ export function ManufacturingProcessSection({
                             </div>
                           </td>
                           {/* Auto / Override status chip */}
-                          <td className="p-3 border-r border-border text-center">
+                          <td className="p-3 text-center">
                             {process.isOverride ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-warning/15 text-warning border border-warning/30">
                                 Override
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-success/100/15 text-success border border-success/30">
                                 Auto
                               </span>
                             )}
@@ -644,14 +646,14 @@ export function ManufacturingProcessSection({
                       </React.Fragment>
                     ))}
 
-                    <tr className="bg-secondary/30 font-semibold">
-                      <td colSpan={9} className="p-3 text-right border-r border-border text-xs">
+                    <tr className="bg-muted/40 font-semibold">
+                      <td colSpan={9} className="p-3 text-right text-xs">
                         Total Process Cost:
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {currencySymbol}{fmtCurrency(Number(calculateTotal()) * conversionRate)}
                       </td>
-                      <td className="p-3 border-r border-border"></td>
+                      <td className="p-3"></td>
                       <td className="p-3"></td>
                     </tr>
                   </>
@@ -684,9 +686,9 @@ export function ManufacturingProcessSection({
 
   return (
     <div className="space-y-4">
-      <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-        <div className="bg-primary py-3 px-4">
-          <h6 className="m-0 font-semibold text-primary-foreground">Manufacturing Processes</h6>
+      <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+        <div className="border-b bg-muted/40 py-3 px-4">
+          <h6 className="m-0 text-sm font-semibold text-foreground">Manufacturing Processes</h6>
         </div>
         {innerContent}
       </div>

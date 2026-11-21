@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+
 import type { ConfidenceLevel, PhysicsGap, LookupTableRow, CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 
 // Narrower than ProcessLineCost -- lets non-process callers (e.g. a material
@@ -21,9 +22,9 @@ export type CalculationTraceLine = {
 // as RiskBadge/ComplexityBadge (bg-x-500/15 text-x-700 span), just a new enum.
 function CalculatorConfidenceBadge({ level }: { level: ConfidenceLevel }) {
   const cls =
-    level === 'verified' ? 'bg-green-500/15 text-green-700 dark:text-green-400' :
-    level === 'derived' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' :
-    'bg-red-500/15 text-red-700 dark:text-red-400';
+    level === 'verified' ? 'bg-success/100/15 text-success' :
+    level === 'derived' ? 'bg-warning/100/15 text-warning' :
+    'bg-destructive/100/15 text-destructive';
   const label = level === 'verified' ? 'Verified' : level === 'derived' ? 'Derived' : 'Unsupported';
   const title =
     level === 'verified' ? 'Every input was real CAD/BOM data or an exact lookup hit — nothing assumed.' :
@@ -43,7 +44,7 @@ function LookupTableRowChip({ row }: { row: LookupTableRow }) {
     <div className="text-[10px] font-mono text-muted-foreground/80 flex items-baseline gap-1.5">
       <span>{cols}</span>
       {hasMatchInfo && (
-        <span className="text-[9px] font-sans font-semibold px-1 py-px rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 shrink-0">
+        <span className="text-[9px] font-sans font-semibold px-1 py-px rounded bg-warning/100/15 text-warning shrink-0">
           matches {row.matchedDimensions}/{row.totalDimensions}
         </span>
       )}
@@ -59,8 +60,8 @@ function LookupTableRowChip({ row }: { row: LookupTableRow }) {
 // one actionable next step?), not one blob of text.
 function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
   return (
-    <div className="rounded border border-red-500/30 bg-red-500/5 p-2.5 space-y-2">
-      <div className="text-[11px] font-semibold text-red-700 dark:text-red-400">
+    <div className="rounded border border-destructive/30 bg-destructive/100/5 p-2.5 space-y-2">
+      <div className="text-[11px] font-semibold text-destructive">
         Result Unavailable — {gap.gapType === 'missing_lookup' ? 'Missing Lookup Data' : 'Unsupported Operation'}
       </div>
       {gap.gapType === 'missing_lookup' ? (
@@ -110,7 +111,7 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
             )}
           </div>
 
-          <div className="text-[11px] text-muted-foreground border-t border-red-500/20 pt-1.5">
+          <div className="text-[11px] text-muted-foreground border-t border-destructive/20 pt-1.5">
             <span className="font-semibold text-foreground/80">Required Action: </span>
             {gap.requiredAction}
           </div>
@@ -118,7 +119,7 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
       ) : (
         <>
           <div className="text-[11px] text-muted-foreground">Reason: {gap.reason}</div>
-          <div className="text-[11px] text-muted-foreground border-t border-red-500/20 pt-1.5">
+          <div className="text-[11px] text-muted-foreground border-t border-destructive/20 pt-1.5">
             <span className="font-semibold text-foreground/80">Required Action: </span>
             {gap.requiredAction ?? `this process needs new calculator capability${gap.requiredCapability ? ` (${gap.requiredCapability})` : ''} — an engineering task, not a missing data row.`}
           </div>
