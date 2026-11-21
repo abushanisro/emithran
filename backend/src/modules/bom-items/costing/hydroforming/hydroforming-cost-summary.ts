@@ -91,7 +91,7 @@ export function buildHydroformingCostSummary(input: {
         press: route.press,
         partsPerTray: route.key === 'fluid-cell' ? { value: route.partsPerTray, requested: input.scenario.partsPerTray, max: route.partsThatFit } : null,
         handAdjustingLengthMm: r2(route.handAdjustingLengthMm), throwPadAreaMm2: r2(route.throwPadAreaMm2), cappingTools: route.cappingTools,
-        holes: { inFlat: part.holes.filter((h) => h.inFlat).length, afterForming: part.holes.filter((h) => !h.inFlat).length },
+        holes: { pierced: part.holes.length, inFormedWalls: part.holes.filter((h) => !h.inFlat).length },
         intensifier: input.scenario.intensifier,
         complete: route.complete,
         options: input.hydroforming.routes.map((r) => ({

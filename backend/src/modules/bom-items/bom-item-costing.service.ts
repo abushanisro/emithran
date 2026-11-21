@@ -2196,7 +2196,9 @@ export class BomItemCostingService {
     // Every real disagreement, in every branch's own warnings — the real
     // numbers, never a vague "mismatch" with nothing to act on.
     materialWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
-    if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
+    // The checks of the numbers the sheet-metal quote prices from (bend and hole counts, cut length: geometry-reconciliation.ts). A hydroformed
+    // part is priced from its hydroform measurement instead, so they say nothing about its quote (and would name a press brake line it has not).
+    if (family === 'sheet_metal' && !isHydroforming(item)) materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
     // The grade this process prices: the part's own, or, when the process prices only its own materials and the grade is not one of them,
     // its closest own material, said in the warnings (process-materials.ts). Every engine below prices this grade.
     const pricedGrade = await this.materialResolutionService.gradeForProcess(accessToken, itemGrade, family, processGroupOf(item));

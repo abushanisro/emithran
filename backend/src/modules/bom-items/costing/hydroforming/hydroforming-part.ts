@@ -19,7 +19,7 @@ export interface HydroformHole {
   diameterMm: number | null;
   perimeterMm: number;
   areaMm2: number;
-  /** Pierced in the flat blank (offline blank); false: through a drawn or formed wall, after forming. */
+  /** Through the flat (a face parallel to the main face); false: through a drawn or formed wall. Either way pierced in the flat blank. */
   inFlat: boolean;
   onMainSurface: boolean;
   /** From the hole's edge to the main face's outer boundary; null when not on the main surface. */
@@ -118,7 +118,7 @@ export function hydroformPart(g: HydroformGeometrySummary | null | undefined): {
   });
   const unmeasured = [
     ...(blankPerimeter == null ? ["the blank's outline (its cut length), so the blanking press's force is not checked"] : []),
-    ...(Array.isArray(get(g, 'holes')) ? [] : ['the holes, so none is costed (no capping tool, no hole through a formed wall)']),
+    ...(Array.isArray(get(g, 'holes')) ? [] : ['the holes, so none is pierced and no capping tool is costed']),
     ...(Array.isArray(get(g, 'flanges')) ? [] : ['the flanges, so no hand adjusting is costed']),
   ];
   const holes = (Array.isArray(get(g, 'holes')) ? get(g, 'holes') as unknown[] : []).map(obj).filter((h): h is Obj => h != null).map((h): HydroformHole => ({

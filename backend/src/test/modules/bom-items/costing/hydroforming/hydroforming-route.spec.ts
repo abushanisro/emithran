@@ -186,11 +186,14 @@ describe('Fluid Cell: the flanged plate', () => {
 });
 
 describe('what cannot be made or measured', () => {
-  it('a hole through a formed wall is pierced after forming: a No Cost Feature line, the route still applied', () => {
+  it("a hole through a formed wall is pierced in the flat blank with the others, as memory's Offline Blank pierces every hole", () => {
     const wall = { ...CUP, holes: [{ featureType: 'SimpleHole', diameterMm: 6, perimeterMm: 18.8, areaMm2: 28.3, inFlat: false, onMainSurface: false, edgeDistanceMm: null }] };
-    const deep = route(input(wall), 'deep-draw');
-    expect(deep.lines.map((l) => l.process)).toEqual(['Offline Blank', 'Hydroform', 'No Cost Feature']);
-    expect(deep.lines[2].operation).toMatch(/1 hole\(s\) through a formed wall: pierced after forming/);
+    const plain = route(input(CUP), 'deep-draw');
+    const deep = route(input(wall, { thicknessMm: 1 }), 'deep-draw');
+    // No $0 line: the Offline Blank's one stroke pierces it, so its cut joins the blanking force (cut x 1 mm x 250 MPa shear).
+    expect(deep.lines.map((l) => l.process)).toEqual(['Offline Blank', 'Hydroform']);
+    expect(deep.blankingForceKn! - plain.blankingForceKn!).toBeCloseTo((18.8 * 1 * 250) / 1000, 6);
+    expect(deep.warnings.some((w) => w.includes('1 hole(s) through a formed wall are pierced in the flat blank') && w.includes('toleranceLooseThresholdHole'))).toBe(true);
     expect(deep.complete).toBe(true);
   });
 
@@ -272,7 +275,7 @@ describe('the part as the cad-engine measures it (hf_v1)', () => {
     expect(declined.part?.blank).toMatchObject({ perimeterMm: null, circumscribedDiameterMm: Math.hypot(200, 140) });
     expect(declined.part?.unmeasured).toEqual([
       "the blank's outline (its cut length), so the blanking press's force is not checked",
-      'the holes, so none is costed (no capping tool, no hole through a formed wall)',
+      'the holes, so none is pierced and no capping tool is costed',
       'the flanges, so no hand adjusting is costed',
     ]);
   });
@@ -297,7 +300,7 @@ describe('the summary and the route comparison', () => {
   }) as CostSummaryResponseDto;
 
   it("quotes memory's Fluid Cell route with the nest Apply's material record holds", () => {
-    expect(summary.hydroforming).toMatchObject({ route: 'fluid-cell', rule: { route: 'fluid-cell', basis: 'part' }, holes: { inFlat: 2, afterForming: 0 }, cappingTools: 1 });
+    expect(summary.hydroforming).toMatchObject({ route: 'fluid-cell', rule: { route: 'fluid-cell', basis: 'part' }, holes: { pierced: 2, inFormedWalls: 0 }, cappingTools: 1 });
     expect(summary.blankSpec).toMatchObject({ form: 'sheet', grossWeightKg: 0.2, partsPerSheet: 50 });
     expect(summary.totalCost).toBeCloseTo(quoted!.totalUsd!, 2);
     expect(summary.hydroformingTooling?.[0]?.costUsd).toBeCloseTo(quoted!.tooling[0].investmentUsd!, 2);

@@ -957,8 +957,8 @@ export interface HydroformingBreakdown {
   handAdjustingLengthMm: number;
   throwPadAreaMm2: number;
   cappingTools: number;
-  /** Holes pierced with the blank, and those through a formed wall (pierced after forming: a No Cost Feature). */
-  holes: { inFlat: number; afterForming: number };
+  /** Every hole is pierced with the blank (memory's Offline Blank); inFormedWalls of them go through a wall the forming then shapes. */
+  holes: { pierced: number; inFormedWalls: number };
   intensifier: boolean;
   complete: boolean;
   options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
