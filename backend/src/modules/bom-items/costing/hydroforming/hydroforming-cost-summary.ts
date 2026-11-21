@@ -73,6 +73,9 @@ export function buildHydroformingCostSummary(input: {
         grossWeightKg: r3(grossKg), netWeightKg: r3(partKg), utilizationPct: r2(nest.utilizationPct),
         wasteKg: r3(Math.max(0, grossKg - partKg)), wasteCost: r2(Math.max(0, grossKg - partKg) * perKg),
         sheetLengthMm: nest.sheetLengthMm, sheetWidthMm: nest.sheetWidthMm, partsPerSheet: nest.partsPerSheet,
+        // The Nest view starts from the quote's own setup and ranks these sheets.
+        ...(nest.kerfMm != null ? { kerfMm: nest.kerfMm } : {}), ...(nest.kerfSource ? { kerfSource: nest.kerfSource } : {}), ...(nest.edgeMarginMm != null ? { edgeMarginMm: nest.edgeMarginMm } : {}),
+        ...(nest.sheetSource ? { sheetSource: nest.sheetSource } : {}), ...(nest.candidateSheets?.length ? { candidateSheets: nest.candidateSheets } : {}),
       },
     } : {}),
     // The hydroform tool and the blanking die (USD): listed in the Cost Guide's tooling and written on Apply, not in the piece cost.

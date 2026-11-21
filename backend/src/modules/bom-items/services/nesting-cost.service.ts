@@ -5,6 +5,7 @@ import { SheetMetalLookupService } from '../costing/sheet-metal/lookup/sheet-met
 import { EDGE_ALLOWANCE_MM, type NestingSheet, isTrueNestCostingCacheValid, trueNestInputFingerprint, computePartAllowanceMm, GROSS_USAGE_SPACING_PROCESS } from '../costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { combineBlankNests, selectBestTrueNestCandidate } from '../costing/sheet-metal/machine/true-nest-costing.engine';
 import type { FlatPatternBlank } from '../costing/sheet-metal/machine/flat-pattern-blanks';
+import { chooseNestBlank, gridNest } from '../costing/sheet-metal/machine/nest-blank-source';
 import type { TrueNestCandidate, TrueNestCostingSelection } from '../costing/sheet-metal/machine/true-nest-costing.engine';
 
 /** Lookup tables read by the generic spec resolver (specLookupSeeds), not by a resolver of their own. */
@@ -546,34 +547,30 @@ export class NestingCostService {
     const fg = item.featureGraph as any;
     const summary = fg?.summary ?? {};
 
+    // Why the analysis has no outline, said with whatever is nested instead. When the user's chosen process and the geometry disagree, that is
+    // the reason (a machined part has no flat pattern).
+    const conflict = processChoiceConflict(fg?.classification);
+    const whyNoOutline = conflict
+      ? `No flat pattern for this part: ${conflict}`
+      : summary.flatPatternOutlineSource === 'unavailable'
+        ? "The flat pattern's outline could not be built on the last analysis (the unfold's boundary did not close or did not reconcile)."
+        : 'No flat-pattern outline is stored for this part.';
+    const hf = (item.scenarioOverrides as Record<string, unknown> | null | undefined)?.processGroup === 'Sheet Metal - Hydroforming'
+      ? summary.hydroformGeometry?.blank : null;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     const blanks: FlatPatternBlank[] | undefined = Array.isArray(summary.flatPatternBlanks) && summary.flatPatternBlanks.length > 1
       ? summary.flatPatternBlanks : undefined;
-    const blankCount = blanks ? blanks.length : 1;
-    const blank = blanks ? blanks[Math.min(Math.max(0, Math.floor(blankIndex)), blankCount - 1)]! : undefined;
-    const shownBlank = blanks ? blanks.indexOf(blank!) : 0;
-    const outlinePointsMm = blank ? blank.outlinePointsMm : summary.flatPatternOutlinePointsMm;
-    const outlineSource: 'wire_walk' | 'unavailable' = (blank ? blank.outlineSource : summary.flatPatternOutlineSource) === 'wire_walk' ? 'wire_walk' : 'unavailable';
-    if (blank && (!outlinePointsMm || outlinePointsMm.length < 3)) {
-      return { result: null, reason: `Blank ${shownBlank + 1} of the ${blankCount} this part is cut from has no flat-pattern outline. Re-run Reanalyze to retry extraction.` };
-    }
-    if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
-      // No real outline resolved for this part -- honest gap, not a guess. When the user's chosen process and the
-      // geometry disagree, that is the reason (a machined part has no flat pattern), and reanalyzing cannot help.
-      const conflict = processChoiceConflict(fg?.classification);
-      const reason = conflict
-        ? `No flat pattern for this part. ${conflict}`
-        : outlineSource === 'unavailable'
-        ? `No real flat-pattern outline is stored for this part (featureGraph.summary.flatPatternOutlineSource = 'unavailable'). ` +
-          `cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis ` +
-          `(fragmentation, self-intersection, or area-reconciliation failure). Re-run Reanalyze to retry extraction.`
-        : `featureGraph.summary.flatPatternOutlinePointsMm is missing or has fewer than 3 points ` +
-          `(source is reported as '${outlineSource}', but the point array itself is empty/absent) -- ` +
-          `this part has not had CAD analysis run since the true-nest feature was added, or the stored ` +
-          `featureGraph predates it. Re-run Reanalyze.`;
-      return { result: null, reason };
-    }
-    const holesMm = this.toNestHoles(blank ? blank.holesMm : summary.flatPatternHolesMm);
+    const choice = chooseNestBlank({
+      blanks, blankIndex,
+      flatOutline: summary.flatPatternOutlinePointsMm, flatHoles: this.toNestHoles(summary.flatPatternHolesMm),
+      flatRect: { lengthMm: num(summary.flatPatternBoundingLengthMm), widthMm: num(summary.flatPatternBoundingWidthMm) },
+      hydroformBlank: hf ? { outline: hf.outline_points_mm ?? null, lengthMm: num(hf.length_mm), widthMm: num(hf.width_mm) } : null,
+      partSizesMm: [num(item.maxLength), num(item.maxWidth), num(item.maxHeight)],
+      whyNoOutline,
+    });
+    if (!choice) return { result: null, reason: `${whyNoOutline} The part has no measured size either, so there is nothing to nest: press Refresh analysis.` };
 
+    const { outlinePointsMm, holesMm } = choice;
     const { result: cadResult, reason: cadReason } = await this.cadAnalysisService.computeTrueNest({
       outlinePointsMm,
       holesMm,
@@ -583,15 +580,25 @@ export class NestingCostService {
       kerfMm,
       edgeMarginMm,
     });
+    const common = { holesMm, outlineSource: choice.source, blankIndex: choice.blankIndex, blankCount: choice.blankCount };
     if (!cadResult) {
-      return { result: null, reason: `Outline was extracted (${outlinePointsMm.length} points, source '${outlineSource}'), but cad-engine could not nest it on the ${sheetWidthMm}x${sheetLengthMm}mm sheet: ${cadReason}` };
+      // The view still shows a nest: the blank on a grid of its rectangle, and why.
+      const grid = gridNest(outlinePointsMm, sheetWidthMm, sheetLengthMm, kerfMm ?? 0, edgeMarginMm ?? 0, quantity);
+      return {
+        result: {
+          ...common, holesMm: [], outlinePointsMm: grid.outlinePointsMm, sheetWidthMm, sheetLengthMm, partsPerSheet: grid.partsPerSheet,
+          placements: grid.placements, utilizationPct: grid.utilizationPct, sheetsRequired: grid.sheetsRequired, capped: grid.capped,
+          placementSource: 'rectangle_grid',
+          outlineNote: [choice.note, `The cad-engine could not nest it (${cadReason}), so it is placed on a grid of its rectangle.`].filter(Boolean).join(' '),
+        },
+        reason: '',
+      };
     }
 
     return {
       result: {
+        ...common,
         outlinePointsMm,
-        holesMm,
-        outlineSource,
         sheetWidthMm: cadResult.sheetWidthMm,
         sheetLengthMm: cadResult.sheetLengthMm,
         partsPerSheet: cadResult.partsPerSheet,
@@ -599,8 +606,8 @@ export class NestingCostService {
         utilizationPct: cadResult.utilizationPct,
         sheetsRequired: cadResult.sheetsRequired,
         capped: cadResult.capped,
-        blankIndex: shownBlank,
-        blankCount,
+        outlineNote: choice.note,
+        placementSource: 'cad_engine',
       },
       reason: '',
     };

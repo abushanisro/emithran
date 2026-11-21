@@ -1487,6 +1487,8 @@ export interface BlankSpecDto {
   // Sheet origin + the kerf / edge margin the cost engine nested with.
   sheetSource?: string;
   kerfMm?: number;
+  /** Where kerfMm comes from, when not sheet metal's part-spacing table (a hydroformed blank). */
+  kerfSource?: string;
   edgeMarginMm?: number;
   // Stock sheets the Nest view ranks and recommends from.
   candidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }>;
@@ -1635,7 +1637,14 @@ export interface NestPlacementDto {
 export interface TrueNestResultDto {
   outlinePointsMm: number[][];
   holesMm: { cxMm: number; cyMm: number; diameterMm: number }[];
-  outlineSource: 'wire_walk' | 'unavailable';
+  /**
+   * What was nested (backend nest-blank-source.ts): the true outline, a hydroformed part's blank, or, with no outline measured, the flat
+   * pattern's rectangle or the part's footprint (an estimate). outlineNote says why when it is not the true outline.
+   */
+  outlineSource: 'wire_walk' | 'hydroform_blank' | 'blank_rectangle' | 'part_footprint';
+  outlineNote: string | null;
+  /** cad_engine: the true-shape placement. rectangle_grid: the cad-engine could not nest it, so it sits on a grid of its rectangle. */
+  placementSource: 'cad_engine' | 'rectangle_grid';
   sheetWidthMm: number;
   sheetLengthMm: number;
   partsPerSheet: number;

@@ -155,6 +155,7 @@ interface ModelViewerProps {
   nestSheetWidthMm?: number | undefined;
   nestSheetLengthMm?: number | undefined;
   nestKerfMm?: number | undefined;
+  nestKerfSource?: string | undefined;
   nestEdgeMarginMm?: number | undefined;
   nestSheetSource?: string | undefined;
   nestCandidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }> | undefined;
@@ -214,6 +215,7 @@ export function ModelViewer({
   nestSheetWidthMm,
   nestSheetLengthMm,
   nestKerfMm,
+  nestKerfSource,
   nestEdgeMarginMm,
   nestSheetSource,
   nestCandidateSheets,
@@ -379,6 +381,7 @@ export function ModelViewer({
               {...(nestSheetWidthMm !== undefined ? { nestSheetWidthMm } : {})}
               {...(nestSheetLengthMm !== undefined ? { nestSheetLengthMm } : {})}
               {...(nestKerfMm !== undefined ? { nestKerfMm } : {})}
+              {...(nestKerfSource !== undefined ? { nestKerfSource } : {})}
               {...(nestEdgeMarginMm !== undefined ? { nestEdgeMarginMm } : {})}
               {...(nestSheetSource !== undefined ? { nestSheetSource } : {})}
               {...(nestCandidateSheets !== undefined ? { nestCandidateSheets } : {})}
@@ -544,6 +547,7 @@ export function ModelViewer({
               {...(nestSheetWidthMm !== undefined ? { nestSheetWidthMm } : {})}
               {...(nestSheetLengthMm !== undefined ? { nestSheetLengthMm } : {})}
               {...(nestKerfMm !== undefined ? { nestKerfMm } : {})}
+              {...(nestKerfSource !== undefined ? { nestKerfSource } : {})}
               {...(nestEdgeMarginMm !== undefined ? { nestEdgeMarginMm } : {})}
               {...(nestSheetSource !== undefined ? { nestSheetSource } : {})}
               {...(nestCandidateSheets !== undefined ? { nestCandidateSheets } : {})}

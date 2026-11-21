@@ -124,6 +124,11 @@ export class HydroformingCostService {
     const kerfMm = spacing + 2 * addendum;
     const edgeMarginMm = edge + addendum;
     const sheet = { lengthMm: length, widthMm: width };
+    // The setup the Nest view starts from (the same the quote nests with), and the stock sheets it ranks beside memory's.
+    const sheetSource = `memory/Sheetmetal Hydroforming standard sheet (standardSheetLength ${length} x standardSheetWidth ${width} mm)`;
+    const candidateSheets = await this.nesting.resolveNestCandidateSheets(undefined, { widthMm: width, lengthMm: length, source: sheetSource }).catch(() => []);
+    const kerfSource = `defaultSheetStockPartSpacing ${spacing} mm${addendum > 0 ? ` + 2 x the blank's ${addendum} mm addendum` : ''}`;
+    const setup = { kerfMm, kerfSource, edgeMarginMm, sheetSource, ...(candidateSheets.length ? { candidateSheets } : {}) };
     const sheetKg = (length * width * req.thicknessMm * density) / 1e9;
     const partKg = (part.developedAreaMm2 * req.thicknessMm * density) / 1e9;
     let note: string;
@@ -136,7 +141,7 @@ export class HydroformingCostService {
         const s = nested.selection;
         return {
           grossKgPerPart: s.grossWeightPerPartKg, partsPerSheet: s.partsPerSheet, utilizationPct: s.utilisationPct,
-          sheetLengthMm: s.sheetLengthMm, sheetWidthMm: s.sheetWidthMm, method: 'true_shape', note: null,
+          sheetLengthMm: s.sheetLengthMm, sheetWidthMm: s.sheetWidthMm, method: 'true_shape', note: null, ...setup,
         };
       }
       note = `The blank is nested as a rectangle: the true-shape nest did not run (${nested.reason}).`;
@@ -145,10 +150,10 @@ export class HydroformingCostService {
     }
     const blank = { lengthMm: Math.max(part.blank.lengthMm, part.blank.widthMm), widthMm: Math.min(part.blank.lengthMm, part.blank.widthMm) };
     const perSheet = rectangleNest(sheet, blank, kerfMm, edgeMarginMm);
-    if (perSheet < 1) return { grossKgPerPart: sheetKg, partsPerSheet: 1, utilizationPct: r2((100 * partKg) / sheetKg), sheetLengthMm: length, sheetWidthMm: width, method: 'rectangle', note: `The blank does not fit the ${length} x ${width} mm sheet: it is costed as one blank a sheet.` };
+    if (perSheet < 1) return { grossKgPerPart: sheetKg, partsPerSheet: 1, utilizationPct: r2((100 * partKg) / sheetKg), sheetLengthMm: length, sheetWidthMm: width, method: 'rectangle', ...setup, note: `The blank does not fit the ${length} x ${width} mm sheet: it is costed as one blank a sheet.` };
     return {
       grossKgPerPart: sheetKg / perSheet, partsPerSheet: perSheet, utilizationPct: r2((100 * partKg * perSheet) / sheetKg),
-      sheetLengthMm: length, sheetWidthMm: width, method: 'rectangle', note,
+      sheetLengthMm: length, sheetWidthMm: width, method: 'rectangle', note, ...setup,
     };
   }
 

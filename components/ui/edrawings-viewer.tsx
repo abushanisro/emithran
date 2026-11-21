@@ -156,6 +156,8 @@ interface EDrawingsViewerProps {
   nestSheetLengthMm?: number;
   /** Kerf / edge margin / sheet origin the cost engine nested with (blankSpec). */
   nestKerfMm?: number;
+  /** Where the costed kerf comes from, when not sheet metal's part-spacing table. */
+  nestKerfSource?: string;
   nestEdgeMarginMm?: number;
   nestSheetSource?: string;
   nestCandidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }>;
@@ -3102,7 +3104,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   onBrepFacePick,
   highlightColor,
   setupAxes,
-  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel, processConflict,
+  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestKerfSource, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel, processConflict,
   flatPatternPartName, flatPatternOutlinePointsMm, flatPatternHolesMm, flatPatternOutlineSource,
   flatPatternBoundingLengthMm, flatPatternBoundingWidthMm, flatPatternCutLengthMm, flatPatternBendCount,
   flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2, flatPatternBlanks,
@@ -4015,12 +4017,12 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   sheetWidthMm={nestSheetWidthMm}
                   sheetLengthMm={nestSheetLengthMm}
                   kerfMm={nestKerfMm}
+                  kerfSource={nestKerfSource}
                   edgeMarginMm={nestEdgeMarginMm}
                   sheetSource={nestSheetSource}
                   candidateSheets={nestCandidateSheets}
                   materialLabel={nestMaterialLabel}
                   gradeLabel={nestGradeLabel}
-                  processConflict={processConflict}
                   thicknessMm={sheetThickness}
                 />
               </DialogContent>
