@@ -73,19 +73,18 @@ export function AssemblyTreeGenerator({ className, bomId, onUploaded }: Assembly
       <div
         {...getRootProps()}
         className={cn(
-          // One slim strip (not a tall box), so the BOM list starts close below it: the icon, what to drop, the accepted files at the right.
-          'flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-dashed px-4 py-3 transition-colors',
+          'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-10 transition-colors',
           bomId ? 'cursor-pointer' : 'opacity-50',
           isDragActive ? 'border-primary/60 bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/40',
         )}
       >
         <input {...getInputProps()} />
-        <UploadCloud className={cn('h-6 w-6 shrink-0', isDragActive ? 'text-primary' : 'text-muted-foreground')} />
-        <div className="min-w-0 flex-1">
+        <UploadCloud className={cn('h-9 w-9', isDragActive ? 'text-primary' : 'text-muted-foreground')} />
+        <div className="text-center">
           <p className="text-sm font-medium">{isDragActive ? 'Release to upload' : 'Drop a .zip of STEP files, or STEP files'}</p>
-          <p className="text-xs text-muted-foreground">A zip or an assembly becomes a BOM with quantities. Native CAD: export as STEP (AP242) first.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">A zip or an assembly becomes a BOM with quantities. Native CAD: export as STEP (AP242) first.</p>
         </div>
-        <p className="text-[11px] text-muted-foreground/70">.zip · .step · .stp · up to {MAX_UPLOAD_MB} MB</p>
+        <p className="text-[11px] text-muted-foreground/60">.zip · .step · .stp · up to {MAX_UPLOAD_MB} MB</p>
       </div>
 
       {entries.map((entry) => (
