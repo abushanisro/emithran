@@ -1,6 +1,5 @@
 'use client';
 
-import { ArrowLeft, ChevronDown, CircuitBoard, FileSpreadsheet, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -10,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ArrowLeft, ChevronDown, CircuitBoard, FileSpreadsheet, Plus } from '@/components/ui/icons';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { isAssemblyResult, type DesignView, type StartAssemblyResult, type StartUploadResult } from '@/lib/api/electronics';
 import { useDeleteDesign, useDeleteRevision, useDesigns } from '@/lib/api/hooks/useElectronics';

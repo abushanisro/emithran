@@ -1,14 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import {
   CheckCircle2,
   Clock,
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 
 interface ModuleCardProps {
   title: string;

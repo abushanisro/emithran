@@ -1,9 +1,9 @@
 'use client';
 
-import { AlertTriangle, ChevronDown, ChevronUp, Info, Lock, Plus, X } from 'lucide-react';
 import { Fragment } from 'react';
 
 import { AddOperationPicker, type AddOperationOption } from '@/components/features/workflow/AddOperationPicker';
+import { AlertTriangle, ChevronDown, ChevronUp, Info, Lock, Plus, X } from '@/components/ui/icons';
 import { fmtMinutes, fmtMoney, fmtRate, fmtSignedMoney } from '@/lib/routing/route-format';
 import { chainCostDelta, computeChainTotals, type WorkflowRouteStep } from '@/lib/routing/route-step';
 import type { RouteNode } from '@/lib/routing/route-tree';

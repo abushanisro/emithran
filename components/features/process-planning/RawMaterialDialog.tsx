@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -14,8 +13,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Loader2, Calculator as CalculatorIcon, Play, Eye } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LocationMark } from '@/components/ui/location-mark';
 import {
   Select,
   SelectContent,
@@ -24,6 +25,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Mark } from '@/components/ui/status-mark';
+
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
@@ -35,6 +38,7 @@ import { CalculationTracePanel } from './CalculationTracePanel';
 import { MaterialUsageJustification } from './MaterialUsageJustification';
 import { ReferenceTable } from './ReferenceTable';
 import { UsageCalculatorForm } from './UsageCalculatorForm';
+
 
 // Static lookup — defined outside component so it is never recreated on re-render
 const CALCULATOR_PROPERTY_MAPPINGS: Record<string, string> = {
@@ -1330,14 +1334,14 @@ export function RawMaterialDialog({
 
               // ── Price matrix ───────────────────────────────────────────────────
               const locationPrices: Array<{ flag: string; label: string; cost: number | undefined; currency: string; symbol: string }> = [
-                { flag: '🇮🇳', label: 'India',     cost: selectedMaterial.costIndia,   currency: 'INR', symbol: '₹'   },
-                { flag: '🇺🇸', label: 'USA',       cost: selectedMaterial.costUsa,     currency: 'USD', symbol: '$'   },
-                { flag: '🇨🇳', label: 'China',     cost: selectedMaterial.costChina,   currency: 'CNY', symbol: '¥'   },
-                { flag: '🇩🇪', label: 'Germany',   cost: selectedMaterial.costGermany, currency: 'EUR', symbol: '€'   },
-                { flag: '🇫🇷', label: 'France',    cost: selectedMaterial.costFrance,  currency: 'EUR', symbol: '€'   },
-                { flag: '🇪🇺', label: 'W. Europe', cost: selectedMaterial.costWEurope, currency: 'EUR', symbol: '€'   },
-                { flag: '🇪🇺', label: 'E. Europe', cost: selectedMaterial.costEEurope, currency: 'EUR', symbol: '€'   },
-                { flag: '🇲🇽', label: 'Mexico',    cost: selectedMaterial.costMexico,  currency: 'MXN', symbol: 'MX$' },
+                { flag: 'IN', label: 'India',     cost: selectedMaterial.costIndia,   currency: 'INR', symbol: '₹'   },
+                { flag: 'US', label: 'USA',       cost: selectedMaterial.costUsa,     currency: 'USD', symbol: '$'   },
+                { flag: 'CN', label: 'China',     cost: selectedMaterial.costChina,   currency: 'CNY', symbol: '¥'   },
+                { flag: 'DE', label: 'Germany',   cost: selectedMaterial.costGermany, currency: 'EUR', symbol: '€'   },
+                { flag: 'FR', label: 'France',    cost: selectedMaterial.costFrance,  currency: 'EUR', symbol: '€'   },
+                { flag: 'EU', label: 'W. Europe', cost: selectedMaterial.costWEurope, currency: 'EUR', symbol: '€'   },
+                { flag: 'EU', label: 'E. Europe', cost: selectedMaterial.costEEurope, currency: 'EUR', symbol: '€'   },
+                { flag: 'MX', label: 'Mexico',    cost: selectedMaterial.costMexico,  currency: 'MXN', symbol: 'MX$' },
               ].filter(p => p.cost && p.cost > 0);
 
               const toUsdPrice = (lc: number, curr: string) =>
@@ -1397,7 +1401,7 @@ export function RawMaterialDialog({
                                     : 'bg-background hover:bg-primary/10 border border-border'
                                 }`}
                               >
-                                <span>{p.flag} {p.label}</span>
+                                <span><LocationMark location={p.label} />{p.label}</span>
                                 <div className="text-right ml-2">
                                   <div className="font-mono tabular-nums">
                                     {locDisplay != null ? `${displaySymbol}${locDisplay.toFixed(2)}` : '—'}
@@ -1657,7 +1661,7 @@ export function RawMaterialDialog({
                     {grossUsageOverridden ? (
                       <div className="rounded border border-warning/40 bg-warning/10 p-2 space-y-0.5">
                         <p className="text-[11px] font-semibold text-warning">
-                          ⚠ Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
+                          <Mark kind="warn" /> Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           Calculated value: {(derivedGrossKg ?? 0).toFixed(4)} kg/part

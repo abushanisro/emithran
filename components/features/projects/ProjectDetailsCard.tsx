@@ -1,15 +1,14 @@
 'use client';
 
+import { Country, State, City } from 'country-state-city';
+import { format } from 'date-fns';
 import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Edit2, Check, X, Mail, Plus, Trash2, Users, ChevronDown, Shield, Eye, UserCog, Wrench, PenTool, ShoppingCart, ClipboardCheck, DollarSign, Settings } from 'lucide-react';
-import { format } from 'date-fns';
-import { useProjectTeam, useAddTeamMember, useRemoveTeamMember, useUpdateTeamMember } from '@/lib/api/hooks/useProjectTeam';
-import type { TeamMemberRole } from '@/lib/api/project-team';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +17,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Combobox } from '@/components/ui/combobox';
-import type { ComboboxOption } from '@/components/ui/combobox';
-import { Country, State, City } from 'country-state-city';
+import { Edit2, Check, X, Mail, Plus, Trash2, Users, ChevronDown, Shield, Eye, UserCog, Wrench, PenTool, ShoppingCart, ClipboardCheck, DollarSign, Settings } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useProjectTeam, useAddTeamMember, useRemoveTeamMember, useUpdateTeamMember } from '@/lib/api/hooks/useProjectTeam';
+import type { TeamMemberRole } from '@/lib/api/project-team';
+
 
 /**
  * The backend's project-team-member DTO (backend/src/modules/projects/dto/project-team-member.dto.ts)

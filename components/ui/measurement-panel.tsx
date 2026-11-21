@@ -1,9 +1,11 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { Ruler, X, Copy, Trash2 } from 'lucide-react';
-import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
+import { Ruler, X, Copy, Trash2 } from '@/components/ui/icons';
+
 import { UNIT_SCALE, getSelectionPoint, getResultColors } from './measurement-overlay';
+
+import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
 
 interface MeasurementPanelProps {
   mode: MeasureMode;

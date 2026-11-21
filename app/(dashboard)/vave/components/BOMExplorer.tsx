@@ -1,6 +1,5 @@
 'use client';
 
-import { Upload, Trash2, Microscope, Search, ChevronDown, Filter, Sparkles, ChevronRight } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart,
@@ -23,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Upload, Trash2, Microscope, Search, ChevronDown, Filter, Sparkles, ChevronRight } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';

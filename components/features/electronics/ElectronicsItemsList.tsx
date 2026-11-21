@@ -1,11 +1,11 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Cpu, FileText, Layers, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ChevronDown, ChevronUp, Cpu, FileText, Layers, Plus, Trash2 } from '@/components/ui/icons';
 import type { DesignView, ItemType } from '@/lib/api/electronics';
 import {
   buildDesignTree,

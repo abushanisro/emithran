@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Check, ChevronsUpDown, X } from 'lucide-react';
-import { ListSkeleton } from '@/components/ui/loading-skeleton';
-import { cn } from '@/lib/utils';
+
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -13,12 +11,16 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Check, ChevronsUpDown, X } from '@/components/ui/icons';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import type { DataSource } from '@/lib/api/calculators';
+import { cn } from '@/lib/utils';
+
 import { InlineReferenceTableEditor } from './InlineReferenceTableEditor';
 
 type DatabaseRecord = {

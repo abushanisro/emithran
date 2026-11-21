@@ -1,5 +1,14 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+import React, { useState, useMemo } from 'react';
+
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Plus,
   Search,
@@ -13,16 +22,7 @@ import {
   CheckCircle2,
   ArrowUpRight,
   MoreVertical,
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import React, { useState, useMemo } from 'react';
-
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { EmptyState } from '@/components/ui/empty-state';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useSupplierNominations, useDeleteSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';

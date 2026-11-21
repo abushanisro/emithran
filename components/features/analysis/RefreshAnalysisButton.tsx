@@ -1,8 +1,8 @@
 'use client';
 
-import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { Loader2, RefreshCw } from '@/components/ui/icons';
 import { analysisRunMessage } from '@/lib/analysis/analysis-status';
 import { useRefreshAnalysisCue } from '@/lib/analysis/refresh-analysis-cue';
 import { useAnalysisRun } from '@/lib/api/hooks/useAnalysisRun';

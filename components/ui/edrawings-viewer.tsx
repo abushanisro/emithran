@@ -1,30 +1,14 @@
 'use client';
 
-import { highlightLabel, uniqueOccurrenceTriangles, withFaceCentroids } from '@/lib/features/highlight-display';
-import { faceIdForTriangle } from '@/lib/features/machining-feature-tree';
-import React, { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid, Center } from '@react-three/drei';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import React, { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
-import { fitCameraToBox } from '@/lib/geometry/camera-fit';
-import { centreGeometry } from '@/lib/geometry/centre-geometry';
-import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
-import { DimensionOverlay, DimensionOverlayCtx } from '@/components/viewer/dimension-overlay';
-import { PmiPanel } from '@/components/viewer/pmi-panel';
-import type { PmiReviewProps } from '@/components/viewer/pmi-review-list';
-import { layoutPmi, type PmiDatumMark, type PmiFrame } from '@/lib/features/pmi-frames';
-import { buildPmiGraphicsBuffers } from '@/lib/features/pmi-graphics';
-import { buildDimensionAnnotations, visibleAnnotations, type AnnotationMode, type AnnotationSource } from '@/lib/features/dimension-annotations';
-import { freshWorldBoundsOf } from '@/lib/geometry/scene-bounds';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { computeHeatmap } from '@/lib/heatmap/engine';
-import { MANUFACTURING_RISK_RAMP } from '@/lib/heatmap/ramps';
-import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
 import {
   Home,
   Download,
@@ -48,15 +32,36 @@ import {
   X,
   LayoutGrid,
   Scan,
-} from 'lucide-react';
-import { NestView } from './nest-view';
+} from '@/components/ui/icons';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
+import { DimensionOverlay, DimensionOverlayCtx } from '@/components/viewer/dimension-overlay';
+import { PmiPanel } from '@/components/viewer/pmi-panel';
+import type { PmiReviewProps } from '@/components/viewer/pmi-review-list';
+import { buildDimensionAnnotations, visibleAnnotations, type AnnotationMode, type AnnotationSource } from '@/lib/features/dimension-annotations';
+import { highlightLabel, uniqueOccurrenceTriangles, withFaceCentroids } from '@/lib/features/highlight-display';
+import { faceIdForTriangle } from '@/lib/features/machining-feature-tree';
+import { layoutPmi, type PmiDatumMark, type PmiFrame } from '@/lib/features/pmi-frames';
+import { buildPmiGraphicsBuffers } from '@/lib/features/pmi-graphics';
+import { fitCameraToBox } from '@/lib/geometry/camera-fit';
+import { centreGeometry } from '@/lib/geometry/centre-geometry';
+import { freshWorldBoundsOf } from '@/lib/geometry/scene-bounds';
+import { computeHeatmap } from '@/lib/heatmap/engine';
+import { MANUFACTURING_RISK_RAMP } from '@/lib/heatmap/ramps';
+import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
+import type { FlatPatternBlank } from '@/lib/types/manufacturing';
+import { CLICK_MAX_DRAG_PX, MODEL_PICK_HOLD_MS, centreOf, zoomOnto } from '@/lib/viewer/feature-zoom';
+
 import { FlatPatternView } from './flat-pattern-view';
 import { MeasurementOverlay } from './measurement-overlay';
-import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
 import { getResultColors } from './measurement-overlay';
-import { CLICK_MAX_DRAG_PX, MODEL_PICK_HOLD_MS, centreOf, zoomOnto } from '@/lib/viewer/feature-zoom';
 import { MeasurementPanel } from './measurement-panel';
-import type { FlatPatternBlank } from '@/lib/types/manufacturing';
+import { NestView } from './nest-view';
+
+import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
+
+
 
 const RISK_HIGHLIGHT_COLORS: Record<string, string> = {
   low: '#22c55e',
@@ -672,7 +677,7 @@ function ModelLoadStatusOverlay({ status }: { status: ModelLoadStatus }) {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg border border-destructive">
           <div className="flex flex-col items-center gap-3 text-center max-w-sm">
-            <div className="text-destructive">⚠️</div>
+            <AlertTriangle className="h-6 w-6 text-destructive" />
             <div className="text-sm font-medium">Failed to Load 3D Model</div>
             <div className="text-xs text-muted-foreground">{status.message}</div>
           </div>

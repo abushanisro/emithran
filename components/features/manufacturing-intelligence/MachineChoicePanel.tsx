@@ -1,5 +1,6 @@
 'use client';
 
+import { Mark } from '@/components/ui/status-mark';
 import type { MachineChoiceDto } from '@/lib/api/hooks/useBOMItems';
 import { formatPerPartCost } from '@/lib/costing/format-cost';
 
@@ -32,7 +33,7 @@ export function MachineChoicePanel({ choice, currencySymbol }: { choice: Machine
         {capable.map((c) => (
           <div key={c.name} className="flex items-baseline justify-between gap-2 text-[11px]">
             <span className={`truncate ${c.status === 'chosen' ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-              {c.status === 'chosen' ? '✓ ' : ''}{c.name}
+              {c.status === 'chosen' ? <><Mark kind="ok" /> </> : ''}{c.name}
               {c.reasons.length > 0 && <span className="text-muted-foreground font-normal"> · {c.reasons.join('; ')}</span>}
             </span>
             {c.perPartCost != null && <span className="tabular-nums shrink-0">{currencySymbol}{formatPerPartCost(c.perPartCost)}</span>}

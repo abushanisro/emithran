@@ -1,5 +1,10 @@
 'use client';
 
+import { useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Plus, 
   Edit, 
@@ -9,12 +14,7 @@ import {
   MapPin,
   Percent,
   Calculator
-} from 'lucide-react';
-import { useState } from 'react';
-
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 
 interface ParentEstimate {

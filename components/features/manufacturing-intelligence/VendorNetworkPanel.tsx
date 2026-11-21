@@ -1,16 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { useVendorMatch, type RankedVendor, type RankedProcessGroup } from "@/lib/api/hooks/useVendors";
-import { useCreateRfq } from "@/lib/api/hooks/useRfq";
-import { useCreateSupplierNomination, supplierNominationKeys } from "@/lib/api/hooks/useSupplierNominations";
-import { NominationType } from "@/lib/api/supplier-nominations";
-import { createSupplierEvaluationGroup } from "@/lib/api/supplier-evaluation-groups";
-import { type HeatmapLayerType } from "@/lib/heatmap/types";
+import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -19,9 +14,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Mark } from '@/components/ui/status-mark';
+import { useCreateRfq } from "@/lib/api/hooks/useRfq";
+import { useCreateSupplierNomination, supplierNominationKeys } from "@/lib/api/hooks/useSupplierNominations";
+import { useVendorMatch, type RankedVendor, type RankedProcessGroup } from "@/lib/api/hooks/useVendors";
+import { createSupplierEvaluationGroup } from "@/lib/api/supplier-evaluation-groups";
+import { NominationType } from "@/lib/api/supplier-nominations";
+import { type HeatmapLayerType } from "@/lib/heatmap/types";
+import { cn } from "@/lib/utils";
 
 interface VendorNetworkPanelProps {
   projectId: string;
@@ -151,7 +153,7 @@ function VendorCard({
       {vendor.whyBest.length > 0 && (
         <div className="flex flex-col gap-0.5 mb-1">
           {vendor.whyBest.slice(0, 3).map((why, i) => (
-            <span key={i} className="text-[9px] text-muted-foreground">✓ {why}</span>
+            <span key={i} className="text-[9px] text-muted-foreground"><Mark kind="ok" /> {why}</span>
           ))}
         </div>
       )}

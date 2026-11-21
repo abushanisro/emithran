@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Package } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft, ArrowRight, Package } from '@/components/ui/icons';
+import { Mark } from '@/components/ui/status-mark';
 
 
 import { formatDate } from "../utils";
@@ -153,7 +154,7 @@ export function BOMSelection({
                             </div>
                             {isSelected && (
                               <Badge variant="default" className="text-xs">
-                                ✓
+                                <Mark kind="ok" />
                               </Badge>
                             )}
                           </div>

@@ -1,5 +1,12 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+import React, { useState, useMemo } from 'react';
+
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Package,
   Search,
@@ -10,14 +17,7 @@ import {
   Layers,
   Wrench,
   ArrowUpRight,
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import React, { useState, useMemo } from 'react';
-
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { useAllSupplierEvaluationGroups } from '@/lib/api/hooks/useSupplierEvaluationGroups';
 import { useVendors } from '@/lib/api/hooks/useVendors';

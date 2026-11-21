@@ -18,11 +18,11 @@
 //
 // Everything shown is the backend's resolution; nothing is decided here.
 
-import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, CircleHelp, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, CircleHelp, Loader2 } from '@/components/ui/icons';
 import { useGdtAnalysis } from '@/lib/api/hooks/useBOMItems';
 import {
   useFeatureTolerances,

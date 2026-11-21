@@ -1,9 +1,9 @@
 'use client';
 
-import { Plus, Edit, Trash2, Loader2, Eye, Database, FlaskConical, TrendingUp } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Plus, Edit, Trash2, Loader2, Eye, Database, FlaskConical, TrendingUp } from '@/components/ui/icons';
 import { useCostSummary, type BlankSpecDto } from '@/lib/api/hooks/useBOMItems';
 import {
   useRawMaterialCosts,

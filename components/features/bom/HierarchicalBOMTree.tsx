@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Edit2, Box, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ChevronDown, ChevronRight, Edit2, Box, Settings } from '@/components/ui/icons';
 
 interface BOMTreeItem {
   id: string;

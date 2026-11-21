@@ -18,6 +18,8 @@ import {
   Legend
 } from 'recharts';
 
+import { BarChart3 } from '@/components/ui/icons';
+
 const CHART_COLORS = [
   'hsl(var(--chart-1))',
   'hsl(var(--chart-2))',
@@ -41,7 +43,7 @@ export function CostChart({ projects }: CostChartProps) {
     return (
       <div className="h-72 flex items-center justify-center text-muted-foreground">
         <div className="text-center">
-          <div className="text-4xl mb-2">📊</div>
+          <BarChart3 className="mb-2 h-10 w-10 opacity-50" />
           <p className="text-sm">No project data available for cost analysis</p>
         </div>
       </div>

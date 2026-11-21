@@ -1,12 +1,12 @@
 'use client';
 
-import { ArrowLeft, Calculator, Loader2, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ArrowLeft, Calculator, Loader2, RefreshCw } from '@/components/ui/icons';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

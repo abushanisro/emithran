@@ -1,8 +1,8 @@
 'use client';
 
-import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
+import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { useMHRReferenceDetail } from '@/lib/api/hooks/useMHR';
 import { cn } from '@/lib/utils';
 import { groupMachineLibraryDetail } from '@/lib/utils/machineLibraryDetail';

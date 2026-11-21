@@ -1,22 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
+import { MachineCapabilityCard } from '@/components/features/mhr/MachineCapabilityCard';
+import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileDown, FileText, Printer, Edit2, Save, X, AlertTriangle } from 'lucide-react';
-
+import { EditableValue } from '@/components/ui/editable-value';
+import { ArrowLeft, FileDown, FileText, Printer, Edit2, Save, X, AlertTriangle } from '@/components/ui/icons';
 import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { useMHRRecord, useUpdateMHR } from '@/lib/api/hooks';
 import { useFxRatesForCurrencies } from '@/lib/api/hooks/useFx';
 import { formatNumber } from '@/lib/utils';
 import { getCurrencyForLocation } from '@/lib/utils/currency-locale';
 import { exportSingleMHRToPDF } from '@/lib/utils/exportMHRToPDF';
-import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
-import { MachineCapabilityCard } from '@/components/features/mhr/MachineCapabilityCard';
-import { EditableValue } from '@/components/ui/editable-value';
 import { calculateMHR } from '@/lib/utils/mhrCalculations';
 import type { MHRInputs, MHRCalculations } from '@/lib/utils/mhrCalculations';
 

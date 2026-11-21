@@ -1,28 +1,13 @@
 'use client';
 
-import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React from 'react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { ArrowRight, ArrowLeft, Clock, CheckCircle, Circle, Lock, Package, Cog, DollarSign, Search, UserCheck, FileText, Calendar, Shield, Truck, Sparkles } from '@/components/ui/icons';
 import { Progress } from '@/components/ui/progress';
-import { 
-  ArrowRight, 
-  ArrowLeft, 
-  Clock,
-  CheckCircle,
-  Circle,
-  Lock,
-  Package,
-  Cog,
-  DollarSign,
-  Search,
-  UserCheck,
-  FileText,
-  Calendar,
-  Shield,
-  Truck,
-} from 'lucide-react';
 import {
   WORKFLOW_MODULES,
   getNextModule,
@@ -170,7 +155,7 @@ export const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
             <div className="flex-1 mx-6">
               <div className="text-center space-y-4">
                 <div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">🎉 Workflow Complete!</h3>
+                  <h3 className="mb-2 flex items-center justify-center gap-2 text-xl font-bold text-foreground"><Sparkles className="h-5 w-5" /> Workflow Complete!</h3>
                   <p className="text-muted-foreground">
                     Congratulations! You have successfully completed the entire manufacturing workflow from BOM to delivery.
                   </p>

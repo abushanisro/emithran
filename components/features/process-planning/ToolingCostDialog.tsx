@@ -1,6 +1,5 @@
 'use client';
 
-import { Calculator as CalculatorIcon, Eye, Loader2, Play } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Calculator as CalculatorIcon, Eye, Loader2, Play } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {

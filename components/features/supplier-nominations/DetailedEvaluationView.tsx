@@ -1,5 +1,11 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   ArrowLeft,
   Save,
@@ -8,13 +14,7 @@ import {
   Zap,
   DollarSign,
   Edit
-} from 'lucide-react';
-import React, { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import {
   getCapabilityScores,

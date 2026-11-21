@@ -1,15 +1,17 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { Box, Maximize2 } from 'lucide-react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import * as THREE from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+
 import { Badge } from '@/components/ui/badge';
+import { Box, Maximize2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiClient } from '@/lib/api/client';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { isWebGLAvailable } from '@/lib/utils/webgl';
-import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+
 
 // ---------------------------------------------------------------------------
 // Module-level thumbnail cache — persists across remounts for the page session

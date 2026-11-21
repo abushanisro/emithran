@@ -1,8 +1,8 @@
 'use client';
 
-import { Cable, CircuitBoard } from 'lucide-react';
 import { useMemo } from 'react';
 
+import { Cable, CircuitBoard } from '@/components/ui/icons';
 import { useBoardThumbnail } from '@/lib/api/hooks/useElectronics';
 
 interface Props {

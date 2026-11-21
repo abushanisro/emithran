@@ -1,11 +1,11 @@
 "use client";
 
-import { Table2 } from "lucide-react";
 import { useState } from "react";
 
 import { PartDetailsSheet } from "@/components/features/manufacturing-intelligence/PartDetailsSheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Table2 } from '@/components/ui/icons';
 import type { Display } from "@/lib/costing/cost-table";
 
 /**

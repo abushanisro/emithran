@@ -1,19 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  CheckCircle, 
-  Clock,
-  PlayCircle,
-  Edit,
-  Package,
-  Download
-} from 'lucide-react';
-import { TableSkeleton } from '@/components/ui/loading-skeleton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +14,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { 
+  CheckCircle, 
+  Clock,
+  PlayCircle,
+  Edit,
+  Package,
+  Download
+} from '@/components/ui/icons';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { productionPlanningApi } from '@/lib/api/production-planning';
+
 import { buildGanttPrintHtml } from './gantt-print-html';
 
 interface BOMPartRequirement {

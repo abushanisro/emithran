@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { Mark } from '@/components/ui/status-mark';
 import { type MachiningDfmCheck, type MachiningDfmFinding, useForgingDfm, useMachiningDfm } from '@/lib/api/hooks/useBOMItems';
 import { machiningDfmHighlight } from '@/lib/features/machining-dfm-highlight';
 import type { FeatureNodeV2 } from '@/lib/types/manufacturing';
@@ -13,7 +14,7 @@ const SEVERITY_CLASS = {
 } as const;
 
 const STATUS_ICON = {
-  passed: <span className="text-emerald-400 text-sm leading-none">✓</span>,
+  passed: <span className="text-emerald-400 text-sm leading-none"><Mark kind="ok" inherit /></span>,
   failed: <span className="text-amber-400 text-sm leading-none">!</span>,
   not_evaluated: <span className="text-muted-foreground text-sm leading-none">•</span>,
 } as const;

@@ -1,28 +1,12 @@
 'use client';
 
+import { format } from 'date-fns';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { EmptyState } from '@/components/ui/empty-state';
-import { PageSkeleton } from '@/components/ui/loading-skeleton';
-import { useBOMs, useCreateBOM, useUpdateBOM, useDeleteBOM } from '@/lib/api/hooks/useBOM';
-import { useProjects } from '@/lib/api/hooks/useProjects';
-import { PageHeader } from '@/components/layout/PageHeader';
+
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +17,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import {
+  FileSpreadsheet,
+  Search,
+  Plus,
+  Calendar,
+  ArrowUpDown,
+  ArrowLeft,
+  Download,
+  Edit,
+  Trash2,
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Select,
   SelectContent,
@@ -48,18 +58,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  FileSpreadsheet,
-  Search,
-  Plus,
-  Calendar,
-  ArrowUpDown,
-  ArrowLeft,
-  Download,
-  Edit,
-  Trash2,
-} from 'lucide-react';
-import { format } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
+import { useBOMs, useCreateBOM, useUpdateBOM, useDeleteBOM } from '@/lib/api/hooks/useBOM';
+import { useProjects } from '@/lib/api/hooks/useProjects';
+
 
 function BOMManagementContent() {
   const router = useRouter();

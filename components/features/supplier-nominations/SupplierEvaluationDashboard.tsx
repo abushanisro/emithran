@@ -1,5 +1,11 @@
 'use client';
 
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     BarChart3,
     TrendingUp,
@@ -10,13 +16,7 @@ import {
     Edit2,
     Save,
     X
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
-
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Progress } from '@/components/ui/progress';

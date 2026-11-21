@@ -1,7 +1,6 @@
 'use client';
 
-import { Search, X } from 'lucide-react';
-
+import { Search, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { footprintCounts } from '@/lib/electronics/viewer-model';
 

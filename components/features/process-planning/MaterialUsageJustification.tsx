@@ -1,8 +1,7 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
+import { Loader2 } from '@/components/ui/icons';
 import type { MaterialUsageExplanation, UsageJustification } from '@/lib/api/hooks/useMaterialUsage';
 import { formatKg, USAGE_SOURCE_LABEL, usageDrift } from '@/lib/costing/material-usage-view';
 

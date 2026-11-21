@@ -14,6 +14,14 @@ declare global {
 // import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 // import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useQuery } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
+
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   FileText,
   Save,
@@ -27,20 +35,11 @@ import {
   CheckCircle,
   Clock,
   XCircle
-} from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo, useRef } from 'react';
-
-import { toast } from 'sonner';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/button';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-
 import { ListSkeleton } from '@/components/ui/loading-skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { apiConfig } from '@/lib/api/config';
 import type { DetailedInspectionReport } from '@/lib/api/hooks/useQualityControl';
 import {

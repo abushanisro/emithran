@@ -1,7 +1,6 @@
 'use client';
 
-import { Timer } from 'lucide-react';
-
+import { Timer } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 import { formatRemaining, useSessionIdle } from './SessionIdleProvider';

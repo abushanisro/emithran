@@ -1,16 +1,10 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -28,8 +22,15 @@ import {
   Calendar,
   Package,
   TrendingUp
-} from 'lucide-react';
-import { format } from 'date-fns';
+} from '@/components/ui/icons';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { ProductionLot } from '@/lib/api/hooks/useProductionPlanning';
 import { useDeleteProductionLot } from '@/lib/api/hooks/useProductionPlanning';
 

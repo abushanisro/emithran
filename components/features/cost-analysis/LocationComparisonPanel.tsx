@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
-import { Globe, ChevronDown, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Globe, ChevronDown, ChevronRight, AlertCircle, RefreshCw } from '@/components/ui/icons';
+import { LocationMark } from '@/components/ui/location-mark';
 import { useLocationComparison, type LocationCostEntry } from '@/lib/api/hooks/useLocationComparison';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -16,19 +18,6 @@ const fmtUsd = (v: number) =>
 // indistinguishable from a genuine no-rate-on-file zero.
 const fmtRate = (v: number) =>
   `$${v.toFixed(2)}/hr`;
-
-const LOCATION_FLAGS: Record<string, string> = {
-  'India':     '🇮🇳',
-  'USA':       '🇺🇸',
-  'China':     '🇨🇳',
-  'Germany':   '🇩🇪',
-  'France':    '🇫🇷',
-  'W. Europe': '🇪🇺',
-  'E. Europe': '🇪🇺',
-  'UK':        '🇬🇧',
-  'Vietnam':   '🇻🇳',
-  'Mexico':    '🇲🇽',
-};
 
 // ── BOM view: aggregate multiple bomItemIds ────────────────────────────────────
 
@@ -63,7 +52,7 @@ const BomAggregateView: React.FC<{ rows: BomLocationRow[] }> = ({ rows }) => {
           {sorted.map((row, i) => (
             <tr key={row.location} className="hover:bg-muted/20">
               <td className="py-2 px-4">
-                <span className="mr-1.5">{LOCATION_FLAGS[row.location] ?? '🏭'}</span>
+                <LocationMark location={row.location} />
                 <span className={i === 0 ? 'font-semibold text-primary' : ''}>{row.location}</span>
                 {i === 0 && (
                   <Badge variant="secondary" className="ml-2 text-[9px] py-0 px-1 bg-green-500/15 text-green-600 border-green-500/30">
@@ -125,7 +114,7 @@ const LocationRow: React.FC<{
               ? <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
               : <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
             }
-            <span className="mr-1">{LOCATION_FLAGS[entry.location] ?? '🏭'}</span>
+            <LocationMark location={entry.location} />
             <span className={isCheapest ? 'font-semibold text-primary' : ''}>
               {entry.location}
             </span>
@@ -257,7 +246,7 @@ export const LocationComparisonPanel: React.FC<Props> = ({
             Digital Factory — Location Cost Comparison
             {data?.cheapestLocation && (
               <Badge variant="secondary" className="ml-2 text-[10px] py-0 px-1.5 bg-green-500/15 text-green-600 border-green-500/30">
-                Best: {LOCATION_FLAGS[data.cheapestLocation]} {data.cheapestLocation}
+                Best: <LocationMark location={data.cheapestLocation} />{data.cheapestLocation}
               </Badge>
             )}
           </CardTitle>

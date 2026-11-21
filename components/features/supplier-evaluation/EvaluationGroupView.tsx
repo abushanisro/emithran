@@ -1,6 +1,5 @@
 'use client';
 
-import { Search, MapPin, Building2, Send, Package, FileText, TrendingUp, Award, Mail, Box, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -11,8 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Search, MapPin, Building2, Send, Package, FileText, TrendingUp, Award, Mail, Box, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { ListSkeleton } from '@/components/ui/loading-skeleton';
+import { Mark } from '@/components/ui/status-mark';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { analyzeTrackingFeature, getFeatureStatusMessage, TrackingFeatureState } from '@/lib/api/features/tracking-feature';
@@ -524,28 +525,28 @@ We look forward to your competitive proposal and establishing a successful partn
               </div>
               
               <Tabs value={activeBomTab} onValueChange={setActiveBomTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 bg-muted rounded-lg p-1 h-10">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger
                     value="rfq"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     RFQ Tracking
                   </TabsTrigger>
                   <TabsTrigger
                     value="overview"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     BOM & Vendor
                   </TabsTrigger>
                   <TabsTrigger
                     value="cost-analysis"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     Cost Analysis
                   </TabsTrigger>
                   <TabsTrigger
                     value="evaluation"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     Supplier Analysis
                   </TabsTrigger>
@@ -980,7 +981,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                         <div className="ml-2">
                                           {vendor.responded ? (
                                             <div className="text-success text-xs">
-                                              <div>✓ Responded</div>
+                                              <div><Mark kind="ok" /> Responded</div>
                                               {vendor.quoteAmount && (
                                                 <div>${vendor.quoteAmount}</div>
                                               )}

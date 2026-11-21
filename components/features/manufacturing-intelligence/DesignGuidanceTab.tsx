@@ -1,9 +1,9 @@
 'use client';
 
-import { Info } from 'lucide-react';
 import { useState } from 'react';
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Info } from '@/components/ui/icons';
 import { type DesignGuidance, type DesignGuidanceItem, type DesignGuidanceRange, useDesignGuidance } from '@/lib/api/hooks/useBOMItems';
 import type { FeatureNodeV2 } from '@/lib/types/manufacturing';
 

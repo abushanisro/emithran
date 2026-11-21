@@ -2,21 +2,22 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+
+import { StatusBadge } from '@/components/common/status-badge';
+import { ProjectDetailsCard } from '@/components/features/projects/ProjectDetailsCard';
+import { ProjectModules } from '@/components/features/projects/ProjectModules';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { StatusBadge } from '@/components/common/status-badge';
 import {
   ArrowLeft,
   ClipboardList,
   DollarSign,
   FileSpreadsheet,
   TrendingUp,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { useProject, useBOMs, useUpdateProject } from '@/lib/api/hooks';
-import { ProjectModules } from '@/components/features/projects/ProjectModules';
-import { ProjectDetailsCard } from '@/components/features/projects/ProjectDetailsCard';
 import { formatProjectMoney, projectCostCurrency } from '@/lib/costing/project-costs';
 
 export default function ProjectDetail() {

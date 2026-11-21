@@ -1,9 +1,9 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, CircleHelp, Loader2, XCircle } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { AlertTriangle, CheckCircle2, CircleHelp, Loader2, XCircle } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';

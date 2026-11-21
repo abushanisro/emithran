@@ -2,16 +2,18 @@
 
 import dynamic from 'next/dynamic';
 import { Suspense, useState, useEffect, Component } from 'react';
-import type { ReactNode } from 'react';
-import { Loader2, Download, RotateCcw, RefreshCw, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api/client';
-import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
-import type { AnnotationSource } from '@/lib/features/dimension-annotations';
+
+import { Button } from '@/components/ui/button';
+import { Loader2, Download, RotateCcw, RefreshCw, AlertTriangle, FileText } from '@/components/ui/icons';
 import type { PmiReviewProps } from '@/components/viewer/pmi-review-list';
-import { isWebGLAvailable } from '@/lib/utils/webgl';
+import { apiClient } from '@/lib/api/client';
+import type { AnnotationSource } from '@/lib/features/dimension-annotations';
+import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
 import type { FlatPatternBlank } from '@/lib/types/manufacturing';
+import { isWebGLAvailable } from '@/lib/utils/webgl';
+
+import type { ReactNode } from 'react';
 
 export type { HeatmapSource, HeatmapNormalization, HeatmapLayerType } from '@/lib/heatmap/types';
 
@@ -406,7 +408,7 @@ export function ModelViewer({
           <div className="absolute inset-0 bg-background/95 backdrop-blur-xs flex items-center justify-center p-6 z-50">
             <div className="text-center max-w-md">
               <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
-                <span className="text-2xl">⚠️</span>
+                <AlertTriangle className="h-8 w-8 text-warning" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Failed to load 3D model</h3>
               <p className="text-sm text-muted-foreground mb-4">{error}</p>
@@ -571,7 +573,7 @@ export function ModelViewer({
           <div className="absolute inset-0 bg-background/95 backdrop-blur-xs flex items-center justify-center p-6 z-50">
             <div className="text-center max-w-md">
               <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
-                <span className="text-2xl">⚠️</span>
+                <AlertTriangle className="h-8 w-8 text-warning" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Failed to load 3D model</h3>
               <p className="text-sm text-muted-foreground mb-4">{error}</p>
@@ -599,7 +601,7 @@ export function ModelViewer({
     <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center p-8">
       <div className="text-center max-w-md">
         <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-          <span className="text-2xl">📄</span>
+          <FileText className="h-8 w-8" />
         </div>
         <h3 className="text-lg font-semibold mb-2">Unsupported File Format</h3>
         <p className="text-sm text-muted-foreground mb-4">
