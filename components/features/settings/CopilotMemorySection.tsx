@@ -32,9 +32,9 @@ export function CopilotMemorySection() {
 
       {preferences.length > 0 && (
         <>
-          <ul className="divide-y divide-border rounded-lg border border-border">
+          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
             {preferences.map((preference) => (
-              <li key={preference} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <li key={preference} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 <span className="flex-1 break-words">{preference}</span>
                 <Button
                   variant="ghost"
