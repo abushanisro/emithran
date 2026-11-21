@@ -204,6 +204,16 @@ describe('BOMItemsService.normalizeCostSummaryToCurrency', () => {
     expect(result.toUsdRate).toBeCloseTo(rate, 6);
   });
 
+  it('converts a line\'s other charge in its own currency with its money; the USD figure its detail states stays USD', () => {
+    const service = buildService() as any;
+    const rates = makeRates({ USD: 83.5 });
+    const line = { process: 'Manual MIG Welding', setupCost: 0, runCost: 167, totalCost: 167, hourlyRate: 835, otherCostPerPart: 83.5, otherCostPerPartUsd: 1 };
+    const result = service.normalizeCostSummaryToCurrency(minimalCostSummary({ processLines: [line] } as never), rates, 'INR', null);
+    expect(result.processLines[0].otherCostPerPart).toBeCloseTo(1, 9);
+    expect(result.processLines[0].otherCostPerPartUsd).toBe(1);
+    expect(result.processLines[0].totalCost).toBeCloseTo(2, 9);
+  });
+
   it('converts the route options of every family, an assembly\'s consumables and a weldment\'s wire, with the lines (an India quote is not half in rupees)', () => {
     const service = buildService() as any;
     const rates = makeRates({ USD: 83.5 });

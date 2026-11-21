@@ -208,12 +208,14 @@ describe('the assembly\'s Cost Summary and route comparison', () => {
   const assemblyResult = (joints: AssemblyJoint[], components: AssemblyComponent[] = COMPONENTS, batchSize = 250) => {
     const { routes, gaps } = buildAssemblyRoutes(input({ joints, components, batchSize }));
     const { route, note } = chooseAssemblyRoute(routes, gaps, null);
-    return { route, routes, gaps, components, joints, note, missing: [], warnings: [] };
+    return { materialOfParts: true, route, routes, gaps, components, joints, note, missing: [], warnings: [] };
   };
 
   it('holds the assembly\'s own work only: no material, its total the sum of its lines; the components are listed, not costed', () => {
     const s = buildAssemblyCostSummary({ assembly: assemblyResult([...deriveJoints(COMPONENTS), weld()]), batchSize: 250, warnings: [], ratesSource: 'test' });
     expect(s.family).toBe('assembly');
+    // Its material is its parts': Apply keeps no record of its own and the Cost tab counts its work without one.
+    expect(s.materialOfParts).toBe(true);
     expect(s.materialCost).toBe(0);
     expect(s.totalCost).toBeCloseTo(s.processLines.reduce((t, l) => t + l.totalCost, 0), 2);
     expect(s.assembly!.components.map((c) => [c.name, c.quantity, c.threadedHoles])).toEqual([['Housing', 1, 4], ['Bracket', 2, 0]]);
@@ -231,7 +233,7 @@ describe('the assembly\'s Cost Summary and route comparison', () => {
   });
 
   it('an assembly that cannot be costed is one named line', () => {
-    const s = buildAssemblyCostSummary({ assembly: { route: null, routes: [], gaps: [], components: [], joints: [], note: null, missing: ['the assembly has no components and no joints'], warnings: [] }, batchSize: 1, warnings: [], ratesSource: 'test' });
+    const s = buildAssemblyCostSummary({ assembly: { materialOfParts: false, route: null, routes: [], gaps: [], components: [], joints: [], note: null, missing: ['the assembly has no components and no joints'], warnings: [] }, batchSize: 1, warnings: [], ratesSource: 'test' });
     expect(s.processLines).toHaveLength(1);
     expect(s.processLines[0].physicsGap).toBeDefined();
     expect(s.warnings).toContain('Assembly cannot be costed: the assembly has no components and no joints');

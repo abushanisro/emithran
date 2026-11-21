@@ -167,6 +167,8 @@ export function lineToLocal(l: ProcessLineCost, usdToLocal: number): ProcessLine
     labourRate: l.labourRate != null ? Math.round(l.labourRate * usdToLocal * 100) / 100 : l.labourRate,
     ...(l.machineCostPerPart != null ? { machineCostPerPart: roundPerPart(l.machineCostPerPart * usdToLocal) } : {}),
     ...(l.laborCostPerPart != null ? { laborCostPerPart: roundPerPart(l.laborCostPerPart * usdToLocal) } : {}),
+    // The line's other charge in its own currency, beside the USD figure its detail text states (ProcessLineCost.otherCostPerPart).
+    ...(l.otherCostPerPartUsd != null ? { otherCostPerPart: roundPerPart(l.otherCostPerPartUsd * usdToLocal) } : {}),
     ...(l.machineChoice ? { machineChoice: { ...l.machineChoice, candidates: l.machineChoice.candidates.map((x) => ({ ...x, perPartCost: x.perPartCost != null ? roundPerPart(x.perPartCost * usdToLocal) : null })) } } : {}),
   };
 }

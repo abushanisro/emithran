@@ -1200,6 +1200,11 @@ export interface CostSummaryDto {
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
   };
   /**
+   * The part's material is its parts': an assembly or a weldment costed from its BOM children has no material record of its own (each part's
+   * is in the BOM roll-up), so Apply keeps none and the Cost tab counts its own costs without one (backend CostSummaryDto.materialOfParts).
+   */
+  materialOfParts?: boolean;
+  /**
    * Part Assembly (a weldment, memory/Part Assembly): the components welded, the plate and material, every weld of the weld table with what
    * it came to on the quoted route, the MIG wire, and every route (backend PartAssemblyBreakdown).
    */

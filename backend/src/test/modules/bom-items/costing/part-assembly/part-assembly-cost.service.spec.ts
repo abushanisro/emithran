@@ -10,7 +10,7 @@ import type { BOMItemResponseDto } from '../../../../../modules/bom-items/dto/bo
 /** A raw_materials read that finds `cutCode` for any material (none when null). */
 const rawMaterials = (cutCode: number | null) => ({
   from: () => {
-    const q = { select: () => q, or: () => q, not: () => q, limit: () => Promise.resolve({ data: cutCode == null ? [] : [{ cut_code: cutCode }], error: null }) };
+    const q = { select: () => q, or: () => q, not: () => q, order: () => q, limit: () => Promise.resolve({ data: cutCode == null ? [] : [{ cut_code: cutCode }], error: null }) };
     return q;
   },
 });
@@ -46,6 +46,8 @@ describe('a weldment of two steel brackets', () => {
     const r = await service().price(request());
     expect(r.components.map((c) => [c.name, c.massKg])).toEqual([['Bracket a', 1.5], ['Bracket b', 1.5]]);
     expect(r.weldment.massKg).toBe(3);
+    // Its material is its brackets', each in the BOM roll-up.
+    expect(r.materialOfParts).toBe(true);
     expect(r.thickness).toEqual({ mm: 3, source: 'the components\' sheet thickness, 3 mm' });
     expect(r.material).toEqual({ name: STEEL, cutCodeFamily: '1' });
     expect(r.routes.map((x) => [x.key, x.complete])).toEqual([['manual', true], ['robotic', true]]);
@@ -66,6 +68,9 @@ describe('a weldment of two steel brackets', () => {
     expect(inr.totalUsd).toBeCloseTo(must(usd.totalUsd, 'the USD total') * 88, 0);
     expect(inr.wireUsd).toBeCloseTo(usd.wireUsd * 88, 6);
     expect(inr.lines.map((l) => l.cycleTimeMin)).toEqual(usd.lines.map((l) => l.cycleTimeMin));
+    // The MIG wire, the line's other charge, in rupees beside its USD figure: what the applied record stores in the row's currency.
+    const mig = must(inr.lines.find((l) => l.process === 'Manual MIG Welding'), 'the MIG line');
+    expect(mig.otherCostPerPart).toBeCloseTo(must(mig.otherCostPerPartUsd, 'its wire') * 88, 4);
   });
 
   it('a weld row it cannot read is reported, not costed', async () => {
@@ -79,6 +84,8 @@ describe('a part set to Part Assembly with no parts under it in the BOM', () => 
   it('is the one component, loaded and welded at its own gauge; its material is not priced here', async () => {
     const r = await service().price(request({ item: bracket('self', { name: 'Tab' }), children: [] }));
     expect(r.components.map((c) => [c.name, c.quantity, c.massKg])).toEqual([['Tab', 1, 1.5]]);
+    // Its own one component: its material record is its own.
+    expect(r.materialOfParts).toBe(false);
     expect(r.thickness.mm).toBe(3);
     expect(r.warnings[0]).toContain('Tab has no parts under it in the BOM');
     expect(r.route?.complete).toBe(true);

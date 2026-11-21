@@ -524,16 +524,29 @@ export function selectRecommendedRoute<T extends RankableRoute>(routes: readonly
 }
 
 /**
- * The route Apply writes when none is recommended (no route is both feasible and fully costed): Apply never fails, so it is the best route
- * there is. Feasible and compatible routes first, then the fewest operations that cannot be costed (each written as a No Cost Feature), then
- * the cheapest, then the shortest cycle and the route id. Null only when the part has no route at all.
+ * Which routes a part's selected secondary operations (heat treatment, a surface finish, ...) go on: every route the part has, that is every
+ * route with lines of its own. A route with none is not one the part has (an assembly's or a weldment's route its parts cannot take, a
+ * route no machine prices): it stays empty, so Apply never takes it for a real one (selectAppliableRoute). When no route has lines of its
+ * own, they all take them: nothing else would carry the part's secondary operations.
  */
-export function selectAppliableRoute<T extends RankableRoute & { dataGaps?: readonly unknown[] | null }>(routes: readonly T[]): T | null {
+export function routesTakingSecondary(routes: readonly { processLines: readonly unknown[] }[]): (route: { processLines: readonly unknown[] }) => boolean {
+  const anyOwn = routes.some((r) => r.processLines.length > 0);
+  return (route) => !anyOwn || route.processLines.length > 0;
+}
+
+/**
+ * The route Apply writes when none is recommended (no route is both feasible and fully costed): Apply never fails, so it is the best route
+ * there is. A route with lines first (one with none is not a route the part has: it would write nothing of the part's work), then feasible
+ * and compatible routes, then the fewest operations that cannot be costed (each written as a No Cost Feature), then the cheapest, then the
+ * shortest cycle and the route id. Null only when the part has no route at all.
+ */
+export function selectAppliableRoute<T extends RankableRoute & { dataGaps?: readonly unknown[] | null; processLines?: readonly unknown[] | null }>(routes: readonly T[]): T | null {
+  const empty = (r: T) => Number(r.processLines?.length === 0);
   const fit = (r: T) => Number(!(r.capability.overallCapable && r.isFeasible && r.producesBlank !== false && r.compatibility?.status !== 'incompatible'));
   const gaps = (r: T) => r.dataGaps?.length ?? (r.dataComplete ? 0 : 1);
   const cost = (r: T) => (typeof r.totalCost === 'number' ? r.totalCost : Infinity);
   const compare = (a: T, b: T) =>
-    fit(a) - fit(b) || gaps(a) - gaps(b) || (cost(a) === cost(b) ? 0 : cost(a) - cost(b))
+    empty(a) - empty(b) || fit(a) - fit(b) || gaps(a) - gaps(b) || (cost(a) === cost(b) ? 0 : cost(a) - cost(b))
     || a.cycleTimes.totalMin - b.cycleTimes.totalMin || (a.routeId < b.routeId ? -1 : a.routeId > b.routeId ? 1 : 0);
   return routes.length === 0 ? null : routes.reduce((best, r) => (compare(r, best) < 0 ? r : best));
 }

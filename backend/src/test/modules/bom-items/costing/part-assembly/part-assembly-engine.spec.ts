@@ -9,7 +9,7 @@ import { loadPartAssemblyCalculatorSpec, partAssemblyCalculatorsByName } from '.
 import { buildPartAssemblyCostSummary } from '../../../../../modules/bom-items/costing/part-assembly/part-assembly-cost-summary';
 import { weldmentMaterial, weldmentThickness, type PartAssemblyCostResult } from '../../../../../modules/bom-items/costing/part-assembly/part-assembly-cost.service';
 import {
-  bevelRow, buildPartAssemblyRoutes, choosePartAssemblyRoute, laserRow, type PartAssemblyRoute, type PartAssemblyRouteInput,
+  bevelRow, buildPartAssemblyRoutes, choosePartAssemblyRoute, laserFamilyOf, laserRow, type PartAssemblyRoute, type PartAssemblyRouteInput,
 } from '../../../../../modules/bom-items/costing/part-assembly/part-assembly-route';
 import { partAssemblyRouteFor } from '../../../../../modules/bom-items/costing/part-assembly/part-assembly-route-comparison';
 import { WELD_OPERATIONS, weldTable } from '../../../../../modules/bom-items/costing/part-assembly/part-assembly-welds';
@@ -193,13 +193,37 @@ describe('what cannot be timed is named, never assumed', () => {
     expect(sec(line(r, 'Bevel Cutting'))).toBeCloseTo(stored(600 / (Number(row['Cut Speed (mm / min)']) / 60) + 2 * 13), 6);
     expect(gapsOf(routeOf('manual', bevelled, { material: { name: 'Aluminum, 5052', cutCodeFamily: '30' } }))[0]).toContain('oxy-fuel cutting data for carbon steel');
   });
+
+  it('a V or U groove bevels both plates: twice the seam cut, a pierce for each edge; a bevel or J groove one', () => {
+    const plate10 = { thickness: { mm: 10, source: 'the components\' sheet thickness, 10 mm' } };
+    // J and U grooves have no default shape: their area is the row's.
+    const groove = (operation: string) => [{ id: 'g', process: 'MIG Welding', operation, feature: 'Edge', count: 1, lengthMm: 500, bevel: true, ...(/^[JU]-Groove/.test(operation) ? { areaMm2: 60 } : {}) }];
+    const speed = Number(must(bevelRow(ref, 10), 'the 10 mm bevel row')['Cut Speed (mm / min)']) / 60;
+    const pierce = Number(must(bevelRow(ref, 10), 'the 10 mm bevel row')['Pierce Time (s)']);
+    expect(sec(line(routeOf('manual', groove('V-Groove Welding'), plate10), 'Bevel Cutting'))).toBeCloseTo(stored(1000 / speed + 2 * pierce), 6);
+    expect(sec(line(routeOf('manual', groove('U-Groove Welding'), plate10), 'Bevel Cutting'))).toBeCloseTo(stored(1000 / speed + 2 * pierce), 6);
+    expect(sec(line(routeOf('manual', groove('Bevel Groove Welding'), plate10), 'Bevel Cutting'))).toBeCloseTo(stored(500 / speed + pierce), 6);
+    expect(sec(line(routeOf('manual', groove('J-Groove Welding'), plate10), 'Bevel Cutting'))).toBeCloseTo(stored(500 / speed + pierce), 6);
+  });
+});
+
+describe('the cut code family of the weldment\'s material', () => {
+  it('is the cut code\'s whole number, as memory numbers the laser seam families: stainless 5.21 is 5, not the thermoset 52', () => {
+    expect(laserFamilyOf(ref, 5.21)).toBe('5');
+    expect(laserFamilyOf(ref, 5.2)).toBe('5');
+    expect(laserFamilyOf(ref, 1.5)).toBe('1');
+    expect(laserFamilyOf(ref, 51.21)).toBe('51');
+    expect(laserFamilyOf(ref, 52.13)).toBe('52');
+    expect(laserFamilyOf(ref, 99.1)).toBeNull();
+    expect(laserFamilyOf(ref, null)).toBeNull();
+  });
 });
 
 describe('the summary and the route comparison', () => {
   const { routes, gaps } = buildPartAssemblyRoutes(input());
   const { route, note } = choosePartAssemblyRoute(routes, gaps, null);
   const result: PartAssemblyCostResult = {
-    route, routes, gaps, components: COMPONENTS, welds: weldTable(WELDS).welds, weldment: { massKg: 3 }, thickness: { mm: 3, source: 's' },
+    materialOfParts: true, route, routes, gaps, components: COMPONENTS, welds: weldTable(WELDS).welds, weldment: { massKg: 3 }, thickness: { mm: 3, source: 's' },
     material: { name: 'Steel', cutCodeFamily: '1' }, note, missing: [], warnings: [],
   };
   const summary = { ...buildPartAssemblyCostSummary({ partAssembly: result, batchSize: 25, warnings: [], ratesSource: 'test' }) } as CostSummaryResponseDto;
@@ -207,6 +231,7 @@ describe('the summary and the route comparison', () => {
   it('the welding only: each weld\'s share, the options, the deposition disclosed', () => {
     expect(summary.family).toBe('part_assembly');
     expect(summary.materialCost).toBe(0);
+    expect(summary.materialOfParts).toBe(true);
     expect(summary.partAssembly?.welds.find((w) => w.id === 'f1')?.cycleSec).toBeGreaterThan(0);
     expect(summary.partAssembly?.options.map((o) => o.route)).toEqual(['manual', 'robotic']);
     expect(summary.warnings.some((w) => w.includes('arcEfficency (0.5)'))).toBe(true);

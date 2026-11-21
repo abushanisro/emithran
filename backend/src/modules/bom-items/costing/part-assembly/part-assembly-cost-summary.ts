@@ -60,6 +60,8 @@ export function buildPartAssemblyCostSummary(input: {
   return {
     materialCost: 0,
     materialGrade: pa.material.name ?? 'Part Assembly',
+    // A weldment of BOM children has no material of its own: each part's is in the roll-up.
+    ...(pa.materialOfParts ? { materialOfParts: true } : {}),
     grossWeightKg: 0,
     materialCostPerKg: 0,
     materialSource: 'db',

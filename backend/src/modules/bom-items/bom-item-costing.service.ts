@@ -103,7 +103,8 @@ import {
 } from './costing/shared/capability/machine-selection/physics';
 import { sandCastingRoute } from './costing/casting/sand/sand-route-comparison';
 import { findRouteDataGaps, noCostFeatureLine, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
-  drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
+  drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable,
+  routesTakingSecondary } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
 import {
@@ -318,6 +319,7 @@ function convertLineMoney(l: ProcessLineCost, conv: (n: number) => number) {
     labourRate: l.labourRate != null ? conv(l.labourRate) : l.labourRate,
     ...(l.machineCostPerPart != null ? { machineCostPerPart: conv(l.machineCostPerPart) } : {}),
     ...(l.laborCostPerPart != null ? { laborCostPerPart: conv(l.laborCostPerPart) } : {}),
+    ...(l.otherCostPerPart != null ? { otherCostPerPart: conv(l.otherCostPerPart) } : {}),
   };
 }
 
@@ -5138,7 +5140,7 @@ export class BomItemCostingService {
         overrides: item.scenarioOverrides, batchSize, usdToLocal,
         costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
       })
-      : { route: null, routes: [], gaps: [], components: [], joints: [], note: null, missing: ['the assembly cost service is not available'], warnings: [] };
+      : { materialOfParts: false, route: null, routes: [], gaps: [], components: [], joints: [], note: null, missing: ['the assembly cost service is not available'], warnings: [] };
     const result = {
       ...buildAssemblyCostSummary({ assembly, batchSize, warnings: [], ratesSource: RATES_SOURCE_LABEL }),
       currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate: 1,
@@ -5221,7 +5223,7 @@ export class BomItemCostingService {
         costContext: { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 },
       })
       : {
-        route: null, routes: [], gaps: [], components: [], welds: [], weldment: { massKg: null }, thickness: { mm: null, source: '' },
+        materialOfParts: false, route: null, routes: [], gaps: [], components: [], welds: [], weldment: { massKg: null }, thickness: { mm: null, source: '' },
         material: { name: null, cutCodeFamily: null }, note: null, missing: ['the Part Assembly cost service is not available'], warnings: [],
       };
     const result = {
@@ -5459,19 +5461,22 @@ export class BomItemCostingService {
     const item = await this.items.findOne(id, userId, accessToken);
     const sec = await this.resolveSecondaryOperations(item, cmp.resolvedInputs.location ?? requestedLocation, cmp.resolvedInputs.batchSize, accessToken, cmp.toUsdRate ?? 1);
     if (sec.lines.length === 0) return cmp;
-    // apply-route persists the local-currency routes: they carry the same selected lines.
+    // The selected lines go on every route the part has (routesTakingSecondary); apply-route persists the local-currency routes, which carry
+    // the same lines.
     if (localCurrencyOut?.routes) {
-      localCurrencyOut.routes = localCurrencyOut.routes.map((r) => ({ ...r, processLines: [...r.processLines, ...sec.localLines] }));
+      const takesLocal = routesTakingSecondary(localCurrencyOut.routes);
+      localCurrencyOut.routes = localCurrencyOut.routes.map((r) => (takesLocal(r) ? { ...r, processLines: [...r.processLines, ...sec.localLines] } : r));
     }
+    const takes = routesTakingSecondary(cmp.routes);
     const extra = sec.lines.reduce((t, l) => t + l.totalCost, 0);
     return {
       ...cmp,
-      routes: cmp.routes.map((r) => ({
+      routes: cmp.routes.map((r) => (takes(r) ? {
         ...r,
         processLines: [...r.processLines, ...sec.lines],
         totalProcessCost: r.totalProcessCost + extra,
         totalCost: r.totalCost != null ? r.totalCost + extra : null,
-      })),
+      } : r)),
     };
   }
 

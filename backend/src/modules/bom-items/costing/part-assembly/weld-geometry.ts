@@ -24,6 +24,15 @@ export const JOINT_TYPE: Readonly<Partial<Record<string, JointType>>> = {
   'Groove Welding': 'groove', 'Other Welding': 'other',
 };
 
+/**
+ * The plate edges a joint's preparation bevels: both plates of a single-V or single-U groove (the V is two 30 deg bevels, the U two J preps),
+ * one of a bevel or J groove. A bevel the engineer flags on any other joint is taken as one edge.
+ */
+export function bevelledEdges(operation: string): number {
+  const type = JOINT_TYPE[operation];
+  return type === 'v_groove' || type === 'u_groove' ? 2 : 1;
+}
+
 export const ROOT_GAP_MM = 2;
 export const V_GROOVE_INCLUDED_DEG = 60;
 export const BEVEL_DEG = 45;

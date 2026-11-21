@@ -61,6 +61,16 @@ describe('saw and punch, a 25 x 1.5 A36 round tube 1 m long', () => {
   });
 });
 
+describe('a stainless bar is sawn as stainless', () => {
+  it('cut code 5.21 is family 5 in saw_cut_rate (stainless), not 52 (thermosets, which saw about four times faster)', () => {
+    const ss = barTubeMaterial('Stainless Steel, AISI 441', 'ROUND_TUBE');
+    expect(ss.cutCode).toBe(5.21);
+    expect(ss.cutCodeFamily).toBe('5');
+    const rate = (family: string) => Number(realBarTubeReference().table('saw_cut_rate').find((r) => r['Process Name'] === 'Band Saw' && String(r['Material Cut Code Family']) === family)?.['Cutting Rate (mm^2 / min)']);
+    expect(rate('5')).toBeLessThan(rate('52') / 3);
+  });
+});
+
 describe('the tube laser route', () => {
   it('steel is cut on the tube laser\'s steel table (memory lists it under family 9) at the carbon steel factor; both routes are complete', () => {
     const laser = routeOf('laser');

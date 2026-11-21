@@ -53,6 +53,27 @@ export class MaterialCostSnapshotService {
     private readonly materials: RawMaterialsService,
   ) {}
 
+  /**
+   * Retires the part's active material records and writes none: an assembly's or a weldment's material is its parts' (each part's record is in
+   * the BOM roll-up), so one of its own would count it twice. Returns how many were retired.
+   */
+  async retireOwnMaterial(itemId: string, userId: string, token: string): Promise<number> {
+    const { records } = await this.costRecords.findAll({ bomItemId: itemId, isActive: true, page: 1, limit: 10 }, userId, token);
+    await this.retire(records, userId, token);
+    return records.length;
+  }
+
+  /** Retires records; one that cannot be retired stops the apply, so a second active record never doubles the material cost. */
+  private async retire(records: readonly { id: string }[], userId: string, token: string): Promise<void> {
+    for (const r of records) {
+      try {
+        await this.costRecords.update(r.id, { isActive: false }, userId, token);
+      } catch (e: unknown) {
+        throw new InternalServerErrorException(`Could not retire the existing material cost record ${r.id}: ${e instanceof Error ? e.message : String(e)}. Nothing was added, to avoid a duplicate.`);
+      }
+    }
+  }
+
   async ensure(input: MaterialSnapshotInput): Promise<MaterialSnapshotResult> {
     const { item, grade, location, summary, userId, organizationId, token } = input;
     const { liveGross, liveNet } = liveWeights(summary);
@@ -82,13 +103,7 @@ export class MaterialCostSnapshotService {
     }
 
     // Retire every active record first; one that cannot be retired stops the apply (a second active record doubles the material cost).
-    for (const r of active) {
-      try {
-        await this.costRecords.update(r.id, { isActive: false } as never, userId, token);
-      } catch (e: unknown) {
-        throw new InternalServerErrorException(`Could not retire the existing material cost record ${r.id}: ${e instanceof Error ? e.message : String(e)}. Nothing was added, to avoid a duplicate.`);
-      }
-    }
+    await this.retire(active, userId, token);
 
     const material = await this.findMaterial(grade, processGroupOf(item, summary), userId, token);
     const usage = deriveMaterialUsage(usageInput(item, summary, material?.densityKgM3 ?? null));
