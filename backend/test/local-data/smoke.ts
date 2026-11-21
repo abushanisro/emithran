@@ -58,6 +58,16 @@ async function main(): Promise<void> {
     const groups = await (await api('/process_material_groups?process_group=eq.Powder%20Metal&select=material_group', minter.forService())).json() as { material_group: string }[];
     must(JSON.stringify(groups) === JSON.stringify([{ material_group: 'Powder Metal' }]), `groups ${JSON.stringify(groups)}`);
   });
+  await check('migrations 1103 and 1106 twinned every Rapid Prototyping and Roto & Blow Molding machine in India, and 1105 and 1108 bound their calculators', async () => {
+    for (const group of ['Rapid Prototyping', 'Roto & Blow Molding']) {
+      const q = encodeURIComponent(group);
+      const machines = await (await api(`/mhr_records?process_group=eq.${q}&select=location`, minter.forService())).json() as { location: string }[];
+      const usa = machines.filter((m) => m.location === 'USA').length;
+      must(usa > 0 && machines.filter((m) => m.location === 'India').length === usa, `${group} machines ${JSON.stringify(machines)}`);
+      const rows = await (await api(`/process_calculator_mappings?process_group=eq.${q}&select=operation,calculator_name`, minter.forService())).json() as { operation: string; calculator_name: string | null }[];
+      must(rows.length === 5 && rows.every((r) => r.calculator_name?.startsWith(`${group} - `)), `${group} catalog ${JSON.stringify(rows)}`);
+    }
+  });
   await check('the carried user directory is readable through migration 932 (same id as the source)', async () => {
     const res = await api('/rpc/directory_find_by_email', minter.forService(), { method: 'POST', body: JSON.stringify({ p_email: 'Alice@Example.com' }) });
     must(res.ok && (await res.json()) === '11111111-1111-4111-8111-111111111111', `HTTP ${res.status}`);

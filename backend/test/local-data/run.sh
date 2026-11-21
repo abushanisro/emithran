@@ -97,6 +97,12 @@ SELECT 'Bar and Tube Fabrication', n, n, false FROM unnest(ARRAY['Band Saw','Cir
 INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
 SELECT 'Part Assembly', n, n, false FROM unnest(ARRAY['Bevel Cutting','Finish Grinding','Grinding','Laser Seam Welding','Manual MIG Welding',
   'Manual Spot Welding','Robotic MIG Welding','Robotic Spot Welding','Wire Brushing']) AS n;
+-- the rapid prototyping and roto & blow molding catalog rows migrations 790 and 862 seed: migrations 1105 and 1108 link their calculators to
+-- them and fail if one is missing
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Rapid Prototyping', n, n, false FROM unnest(ARRAY['Laser Sintering','Printing','Resin Curing','Part Curing','Cleaning']) AS n;
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Roto & Blow Molding', n, n, false FROM unnest(ARRAY['Extrusion Blow Mold','Rotational Mold','Grind','Router','Saw']) AS n;
 -- the catalog columns and the process taxonomy as the real database has them (migrations 367-371, 424, 725), and the four
 -- secondary-operation calculators the baseline holds: migration 984 restores their catalog rows and fails if a calculator is missing
 ALTER TABLE public.process_calculator_mappings ADD COLUMN machine_class varchar(100), ADD COLUMN applicable_families text[],
@@ -121,6 +127,9 @@ ALTER TABLE public.raw_materials ADD COLUMN density numeric(10,4), ADD COLUMN de
 -- Machining's and fails if Machining has none
 \i /migrations/879_process_material_groups.sql
 INSERT INTO public.raw_materials (name) VALUES ('Generic Nylon, Type 11 40% Glass');
+-- a material of each group migration 855 fills: migrations 1104 and 1107 link Rapid Prototyping and Roto & Blow Molding to their own group
+-- and fail when the group holds no material
+INSERT INTO public.raw_materials (name, material_group) VALUES ('Accura 60', 'Rapid Prototyping'), ('HDPE, Blow Molding', 'Roto & Blow Molding');
 -- the machine table (00_stubs.sql has it), plus the columns migration 981 reads and writes: a Black Oxide machine with no labor rate, and two machines of its wage grade that agree on one
 -- machine_name (migration 130) and updated_at as the real database has them: migration 1043 matches each turning machine by class and name
 ALTER TABLE public.mhr_records ADD COLUMN machine_class varchar(100), ADD COLUMN usd_labor_rate_per_hr numeric, ADD COLUMN usd_lhr_total numeric,
@@ -150,6 +159,14 @@ SELECT m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1085_asse
 INSERT INTO public.mhr_records (process_group, machine_class, machine_name, location)
 SELECT DISTINCT 'Powder Metal', m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1101_powder_metal_machines.sql'),
   '\(\$str\$(powder_metal_[a-z_]+)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
+-- the Rapid Prototyping and Roto & Blow Molding machines migration 862 seeds for the USA: migrations 1103 and 1106 twin each one in India and
+-- fail if one is missing. Read from each migration's own list (1103 names a machine again where it renames its specs).
+INSERT INTO public.mhr_records (process_group, machine_class, machine_name, location)
+SELECT DISTINCT 'Rapid Prototyping', m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1103_rapid_prototyping_machines.sql'),
+  '\(\$str\$(rapid_prototyping_[a-z_]+)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
+INSERT INTO public.mhr_records (process_group, machine_class, machine_name, location)
+SELECT DISTINCT 'Roto & Blow Molding', m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1106_roto_blow_machines_india.sql'),
+  '\(\$str\$(roto_blow_molding_[a-z_]+)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
 -- the machine envelope columns as the real database has them (migration 755 fills them for the lathes): migration 1093 fills them for the multi-spindle machines
 ALTER TABLE public.mhr_records ADD COLUMN max_diameter_mm numeric(10,2), ADD COLUMN max_length_mm numeric(10,2);
 -- the taxonomy columns as the real database has them (migration 609): migration 1094 adds the Multi-Spindle Machining > Simultaneous Turning row
