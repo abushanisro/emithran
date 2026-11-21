@@ -3,7 +3,7 @@
 // records. Pure.
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 import { FORGING_ROUTES, type ForgingRouteKey } from './forging-route';
 
 /** The route id of a forging route ("forging-closed_die_hammer"). */
@@ -18,7 +18,9 @@ export function forgingRouteFor(key: ForgingRouteKey, summary: CostSummaryRespon
   const forging = summary.forging;
   const label = FORGING_ROUTES.find((r) => r.key === key)!.label;
   const isThis = forging?.route === key;
-  const feasible = isThis && forging!.complete && summary.totalCost != null;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && forging!.complete && summary.totalCost != null;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const option = forging?.options.find((o) => o.route === key);
   const why = !forging ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith('Forging cannot be costed')) ?? 'the part could not be costed'
@@ -42,7 +44,7 @@ export function forgingRouteFor(key: ForgingRouteKey, summary: CostSummaryRespon
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

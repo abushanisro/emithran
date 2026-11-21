@@ -104,7 +104,7 @@ import {
 import { sandCastingRoute } from './costing/casting/sand/sand-route-comparison';
 import { findRouteDataGaps, noCostFeatureLine, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
   drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable,
-  routesTakingSecondary } from './costing/shared/core/engine-kernel';
+  routesTakingSecondary, unpricedReason, r2 } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
 import {
@@ -336,7 +336,6 @@ import { BOMItemsService } from './bom-items.service';
 import { MachineRateService } from './services/machine-rate.service';
 import { CostOverridesService } from './services/cost-overrides.service';
 import { GdtAnalysisService } from './services/gdt-analysis.service';
-import { r2 } from './costing/shared/core/engine-kernel';
 import { NestingCostService } from './services/nesting-cost.service';
 
 /**
@@ -4682,7 +4681,9 @@ export class BomItemCostingService {
     const routes: RouteResultDto[] = processes.map((p, i) => {
       const s = summaries[i]!;
       const option = s.dieCastingProcess?.options.find((o) => o.process === p) ?? null;
-      const feasible = option?.feasible !== false;
+      // A summary that priced nothing (no material grade) has no process options: not feasible, and the missing input is the reason.
+      const unpriced = unpricedReason(s);
+      const feasible = !unpriced && option?.feasible !== false;
       const gaps = findRouteDataGaps(s.processLines);
       return {
         routeId: dieCastingRouteId(p),
@@ -4702,7 +4703,7 @@ export class BomItemCostingService {
         badges: { lowestCost: auto?.chosen === p && auto.chosenBy === 'auto', fastest: false, bestQuality: false },
         capability: {
           cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-          estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [option?.detail ?? 'not feasible'],
+          estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? option?.detail ?? 'not feasible'],
         },
         warnings: [...(option ? [`${p}: ${option.detail}`] : []), ...s.warnings],
         ratesSource: s.ratesSource,

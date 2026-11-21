@@ -145,8 +145,12 @@ export class RouteApplicationService {
 
     // 4. What the route cannot make is applied with it as No Cost Features (written below with its lines): why it is not feasible for the
     // part, and each feature its process cannot make. Its operations that cannot be costed become No Cost Features as they are written.
+    // A route not priced because an input is missing (INPUT_MISSING: no material grade) is not costed yet, not infeasible: said as such.
+    const notMade = route.capability.warnings[0] ?? route.warnings?.[0] ?? 'machine capability constraints not met';
     const unmade = [
-      ...(route.isFeasible ? [] : [`${route.routeLabel} is not feasible for this part: ${route.capability.warnings[0] ?? route.warnings?.[0] ?? 'machine capability constraints not met'}`]),
+      ...(route.isFeasible ? [] : [route.capability.reasonCodes.includes('INPUT_MISSING')
+        ? `${route.routeLabel} is not costed: ${notMade}`
+        : `${route.routeLabel} is not feasible for this part: ${notMade}`]),
       ...(route.compatibility?.incompatibilities ?? []).map((i) => `${i.count} x ${i.featureType}: ${i.reason}`),
     ];
 
