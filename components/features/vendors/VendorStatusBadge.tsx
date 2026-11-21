@@ -7,8 +7,12 @@ interface VendorStatusBadgeProps {
 
 const STATUS_STYLES: Record<string, { dot: string; badge: string }> = {
   active: { dot: 'bg-success', badge: 'bg-success/10 text-success border-success/20' },
-  inactive: { dot: 'bg-muted-foreground/60', badge: 'bg-muted text-muted-foreground border-border' },
   pending: { dot: 'bg-warning', badge: 'bg-warning/10 text-warning border-warning/20' },
+};
+
+const INACTIVE_STYLE = {
+  dot: 'bg-muted-foreground/60',
+  badge: 'bg-muted text-muted-foreground border-border',
 };
 
 /**
@@ -16,7 +20,7 @@ const STATUS_STYLES: Record<string, { dot: string; badge: string }> = {
  * status text unchanged, with a coloured dot and tint per state.
  */
 export function VendorStatusBadge({ status, className }: VendorStatusBadgeProps) {
-  const style = STATUS_STYLES[status] ?? STATUS_STYLES.inactive!;
+  const style = STATUS_STYLES[status] ?? INACTIVE_STYLE;
   return (
     <span
       className={cn(

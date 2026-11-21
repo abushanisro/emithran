@@ -1,17 +1,35 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Edit,
+  Building2,
+  Factory,
+  Users,
+  Award,
+  FileText,
+  MoreVertical,
+} from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
+import { VendorStatusBadge } from '@/components/features/vendors/VendorStatusBadge';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { PageSkeleton } from '@/components/ui/loading-skeleton';
-import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
+import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -23,20 +41,20 @@ import {
   useVendorContacts,
   useUpdateVendor,
 } from '@/lib/api/hooks/useVendors';
-import {
-  ArrowLeft,
-  Plus,
-  Trash2,
-  Edit,
-  Building2,
-  Factory,
-  Users,
-  Award,
-  FileText,
-} from 'lucide-react';
 import type { VendorEquipment } from '@/lib/api/vendors';
 import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES, getAllCategories, getEquipmentTypesByCategory, getFieldsForCategory, type FieldConfig, type EquipmentCategory } from '@/lib/constants/equipment-types';
 import { normalizeWebsiteUrl } from '@/lib/utils/website-url';
+
+import type { ReactNode } from 'react';
+
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
 
 type TabType = 'basic' | 'equipment' | 'facility' | 'qms' | 'users' | 'docs';
 
@@ -178,7 +196,7 @@ export default function VendorDetailPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-muted-foreground">Vendor not found</p>
-          <Button onClick={() => router.push('/vendors')} className="mt-4">
+          <Button onClick={() => { router.push('/vendors'); }} className="mt-4">
             Back to Vendors
           </Button>
         </div>
@@ -191,368 +209,298 @@ export default function VendorDetailPage() {
   const machineListHref = normalizeWebsiteUrl(vendor.machineListUrl);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="bg-card border-b sticky top-0 z-10">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push('/vendors')}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">{vendor.name}</h1>
-                <p className="text-sm text-muted-foreground">{vendor.supplierCode}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant={vendor.status === 'active' ? 'default' : 'secondary'}>
-                {vendor.status}
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={handleEditVendor}
-              >
-                <Edit className="h-4 w-4" />
-                Edit Supplier
-              </Button>
-            </div>
-          </div>
+      <div className="flex items-start gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          className="mt-0.5 h-8 w-8 shrink-0"
+          aria-label="Back to vendors"
+          onClick={() => { router.push('/vendors'); }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title={vendor.name}
+            {...(vendor.supplierCode ? { description: vendor.supplierCode } : {})}
+          >
+            <VendorStatusBadge status={vendor.status} />
+            <Button variant="outline" className="gap-2" onClick={handleEditVendor}>
+              <Edit className="h-4 w-4" />
+              Edit Supplier
+            </Button>
+          </PageHeader>
         </div>
       </div>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-card text-foreground min-h-[calc(100vh-73px)] p-4">
-          <nav className="space-y-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
+      {/* Section tabs */}
+      <nav aria-label="Vendor sections" className="-mb-2 overflow-x-auto border-b">
+        <ul className="flex min-w-max items-center gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <li key={tab.id}>
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-muted text-foreground'
-                      : 'text-foreground/80 hover:bg-accent hover:text-foreground'
+                  type="button"
+                  onClick={() => { setActiveTab(tab.id as TabType); }}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`inline-flex h-10 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    isActive
+                      ? 'border-primary text-foreground'
+                      : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                   {tab.label}
                 </button>
-              );
-            })}
-          </nav>
-        </aside>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
-        {/* Main Content */}
-        <main className="flex-1 p-6">
+      <div>
           {activeTab === 'basic' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Company Name</Label>
-                    <p className="mt-1">{vendor.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Supplier Code</Label>
-                    <p className="mt-1">{vendor.supplierCode || 'N/A'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                    <p className="mt-1">{vendor.addresses || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Website</Label>
-                    <p className="mt-1">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <Card className="lg:col-span-2">
+                <CardHeader className="border-b py-4">
+                  <CardTitle className="text-base">Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 p-6">
+                  <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                    <Field label="Company Name">{vendor.name}</Field>
+                    <Field label="Supplier Code">{vendor.supplierCode || 'N/A'}</Field>
+                    <Field label="Address" className="sm:col-span-2">{vendor.addresses || 'N/A'}</Field>
+                    <Field label="Website">
                       {normalizeWebsiteUrl(vendor.website) ? (
                         <a href={normalizeWebsiteUrl(vendor.website)!} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                           {vendor.website}
                         </a>
                       ) : (vendor.website || 'N/A')}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                    <p className="mt-1">{vendor.companyPhone || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                    <p className="mt-1">{vendor.companyEmail || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">City</Label>
-                    <p className="mt-1">{vendor.city || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">State</Label>
-                    <p className="mt-1">{vendor.state || 'N/A'}</p>
-                  </div>
-                </div>
+                    </Field>
+                    <Field label="Phone">{vendor.companyPhone || 'N/A'}</Field>
+                    <Field label="Email">{vendor.companyEmail || 'N/A'}</Field>
+                    <Field label="City">{vendor.city || 'N/A'}</Field>
+                    <Field label="State">{vendor.state || 'N/A'}</Field>
+                  </dl>
 
-                <Separator />
+                  <Separator />
 
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Industries</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {vendor.industries && vendor.industries.length > 0 ? (
-                      vendor.industries.map((industry) => (
-                        <Badge key={industry} variant="outline">{industry}</Badge>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No industries listed</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Processes</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {vendor.process && vendor.process.length > 0 ? (
-                      vendor.process.map((proc) => (
-                        <Badge key={proc} variant="outline">{proc}</Badge>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No processes listed</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Certifications</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {vendor.certifications && vendor.certifications.length > 0 ? (
-                      vendor.certifications.map((cert) => (
-                        <Badge key={cert} variant="secondary">{cert}</Badge>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No certifications listed</p>
-                    )}
-                  </div>
-                </div>
-
-                {contacts.length > 0 && (
-                  <>
-                    <Separator />
+                  <div className="space-y-5">
                     <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Contacts</Label>
-                      <div className="mt-3 space-y-3">
-                        {contacts.map((contact) => (
-                          <Card key={contact.id}>
-                            <CardContent className="pt-4">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-medium">{contact.name}</p>
-                                  {contact.designation && (
-                                    <p className="text-sm text-muted-foreground">{contact.designation}</p>
-                                  )}
-                                </div>
-                                {contact.isPrimary && (
-                                  <Badge variant="default">Primary</Badge>
-                                )}
-                              </div>
-                              <div className="mt-2 space-y-1">
-                                {contact.email && (
-                                  <p className="text-sm">
-                                    <span className="text-muted-foreground">Email:</span> {contact.email}
-                                  </p>
-                                )}
-                                {contact.phone && (
-                                  <p className="text-sm">
-                                    <span className="text-muted-foreground">Phone:</span> {contact.phone}
-                                  </p>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                      <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Industries</Label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {vendor.industries && vendor.industries.length > 0 ? (
+                          vendor.industries.map((industry) => (
+                            <Badge key={industry} variant="outline">{industry}</Badge>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No industries listed</p>
+                        )}
                       </div>
                     </div>
-                  </>
+
+                    <div>
+                      <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Processes</Label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {vendor.process && vendor.process.length > 0 ? (
+                          vendor.process.map((proc) => (
+                            <Badge key={proc} variant="outline">{proc}</Badge>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No processes listed</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Certifications</Label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {vendor.certifications && vendor.certifications.length > 0 ? (
+                          vendor.certifications.map((cert) => (
+                            <Badge key={cert} variant="secondary">{cert}</Badge>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No certifications listed</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {contacts.length > 0 && (
+                <Card className="self-start">
+                  <CardHeader className="border-b py-4">
+                    <CardTitle className="text-base">Contacts</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-4">
+                    {contacts.map((contact) => (
+                      <div key={contact.id} className="rounded-md border bg-muted/30 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{contact.name}</p>
+                            {contact.designation && (
+                              <p className="text-sm text-muted-foreground">{contact.designation}</p>
+                            )}
+                          </div>
+                          {contact.isPrimary && (
+                            <Badge variant="default">Primary</Badge>
+                          )}
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {contact.email && (
+                            <p className="break-all text-sm">
+                              <span className="text-muted-foreground">Email:</span> {contact.email}
+                            </p>
+                          )}
+                          {contact.phone && (
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">Phone:</span> {contact.phone}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'equipment' && (
+            <Card className="overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b px-6 py-4">
+                <CardTitle className="text-base">Equipments</CardTitle>
+                <Button onClick={handleAddEquipment} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Equipment
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {equipmentLoading ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Loading equipment...</p>
+                  </div>
+                ) : equipment.length === 0 ? (
+                  <EmptyState icon={Factory} title="No equipment added yet" />
+                ) : (
+                  <Table>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="px-6">Manufacturer</TableHead>
+                        <TableHead>Model</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Sub Type</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Yr of Manufacture</TableHead>
+                        <TableHead className="text-right">Market Price</TableHead>
+                        <TableHead className="w-12 text-right">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {equipment.map((equip) => (
+                        <TableRow key={equip.id}>
+                          <TableCell className="px-6 font-medium">{equip.manufacturer || '-'}</TableCell>
+                          <TableCell>{equip.model || '-'}</TableCell>
+                          <TableCell>
+                            {EQUIPMENT_TYPES.find(t => t.id === equip.equipmentType)?.name || equip.equipmentType || '-'}
+                          </TableCell>
+                          <TableCell>{equip.equipmentSubtype || '-'}</TableCell>
+                          <TableCell className="text-right tabular-nums">{equip.quantity || 0}</TableCell>
+                          <TableCell className="text-right tabular-nums">{equip.yearOfManufacture || 0}</TableCell>
+                          <TableCell className="text-right tabular-nums">{equip.marketPrice || 0}</TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Equipment actions">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => { handleEditEquipment(equip); }}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() => handleDeleteEquipment(equip.id)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>
           )}
 
-          {activeTab === 'equipment' && (
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Equipments</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {equipmentLoading ? (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">Loading equipment...</p>
-                    </div>
-                  ) : equipment.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">No equipment added yet</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-3 px-4 font-medium">Manufacturer</th>
-                            <th className="text-left py-3 px-4 font-medium">Model</th>
-                            <th className="text-left py-3 px-4 font-medium">Type</th>
-                            <th className="text-left py-3 px-4 font-medium">Sub Type</th>
-                            <th className="text-left py-3 px-4 font-medium">Quantity</th>
-                            <th className="text-left py-3 px-4 font-medium">Yr of Manufacture</th>
-                            <th className="text-left py-3 px-4 font-medium">Market Price</th>
-                            <th className="text-left py-3 px-4 font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {equipment.map((equip) => (
-                            <tr key={equip.id} className="border-b hover:bg-primary/5 transition-colors cursor-pointer">
-                              <td className="py-3 px-4">{equip.manufacturer || '-'}</td>
-                              <td className="py-3 px-4">{equip.model || '-'}</td>
-                              <td className="py-3 px-4">
-                                {EQUIPMENT_TYPES.find(t => t.id === equip.equipmentType)?.name || equip.equipmentType || '-'}
-                              </td>
-                              <td className="py-3 px-4">{equip.equipmentSubtype || '-'}</td>
-                              <td className="py-3 px-4">{equip.quantity || 0}</td>
-                              <td className="py-3 px-4">{equip.yearOfManufacture || 0}</td>
-                              <td className="py-3 px-4">{equip.marketPrice || 0}</td>
-                              <td className="py-3 px-4">
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditEquipment(equip)}
-                                    className="gap-1"
-                                  >
-                                    <Edit className="h-3 w-3" />
-                                    Details
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeleteEquipment(equip.id)}
-                                    className="gap-1 text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Add Equipment Button at bottom */}
-                  <div className="mt-4 pt-4 border-t">
-                    <Button onClick={handleAddEquipment} className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Add Equipment
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
           {activeTab === 'facility' && (
             <Card>
-              <CardHeader>
-                <CardTitle>Facility Information</CardTitle>
+              <CardHeader className="border-b py-4">
+                <CardTitle className="text-base">Facility Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Manufacturing Workshop</Label>
-                    <p className="mt-1">{vendor.manufacturingWorkshop || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Maximum Production Capacity</Label>
-                    <p className="mt-1">{vendor.maximumProductionCapacity || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Warehouse</Label>
-                    <p className="mt-1">{vendor.warehouse ? 'Yes' : 'No'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Packing</Label>
-                    <p className="mt-1">{vendor.packing ? 'Yes' : 'No'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Logistics & Transportation</Label>
-                    <p className="mt-1">{vendor.logisticsTransportation ? 'Yes' : 'No'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">In-House Material Testing</Label>
-                    <p className="mt-1">{vendor.inHouseMaterialTesting ? 'Yes' : 'No'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Hours in Shift</Label>
-                    <p className="mt-1">{vendor.numHoursInShift || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Shifts per Day</Label>
-                    <p className="mt-1">{vendor.numShiftsInDay || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Working Days per Week</Label>
-                    <p className="mt-1">{vendor.numWorkingDaysPerWeek || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Average Capacity Utilization</Label>
-                    <p className="mt-1">{vendor.averageCapacityUtilization ? `${vendor.averageCapacityUtilization}%` : 'N/A'}</p>
-                  </div>
-                </div>
+              <CardContent className="p-6">
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <Field label="Manufacturing Workshop">{vendor.manufacturingWorkshop || 'N/A'}</Field>
+                  <Field label="Maximum Production Capacity">{vendor.maximumProductionCapacity || 'N/A'}</Field>
+                  <Field label="Warehouse">{vendor.warehouse ? 'Yes' : 'No'}</Field>
+                  <Field label="Packing">{vendor.packing ? 'Yes' : 'No'}</Field>
+                  <Field label="Logistics & Transportation">{vendor.logisticsTransportation ? 'Yes' : 'No'}</Field>
+                  <Field label="In-House Material Testing">{vendor.inHouseMaterialTesting ? 'Yes' : 'No'}</Field>
+                  <Field label="Hours in Shift">{vendor.numHoursInShift || 'N/A'}</Field>
+                  <Field label="Shifts per Day">{vendor.numShiftsInDay || 'N/A'}</Field>
+                  <Field label="Working Days per Week">{vendor.numWorkingDaysPerWeek || 'N/A'}</Field>
+                  <Field label="Average Capacity Utilization">{vendor.averageCapacityUtilization ? `${vendor.averageCapacityUtilization}%` : 'N/A'}</Field>
+                </dl>
               </CardContent>
             </Card>
           )}
 
           {activeTab === 'users' && (
             <Card>
-              <CardHeader>
-                <CardTitle>Staff Information</CardTitle>
+              <CardHeader className="border-b py-4">
+                <CardTitle className="text-base">Staff Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-3 gap-6">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Number of Operators</Label>
-                    <p className="mt-1 text-2xl font-bold">{vendor.numOperators || 0}</p>
+              <CardContent className="p-6">
+                <dl className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  <div className="rounded-md border bg-muted/30 p-4">
+                    <dt className="text-xs font-medium text-muted-foreground">Number of Operators</dt>
+                    <dd className="mt-1 text-2xl font-semibold tabular-nums">{vendor.numOperators || 0}</dd>
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Number of Engineers</Label>
-                    <p className="mt-1 text-2xl font-bold">{vendor.numEngineers || 0}</p>
+                  <div className="rounded-md border bg-muted/30 p-4">
+                    <dt className="text-xs font-medium text-muted-foreground">Number of Engineers</dt>
+                    <dd className="mt-1 text-2xl font-semibold tabular-nums">{vendor.numEngineers || 0}</dd>
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Number of Production Managers</Label>
-                    <p className="mt-1 text-2xl font-bold">{vendor.numProductionManagers || 0}</p>
+                  <div className="rounded-md border bg-muted/30 p-4">
+                    <dt className="text-xs font-medium text-muted-foreground">Number of Production Managers</dt>
+                    <dd className="mt-1 text-2xl font-semibold tabular-nums">{vendor.numProductionManagers || 0}</dd>
                   </div>
-                </div>
+                </dl>
               </CardContent>
             </Card>
           )}
 
           {activeTab === 'qms' && (
             <Card>
-              <CardHeader>
-                <CardTitle>Quality Management System</CardTitle>
+              <CardHeader className="border-b py-4">
+                <CardTitle className="text-base">Quality Management System</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-5 p-6">
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Certifications</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Certifications</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {vendor.certifications && vendor.certifications.length > 0 ? (
                       vendor.certifications.map((cert) => (
                         <Badge key={cert} variant="secondary">{cert}</Badge>
@@ -562,47 +510,39 @@ export default function VendorDetailPage() {
                     )}
                   </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Inspection Options</Label>
-                  <p className="mt-1">{vendor.inspectionOptions || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">QMS Metrics</Label>
-                  <p className="mt-1">{vendor.qmsMetrics || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">QMS Procedures</Label>
-                  <p className="mt-1">{vendor.qmsProcedures || 'N/A'}</p>
-                </div>
+                <Separator />
+                <dl className="space-y-5">
+                  <Field label="Inspection Options">{vendor.inspectionOptions || 'N/A'}</Field>
+                  <Field label="QMS Metrics">{vendor.qmsMetrics || 'N/A'}</Field>
+                  <Field label="QMS Procedures">{vendor.qmsProcedures || 'N/A'}</Field>
+                </dl>
               </CardContent>
             </Card>
           )}
 
           {activeTab === 'docs' && (
             <Card>
-              <CardHeader>
-                <CardTitle>Documents</CardTitle>
+              <CardHeader className="border-b py-4">
+                <CardTitle className="text-base">Documents</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5 p-6">
                 {companyProfileHref && (
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Company Profile</Label>
-                    <p className="mt-1">
+                  <dl>
+                    <Field label="Company Profile">
                       <a href={companyProfileHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                         View Company Profile
                       </a>
-                    </p>
-                  </div>
+                    </Field>
+                  </dl>
                 )}
                 {machineListHref && (
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Machine List</Label>
-                    <p className="mt-1">
+                  <dl>
+                    <Field label="Machine List">
                       <a href={machineListHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                         View Machine List
                       </a>
-                    </p>
-                  </div>
+                    </Field>
+                  </dl>
                 )}
                 {!companyProfileHref && !machineListHref && (
                   <p className="text-sm text-muted-foreground">No documents available</p>
@@ -610,7 +550,6 @@ export default function VendorDetailPage() {
               </CardContent>
             </Card>
           )}
-        </main>
       </div>
 
       {/* Equipment Sheet */}
@@ -627,7 +566,7 @@ export default function VendorDetailPage() {
             {/* Equipment Type Selector with Tabs */}
             <div>
               <Label className="text-base font-semibold">Select Equipment Type</Label>
-              <Tabs value={selectedCategory} onValueChange={(val) => setSelectedCategory(val as EquipmentCategory)} className="mt-3">
+              <Tabs value={selectedCategory} onValueChange={(val) => { setSelectedCategory(val as EquipmentCategory); }} className="mt-3">
                 {/* Scrollable tabs list */}
                 <div className="relative mb-4 overflow-x-auto">
                   <TabsList className="inline-flex w-max min-w-full">
@@ -655,7 +594,7 @@ export default function VendorDetailPage() {
                             key={type.id}
                             variant={equipmentForm.equipmentType === type.id ? "default" : "outline"}
                             className="h-auto py-3 text-sm font-normal justify-start"
-                            onClick={() => handleSelectEquipmentType(type.id)}
+                            onClick={() => { handleSelectEquipmentType(type.id); }}
                           >
                             {type.name}
                           </Button>
@@ -691,7 +630,7 @@ export default function VendorDetailPage() {
                   // Group fields
                   fields.forEach(field => {
                     if (field.group) {
-                      const groupKey = field.group!;
+                      const groupKey = field.group;
                       (groupedFields[groupKey] ??= []).push(field);
                     } else {
                       ungroupedFields.push(field);
@@ -758,7 +697,7 @@ export default function VendorDetailPage() {
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={() => setEquipmentSheetOpen(false)}>
+              <Button variant="outline" onClick={() => { setEquipmentSheetOpen(false); }}>
                 Cancel
               </Button>
               <Button
@@ -784,13 +723,13 @@ export default function VendorDetailPage() {
 
           <div className="space-y-4 py-4">
             {/* Basic Information */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="name">Company Name *</Label>
                 <Input
                   id="name"
                   value={editForm.name || ''}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, name: e.target.value }); }}
                   placeholder="Enter company name"
                 />
               </div>
@@ -799,7 +738,7 @@ export default function VendorDetailPage() {
                 <Input
                   id="supplierCode"
                   value={editForm.supplierCode || ''}
-                  onChange={(e) => setEditForm({ ...editForm, supplierCode: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, supplierCode: e.target.value }); }}
                   placeholder="Enter supplier code"
                 />
               </div>
@@ -809,7 +748,7 @@ export default function VendorDetailPage() {
                   id="website"
                   type="url"
                   value={editForm.website || ''}
-                  onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, website: e.target.value }); }}
                   placeholder="https://example.com"
                 />
               </div>
@@ -819,7 +758,7 @@ export default function VendorDetailPage() {
                   id="companyPhone"
                   type="tel"
                   value={editForm.companyPhone || ''}
-                  onChange={(e) => setEditForm({ ...editForm, companyPhone: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, companyPhone: e.target.value }); }}
                   placeholder="+1 234 567 8900"
                 />
               </div>
@@ -829,7 +768,7 @@ export default function VendorDetailPage() {
                   id="companyEmail"
                   type="email"
                   value={editForm.companyEmail || ''}
-                  onChange={(e) => setEditForm({ ...editForm, companyEmail: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, companyEmail: e.target.value }); }}
                   placeholder="info@company.com"
                 />
               </div>
@@ -841,20 +780,20 @@ export default function VendorDetailPage() {
               <Textarea
                 id="addresses"
                 value={editForm.addresses || ''}
-                onChange={(e) => setEditForm({ ...editForm, addresses: e.target.value })}
+                onChange={(e) => { setEditForm({ ...editForm, addresses: e.target.value }); }}
                 placeholder="Enter full address"
                 rows={3}
               />
             </div>
 
             {/* Location */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <Label htmlFor="city">City</Label>
                 <Input
                   id="city"
                   value={editForm.city || ''}
-                  onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, city: e.target.value }); }}
                   placeholder="Enter city"
                 />
               </div>
@@ -863,7 +802,7 @@ export default function VendorDetailPage() {
                 <Input
                   id="state"
                   value={editForm.state || ''}
-                  onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, state: e.target.value }); }}
                   placeholder="Enter state"
                 />
               </div>
@@ -872,7 +811,7 @@ export default function VendorDetailPage() {
                 <Input
                   id="country"
                   value={editForm.country || ''}
-                  onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, country: e.target.value }); }}
                   placeholder="Enter country"
                 />
               </div>
@@ -883,7 +822,7 @@ export default function VendorDetailPage() {
               <Label htmlFor="status">Status</Label>
               <Select
                 value={editForm.status || 'active'}
-                onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                onValueChange={(value) => { setEditForm({ ...editForm, status: value }); }}
               >
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Select status" />
@@ -902,10 +841,10 @@ export default function VendorDetailPage() {
               <Input
                 id="industries"
                 value={editForm.industries?.join(', ') || ''}
-                onChange={(e) => setEditForm({
+                onChange={(e) => { setEditForm({
                   ...editForm,
                   industries: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                })}
+                }); }}
                 placeholder="e.g., Aerospace, Automotive, Medical"
               />
             </div>
@@ -916,10 +855,10 @@ export default function VendorDetailPage() {
               <Input
                 id="process"
                 value={editForm.process?.join(', ') || ''}
-                onChange={(e) => setEditForm({
+                onChange={(e) => { setEditForm({
                   ...editForm,
                   process: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                })}
+                }); }}
                 placeholder="e.g., CNC Machining, Casting, Sheet Metal"
               />
             </div>
@@ -930,17 +869,17 @@ export default function VendorDetailPage() {
               <Input
                 id="certifications"
                 value={editForm.certifications?.join(', ') || ''}
-                onChange={(e) => setEditForm({
+                onChange={(e) => { setEditForm({
                   ...editForm,
                   certifications: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                })}
+                }); }}
                 placeholder="e.g., ISO 9001, AS9100, IATF 16949"
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => { setEditDialogOpen(false); }}>
               Cancel
             </Button>
             <Button
