@@ -30,12 +30,23 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   additive: 'Additive Manufacturing',
   // A length of bar, tube or profile, cut, punched, formed and bent (cad-engine bar_tube/feature_extractor.py: section, centreline, ends).
   bar_tube: 'Bar and Tube Fabrication',
+  // A blow molded or rotomolded hollow shell (cad-engine roto_blow/feature_extractor.py: wall, inside, spout, parting line, envelope).
+  roto_blow: 'Roto & Blow Molding',
   // An assembly's own work: its BOM children loaded and joined (costing/assembly). An assembly has no model of its own to analyse.
   assembly: 'Assembly',
+  // A weldment's welding (memory/Part Assembly): its BOM children (or the part itself) loaded and welded by the Cost Guide's weld table
+  // (costing/part-assembly). Nothing of it is read from a model: no extractor analyses a part as one.
+  part_assembly: 'Part Assembly',
 };
 
 /** An assembly's family: its own work (loading and joining its BOM children), costed by costing/assembly. */
 export const ASSEMBLY_FAMILY = 'assembly';
+
+/** A weldment's family: its welding (memory/Part Assembly), costed by costing/part-assembly. */
+export const PART_ASSEMBLY_FAMILY = 'part_assembly';
+
+/** The families costed from the BOM and the Cost Guide alone: the cad-engine has no extractor for them, so no analysis is run as one. */
+export const NO_CAD_EXTRACTOR_FAMILIES: ReadonlySet<string> = new Set([ASSEMBLY_FAMILY, PART_ASSEMBLY_FAMILY]);
 
 /** Insert molding (memory/Assembly molding): costed as a plastic molded part on the insert presses. */
 export const INSERT_MOLDING_PROCESS_GROUP = 'Assembly Molding';
@@ -45,6 +56,9 @@ export const MULTI_SHOT_PROCESS_GROUP = 'Assembly Plastic Molding';
 
 /** Multi-spindle machining (memory/Multi-Spindle Maching, memory/Machining Simultaneous Turning): a turned part, made from bar on a CNC multi-spindle or twin-spindle turning center. */
 export const MULTI_SPINDLE_PROCESS_GROUP = 'Multi-Spindle Machining';
+
+/** Rapid prototyping (memory/Rapid prototyping): a part built layer by layer (laser sintering, 3D printing, stereolithography), priced by the additive engine in its own domain. */
+export const RAPID_PROTOTYPING_PROCESS_GROUP = 'Rapid Prototyping';
 
 /** The generic casting process: the part is analysed as a casting and priced by every casting process, the cheapest feasible one quoted. */
 /**
@@ -57,6 +71,8 @@ export function familiesAnalysedForHint(hint: string): readonly string[] {
 }
 
 export const CASTING_PROCESS_GROUP = 'Casting';
+/** A hydroformed part: a sheet-metal part (its CAD analysis is sheet metal's), priced by costing/hydroforming. */
+export const HYDROFORMING_PROCESS_GROUP = 'Sheet Metal - Hydroforming';
 
 /**
  * Process groups with no CAD family of their own, and the families they are costed as. A hydroformed part is a sheet-metal part. A Casting part
@@ -64,7 +80,7 @@ export const CASTING_PROCESS_GROUP = 'Casting';
  * catalog holds every feature type the sand catalog has, and slides.
  */
 const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
-  'Sheet Metal - Hydroforming': ['sheet_metal'],
+  [HYDROFORMING_PROCESS_GROUP]: ['sheet_metal'],
   [CASTING_PROCESS_GROUP]: ['die_cast', 'sand_cast', 'investment_cast'],
   // Insert molding: a molded plastic part, analysed and priced as one, on the insert presses with its inserts loaded (plastic-molding/insert).
   [INSERT_MOLDING_PROCESS_GROUP]: ['plastic_molded'],
@@ -72,6 +88,9 @@ const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
   [MULTI_SHOT_PROCESS_GROUP]: ['plastic_molded'],
   // Multi-spindle machining: a turned part, its operations laid out over a multi-spindle's stations (multi-spindle/).
   [MULTI_SPINDLE_PROCESS_GROUP]: ['turned'],
+  // Rapid prototyping: a part built layer by layer, analysed for its build as an additive part and priced in the Rapid Prototyping domain
+  // (additive/additive-domain.ts: its own machines, materials, reference data and per-feature cleaning).
+  [RAPID_PROTOTYPING_PROCESS_GROUP]: ['additive'],
 };
 
 /**

@@ -1,7 +1,7 @@
 // An insert-molded part's entries in the route comparison: one per load method, each its cost summary priced on that route (the same
 // lines and totals as the quote, so the comparison cannot disagree with it). Apply saves a route's lines as the part's process records. Pure.
 import { INSERT_MOLDING_ROUTES, insertMoldingRouteId, type InsertMoldingRouteKey } from './insert-molding';
-import { findRouteDataGaps } from '../../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../../shared/core/engine-kernel';
 
 import type { CostSummaryResponseDto } from '../../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../../dto/route-comparison.dto';
@@ -11,7 +11,9 @@ export function insertMoldingRouteFor(key: InsertMoldingRouteKey, summary: CostS
   const im = summary.insertMolding;
   const label = INSERT_MOLDING_ROUTES.find((r) => r.key === key)!.label;
   const isThis = im?.route === key;
-  const feasible = isThis && im.complete;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && im.complete;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const why = !im ? summary.warnings[0] ?? 'the part could not be costed'
     : !isThis ? im.options.find((o) => o.route === key)?.reason ?? 'not a route for this part'
@@ -34,7 +36,7 @@ export function insertMoldingRouteFor(key: InsertMoldingRouteKey, summary: CostS
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

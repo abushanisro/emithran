@@ -22,7 +22,7 @@ import { REFERENCE_FEATURE_OPERATIONS } from '../costing/shared/reference-featur
 import { MachiningLookupService } from '../costing/machining/lookup/machining-lookup.service';
 import { requiredMilledClassFromToolAxes } from '../costing/machining/setup-axis-rule';
 import { machiningFeatureCounts } from '../costing/machining/operation/machining-feature-counts';
-import { ASSEMBLY_FAMILY, CAD_FAMILY_TO_PROCESS_GROUP, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
+import { CAD_FAMILY_TO_PROCESS_GROUP, familiesOfProcessGroup, NO_CAD_EXTRACTOR_FAMILIES } from '../costing/shared/core/part-family-process-group';
 import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 import { currentFeatureGraphVersion } from '../analysis-status';
 import { plasticCostDrivers } from '../costing/plastic-molding/plastic-cost-drivers';
@@ -152,6 +152,46 @@ export interface RawGeometry {
   bendLengths: number[];
   bendAngles: number[];
   featureSource: 'step_topology' | 'mesh_inference';
+}
+
+/**
+ * What a sheet-metal part is measured for hydroforming (cad-engine sheet_metal/features/hydroform.py, its "hydroform" result), as
+ * feature_graph.summary.hydroformGeometry: the top-level keys camelCase, the objects inside (plan, mainSurface, drawn, blank, flanges,
+ * holes) as the engine writes them, snake_case -- as rotoBlowGeometry carries its engine objects. null when the engine did not measure
+ * the part (an analysis from before hf_v1, or a part with no sheet frame).
+ */
+export function hydroformGeometry(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const hf = raw as HydroformMeasurement;
+  if (typeof hf.version !== 'string') return null;
+  return {
+    extractionVersion: hf.version,
+    normal: hf.normal ?? null,
+    formingDepthMm: hf.forming_depth_mm ?? null,
+    plan: hf.plan ?? null,
+    projectedAreaMm2: hf.projected_area_mm2 ?? null,
+    developedAreaMm2: hf.developed_area_mm2 ?? null,
+    mainSurface: hf.main_surface ?? null,
+    drawn: hf.drawn ?? null,
+    blank: hf.blank ?? null,
+    flanges: hf.flanges ?? null,
+    holes: hf.holes ?? null,
+  };
+}
+
+/** The engine's "hydroform" result as it arrives (its values are passed on as measured). */
+interface HydroformMeasurement {
+  version?: unknown;
+  normal?: unknown;
+  forming_depth_mm?: unknown;
+  plan?: unknown;
+  projected_area_mm2?: unknown;
+  developed_area_mm2?: unknown;
+  main_surface?: unknown;
+  drawn?: unknown;
+  blank?: unknown;
+  flanges?: unknown;
+  holes?: unknown;
 }
 
 @Injectable()
@@ -595,9 +635,12 @@ export class AutoFillService {
         } : {}),
         // An additive build (cad-engine additive/feature_extractor.py): each of the six build directions with its height, footprint and, at each
         // self-supporting angle, the overhang, supports and plate contact; the additive cost picks the direction at the material's own angle.
+        // The holes and voids (additive/voids.py) are what Rapid Prototyping's cleaning is timed by; an analysis before them has no voids.
         ...(family.family === 'additive' ? {
           additiveBuild: cadMI?.features?.extraction_version ? {
             extractionVersion: cadMI.features.extraction_version,
+            holes: cadMI.features.holes ?? null,
+            voids: cadMI.features.voids ?? null,
             axis: cadMI.features.build_direction?.axis ?? null,
             partVolumeMm3: cadMI.features.part_volume_mm3 ?? null,
             surfaceAreaMm2: cadMI.features.surface_area_mm2 ?? null,
@@ -609,6 +652,31 @@ export class AutoFillService {
               }])),
             }])),
           } : null,
+        } : {}),
+        // A blow molded or rotomolded shell (cad-engine roto_blow/feature_extractor.py): its envelope, wall, the air it closes in, spouts, parting
+        // line and perimeter, holes and voids. The Roto & Blow Molding cost prices both routes and the operations its features take from it.
+        ...(family.family === 'roto_blow' ? {
+          rotoBlowGeometry: cadMI?.features?.extraction_version ? {
+            extractionVersion: cadMI.features.extraction_version,
+            envelopeMm: cadMI.features.envelope_mm ?? null,
+            partVolumeMm3: cadMI.features.part_volume_mm3 ?? null,
+            surfaceAreaMm2: cadMI.features.surface_area_mm2 ?? null,
+            wall: cadMI.features.wall ?? null,
+            hollow: cadMI.features.hollow ?? null,
+            inside: cadMI.features.inside ?? null,
+            partingLineMm: cadMI.features.parting_line_mm ?? null,
+            perimeterMm: cadMI.features.perimeter_mm ?? null,
+            spouts: cadMI.features.spouts ?? null,
+            holes: cadMI.features.holes ?? null,
+            voids: cadMI.features.voids ?? null,
+          } : null,
+        } : {}),
+        // What every sheet-metal part is measured for hydroforming (cad-engine sheet_metal/features/hydroform.py): the press axis, forming
+        // depth, plan, projected and developed area, the main surface, the drawn form, the blank, the straight and curved flanges and the
+        // holes. The Sheet Metal - Hydroforming cost routes and prices from it; null until the part is analysed by an engine that measures
+        // it (press Refresh analysis). See hydroformGeometry().
+        ...(isSheetMetal ? {
+          hydroformGeometry: hydroformGeometry((cadMI as { features?: { hydroform?: unknown } } | undefined)?.features?.hydroform),
         } : {}),
         // A bar, tube or profile (cad-engine bar_tube/feature_extractor.py): its stock form and section, the centreline's developed length, the
         // bends, the holes and openings through the wall, the end cuts and the end forms. The bar and tube cost prices its stock and routes from it.
@@ -1286,13 +1354,13 @@ export class AutoFillService {
    * milled/turned/mill_turn; the first entry (milled) is the general one; Sand
    * Casting is sand_cast; Casting is analysed as a die casting. A group with no
    * cost model (Part Assembly, ...), or whose family the cad-engine has no
-   * extractor for (Assembly: an assembly is costed from its children, it has no
-   * model of its own), returns undefined: there is no extractor to force, so
-   * the real classifier chain runs.
+   * extractor for (Assembly and Part Assembly: costed from the BOM children and
+   * the Cost Guide, with no model of their own to read), returns undefined: there
+   * is no extractor to force, so the real classifier chain runs.
    */
   familyHintForProcessGroup(processGroup: string | null | undefined): string | undefined {
     if (!processGroup) return undefined;
-    return familiesOfProcessGroup(processGroup).find((family) => family !== ASSEMBLY_FAMILY);
+    return familiesOfProcessGroup(processGroup).find((family) => !NO_CAD_EXTRACTOR_FAMILIES.has(family));
   }
 
   /**

@@ -5,7 +5,7 @@ import { DatabaseService } from '../../../common/database/database.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { resolveUtsMpa, isSheetFormableMaterial } from '../costing/shared/core/default-rates.constants';
 import { ASSEMBLY_FAMILY, CAD_FAMILY_TO_PROCESS_GROUP, costedProcessGroups, familiesOfProcessGroup } from '../costing/shared/core/part-family-process-group';
-import { isMaterialNamed, pricedGradeFor, PROCESS_OWN_MATERIAL_GROUP, type PricedGrade, type ProcessMaterial } from '../costing/shared/core/process-materials';
+import { isMaterialNamed, ownMaterialGroup, pricedGradeFor, type PricedGrade, type ProcessMaterial } from '../costing/shared/core/process-materials';
 import { isPlasticGrade } from '../costing/plastic-molding/process/process-tree';
 import { isDiscouragedShapeForFamily } from '../../raw-materials/constants/material-shape-ranking';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
@@ -501,10 +501,11 @@ export class MaterialResolutionService {
   /**
    * The grade `family`'s engine prices for the part's `grade` (process-materials.ts): the grade itself, or, when the process prices only its
    * own materials and the grade is not one of them, the process's closest own material with a note saying so. The grade's own row is read
-   * with the same ranked search the quote resolves materials with.
+   * with the same ranked search the quote resolves materials with. `processGroup`: the part's Process, for a group costed as another's family
+   * that prices from materials of its own (Rapid Prototyping).
    */
-  async gradeForProcess(accessToken: string, grade: string, family: string): Promise<PricedGrade> {
-    const group = PROCESS_OWN_MATERIAL_GROUP[family];
+  async gradeForProcess(accessToken: string, grade: string, family: string, processGroup?: string | null): Promise<PricedGrade> {
+    const group = ownMaterialGroup(family, processGroup);
     if (!group) return { grade, note: null };
     const client = this.databaseService.getClient(accessToken);
     const { data, error } = await client.from('raw_materials').select('name, grade, material_type, density_kg_m3, density').eq('material_group', group).order('name');
@@ -521,7 +522,9 @@ export class MaterialResolutionService {
     const own = row
       ? { name: row.materialGrade, grade: row.material, materialGroup: row.materialGroup, materialType: row.materialType, densityKgM3: row.densityKgM3 }
       : null;
-    return pricedGradeFor({ family, processLabel: CAD_FAMILY_TO_PROCESS_GROUP[family] ?? group, grade, own, materials });
+    // Named as the Process whose own materials these are (Rapid Prototyping), else as the family's process group.
+    const processLabel = processGroup && group !== ownMaterialGroup(family, null) ? processGroup : CAD_FAMILY_TO_PROCESS_GROUP[family] ?? group;
+    return pricedGradeFor({ family, processGroup, processLabel, grade, own, materials });
   }
 
   // Real, single density lookup for a grade — used wherever a caller needs

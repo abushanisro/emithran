@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TableRowDialog } from '@/components/costing/TableRowDialog';
 import {
-  JOINT_CHOICES, JOINT_FIELD_LABELS, JOINT_PROCESSES, jointMeasures, jointTableOf, jointTablePatch,
-  missingMeasures, newJointId, withDerivedEnabled, withJoint, withoutJoint,
+  ASSEMBLY_JOINTS, ASSEMBLY_SCENARIO_KEYS, jointMeasures, withDerivedEnabled,
   type AssemblySummary, type AssemblyJointView, type JointField, type JointRow,
 } from '@/lib/costing/assembly-view';
+import { newRowId, tableOf, tablePatch, withRow, withoutRow } from '@/lib/costing/joint-table';
 
 interface Props {
   assembly: AssemblySummary | null | undefined;
@@ -21,90 +20,8 @@ interface Props {
 }
 
 const headClass = 'text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
-const controlClass = 'w-full min-w-0 text-sm border border-border rounded-md px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-primary/40';
 const linkButton = 'text-xs text-primary hover:underline disabled:opacity-50';
-const FLAGS: ReadonlySet<JointField> = new Set(['prep', 'cleanUp']);
 const seconds = (s: number) => (s >= 60 ? `${Math.round((s / 60) * 10) / 10} min` : `${Math.round(s * 10) / 10} s`);
-
-/** The joint dialog: its kind, then exactly the measures that kind needs (required) or takes (optional). */
-function JointDialog({ initial, isNew, onSave, onClose }: { initial: JointRow; isNew: boolean; onSave: (row: JointRow) => void; onClose: () => void }) {
-  const [row, setRow] = useState<JointRow>(initial);
-  const spec = JOINT_PROCESSES.find((p) => p.process === row.process) ?? { process: row.process, label: row.process, required: ['count'] as JointField[], optional: [] as JointField[] };
-  const missing = missingMeasures(row);
-  const set = (f: JointField | 'label', v: string | number | boolean | undefined) => {
-    setRow((r) => {
-      const next = Object.fromEntries(Object.entries(r).filter(([k]) => k !== f)) as JointRow;
-      return v === undefined || v === '' ? next : { ...next, [f]: v };
-    });
-  };
-  const choicesOf = (f: JointField): readonly string[] | null => {
-    const c = JOINT_CHOICES[f];
-    if (!c) return null;
-    return Array.isArray(c) ? c : (c as Readonly<Record<string, readonly string[]>>)[row.process] ?? null;
-  };
-  const field = (f: JointField, required: boolean) => {
-    const choices = choicesOf(f);
-    return (
-      <label key={f} className="flex flex-col gap-1 text-xs">
-        <span className="text-muted-foreground">{JOINT_FIELD_LABELS[f]}{required ? ' *' : ''}</span>
-        {choices ? (
-          <select className={`${controlClass} cursor-pointer`} value={typeof row[f] === 'string' ? row[f] : ''} onChange={(e) => { set(f, e.target.value || undefined); }}>
-            <option value="">{required ? 'Choose…' : 'Default'}</option>
-            {choices.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        ) : (
-          <input
-            className={controlClass} type="number" min={0} step="any" inputMode="decimal"
-            value={typeof row[f] === 'number' ? row[f] : ''}
-            onChange={(e) => { set(f, e.target.value === '' ? undefined : Number(e.target.value)); }}
-          />
-        )}
-      </label>
-    );
-  };
-  const flags = spec.optional.filter((f) => FLAGS.has(f));
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isNew ? 'Add joint' : 'Edit joint'}</DialogTitle>
-          <DialogDescription>Each joint is costed by its Assembly process on the route&apos;s machine. Fields marked * are needed to cost it.</DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="col-span-2 flex flex-col gap-1 text-xs">
-            <span className="text-muted-foreground">Joint type</span>
-            <select
-              className={`${controlClass} cursor-pointer`} value={row.process} disabled={!isNew && row.id.startsWith('screw:')}
-              onChange={(e) => { setRow({ id: row.id, process: e.target.value, ...(row.label ? { label: row.label } : {}), count: typeof row.count === 'number' ? row.count : 1 }); }}
-            >
-              {JOINT_PROCESSES.map((p) => <option key={p.process} value={p.process}>{p.label}</option>)}
-            </select>
-          </label>
-          <label className="col-span-2 flex flex-col gap-1 text-xs">
-            <span className="text-muted-foreground">Name</span>
-            <input className={controlClass} value={row.label ?? ''} onChange={(e) => { set('label', e.target.value || undefined); }} placeholder="Optional, e.g. Bracket to frame" />
-          </label>
-          {spec.required.map((f) => field(f, true))}
-          {spec.optional.filter((f) => !FLAGS.has(f)).map((f) => field(f, false))}
-          {flags.length > 0 && (
-            <div className="col-span-2 flex gap-4">
-              {flags.map((f) => (
-                <label key={f} className="flex items-center gap-1.5 text-xs">
-                  <input type="checkbox" checked={row[f] === true} onChange={(e) => { set(f, e.target.checked || undefined); }} /> {JOINT_FIELD_LABELS[f]}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-        {missing.length > 0 && <p className="text-xs text-amber-600">Still needed: {missing.map((f) => JOINT_FIELD_LABELS[f]).join(', ')}</p>}
-        <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" disabled={missing.length > 0} onClick={() => { onSave(row); }}>{isNew ? 'Add joint' : 'Save'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /** A joint as its table row: the stored row of its id, else one built from what the engine read (a derived joint not yet edited). */
 function rowOf(table: readonly JointRow[], j: AssemblyJointView): JointRow {
@@ -122,9 +39,9 @@ function rowOf(table: readonly JointRow[], j: AssemblyJointView): JointRow {
  * Builder); this panel only says which one is quoted.
  */
 export function AssemblySection({ assembly: a, overrides, onChange, hrefOf }: Props) {
-  const table = jointTableOf(overrides);
+  const table = tableOf<JointField>(ASSEMBLY_SCENARIO_KEYS.joints, overrides);
   const [editing, setEditing] = useState<{ row: JointRow; isNew: boolean } | null>(null);
-  const save = (next: JointRow[]) => { onChange(jointTablePatch(next)); };
+  const save = (next: JointRow[]) => { onChange(tablePatch(ASSEMBLY_SCENARIO_KEYS.joints, next)); };
   if (!a) return <p className="text-xs text-muted-foreground">Costing the assembly…</p>;
 
   return (
@@ -158,7 +75,7 @@ export function AssemblySection({ assembly: a, overrides, onChange, hrefOf }: Pr
       <section className="space-y-1">
         <div className="flex items-center justify-between">
           <h4 className={headClass}>Joints</h4>
-          <button type="button" className={linkButton} onClick={() => { setEditing({ row: { id: newJointId(table), process: 'MIG Welding', count: 1 }, isNew: true }); }}>+ Add joint</button>
+          <button type="button" className={linkButton} onClick={() => { setEditing({ row: { id: newRowId(table, 'joint'), process: 'MIG Welding', count: 1 }, isNew: true }); }}>+ Add joint</button>
         </div>
         {a.joints.length === 0 && <p className="text-muted-foreground">None yet: screws come from threaded holes; add welds, rivets, sealing or bonding with Add joint.</p>}
         <ul className="divide-y divide-border rounded-md border border-border">
@@ -174,7 +91,7 @@ export function AssemblySection({ assembly: a, overrides, onChange, hrefOf }: Pr
                   <span className="shrink-0 tabular-nums text-muted-foreground">{j.cycleSec != null ? seconds(j.cycleSec) : ''}</span>
                   <button type="button" className={linkButton} onClick={() => { setEditing({ row: rowOf(table, j), isNew: false }); }}>Edit</button>
                   {(j.source === 'engineer' || edited) && (
-                    <button type="button" className={linkButton} onClick={() => { save(withoutJoint(table, j.id)); }} title={j.source === 'derived' ? 'Back to what the threaded holes give.' : 'Remove the joint.'}>
+                    <button type="button" className={linkButton} onClick={() => { save(withoutRow(table, j.id)); }} title={j.source === 'derived' ? 'Back to what the threaded holes give.' : 'Remove the joint.'}>
                       {j.source === 'derived' ? 'Reset' : 'Remove'}
                     </button>
                   )}
@@ -200,10 +117,14 @@ export function AssemblySection({ assembly: a, overrides, onChange, hrefOf }: Pr
       <p className="text-muted-foreground">The assembly&apos;s own work: each component&apos;s cost is added once by the BOM roll-up.</p>
 
       {editing && (
-        <JointDialog
-          key={editing.row.id} initial={editing.row} isNew={editing.isNew}
+        <TableRowDialog
+          key={editing.row.id} vocabulary={ASSEMBLY_JOINTS} initial={editing.row} isNew={editing.isNew}
+          noun="joint" kindLabel="Joint type" namePlaceholder="Optional, e.g. Bracket to frame"
+          description="Each joint is costed by its Assembly process on the route's machine."
+          // A joint found in the part's threaded holes stays a screw joint: its kind is the hole's.
+          kindLocked={!editing.isNew && editing.row.id.startsWith('screw:')}
           onClose={() => { setEditing(null); }}
-          onSave={(row) => { save(withJoint(table, row)); setEditing(null); }}
+          onSave={(row) => { save(withRow(table, row)); setEditing(null); }}
         />
       )}
     </div>

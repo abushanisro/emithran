@@ -16,14 +16,18 @@ function build(over: {
   pricedGrade?: string;
   /** What the route could not cost, as RouteApplicationService reports it. */
   noCostFeatures?: string[];
+  /** The part's BOM children, and whether its cost summary says its material is its parts' (an assembly or weldment of them). */
+  children?: object[];
+  materialOfParts?: boolean;
 } = {}) {
   const calls: string[] = [];
   const patches: Array<Record<string, unknown>> = [];
   const bomItems = {
     update: jest.fn().mockImplementation(() => { calls.push('item.update'); return Promise.resolve({}); }),
     patchScenarioOverrides: jest.fn().mockImplementation((_id: string, patch: Record<string, unknown>) => { calls.push('overrides'); patches.push(patch); return Promise.resolve({}); }),
-    findOne: jest.fn().mockResolvedValue({ id: 'i1', volume: 10, weight: 1 }),
-    getCostSummary: jest.fn().mockImplementation(() => { calls.push('cost-summary'); return Promise.resolve({ grossWeightKg: 1, materialGrade: over.pricedGrade ?? '' }); }),
+    findOne: jest.fn().mockResolvedValue({ id: 'i1', name: 'Frame', volume: 10, weight: 1 }),
+    findChildren: jest.fn().mockResolvedValue(over.children ?? []),
+    getCostSummary: jest.fn().mockImplementation(() => { calls.push('cost-summary'); return Promise.resolve({ grossWeightKg: 1, materialGrade: over.pricedGrade ?? '', ...(over.materialOfParts ? { materialOfParts: true } : {}) }); }),
     setMachineOverride: over.machine ?? jest.fn().mockResolvedValue({}),
   };
   let routeRan = false;
@@ -34,7 +38,10 @@ function build(over: {
       from: () => chain,
     }),
   };
-  const materials = { ensure: jest.fn().mockImplementation(() => { calls.push('material'); return Promise.resolve({ action: 'replaced', recordId: 'r1', usage: null }); }) };
+  const materials = {
+    ensure: jest.fn().mockImplementation(() => { calls.push('material'); return Promise.resolve({ action: 'replaced', recordId: 'r1', usage: null }); }),
+    retireOwnMaterial: jest.fn().mockImplementation(() => { calls.push('material.retire'); return Promise.resolve(1); }),
+  };
   const toolingCosts = {
     ensure: jest.fn().mockImplementation(() => { calls.push('tooling'); return Promise.resolve({ action: 'replaced', items: ['Injection mold'] }); }),
     retire: jest.fn().mockImplementation(() => { calls.push('tooling.retire'); return Promise.resolve(['Forging dies (1 set)']); }),
@@ -83,6 +90,33 @@ describe('ScenarioApplicationService.apply', () => {
     expect(materials.ensure).toHaveBeenCalledWith(expect.objectContaining({ grade: 'Aluminum, ANSI 6061' }));
     expect(r.material).toEqual({ grade: 'Aluminum, ANSI 6061', action: 'replaced', recordId: 'r1' });
     expect(r.warnings).toContain('"Generic PETG Copol" is priced as "Aluminum, ANSI 6061", a material of the part\'s process (the cost summary says why).');
+  });
+
+  it('an assembly or a weldment with parts under it keeps no material record of its own: an earlier one is retired, with or without a grade', async () => {
+    {
+      const withGrade = build({ children: [{ id: 'a' }, { id: 'b' }], materialOfParts: true });
+      const r = await withGrade.svc.apply(input({ materialGrade: 'Steel, Cold Worked, AISI 1020' }));
+      expect(withGrade.materials.ensure).not.toHaveBeenCalled();
+      expect(withGrade.materials.retireOwnMaterial).toHaveBeenCalledWith('i1', 'u', 't');
+      expect(r.material).toBeNull();
+      expect(r.warnings).toContain("Frame's material is its parts' (each part's is in the BOM roll-up): its own material record was retired.");
+      // No grade sent: a record from an older Apply, or from the part's previous process, is retired all the same.
+      const noGrade = build({ children: [{ id: 'a' }], materialOfParts: true });
+      await noGrade.svc.apply(input({}));
+      expect(noGrade.materials.retireOwnMaterial).toHaveBeenCalled();
+    }
+  });
+
+  it('one with no parts under it is its own one component and keeps its own; a part of another process with parts under it is priced as before', async () => {
+    const alone = build();
+    expect((await alone.svc.apply(input({ materialGrade: 'ABS' }))).material).toMatchObject({ grade: 'ABS', action: 'replaced' });
+    expect(alone.materials.retireOwnMaterial).not.toHaveBeenCalled();
+    const machined = build({ children: [{ id: 'a' }] });
+    expect((await machined.svc.apply(input({ materialGrade: 'ABS' }))).material).toMatchObject({ grade: 'ABS', action: 'replaced' });
+    // Nothing to price and nothing it could have: no grade and no parts leaves the material step out.
+    const bare = build();
+    await bare.svc.apply(input({}));
+    expect(bare.bomItems.getCostSummary).toHaveBeenCalledTimes(1);
   });
 
   it('what the route could not cost is applied as No Cost Features, each said in the warnings (Apply never fails)', async () => {

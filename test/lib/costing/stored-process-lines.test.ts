@@ -5,6 +5,7 @@ import {
   resolveStoredProcessLines,
   totalStoredProcessCost,
   selectProcessTotal,
+  isMaterialSettled,
   type StoredProcessRow,
   type EngineLineLite,
 } from '@/lib/costing/stored-process-lines';
@@ -152,6 +153,16 @@ describe('resolveStoredProcessLines — the setup denominator follows the effect
     expect(at1k.setupPerPart / at10k.setupPerPart).toBeCloseTo(10, 9);
     // Cycle cost is per-part and must NOT move with batch size.
     expect(at1k.cyclePerPart).toBeCloseTo(at10k.cyclePerPart, 12);
+  });
+});
+
+describe('isMaterialSettled — when a part\'s saved process costs count', () => {
+  it('with a material record; or, with none, when its material is its parts\' (an assembly or a weldment of BOM children)', () => {
+    expect(isMaterialSettled(1, {})).toBe(true);
+    expect(isMaterialSettled(0, { materialOfParts: true })).toBe(true);
+    expect(isMaterialSettled(0, { materialOfParts: false })).toBe(false);
+    expect(isMaterialSettled(0, {})).toBe(false);
+    expect(isMaterialSettled(0, undefined)).toBe(false);
   });
 });
 

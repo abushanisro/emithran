@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,22 +11,14 @@ import { Plus, Search, Trash2, Edit2, X, Check, ArrowLeft, Download, Sigma } fro
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCalculators, useCreateCalculator, useDeleteCalculator, useUpdateCalculator } from '@/lib/api/hooks';
-
-const CATEGORY_TABS = [
-  { label: 'All', value: '' },
-  { label: 'Sheet Metal', value: 'sheet_metal' },
-  { label: 'Costing', value: 'costing' },
-  { label: 'Material', value: 'material' },
-  { label: 'Process', value: 'process' },
-  { label: 'Tooling', value: 'tooling' },
-  { label: 'Custom', value: 'custom' },
-];
+import { calculatorProcessGroups, processGroupTabs } from '@/lib/calculators/process-group-tabs';
 
 export default function CalculatorsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('');
+  // The process group tab shown ('' = all).
+  const [activeGroup, setActiveGroup] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -51,7 +43,6 @@ export default function CalculatorsPage() {
 
   const { data, isLoading } = useCalculators({
     ...(searchQuery ? { search: searchQuery } : {}),
-    ...(activeCategory ? { calcCategory: activeCategory } : {}),
     limit: 100,
   });
 
@@ -119,7 +110,10 @@ export default function CalculatorsPage() {
     }
   };
 
-  const allCalculators = data?.calculators || [];
+  const allCalculators = useMemo(() => data?.calculators ?? [], [data]);
+  // Each calculator's process groups, and the tabs they make (lib/calculators/process-group-tabs.ts).
+  const groupsById = useMemo(() => calculatorProcessGroups(allCalculators), [allCalculators]);
+  const groupTabs = useMemo(() => processGroupTabs(groupsById), [groupsById]);
 
   const handleDownloadJson = () => {
     const payload = {
@@ -137,6 +131,7 @@ export default function CalculatorsPage() {
   };
 
   const filteredCalculators = allCalculators.filter((calc) => {
+    if (activeGroup && !groupsById.get(calc.id)?.includes(activeGroup)) return false;
     if (!processFilters.processGroup && !processFilters.processRoute && !processFilters.operation) {
       return true;
     }
@@ -153,37 +148,12 @@ export default function CalculatorsPage() {
     return true;
   });
 
-  // Fix TS2322 (line 171): groupKey must always be a string — initialise with a string literal
-  // Fix TS2532 (line 179): use optional chaining + nullish coalescing when reading groups[groupKey]
-  const groupedCalculators = filteredCalculators.reduce(
-    (groups: Record<string, typeof filteredCalculators>, calc) => {
-      let groupKey: string = 'General';
-
-      if (calc.calcCategory) {
-        groupKey =
-          calc.calcCategory.charAt(0).toUpperCase() + calc.calcCategory.slice(1);
-      }
-
-      if (calc.associatedProcessId) {
-        groupKey = `Process: ${calc.associatedProcessId}`;
-      }
-
-      if (calc.description) {
-        const desc = calc.description.toLowerCase();
-        if (desc.includes('calculator for ')) {
-          const processMatch = calc.description.match(/calculator for (.+?)(?:\s|$)/i);
-          if (processMatch?.[1]) {
-            groupKey = processMatch[1];
-          }
-        }
-      }
-
-      groups[groupKey] = [...(groups[groupKey] ?? []), calc];
-
-      return groups;
-    },
-    {}
-  );
+  // Under the tab's process group, or (All) under each group a calculator belongs to, groups by name.
+  const groupedCalculators: Record<string, typeof filteredCalculators> = {};
+  for (const calc of filteredCalculators) {
+    for (const group of activeGroup ? [activeGroup] : groupsById.get(calc.id) ?? []) (groupedCalculators[group] ??= []).push(calc);
+  }
+  const groupOrder = groupTabs.map((t) => t.group).filter((g) => groupedCalculators[g]);
 
   const calculators = filteredCalculators;
 
@@ -262,19 +232,19 @@ export default function CalculatorsPage() {
         </div>
       </div>
 
-      {/* Category Tabs */}
+      {/* Process group tabs: every process group with a calculator, from the database */}
       <div className="flex gap-1 flex-wrap border-b border-border pb-2">
-        {CATEGORY_TABS.map((tab) => (
+        {[{ group: '', label: 'All', count: allCalculators.length }, ...groupTabs.map((t) => ({ ...t, label: t.group }))].map((tab) => (
           <button
-            key={tab.value}
-            onClick={() => setActiveCategory(tab.value)}
+            key={tab.group || 'all'}
+            onClick={() => setActiveGroup(tab.group)}
             className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
-              activeCategory === tab.value
+              activeGroup === tab.group
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
-            {tab.label}
+            {tab.label} <span className="tabular-nums opacity-70">{tab.count}</span>
           </button>
         ))}
       </div>
@@ -325,7 +295,7 @@ export default function CalculatorsPage() {
         </EmptyState>
       ) : (
         <div className="space-y-8">
-          {Object.entries(groupedCalculators).map(([groupName, groupCalcs]) => (
+          {groupOrder.map((groupName) => [groupName, groupedCalculators[groupName] ?? []] as const).map(([groupName, groupCalcs]) => (
             <div key={groupName} className="space-y-4">
               {/* Group Header */}
               <div className="flex items-center gap-2">

@@ -3,7 +3,7 @@
 // the item's process records. Pure.
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 import { BAR_TUBE_ROUTES, type BarTubeRouteKey } from './bar-tube-route';
 
 /** The route id of a bar and tube route ("bar-tube-saw"). */
@@ -15,7 +15,9 @@ export function barTubeRouteFor(key: BarTubeRouteKey, summary: CostSummaryRespon
   const barTube = summary.barTube;
   const label = BAR_TUBE_ROUTES.find((r) => r.key === key)!.label;
   const isThis = barTube?.route === key;
-  const feasible = isThis && barTube!.complete && summary.totalCost != null;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && barTube!.complete && summary.totalCost != null;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const option = barTube?.options.find((o) => o.route === key);
   const why = !barTube ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith('Bar and Tube Fabrication cannot be costed')) ?? 'the part could not be costed'
@@ -39,7 +41,7 @@ export function barTubeRouteFor(key: BarTubeRouteKey, summary: CostSummaryRespon
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

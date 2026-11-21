@@ -45,6 +45,7 @@ describe('a part set to Assembly with no parts under it in the BOM', () => {
     expect(r.route!.lines.map((l) => l.process)).toEqual(['Pick and Place', 'Pick and Place', 'Mechanical Assembly', 'Mechanical Assembly', 'Mechanical Assembly']);
     expect(r.route!.lines.filter((l) => l.process === 'Mechanical Assembly').map((l) => Math.round(l.cycleTimeMin * 60 * 10) / 10)).toEqual([49, 29.4, 19.6]);
     expect(r.warnings[0]).toContain('has no parts under it in the BOM');
+    expect(r.materialOfParts).toBe(false);
   });
 
   it('points at the part on the page: its load and unload highlight it whole, a screw count its own threaded holes, names stay short', async () => {
@@ -70,6 +71,7 @@ describe('a part set to Assembly with no parts under it in the BOM', () => {
     const child = { ...holder, id: 'c', name: 'Bracket', weight: undefined, volume: 38354.17, materialGrade: 'Aluminum, 6061', featureGraph: null } as unknown as BOMItemResponseDto;
     const r = await service().price(request({ children: [child], densityOf: (g) => Promise.resolve(g === 'Aluminum, 6061' ? 2700 : null) }));
     expect(r.components[0]).toMatchObject({ massKg: 0.103556, massSource: 'volume' });
+    expect(r.materialOfParts).toBe(true);
     expect(r.route?.complete).toBe(true);
   });
 

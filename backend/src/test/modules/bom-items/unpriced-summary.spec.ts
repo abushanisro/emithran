@@ -5,7 +5,7 @@ import { BomItemCostingService, hasCostModel } from '../../../modules/bom-items/
  * missing. The no-material-grade summary is the same shape.
  */
 describe('which part families have a cost model', () => {
-  it.each(['milled', 'turned', 'mill_turn', 'sheet_metal', 'plastic_molded', 'die_cast', 'sand_cast', 'investment_cast', 'forged', 'powder_metal', 'additive', 'assembly'])('%s has one', (family) => {
+  it.each(['milled', 'turned', 'mill_turn', 'sheet_metal', 'plastic_molded', 'die_cast', 'sand_cast', 'investment_cast', 'forged', 'powder_metal', 'additive', 'assembly', 'part_assembly'])('%s has one', (family) => {
     expect(hasCostModel(family)).toBe(true);
   });
 

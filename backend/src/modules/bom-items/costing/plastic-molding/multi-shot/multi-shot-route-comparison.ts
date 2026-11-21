@@ -1,7 +1,7 @@
 // A multi-shot molded part's entries in the route comparison: one per press orientation, each its cost summary priced on that route (the same
 // lines and totals as the quote, so the comparison cannot disagree with it). Apply saves a route's lines as the part's process records. Pure.
 import { MULTI_SHOT_ROUTES, multiShotRouteId, type MultiShotRouteKey } from './multi-shot';
-import { findRouteDataGaps } from '../../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../../shared/core/engine-kernel';
 import { routeCompatibility } from '../operation/route-compatibility';
 
 import type { CostSummaryResponseDto } from '../../../dto/cost-breakdown.dto';
@@ -12,7 +12,9 @@ export function multiShotRouteFor(key: MultiShotRouteKey, summary: CostSummaryRe
   const im = summary.multiShot;
   const label = MULTI_SHOT_ROUTES.find((r) => r.key === key)!.label;
   const isThis = im?.route === key;
-  const feasible = isThis && im.complete;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && im.complete;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const why = !im ? summary.warnings[0] ?? 'the part could not be costed'
     // A part not priced as multi-shot yet (one shot) has no options: the reason is the engine's (on the press).
@@ -36,7 +38,7 @@ export function multiShotRouteFor(key: MultiShotRouteKey, summary: CostSummaryRe
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     // Both orientations are the same process on the same features: each route says what of the part it can make.

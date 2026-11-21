@@ -1,5 +1,6 @@
 import { SAND_CASTING_ROUTE_ID } from '../costing/casting/sand/sand-route-comparison';
 import { INVESTMENT_CASTING_ROUTE_ID } from '../costing/casting/investment/investment-route-comparison';
+import { HYDROFORMING_ROUTE_IDS } from '../costing/hydroforming/hydroforming-route-comparison';
 import { POWDER_METAL_ROUTE_ID } from '../costing/powder-metal/powder-metal-route-comparison';
 import { TWO_MODEL_ROUTE_ID } from '../costing/two-model/two-model-route-comparison';
 import { OTHER_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/molding-route-projection';
@@ -13,7 +14,9 @@ import { FORGING_ROUTE_IDS } from '../costing/forging/forging-route-comparison';
 import { COMPOSITES_ROUTE_IDS } from '../costing/composites/composites-route-comparison';
 import { ADDITIVE_ROUTE_IDS } from '../costing/additive/additive-route-comparison';
 import { BAR_TUBE_ROUTE_IDS } from '../costing/bar-tube/bar-tube-route-comparison';
+import { ROTO_BLOW_ROUTE_IDS } from '../costing/roto-blow/roto-blow-route-comparison';
 import { ASSEMBLY_ROUTE_IDS } from '../costing/assembly/assembly-route-comparison';
+import { PART_ASSEMBLY_ROUTE_IDS } from '../costing/part-assembly/part-assembly-route-comparison';
 import { INSERT_MOLDING_ROUTE_IDS } from '../costing/plastic-molding/insert/insert-molding';
 import { MULTI_SHOT_ROUTE_IDS } from '../costing/plastic-molding/multi-shot/multi-shot';
 import { MULTI_SPINDLE_ROUTE_IDS } from '../costing/multi-spindle/multi-spindle-route-comparison';
@@ -44,8 +47,12 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...ADDITIVE_ROUTE_IDS,
   // A bar or tube part's routes (saw and punch, tube laser), priced by the bar and tube engine (bar-tube-route-comparison.ts).
   ...BAR_TUBE_ROUTE_IDS,
+  ...ROTO_BLOW_ROUTE_IDS,
+  // A hydroformed part's routes (Deep Draw, Fluid Cell), priced by the hydroforming engine (hydroforming-route-comparison.ts).
+  ...HYDROFORMING_ROUTE_IDS,
   // An assembly's routes (manual, robotic welding), priced by the assembly engine (assembly-route-comparison.ts).
   ...ASSEMBLY_ROUTE_IDS,
+  ...PART_ASSEMBLY_ROUTE_IDS,
   // An insert-molded part's load methods (manual, 3-axis, 6-axis), priced by the insert molding engine.
   ...INSERT_MOLDING_ROUTE_IDS,
   // A multi-shot part's press orientations (horizontal, vertical), priced by the multi-shot engine.

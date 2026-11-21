@@ -12,10 +12,13 @@ import { BarTubeSection } from '@/components/costing/BarTubeSection';
 import { CompositesSection } from '@/components/costing/CompositesSection';
 import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { ForgingSection } from '@/components/costing/ForgingSection';
+import { HydroformingSection } from '@/components/costing/HydroformingSection';
 import { InsertMoldingCycle, InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
 import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
 import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
-import { PowderMetalSection } from '@/components/costing/PowderMetalSection';
+import { PartAssemblySection } from '@/components/costing/PartAssemblySection';
+import { PowderMetalSection, powderMetalUncostedReason } from '@/components/costing/PowderMetalSection';
+import { RotoBlowSection } from '@/components/costing/RotoBlowSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -55,6 +58,7 @@ import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import {
   resolveStoredProcessLines,
   selectProcessTotal,
+  isMaterialSettled,
   type StoredProcessRow,
 } from '@/lib/costing/stored-process-lines';
 import {
@@ -82,6 +86,7 @@ import { ModelViewer } from '@/components/ui/model-viewer';
 import { effectiveSheetThicknessMm } from '@/lib/costing/effective-sheet-thickness';
 import { splitSandRuns } from '@/lib/costing/sand-calculations';
 import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
+import { routePickKeyOf, routePicksOf } from '@/lib/routing/route-pick';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { PlasticRecognisedFeatures } from '@/components/features/manufacturing-intelligence/PlasticRecognisedFeatures';
@@ -116,7 +121,7 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 // also used by NRE and by the drawing-callout surface-treatment auto-cost).
 import { useSecondaryProcesses, useNre } from '@/lib/api/hooks/useSecondaryProcesses';
 import {
-  isCostedProcessGroup, processGroupOptionLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict,
+  isCostedProcessGroup, processGroupOptionLabel, processGroupOptionsFrom, isCastingProcessGroup, isCastingFamily, processChoiceConflict, routingFamilyOf,
 } from '@/lib/features/process-group';
 import { isCompleteRouteFamily as isCompleteRouteFamilyOf } from '@/lib/routing/complete-route-family';
 import { PROCESS_MATERIALS, initialMaterialGroup, materialPickerQuery } from '@/lib/features/material-picker-query';
@@ -145,6 +150,8 @@ import { ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight, AlertCircle
 import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
 import { calculationOfLine, calculationOfRecord, NO_CALCULATION, seedOfCalculation, tracedLineOf, type LineCalculation } from '@/lib/calculators/calculator-run';
+import { additiveSectionTitle } from '@/lib/costing/additive-view';
+import { isHydroformingItem } from '@/lib/costing/hydroforming-view';
 import { useAuth } from '@/lib/providers/auth-context';
 import type { PanelId, ManualRouteOption, AddProcessRequest } from '@/lib/features/mi-page-types';
 import { fmt, materialLabel, splitMaterialDisplay, fmtInt, formatCell, machineDisplayLabel, familyLabel, confidenceCls, formatEstCycleTime, money, partProcessBadge } from '@/lib/features/display-format';
@@ -159,20 +166,9 @@ import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hook
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { routeMachineDrift } from '@/lib/costing/applied-route';
-import { isAssemblyItem } from '@/lib/costing/assembly-view';
-import { isInsertMoldingItem } from '@/lib/costing/insert-molding-view';
-import { isMultiShotItem } from '@/lib/costing/multi-shot-view';
 import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
 import { isTwoModelPart } from '@/lib/costing/two-model-view';
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
-import { additiveRouteKeyOf } from '@/lib/routing/additive-route-id';
-import { assemblyRouteKeyOf } from '@/lib/routing/assembly-route-id';
-import { barTubeRouteKeyOf } from '@/lib/routing/bar-tube-route-id';
-import { compositesRouteKeyOf } from '@/lib/routing/composites-route-id';
-import { forgingRouteKeyOf } from '@/lib/routing/forging-route-id';
-import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
-import { multiShotRouteKeyOf } from '@/lib/routing/multi-shot-route-id';
-import { multiSpindleRouteKeyOf } from '@/lib/routing/multi-spindle-route-id';
 import { splitNote } from '@/lib/text/concise-note';
 import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, HoleGroup, FeatureNodeV2, DFMScoresResponse } from '@/lib/types/manufacturing';
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -740,6 +736,9 @@ function CostSummaryTab({
 
   // Grand total: engine estimate (process + material) + stored records converted to factory currency
   const hasStoredMat = (storedRawMat?.records?.length ?? 0) > 0;
+  // The material side is settled: a material record, or an assembly's or a weldment's material being its parts' (the cost summary says so;
+  // each part's is in the BOM roll-up), so its own joining or welding counts without a record of its own.
+  const materialSettled = isMaterialSettled(storedRawMat?.records.length ?? 0, cost);
   const storedMatTotal = (storedRawMat?.records ?? []).reduce((s, r: { totalCost?: number | null }) => s + (r.totalCost ?? 0), 0) * fromUsd;
   const packagingTotal = (storedPackaging?.items ?? []).reduce((s, i: { totalCost?: number | null }) => s + (i.totalCost ?? 0), 0) * fromUsd;
   const procuredTotal = (storedProcured?.items ?? []).reduce((s, p: any) => {
@@ -785,7 +784,7 @@ function CostSummaryTab({
   // question, so the freshly computed engine result wins instead of being
   // silently overridden by it.
   const processTotal = selectProcessTotal({
-    hasStoredMaterial: hasStoredMat,
+    hasStoredMaterial: materialSettled,
     storedLines: storedProcessLines,
     engineTotalProcess: eff.totalProcess,
   });
@@ -888,13 +887,17 @@ function CostSummaryTab({
       <SectionHeader label="Direct Material Costs" />
 
       {/* Estimated row (shown when no DB records exist yet — gives the user context) */}
-      {!isScenarioReady ? (
+      {cost.materialOfParts ? (
+        <div className="pl-2 pb-2 text-xs text-muted-foreground">
+          Its material is its parts&apos;: each part&apos;s is costed on the part and added once by the BOM roll-up, so this has none of its own.
+        </div>
+      ) : !isScenarioReady ? (
         <div className="pl-2 pb-2">
           <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
             Apply a material grade — engine will price this part from your DB rates
           </div>
         </div>
-      ) : cost.materialSource === 'default' && !matRateOverride ? (
+      ) : cost.materialSource === 'default' && !matRateOverride && !materialSettled ? (
         <div className="pl-5 pb-2">
           <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
             <span className="text-amber-500">(est.)</span>
@@ -953,10 +956,12 @@ function CostSummaryTab({
       {/* ── DIRECT PROCESS COSTS ── engine rows shown only when no stored records exist ── */}
       <SectionHeader label="Direct Process Costs" />
 
-      {/* Stale process costs warning — stored records exist but no material is applied */}
-      {!hasStoredMat && hasStoredProcs && (
+      {/* Stale process costs warning — stored records exist but no material is applied: removed, or never chosen (no material grade) */}
+      {!materialSettled && hasStoredProcs && (
         <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 mb-2 text-xs text-amber-600 dark:text-amber-400">
-          Process costs below were computed from a material that was removed — they are excluded from the total. Remove them or add a material to recalculate.
+          {costedGrade(item).trim()
+            ? 'Process costs below were computed from a material that was removed — they are excluded from the total. Remove them or add a material to recalculate.'
+            : 'The part has no material grade, so the process costs below are excluded from the total. Choose a material grade and Apply to price the part.'}
         </div>
       )}
 
@@ -996,7 +1001,7 @@ function CostSummaryTab({
       {/* Material applied, route not. The engine can price this part, but no
           route has been applied, so nothing here is costed — see
           selectProcessTotal, which returns no process total for this state. */}
-      {hasStoredMat && !hasStoredProcs && !isLoadingProcRecords && (
+      {materialSettled && !hasStoredProcs && !isLoadingProcRecords && (
         <div className="pl-2 pb-2">
           <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
             No process route applied yet. Press <strong>Apply</strong> to
@@ -2718,8 +2723,9 @@ function RouteSelectionDialog({
   const isInvestmentCast = partFamily === 'investment_cast';
   // Forged parts: the closed-die forging route as quoted, like sand.
   const isForged = partFamily === 'forged';
-  const isComposite = partFamily === 'composite';
   const isPowderMetal = partFamily === 'powder_metal';
+  // Hydroformed parts: Hydroform Deep Draw and Hydroform Fluid Cell, each the full quote (process-group.ts routingFamilyOf).
+  const isHydroforming = partFamily === 'hydroforming';
   const isCompleteRouteFamily = isCompleteRouteFamilyOf(partFamily);
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
@@ -2813,7 +2819,8 @@ function RouteSelectionDialog({
       // real constraint on the node (the exact purpose of RouteNode.selectable /
       // selectionNote) states it up front instead.
       return adaptRoutesToTree(allRoutesForTree).map((node) => {
-        if (node.processFamily === 'forming') {
+        // Only the sheet-metal builder stages cutting routes; a hydroformed part's routes are forming routes set as they are.
+        if (isSheetMetal && node.processFamily === 'forming') {
           return {
             ...node,
             selectable: false,
@@ -3197,18 +3204,14 @@ function RouteSelectionDialog({
   // tonnage tiers, or Compression/Reaction Injection/Structural Foam
   // Molding) is already a complete, self-contained multi-line quote (Mold
   // Setup/Injection/Packing/Cooling/Ejection/Inspections all included). ═══
-  // A complete route can be set when apply-route accepts it: for plastic,
-  // one of the 3 injection tonnage tiers; for machining, any feasible
-  // catalog-machine route (apply-route.dto.ts validates against the same
-  // registered milling/turning engines the comparison priced).
+  // A complete route can be set when apply-route accepts it: for plastic, one of the 3 injection tonnage tiers (the other molding processes are
+  // compared, not set); for every other family whose comparison lists complete routes (machining, casting, forging, powder metal,
+  // composites, additive, bar and tube, an assembly, a weldment), a feasible one: an infeasible row still says why.
   const isCompleteRouteApplicable = (routeId: string | null): boolean => {
-    if (!routeId) return false;
-    if (isIM) { const dto = allRoutesForTree.find((r) => r.routeId === routeId); return !!dto && moldingRouteSelectability(dto).selectable; }
-    if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
-    // A die-casting process route: feasible ones only, the same rule apply-route
-    // enforces (an infeasible row still says why).
-    if (isDieCast || isSandCast || isInvestmentCast || isForged || isPowderMetal) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
-    return false;
+    const dto = routeId ? allRoutesForTree.find((r) => r.routeId === routeId) : undefined;
+    if (!dto) return false;
+    if (isIM) return moldingRouteSelectability(dto).selectable;
+    return isCompleteRouteFamily && dto.isFeasible;
   };
 
   function handleApplyCompleteRoute() {
@@ -3222,20 +3225,8 @@ function RouteSelectionDialog({
       processes: selected.processLines.map((l) => l.process),
       rationale: `${selected.routeLabel} route — selected in Workflow Builder`,
       directApplyRouteId: selected.routeId,
-      ...(isDieCast ? { dieCastingProcess: selected.routeLabel } : {}),
-      ...(() => { const key = isForged ? forgingRouteKeyOf(selected.routeId) : undefined; return key ? { forgingRoute: key } : {}; })(),
-      ...(() => { const key = isComposite ? compositesRouteKeyOf(selected.routeId) : undefined; return key ? { compositesRoute: key } : {}; })(),
-      ...(() => { const key = partFamily === 'additive' ? additiveRouteKeyOf(selected.routeId) : undefined; return key ? { additiveRoute: key } : {}; })(),
-      // A bar and tube route ("bar-tube-<key>"): the key is committed as the scenario's barTubeRoute.
-      ...(() => { const key = barTubeRouteKeyOf(selected.routeId); return key ? { barTubeRoute: key } : {}; })(),
-      // An assembly's route ids are its own ("assembly-<key>"): the key is committed as the scenario's assemblyRoute.
-      ...(() => { const key = assemblyRouteKeyOf(selected.routeId); return key ? { assemblyRoute: key } : {}; })(),
-      // An insert molding route ("im-insert-<method>"): its load method is committed as the scenario's insertMoldingRoute.
-      ...(() => { const key = insertMoldingRouteKeyOf(selected.routeId); return key ? { insertMoldingRoute: key } : {}; })(),
-      // A multi-shot route ("ms-<orientation>"): its orientation is committed as the scenario's multiShotRoute.
-      ...(() => { const key = multiShotRouteKeyOf(selected.routeId); return key ? { multiShotRoute: key } : {}; })(),
-      // A multi-spindle route ("multispindle-<key>"): its key (6, 8, twin) is committed as the scenario's multiSpindleRoute.
-      ...(() => { const key = multiSpindleRouteKeyOf(selected.routeId); return key ? { multiSpindleRoute: key } : {}; })(),
+      // Its family's route key ("partassembly-robotic" -> partAssemblyRoute "robotic"), or a die casting route's process.
+      routePicks: routePicksOf(selected, partFamily),
     };
     onSelectRoute(route);
     onApplied();
@@ -3378,6 +3369,10 @@ function RouteSelectionDialog({
                 title: 'Machine',
                 description: 'One real, priced route per catalog machine for this part. Machines that cannot produce it stay listed with the reason.',
               }}
+              {...(isHydroforming ? { formingGroupMeta: {
+                title: 'Hydroforming',
+                description: 'Each route blanks and pierces the blank on the offline press, then forms it: Deep Draw on a round tool, draw by draw, or Fluid Cell on a tray of form blocks. The quoted one follows memory\'s depth / width rule unless the Cost Guide sets a route; a press that cannot take the part says why.',
+              } } : {})}
             />
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
               {/* Machining: add any catalog process and operation by hand. It opens as a new line on the Cost tab,
@@ -4548,12 +4543,18 @@ function CostGuidePanel({
                   so this value and the stored column can no longer diverge the
                   way they used to (a CAD-import-written generic grade like
                   "Generic CuZn39Pb3" silently beating a real drawing/selection). */}
-              {cgpCostSummary?.materialGrade && (
+              {/* A grade the engine found no raw_materials row for (materialSource 'default') is costed at no price and no weight: said, not ticked. */}
+              {cgpCostSummary?.materialGrade && (cgpCostSummary.materialSource === 'default' ? (
+                <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 mb-1.5 px-0.5">
+                  <span>!</span>
+                  <span>Costed as <strong>{cgpCostSummary.materialGrade}</strong>, which is not in Raw Materials: no material price or weight</span>
+                </div>
+              ) : (
                 <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 mb-1.5 px-0.5">
                   <span><Mark kind="ok" /></span>
                   <span>Currently costed as <strong>{cgpCostSummary.materialGrade}</strong></span>
                 </div>
-              )}
+              ))}
 
               {/* Drawing / CAD suggestion — shown only when it is NOT already the
                   grade being costed. Never applied immediately: this only stages
@@ -4675,6 +4676,7 @@ function CostGuidePanel({
               <Section title="Powder Metal">
                 <PowderMetalSection
                   powderMetal={cgpCostSummary.powderMetal}
+                  uncostedReason={powderMetalUncostedReason(cgpCostSummary)}
                   greenDensity={typeof item.scenarioOverrides?.powderMetalGreenDensity === 'number' ? item.scenarioOverrides.powderMetalGreenDensity : null}
                   onChange={(v) => { patchScenarioOverrides.mutate({ id: item.id, patch: { powderMetalGreenDensity: v } }); }}
                 />
@@ -4713,6 +4715,17 @@ function CostGuidePanel({
               </Section>
             )}
 
+            {isHydroformingItem(item) && (
+              <Section title="Sheet Metal - Hydroforming">
+                <HydroformingSection
+                  hydroforming={cgpCostSummary?.hydroforming}
+                  tooling={cgpCostSummary?.hydroformingTooling}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
             {isMultiSpindleItem(item) && (
               <Section title="Multi-Spindle Machining">
                 <MultiSpindleSection
@@ -4734,8 +4747,19 @@ function CostGuidePanel({
               </Section>
             )}
 
+            {cgpCostSummary?.family === 'part_assembly' && (
+              <Section title="Part Assembly">
+                <PartAssemblySection
+                  partAssembly={cgpCostSummary.partAssembly}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                  hrefOf={(childId) => `/projects/${String(cgpParams.id)}/bom/${String(cgpParams.bomId)}/items/${childId}/manufacturing-intelligence`}
+                />
+              </Section>
+            )}
+
             {cgpCostSummary?.family === 'additive' && (
-              <Section title="Additive Manufacturing">
+              <Section title={additiveSectionTitle(cgpCostSummary.additive, item.scenarioOverrides?.processGroup)}>
                 <AdditiveSection
                   additive={cgpCostSummary.additive}
                   overrides={item.scenarioOverrides}
@@ -4749,6 +4773,17 @@ function CostGuidePanel({
                 <BarTubeSection
                   barTube={cgpCostSummary.barTube}
                   tooling={cgpCostSummary.barTubeTooling}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'roto_blow' && (
+              <Section title="Roto & Blow Molding">
+                <RotoBlowSection
+                  rotoBlow={cgpCostSummary.rotoBlow}
+                  tooling={cgpCostSummary.rotoBlowTooling}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
@@ -4948,8 +4983,8 @@ function CostGuidePanel({
                 <li>
                   Casting process:{' '}
                   <span className="text-foreground font-medium">
-                    {processRouting === 'manual' && selectedManualRoute?.dieCastingProcess
-                      ? selectedManualRoute.dieCastingProcess
+                    {processRouting === 'manual' && selectedManualRoute?.routePicks?.dieCastingProcess
+                      ? selectedManualRoute.routePicks.dieCastingProcess
                       : processRouting === 'auto'
                         ? `${cgpCostSummary.dieCastingProcess.options.filter((o) => o.feasible !== false && o.total != null).sort((a, b) => a.total! - b.total!)[0]?.process ?? 'none feasible'} (cheapest feasible)`
                         : cgpCostSummary.dieCastingProcess.chosen}
@@ -8220,14 +8255,7 @@ export default function ManufacturingIntelligencePage() {
       materialGrade: staged.materialGrade,
       processRouting,
       manualRoute: selectedManualRoute,
-      isDieCast: (item.familyClassification ?? fg?.classification?.family) === 'die_cast',
-      isForged: (item.familyClassification ?? fg?.classification?.family) === 'forged',
-      isAdditive: (item.familyClassification ?? fg?.classification?.family) === 'additive',
-      isBarTube: (item.familyClassification ?? fg?.classification?.family) === 'bar_tube',
-      isAssembly: isAssemblyItem(item),
-      isInsertMolding: isInsertMoldingItem(item),
-      isMultiShot: isMultiShotItem(item),
-      isMultiSpindle: isMultiSpindleItem(item),
+      routePickKey: routePickKeyOf(item, item.familyClassification ?? fg?.classification.family),
       ...(staged.scenarioPatch ? { scenarioPatch: staged.scenarioPatch } : {}),
       ...(appliedRevision !== undefined ? { expectedRevision: appliedRevision } : {}),
     });
@@ -8327,6 +8355,9 @@ export default function ManufacturingIntelligencePage() {
   // third wasted full cost computation on every load/Apply regardless of the
   // real Digital Factory.
   const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize, factory);
+  // The Workflow Builder lists the routes of the family the part is costed as: an assembly or a weldment has none from CAD (or one from an
+  // analysis as another process), so its routes are the costed family's; a hydroformed part's are its Process's two complete routes.
+  const routingFamily = routingFamilyOf(fg?.classification.family, costForHeatmap?.family, item?.scenarioOverrides?.processGroup);
   // costForHeatmap.processLines always reflects the cost engine's OWN default-
   // recommended route (e.g. Fiber Laser Cutting), never whatever route the
   // engineer actually applied (e.g. Waterjet Cutting) -- same root cause
@@ -8372,6 +8403,8 @@ export default function ManufacturingIntelligencePage() {
         processes: route.processLines.map((l) => l.process),
         rationale: 'Manual route — restored from the applied process costs after reload',
         directApplyRouteId: route.routeId,
+        // The choice it was applied with, so a re-Apply sends it again instead of clearing it.
+        routePicks: routePicksOf(route, routingFamily),
       });
       setProcessRouting('manual');
       return;
@@ -9540,7 +9573,7 @@ export default function ManufacturingIntelligencePage() {
             if (!selectedManualRoute) setProcessRouting('auto');
           }}
           onApplied={() => { setRouteDialogOpen(false); }}
-          partFamily={fg?.classification?.family ?? null}
+          partFamily={routingFamily}
           currentRouteId={selectedManualRoute?.id ?? null}
           existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
           existingSteps={selectedManualRoute?.dynamicSteps}
@@ -9757,7 +9790,7 @@ export default function ManufacturingIntelligencePage() {
           if (!selectedManualRoute) setProcessRouting('auto');
         }}
         onApplied={() => { setRouteDialogOpen(false); }}
-        partFamily={fg?.classification?.family ?? null}
+        partFamily={routingFamily}
         currentRouteId={selectedManualRoute?.id ?? null}
         existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
         existingSteps={selectedManualRoute?.dynamicSteps}

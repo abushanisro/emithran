@@ -1199,13 +1199,41 @@ export interface CostSummaryDto {
     adhesiveKg: number;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
   };
+  /**
+   * The part's material is its parts': an assembly or a weldment costed from its BOM children has no material record of its own (each part's
+   * is in the BOM roll-up), so Apply keeps none and the Cost tab counts its own costs without one (backend CostSummaryDto.materialOfParts).
+   */
+  materialOfParts?: boolean;
+  /**
+   * Part Assembly (a weldment, memory/Part Assembly): the components welded, the plate and material, every weld of the weld table with what
+   * it came to on the quoted route, the MIG wire, and every route (backend PartAssemblyBreakdown).
+   */
+  partAssembly?: {
+    route: string | null; routeLabel: string | null; complete: boolean;
+    components: { id: string; name: string; quantity: number; massKg: number | null; massSource: 'weight' | 'volume' | null; maxDimensionMm: number | null }[];
+    weldmentMassKg: number | null;
+    thicknessMm: number | null; thicknessSource: string;
+    material: string | null; cutCodeFamily: string | null;
+    welds: {
+      id: string; process: string; routeProcess: string | null; operation: string; feature: 'Edge' | 'Blank' | 'SimpleHole'; label: string; count: number | null;
+      lengthMm: number | null; sizeMm: number | null; thicknessMm: number | null; areaMm2: number | null; depthMm: number | null;
+      bevel: boolean; grind: boolean; finishGrind: boolean; wireBrush: boolean; enabled: boolean;
+      cycleSec: number | null; wireKg: number | null; reason: string | null;
+    }[];
+    wireCost: number;
+    options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+  };
   /** Additive Manufacturing: the build (direction, height, supports, parts per build), the route quoted and every route (backend AdditiveBreakdown). */
   additive?: {
+    /** Additive Manufacturing or Rapid Prototyping (backend additive-domain.ts). */
+    processGroup: string;
     route: string; routeLabel: string;
     buildDirection: string; buildDirectionSource: 'engineer' | 'least_support'; selfSupportingDeg: number;
     buildHeightMm: number; footprintMm: number[]; overhangAreaMm2: number; supportVolumeMm3: number; plateContactAreaMm2: number;
     partsPerBuild: number | null; layers: number | null; materialMassKg: number; complete: boolean;
     options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
+    /** Rapid Prototyping: each hole and void cleaning timed (size: a diameter in mm or a volume in mm³, as `measure` says). */
+    cleaning: { id: string; type: string; label: string; measure: 'diameter' | 'volume'; size: number; depthMm: number; timeSec: number }[];
   };
   /** Bar and Tube Fabrication: the stock, the bends (each one's method), ends, forms and openings, the route quoted and every route. */
   barTube?: {
@@ -1240,6 +1268,45 @@ export interface CostSummaryDto {
   };
   /** Bar and tube: the tools the quoted route needs (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when unpriced. */
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
+  /** Roto & Blow Molding: the shell, its features' operations, parts per shot or arm, the route quoted and both routes (backend RotoBlowBreakdown). */
+  rotoBlow?: {
+    route: string; routeLabel: string;
+    envelopeMm: number[]; wallMm: number; insideVolumeMm3: number; partingLineMm: number | null;
+    spouts: { id: string; diameterMm: number }[];
+    partsPerCycle: number | null; coolingTimeS: number | null; materialMassKg: number; partMassKg: number;
+    features: { id: string; featureType: string; operation: string; process: string; reason: string }[];
+    complete: boolean;
+    options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+  };
+  /** Roto & Blow Molding: the molds and trim tooling (USD), kept out of the piece cost. */
+  rotoBlowTooling?: { key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }[];
+  /**
+   * Sheet Metal - Hydroforming: memory's route rule, the draws, the blank and its nest, the press, the tray, the route quoted and both routes
+   * (backend HydroformingBreakdown).
+   */
+  hydroforming?: {
+    route: string; routeLabel: string;
+    rule: { route: string; ratio: number; depthMm: number; widthMm: number; threshold: number; basis: string };
+    draws: number; drawRatiosPct: number[];
+    blank: { method: string; areaMm2: number; addendumMm: number; massKg: number };
+    nest: { method: string; partsPerSheet: number; utilizationPct: number; sheetLengthMm: number; sheetWidthMm: number } | null;
+    press: { name: string; formingCycleTimeS: number } | null;
+    /** Fluid Cell: the parts formed a cycle, the Cost Guide's ask (null: the data's default) and how many fit the tray; null on Deep Draw. */
+    partsPerTray: { value: number; requested: number | null; max: number | null } | null;
+    handAdjustingLengthMm: number; throwPadAreaMm2: number; cappingTools: number;
+    /** Every hole is pierced with the blank (memory's Offline Blank); inFormedWalls of them go through a wall the forming then shapes. */
+    holes: { pierced: number; inFormedWalls: number };
+    intensifier: boolean;
+    complete: boolean;
+    options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+  };
+  /**
+   * Sheet Metal - Hydroforming: the hydroform tool and the offline blanking die (USD), kept out of the piece cost. costUsd is the tools the job
+   * wears out, spread over amortizationParts; toolCostUsd one tool. Both null when not costed (the blanking die is listed, not costed).
+   */
+  hydroformingTooling?: {
+    key: string; description: string; detail: string; costUsd: number | null; toolCostUsd: number | null; perPartUsd: number | null; amortizationParts: number | null;
+  }[];
   composites?: {
     route: string; routeLabel: string;
     /** The laminate at its thickest (core excluded) and the cured ply thickness it is divided by. */
@@ -1634,7 +1701,10 @@ export type CapabilityReasonCode =
   | "CLASS_THICKNESS_LIMIT"
   | "THICKNESS_EXCEEDED"
   | "BED_LENGTH_EXCEEDED"
-  | "BED_WIDTH_EXCEEDED";
+  | "BED_WIDTH_EXCEEDED"
+  | "TONNAGE_EXCEEDED"
+  /** An input the quote needs is missing (the material grade): the route was not priced. */
+  | "INPUT_MISSING";
 
 export interface RouteCapability {
   cuttingCapable: boolean;

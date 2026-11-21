@@ -42,6 +42,13 @@ cad-engine/
   sheet_metal/
     feature_extractor.py         — SheetMetalFeatureExtractor (+ _annotate_tap_candidates)
     bend_relationships.py        — bend-to-bend/flange relationship extraction
+    features/drawn_shell.py      — the one pass over a sheet part's faces (types, areas, offset twins, adjacency) and the drawn
+                                   shell (deep draw / fluid cell): depth, opening width, developed and form areas; a drawn
+                                   part's flat pattern is its developed sheet
+    features/hydroform.py        — what every sheet part is measured for hydroforming ("hydroform", hf_v1): press axis, forming
+                                   depth, plan, projected and developed area, main surface, the drawn form, the blank (unfolded,
+                                   drawn equal-area or flat), straight and curved flanges, holes (pierced in the flat or not,
+                                   edge distance to the main surface)
     nesting.py                   — real-polygon 2D nesting (Nest View)
   injection_molding/
     feature_extractor.py         — InjectionMoldedFeatureExtractor
@@ -50,7 +57,10 @@ cad-engine/
   forging/
     feature_extractor.py         — closed-die forging measurements (reached through family_hint="forged")
   additive/
-    feature_extractor.py         — additive build measurements: build direction of least support, height, footprint, overhang, support volume, plate contact (family_hint="additive")
+    feature_extractor.py         — additive build measurements: build direction of least support, height, footprint, overhang, support volume, plate contact, holes (RingedHole: a grooved bore) (family_hint="additive"; Additive Manufacturing and Rapid Prototyping)
+    voids.py                     — the voids cleaning clears, on a voxel grid: pockets, ring pockets, enclosed cavities, non-round holes, each with its volume and depth
+  roto_blow/
+    feature_extractor.py         — a blow molded or rotomolded shell: wall, the inside (additive/voids.py), spout, parting line, perimeter, envelope, holes and voids (family_hint="roto_blow")
   bar_tube/
     feature_extractor.py         — bar and tube measurements: section swept along a centreline (stock form, bends, developed length, holes, ends, end forms) or cut plate (family_hint="bar_tube")
     centreline.py, section.py    — the centreline (bends joined by straights, section frame) and the cross-section classifier

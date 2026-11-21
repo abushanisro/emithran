@@ -309,14 +309,14 @@ describe('an applied line reports the rate the engine costed it at', () => {
   });
 });
 
-// Migration 1005: what a line charges beyond machine and crew time (energy, a consumable) is stored with it, USD like total_cost_per_part, so the
-// Cost tab can add it back when it recomputes the row from its rates.
+// Migration 1005: what a line charges beyond machine and crew time (energy, a consumable) is stored with it, in the row's currency like
+// total_cost_per_part, so the Cost tab can add it back when it recomputes the row from its rates.
 describe('the line\'s other cost is persisted', () => {
   const code = executable(readFileSync(CONTROLLER, 'utf8'));
   const sql = readFileSync(join(__dirname, '..', '..', '..', '..', 'migrations', '1005_process_cost_other_cost.sql'), 'utf8');
 
-  it('the writer passes the engine\'s USD figure through, NULL when the line charges nothing beyond time', () => {
-    expect(code).toMatch(/other_cost_per_part:\s*line\.otherCostPerPartUsd \?\? null/);
+  it('the writer stores the line\'s own-currency figure (a USD line\'s USD one), NULL when the line charges nothing beyond time or states only USD in another currency', () => {
+    expect(code).toMatch(/other_cost_per_part:\s*line\.otherCostPerPart \?\? \(currencyContext\.lineCurrency === 'USD' \? line\.otherCostPerPartUsd \?\? null : null\)/);
   });
 
   it('the replace function declares and inserts it, keeping the 972 columns', () => {

@@ -10,6 +10,7 @@ import {
   isRouteDataComplete,
   selectRecommendedRoute,
   selectAppliableRoute,
+  routesTakingSecondary,
   lineDataGap,
   preferRealRate,
   type RankableRoute,
@@ -708,9 +709,32 @@ describe('selectAppliableRoute: the route Apply writes when none is recommended'
     expect(selectAppliableRoute([route('b', 1), route('a', 1)])?.routeId).toBe('a');
   });
 
+  it('a route with no lines (one the part does not have, such as robotic welding for laser seams only) ranks after every route with lines', () => {
+    const missing = route('partassembly-robotic', null, { isFeasible: false, dataGaps: [], processLines: [] } as never);
+    const real = route('partassembly-manual', 12, { isFeasible: false, dataGaps: [{}], processLines: [{}] } as never);
+    expect(selectAppliableRoute([missing, real])?.routeId).toBe('partassembly-manual');
+    expect(selectAppliableRoute([real, missing])?.routeId).toBe('partassembly-manual');
+    // A caller that does not list a route's lines is ranked as before.
+    expect(selectAppliableRoute([route('two-gaps', 1, { dataGaps: [{}, {}] }), route('one-gap', 9)])?.routeId).toBe('one-gap');
+  });
+
   it('every route ruled out still gives one (only no routes at all gives none)', () => {
     expect(selectAppliableRoute([route('x', null, { isFeasible: false, capability: { overallCapable: false } })])?.routeId).toBe('x');
     expect(selectAppliableRoute([])).toBeNull();
+  });
+});
+
+describe('routesTakingSecondary: the routes a part\'s secondary operations go on', () => {
+  const route = (lines: number) => ({ processLines: Array.from({ length: lines }, () => ({})) });
+
+  it('every route the part has; a route with no lines of its own stays empty, so it is never applied for a real one', () => {
+    const routes = [route(3), route(0), route(1)];
+    expect(routes.map(routesTakingSecondary(routes))).toEqual([true, false, true]);
+  });
+
+  it('all of them when none has lines of its own: nothing else would carry the part\'s secondary operations', () => {
+    const routes = [route(0), route(0)];
+    expect(routes.map(routesTakingSecondary(routes))).toEqual([true, true]);
   });
 });
 

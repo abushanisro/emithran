@@ -56,7 +56,8 @@ export function buildPowderMetalCostSummary(input: {
     grossWeightKg: r3(grossKg),
     // The price per kg the route charged (the powder, in the location's currency); the material resolution's own price is not in it.
     materialCostPerKg: route ? route.material.costPerKgUsd : input.materialCostPerKg,
-    materialSource: input.materialSource,
+    // Its source with it: a built route priced the powder from its raw_materials row (powder-metal-cost.service.ts getMaterial).
+    materialSource: route ? 'db' : input.materialSource,
     processLines,
     totalProcessCost: r2(totalProcessCost),
     totalCost: r2(materialCost + totalProcessCost),

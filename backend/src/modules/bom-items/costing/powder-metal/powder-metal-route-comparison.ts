@@ -2,14 +2,16 @@
 // path as the quote, so the comparison cannot disagree with it). Apply saves its lines as the item's process records. Pure.
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 import { POWDER_METAL_ROUTE_LABEL } from './powder-metal-route';
 
 export const POWDER_METAL_ROUTE_ID = 'powder-metal';
 
 export function powderMetalRoute(summary: CostSummaryResponseDto): RouteResultDto {
   const pm = summary.powderMetal;
-  const feasible = !!pm?.complete && summary.totalCost != null;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && !!pm?.complete && summary.totalCost != null;
   const gaps = findRouteDataGaps(summary.processLines);
   const why = pm?.complete === false ? 'the powder metal route is incomplete: a step has no capable machine or data' : (!pm && gaps[0]?.reason) || 'the part could not be costed';
   return {
@@ -30,7 +32,7 @@ export function powderMetalRoute(summary: CostSummaryResponseDto): RouteResultDt
     badges: { lowestCost: feasible, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: summary.warnings,
     ratesSource: summary.ratesSource,

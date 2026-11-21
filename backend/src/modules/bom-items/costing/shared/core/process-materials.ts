@@ -2,8 +2,9 @@
 // route is costed). Each memory/<process> catalog holds its own materials with the process data its engine reads: a die-casting alloy's
 // clamping pressure, a forging steel's flow stress, a resin's melt temperatures, a bar's stock price. A grade from another catalog has none
 // of it, so the process prices its closest own material instead and says so; the part's own grade is not changed.
-import { ADDITIVE_PROCESS_GROUP } from '../../additive/additive-route';
+import { ADDITIVE, RAPID_PROTOTYPING } from '../../additive/additive-domain';
 import { BAR_TUBE_PROCESS_GROUP } from '../../bar-tube/bar-tube-route';
+import { ROTO_BLOW_PROCESS_GROUP } from '../../roto-blow/roto-blow-route';
 import { CASTING_MATERIAL_GROUP } from '../../casting/casting-reference.service';
 import { INVESTMENT_PROCESS_GROUP } from '../../casting/investment/investment-reference';
 import { COMPOSITES_PROCESS_GROUP } from '../../composites/composites-route';
@@ -21,10 +22,24 @@ export const PROCESS_OWN_MATERIAL_GROUP: Readonly<Record<string, string>> = {
   forged: FORGING_PROCESS_GROUP,
   powder_metal: POWDER_METAL_PROCESS_GROUP,
   composite: COMPOSITES_PROCESS_GROUP,
-  additive: ADDITIVE_PROCESS_GROUP,
+  additive: ADDITIVE.materialGroup,
   bar_tube: BAR_TUBE_PROCESS_GROUP,
+  roto_blow: ROTO_BLOW_PROCESS_GROUP,
   plastic_molded: 'Plastic & Rubber',
 };
+
+/**
+ * Process groups costed as another group's family that price from materials of their own: a Rapid Prototyping part is priced by the additive
+ * engine, from memory/Rapid prototyping's materials, not Additive Manufacturing's.
+ */
+const PROCESS_GROUP_OWN_MATERIAL_GROUP: Readonly<Record<string, string>> = {
+  [RAPID_PROTOTYPING.processGroup]: RAPID_PROTOTYPING.materialGroup,
+};
+
+/** The raw_materials group a part's engine prices from (its Process's own, else its family's); undefined when it prices any grade. */
+export function ownMaterialGroup(family: string, processGroup: string | null | undefined): string | undefined {
+  return (processGroup ? PROCESS_GROUP_OWN_MATERIAL_GROUP[processGroup] : undefined) ?? PROCESS_OWN_MATERIAL_GROUP[family];
+}
 
 /**
  * Families whose engine resolves the grade with the ranked material search (resolveMaterialForFamily), not by exact name: a grade the
@@ -91,13 +106,15 @@ export function closestProcessMaterial(own: OwnMaterial | null, materials: reado
  */
 export function pricedGradeFor(input: {
   family: string;
+  /** The part's Process when it prices from materials of its own (ownMaterialGroup). */
+  processGroup?: string | null;
   processLabel: string;
   grade: string;
   own: OwnMaterial | null;
   materials: readonly ProcessMaterial[];
 }): PricedGrade {
   const { family, processLabel, grade, own, materials } = input;
-  const group = PROCESS_OWN_MATERIAL_GROUP[family];
+  const group = ownMaterialGroup(family, input.processGroup);
   if (!group || materials.some((m) => isMaterialNamed(m, grade))) return { grade, note: null };
   if (own?.materialGroup === group) {
     // The search placed the grade in the group: an exact-name engine needs the row's own name; a ranked-search engine finds it as given.

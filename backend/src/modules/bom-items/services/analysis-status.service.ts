@@ -25,6 +25,9 @@ export class AnalysisStatusService {
     const statuses = sourcePath ? await this.sandCasting.currentStatuses(item.id, sourcePath, token) : [];
     const group = (item.scenarioOverrides as Record<string, unknown> | null | undefined)?.['processGroup'];
     const chosenFamilyHint = this.autoFill.familyHintForProcessGroup(typeof group === 'string' ? group : undefined) ?? null;
-    return deriveAnalysisStatus({ ...item, chosenFamilyHint }, castingStatusOf(statuses), currentFeatureGraphVersion(), castingWorkerAvailable());
+    return deriveAnalysisStatus(
+      { ...item, chosenFamilyHint, chosenProcessGroup: typeof group === 'string' ? group : null },
+      castingStatusOf(statuses), currentFeatureGraphVersion(), castingWorkerAvailable(),
+    );
   }
 }

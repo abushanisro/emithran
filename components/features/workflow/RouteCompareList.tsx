@@ -53,6 +53,8 @@ export interface RouteCompareListProps {
    *  a caller whose 'cutting'-tagged routes are not Sheet Metal's cutting
    *  methods (e.g. Injection Molding's real molding-process alternatives). */
   cuttingGroupMeta?: { title: string; description: string };
+  /** The same for a caller whose own routes are 'forming'-tagged (a hydroformed part's Deep Draw and Fluid Cell routes). */
+  formingGroupMeta?: { title: string; description: string };
   /** Badge on the first recommended route. Sheet metal's is its CAD-based pick; a family whose recommendation is the cheapest capable route says so. */
   topRecommendedLabel?: string;
   /** Shown above the list when every route is incompatible (the backend's own message). No route is recommended or pre-selected then. */
@@ -76,13 +78,13 @@ function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'viole
 
 export function RouteCompareList({
   nodes, selectedId, onSelect, recommendedIds, sortMode, onSortModeChange, currencySymbol,
-  isLoading = false, errorMessage = null, cuttingGroupMeta, topRecommendedLabel = 'CAD-optimal', noCompatibleMessage = null,
+  isLoading = false, errorMessage = null, cuttingGroupMeta, formingGroupMeta, topRecommendedLabel = 'CAD-optimal', noCompatibleMessage = null,
 }: RouteCompareListProps) {
   const groupId = useId();
   const listRef = useRef<HTMLDivElement>(null);
 
   // Routes that can be used come first in every group; the ones that cannot stay listed below, muted, with the reason.
-  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds), cuttingGroupMeta).map((g) => ({
+  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds), cuttingGroupMeta, formingGroupMeta).map((g) => ({
     ...g,
     nodes: [...g.nodes.filter((n) => n.feasible && !n.incompatible), ...g.nodes.filter((n) => !n.feasible || n.incompatible)],
   }));

@@ -32,15 +32,37 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   additive: 'Additive Manufacturing',
   // A length of bar, tube or profile (cad-engine bar_tube): costed by the bar and tube engine (backend costing/bar-tube).
   bar_tube: 'Bar and Tube Fabrication',
+  // A blow molded or rotomolded hollow shell (cad-engine roto_blow): costed by the Roto & Blow Molding engine (backend costing/roto-blow).
+  roto_blow: 'Roto & Blow Molding',
   // An assembly's own work, costed from its BOM children (backend costing/assembly): a costed group with no CAD extractor.
   assembly: 'Assembly',
+  // A weldment's welding, costed from its BOM children and the Cost Guide's weld table (backend costing/part-assembly): no CAD extractor either.
+  part_assembly: 'Part Assembly',
 };
 
-/** Families the cad-engine has no extractor for: an assembly is costed from its children, it has no model of its own to analyse. */
-const NO_CAD_EXTRACTOR: ReadonlySet<string> = new Set(['assembly'])
+/** Families the cad-engine has no extractor for: an assembly and a weldment are costed from their BOM children and the Cost Guide. */
+const NO_CAD_EXTRACTOR: ReadonlySet<string> = new Set(['assembly', 'part_assembly'])
 
 export function familyToProcessGroupLabel(family: string | null | undefined): string | null {
   return (family && FAMILY_HINT_TO_PROCESS_GROUP[family]) || null;
+}
+
+/**
+ * Processes whose routes are complete alternatives inside a CAD family that has a builder of its own: a hydroformed part is analysed as sheet
+ * metal, but its routes (Hydroform Deep Draw, Hydroform Fluid Cell, each an offline blank then the press) are not cut-then-form routes.
+ */
+const ROUTES_AS_FAMILY: Readonly<Record<string, string>> = {
+  'Sheet Metal - Hydroforming': 'hydroforming',
+};
+
+/**
+ * The family a part's routes are listed for (the Workflow Builder): its Process's when that process lists complete routes inside its CAD
+ * family (a hydroformed part); the one it is costed as when that family has no CAD extractor (an assembly, a weldment: costed from the BOM and
+ * the Cost Guide, so its CAD family is none, or one from an analysis as another process); else its CAD family.
+ */
+export function routingFamilyOf(cadFamily: string | null | undefined, costedFamily: string | null | undefined, processGroup?: unknown): string | null {
+  if (typeof processGroup === 'string' && processGroup in ROUTES_AS_FAMILY) return ROUTES_AS_FAMILY[processGroup] ?? null;
+  return costedFamily && NO_CAD_EXTRACTOR.has(costedFamily) ? costedFamily : cadFamily ?? null;
 }
 
 /**
@@ -68,6 +90,8 @@ const COSTED_AS_FAMILY: Readonly<Record<string, string>> = {
   'Assembly Plastic Molding': 'plastic_molded',
   // Multi-spindle machining: a turned part made from bar on a CNC multi-spindle or twin-spindle turning center (backend multi-spindle).
   'Multi-Spindle Machining': 'turned',
+  // Rapid prototyping: analysed for its build as an additive part, priced in its own domain (backend additive/additive-domain.ts).
+  'Rapid Prototyping': 'additive',
 };
 
 /**

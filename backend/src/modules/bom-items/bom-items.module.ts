@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { BOMItemsController } from './bom-items.controller';
 import { BOMItemsService } from './bom-items.service';
 import { BomItemCostingService } from './bom-item-costing.service';
+import { HydroformingCostService } from './costing/hydroforming/hydroforming-cost.service';
 import { NestingCostService } from './services/nesting-cost.service';
 import { GdtAnalysisService } from './services/gdt-analysis.service';
 import { CostOverridesService } from './services/cost-overrides.service';
@@ -33,7 +34,6 @@ import { BomItemReanalysisService } from './services/bom-item-reanalysis.service
 import { PlasticPullDirectionService } from './services/plastic-pull-direction.service';
 import { PlasticCatalogOperationsService } from './costing/plastic-molding/operation/plastic-catalog-operations.service';
 import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
-import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
@@ -66,7 +66,9 @@ import { PowderMetalCostService } from './costing/powder-metal/powder-metal-cost
 import { CompositesCostService } from './costing/composites/composites-cost.service';
 import { AdditiveCostService } from './costing/additive/additive-cost.service';
 import { BarTubeCostService } from './costing/bar-tube/bar-tube-cost.service';
+import { RotoBlowCostService } from './costing/roto-blow/roto-blow-cost.service';
 import { AssemblyCostService } from './costing/assembly/assembly-cost.service';
+import { PartAssemblyCostService } from './costing/part-assembly/part-assembly-cost.service';
 import { InsertMoldingService } from './costing/plastic-molding/insert/insert-molding.service';
 import { MultiShotService } from './costing/plastic-molding/multi-shot/multi-shot.service';
 import { MultiSpindleCostService } from './costing/multi-spindle/multi-spindle-cost.service';
@@ -82,7 +84,7 @@ import { SandSnapshotReviewController, SandSnapshotsController } from './sand-sn
 @Module({
   imports: [DatabaseModule, LoggerModule, ConfigModule, ManufacturingKnowledgeModule, ManufacturingRulesModule, ExchangeRateModule, MHRModule, SandCastingModule, RawMaterialsModule, ToolingCostsModule],
   controllers: [BOMItemsController, BomItemPullDirectionController, SandVariableOverridesController, CalculatorFieldOverridesController, SandSnapshotsController, SandSnapshotReviewController],
-  providers: [BOMItemsService, BomItemCostingService, NestingCostService, GdtAnalysisService, CostOverridesService, MachineRateService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService, PlasticDfmService, MachiningDfmService, ForgingDfmService, PowderMetalCostService, CompositesCostService, AdditiveCostService, BarTubeCostService, AssemblyCostService, InsertMoldingService, MultiShotService, MultiSpindleCostService, PartSummaryService, DesignGuidanceService, PlasticRouteComparisonService, CastingReferenceService, SandReferenceService, SandMachineService, SandCostService, InvestmentReferenceService, InvestmentCostService, ForgingCostService, SandCatalogOperationsService, MachiningAllowanceService, SandVariableOverridesService, CalculatorFieldOverridesService, SandSnapshotsService, FeatureToleranceService, PmiReviewService, ToleranceReferenceService, SheetMetalCatalogOperationsService, PlasticCatalogOperationsService, PlasticPullDirectionService, BomItemReanalysisService, AnalysisRunService, RouteApplicationService, MaterialCostSnapshotService, ToolingCostSnapshotService, ScenarioApplicationService, CostTableService, HydroformingReferenceService, AnalysisStatusService],
+  providers: [BOMItemsService, BomItemCostingService, NestingCostService, GdtAnalysisService, CostOverridesService, MachineRateService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService, PlasticDfmService, MachiningDfmService, ForgingDfmService, PowderMetalCostService, CompositesCostService, AdditiveCostService, BarTubeCostService, RotoBlowCostService, AssemblyCostService, PartAssemblyCostService, InsertMoldingService, MultiShotService, MultiSpindleCostService, PartSummaryService, DesignGuidanceService, PlasticRouteComparisonService, CastingReferenceService, SandReferenceService, SandMachineService, SandCostService, InvestmentReferenceService, InvestmentCostService, ForgingCostService, SandCatalogOperationsService, MachiningAllowanceService, SandVariableOverridesService, CalculatorFieldOverridesService, SandSnapshotsService, FeatureToleranceService, PmiReviewService, ToleranceReferenceService, SheetMetalCatalogOperationsService, PlasticCatalogOperationsService, PlasticPullDirectionService, BomItemReanalysisService, AnalysisRunService, RouteApplicationService, MaterialCostSnapshotService, ToolingCostSnapshotService, ScenarioApplicationService, CostTableService, HydroformingCostService, AnalysisStatusService],
   exports: [BOMItemsService, BomItemCostingService, NestingCostService, CostOverridesService, AnalysisStatusService, FileStorageService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalLookupService, MachiningLookupService],
 })
 export class BOMItemsModule {}

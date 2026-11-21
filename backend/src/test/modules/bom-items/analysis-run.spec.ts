@@ -40,12 +40,18 @@ describe('the family hint a chosen Process sends the cad-engine', () => {
 
   it('is the first family the Process is costed as; none for a Process with no cost model', () => {
     expect(hint('Forging')).toBe('forged');
-    expect(hint('Part Assembly')).toBeUndefined();
+    // Rapid Prototyping is analysed for its build as an additive part, and priced in its own domain.
+    expect(hint('Rapid Prototyping')).toBe('additive');
+    // A blow or roto molded part is measured as a hollow shell.
+    expect(hint('Roto & Blow Molding')).toBe('roto_blow');
+    expect(hint('Sheet Plastic')).toBeUndefined();
   });
 
-  it('is none for Assembly: an assembly is costed from its children, and the cad-engine has no extractor to force for it', () => {
+  it('is none for Assembly and Part Assembly: each is costed from its BOM and the Cost Guide, and the cad-engine has no extractor to force for it', () => {
     expect(familiesOfProcessGroup('Assembly')).toEqual(['assembly']);
     expect(hint('Assembly')).toBeUndefined();
+    expect(familiesOfProcessGroup('Part Assembly')).toEqual(['part_assembly']);
+    expect(hint('Part Assembly')).toBeUndefined();
   });
 });
 

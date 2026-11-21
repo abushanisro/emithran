@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { isCostedProcessGroup, processGroupOptionLabel, processGroupToFamilyHint } from '@/lib/features/process-group';
+import { isCostedProcessGroup, processGroupOptionLabel, processGroupToFamilyHint, routingFamilyOf } from '@/lib/features/process-group';
 
 // A Process with no cost model is not costed (the backend's familiesOfProcessGroup), so the Process fields mark it instead of offering it blind:
 // a part whose Process had none was priced as whatever it was last analysed as.
 describe('process groups with a cost model', () => {
-  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal', 'Additive Manufacturing', 'Bar and Tube Fabrication', 'Assembly', 'Assembly Molding'])('%s is costed', (group) => {
+  it.each(['Sheet Metal', 'Machining', 'Plastic Molding', 'Die Casting', 'Sand Casting', 'Casting Investment', 'Sheet Metal - Hydroforming', 'Casting', 'Forging', 'Powder Metal', 'Additive Manufacturing', 'Bar and Tube Fabrication', 'Assembly', 'Assembly Molding', 'Part Assembly', 'Rapid Prototyping', 'Roto & Blow Molding'])('%s is costed', (group) => {
     expect(isCostedProcessGroup(group)).toBe(true);
     expect(processGroupOptionLabel(group)).toBe(group);
   });
 
-  it.each(['Rapid Prototyping', 'Part Assembly'])('%s is not, and its option says so', (group) => {
+  it.each(['Sheet Plastic', 'Stock Machining'])('%s is not, and its option says so', (group) => {
     expect(isCostedProcessGroup(group)).toBe(false);
     expect(processGroupOptionLabel(group)).toBe(`${group} (not costed yet)`);
   });
@@ -29,10 +29,31 @@ describe('process groups with a cost model', () => {
     expect(processGroupToFamilyHint('Composites')).toBe('composite');
     expect(processGroupToFamilyHint('Additive Manufacturing')).toBe('additive');
     expect(processGroupToFamilyHint('Bar and Tube Fabrication')).toBe('bar_tube');
-    expect(processGroupToFamilyHint('Rapid Prototyping')).toBeUndefined();
-    // An assembly is costed from its children: there is no CAD extractor to force for it.
+    // Rapid Prototyping is analysed for its build as an additive part.
+    expect(processGroupToFamilyHint('Rapid Prototyping')).toBe('additive');
+    // A blow or roto molded part is measured as a hollow shell.
+    expect(processGroupToFamilyHint('Roto & Blow Molding')).toBe('roto_blow');
+    expect(processGroupToFamilyHint('Sheet Plastic')).toBeUndefined();
+    // An assembly and a weldment are costed from their children and the Cost Guide: there is no CAD extractor to force for them.
     expect(processGroupToFamilyHint('Assembly')).toBeUndefined();
+    expect(processGroupToFamilyHint('Part Assembly')).toBeUndefined();
     // Insert molding is analysed as the molded plastic part it is.
     expect(processGroupToFamilyHint('Assembly Molding')).toBe('plastic_molded');
+  });
+
+  it('the Workflow Builder lists an assembly\'s or a weldment\'s routes by the family it is costed as, any other part\'s by its CAD family', () => {
+    // A part analysed as milled whose Process is now Part Assembly; an assembly with no model at all.
+    expect(routingFamilyOf('milled', 'part_assembly')).toBe('part_assembly');
+    expect(routingFamilyOf(null, 'assembly')).toBe('assembly');
+    // Every other part keeps its CAD family, as before (and none while its cost is loading).
+    expect(routingFamilyOf('die_cast', 'sand_cast')).toBe('die_cast');
+    expect(routingFamilyOf('milled', undefined)).toBe('milled');
+    expect(routingFamilyOf(undefined, undefined)).toBeNull();
+  });
+
+  it('a hydroformed part (analysed as sheet metal) lists its Process\'s complete routes, not the sheet-metal cut-then-form builder', () => {
+    expect(routingFamilyOf('sheet_metal', 'sheet_metal', 'Sheet Metal - Hydroforming')).toBe('hydroforming');
+    expect(routingFamilyOf('sheet_metal', 'sheet_metal', 'Sheet Metal')).toBe('sheet_metal');
+    expect(routingFamilyOf('sheet_metal', 'sheet_metal', null)).toBe('sheet_metal');
   });
 });

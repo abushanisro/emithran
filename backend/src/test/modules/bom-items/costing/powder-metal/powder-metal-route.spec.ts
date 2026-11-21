@@ -1,6 +1,9 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { buildPowderMetalRoute, POWDER_METAL_CLASS, type PowderMetalPart, type PowderMetalRouteInput } from '../../../../../modules/bom-items/costing/powder-metal/powder-metal-route';
+import { buildPowderMetalCostSummary } from '../../../../../modules/bom-items/costing/powder-metal/powder-metal-cost-summary';
+import {
+  buildPowderMetalRoute, POWDER_METAL_CLASS, type PowderMetalPart, type PowderMetalRoute, type PowderMetalRouteInput,
+} from '../../../../../modules/bom-items/costing/powder-metal/powder-metal-route';
 import { loadPowderMetalCalculatorSpec, powderMetalCalculatorsByName } from '../../../../../modules/bom-items/costing/powder-metal/calculators/powder-metal-calculator-spec';
 import { buildPowderMetalCalculatorsMigrationSql } from '../../../../../modules/bom-items/costing/powder-metal/calculators/powder-metal-calculators-migration';
 import { findRouteDataGaps } from '../../../../../modules/bom-items/costing/shared/core/engine-kernel';
@@ -105,8 +108,19 @@ describe('powder metal: the route', () => {
     expect(route.totalUsd).toBeCloseTo(route.material.costUsd + route.lines.reduce((s, l) => s + l.totalCost, 0), 2);
   });
 
-  it('says what it does not cost: the compaction tooling', () => {
+  it('says what it does not cost or check: the compaction tooling, and whether the part can be pressed', () => {
     expect(route.warnings.join(' ')).toMatch(/compaction tooling \(die, punches, core rods\) is not costed/);
+    expect(route.warnings.join(' ')).toMatch(/Whether the part can be pressed .* is not checked/);
+  });
+
+  it('its Cost Summary gives the powder\'s price with its source: the raw_materials row the route priced it from', () => {
+    const summary = (built: PowderMetalRoute | null) => buildPowderMetalCostSummary({
+      powderMetal: { route: built, missing: built ? [] : ['HR Rates has no powder metal machines for India'], warnings: [] },
+      // The material resolution's own result, as when it found no row for the grade.
+      materialGrade: 'F-0005', materialCostPerKg: 0, materialSource: 'default', batchSize: 1000, warnings: [], ratesSource: 'test',
+    });
+    expect(summary(route)).toMatchObject({ materialSource: 'db', materialCostPerKg: route.material.costPerKgUsd });
+    expect(summary(null)).toMatchObject({ materialSource: 'default', materialCost: 0 });
   });
 
   it('names a powder with no green density or compaction curve', () => {

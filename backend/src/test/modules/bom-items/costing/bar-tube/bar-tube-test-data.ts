@@ -4,7 +4,8 @@ import { readdirSync } from 'fs';
 import { join } from 'path';
 import { resolveSandReference } from '../../../../../modules/bom-items/costing/casting/sand/sand-reference';
 import { sandMachineFromRow, type SandMachine } from '../../../../../modules/bom-items/costing/casting/sand/sand-machines';
-import { STOCK_PRICE_FORM, barTubeClass, cutCodeFamilyOf, type BarTubeMaterial } from '../../../../../modules/bom-items/costing/bar-tube/bar-tube-route';
+import { STOCK_PRICE_FORM, barTubeClass, type BarTubeMaterial } from '../../../../../modules/bom-items/costing/bar-tube/bar-tube-route';
+import { cutCodeFamilyOf } from '../../../../../modules/bom-items/costing/shared/core/cut-code';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { readCsv, specKey } = require('../../../../../../migrations/scripts/lib/memory-machine-seed.js');
