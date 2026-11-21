@@ -1,39 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-
-import { PageSkeleton } from '@/components/ui/loading-skeleton';
-import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Shield,
   Search,
@@ -50,8 +16,46 @@ import {
   ThumbsUp,
   ThumbsDown,
   Loader2,
+  Undo2,
 } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { Fragment, useState, useEffect } from 'react';
+
 import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
+import { PageHeader } from '@/components/layout/PageHeader';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
+import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function QualityControlPage() {
   const params = useParams();
@@ -151,291 +155,286 @@ export default function QualityControlPage() {
   };
 
   const getStatusIcon = (status: string, result?: string) => {
-    if (result === 'pass') return <CheckCircle className="h-4 w-4 text-green-600" />;
-    if (result === 'fail') return <XCircle className="h-4 w-4 text-red-600" />;
-    if (result === 'conditional') return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    if (result === 'pass') return <CheckCircle className="h-3.5 w-3.5" />;
+    if (result === 'fail') return <XCircle className="h-3.5 w-3.5" />;
+    if (result === 'conditional') return <AlertTriangle className="h-3.5 w-3.5" />;
 
     switch (status) {
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'approved': return <ThumbsUp className="h-4 w-4 text-green-600" />;
-      case 'rejected': return <ThumbsDown className="h-4 w-4 text-red-600" />;
-      case 'in_progress': return <Clock className="h-4 w-4 text-primary" />;
-      case 'planned': return <Calendar className="h-4 w-4 text-muted-foreground" />;
-      default: return <Clock className="h-4 w-4 text-muted-foreground" />;
+      case 'completed': return <CheckCircle className="h-3.5 w-3.5" />;
+      case 'approved': return <ThumbsUp className="h-3.5 w-3.5" />;
+      case 'rejected': return <ThumbsDown className="h-3.5 w-3.5" />;
+      case 'in_progress': return <Clock className="h-3.5 w-3.5" />;
+      case 'planned': return <Calendar className="h-3.5 w-3.5" />;
+      default: return <Clock className="h-3.5 w-3.5" />;
     }
   };
 
   const getStatusBadge = (status: string, result?: string) => {
-    if (result === 'pass') return 'bg-green-100 text-green-800 border-green-200';
-    if (result === 'fail') return 'bg-red-100 text-red-800 border-red-200';
-    if (result === 'conditional') return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (result === 'pass') return 'bg-success/10 text-success border-success/30';
+    if (result === 'fail') return 'bg-destructive/10 text-destructive border-destructive/30';
+    if (result === 'conditional') return 'bg-warning/10 text-warning border-warning/30';
 
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
-      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
-      case 'in_progress': return 'bg-primary/10 text-primary border-primary/40';
-      case 'planned': return 'bg-muted text-foreground border-border';
-      default: return 'bg-muted text-foreground border-border';
+      case 'completed': return 'bg-success/10 text-success border-success/30';
+      case 'approved': return 'bg-success/10 text-success border-success/30';
+      case 'rejected': return 'bg-destructive/10 text-destructive border-destructive/30';
+      case 'in_progress': return 'bg-primary/10 text-primary border-primary/30';
+      case 'planned': return 'bg-muted text-muted-foreground border-border';
+      default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
   if (loadingInspections) {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div>
         <PageSkeleton label="Loading quality inspections..." />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="animate-fade-in space-y-6">
       {/* Header */}
-      <div className="bg-card text-card-foreground border-b border-border shadow-xs">
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  onClick={() => router.push(`/projects/${projectId}`)}
-                  className="flex items-center gap-2"
-                  size="sm"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span className="hidden xs:inline">Back to Project</span>
-                  <span className="xs:hidden">Back</span>
-                </Button>
-                <h1 className="text-xl sm:text-2xl font-semibold text-foreground flex items-center gap-2">
-                  <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  <span className="hidden sm:inline">Quality Control</span>
-                  <span className="sm:hidden">QC</span>
-                </h1>
-              </div>
-              <p className="text-xs sm:text-sm text-muted-foreground sm:ml-24">
-                Manage quality inspections and reports for this project
-              </p>
-            </div>
-            <div className="flex items-center gap-3 justify-end">
-              <Badge variant="outline" className="text-xs sm:text-sm">
-                {filteredInspections.length} Inspections
-              </Badge>
-              <CreateQCInspectionDialog
-                projectId={projectId}
-                onInspectionCreated={handleInspectionCreated}
-              />
-            </div>
-          </div>
+      <div className="flex items-start gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          className="mt-0.5 h-8 w-8 shrink-0"
+          aria-label="Back to project"
+          onClick={() => router.push(`/projects/${projectId}`)}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title="Quality Control"
+            description="Manage quality inspections and reports for this project"
+          >
+            <Badge variant="outline" className="text-xs">
+              {filteredInspections.length} Inspections
+            </Badge>
+            <CreateQCInspectionDialog
+              projectId={projectId}
+              onInspectionCreated={handleInspectionCreated}
+            />
+          </PageHeader>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-        {/* Search and Filters */}
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search inspections..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 text-sm"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Search */}
+      <div className="relative w-full sm:max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <Input
+          aria-label="Search inspections"
+          placeholder="Search inspections..."
+          value={searchTerm}
+          onChange={(e) => { setSearchTerm(e.target.value); }}
+          className="h-9 pl-9 text-sm"
+        />
+      </div>
 
-        {/* Inspections List */}
-        {filteredInspections.length === 0 ? (
-          <Card>
-            <CardContent className="p-6 sm:p-12 text-center">
-              <Shield className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
-                {qualityInspections.length === 0 ? 'No Quality Inspections' : 'No Matching Inspections'}
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                {qualityInspections.length === 0
-                  ? 'Get started by creating your first quality control inspection.'
-                  : 'Try adjusting your search criteria to find inspections.'
-                }
-              </p>
+      {/* Inspections */}
+      {filteredInspections.length === 0 ? (
+        <Card>
+          <CardContent>
+            <EmptyState
+              icon={Shield}
+              title={qualityInspections.length === 0 ? 'No Quality Inspections' : 'No Matching Inspections'}
+              description={qualityInspections.length === 0
+                ? 'Get started by creating your first quality control inspection.'
+                : 'Try adjusting your search criteria to find inspections.'}
+            >
               {qualityInspections.length === 0 && (
                 <CreateQCInspectionDialog
                   projectId={projectId}
                   onInspectionCreated={handleInspectionCreated}
                 />
               )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {filteredInspections.map((inspection: any) => (
-              <Card key={inspection.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-2 flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                        <CardTitle className="text-base sm:text-lg truncate pr-2">{inspection.name}</CardTitle>
-                        <Badge className={`text-xs border w-fit ${getStatusBadge(inspection.status, inspection.overall_result)}`}>
-                          <div className="flex items-center gap-1">
-                            {getStatusIcon(inspection.status, inspection.overall_result)}
-                            <span className="hidden xs:inline">{inspection.overall_result?.toUpperCase() || inspection.status?.toUpperCase() || 'PLANNED'}</span>
-                            <span className="xs:hidden">{(inspection.overall_result?.toUpperCase() || inspection.status?.toUpperCase() || 'PLANNED').substr(0, 4)}</span>
-                          </div>
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                          <span className="truncate">{inspection.type || 'First Article'}</span>
-                        </div>
-                        {inspection.inspector && (
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                            <span className="truncate">{inspection.inspector}</span>
-                          </div>
-                        )}
-                        {inspection.plannedDate && (
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                            <span className="truncate">{new Date(inspection.plannedDate).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1">
-                          <Shield className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                          <span>{inspection.selectedItems?.length || 0} items</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                      <Button
-                        variant="outline"
-                        size="sm"
+            </EmptyState>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-4">Inspection</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Inspector</TableHead>
+                <TableHead>Planned</TableHead>
+                <TableHead className="text-right">Items</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Dates</TableHead>
+                <TableHead className="pr-4 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredInspections.map((inspection: any) => (
+                <Fragment key={inspection.id}>
+                  <TableRow className="align-top">
+                    <TableCell className="max-w-xs pl-4">
+                      <button
+                        type="button"
                         onClick={() => openReportDialog(inspection)}
-                        className="flex items-center gap-1 text-xs sm:text-sm"
+                        className="block max-w-full truncate text-left font-medium text-foreground hover:text-primary hover:underline"
                       >
-                        <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden xs:inline">Open Report</span>
-                        <span className="xs:hidden">Report</span>
-                      </Button>
-                      
-                      {/* Undo button - only for approved/rejected */}
-                      {(inspection.status === 'approved' || inspection.status === 'rejected') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setResetTarget(inspection)}
-                          className="flex items-center gap-1 text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700 text-xs sm:text-sm"
-                          disabled={resetInspection.isPending && resetTarget?.id === inspection.id}
-                        >
-                          {resetInspection.isPending && resetTarget?.id === inspection.id
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : <span className="text-sm">↩</span>
-                          }
-                          <span className="hidden sm:inline">Undo</span>
-                        </Button>
+                        {inspection.name}
+                      </button>
+                      {inspection.description && (
+                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{inspection.description}</p>
                       )}
-
-                      {/* Approve/Reject buttons - show for any inspection not already approved/rejected */}
-                      {inspection.status !== 'approved' && inspection.status !== 'rejected' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleApproveInspection(inspection)}
-                            className="flex items-center gap-1 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 text-xs sm:text-sm"
-                            disabled={approveInspection.isPending && approveTarget?.id === inspection.id}
-                          >
-                            {approveInspection.isPending && approveTarget?.id === inspection.id
-                              ? <Loader2 className="h-3 w-3 animate-spin" />
-                              : <ThumbsUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                            }
-                            <span className="hidden sm:inline">Approve</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRejectInspection(inspection)}
-                            className="flex items-center gap-1 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 text-xs sm:text-sm"
-                            disabled={rejectInspection.isPending && rejectTarget?.id === inspection.id}
-                          >
-                            {rejectInspection.isPending && rejectTarget?.id === inspection.id
-                              ? <Loader2 className="h-3 w-3 animate-spin" />
-                              : <ThumbsDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                            }
-                            <span className="hidden sm:inline">Decline</span>
-                          </Button>
-                        </>
+                      {inspection.bomName && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground/80">BOM:</span> {inspection.bomName}
+                        </p>
                       )}
-                      
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-8 w-8 sm:h-9 sm:w-9 p-0">
-                            <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600"
-                            onClick={() => handleDeleteInspection(inspection)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Inspection
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {inspection.description && (
-                      <p className="text-sm text-muted-foreground">{inspection.description}</p>
-                    )}
-
-                    {/* BOM Info */}
-                    {inspection.bomName && (
-                      <div className="text-sm">
-                        <span className="font-medium">BOM:</span> {inspection.bomName}
-                      </div>
-                    )}
-
-                    {/* Quality Standards */}
-                    {inspection.qualityStandards && inspection.qualityStandards.length > 0 && (
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span className="text-sm font-medium shrink-0">Standards:</span>
-                        <div className="flex gap-1 flex-wrap">
+                      {inspection.qualityStandards && inspection.qualityStandards.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                          <span className="text-xs font-medium text-foreground/80">Standards:</span>
                           {inspection.qualityStandards.map((standard: string, index: number) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
+                            <Badge key={index} variant="secondary" className="text-[11px]">
                               {standard}
                             </Badge>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      )}
+                      {inspection.checklist && inspection.checklist.length > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {inspection.checklist.length} checklist item{inspection.checklist.length !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <span className="inline-flex items-center gap-1.5">
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {inspection.type || 'First Article'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {inspection.inspector ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          {inspection.inspector}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm tabular-nums">
+                      {inspection.plannedDate ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          {new Date(inspection.plannedDate).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {inspection.selectedItems?.length || 0}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`gap-1 border text-xs font-medium hover:bg-transparent ${getStatusBadge(inspection.status, inspection.overall_result)}`}>
+                        {getStatusIcon(inspection.status, inspection.overall_result)}
+                        {inspection.overall_result?.toUpperCase() || inspection.status?.toUpperCase() || 'PLANNED'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground tabular-nums">
+                      <div>Created: {new Date(inspection.createdAt).toLocaleDateString()}</div>
+                      {inspection.completedAt && (
+                        <div>Completed: {new Date(inspection.completedAt).toLocaleDateString()}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="pr-4">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openReportDialog(inspection)}
+                          className="gap-1 text-xs"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          Open Report
+                        </Button>
 
-                    {/* Checklist Summary */}
-                    {inspection.checklist && inspection.checklist.length > 0 && (
-                      <div className="text-sm text-muted-foreground">
-                        {inspection.checklist.length} checklist item{inspection.checklist.length !== 1 ? 's' : ''}
-                      </div>
-                    )}
+                        {/* Approve/Reject: any inspection not already approved/rejected */}
+                        {inspection.status !== 'approved' && inspection.status !== 'rejected' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleApproveInspection(inspection)}
+                              className="gap-1 border-success/40 text-xs text-success hover:bg-success/10 hover:text-success"
+                              disabled={approveInspection.isPending && approveTarget?.id === inspection.id}
+                            >
+                              {approveInspection.isPending && approveTarget?.id === inspection.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <ThumbsUp className="h-3.5 w-3.5" />
+                              }
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRejectInspection(inspection)}
+                              className="gap-1 border-destructive/40 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              disabled={rejectInspection.isPending && rejectTarget?.id === inspection.id}
+                            >
+                              {rejectInspection.isPending && rejectTarget?.id === inspection.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <ThumbsDown className="h-3.5 w-3.5" />
+                              }
+                              Decline
+                            </Button>
+                          </>
+                        )}
 
-                    {/* Rejection Reason */}
-                    {inspection.status === 'rejected' && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`More actions for ${String(inspection.name)}`}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {/* Undo: only for approved/rejected */}
+                            {(inspection.status === 'approved' || inspection.status === 'rejected') && (
+                              <DropdownMenuItem
+                                onClick={() => setResetTarget(inspection)}
+                                disabled={resetInspection.isPending && resetTarget?.id === inspection.id}
+                              >
+                                {resetInspection.isPending && resetTarget?.id === inspection.id
+                                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  : <Undo2 className="mr-2 h-4 w-4" />
+                                }
+                                Undo {inspection.status === 'approved' ? 'approval' : 'decline'}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDeleteInspection(inspection)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Inspection
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Decision details */}
+                  {inspection.status === 'rejected' && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={8} className="bg-destructive/5 px-4 py-2.5">
                         <div className="flex items-start gap-2">
-                          <ThumbsDown className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                          <ThumbsDown className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-red-800 mb-1">Declined</p>
+                            <p className="text-sm font-medium text-destructive">Declined</p>
                             {(inspection.rejectionReason || inspection.rejection_reason) && (
-                              <p className="text-sm text-red-700">{inspection.rejectionReason || inspection.rejection_reason}</p>
+                              <p className="text-sm text-foreground/80">{inspection.rejectionReason || inspection.rejection_reason}</p>
                             )}
                             {(inspection.rejectedBy || inspection.rejected_by) && (
-                              <p className="text-xs text-red-600 mt-1">
+                              <p className="mt-0.5 text-xs text-muted-foreground">
                                 By: {inspection.rejectedBy || inspection.rejected_by}
                                 {(inspection.rejectedAt || inspection.rejected_at) && (
                                   <span className="ml-1">on {new Date(inspection.rejectedAt || inspection.rejected_at).toLocaleString()}</span>
@@ -444,18 +443,18 @@ export default function QualityControlPage() {
                             )}
                           </div>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Approval Info */}
-                    {inspection.status === 'approved' && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {inspection.status === 'approved' && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={8} className="bg-success/5 px-4 py-2.5">
                         <div className="flex items-start gap-2">
-                          <ThumbsUp className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                          <ThumbsUp className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-green-800 mb-1">Approved</p>
+                            <p className="text-sm font-medium text-success">Approved</p>
                             {(inspection.approvedBy || inspection.approved_by) && (
-                              <p className="text-xs text-green-600">
+                              <p className="text-xs text-muted-foreground">
                                 By: {inspection.approvedBy || inspection.approved_by}
                                 {(inspection.approvedAt || inspection.approved_at) && (
                                   <span className="ml-1">on {new Date(inspection.approvedAt || inspection.approved_at).toLocaleString()}</span>
@@ -464,30 +463,22 @@ export default function QualityControlPage() {
                             )}
                           </div>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Timestamps */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-muted-foreground pt-2 border-t">
-                      <span>Created: {new Date(inspection.createdAt).toLocaleDateString()}</span>
-                      {inspection.completedAt && (
-                        <span>Completed: {new Date(inspection.completedAt).toLocaleDateString()}</span>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
       {/* Approve confirmation dialog */}
       <AlertDialog open={!!approveTarget} onOpenChange={(open) => !open && setApproveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <ThumbsUp className="h-5 w-5 text-green-600" />
+              <ThumbsUp className="h-5 w-5 text-success" />
               Approve Inspection
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -500,7 +491,7 @@ export default function QualityControlPage() {
             <AlertDialogAction
               onClick={confirmApprove}
               disabled={approveInspection.isPending}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-success text-success-foreground hover:bg-success/90"
             >
               {approveInspection.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" />Approving...</>
@@ -515,7 +506,7 @@ export default function QualityControlPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ThumbsDown className="h-5 w-5 text-red-600" />
+              <ThumbsDown className="h-5 w-5 text-destructive" />
               Decline Inspection
             </DialogTitle>
             <DialogDescription>
@@ -553,14 +544,14 @@ export default function QualityControlPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <span className="text-lg">↩</span>
+              <Undo2 className="h-5 w-5 text-warning" />
               Undo {resetTarget?.status === 'approved' ? 'Approval' : 'Decline'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               This will reset <span className="font-semibold text-foreground">"{resetTarget?.name}"</span> back to{' '}
               <span className="font-semibold">Completed</span> status.
               {resetTarget?.status === 'approved' && (
-                <span className="block mt-1 text-orange-700">
+                <span className="block mt-1 text-warning">
                   The quality-approved items created for delivery will also be removed.
                 </span>
               )}
@@ -571,7 +562,7 @@ export default function QualityControlPage() {
             <AlertDialogAction
               onClick={confirmReset}
               disabled={resetInspection.isPending}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
+              className="bg-warning text-white hover:bg-warning/90"
             >
               {resetInspection.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" />Resetting...</>
@@ -586,7 +577,7 @@ export default function QualityControlPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-red-600" />
+              <Trash2 className="h-5 w-5 text-destructive" />
               Delete Inspection
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -599,7 +590,7 @@ export default function QualityControlPage() {
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={deleteInspection.isPending}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-destructive text-white hover:bg-destructive/90"
             >
               {deleteInspection.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" />Deleting...</>
