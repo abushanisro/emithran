@@ -1,3 +1,5 @@
+import type { NestOutlineSource } from '../costing/sheet-metal/machine/nest-blank-source';
+
 // True (real polygon) 2D nesting placement -- visualization only. NOT a
 // material-cost source; sheet-metal-nesting.engine.ts's rectangle-grid
 // computeNesting() remains the sole source of truth for material cost,
@@ -15,7 +17,12 @@ export interface TrueNestResultDto {
   // separate fetch), transformed per placement below.
   outlinePointsMm: number[][];
   holesMm: Array<{ cxMm: number; cyMm: number; diameterMm: number }>;
-  outlineSource: 'wire_walk' | 'unavailable';
+  // What was nested (nest-blank-source.ts): the true outline, a hydroformed part's blank, or, with no outline measured, the flat pattern's
+  // rectangle or the part's footprint (an estimate), so the view always has a nest. outlineNote says why when it is not the true outline.
+  outlineSource: NestOutlineSource;
+  outlineNote: string | null;
+  // cad_engine: the cad-engine's true-shape placement. rectangle_grid: it could not nest the outline, so it sits on a grid of its rectangle.
+  placementSource: 'cad_engine' | 'rectangle_grid';
 
   sheetWidthMm: number;
   sheetLengthMm: number;
