@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { flushSync } from 'react-dom';
 
 const BOMItemThumbnail = dynamic(
   () => import('./BOMItemThumbnail').then((m) => m.BOMItemThumbnail),
@@ -30,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { dropIntent, type DropIntent } from '@/lib/bom/drop-intent';
 import { filterTree, highlightParts, matchesQuery, visibleTreeRows } from '@/lib/bom/tree-rows';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -170,7 +172,6 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   const [expandedItems, setExpandedItems]       = useState<Set<string>>(new Set());
   const [draggedItem, setDraggedItem]           = useState<BOMItem | null>(null);
   const [dragOverItem, setDragOverItem]         = useState<string | null>(null);
-  const [isDragging, setIsDragging]             = useState(false);
   const [isUpdating, setIsUpdating]             = useState(false);
   const [detailItem, setDetailItem]             = useState<BOMItem | null>(null);
 
@@ -316,170 +317,91 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Drag & Drop
   // -------------------------------------------------------------------------
 
-  const resetDrag = () => { setDraggedItem(null); setDragOverItem(null); setIsDragging(false); };
+  // The browser's own drag and drop, done properly: the image under the cursor is a small card of the dragged item (drawn below, off
+  // screen), not a snapshot of the whole table row; only the row under the cursor shows what dropping there does (lib/bom/drop-intent.ts),
+  // and a row where the move is not allowed is no drop target, so the browser shows its not-allowed cursor.
+  const dragCardRef = useRef<HTMLDivElement>(null);
+  const expandTimer = useRef<number | null>(null);
+  // A drop ends on a row; the click the browser may send after it must not open that row.
+  const lastDropAt  = useRef(0);
+  const isDragging  = draggedItem !== null;
+
+  const clearExpandTimer = () => {
+    if (expandTimer.current !== null) { window.clearTimeout(expandTimer.current); expandTimer.current = null; }
+  };
+  const resetDrag = () => { clearExpandTimer(); setDraggedItem(null); setDragOverItem(null); };
 
   const handleDragStart = (e: React.DragEvent, item: BOMItem) => {
+    if (isUpdating) { e.preventDefault(); return; }
     e.stopPropagation();
-    setDraggedItem(item);
-    setIsDragging(true);
+    // Draw the drag card for this item now, so the browser takes it (not the row) as the drag image, held where the cursor grabbed it.
+    flushSync(() => { setDraggedItem(item); setDragOverItem(null); });
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', item.id);
-
-    const el    = e.currentTarget as HTMLElement;
-    const clone = el.cloneNode(true) as HTMLElement;
-    clone.style.cssText = `opacity:0.8;transform:rotate(2deg);width:${el.offsetWidth}px`;
-    document.body.appendChild(clone);
-    e.dataTransfer.setDragImage(clone, el.offsetWidth / 2, 20);
-    setTimeout(() => document.body.contains(clone) && document.body.removeChild(clone), 0);
+    if (dragCardRef.current) e.dataTransfer.setDragImage(dragCardRef.current, 16, 16);
   };
 
-  const handleDragEnd   = () => resetDrag();
+  const handleDragEnd = () => { resetDrag(); };
 
-  const handleDragOver  = (e: React.DragEvent, targetItem: BOMItem) => {
+  const handleDragOver = (e: React.DragEvent, target: BOMItem) => {
+    if (!draggedItem) return;
+    const intent = dropIntent(draggedItem, target, items);
+    if (dragOverItem !== target.id) {
+      setDragOverItem(target.id);
+      clearExpandTimer();
+      // Resting on a closed parent it can go into opens it, so a part deeper down can be reached.
+      if (intent.kind === 'into' && !expandedItems.has(target.id) && items.some(c => c.parentItemId === target.id)) {
+        expandTimer.current = window.setTimeout(() => { setExpandedItems(prev => new Set(prev).add(target.id)); }, 700);
+      }
+    }
+    // Only a real move is a drop target; elsewhere the browser shows the not-allowed cursor and a drop does nothing.
+    if (intent.kind === 'none' || intent.kind === 'invalid') return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (draggedItem && draggedItem.id !== targetItem.id) setDragOverItem(targetItem.id);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverItem(null);
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetItem: BOMItem) => {
+  const handleDrop = async (e: React.DragEvent, target: BOMItem) => {
     e.preventDefault();
     e.stopPropagation();
+    lastDropAt.current = Date.now();
+    const dragged = draggedItem;
+    resetDrag();
+    if (!dragged || isUpdating || dragged.id !== e.dataTransfer.getData('text/plain')) return;
 
-    if (!draggedItem || draggedItem.id === targetItem.id || isUpdating) { resetDrag(); return; }
-    if (draggedItem.id !== e.dataTransfer.getData('text/plain'))        { resetDrag(); return; }
-
-    // Circular reference guard
-    const wouldCreateCircle = (currentId: string, searchId: string, visited = new Set<string>()): boolean => {
-      if (visited.has(currentId) || currentId === searchId) return currentId === searchId;
-      visited.add(currentId);
-      return items
-        .filter(i => i.parentItemId === currentId)
-        .some(child => child.id === searchId || wouldCreateCircle(child.id, searchId, new Set(visited)));
-    };
-
-    if (targetItem.itemType !== 'child_part' && wouldCreateCircle(draggedItem.id, targetItem.id)) {
-      toast.error('Invalid move', { description: 'Cannot move an item into its own sub-components', duration: 4000 });
-      resetDrag();
-      return;
-    }
-
-    const isSameParentReorder =
-      draggedItem.parentItemId === targetItem.parentItemId &&
-      draggedItem.itemType     === targetItem.itemType;
+    const intent: DropIntent = dropIntent(dragged, target, items);
+    if (intent.kind === 'none') return;
+    if (intent.kind === 'invalid') { toast.error('Not moved', { description: intent.label, duration: 4000 }); return; }
 
     try {
       setIsUpdating(true);
 
-      if (isSameParentReorder) {
-        // ── Same-parent reorder ──────────────────────────────────────────────
+      if (intent.kind === 'reorder') {
+        // Same parent, same type: the dragged item takes the target's place.
         const siblings = items
-          .filter(i => i.parentItemId === draggedItem.parentItemId && i.itemType === draggedItem.itemType)
+          .filter(i => i.parentItemId === dragged.parentItemId && i.itemType === dragged.itemType)
           .sort((a, b) => a.sortOrder - b.sortOrder);
-
-        const withoutDragged = siblings.filter(i => i.id !== draggedItem.id);
-        const targetIndex    = withoutDragged.findIndex(i => i.id === targetItem.id);
-        withoutDragged.splice(targetIndex, 0, draggedItem);
-
-        const updatePayloads = withoutDragged.map((item, index) => ({ id: item.id, sortOrder: index }));
-
-        if (typeof updateBOMItemsSortOrder === 'function') {
-          await updateBOMItemsSortOrder(updatePayloads);
-        } else {
-          for (const payload of updatePayloads) {
-            if (payload.sortOrder !== items.find(i => i.id === payload.id)?.sortOrder) {
-              await updateBOMItem(payload.id, { sortOrder: payload.sortOrder });
-            }
-          }
-        }
-
-        toast.success(`Reordered "${draggedItem.name}"`, { duration: 3000 });
-
+        const withoutDragged = siblings.filter(i => i.id !== dragged.id);
+        withoutDragged.splice(withoutDragged.findIndex(i => i.id === target.id), 0, dragged);
+        await updateBOMItemsSortOrder(withoutDragged.map((item, index) => ({ id: item.id, sortOrder: index })));
+        toast.success(`Reordered “${dragged.name}”`, { description: `now before “${target.name}”`, duration: 3000 });
+      } else if (intent.kind === 'swap') {
+        await updateBOMItem(dragged.id, { sortOrder: target.sortOrder });
+        await updateBOMItem(target.id,  { sortOrder: dragged.sortOrder });
+        toast.success('Assemblies reordered', { description: `${dragged.name} ↔ ${target.name}`, duration: 3000 });
       } else {
-        // ── Cross-hierarchy move ─────────────────────────────────────────────
-        const bothRootAssemblies =
-          draggedItem.itemType === 'assembly' && !draggedItem.parentItemId?.trim() &&
-          targetItem.itemType  === 'assembly' && !targetItem.parentItemId?.trim();
-
-        if (bothRootAssemblies) {
-          await updateBOMItem(draggedItem.id, { sortOrder: targetItem.sortOrder });
-          await updateBOMItem(targetItem.id,  { sortOrder: draggedItem.sortOrder });
-          toast.success('Assemblies reordered', { description: `${draggedItem.name} ↔ ${targetItem.name}`, duration: 3000 });
-
-        } else {
-          // Validate move legality
-          const isValidMove = (): boolean => {
-            const { itemType: d } = draggedItem;
-            const { itemType: t } = targetItem;
-            if (d === 'assembly' && (t === 'sub_assembly' || t === 'child_part')) return false;
-            if (d === 'sub_assembly' && t === 'child_part') return false;
-            if (d === 'child_part'   && (t === 'sub_assembly' || t === 'assembly')) return true;
-            if (d === 'sub_assembly' && t === 'assembly') return true;
-            return false;
-          };
-
-          if (!isValidMove()) {
-            toast.error('Invalid move', {
-              description: `Cannot move ${draggedItem.itemType.replace('_', ' ')} to ${targetItem.itemType.replace('_', ' ')}`,
-              duration: 4000,
-            });
-            resetDrag();
-            setIsUpdating(false);
-            return;
-          }
-
-          // Compute new parent & bomLevel for the dragged item
-          let newParentId: string | undefined;
-          let newBomLevel: string;
-
-          if (targetItem.itemType === 'assembly') {
-            newParentId = targetItem.id;
-            newBomLevel = draggedItem.itemType === 'sub_assembly' ? 'L1' : 'L2';
-          } else if (targetItem.itemType === 'sub_assembly') {
-            newParentId = targetItem.id;
-            newBomLevel = 'L2';
-          } else {
-            // child_part → become sibling
-            // ✅ Fix 2345: use `undefined` instead of `null` to match UpdateBOMItemDto
-            newParentId = targetItem.parentItemId ?? undefined;
-            newBomLevel = targetItem.bomLevel || 'L2';
-          }
-
-          const noChange =
-            draggedItem.parentItemId === (newParentId ?? null) &&
-            draggedItem.bomLevel     === newBomLevel           &&
-            draggedItem.itemType     === draggedItem.itemType;   // always same
-
-          if (!noChange) {
-            await updateBOMItem(draggedItem.id, {
-              parentItemId: newParentId,   // ✅ undefined, not null
-              bomLevel:     newBomLevel,
-              itemType:     draggedItem.itemType,
-            });
-
-            const desc =
-              targetItem.itemType === 'assembly'    ? `moved under assembly "${targetItem.name}"` :
-              targetItem.itemType === 'sub_assembly' ? `moved under sub-assembly "${targetItem.name}"` :
-              `moved to same level as "${targetItem.name}"`;
-
-            toast.success(`Moved "${draggedItem.name}"`, { description: desc, duration: 3000 });
-          }
-        }
+        await updateBOMItem(dragged.id, { parentItemId: intent.parentId, bomLevel: intent.bomLevel, itemType: dragged.itemType });
+        // Open the new parent, so the moved item is in view where it landed.
+        setExpandedItems(prev => new Set(prev).add(intent.parentId));
+        toast.success(`Moved “${dragged.name}”`, { description: `into “${target.name}”`, duration: 3000 });
       }
 
-      queryClient.invalidateQueries({ queryKey: ['bom-items'] });
+      void queryClient.invalidateQueries({ queryKey: ['bom-items'] });
       await refetch();
-
     } catch (error: unknown) {
-      // ✅ Fix 2339: getErrorMessage handles unknown type safely
       const msg = getErrorMessage(error);
       toast.error('Failed to move item', { description: msg || 'Please try again.', duration: 5000 });
     } finally {
       setIsUpdating(false);
-      resetDrag();
     }
   };
 
@@ -506,20 +428,26 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
     // blue), a line running past it the colour of the branch it joins (path[i + 1], the ancestor whose next sibling it reaches), and the
     // line down from an open parent its children's.
     const lineOf         = (node: TreeNode | undefined) => typeStyleOf(node?.itemType ?? '').line;
+    // What dropping the dragged item here would do: shown on this row only, while it is under the cursor.
+    const overIntent     = isDraggedOver && draggedItem ? dropIntent(draggedItem, item, items) : null;
+    const dropClass      = !overIntent ? ''
+      : overIntent.kind === 'into' ? 'bg-primary/10 [&>td]:shadow-[inset_0_2px_0_0_hsl(var(--primary)),inset_0_-2px_0_0_hsl(var(--primary))]'
+      : overIntent.kind === 'reorder' || overIntent.kind === 'swap' ? '[&>td]:shadow-[inset_0_3px_0_0_hsl(var(--primary))]'
+      : overIntent.kind === 'invalid' ? 'bg-destructive/5 [&>td]:shadow-[inset_0_2px_0_0_hsl(var(--destructive)),inset_0_-2px_0_0_hsl(var(--destructive))]'
+      : '';
 
     return (
       <tr
         key={item.id}
         aria-level={depth + 1}
         aria-expanded={hasChildren ? isExpanded : undefined}
-        draggable
-        onDragStart={e => handleDragStart(e, item)}
+        draggable={!isUpdating}
+        onDragStart={e => { handleDragStart(e, item); }}
         onDragEnd={handleDragEnd}
-        onDragOver={e => handleDragOver(e, item)}
-        onDragLeave={handleDragLeave}
-        onDrop={e => handleDrop(e, item)}
+        onDragOver={e => { handleDragOver(e, item); }}
+        onDrop={e => { void handleDrop(e, item); }}
         onClick={e => {
-          if (isDragging) { e.preventDefault(); e.stopPropagation(); return; }
+          if (isDragging || Date.now() - lastDropAt.current < 300) { e.preventDefault(); e.stopPropagation(); return; }
           // Clicking a row opens Manufacturing Intelligence -- the same
           // destination as the Cpu button. Explicit controls keep their own meaning.
           if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return;
@@ -527,11 +455,13 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           onViewItem?.(item, 'intelligence');
         }}
         className={[
-          'group border-b transition-colors hover:bg-muted/50',
-          isBeingDragged ? 'opacity-50' : '',
-          isDraggedOver ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',
+          'group border-b transition-colors',
+          isDragging ? '' : 'hover:bg-muted/50',
+          // The row being dragged stays in place, faded, so you see where it came from.
+          isBeingDragged ? 'bg-muted/40 opacity-40' : '',
+          dropClass,
           isUpdating ? 'cursor-wait opacity-75' : 'cursor-pointer',
-          style.tint,
+          dropClass ? '' : style.tint,
         ].join(' ')}
       >
         <td className={`p-0 ${style.accent}`}>
@@ -540,7 +470,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             <span className="flex w-6 shrink-0 items-center justify-center">
               <GripVertical
                 className={`h-3.5 w-3.5 cursor-grab active:cursor-grabbing transition-opacity ${
-                  isBeingDragged ? 'text-primary' : isDraggedOver ? 'text-success' : 'text-muted-foreground/50 opacity-0 group-hover:opacity-100'
+                  isBeingDragged ? 'text-primary' : 'text-muted-foreground/60 opacity-0 group-hover:opacity-100'
                 }`}
                 aria-hidden="true"
               />
@@ -595,8 +525,15 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                       {item.children.length} {item.children.length === 1 ? 'item' : 'items'}
                     </span>
                   )}
-                  {isDragging && !isBeingDragged && draggedItem && (
-                    <Badge variant="outline" className="h-4 shrink-0 px-1.5 text-[10px]">Drop to swap ↔</Badge>
+                  {overIntent && overIntent.kind !== 'none' && (
+                    <span
+                      role="status"
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none shadow-sm ${
+                        overIntent.kind === 'invalid' ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'
+                      }`}
+                    >
+                      {overIntent.label}
+                    </span>
                   )}
                   {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
                     <Badge variant="destructive" className="h-4 shrink-0 px-1.5 text-[10px]">Circular Ref</Badge>
@@ -774,8 +711,33 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           </Button>
         </div>
       </div>
+      {/* The drag image: a card of the item being dragged, drawn off screen for the browser to take under the cursor (handleDragStart). */}
+      <div
+        ref={dragCardRef}
+        aria-hidden="true"
+        className={`pointer-events-none fixed left-0 top-[-1000px] flex w-72 items-center gap-2.5 rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-lg ${
+          draggedItem ? typeStyleOf(draggedItem.itemType).accent : ''
+        }`}
+      >
+        {draggedItem && (() => {
+          const s = typeStyleOf(draggedItem.itemType);
+          return (
+            <>
+              <s.Icon className={`h-4 w-4 shrink-0 ${s.icon}`} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{draggedItem.name}</span>
+                <span className="block truncate font-mono text-[11px] text-muted-foreground">{draggedItem.partNumber ? draggedItem.partNumber : s.label}</span>
+              </span>
+              {getItemTypeBadge(draggedItem.itemType)}
+            </>
+          );
+        })()}
+      </div>
       {/* No height of its own: the table grows with the page (one scroll, the page's); it scrolls sideways only on a narrow screen. */}
-      <div className="overflow-x-auto rounded-md border">
+      <div
+        className="overflow-x-auto rounded-md border"
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOverItem(null); }}
+      >
         <table role="treegrid" aria-label="BOM items" className="w-full caption-bottom border-collapse text-sm">
           <thead>
             <tr className="text-left">
