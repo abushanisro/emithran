@@ -2845,6 +2845,7 @@ export class BomItemCostingService {
           },
           // Absent (an analysis from before the measurement) and null (nothing the engine could measure) are told apart.
           thicknessMm: sheetThicknessMm, geometry: summary.hydroformGeometry as Record<string, unknown> | null | undefined, summary,
+          partVolumeMm3: Number(item.volume) > 0 ? Number(item.volume) : null,
           amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
           ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
           overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
