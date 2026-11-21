@@ -1,25 +1,29 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ListSkeleton } from '@/components/ui/loading-skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, MapPin, Building2, Send, Package, FileText, TrendingUp, Award, Mail, Box, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { useVendors } from '@/lib/api/hooks/useVendors';
-import { useCreateRfq, useSendRfq } from '@/lib/api/hooks/useRfq';
-import { useRfqTrackingRecords, useRfqTrackingStats, useInvalidateRfqTracking, useUpdateRfqTrackingStatus, useDeleteRfqTracking, useCreateRfqTracking } from '@/lib/api/hooks/useRfqTracking';
-import { getRfqSummaryText, formatResponseTime, getStatusText, getStatusColor, RfqTrackingStatus } from '@/lib/api/rfq-tracking';
+
+import { VendorRatingEngine } from '@/components/features/supplier-nominations/VendorRatingEngine';
+import { VendorStatusBadge } from '@/components/features/vendors/VendorStatusBadge';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { analyzeTrackingFeature, getFeatureStatusMessage, TrackingFeatureState } from '@/lib/api/features/tracking-feature';
 import { useProcessCosts } from '@/lib/api/hooks/useProcessCosts';
 import type { ProcessCostListResponse, ProcessCostRecord } from '@/lib/api/hooks/useProcessCosts';
 import { useProcesses } from '@/lib/api/hooks/useProcesses';
-import { VendorRatingEngine } from '@/components/features/supplier-nominations/VendorRatingEngine';
+import { useCreateRfq, useSendRfq } from '@/lib/api/hooks/useRfq';
+import { useRfqTrackingRecords, useRfqTrackingStats, useInvalidateRfqTracking, useUpdateRfqTrackingStatus, useDeleteRfqTracking, useCreateRfqTracking } from '@/lib/api/hooks/useRfqTracking';
 import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
+import { useVendors } from '@/lib/api/hooks/useVendors';
+import { getRfqSummaryText, formatResponseTime, getStatusText, getStatusColor, RfqTrackingStatus } from '@/lib/api/rfq-tracking';
 
 interface BOMPart {
   id: string;
@@ -434,108 +438,63 @@ We look forward to your competitive proposal and establishing a successful partn
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="animate-fade-in">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-4">
-            {onBack && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onBack}
-                className="border-border text-foreground/80 hover:bg-accent hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            )}
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                {evaluationGroupName ? evaluationGroupName : 'Supplier Evaluation'}
-              </h1>
-              <p className="text-foreground/80 mt-1">
-                {evaluationGroupName 
-                  ? 'Evaluate vendors and manage RFQs for this evaluation group'
-                  : 'Select BOM parts to find and evaluate vendors'
-                }
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search parts, vendors..."
-                className="pl-9 w-80 bg-card border-border text-foreground placeholder:text-muted-foreground"
-                value={partsSearchTerm}
-                onChange={(e) => setPartsSearchTerm(e.target.value)}
-              />
-            </div>
+        <div className="flex items-start gap-3">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="mt-0.5 h-8 w-8 shrink-0"
+              aria-label="Back to evaluation groups"
+              onClick={onBack}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="min-w-0 flex-1">
+            <PageHeader
+              title={evaluationGroupName ? evaluationGroupName : 'Supplier Evaluation'}
+              description={evaluationGroupName
+                ? 'Evaluate vendors and manage RFQs for this evaluation group'
+                : 'Select BOM parts to find and evaluate vendors'}
+            >
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  aria-label="Search parts and vendors"
+                  placeholder="Search parts, vendors..."
+                  className="h-9 w-full pl-9 sm:w-72"
+                  value={partsSearchTerm}
+                  onChange={(e) => setPartsSearchTerm(e.target.value)}
+                />
+              </div>
+            </PageHeader>
           </div>
         </div>
 
         {/* Overview Stats */}
-        <div className="grid grid-cols-4 gap-6">
-          <Card className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-teal-600/20">
-                  <Package className="h-6 w-6 text-teal-400" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Total Parts', value: stats.totalParts, hint: 'From active BOM', icon: Package, hintTone: 'text-success' },
+            { label: 'Active Vendors', value: stats.activeVendors, hint: 'Database managed vendors', icon: Building2, hintTone: 'text-muted-foreground' },
+            { label: 'Available Vendors', value: stats.availableVendors, hint: 'Ready for RFQ', icon: Award, hintTone: 'text-success' },
+            { label: 'RFQs Sent', value: stats.sentRfqCount, hint: 'Total sent today', icon: TrendingUp, hintTone: 'text-primary' },
+          ].map(({ label, value, hint, icon: Icon, hintTone }) => (
+            <Card key={label}>
+              <CardContent className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
+                  <p className={`mt-0.5 truncate text-xs ${hintTone}`}>{hint}</p>
                 </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-foreground">{stats.totalParts}</h3>
-                  <p className="text-sm text-foreground/80">Total Parts</p>
-                  <p className="text-xs text-green-400 mt-1">From active BOM</p>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/20">
-                  <Building2 className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-foreground">{stats.activeVendors}</h3>
-                  <p className="text-sm text-foreground/80">Active Vendors</p>
-                  <p className="text-xs text-muted-foreground mt-1">Database managed vendors</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/20">
-                  <Award className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-foreground">{stats.availableVendors}</h3>
-                  <p className="text-sm text-foreground/80">Available Vendors</p>
-                  <p className="text-xs text-green-400 mt-1">Ready for RFQ</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/20">
-                  <TrendingUp className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-foreground">{stats.sentRfqCount}</h3>
-                  <p className="text-sm text-foreground/80">RFQs Sent</p>
-                  <p className="text-xs text-primary mt-1">Total sent today</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Block 1: SELECT BOM PARTS */}
@@ -545,7 +504,7 @@ We look forward to your competitive proposal and establishing a successful partn
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-foreground">BOM Parts</h2>
                 <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-teal-400 border-teal-400/50">
+                  <Badge variant="outline" className="text-primary border-primary/40">
                     {selectedParts.length} selected
                   </Badge>
                   {selectedParts.length > 0 && (
@@ -556,7 +515,7 @@ We look forward to your competitive proposal and establishing a successful partn
                         setSelectedParts([]);
                         setSelectedVendors([]);
                       }}
-                      className="h-7 text-xs border-border text-foreground/80 hover:border-red-500 hover:text-red-400"
+                      className="h-7 text-xs border-border text-foreground/80 hover:border-destructive/50 hover:text-destructive"
                     >
                       Clear Selection
                     </Button>
@@ -595,21 +554,21 @@ We look forward to your competitive proposal and establishing a successful partn
 
             {/* Parts Table */}
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-card/50 border-b border-border">
-                  <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground"></th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">PART NO.</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">DESCRIPTION</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">PROCESS</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">QTY</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">FILES</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader className="bg-muted/40">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10"><span className="sr-only">Select</span></TableHead>
+                    <TableHead>Part No.</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Process</TableHead>
+                    <TableHead>Qty</TableHead>
+                    <TableHead>Files</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {filteredParts.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-12 text-center">
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={7} className="p-12 text-center">
                         <div className="text-muted-foreground">
                           <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
                           <h3 className="font-medium mb-2 text-foreground">No BOM Parts Found</h3>
@@ -620,33 +579,33 @@ We look forward to your competitive proposal and establishing a successful partn
                             }
                           </p>
                           {bomParts.length === 0 && (
-                            <p className="text-xs mt-2 text-teal-400">
+                            <p className="text-xs mt-2 text-primary">
                               Check if BOM data is properly loaded from the project
                             </p>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    filteredParts.map((part, index) => (
-                    <tr key={part.id} className={index % 2 === 0 ? 'bg-card' : 'bg-card/50'}>
-                      <td className="p-4">
+                    filteredParts.map((part) => (
+                    <TableRow key={part.id}>
+                      <TableCell>
                         <Checkbox
                           checked={selectedParts.includes(part.id)}
                           onCheckedChange={(checked) => handlePartToggle(part.id, !!checked)}
-                          className="border-border data-[state=checked]:bg-teal-600"
+                          className="border-border data-[state=checked]:bg-primary"
                         />
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell>
                         <div className="font-medium text-foreground">{part.partNumber}</div>
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell>
                         <div className="text-foreground">{part.description}</div>
                         {part.price && (
-                          <div className="text-sm text-teal-400 font-medium">${part.price.toFixed(3)}</div>
+                          <div className="text-sm text-primary font-medium">${part.price.toFixed(3)}</div>
                         )}
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell>
                         <ProcessEditor
                           partId={part.id}
                           processes={partProcesses[part.id] || []}
@@ -658,11 +617,11 @@ We look forward to your competitive proposal and establishing a successful partn
                             }));
                           }}
                         />
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell>
                         <div className="text-foreground">{part.quantity} pcs</div>
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell>
                         <div className="flex flex-col gap-1">
                           {part.file2dPath && (
                             <button
@@ -694,12 +653,12 @@ We look forward to your competitive proposal and establishing a successful partn
                             <span className="text-xs text-muted-foreground">No files</span>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                     ))
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             <div className="p-4 border-t border-border bg-card/30 text-sm text-muted-foreground">
@@ -713,7 +672,7 @@ We look forward to your competitive proposal and establishing a successful partn
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-foreground">Matched Vendors</h2>
                     <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="text-teal-400 border-teal-400/50">
+                      <Badge variant="outline" className="text-primary border-primary/40">
                         {matchedVendors.length} available
                       </Badge>
                       <Badge variant="outline" className="text-primary border-primary/50">
@@ -736,7 +695,7 @@ We look forward to your competitive proposal and establishing a successful partn
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {uniqueProcesses.map(process => (
-                            <Badge key={process} variant="outline" className="text-xs border-yellow-500 text-yellow-400">
+                            <Badge key={process} variant="outline" className="text-xs border-warning/40 text-warning">
                               {process}
                             </Badge>
                           ))}
@@ -769,7 +728,7 @@ We look forward to your competitive proposal and establishing a successful partn
                         }
                       </p>
                       {selectedParts.length > 0 && (
-                        <p className="text-xs mt-2 text-teal-400">
+                        <p className="text-xs mt-2 text-primary">
                           Selected parts: {selectedParts.length} | Available vendors: {vendors.length}
                         </p>
                       )}
@@ -782,7 +741,7 @@ We look forward to your competitive proposal and establishing a successful partn
                             {selectedVendors.length} vendor{selectedVendors.length !== 1 ? 's' : ''} selected
                           </span>
                           <Button
-                            className="bg-teal-600 hover:bg-teal-700 text-white"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             onClick={handleSendRfq}
                             disabled={isSubmittingRfq || createRfqMutation.isPending || sendRfqMutation.isPending}
                           >
@@ -801,33 +760,28 @@ We look forward to your competitive proposal and establishing a successful partn
                             key={vendor.id}
                             className={`border rounded-lg p-4 cursor-pointer transition-all ${
                               selectedVendors.includes(vendor.id)
-                                ? 'border-teal-500 bg-teal-600/10 shadow-md shadow-teal-500/20'
-                                : 'border-border hover:border-teal-500/50 hover:shadow-xs bg-card/50 hover:bg-accent'
+                                ? 'border-primary bg-primary/10 shadow-xs'
+                                : 'border-border hover:border-primary/50 hover:shadow-xs bg-card/50 hover:bg-accent'
                             }`}
                             onClick={() => handleVendorToggle(vendor.id, !selectedVendors.includes(vendor.id))}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <h3 className="font-semibold text-foreground mb-1">{vendor.name}</h3>
-                                <Badge 
-                                  variant={vendor.status === 'active' ? "default" : "secondary"}
-                                  className={`text-xs ${vendor.status === 'active' ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'}`}
-                                >
-                                  {vendor.status}
-                                </Badge>
+                                <VendorStatusBadge status={vendor.status} />
                               </div>
                               <div className="ml-2">
                                 <Checkbox
                                   checked={selectedVendors.includes(vendor.id)}
                                   onChange={() => {}}
-                                  className="border-border data-[state=checked]:bg-teal-600"
+                                  className="border-border data-[state=checked]:bg-primary"
                                 />
                               </div>
                             </div>
 
                             <div className="mt-3 space-y-2 text-sm text-foreground/80">
                               <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-teal-400" />
+                                <MapPin className="h-4 w-4 text-primary" />
                                 <span>{vendor.city && vendor.state ? `${vendor.city}, ${vendor.state}` : 'Location TBD'}</span>
                               </div>
                             </div>
@@ -878,7 +832,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                       key={cap}
                                       variant="outline"
                                       className={`text-xs ${isMatch 
-                                        ? 'border-green-500 text-green-400 bg-green-500/10' 
+                                        ? 'border-success/40 text-success bg-success/10' 
                                         : 'border-border text-foreground/80'
                                       }`}
                                     >
@@ -918,11 +872,11 @@ We look forward to your competitive proposal and establishing a successful partn
                           {rfqStats && (
                             <>
                               <div className="text-center">
-                                <div className="text-lg font-bold text-teal-400">{rfqStats.totalSent}</div>
+                                <div className="text-lg font-bold text-primary">{rfqStats.totalSent}</div>
                                 <div className="text-xs text-muted-foreground">Total Sent</div>
                               </div>
                               <div className="text-center">
-                                <div className="text-lg font-bold text-green-400">{rfqStats.totalResponded}</div>
+                                <div className="text-lg font-bold text-success">{rfqStats.totalResponded}</div>
                                 <div className="text-xs text-muted-foreground">Responded</div>
                               </div>
                               <div className="text-center">
@@ -968,7 +922,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                       size="sm"
                                       onClick={() => handleCancelRfq(tracking.id)}
                                       disabled={deleteTrackingMutation.isPending}
-                                      className="border-red-600 text-red-400 hover:bg-red-600/10 hover:text-red-300"
+                                      className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                     >
                                       <X className="h-3 w-3 mr-1" />
                                       Cancel
@@ -978,7 +932,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                       size="sm"
                                       onClick={() => handleApproveRfq(tracking.id, tracking.vendors)}
                                       disabled={updateTrackingStatusMutation.isPending}
-                                      className="border-green-600 text-green-400 hover:bg-green-600/10 hover:text-green-300"
+                                      className="border-success/50 text-success hover:bg-success/10 hover:text-success"
                                     >
                                       <Check className="h-3 w-3 mr-1" />
                                       Approve
@@ -993,7 +947,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                     size="sm"
                                     onClick={() => handleDeleteEvaluationRfq(tracking.id)}
                                     disabled={deleteTrackingMutation.isPending}
-                                    className="border-red-600 text-red-400 hover:bg-red-600/10 hover:text-red-300"
+                                    className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                   >
                                     <Trash2 className="h-3 w-3 mr-1" />
                                     Delete
@@ -1025,7 +979,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                         </div>
                                         <div className="ml-2">
                                           {vendor.responded ? (
-                                            <div className="text-green-400 text-xs">
+                                            <div className="text-success text-xs">
                                               <div>✓ Responded</div>
                                               {vendor.quoteAmount && (
                                                 <div>${vendor.quoteAmount}</div>
@@ -1063,7 +1017,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                           </Badge>
                                         ))}
                                         {part.has2dFile && (
-                                          <Badge variant="outline" className="text-xs border-green-500 text-green-400">
+                                          <Badge variant="outline" className="text-xs border-success/50 text-success">
                                             2D
                                           </Badge>
                                         )}
@@ -1084,7 +1038,7 @@ We look forward to your competitive proposal and establishing a successful partn
                               <div className="mt-4 pt-4 border-t border-border">
                                 <div className="flex justify-between text-sm">
                                   <div className="text-foreground/80">
-                                    Response Rate: <span className="text-green-400 font-medium">{Math.round((tracking.responseCount / tracking.vendorCount) * 100)}%</span>
+                                    Response Rate: <span className="text-success font-medium">{Math.round((tracking.responseCount / tracking.vendorCount) * 100)}%</span>
                                   </div>
                                   {tracking.firstResponseAt && (
                                     <div className="text-muted-foreground">
@@ -1212,7 +1166,7 @@ We look forward to your competitive proposal and establishing a successful partn
               <div className="p-6 border-b border-border">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-foreground">RFQ Summary</h2>
-                  <Badge variant="outline" className="text-green-400 border-green-400/50">
+                  <Badge variant="outline" className="text-success border-success/40">
                     {selectedVendors.length} vendor{selectedVendors.length !== 1 ? 's' : ''} ready
                   </Badge>
                 </div>
@@ -1224,14 +1178,14 @@ We look forward to your competitive proposal and establishing a successful partn
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="p-2 rounded bg-teal-600/20">
-                            <Building2 className="h-5 w-5 text-teal-400" />
+                          <div className="p-2 rounded bg-primary/10">
+                            <Building2 className="h-5 w-5 text-primary" />
                           </div>
                           <div>
                             <h3 className="font-semibold text-foreground">{vendor.name}</h3>
                             <p className="text-sm text-muted-foreground">{vendor.supplierCode || 'No supplier code'}</p>
                           </div>
-                          <Badge className="ml-auto bg-green-600 text-white">
+                          <Badge className="ml-auto bg-success text-success-foreground">
                             {vendor.status}
                           </Badge>
                         </div>
@@ -1249,7 +1203,7 @@ We look forward to your competitive proposal and establishing a successful partn
                             <h4 className="font-medium text-foreground mb-1">CAPABILITIES</h4>
                             <div className="flex flex-wrap gap-1">
                               {vendor.process?.map((cap) => (
-                                <Badge key={cap} className="bg-teal-600 text-white text-xs">
+                                <Badge key={cap} className="bg-primary text-primary-foreground text-xs">
                                   {cap}
                                 </Badge>
                               )) || <span className="text-xs text-muted-foreground">No capabilities listed</span>}
@@ -1272,7 +1226,7 @@ We look forward to your competitive proposal and establishing a successful partn
                       </div>
 
                       <div className="ml-6 text-right">
-                        <div className="text-2xl font-bold text-teal-400">Ready</div>
+                        <div className="text-2xl font-bold text-primary">Ready</div>
                         <div className="text-sm text-muted-foreground">{vendor.city && vendor.state ? `${vendor.city}, ${vendor.state}` : 'Location TBD'}</div>
                       </div>
                     </div>
@@ -1281,7 +1235,7 @@ We look forward to your competitive proposal and establishing a successful partn
 
                 <div className="mt-6 flex justify-end">
                   <Button 
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-8"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-8"
                     onClick={handleSendRfq}
                     disabled={isSubmittingRfq || createRfqMutation.isPending || sendRfqMutation.isPending}
                   >
@@ -1302,9 +1256,9 @@ We look forward to your competitive proposal and establishing a successful partn
         {shouldShowFeatureNotice && (
           <Card className={`mt-6 ${
             trackingFeatureStatus.state === TrackingFeatureState.MIGRATION_REQUIRED 
-              ? 'bg-amber-900/20 border-amber-600/50' 
+              ? 'bg-warning/10 border-warning/40' 
               : trackingFeatureStatus.state === TrackingFeatureState.ERROR
-              ? 'bg-red-900/20 border-red-600/50'
+              ? 'bg-destructive/10 border-destructive/40'
               : 'bg-card/50 border-border/50'
           }`}>
             <CardContent className="p-6">
@@ -1312,40 +1266,40 @@ We look forward to your competitive proposal and establishing a successful partn
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${
                     trackingFeatureStatus.state === TrackingFeatureState.MIGRATION_REQUIRED 
-                      ? 'bg-amber-600/20' 
+                      ? 'bg-warning/15' 
                       : trackingFeatureStatus.state === TrackingFeatureState.ERROR
-                      ? 'bg-red-600/20'
+                      ? 'bg-destructive/15'
                       : 'bg-muted-foreground/20'
                   }`}>
                     <Package className={`h-5 w-5 ${
                       trackingFeatureStatus.state === TrackingFeatureState.MIGRATION_REQUIRED 
-                        ? 'text-amber-400' 
+                        ? 'text-warning' 
                         : trackingFeatureStatus.state === TrackingFeatureState.ERROR
-                        ? 'text-red-400'
+                        ? 'text-destructive'
                         : 'text-muted-foreground'
                     }`} />
                   </div>
                   <div>
                     <h3 className={`text-lg font-semibold ${
                       trackingFeatureStatus.state === TrackingFeatureState.MIGRATION_REQUIRED 
-                        ? 'text-amber-300' 
+                        ? 'text-warning' 
                         : trackingFeatureStatus.state === TrackingFeatureState.ERROR
-                        ? 'text-red-300'
+                        ? 'text-destructive'
                         : 'text-foreground/80'
                     }`}>
                       {featureStatusMessage.title}
                     </h3>
                     <p className={`text-sm mt-1 ${
                       trackingFeatureStatus.state === TrackingFeatureState.MIGRATION_REQUIRED 
-                        ? 'text-amber-200' 
+                        ? 'text-warning' 
                         : trackingFeatureStatus.state === TrackingFeatureState.ERROR
-                        ? 'text-red-200'
+                        ? 'text-destructive'
                         : 'text-foreground/80'
                     }`}>
                       {featureStatusMessage.description}
                     </p>
                     {trackingFeatureStatus.state === TrackingFeatureState.MIGRATION_REQUIRED && (
-                      <p className="text-amber-300 text-xs mt-2">
+                      <p className="text-warning text-xs mt-2">
                         Your RFQs are being sent successfully! Tracking will be available after migration.
                       </p>
                     )}
@@ -1361,9 +1315,9 @@ We look forward to your competitive proposal and establishing a successful partn
                     }}
                     className={`${
                       trackingFeatureStatus.state === TrackingFeatureState.MIGRATION_REQUIRED 
-                        ? 'border-amber-600 text-amber-300 hover:bg-amber-600/10'
+                        ? 'border-warning/50 text-warning hover:bg-warning/10'
                         : trackingFeatureStatus.state === TrackingFeatureState.ERROR
-                        ? 'border-red-600 text-red-300 hover:bg-red-600/10'
+                        ? 'border-destructive/50 text-destructive hover:bg-destructive/10'
                         : 'border-border text-foreground/80 hover:bg-accent/10'
                     }`}
                   >
@@ -1383,7 +1337,7 @@ We look forward to your competitive proposal and establishing a successful partn
                 <div className="p-6 border-b border-border">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <UserCheck className="h-5 w-5 text-green-400" />
+                      <UserCheck className="h-5 w-5 text-success" />
                       Approve RFQ - Select Vendors
                     </h3>
                     <Button
@@ -1411,8 +1365,8 @@ We look forward to your competitive proposal and establishing a successful partn
                         key={vendor.id}
                         className={`border rounded-lg p-4 mb-3 cursor-pointer transition-all ${
                           selectedApproveVendors.includes(vendor.id)
-                            ? 'border-green-500 bg-green-600/10'
-                            : 'border-border hover:border-green-500/50 bg-card/50'
+                            ? 'border-success bg-success/10'
+                            : 'border-border hover:border-success/50 bg-card/50'
                         }`}
                         onClick={() => {
                           setSelectedApproveVendors(prev =>
@@ -1429,12 +1383,12 @@ We look forward to your competitive proposal and establishing a successful partn
                                 <Checkbox
                                   checked={selectedApproveVendors.includes(vendor.id)}
                                   onChange={() => {}} // Controlled by parent click
-                                  className="border-border data-[state=checked]:bg-green-600"
+                                  className="border-border data-[state=checked]:bg-success"
                                 />
                                 <h4 className="font-medium text-foreground">{vendor.name}</h4>
                               </div>
                               {vendor.responded && (
-                                <Badge className="bg-green-600 text-white text-xs">
+                                <Badge className="bg-success text-success-foreground text-xs">
                                   Responded
                                 </Badge>
                               )}
@@ -1452,7 +1406,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                 {vendor.quoteAmount && (
                                   <div>
                                     <div className="text-muted-foreground">Quote Amount</div>
-                                    <div className="font-medium text-green-400">${vendor.quoteAmount}</div>
+                                    <div className="font-medium text-success">${vendor.quoteAmount}</div>
                                   </div>
                                 )}
                                 {vendor.leadTimeDays && (
@@ -1466,7 +1420,7 @@ We look forward to your competitive proposal and establishing a successful partn
                           </div>
 
                           {selectedApproveVendors.includes(vendor.id) && (
-                            <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center ml-3">
+                            <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center ml-3">
                               <Check className="w-3 h-3 text-white" />
                             </div>
                           )}
@@ -1495,7 +1449,7 @@ We look forward to your competitive proposal and establishing a successful partn
                       <Button
                         onClick={handleConfirmApproval}
                         disabled={selectedApproveVendors.length === 0 || updateTrackingStatusMutation.isPending}
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className="bg-success hover:bg-success/90 text-success-foreground"
                       >
                         {updateTrackingStatusMutation.isPending ? (
                           <>
