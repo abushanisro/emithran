@@ -1,21 +1,29 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { formatDistanceToNow, isAfter } from 'date-fns';
 import { ArrowLeft, FileText, Send, Users, Calendar, Clock, CheckCircle, Mail, Download, Eye, Paperclip, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useState } from 'react';
+
+import { RfqStatusBadge } from '@/components/features/rfq/RfqStatusBadge';
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { apiConfig } from '@/lib/api/config';
+import { useBOMs } from '@/lib/api/hooks/useBOM';
+import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useRfqs } from '@/lib/api/hooks/useRfq';
 import { useRfqTrackingStats, useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
 import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
 import { useVendors } from '@/lib/api/hooks/useVendors';
-import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
-import { useBOMs } from '@/lib/api/hooks/useBOM';
-import { apiConfig } from '@/lib/api/config';
-import { formatDistanceToNow, isAfter } from 'date-fns';
-import { useState } from 'react';
+
 
 export default function RFQPage() {
   const params = useParams();
@@ -161,106 +169,59 @@ export default function RFQPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-[1800px] mx-auto space-y-6">
-        {/* BREADCRUMB & HEADER */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Link 
-                href={`/projects/${projectId}`}
-                className="flex items-center gap-1 hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-3 w-3" />
-                Back to Project
-              </Link>
-              <span>/</span>
-              <span>RFQ Management</span>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Request for Quotation (RFQ) Management
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Create and manage RFQ processes with nominated suppliers
-            </p>
-          </div>
-          <Button className="flex items-center gap-2" asChild>
-            <Link href={`/projects/${projectId}/supplier-evaluation`}>
-              <Send className="h-4 w-4" />
-              Create New RFQ
+    <div className="animate-fade-in">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-start gap-3">
+          <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to project" asChild>
+            <Link href={`/projects/${projectId}`}>
+              <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
+          <div className="min-w-0 flex-1">
+            <PageHeader
+              title="RFQ Management"
+              description="Create and manage RFQ processes with nominated suppliers"
+            >
+              <Button className="gap-2" asChild>
+                <Link href={`/projects/${projectId}/supplier-evaluation`}>
+                  <Send className="h-4 w-4" />
+                  Create New RFQ
+                </Link>
+              </Button>
+            </PageHeader>
+          </div>
         </div>
 
-        {/* OVERVIEW CARDS - Real Data */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active RFQs</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {rfqsLoading ? '-' : activeRfqsCount}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Currently in process
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Suppliers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {trackingLoading ? '-' : totalSuppliersInvited}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Invited to quote
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Responses</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {trackingLoading ? '-' : totalResponses}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Quotes received
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {trackingLoading ? '-' : avgResponseTime.toFixed(1)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Days to respond
-              </p>
-            </CardContent>
-          </Card>
+        {/* Overview cards */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Active RFQs', icon: FileText, value: rfqsLoading ? '-' : activeRfqsCount, hint: 'Currently in process' },
+            { label: 'Suppliers', icon: Users, value: trackingLoading ? '-' : totalSuppliersInvited, hint: 'Invited to quote' },
+            { label: 'Responses', icon: CheckCircle, value: trackingLoading ? '-' : totalResponses, hint: 'Quotes received' },
+            { label: 'Avg Response Time', icon: Clock, value: trackingLoading ? '-' : avgResponseTime.toFixed(1), hint: 'Days to respond' },
+          ].map(({ label, icon: Icon, value, hint }) => (
+            <Card key={label}>
+              <CardContent className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* MAIN CONTENT */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* ACTIVE RFQS - Real Data */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <FileText className="h-5 w-5" />
                 Active RFQs
               </CardTitle>
@@ -273,7 +234,7 @@ export default function RFQPage() {
                 {rfqsLoading ? (
                   <div className="space-y-4">
                     {[1, 2, 3].map(i => (
-                      <div key={i} className="flex items-center justify-between p-4 border rounded-lg animate-pulse">
+                      <div key={i} className="flex items-center justify-between gap-3 rounded-md border p-3 animate-pulse">
                         <div className="space-y-2">
                           <div className="h-4 w-48 bg-muted rounded"></div>
                           <div className="h-3 w-32 bg-muted rounded"></div>
@@ -298,18 +259,18 @@ export default function RFQPage() {
                         switch (status?.toLowerCase()) {
                           case 'sent':
                           case 'in_progress':
-                            return <Badge>Active</Badge>;
+                            return <RfqStatusBadge tone="primary">Active</RfqStatusBadge>;
                           case 'draft':
-                            return <Badge variant="outline">Draft</Badge>;
+                            return <RfqStatusBadge tone="warning">Draft</RfqStatusBadge>;
                           case 'closed':
-                            return <Badge variant="secondary">Closed</Badge>;
+                            return <RfqStatusBadge tone="muted">Closed</RfqStatusBadge>;
                           default:
-                            return <Badge variant="secondary">Pending</Badge>;
+                            return <RfqStatusBadge tone="muted">Pending</RfqStatusBadge>;
                         }
                       };
 
                       return (
-                        <div key={rfq.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div key={rfq.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
                           <div>
                             <p className="font-medium">{rfq.rfqName}</p>
                             <p className="text-sm text-muted-foreground">
@@ -346,7 +307,7 @@ export default function RFQPage() {
           {/* SUPPLIER RESPONSES - Real Data */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-5 w-5" />
                 Supplier Responses
               </CardTitle>
@@ -359,7 +320,7 @@ export default function RFQPage() {
                 {trackingLoading ? (
                   <div className="space-y-4">
                     {[1, 2, 3].map(i => (
-                      <div key={i} className="flex items-center justify-between p-4 border rounded-lg animate-pulse">
+                      <div key={i} className="flex items-center justify-between gap-3 rounded-md border p-3 animate-pulse">
                         <div className="space-y-2">
                           <div className="h-4 w-40 bg-muted rounded"></div>
                           <div className="h-3 w-56 bg-muted rounded"></div>
@@ -381,14 +342,14 @@ export default function RFQPage() {
                         
                         const getStatusBadge = (responded: boolean) => {
                           if (responded) {
-                            return <Badge>Received</Badge>;
+                            return <RfqStatusBadge tone="success">Received</RfqStatusBadge>;
                           } else {
-                            return <Badge variant="outline">Pending</Badge>;
+                            return <RfqStatusBadge tone="warning">Pending</RfqStatusBadge>;
                           }
                         };
 
                         return (
-                          <div key={`${record.id}-${vendor.id}`} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div key={`${record.id}-${vendor.id}`} className="flex items-center justify-between gap-3 rounded-md border p-3">
                             <div>
                               <p className="font-medium">{vendor.name || 'Unknown Vendor'}</p>
                               <p className="text-sm text-muted-foreground">
@@ -429,7 +390,7 @@ export default function RFQPage() {
         {/* BOM PARTS & EMAIL MANAGEMENT */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Mail className="h-5 w-5" />
               Email Management & BOM Parts
             </CardTitle>
@@ -440,20 +401,25 @@ export default function RFQPage() {
           <CardContent>
             <div className="space-y-6">
               {/* Email Management Tabs */}
-              <div className="flex items-center gap-1 border-b">
+              <div className="flex items-center gap-1 overflow-x-auto border-b" role="tablist" aria-label="Email management">
                 {['overview', 'compose', 'history'].map((tab) => (
-                  <Button
+                  <button
                     key={tab}
-                    variant={emailView === tab ? 'default' : 'ghost'}
-                    size="sm"
-                    className="capitalize"
-                    onClick={() => setEmailView(tab as any)}
+                    type="button"
+                    role="tab"
+                    aria-selected={emailView === tab}
+                    className={`-mb-px inline-flex h-10 items-center gap-2 border-b-2 px-3 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      emailView === tab
+                        ? 'border-primary text-foreground'
+                        : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                    }`}
+                    onClick={() => { setEmailView(tab as any); }}
                   >
-                    {tab === 'overview' && <Users className="h-4 w-4 mr-1" />}
-                    {tab === 'compose' && <Send className="h-4 w-4 mr-1" />}
-                    {tab === 'history' && <Clock className="h-4 w-4 mr-1" />}
+                    {tab === 'overview' && <Users className="h-4 w-4" />}
+                    {tab === 'compose' && <Send className="h-4 w-4" />}
+                    {tab === 'history' && <Clock className="h-4 w-4" />}
                     {tab}
-                  </Button>
+                  </button>
                 ))}
               </div>
 
@@ -583,12 +549,12 @@ export default function RFQPage() {
                                             </p>
                                             {(bomItem.file2dPath || bomItem.file3dPath) && (
                                               <p className="text-xs">
-                                                Files: {bomItem.file2dPath ? '✓ 2D' : '✗ 2D'} | {bomItem.file3dPath ? '✓ 3D' : '✗ 3D'}
+                                                Files: {bomItem.file2dPath ? 'Available' : 'Missing'} 2D | {bomItem.file3dPath ? 'Available' : 'Missing'} 3D
                                               </p>
                                             )}
                                           </div>
                                         ) : (
-                                          <div className="mt-2 p-2 bg-orange-50 rounded text-xs text-orange-800">
+                                          <div className="mt-2 p-2 bg-warning/10 rounded text-xs text-warning">
                                             <p className="flex items-center gap-1">
                                               <AlertCircle className="h-3 w-3" />
                                               No BOM item found for part: {part.partNumber}
@@ -606,7 +572,7 @@ export default function RFQPage() {
                                       {trackingRecord.vendors?.filter(v => v.responded).length > 0 ? (
                                         <div className="space-y-1">
                                           {trackingRecord.vendors.filter(v => v.responded).map(vendor => (
-                                            <div key={vendor.id} className="flex items-center justify-between text-xs p-2 bg-green-50 rounded">
+                                            <div key={vendor.id} className="flex items-center justify-between text-xs p-2 bg-success/10 rounded">
                                               <span>{vendor.name}</span>
                                               <span className="font-medium">
                                                 {vendor.quoteAmount ? 
@@ -646,9 +612,9 @@ export default function RFQPage() {
                                 <div key={vendor.id} className="flex items-center justify-between p-2 border rounded text-sm">
                                   <span>{vendor.name}</span>
                                   <div className="flex items-center gap-2">
-                                    <Badge variant={vendor.responded ? "default" : "outline"}>
+                                    <RfqStatusBadge tone={vendor.responded ? 'success' : 'warning'}>
                                       {vendor.responded ? 'Responded' : 'Pending'}
-                                    </Badge>
+                                    </RfqStatusBadge>
                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                                       <Mail className="h-3 w-3" />
                                     </Button>
@@ -673,12 +639,12 @@ export default function RFQPage() {
               {/* Compose Email */}
               {emailView === 'compose' && (
                 <div className="space-y-4">
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-4">Compose Email to Suppliers</h4>
+                  <div className="rounded-md border p-4">
+                    <h4 className="mb-4 font-medium">Compose Email to Suppliers</h4>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium">Select RFQ</label>
-                        <select className="w-full mt-1 p-2 border rounded">
+                        <Label className="text-sm font-medium">Select RFQ</Label>
+                        <select className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <option>Select an RFQ...</option>
                           {rfqs?.map(rfq => (
                             <option key={rfq.id} value={rfq.id}>
@@ -688,11 +654,11 @@ export default function RFQPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-sm font-medium">Recipients</label>
+                        <Label className="text-sm font-medium">Recipients</Label>
                         <div className="mt-2 space-y-2">
                           {trackingRecords?.[0]?.vendors?.map(vendor => (
                             <label key={vendor.id} className="flex items-center gap-2">
-                              <input type="checkbox" className="rounded" defaultChecked />
+                              <Checkbox defaultChecked />
                               <span className="text-sm">{vendor.name}</span>
                               {vendor.email && (
                                 <span className="text-xs text-muted-foreground">({vendor.email})</span>
@@ -702,8 +668,8 @@ export default function RFQPage() {
                         </div>
                       </div>
                       <div>
-                        <label className="text-sm font-medium">Email Template</label>
-                        <select className="w-full mt-1 p-2 border rounded">
+                        <Label className="text-sm font-medium">Email Template</Label>
+                        <select className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <option>RFQ Invitation</option>
                           <option>Follow-up Reminder</option>
                           <option>Deadline Extension</option>
@@ -711,17 +677,17 @@ export default function RFQPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-sm font-medium">Subject</label>
-                        <input 
-                          type="text" 
-                          className="w-full mt-1 p-2 border rounded" 
+                        <Label className="text-sm font-medium">Subject</Label>
+                        <Input
+                          type="text"
+                          className="mt-1"
                           placeholder="RFQ Request - [RFQ Number]"
                         />
                       </div>
                       <div>
-                        <label className="text-sm font-medium">Message</label>
-                        <textarea 
-                          className="w-full mt-1 p-2 border rounded h-32" 
+                        <Label className="text-sm font-medium">Message</Label>
+                        <Textarea
+                          className="mt-1 h-32"
                           placeholder="Enter your message here..."
                         />
                       </div>
@@ -740,8 +706,8 @@ export default function RFQPage() {
               {/* Email History */}
               {emailView === 'history' && (
                 <div className="space-y-4">
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-4">Email Communication History</h4>
+                  <div className="rounded-md border p-4">
+                    <h4 className="mb-4 font-medium">Email Communication History</h4>
                     {/* Sent RFQs from /rfq/tracking — the only record of RFQ emails the backend keeps. */}
                     <div className="space-y-3">
                       {trackingLoading ? (
@@ -780,7 +746,7 @@ export default function RFQPage() {
         {/* RFQ TEMPLATES & MANAGEMENT */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Calendar className="h-5 w-5" />
               RFQ Templates & Management
             </CardTitle>
