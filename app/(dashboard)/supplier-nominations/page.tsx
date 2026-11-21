@@ -1,12 +1,5 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import {
   Package,
   Users,
@@ -19,11 +12,21 @@ import {
   ArrowUpRight,
   Loader2
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, useMemo } from 'react';
+
+import { toneClasses } from '@/components/features/supplier-nominations/tone';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
 import { useProjects } from '@/lib/api/hooks/useProjects';
 import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
 import {
-  NominationStatus,
   NominationType,
+  getStatusColor,
   getStatusText,
   getNominationTypeLabel,
   type SupplierNominationSummary
@@ -70,63 +73,47 @@ function SupplierNominationsGlobalContent({
   router,
 }: SupplierNominationsGlobalContentProps) {
   return (
-    <div className="space-y-8">
-      {/* OEM Executive Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-linear-to-br from-card/90 via-card to-primary/5 p-6 md:p-8 shadow-xs">
-        <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-        <div className="absolute right-1/4 -bottom-12 h-48 w-48 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
+    <div className="space-y-6">
+      <PageHeader
+        title="Supplier Nominations Portfolio"
+        description="Evaluate and nominate suppliers, allocate BOM parts and track program readiness across all projects"
+      >
+        <Button onClick={() => router.push('/projects')} className="gap-2">
+          <Plus className="h-4 w-4" />
+          New Nomination Group
+        </Button>
+      </PageHeader>
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-              Supplier Nominations Portfolio
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-              Evaluate and nominate suppliers for OEM and manufacturing partnerships, allocate BOM parts, and track program readiness across all projects.
-            </p>
-          </div>
+      {/* Global KPIs */}
+      <GlobalNominationsSummary projects={projects} />
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={() => router.push('/projects')}
-              size="lg"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md shadow-primary/20 transition-all hover:scale-[1.02]"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Nomination Group
-            </Button>
-          </div>
-        </div>
-
-        {/* Global Executive KPIs Row */}
-        <GlobalNominationsSummary projects={projects} />
-      </div>
-
-      {/* Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/80 p-4 backdrop-blur-sm">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Toolbar: search and category filter */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
+            aria-label="Search nominations"
             placeholder="Search nominations by name or project..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-background/80 border-border/80 text-foreground placeholder:text-muted-foreground"
+            onChange={(e) => { setSearchTerm(e.target.value); }}
+            className="h-9 pl-9"
           />
         </div>
 
-        {/* Category Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto p-1 rounded-lg bg-muted/50 border border-border/40">
+        <div role="group" aria-label="Filter by category" className="flex items-center gap-1 overflow-x-auto rounded-md border bg-muted/40 p-0.5">
           {(['all', NominationType.OEM, NominationType.MANUFACTURER, NominationType.HYBRID] as const).map((type) => {
             const isActive = selectedType === type;
             const label = type === 'all' ? 'All Groups' : getNominationTypeLabel(type as NominationType);
             return (
               <button
                 key={type}
-                onClick={() => setSelectedType(type)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                type="button"
+                onClick={() => { setSelectedType(type); }}
+                aria-pressed={isActive}
+                className={`whitespace-nowrap rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive
                     ? 'bg-background text-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {label}
@@ -138,10 +125,10 @@ function SupplierNominationsGlobalContent({
 
       {/* Project Nominations Grid */}
       {isLoadingProjects ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse border border-border/50 bg-card">
-              <CardContent className="p-6 space-y-4">
+            <Card key={i} className="animate-pulse">
+              <CardContent className="space-y-4 p-5">
                 <div className="h-5 bg-muted rounded w-2/3" />
                 <div className="h-4 bg-muted rounded w-1/3" />
                 <div className="h-20 bg-muted rounded-lg" />
@@ -150,18 +137,15 @@ function SupplierNominationsGlobalContent({
           ))}
         </div>
       ) : projects.length === 0 ? (
-        <Card className="border border-dashed border-border/80 bg-card/40 py-16 text-center">
+        <Card>
           <CardContent>
             <EmptyState
               icon={Award}
               title="No projects found"
               description="Create an OEM project first to start supplier nominations and allocation programs."
             >
-              <Button
-                onClick={() => router.push('/projects')}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-              >
-                <FolderKanban className="h-4 w-4 mr-2" />
+              <Button onClick={() => router.push('/projects')} className="gap-2">
+                <FolderKanban className="h-4 w-4" />
                 Go to Projects
               </Button>
             </EmptyState>
@@ -181,57 +165,30 @@ function SupplierNominationsGlobalContent({
 
 function GlobalNominationsSummary({ projects }: { projects: any[] }) {
   // We compute total projects count and summarize display
+  const tiles = [
+    { label: 'Active Projects', icon: Layers, value: String(projects.length), hint: 'groups' },
+    { label: 'Vendor Allocation', icon: Users, value: 'Multi-OEM', hint: 'network' },
+    { label: 'Allocation Method', icon: CheckCircle2, value: 'BOM Part & Process', hint: undefined },
+    { label: 'Nomination Engine', icon: Package, value: 'Active', hint: undefined },
+  ];
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border/40">
-      <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Layers className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Projects</p>
-          <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="text-2xl font-bold text-foreground">{projects.length}</span>
-            <span className="text-xs text-muted-foreground">groups</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Users className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vendor Allocation</p>
-          <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="text-2xl font-bold text-foreground">Multi-OEM</span>
-            <span className="text-xs text-muted-foreground">network</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-          <CheckCircle2 className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Allocation Method</p>
-          <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="text-lg font-bold text-foreground">BOM Part &amp; Process</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500">
-          <Package className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nomination Engine</p>
-          <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="text-lg font-bold text-foreground">Active</span>
-          </div>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {tiles.map(({ label, icon: Icon, value, hint }) => (
+        <Card key={label}>
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+              <p className="mt-1 flex items-baseline gap-2">
+                <span className="truncate text-xl font-semibold tracking-tight">{value}</span>
+                {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+              </p>
+            </div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Icon className="h-4 w-4" aria-hidden="true" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -248,7 +205,7 @@ function AllProjectsNominationsList({
   router: any;
 }) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {projects.map((project) => (
         <ProjectNominationsSection
           key={project.id}
@@ -296,8 +253,8 @@ function ProjectNominationsSection({
 
   if (isLoading) {
     return (
-      <Card className="border border-border/50 bg-card/60">
-        <CardContent className="p-6">
+      <Card>
+        <CardContent className="p-5">
           <div className="animate-pulse flex items-center gap-4">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             <div className="h-4 bg-muted rounded w-48" />
@@ -317,7 +274,7 @@ function ProjectNominationsSection({
             <FolderKanban className="h-4.5 w-4.5" />
           </div>
           <div>
-            <h3 className="font-bold text-foreground text-base">{project.name}</h3>
+            <h3 className="text-base font-semibold text-foreground">{project.name}</h3>
             <p className="text-xs text-muted-foreground">
               {filtered.length} nomination group{filtered.length !== 1 ? 's' : ''}
             </p>
@@ -334,7 +291,7 @@ function ProjectNominationsSection({
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((nomination) => (
           <GlobalOEMNominationCard
             key={nomination.id}
@@ -360,35 +317,20 @@ function GlobalOEMNominationCard({
   const statusText = getStatusText(nomination.status);
   const typeLabel = getNominationTypeLabel(nomination.nominationType);
 
-  const isCompleted = nomination.status === NominationStatus.COMPLETED || nomination.status === NominationStatus.APPROVED;
-  const isInProgress = nomination.status === NominationStatus.IN_PROGRESS;
+  const completion = Math.min(100, Math.max(0, nomination.completionPercentage || 0));
 
   return (
     <Card
       onClick={onSelect}
-      className="group relative flex flex-col justify-between rounded-xl border border-border/60 bg-card/90 shadow-xs hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer overflow-hidden"
+      className="group relative flex cursor-pointer flex-col overflow-hidden transition-colors hover:border-primary/50"
     >
-      {/* Top accent bar */}
-      <div className="h-1.5 w-full bg-linear-to-r from-primary/80 via-teal-500 to-brand-500 opacity-80 group-hover:opacity-100 transition-opacity" />
-
-      <CardContent className="p-6 flex-1 flex flex-col justify-between space-y-5">
-        {/* Title, Badges & Status */}
+      <CardContent className="flex flex-1 flex-col gap-5 p-5">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-1.5">
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
-                isCompleted
-                  ? 'bg-primary/10 text-primary dark:text-primary border-primary/30'
-                  : isInProgress
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-              }`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${toneClasses(getStatusColor(nomination.status))}`}
             >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  isCompleted ? 'bg-brand-500' : isInProgress ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                }`}
-              />
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />
               {statusText}
             </span>
 
@@ -399,15 +341,15 @@ function GlobalOEMNominationCard({
           </div>
 
           <div>
-            <h3 className="text-lg font-bold text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-1">
+            <h3 className="line-clamp-1 text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-primary">
               {nomination.nominationName || 'Unnamed Nomination Group'}
             </h3>
-            <div className="flex items-center gap-1.5 mt-1.5">
+            <div className="mt-1.5 flex items-center gap-1.5">
               <Badge variant="secondary" className="text-[11px] font-medium">
                 {typeLabel}
               </Badge>
               {nomination.bomPartsCount && nomination.bomPartsCount > 0 && (
-                <Badge variant="outline" className="text-[11px] border-primary/40 text-primary bg-primary/5">
+                <Badge variant="outline" className="border-primary/40 bg-primary/5 text-[11px] text-primary">
                   BOM-Based
                 </Badge>
               )}
@@ -415,59 +357,49 @@ function GlobalOEMNominationCard({
           </div>
         </div>
 
-        {/* OEM Procurement Metrics Box */}
-        <div className="grid grid-cols-2 gap-3 rounded-xl bg-muted/30 border border-border/40 p-3.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Users className="h-4.5 w-4.5" />
-            </div>
+        <dl className="grid grid-cols-2 divide-x rounded-md border bg-muted/30">
+          <div className="flex items-center gap-3 p-3">
+            <Users className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <div>
-              <p className="text-lg font-bold text-foreground leading-none">{nomination.vendorCount || 0}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Vendors</p>
+              <dd className="text-lg font-semibold leading-none tabular-nums text-foreground">{nomination.vendorCount || 0}</dd>
+              <dt className="mt-1 text-[11px] text-muted-foreground">Vendors</dt>
             </div>
           </div>
-
-          <div className="flex items-center gap-3 border-l border-border/40 pl-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-500">
-              <Package className="h-4.5 w-4.5" />
-            </div>
+          <div className="flex items-center gap-3 p-3">
+            <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <div>
-              <p className="text-lg font-bold text-foreground leading-none">{nomination.bomPartsCount || 0}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">BOM Parts</p>
+              <dd className="text-lg font-semibold leading-none tabular-nums text-foreground">{nomination.bomPartsCount || 0}</dd>
+              <dt className="mt-1 text-[11px] text-muted-foreground">BOM Parts</dt>
             </div>
           </div>
-        </div>
+        </dl>
 
-        {/* Completion Bar */}
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-1.5">
           <div className="flex justify-between text-[11px]">
             <span className="font-medium text-muted-foreground">Allocation Progress</span>
-            <span className="font-semibold text-foreground">{nomination.completionPercentage || 0}%</span>
+            <span className="font-semibold tabular-nums text-foreground">{nomination.completionPercentage || 0}%</span>
           </div>
-          <div className="w-full bg-muted/70 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-linear-to-r from-primary to-teal-500 h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, Math.max(0, nomination.completionPercentage || 0))}%` }}
-            />
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={completion} aria-valuemin={0} aria-valuemax={100}>
+            <div className="h-1.5 rounded-full bg-primary transition-all duration-500" style={{ width: `${completion}%` }} />
           </div>
         </div>
 
-        {/* Footer Actions & Metadata */}
-        <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-2">
+        <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3">
           <span className="text-[11px] text-muted-foreground">
             Created {new Date(nomination.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
 
           <Button
             size="sm"
-            className="h-8 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-xs font-semibold px-3 transition-all group-hover:translate-x-0.5"
+            variant="outline"
+            className="h-8 gap-1 text-xs"
             onClick={(e) => {
               e.stopPropagation();
               onSelect();
             }}
           >
             Open Nomination
-            <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       </CardContent>

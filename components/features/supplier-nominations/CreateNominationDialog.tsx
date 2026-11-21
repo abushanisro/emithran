@@ -1,11 +1,5 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Building2,
   CheckCircle,
@@ -17,13 +11,20 @@ import {
   ChevronUp,
   Search
 } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import { useCreateSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
-import { useVendors } from '@/lib/api/hooks/useVendors';
-import { useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
-import { useSupplierEvaluations } from '@/lib/api/hooks/useSupplierEvaluation';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
+import { useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
+import { useSupplierEvaluations } from '@/lib/api/hooks/useSupplierEvaluation';
+import { useCreateSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
+import { useVendors } from '@/lib/api/hooks/useVendors';
 import {
   NominationType,
   type CreateSupplierNominationData
@@ -399,7 +400,7 @@ export function CreateNominationDialog({
       case 'oem':
         return <Award className="h-4 w-4 text-primary" />;
       case 'manufacturer':
-        return <Factory className="h-4 w-4 text-green-400" />;
+        return <Factory className="h-4 w-4 text-success" />;
       default:
         return <Building2 className="h-4 w-4 text-muted-foreground" />;
     }
@@ -410,9 +411,9 @@ export function CreateNominationDialog({
 
     const responseRate = stats.responseCount || 0;
     if (responseRate >= 3) {
-      return <Badge variant="outline" className="border-green-500 text-green-400">Highly Reliable</Badge>;
+      return <Badge variant="outline" className="border-success/40 text-success">Highly Reliable</Badge>;
     } else if (responseRate >= 2) {
-      return <Badge variant="outline" className="border-yellow-500 text-yellow-400">Reliable</Badge>;
+      return <Badge variant="outline" className="border-warning/40 text-warning">Reliable</Badge>;
     }
     return <Badge variant="outline" className="border-border text-muted-foreground">New Vendor</Badge>;
   };
@@ -756,7 +757,7 @@ export function CreateNominationDialog({
                   <div className="text-sm text-primary">
                     <strong>{selectedVendorIds.length} of 4</strong> vendor(s) selected for nomination
                     {selectedVendorIds.length === 4 && (
-                      <span className="ml-2 text-yellow-400">(Maximum reached)</span>
+                      <span className="ml-2 text-warning">(Maximum reached)</span>
                     )}
                   </div>
                 </div>

@@ -1,13 +1,5 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TableSkeleton } from '@/components/ui/loading-skeleton';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
     BarChart3,
     TrendingUp,
@@ -19,9 +11,21 @@ import {
     Save,
     X
 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { useSupplierNomination, useUpdateVendorEvaluation } from '@/lib/api/hooks/useSupplierNominations';
 import { Recommendation, getRiskLevelColor, getRecommendationColor, type VendorEvaluation } from '@/lib/api/supplier-nominations';
-import { toast } from 'sonner';
+
+
+import { toneClasses } from './tone';
 
 // Helper functions for score calculation with evaluation data priority
 const getCostScore = (evaluation: VendorEvaluation, evaluationData?: any, realTimeCostScore?: number): number => {
@@ -293,7 +297,7 @@ export function SupplierEvaluationDashboard({
     if (!evaluation) {
         return (
             <div className="text-center py-12 bg-card rounded-xl border border-border">
-                <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-foreground">Evaluation Data Not Found</h3>
                 <p className="text-muted-foreground">Could not find evaluation records for this supplier.</p>
             </div>
@@ -312,13 +316,13 @@ export function SupplierEvaluationDashboard({
                         {isEditingWeights && (
                             <p className="text-sm text-muted-foreground mt-1">
                                 Total: <span className={`font-medium ${weights.costWeight + weights.vendorWeight + weights.capabilityWeight === 100
-                                    ? 'text-green-400'
-                                    : 'text-yellow-400'
+                                    ? 'text-success'
+                                    : 'text-warning'
                                     }`}>
                                     {weights.costWeight + weights.vendorWeight + weights.capabilityWeight}%
                                 </span>
                                 {weights.costWeight + weights.vendorWeight + weights.capabilityWeight !== 100 && (
-                                    <span className="text-yellow-400 ml-2">(Should equal 100%)</span>
+                                    <span className="text-warning ml-2">(Should equal 100%)</span>
                                 )}
                             </p>
                         )}
@@ -390,7 +394,7 @@ export function SupplierEvaluationDashboard({
                             <div className="flex items-baseline gap-2 mt-2">
                                 <h3 className="text-3xl font-bold text-foreground">{getCostScore(evaluation, evaluationData, costScore).toFixed(1)}%</h3>
                             </div>
-                            <div className="flex items-center gap-1 mt-4 text-xs text-green-400">
+                            <div className="flex items-center gap-1 mt-4 text-xs text-success">
                                 <TrendingUp className="h-3 w-3" />
                                 <span>Cost Analysis</span>
                             </div>
@@ -420,7 +424,7 @@ export function SupplierEvaluationDashboard({
                                 <h3 className="text-3xl font-bold text-foreground">{getVendorRatingScore(evaluation, evaluationData, ratingEngineScore).toFixed(1)}%</h3>
                                 <Badge
                                     variant="outline"
-                                    className={`text-[10px] border-${getRiskLevelColor(evaluationData?.overview?.risk_level || evaluation.riskLevel)}-500 text-${getRiskLevelColor(evaluationData?.overview?.risk_level || evaluation.riskLevel)}-400 font-bold`}
+                                    className={`text-[10px] font-bold ${toneClasses(getRiskLevelColor(evaluationData?.overview?.risk_level || evaluation.riskLevel))}`}
                                 >
                                     {(evaluationData?.overview?.risk_level || evaluation.riskLevel).toUpperCase()}
                                 </Badge>
@@ -481,7 +485,7 @@ export function SupplierEvaluationDashboard({
                         <div className="p-4 bg-card/50 rounded-xl border border-border text-center">
                             <p className="text-xs text-muted-foreground uppercase font-black tracking-widest mb-3">Recommendation</p>
                             <Badge
-                                className={`px-6 py-2 text-sm font-bold bg-${getRecommendationColor(evaluationData?.overview?.recommendation || evaluation.recommendation || Recommendation.PENDING)}-500/10 text-${getRecommendationColor(evaluationData?.overview?.recommendation || evaluation.recommendation || Recommendation.PENDING)}-400 border-${getRecommendationColor(evaluationData?.overview?.recommendation || evaluation.recommendation || Recommendation.PENDING)}-500/50`}
+                                className={`px-6 py-2 text-sm font-bold ${toneClasses(getRecommendationColor(evaluationData?.overview?.recommendation || evaluation.recommendation || Recommendation.PENDING))}`}
                                 variant="outline"
                             >
                                 {(evaluationData?.overview?.recommendation || evaluation.recommendation)?.toUpperCase() || 'PENDING'}
@@ -524,7 +528,7 @@ export function SupplierEvaluationDashboard({
                                             size="sm"
                                             onClick={handleSave}
                                             disabled={updateEvaluationMutation.isPending}
-                                            className="bg-green-600 hover:bg-green-700"
+                                            className="bg-success hover:bg-success/90 text-success-foreground"
                                         >
                                             <Save className="h-4 w-4 mr-1" />
                                             Save
@@ -580,7 +584,7 @@ export function SupplierEvaluationDashboard({
 
                         <div className="pt-4 border-t border-border flex flex-wrap gap-4">
                             <div className="flex items-center gap-2 bg-card/50 px-4 py-2 rounded-full border border-border">
-                                <DollarSign className="h-4 w-4 text-green-400" />
+                                <DollarSign className="h-4 w-4 text-success" />
                                 <span className="text-xs text-foreground/80 font-medium">Cost Ratio: <span className="text-foreground italic">{calculateCostRatio(evaluation, evaluationData).toFixed(2)}</span></span>
                             </div>
                             <div className="flex items-center gap-2 bg-card/50 px-4 py-2 rounded-full border border-border">
@@ -588,7 +592,7 @@ export function SupplierEvaluationDashboard({
                                 <span className="text-xs text-foreground/80 font-medium">Response Rate: <span className="text-foreground italic">{calculateResponseRate(evaluation, evaluationData)}</span></span>
                             </div>
                             <div className="flex items-center gap-2 bg-card/50 px-4 py-2 rounded-full border border-border">
-                                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                                <ShieldCheck className="h-4 w-4 text-success" />
                                 <span className="text-xs text-foreground/80 font-medium">Compliance: <span className="text-foreground italic">{calculateCompliance(evaluation, evaluationData).toFixed(0)}%</span></span>
                             </div>
                         </div>

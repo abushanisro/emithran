@@ -1,11 +1,5 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-
 import {
   ArrowLeft,
   Save,
@@ -15,11 +9,13 @@ import {
   DollarSign,
   Edit
 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import {
-  useSupplierNomination
-} from '@/lib/api/hooks/useSupplierNominations';
-// import { useVendors } from '@/lib/api/hooks/useVendors';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   getCapabilityScores,
   initializeCapabilityScores,
@@ -29,19 +25,27 @@ import {
   type BatchCapabilityUpdate
 } from '@/lib/api/capability-scoring';
 import {
+  useSupplierNomination
+} from '@/lib/api/hooks/useSupplierNominations';
+// import { useVendors } from '@/lib/api/hooks/useVendors';
+import {
   Recommendation,
   getRiskLevelColor,
   getRecommendationColor,
   type VendorEvaluation,
   type NominationCriteria
 } from '@/lib/api/supplier-nominations';
-import { VendorRatingEngine } from './VendorRatingEngine';
-import { CostCompetencyAnalysis } from './CostCompetencyAnalysis';
-import { SupplierEvaluationDashboard } from './SupplierEvaluationDashboard';
 import {
   getVendorRatingOverallScores,
   type VendorRatingOverallScores
 } from '@/lib/api/vendor-rating-matrix';
+
+import { CostCompetencyAnalysis } from './CostCompetencyAnalysis';
+import { SupplierEvaluationDashboard } from './SupplierEvaluationDashboard';
+import { toneClasses } from './tone';
+import { VendorRatingEngine } from './VendorRatingEngine';
+
+
 
 interface DetailedEvaluationViewProps {
   evaluation: VendorEvaluation;
@@ -449,7 +453,7 @@ export function DetailedEvaluationView({
             {isEditingCapability ? (
               <>
                 {Object.keys(editingCapabilityScores).length > 0 && (
-                  <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                  <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/30">
                     {Object.values(editingCapabilityScores).reduce((count, vendorScores) =>
                       count + Object.keys(vendorScores).length, 0
                     )} unsaved changes
@@ -458,7 +462,7 @@ export function DetailedEvaluationView({
                 <Button
                   onClick={saveCapabilityScores}
                   disabled={isSavingCapability || Object.keys(editingCapabilityScores).length === 0}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-success hover:bg-success/90 text-success-foreground"
                   size="sm"
                 >
                   {isSavingCapability ? (
@@ -593,8 +597,8 @@ export function DetailedEvaluationView({
 // renderTechnicalTab function removed
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="animate-fade-in">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-4">
@@ -614,7 +618,7 @@ export function DetailedEvaluationView({
               <div className="flex items-center gap-3 mt-2">
                 <Badge
                   variant="outline"
-                  className={`border-${getRecommendationColor(evaluation.recommendation || Recommendation.PENDING)}-500 text-${getRecommendationColor(evaluation.recommendation || Recommendation.PENDING)}-400`}
+                  className={toneClasses(getRecommendationColor(evaluation.recommendation || Recommendation.PENDING))}
                 >
                   {evaluation.recommendation?.toUpperCase() || 'PENDING'}
                 </Badge>
@@ -623,7 +627,7 @@ export function DetailedEvaluationView({
                 </Badge>
                 <Badge
                   variant="outline"
-                  className={`border-${getRiskLevelColor(evaluation.riskLevel)}-500 text-${getRiskLevelColor(evaluation.riskLevel)}-400`}
+                  className={toneClasses(getRiskLevelColor(evaluation.riskLevel))}
                 >
                   {evaluation.riskLevel.toUpperCase()} RISK
                 </Badge>

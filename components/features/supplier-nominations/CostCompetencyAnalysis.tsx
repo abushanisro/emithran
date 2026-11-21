@@ -1,29 +1,5 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  getFactorWeights,
-  getPartWiseCostAnalysis,
-  initializePartWiseCostAnalysis,
-  bulkUpdatePartWiseCostAnalysis,
-  type PartWiseCostAnalysis,
-  type PartWiseCostBaseData,
-  type BulkUpdatePartWiseCostAnalysisData
-} from '@/lib/api/supplier-nominations';
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DollarSign,
   TrendingDown,
@@ -35,7 +11,31 @@ import {
   Save,
   Package
 } from 'lucide-react';
+import React, { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  getFactorWeights,
+  getPartWiseCostAnalysis,
+  initializePartWiseCostAnalysis,
+  bulkUpdatePartWiseCostAnalysis,
+  type PartWiseCostAnalysis,
+  type PartWiseCostBaseData,
+  type BulkUpdatePartWiseCostAnalysisData
+} from '@/lib/api/supplier-nominations';
 import { rankAscending, weightedRankScore } from '@/lib/utils/rank';
 
 export interface CostCompetencyData {
@@ -875,10 +875,10 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
 
   const getRankingColor = (rank: number) => {
     switch (rank) {
-      case 1: return 'bg-green-500/20 text-green-400 border-green-500';
+      case 1: return 'bg-success/10 text-success border-success/40';
       case 2: return 'bg-primary/20 text-primary border-primary/40';
-      case 3: return 'bg-yellow-500/20 text-yellow-400 border-yellow-500';
-      case 4: return 'bg-red-500/20 text-red-400 border-red-500';
+      case 3: return 'bg-warning/10 text-warning border-warning/40';
+      case 4: return 'bg-destructive/10 text-destructive border-destructive/40';
       default: return 'bg-muted-foreground/20 text-muted-foreground border-border';
     }
   };
@@ -966,8 +966,8 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                         <span className="text-muted-foreground text-xs">Top Vendor:</span>
                         {partSummary.topVendor ? (
                           <div className="flex items-center gap-1">
-                            <Award className="h-3 w-3 text-green-400" />
-                            <span className="text-green-400 text-xs font-medium">
+                            <Award className="h-3 w-3 text-success" />
+                            <span className="text-success text-xs font-medium">
                               {partSummary.topVendor.name}
                             </span>
                           </div>
@@ -988,7 +988,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                       {partSummary.lowestCost > 0 && (
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground text-xs">Best Price:</span>
-                          <span className="text-green-400 text-xs font-medium">
+                          <span className="text-success text-xs font-medium">
                             {partSummary.lowestCost.toFixed(2)}
                           </span>
                         </div>
@@ -1062,7 +1062,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
               {selectedBomItemId && (
                 <div className="flex items-center gap-2 text-sm text-foreground/80">
                   <span>Selected:</span>
-                  <Badge variant="outline" className="border-green-500 text-green-400">
+                  <Badge variant="outline" className="border-success/40 text-success">
                     {availableBomParts.find(part => part.bomItemId === selectedBomItemId)?.bomItemName}
                   </Badge>
                 </div>
@@ -1106,14 +1106,14 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                 {isEditingCost ? (
                   <>
                     {Object.keys(editingCostValues).length > 0 && (
-                      <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                      <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/30">
                         {Object.keys(editingCostValues).length} unsaved changes
                       </Badge>
                     )}
                     <Button
                       onClick={saveCostData}
                       disabled={isSavingCost || Object.keys(editingCostValues).length === 0}
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-success hover:bg-success/90 text-success-foreground"
                       size="sm"
                     >
                       {isSavingCost ? (
@@ -1159,7 +1159,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                   <TableHead className="text-foreground/80 font-medium w-[200px]">Cost Component</TableHead>
                   <TableHead className="text-center text-foreground/80 font-medium w-[120px]">Base/Reference</TableHead>
                   {vendors.length > 0 ? vendors.map((vendor, index) => {
-                    const colors = ['text-primary', 'text-green-400', 'text-yellow-400', 'text-primary'];
+                    const colors = ['text-primary', 'text-success', 'text-warning', 'text-primary'];
                     return (
                       <TableHead key={vendor.id} className={`text-center ${colors[index % colors.length]} font-medium w-[100px]`}>
                         {vendor.name}
@@ -1168,8 +1168,8 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                   }) : (
                     <>
                       <TableHead className="text-center text-primary font-medium w-[100px]">Supplier-1</TableHead>
-                      <TableHead className="text-center text-green-400 font-medium w-[100px]">Supplier-2</TableHead>
-                      <TableHead className="text-center text-yellow-400 font-medium w-[100px]">Supplier-3</TableHead>
+                      <TableHead className="text-center text-success font-medium w-[100px]">Supplier-2</TableHead>
+                      <TableHead className="text-center text-warning font-medium w-[100px]">Supplier-3</TableHead>
                       <TableHead className="text-center text-primary font-medium w-[100px]">Supplier-4</TableHead>
                     </>
                   )}
@@ -1266,7 +1266,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                     ) : (
                       // Regular Numeric Values - Edit Mode Pattern  
                       row.supplierValues.map((_, index) => {
-                        const colors = ['text-primary', 'text-green-400', 'text-yellow-400', 'text-primary'];
+                        const colors = ['text-primary', 'text-success', 'text-warning', 'text-primary'];
                         const colorClass = colors[index % colors.length];
                         const currentValue = getCurrentSupplierValue(row.id, index);
 

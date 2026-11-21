@@ -1,17 +1,5 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   ArrowLeft,
   Download,
@@ -24,7 +12,28 @@ import {
   Undo2,
   Plus,
 } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
+
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  getCapabilityScores,
+} from '@/lib/api/capability-scoring';
+import {
+  getCostAnalysis,
+  transformCostAnalysisToComponentData,
+} from '@/lib/api/cost-competency';
 import {
   useSupplierNomination,
   useSupplierNominations,
@@ -33,7 +42,6 @@ import {
   useCompleteSupplierNomination,
   useAddVendorsToNomination,
 } from '@/lib/api/hooks/useSupplierNominations';
-import { VendorSelectionModal } from './VendorSelectionModal';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import {
   Recommendation,
@@ -46,16 +54,12 @@ import {
   type NominationCriteria,
 } from '@/lib/api/supplier-nominations';
 import {
-  getCostAnalysis,
-  transformCostAnalysisToComponentData,
-} from '@/lib/api/cost-competency';
-import {
   getVendorRatingOverallScores,
   type VendorRatingOverallScores,
 } from '@/lib/api/vendor-rating-matrix';
-import {
-  getCapabilityScores,
-} from '@/lib/api/capability-scoring';
+
+import { toneClasses } from './tone';
+import { VendorSelectionModal } from './VendorSelectionModal';
 
 // ---------------------------------------------------------------------------
 // Score calculation helpers
@@ -338,20 +342,20 @@ function SupplierCard({
   const getRecommendationIcon = (recommendation: Recommendation) => {
     switch (recommendation) {
       case Recommendation.APPROVED:
-        return <CheckCircle className="h-4 w-4 text-green-400" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case Recommendation.CONDITIONAL:
-        return <AlertTriangle className="h-4 w-4 text-yellow-400" />;
+        return <AlertTriangle className="h-4 w-4 text-warning" />;
       case Recommendation.REJECTED:
-        return <XCircle className="h-4 w-4 text-red-400" />;
+        return <XCircle className="h-4 w-4 text-destructive" />;
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getRankColor = (r: number) => {
-    if (r === 1) return 'text-green-400 bg-green-400/20';
+    if (r === 1) return 'text-success bg-success/15';
     if (r === 2) return 'text-primary bg-primary/20';
-    if (r === 3) return 'text-orange-400 bg-orange-400/20';
+    if (r === 3) return 'text-warning bg-warning/15';
     return 'text-muted-foreground bg-muted-foreground/20';
   };
 
@@ -421,7 +425,7 @@ function SupplierCard({
               <div className="flex items-center gap-2 mt-1">
                 <Badge
                   variant="outline"
-                  className={`border-${getRecommendationColor(evaluation.recommendation || Recommendation.PENDING)}-500 text-${getRecommendationColor(evaluation.recommendation || Recommendation.PENDING)}-400`}
+                  className={toneClasses(getRecommendationColor(evaluation.recommendation || Recommendation.PENDING))}
                 >
                   {getRecommendationIcon(evaluation.recommendation || Recommendation.PENDING)}
                   <span className="ml-1">
@@ -463,7 +467,7 @@ function SupplierCard({
             <div className="flex items-center gap-2 mt-1">
               <Badge
                 variant="outline"
-                className={`border-${getRiskLevelColor(evaluation.riskLevel)}-500 text-${getRiskLevelColor(evaluation.riskLevel)}-400`}
+                className={toneClasses(getRiskLevelColor(evaluation.riskLevel))}
               >
                 {evaluation.riskLevel.toUpperCase()}
               </Badge>
@@ -486,7 +490,7 @@ function SupplierCard({
                 variant="default"
                 size="sm"
                 onClick={() => onSelectEvaluation(evaluation.id)}
-                className="bg-brand-600 hover:bg-brand-700 text-white"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 Evaluate
               </Button>
@@ -503,14 +507,14 @@ function SupplierCard({
                 Recommendation.REJECTED,
                 'Undo Approval',
                 Undo2,
-                'border-orange-600 text-orange-400 hover:bg-orange-600 hover:text-white'
+                'border-warning/40 text-warning hover:bg-warning hover:text-white'
               )
               : evaluation.recommendation === Recommendation.REJECTED
                 ? renderActionButton(
                   Recommendation.APPROVED,
                   'Approve',
                   CheckCircle,
-                  'border-green-600 text-green-400 hover:bg-green-600 hover:text-white'
+                  'border-success/40 text-success hover:bg-success hover:text-success-foreground'
                 )
                 : (
                   <>
@@ -518,13 +522,13 @@ function SupplierCard({
                       Recommendation.APPROVED,
                       'Approve',
                       CheckCircle,
-                      'border-green-600 text-green-400 hover:bg-green-600 hover:text-white'
+                      'border-success/40 text-success hover:bg-success hover:text-success-foreground'
                     )}
                     {renderActionButton(
                       Recommendation.REJECTED,
                       'Reject',
                       XCircle,
-                      'border-red-600 text-red-400 hover:bg-red-600 hover:text-white'
+                      'border-destructive/40 text-destructive hover:bg-destructive hover:text-white'
                     )}
                   </>
                 )}
@@ -894,8 +898,8 @@ export function SupplierNominationPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-center h-64">
+      <div className="animate-fade-in">
+        <div className="flex items-center justify-center h-64">
           <div className="text-foreground">Loading nomination...</div>
         </div>
       </div>
@@ -904,10 +908,10 @@ export function SupplierNominationPage({
 
   if (error || !nomination) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center h-64 space-y-4">
+      <div className="animate-fade-in">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="h-8 w-8 text-red-400" />
+            <AlertTriangle className="h-8 w-8 text-destructive" />
             <div className="text-xl font-semibold text-foreground">Nomination Not Found</div>
           </div>
           <div className="text-muted-foreground text-center max-w-md">
@@ -932,67 +936,49 @@ export function SupplierNominationPage({
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="animate-fade-in">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-4">
-            {onBack && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onBack}
-                className="border-border text-foreground/80 hover:bg-accent"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
+        <div className="flex items-start gap-3">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="mt-0.5 h-8 w-8 shrink-0"
+              aria-label="Back to nominations"
+              onClick={onBack}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="min-w-0 flex-1">
+            <PageHeader
+              title={nomination.nominationName}
+              description={`${nomination.vendorEvaluations.length} vendors under evaluation`}
+            >
+              <Badge variant="outline" className={toneClasses(getStatusColor(nomination.status))}>
+                {getStatusText(nomination.status)}
+              </Badge>
+              <Badge variant="secondary">
+                {getNominationTypeLabel(nomination.nominationType)}
+              </Badge>
+              <Button variant="outline" size="sm" onClick={handleExportResults} className="gap-2">
+                <Download className="h-4 w-4" />
+                Export
               </Button>
-            )}
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">{nomination.nominationName}</h1>
-              <div className="flex items-center gap-4 mt-2">
-                <Badge
-                  variant="outline"
-                  className={`border-${getStatusColor(nomination.status)}-500 text-${getStatusColor(nomination.status)}-400`}
-                >
-                  {getStatusText(nomination.status)}
-                </Badge>
-                <Badge variant="secondary">
-                  {getNominationTypeLabel(nomination.nominationType)}
-                </Badge>
-                <span className="text-muted-foreground text-sm">
-                  {nomination.vendorEvaluations.length} vendors under evaluation
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportResults}
-              className="border-border text-foreground/80"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddVendorsOpen(true)}
-              className="border-primary/40 text-primary hover:bg-primary/20"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Vendors
-            </Button>
-            <Button
-              onClick={handleCompleteNomination}
-              disabled={completeNominationMutation.isPending}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Complete Nomination
-            </Button>
+              <Button variant="outline" size="sm" onClick={() => { setAddVendorsOpen(true); }} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Vendors
+              </Button>
+              <Button
+                onClick={handleCompleteNomination}
+                disabled={completeNominationMutation.isPending}
+                className="gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Complete Nomination
+              </Button>
+            </PageHeader>
           </div>
         </div>
 
@@ -1123,22 +1109,22 @@ export function SupplierNominationPage({
               </CardContent>
             </Card>
             <Card
-              className={`bg-card border-border cursor-pointer transition-all hover:border-green-500 ${statusFilter === 'approved' ? 'border-green-500 bg-green-500/10' : ''
+              className={`bg-card border-border cursor-pointer transition-all hover:border-success/50 ${statusFilter === 'approved' ? 'border-success bg-success/10' : ''
                 }`}
               onClick={() => setStatusFilter(statusFilter === 'approved' ? 'all' : 'approved')}
             >
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-400">{summaryStats.approved}</div>
+                <div className="text-2xl font-bold text-success">{summaryStats.approved}</div>
                 <div className="text-sm text-muted-foreground">Approved</div>
               </CardContent>
             </Card>
             <Card
-              className={`bg-card border-border cursor-pointer transition-all hover:border-red-500 ${statusFilter === 'rejected' ? 'border-red-500 bg-red-500/10' : ''
+              className={`bg-card border-border cursor-pointer transition-all hover:border-destructive/50 ${statusFilter === 'rejected' ? 'border-destructive bg-destructive/10' : ''
                 }`}
               onClick={() => setStatusFilter(statusFilter === 'rejected' ? 'all' : 'rejected')}
             >
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-red-400">{summaryStats.rejected}</div>
+                <div className="text-2xl font-bold text-destructive">{summaryStats.rejected}</div>
                 <div className="text-sm text-muted-foreground">Not Approved</div>
               </CardContent>
             </Card>
@@ -1169,13 +1155,13 @@ export function SupplierNominationPage({
                   </SelectItem>
                   <SelectItem value="approved" className="text-foreground hover:bg-accent">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-400" />
+                      <div className="w-2 h-2 rounded-full bg-success" />
                       Approved ({summaryStats?.approved ?? 0})
                     </div>
                   </SelectItem>
                   <SelectItem value="rejected" className="text-foreground hover:bg-accent">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-red-400" />
+                      <div className="w-2 h-2 rounded-full bg-destructive" />
                       Not Approved ({summaryStats?.rejected ?? 0})
                     </div>
                   </SelectItem>
