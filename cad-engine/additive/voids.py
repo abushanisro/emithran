@@ -175,7 +175,7 @@ def _footprint(cells: Set[Tuple[int, int]]) -> Tuple[bool, int]:
 def find_voids(shape: Any, meshes: Sequence[FaceMesh], holes: Sequence[Dict[str, Any]], voxel_count: int = VOXEL_COUNT) -> Dict[str, Any]:
     pts = [v for f in meshes for t in f.triangles for v in t.vertices]
     if not pts:
-        return {"voids": [], "cell_mm": None, "skipped_columns": 0, "open_recesses": 0}
+        return {"voids": [], "cell_mm": None, "skipped_columns": 0, "open_recesses": 0, "void_at": lambda p: None}
     lo = [min(p[a] for p in pts) for a in range(3)]
     hi = [max(p[a] for p in pts) for a in range(3)]
     g = _Grid(lo, hi, voxel_count)
@@ -253,7 +253,7 @@ def find_voids(shape: Any, meshes: Sequence[FaceMesh], holes: Sequence[Dict[str,
             open_recesses += 1
             continue
         face_ids = sorted(fid for fid, cells in face_cells.items() if cells & members)
-        base = {"volume_mm3": round(volume, 3), "centroid": centroid, "face_ids": face_ids}
+        base = {"volume_mm3": round(volume, 3), "centroid": centroid, "face_ids": face_ids, "_cells": comp}
         if not opens:
             voids.append({**base, "feature_type": "Void", "variant": "complex", "enclosed": True, "depth_mm": round(max(extent), 3), "open_axis": None})
             continue
@@ -280,4 +280,14 @@ def find_voids(shape: Any, meshes: Sequence[FaceMesh], holes: Sequence[Dict[str,
     voids.sort(key=lambda v: (-v["volume_mm3"], v["centroid"]))
     for n, v in enumerate(voids, 1):
         v["id"] = f"void-{n}"
-    return {"voids": voids, "cell_mm": round(g.cell, 4), "skipped_columns": skipped, "open_recesses": open_recesses}
+    # Which void a point lies in (None: solid, outside air, a hole's bore or an open recess), for a caller that asks where an opening leads.
+    owner: Dict[int, str] = {}
+    for v in voids:
+        for cell in v.pop("_cells"):
+            owner[cell] = v["id"]
+
+    def void_at(p: Sequence[float]) -> Optional[str]:
+        w = g.at(p)
+        return owner.get(w) if w is not None else None
+
+    return {"voids": voids, "cell_mm": round(g.cell, 4), "skipped_columns": skipped, "open_recesses": open_recesses, "void_at": void_at}

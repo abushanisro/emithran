@@ -42,7 +42,9 @@ describe('the family hint a chosen Process sends the cad-engine', () => {
     expect(hint('Forging')).toBe('forged');
     // Rapid Prototyping is analysed for its build as an additive part, and priced in its own domain.
     expect(hint('Rapid Prototyping')).toBe('additive');
-    expect(hint('Roto & Blow Molding')).toBeUndefined();
+    // A blow or roto molded part is measured as a hollow shell.
+    expect(hint('Roto & Blow Molding')).toBe('roto_blow');
+    expect(hint('Sheet Plastic')).toBeUndefined();
   });
 
   it('is none for Assembly and Part Assembly: each is costed from its BOM and the Cost Guide, and the cad-engine has no extractor to force for it', () => {

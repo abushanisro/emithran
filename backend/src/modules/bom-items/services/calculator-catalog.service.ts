@@ -12,6 +12,7 @@ import { loadCompositesCalculatorSpec } from '../costing/composites/calculators/
 import { loadAdditiveCalculatorSpec } from '../costing/additive/calculators/additive-calculator-spec';
 import { loadRapidPrototypingCalculatorSpec } from '../costing/additive/calculators/rapid-prototyping-calculator-spec';
 import { loadBarTubeCalculatorSpec } from '../costing/bar-tube/calculators/bar-tube-calculator-spec';
+import { loadRotoBlowCalculatorSpec } from '../costing/roto-blow/calculators/roto-blow-calculator-spec';
 import { loadMultiSpindleCalculatorSpec } from '../costing/multi-spindle/calculators/multi-spindle-calculator-spec';
 import { loadPartAssemblyCalculatorSpec } from '../costing/part-assembly/calculators/part-assembly-calculator-spec';
 import { loadAssemblyCalculatorSpec } from '../costing/assembly/calculators/assembly-calculator-spec';
@@ -231,6 +232,11 @@ export class CalculatorCatalogService {
   /** The bar and tube fabrication calculators (migration 1091), from the database. */
   loadBarTubeCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return this.loadSpecCalculators('bar-tube-calculators', loadBarTubeCalculatorSpec(), accessToken);
+  }
+
+  /** The Roto & Blow Molding calculators (migration 1108), from the database. */
+  loadRotoBlowCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadSpecCalculators('roto-blow-calculators', loadRotoBlowCalculatorSpec(), accessToken);
   }
 
   /** The Multi-Spindle Machining calculators (migration 1095), from the database. */

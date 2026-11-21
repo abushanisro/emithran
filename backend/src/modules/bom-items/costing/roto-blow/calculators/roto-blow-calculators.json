@@ -1,0 +1,1127 @@
+{
+ "domain": "roto_blow",
+ "processGroup": "Roto & Blow Molding",
+ "calculators": [
+  {
+   "key": "roto_blow.cooling",
+   "name": "Roto & Blow Molding - Cooling",
+   "helper": true,
+   "operations": [],
+   "output": "Cooling Time",
+   "results": [
+    "Thermal Diffusivity"
+   ],
+   "description": "The time a blown or rotomolded wall takes to cool from the melt to its eject temperature (Menges, as the plastic molding cooling calculator): t = s² / (π² α) × ln(4/π × (Tm − Tw) / (Te − Tw)), α = k / (ρ_melt × cp). The shell is cooled from the mold side only (air inside), so s is twice the wall (eMithran assumption). The material's melt temperature, mold temperature, eject deflection temperature, melt density, specific heat and thermal conductivity of the melt are memory/Roto & blow molding's (raw_material_properties).",
+   "fields": [
+    {
+     "name": "Wall",
+     "unit": "mm",
+     "source": {
+      "engine": "wall_mm (twice the shell's nominal wall: cooled from one side)"
+     }
+    },
+    {
+     "name": "Thermal Conductivity",
+     "unit": "W/m·°C",
+     "source": {
+      "engine": "thermal_conductivity (the material's, of the melt)"
+     }
+    },
+    {
+     "name": "Melt Density",
+     "unit": "kg/m³",
+     "source": {
+      "engine": "melt_density (the material's)"
+     }
+    },
+    {
+     "name": "Specific Heat",
+     "unit": "J/g·°C",
+     "source": {
+      "engine": "specific_heat (the material's, of the melt)"
+     }
+    },
+    {
+     "name": "Melt Temperature",
+     "unit": "°C",
+     "source": {
+      "engine": "melt_temperature (the material's)"
+     }
+    },
+    {
+     "name": "Mold Temperature",
+     "unit": "°C",
+     "source": {
+      "engine": "mold_temperature (the material's)"
+     }
+    },
+    {
+     "name": "Eject Temperature",
+     "unit": "°C",
+     "source": {
+      "engine": "eject_temperature (the material's eject deflection temperature)"
+     }
+    },
+    {
+     "name": "Thermal Diffusivity",
+     "unit": "mm²/s",
+     "formula": "{Thermal Conductivity} / ({Melt Density} * {Specific Heat} * 1000) * 1000000"
+    },
+    {
+     "name": "Cooling Time",
+     "unit": "s",
+     "formula": "{Wall} * {Wall} / (pi * pi * {Thermal Diffusivity}) * LN(4 / pi * ({Melt Temperature} - {Mold Temperature}) / ({Eject Temperature} - {Mold Temperature}))"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.inflate",
+   "name": "Roto & Blow Molding - Inflate",
+   "helper": true,
+   "operations": [],
+   "output": "Inflate Time",
+   "description": "The time a blow mold takes to fill the parison with air: the part's inside volume through the blow pin's bore (boreDiameter) at the air's speed (airFlowVelocity).",
+   "fields": [
+    {
+     "name": "Inside Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "inside_volume"
+     }
+    },
+    {
+     "name": "Air Flow Velocity",
+     "unit": "m/s",
+     "source": {
+      "variable": "airFlowVelocity"
+     }
+    },
+    {
+     "name": "Bore Diameter",
+     "unit": "mm",
+     "source": {
+      "variable": "boreDiameter"
+     }
+    },
+    {
+     "name": "Inflate Time",
+     "unit": "s",
+     "formula": "{Inside Volume} / ({Air Flow Velocity} * 1000 * pi * {Bore Diameter} * {Bore Diameter} / 4)"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.cavities",
+   "name": "Roto & Blow Molding - Blow mold cavities",
+   "helper": true,
+   "operations": [],
+   "output": "Cavities",
+   "results": [
+    "Fits Across",
+    "Fits Deep"
+   ],
+   "description": "How many parts one blow mold makes a shot: the cavities the mold's length takes in a row (each the part's length and the adjacent cavity margin, never closer than the parisons' centre distance, the mold's own envelope margin at both ends), capped by the parisons the head extrudes; none when the part, with the envelope margin each side, is wider than the mold, or deeper than its two halves.",
+   "fields": [
+    {
+     "name": "Mold Length",
+     "unit": "mm",
+     "source": {
+      "machine": "mold_length_mm"
+     }
+    },
+    {
+     "name": "Mold Width",
+     "unit": "mm",
+     "source": {
+      "machine": "mold_width_mm"
+     }
+    },
+    {
+     "name": "Mold Depth",
+     "unit": "mm",
+     "source": {
+      "machine": "mold_depth_mm"
+     }
+    },
+    {
+     "name": "Envelope Margin",
+     "unit": "mm",
+     "source": {
+      "machine": "cavity_envelope_margin_mm"
+     }
+    },
+    {
+     "name": "Adjacent Margin",
+     "unit": "mm",
+     "source": {
+      "machine": "adjacent_cavity_margin_mm"
+     }
+    },
+    {
+     "name": "Parison Distance",
+     "unit": "mm",
+     "source": {
+      "machine": "parison_center_distance_mm"
+     }
+    },
+    {
+     "name": "Max Parisons",
+     "unit": null,
+     "source": {
+      "machine": "max_number_of_parisons"
+     }
+    },
+    {
+     "name": "Part Length",
+     "unit": "mm",
+     "source": {
+      "engine": "part_length_mm (the envelope across the parting plane, long side)"
+     }
+    },
+    {
+     "name": "Part Width",
+     "unit": "mm",
+     "source": {
+      "engine": "part_width_mm (the envelope across the parting plane, short side)"
+     }
+    },
+    {
+     "name": "Part Depth",
+     "unit": "mm",
+     "source": {
+      "engine": "part_depth_mm (the envelope along the pull)"
+     }
+    },
+    {
+     "name": "Fits Across",
+     "unit": null,
+     "formula": "{Part Width} + 2 * {Envelope Margin} <= {Mold Width} ? 1 : 0"
+    },
+    {
+     "name": "Fits Deep",
+     "unit": null,
+     "formula": "{Part Depth} + 2 * {Envelope Margin} <= 2 * {Mold Depth} ? 1 : 0"
+    },
+    {
+     "name": "Cavities",
+     "unit": null,
+     "formula": "{Fits Across} * {Fits Deep} * min({Max Parisons}, max(0, floor(({Mold Length} - 2 * {Envelope Margin} + {Adjacent Margin}) / max({Part Length} + {Adjacent Margin}, {Parison Distance}))))"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.extrusion_blow_mold",
+   "name": "Roto & Blow Molding - Extrusion blow mold",
+   "operations": [
+    "Extrusion Blow Mold"
+   ],
+   "results": [
+    "Shot Time"
+   ],
+   "description": "Extrusion blow molding, per part. A shot is the machine's dry cycle (the mold closing on the parison, the shuttle), the inflation and the wall's cooling (times blowMoldVacuumFactor when the mold pulls a vacuum for in-mold labels); it makes one part per cavity, at each station.",
+   "fields": [
+    {
+     "name": "Dry Cycle",
+     "unit": "s",
+     "source": {
+      "machine": "dry_cycle_time_s"
+     }
+    },
+    {
+     "name": "Inflate Time",
+     "unit": "s",
+     "source": {
+      "engine": "inflate_time_s (Roto & Blow Molding - Inflate)"
+     }
+    },
+    {
+     "name": "Cooling Time",
+     "unit": "s",
+     "source": {
+      "engine": "cooling_time_s (Roto & Blow Molding - Cooling)"
+     }
+    },
+    {
+     "name": "Vacuum Factor",
+     "unit": null,
+     "source": {
+      "engine": "vacuum_factor (blowMoldVacuumFactor with in-mold labels, else 1)"
+     }
+    },
+    {
+     "name": "Cavities",
+     "unit": null,
+     "source": {
+      "engine": "cavities (Roto & Blow Molding - Blow mold cavities)"
+     }
+    },
+    {
+     "name": "Stations",
+     "unit": null,
+     "source": {
+      "machine": "number_of_stations"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Shot Time",
+     "unit": "s",
+     "formula": "{Dry Cycle} + {Inflate Time} + {Cooling Time} * {Vacuum Factor}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Shot Time} / ({Cavities} * {Stations}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.molds_per_arm",
+   "name": "Roto & Blow Molding - Molds per arm",
+   "helper": true,
+   "operations": [],
+   "output": "Molds per Arm",
+   "results": [
+    "Mold Length",
+    "Mold Width",
+    "Mold Depth"
+   ],
+   "description": "How many molds one carousel arm carries. A mold is the part grown by its shrinkage (rotoMoldingShrinkageAllowance, %) with the flange and framework (rotoMoldStructureMargin) on each side; it must swing within the machine's cylinder with the mounting margin (rotoMoldMountingMargin); the molds that fit side by side on a mounting surface (rotoMoldSpacingMargin between them), times the arm's mounting surfaces, as many as the weight capacity carries of the charges (the molds' own weight is not known: the charge only).",
+   "fields": [
+    {
+     "name": "Part Length",
+     "unit": "mm",
+     "source": {
+      "engine": "part_length_mm"
+     }
+    },
+    {
+     "name": "Part Width",
+     "unit": "mm",
+     "source": {
+      "engine": "part_width_mm"
+     }
+    },
+    {
+     "name": "Part Depth",
+     "unit": "mm",
+     "source": {
+      "engine": "part_depth_mm"
+     }
+    },
+    {
+     "name": "Shrinkage",
+     "unit": "%",
+     "source": {
+      "variable": "rotoMoldingShrinkageAllowance"
+     }
+    },
+    {
+     "name": "Structure Margin",
+     "unit": "mm",
+     "source": {
+      "variable": "rotoMoldStructureMargin"
+     }
+    },
+    {
+     "name": "Mounting Margin",
+     "unit": "mm",
+     "source": {
+      "variable": "rotoMoldMountingMargin"
+     }
+    },
+    {
+     "name": "Spacing Margin",
+     "unit": "mm",
+     "source": {
+      "variable": "rotoMoldSpacingMargin"
+     }
+    },
+    {
+     "name": "Cylinder Diameter",
+     "unit": "mm",
+     "source": {
+      "machine": "max_cylinder_dia_mm"
+     }
+    },
+    {
+     "name": "Surfaces per Arm",
+     "unit": null,
+     "source": {
+      "machine": "num_mounting_surfaces_per_arm"
+     }
+    },
+    {
+     "name": "Weight Capacity",
+     "unit": "kg",
+     "source": {
+      "machine": "weight_capacity_kg"
+     }
+    },
+    {
+     "name": "Charge Mass",
+     "unit": "kg",
+     "source": {
+      "engine": "charge_kg (the material one part takes)"
+     }
+    },
+    {
+     "name": "Mold Length",
+     "unit": "mm",
+     "formula": "{Part Length} * (1 + {Shrinkage} / 100) + 2 * {Structure Margin}"
+    },
+    {
+     "name": "Mold Width",
+     "unit": "mm",
+     "formula": "{Part Width} * (1 + {Shrinkage} / 100) + 2 * {Structure Margin}"
+    },
+    {
+     "name": "Mold Depth",
+     "unit": "mm",
+     "formula": "{Part Depth} * (1 + {Shrinkage} / 100) + 2 * {Structure Margin}"
+    },
+    {
+     "name": "Usable",
+     "unit": "mm",
+     "formula": "{Cylinder Diameter} - 2 * {Mounting Margin}"
+    },
+    {
+     "name": "Per Surface",
+     "unit": null,
+     "formula": "max({Mold Length}, {Mold Depth}) <= {Usable} ? floor(({Usable} + {Spacing Margin}) / ({Mold Length} + {Spacing Margin})) * floor(({Usable} + {Spacing Margin}) / ({Mold Width} + {Spacing Margin})) : 0"
+    },
+    {
+     "name": "Molds per Arm",
+     "unit": null,
+     "formula": "min({Per Surface} * {Surfaces per Arm}, floor({Weight Capacity} / max({Charge Mass}, 0.001)))"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.load_unload",
+   "name": "Roto & Blow Molding - Load and unload",
+   "helper": true,
+   "operations": [],
+   "output": "Load Time",
+   "description": "The load station's work on one arm, per mold: clean the mold and spray its release over its surface (rotoMoldCleanRate, applyMoldReleaseRate: memory gives them without a unit; read as mm² a second, 1 ft² and 4 ft² a second, which puts a mold's whole load and unload at about a minute), fill it (moldFillRate), open and close its clamps (as many as its parting line takes at clampSpacing, never fewer than minNumberOfClamps; clampingRate each way), take out and put back its cores (coreInstallRate each way), place its inserts (insertInstallRate) and labels (applyLabelRate), and trim the cut-outs by hand at manualTrimRate.",
+   "fields": [
+    {
+     "name": "Mold Area",
+     "unit": "mm²",
+     "source": {
+      "engine": "mold_area_mm2 (the mold's outer surface)"
+     }
+    },
+    {
+     "name": "Clean Rate",
+     "unit": "mm²/s",
+     "source": {
+      "variable": "rotoMoldCleanRate"
+     }
+    },
+    {
+     "name": "Release Rate",
+     "unit": "mm²/s",
+     "source": {
+      "variable": "applyMoldReleaseRate"
+     }
+    },
+    {
+     "name": "Fill Time",
+     "unit": "s",
+     "source": {
+      "variable": "moldFillRate"
+     }
+    },
+    {
+     "name": "Clamps",
+     "unit": null,
+     "source": {
+      "engine": "clamps (the parting line at clampSpacing, at least minNumberOfClamps)"
+     }
+    },
+    {
+     "name": "Clamping Time",
+     "unit": "s",
+     "source": {
+      "variable": "clampingRate"
+     }
+    },
+    {
+     "name": "Cores",
+     "unit": null,
+     "source": {
+      "engine": "cores (the features a core forms)"
+     }
+    },
+    {
+     "name": "Core Time",
+     "unit": "s",
+     "source": {
+      "variable": "coreInstallRate"
+     }
+    },
+    {
+     "name": "Inserts",
+     "unit": null,
+     "source": {
+      "engine": "inserts (Cost Guide)"
+     }
+    },
+    {
+     "name": "Insert Time",
+     "unit": "s",
+     "source": {
+      "variable": "insertInstallRate"
+     }
+    },
+    {
+     "name": "Labels",
+     "unit": null,
+     "source": {
+      "engine": "labels (Cost Guide, else defaultNumLabels)"
+     }
+    },
+    {
+     "name": "Label Time",
+     "unit": "s",
+     "source": {
+      "variable": "applyLabelRate"
+     }
+    },
+    {
+     "name": "Trim Length",
+     "unit": "mm",
+     "source": {
+      "engine": "trim_length_mm (the cut-outs' edges)"
+     }
+    },
+    {
+     "name": "Trim Rate",
+     "unit": "mm/s",
+     "source": {
+      "variable": "manualTrimRate"
+     }
+    },
+    {
+     "name": "Molds",
+     "unit": null,
+     "source": {
+      "engine": "molds (on the arm)"
+     }
+    },
+    {
+     "name": "Per Mold",
+     "unit": "s",
+     "formula": "{Mold Area} / {Clean Rate} + {Mold Area} / {Release Rate} + {Fill Time} + {Clamps} * {Clamping Time} * 2 + {Cores} * {Core Time} * 2 + {Inserts} * {Insert Time} + {Labels} * {Label Time} + {Trim Length} / {Trim Rate}"
+    },
+    {
+     "name": "Load Time",
+     "unit": "s",
+     "formula": "{Per Mold} * {Molds}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.rotational_mold",
+   "name": "Roto & Blow Molding - Rotational mold",
+   "operations": [
+    "Rotational Mold"
+   ],
+   "results": [
+    "Index Period"
+   ],
+   "description": "Rotational molding on a carousel, per part. Its arms pass in turn through the oven, the cooling station and the load station: the carousel indexes when the slowest of the three is done, plus its index time, and each index completes one arm's molds. The oven time is taken as the cooling time (eMithran assumption: memory/Roto & blow molding holds no oven temperature or heating rate) unless set in the Cost Guide (rotoOvenTimeS).",
+   "fields": [
+    {
+     "name": "Oven Time",
+     "unit": "s",
+     "source": {
+      "engine": "oven_time_s (the cooling time, or the Cost Guide's)"
+     }
+    },
+    {
+     "name": "Cooling Time",
+     "unit": "s",
+     "source": {
+      "engine": "cooling_time_s (Roto & Blow Molding - Cooling)"
+     }
+    },
+    {
+     "name": "Load Time",
+     "unit": "s",
+     "source": {
+      "engine": "load_time_s (Roto & Blow Molding - Load and unload)"
+     }
+    },
+    {
+     "name": "Index Time",
+     "unit": "s",
+     "source": {
+      "machine": "station_index_time_s"
+     }
+    },
+    {
+     "name": "Molds per Arm",
+     "unit": null,
+     "source": {
+      "engine": "molds_per_arm (Roto & Blow Molding - Molds per arm)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Index Period",
+     "unit": "s",
+     "formula": "max({Oven Time}, {Cooling Time}, {Load Time}) + {Index Time}"
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Index Period} / {Molds per Arm} * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.grind",
+   "name": "Roto & Blow Molding - Grind",
+   "operations": [
+    "Grind"
+   ],
+   "description": "Grinding the pellets to the powder a rotational mold is charged with (grindProcessEnable), per part: the charge at the grinder's rate.",
+   "fields": [
+    {
+     "name": "Charge Mass",
+     "unit": "kg",
+     "source": {
+      "engine": "charge_kg (the material one part takes)"
+     }
+    },
+    {
+     "name": "Grind Rate",
+     "unit": "kg/hr",
+     "source": {
+      "machine": "grind_rate_kg_per_hr"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "{Charge Mass} / {Grind Rate} * 3600 * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.router",
+   "name": "Roto & Blow Molding - Router",
+   "operations": [
+    "Router"
+   ],
+   "description": "Routing a molded part, per part: the parting line's pinch-off and the openings cut after molding, at the router's feed rate, a rapid move to each cut (the part's diagonal at the rapid traverse rate), and the part's handling (materialHandling by its weight).",
+   "fields": [
+    {
+     "name": "Cut Length",
+     "unit": "mm",
+     "source": {
+      "engine": "cut_length_mm (every routed edge)"
+     }
+    },
+    {
+     "name": "Cuts",
+     "unit": null,
+     "source": {
+      "engine": "cuts (separate routed edges)"
+     }
+    },
+    {
+     "name": "Part Diagonal",
+     "unit": "mm",
+     "source": {
+      "engine": "part_diagonal_mm"
+     }
+    },
+    {
+     "name": "Feed Rate",
+     "unit": "mm/min",
+     "source": {
+      "machine": "feed_rate_mm_per_min"
+     }
+    },
+    {
+     "name": "Rapid Rate",
+     "unit": "mm/min",
+     "source": {
+      "machine": "rapid_traverse_rate_mm_per_min"
+     }
+    },
+    {
+     "name": "Handling Time",
+     "unit": "s",
+     "source": {
+      "lookup": "materialHandling.Handling Time (s)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Cut Length} / {Feed Rate} * 60 + {Cuts} * {Part Diagonal} / {Rapid Rate} * 60 + {Handling Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.saw",
+   "name": "Roto & Blow Molding - Saw",
+   "operations": [
+    "Saw"
+   ],
+   "description": "Sawing a blown part's neck moil off, per part: the sawn section at the circular saw's cutting rate (circularSawCutting), and the part's handling (materialHandling by its weight).",
+   "fields": [
+    {
+     "name": "Cut Area",
+     "unit": "mm²",
+     "source": {
+      "engine": "cut_area_mm2 (every sawn section)"
+     }
+    },
+    {
+     "name": "Cutting Rate",
+     "unit": "mm²/min",
+     "source": {
+      "lookup": "circularSawCutting.Cutting Rate (mm^2 / min)"
+     }
+    },
+    {
+     "name": "Handling Time",
+     "unit": "s",
+     "source": {
+      "lookup": "materialHandling.Handling Time (s)"
+     }
+    },
+    {
+     "name": "Cycle Time Factor",
+     "unit": null,
+     "source": {
+      "variable": "cycleTimeAdjustmentFactor"
+     }
+    },
+    {
+     "name": "Cycle Time",
+     "unit": "s",
+     "formula": "({Cut Area} / {Cutting Rate} * 60 + {Handling Time}) * {Cycle Time Factor}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.blow_material",
+   "name": "Roto & Blow Molding - Blow molded material",
+   "helper": true,
+   "operations": [],
+   "output": "Material Cost",
+   "results": [
+    "Material Mass",
+    "Flash Volume"
+   ],
+   "description": "The resin one blown part takes: the part and the pinch-off flash along its parting line (blowMoldTailLength long, the wall thick), times the flash dial (materialVolumeComp), at the material's density and price, plus colorant (colorantCost a kg) when the part is colored and its in-mold labels (defaultCostPerBlowMoldLabel each).",
+   "fields": [
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Parting Line",
+     "unit": "mm",
+     "source": {
+      "cad": "parting_line"
+     }
+    },
+    {
+     "name": "Tail Length",
+     "unit": "mm",
+     "source": {
+      "variable": "blowMoldTailLength"
+     }
+    },
+    {
+     "name": "Wall",
+     "unit": "mm",
+     "source": {
+      "engine": "wall_mm (the shell's nominal wall)"
+     }
+    },
+    {
+     "name": "Volume Dial",
+     "unit": null,
+     "source": {
+      "variable": "materialVolumeComp"
+     }
+    },
+    {
+     "name": "Density",
+     "unit": "kg/m³",
+     "source": {
+      "material": "density_kg_m3"
+     }
+    },
+    {
+     "name": "Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "material": "cost"
+     }
+    },
+    {
+     "name": "Colorant",
+     "unit": "USD/kg",
+     "source": {
+      "engine": "colorant_usd_per_kg (colorantCost when colored, else 0)"
+     }
+    },
+    {
+     "name": "Labels",
+     "unit": null,
+     "source": {
+      "engine": "labels"
+     }
+    },
+    {
+     "name": "Label Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "defaultCostPerBlowMoldLabel"
+     }
+    },
+    {
+     "name": "Flash Volume",
+     "unit": "mm³",
+     "formula": "{Parting Line} * {Tail Length} * {Wall}"
+    },
+    {
+     "name": "Material Mass",
+     "unit": "kg",
+     "formula": "({Part Volume} + {Flash Volume}) * {Volume Dial} * {Density} / 1000000000"
+    },
+    {
+     "name": "Material Cost",
+     "unit": "USD",
+     "formula": "{Material Mass} * ({Unit Cost} + {Colorant}) + {Labels} * {Label Cost}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.roto_material",
+   "name": "Roto & Blow Molding - Rotomolded material",
+   "helper": true,
+   "operations": [],
+   "output": "Material Cost",
+   "results": [
+    "Material Mass"
+   ],
+   "description": "The powder one rotomolded part takes: the part, and the plugs cut out of its openings with their trim stock (trimStockAllowance), times the volume dial (materialVolumeComp), at the material's density and price, plus colorant (colorantCost a kg) when colored, its inserts (defaultInsertCost each) and in-mold labels (defaultCostPerLabel each).",
+   "fields": [
+    {
+     "name": "Part Volume",
+     "unit": "mm³",
+     "source": {
+      "cad": "part_volume"
+     }
+    },
+    {
+     "name": "Trim Waste",
+     "unit": "mm³",
+     "source": {
+      "engine": "trim_waste_mm3 (the cut-out plugs and their stock)"
+     }
+    },
+    {
+     "name": "Volume Dial",
+     "unit": null,
+     "source": {
+      "variable": "materialVolumeComp"
+     }
+    },
+    {
+     "name": "Density",
+     "unit": "kg/m³",
+     "source": {
+      "material": "density_kg_m3"
+     }
+    },
+    {
+     "name": "Unit Cost",
+     "unit": "USD/kg",
+     "source": {
+      "material": "cost"
+     }
+    },
+    {
+     "name": "Colorant",
+     "unit": "USD/kg",
+     "source": {
+      "engine": "colorant_usd_per_kg (colorantCost when colored, else 0)"
+     }
+    },
+    {
+     "name": "Inserts",
+     "unit": null,
+     "source": {
+      "engine": "inserts"
+     }
+    },
+    {
+     "name": "Insert Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "defaultInsertCost"
+     }
+    },
+    {
+     "name": "Labels",
+     "unit": null,
+     "source": {
+      "engine": "labels"
+     }
+    },
+    {
+     "name": "Label Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "defaultCostPerLabel"
+     }
+    },
+    {
+     "name": "Material Mass",
+     "unit": "kg",
+     "formula": "({Part Volume} + {Trim Waste}) * {Volume Dial} * {Density} / 1000000000"
+    },
+    {
+     "name": "Material Cost",
+     "unit": "USD",
+     "formula": "{Material Mass} * ({Unit Cost} + {Colorant}) + {Inserts} * {Insert Cost} + {Labels} * {Label Cost}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.blow_mold",
+   "name": "Roto & Blow Molding - Blow mold tooling",
+   "helper": true,
+   "operations": [],
+   "output": "Tool Cost",
+   "results": [
+    "Size Share"
+   ],
+   "description": "The blow mold's cost, from its size (eMithran assumption: memory/Roto & blow molding gives only its limits, blowMoldingMinMoldCost to blowMoldingMaxMoldCost, and its dial blowMoldingMoldCostComp): the limit range scaled by the cavities' area over the largest blow mold platen, never above the upper limit, times the dial and the region's multiplier (regionMultiplier).",
+   "fields": [
+    {
+     "name": "Minimum Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "blowMoldingMinMoldCost"
+     }
+    },
+    {
+     "name": "Maximum Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "blowMoldingMaxMoldCost"
+     }
+    },
+    {
+     "name": "Cost Dial",
+     "unit": null,
+     "source": {
+      "variable": "blowMoldingMoldCostComp"
+     }
+    },
+    {
+     "name": "Region Multiplier",
+     "unit": null,
+     "source": {
+      "variable": "regionMultiplier"
+     }
+    },
+    {
+     "name": "Size",
+     "unit": null,
+     "source": {
+      "engine": "size (the cavities' area on the platen: each the part with the envelope margin, mm²)"
+     }
+    },
+    {
+     "name": "Largest Size",
+     "unit": null,
+     "source": {
+      "engine": "largest (the same measure of the largest machine)"
+     }
+    },
+    {
+     "name": "Size Share",
+     "unit": null,
+     "formula": "min(1, {Size} / {Largest Size})"
+    },
+    {
+     "name": "Tool Cost",
+     "unit": "USD",
+     "formula": "({Minimum Cost} + ({Maximum Cost} - {Minimum Cost}) * {Size Share}) * {Cost Dial} * {Region Multiplier}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.trim_tooling",
+   "name": "Roto & Blow Molding - Trim tooling",
+   "helper": true,
+   "operations": [],
+   "output": "Tool Cost",
+   "results": [
+    "Size Share"
+   ],
+   "description": "The trim-transfer tooling's cost, from its size (eMithran assumption: memory/Roto & blow molding gives only its limits, blowMoldingMinTrimToolingCost to blowMoldingMaxTrimToolingCost, and its dial blowMoldingTrimToolingCostComp): the limit range scaled by the routed length over the largest blow mold platen's perimeter, never above the upper limit, times the dial and the region's multiplier (regionMultiplier).",
+   "fields": [
+    {
+     "name": "Minimum Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "blowMoldingMinTrimToolingCost"
+     }
+    },
+    {
+     "name": "Maximum Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "blowMoldingMaxTrimToolingCost"
+     }
+    },
+    {
+     "name": "Cost Dial",
+     "unit": null,
+     "source": {
+      "variable": "blowMoldingTrimToolingCostComp"
+     }
+    },
+    {
+     "name": "Region Multiplier",
+     "unit": null,
+     "source": {
+      "variable": "regionMultiplier"
+     }
+    },
+    {
+     "name": "Size",
+     "unit": null,
+     "source": {
+      "engine": "size (the routed length, mm)"
+     }
+    },
+    {
+     "name": "Largest Size",
+     "unit": null,
+     "source": {
+      "engine": "largest (the same measure of the largest machine)"
+     }
+    },
+    {
+     "name": "Size Share",
+     "unit": null,
+     "formula": "min(1, {Size} / {Largest Size})"
+    },
+    {
+     "name": "Tool Cost",
+     "unit": "USD",
+     "formula": "({Minimum Cost} + ({Maximum Cost} - {Minimum Cost}) * {Size Share}) * {Cost Dial} * {Region Multiplier}"
+    }
+   ]
+  },
+  {
+   "key": "roto_blow.roto_mold",
+   "name": "Roto & Blow Molding - Rotational mold tooling",
+   "helper": true,
+   "operations": [],
+   "output": "Tool Cost",
+   "results": [
+    "Size Share"
+   ],
+   "description": "The rotational mold's cost, from its size (eMithran assumption: memory/Roto & blow molding gives only its limits, rotoMoldingMinMoldCost to rotoMoldingMaxMoldCost, and its dial rotoMoldingMoldCostComp): the limit range scaled by the mold's surface over the surface of the largest mold the largest carousel swings, never above the upper limit, times the dial and the region's multiplier (regionMultiplier).",
+   "fields": [
+    {
+     "name": "Minimum Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "rotoMoldingMinMoldCost"
+     }
+    },
+    {
+     "name": "Maximum Cost",
+     "unit": "USD",
+     "source": {
+      "variable": "rotoMoldingMaxMoldCost"
+     }
+    },
+    {
+     "name": "Cost Dial",
+     "unit": null,
+     "source": {
+      "variable": "rotoMoldingMoldCostComp"
+     }
+    },
+    {
+     "name": "Region Multiplier",
+     "unit": null,
+     "source": {
+      "variable": "regionMultiplier"
+     }
+    },
+    {
+     "name": "Size",
+     "unit": null,
+     "source": {
+      "engine": "size (the mold's outer surface, mm²)"
+     }
+    },
+    {
+     "name": "Largest Size",
+     "unit": null,
+     "source": {
+      "engine": "largest (the same measure of the largest machine)"
+     }
+    },
+    {
+     "name": "Size Share",
+     "unit": null,
+     "formula": "min(1, {Size} / {Largest Size})"
+    },
+    {
+     "name": "Tool Cost",
+     "unit": "USD",
+     "formula": "({Minimum Cost} + ({Maximum Cost} - {Minimum Cost}) * {Size Share}) * {Cost Dial} * {Region Multiplier}"
+    }
+   ]
+  }
+ ]
+}

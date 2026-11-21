@@ -17,11 +17,12 @@ import { insertMoldingRouteKeyOf } from '@/lib/routing/insert-molding-route-id';
 import { multiShotRouteKeyOf } from '@/lib/routing/multi-shot-route-id';
 import { multiSpindleRouteKeyOf } from '@/lib/routing/multi-spindle-route-id';
 import { partAssemblyRouteKeyOf } from '@/lib/routing/part-assembly-route-id';
+import { rotoBlowRouteKeyOf } from '@/lib/routing/roto-blow-route-id';
 
 
 /** The scenario keys a route choice is stored under (each backend engine reads its own). */
 export type RoutePickKey =
-  | 'dieCastingProcess' | 'forgingRoute' | 'compositesRoute' | 'additiveRoute' | 'barTubeRoute' | 'assemblyRoute'
+  | 'dieCastingProcess' | 'forgingRoute' | 'compositesRoute' | 'additiveRoute' | 'barTubeRoute' | 'rotoBlowRoute' | 'assemblyRoute'
   | 'insertMoldingRoute' | 'multiShotRoute' | 'multiSpindleRoute' | 'partAssemblyRoute';
 
 /** A route's choice under its family's key (one key for any route). */
@@ -33,6 +34,7 @@ const BY_ROUTE_ID: readonly (readonly [RoutePickKey, (routeId: string) => string
   ['compositesRoute', compositesRouteKeyOf],
   ['additiveRoute', additiveRouteKeyOf],
   ['barTubeRoute', barTubeRouteKeyOf],
+  ['rotoBlowRoute', rotoBlowRouteKeyOf],
   ['assemblyRoute', assemblyRouteKeyOf],
   ['insertMoldingRoute', insertMoldingRouteKeyOf],
   ['multiShotRoute', multiShotRouteKeyOf],
@@ -61,6 +63,7 @@ const KEY_OF_FAMILY: Readonly<Record<string, RoutePickKey>> = {
   composite: 'compositesRoute',
   additive: 'additiveRoute',
   bar_tube: 'barTubeRoute',
+  roto_blow: 'rotoBlowRoute',
 };
 
 /**

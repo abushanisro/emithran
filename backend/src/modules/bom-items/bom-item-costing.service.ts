@@ -139,6 +139,10 @@ import { buildAdditiveCostSummary } from './costing/additive/additive-cost-summa
 import { ADDITIVE, additiveDomainOf } from './costing/additive/additive-domain';
 import { additiveRouteFor, additiveRouteId } from './costing/additive/additive-route-comparison';
 import { BarTubeCostService, type BarTubeGeometrySummary } from './costing/bar-tube/bar-tube-cost.service';
+import { RotoBlowCostService, type RotoBlowGeometrySummary } from './costing/roto-blow/roto-blow-cost.service';
+import { buildRotoBlowCostSummary } from './costing/roto-blow/roto-blow-cost-summary';
+import { ROTO_BLOW_ROUTES, type RotoBlowRouteKey } from './costing/roto-blow/roto-blow-route';
+import { rotoBlowRouteFor, rotoBlowRouteId } from './costing/roto-blow/roto-blow-route-comparison';
 import { buildBarTubeCostSummary } from './costing/bar-tube/bar-tube-cost-summary';
 import { BAR_TUBE_ROUTES, type BarTubeRouteKey } from './costing/bar-tube/bar-tube-route';
 import { barTubeRouteFor, barTubeRouteId } from './costing/bar-tube/bar-tube-route-comparison';
@@ -262,7 +266,7 @@ export function convertRouteOptions<T extends { totalCost: number | null }>(opti
 }
 
 export function hasCostModel(family: string): boolean {
-  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === 'bar_tube' || family === ASSEMBLY_FAMILY || family === PART_ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
+  return isMachiningFamily(family) || family === 'sheet_metal' || family === 'plastic_molded' || family === 'forged' || family === 'powder_metal' || family === 'composite' || family === 'additive' || family === 'bar_tube' || family === 'roto_blow' || family === ASSEMBLY_FAMILY || family === PART_ASSEMBLY_FAMILY || family === TWO_MODEL_FAMILY || castingProcessOfFamily(family) !== null;
 }
 
 /** The molding line's material reason, when the engine found the material itself cannot be molded (requiredCapability says so). */
@@ -394,6 +398,8 @@ export class BomItemCostingService {
     private readonly multiSpindleCostService?: MultiSpindleCostService,
     /** A weldment's welding (Part Assembly); optional for the same reason (without it a Part Assembly part is one named, uncosted line). */
     private readonly partAssemblyCostService?: PartAssemblyCostService,
+    /** The blow and roto molding routes; optional for the same reason (without it a Roto & Blow Molding part is one named, uncosted line). */
+    private readonly rotoBlowCostService?: RotoBlowCostService,
   ) { }
 
   // Every getCostSummary/getRouteComparison money field is computed in the
@@ -522,6 +528,7 @@ export class BomItemCostingService {
       ...(dto.composites ? { composites: { ...dto.composites, options: convertRouteOptions(dto.composites.options, conv) } } : {}),
       ...(dto.additive ? { additive: { ...dto.additive, options: convertRouteOptions(dto.additive.options, conv) } } : {}),
       ...(dto.barTube ? { barTube: { ...dto.barTube, options: convertRouteOptions(dto.barTube.options, conv) } } : {}),
+      ...(dto.rotoBlow ? { rotoBlow: { ...dto.rotoBlow, options: convertRouteOptions(dto.rotoBlow.options, conv) } } : {}),
       ...(dto.multiSpindle ? { multiSpindle: { ...dto.multiSpindle, options: convertRouteOptions(dto.multiSpindle.options, conv) } } : {}),
       ...(dto.insertMolding ? { insertMolding: { ...dto.insertMolding, options: convertRouteOptions(dto.insertMolding.options, conv) } } : {}),
       ...(dto.multiShot ? { multiShot: { ...dto.multiShot, options: convertRouteOptions(dto.multiShot.options, conv) } } : {}),
@@ -2774,6 +2781,38 @@ export class BomItemCostingService {
         localLinesOut.localCurrency = locInfo.code;
       }
       return { ...this.normalizeCostSummaryToCurrency(barTubeResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
+    }
+
+    // ── Roto & Blow Molding ───────────────────────────────────────────────────
+    // The shell measured by the cad-engine (roto_blow/feature_extractor.py, via auto-fill's rotoBlowGeometry: wall, inside, spout, parting line,
+    // envelope, holes and voids) and memory/Roto & blow molding price both routes (roto-blow-route.ts): extrusion blow molding and rotational
+    // molding, each with the operations its features take, on the machines that make the part; the molds are tooling.
+    if (family === 'roto_blow') {
+      const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
+      const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
+      const rotoBlow = this.rotoBlowCostService
+        ? await this.rotoBlowCostService.price({
+          client: this.databaseService.getClient(accessToken), accessToken, location, grade,
+          geometry: (summary.rotoBlowGeometry ?? null) as RotoBlowGeometrySummary | null,
+          amortizationParts: annualVolume && productionLifeYears ? annualVolume * productionLifeYears : null,
+          ...(forceDieCastingProcess ? { forceRoute: forceDieCastingProcess } : {}),
+          overrides: item.scenarioOverrides, batchSize, usdToLocal, costContext: zeroCtx,
+        })
+        : { route: null, routes: [], gaps: [], part: null, note: null, missing: ['the Roto & Blow Molding cost service is not available'], warnings: [] };
+      const rotoBlowResult = {
+        ...buildRotoBlowCostSummary({
+          rotoBlow, materialGrade: grade, materialCostPerKg, materialSource, batchSize, warnings: [...materialWarnings], ratesSource: RATES_SOURCE_LABEL,
+        }),
+        ...currencyMeta,
+        drawingCadConsistency,
+      };
+      this.overrides.applyCostOverrides(rotoBlowResult, costOverrides);
+      if (costOverrides.size > 0) rotoBlowResult.costOverrides = Object.fromEntries(costOverrides);
+      if (localLinesOut) {
+        localLinesOut.lines = JSON.parse(JSON.stringify(rotoBlowResult.processLines)) as ProcessLineCost[];
+        localLinesOut.localCurrency = locInfo.code;
+      }
+      return { ...this.normalizeCostSummaryToCurrency(rotoBlowResult, rates, locInfo.code, item.scenarioOverrides), resolvedInputs: costingInputs };
     }
 
     // ── Casting (die / sand / investment) ────────────────────────────────────
@@ -5327,6 +5366,46 @@ export class BomItemCostingService {
   }
 
   /**
+   * A blow molded or rotomolded part's route comparison: extrusion blow molding and rotational molding, each the full Cost Summary priced on
+   * that route, as the additive routes are. The recommended one is the route the quote chose.
+   */
+  private async rotoBlowRouteComparison(
+    id: string, userId: string, accessToken: string,
+    requestedBatchSize: number | undefined, requestedLocation: string, requestedProductionLifeYears?: number,
+    localCurrencyOut?: { routes?: RouteResultDto[]; localCurrency?: string },
+  ): Promise<RouteComparisonResponseDto> {
+    const keys: RotoBlowRouteKey[] = ROTO_BLOW_ROUTES.map((r) => r.key);
+    const locals = keys.map(() => ({} as { lines?: ProcessLineCost[]; localCurrency?: string }));
+    const [quote, ...summaries] = await Promise.all([
+      this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, undefined, undefined, 'roto_blow'),
+      ...keys.map((key, i) => this.computeCostSummary(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, key, locals[i], 'roto_blow')),
+    ]);
+    const routes = keys.map((key, i) => rotoBlowRouteFor(key, summaries[i]!));
+    if (localCurrencyOut) {
+      localCurrencyOut.routes = routes.map((r, i) => ({ ...r, processLines: locals[i]!.lines ?? [] }));
+      localCurrencyOut.localCurrency = locals[0]!.localCurrency;
+    }
+    const recommended = quote!.rotoBlow?.complete ? rotoBlowRouteId(quote!.rotoBlow.route) : null;
+    return {
+      bomItemId: id,
+      batchSize: quote!.batchSize,
+      recommendedRouteId: recommended,
+      materialCost: quote!.materialCost,
+      materialGrade: quote!.materialGrade,
+      grossWeightKg: quote!.grossWeightKg,
+      materialCostPerKg: quote!.materialCostPerKg,
+      materialSource: quote!.materialSource,
+      routes: routes.map((r) => ({ ...r, badges: { ...r.badges, lowestCost: r.routeId === recommended } })),
+      comparisonWarnings: recommended ? [] : ['No Roto & Blow Molding route is both feasible and fully costed for this part.'],
+      currency: quote!.currency ?? 'USD',
+      currencySymbol: quote!.currencySymbol ?? '$',
+      ...(quote!.toUsdRate != null ? { toUsdRate: quote!.toUsdRate } : {}),
+      ...(quote!.usdToDisplayRate != null ? { usdToDisplayRate: quote!.usdToDisplayRate } : {}),
+      resolvedInputs: quote!.resolvedInputs,
+    };
+  }
+
+  /**
    * A part built layer by layer: its route comparison, every build route of its domain (Additive Manufacturing: metal sintering, laser
    * sintering, material jetting, stereolithography; Rapid Prototyping: laser sintering, 3D printing, stereolithography), each the full Cost
    * Summary priced on that route, as the composites routes are. The recommended one is the route the quote chose.
@@ -5645,6 +5724,10 @@ export class BomItemCostingService {
     // Bar and Tube Fabrication: saw and punch against tube laser, each the full quote on that route (bar-tube-route-comparison.ts).
     if (family === 'bar_tube') {
       return this.barTubeRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
+    }
+    // Roto & Blow Molding: extrusion blow molding and rotational molding, each the full quote on that route (roto-blow-route-comparison.ts).
+    if (family === 'roto_blow') {
+      return this.rotoBlowRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut);
     }
     if (family === 'additive') {
       return this.additiveRouteComparison(id, userId, accessToken, requestedBatchSize, requestedLocation, requestedProductionLifeYears, localCurrencyOut,

@@ -1268,6 +1268,18 @@ export interface CostSummaryDto {
   };
   /** Bar and tube: the tools the quoted route needs (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when unpriced. */
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
+  /** Roto & Blow Molding: the shell, its features' operations, parts per shot or arm, the route quoted and both routes (backend RotoBlowBreakdown). */
+  rotoBlow?: {
+    route: string; routeLabel: string;
+    envelopeMm: number[]; wallMm: number; insideVolumeMm3: number; partingLineMm: number | null;
+    spouts: { id: string; diameterMm: number }[];
+    partsPerCycle: number | null; coolingTimeS: number | null; materialMassKg: number; partMassKg: number;
+    features: { id: string; featureType: string; operation: string; process: string; reason: string }[];
+    complete: boolean;
+    options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+  };
+  /** Roto & Blow Molding: the molds and trim tooling (USD), kept out of the piece cost. */
+  rotoBlowTooling?: { key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }[];
   composites?: {
     route: string; routeLabel: string;
     /** The laminate at its thickest (core excluded) and the cured ply thickness it is divided by. */

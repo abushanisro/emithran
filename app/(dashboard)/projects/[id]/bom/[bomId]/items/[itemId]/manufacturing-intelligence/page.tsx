@@ -29,6 +29,7 @@ import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShot
 import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
 import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
 import { PowderMetalSection, powderMetalUncostedReason } from '@/components/costing/PowderMetalSection';
+import { RotoBlowSection } from '@/components/costing/RotoBlowSection';
 import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
@@ -4708,6 +4709,17 @@ function CostGuidePanel({
                 <BarTubeSection
                   barTube={cgpCostSummary.barTube}
                   tooling={cgpCostSummary.barTubeTooling}
+                  overrides={item.scenarioOverrides}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'roto_blow' && (
+              <Section title="Roto & Blow Molding">
+                <RotoBlowSection
+                  rotoBlow={cgpCostSummary.rotoBlow}
+                  tooling={cgpCostSummary.rotoBlowTooling}
                   overrides={item.scenarioOverrides}
                   onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />

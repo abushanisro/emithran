@@ -377,7 +377,9 @@ export type MeasurementKey = 'pierce_count' | 'bend_line_length' | 'flat_pattern
   // An additive build along its build direction: cad-engine additive/feature_extractor.py additive_measurements.
   | 'build_height' | 'overhang_area' | 'support_volume' | 'plate_contact_area'
   // A bar, tube or profile: cad-engine bar_tube/feature_extractor.py.
-  | 'developed_length' | 'section_area';
+  | 'developed_length' | 'section_area'
+  // A blow molded or rotomolded shell: cad-engine roto_blow/feature_extractor.py.
+  | 'inside_volume' | 'parting_line';
 
 export interface FeatureMeasurement {
   value: number;
