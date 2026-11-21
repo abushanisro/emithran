@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
 const BOMItemThumbnail = dynamic(
   () => import('./BOMItemThumbnail').then((m) => m.BOMItemThumbnail),
@@ -22,14 +22,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info, Layers, Layers3, Package } from '@/components/ui/icons';
+import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info, Layers, Layers3, Package, Search, X } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
-import { visibleTreeRows } from '@/lib/bom/tree-rows';
+import { filterTree, highlightParts, matchesQuery, visibleTreeRows } from '@/lib/bom/tree-rows';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -98,29 +99,36 @@ function getDefaultBomLevel(itemType: string): string {
 }
 
 /**
- * Each item type's colour, as the BOM had it before the redesign (assembly green, sub-assembly blue, child part amber), from the theme's
- * success / info / warning tokens: the row's left accent, the type badge (its text a shade darker in light mode, so it reads on white), the
- * icon of a part with no file, and the legend's dot. Static class names: Tailwind cannot build them at runtime.
+ * Each item type's colour: assembly green, sub-assembly blue, child part yellow. The row's left bar, its tree lines (an assembly's lines down
+ * to its sub-assemblies are green, a sub-assembly's down to its parts blue), a faint tint on the parent rows, the type badge (its text a
+ * shade darker in light mode, so it reads on white), the icon of a part with no file, and the legend's dot. Static class names: Tailwind
+ * cannot build them at runtime.
  */
-interface TypeStyle { label: string; Icon: React.ComponentType<{ className?: string }>; accent: string; badge: string; icon: string; dot: string }
+interface TypeStyle {
+  label: string; Icon: React.ComponentType<{ className?: string }>;
+  accent: string; line: string; tint: string; badge: string; icon: string; dot: string;
+}
 const TYPE_STYLE: Record<string, TypeStyle> = {
   assembly: {
-    label: 'Assembly', Icon: Layers, accent: 'shadow-[inset_3px_0_0_hsl(var(--success))]',
-    badge: 'border-success/30 bg-success/10 text-emerald-700 dark:text-emerald-400', icon: 'text-success', dot: 'bg-success',
+    label: 'Assembly', Icon: Layers, accent: 'border-l-4 border-l-emerald-500', line: 'border-emerald-500', tint: 'bg-emerald-500/[0.04]',
+    badge: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', icon: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500',
   },
   sub_assembly: {
-    label: 'Sub-Assembly', Icon: Layers3, accent: 'shadow-[inset_3px_0_0_hsl(var(--info))]',
-    badge: 'border-info/30 bg-info/10 text-sky-700 dark:text-sky-400', icon: 'text-info', dot: 'bg-info',
+    label: 'Sub-Assembly', Icon: Layers3, accent: 'border-l-4 border-l-blue-500', line: 'border-blue-500', tint: 'bg-blue-500/[0.04]',
+    badge: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400', icon: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500',
   },
   child_part: {
-    label: 'Child Part', Icon: Box, accent: 'shadow-[inset_3px_0_0_hsl(var(--warning))]',
-    badge: 'border-warning/30 bg-warning/10 text-amber-700 dark:text-amber-400', icon: 'text-warning', dot: 'bg-warning',
+    label: 'Child Part', Icon: Box, accent: 'border-l-4 border-l-yellow-400', line: 'border-yellow-400', tint: '',
+    badge: 'border-yellow-500/50 bg-yellow-400/15 text-yellow-800 dark:text-yellow-300', icon: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-400',
   },
 };
 const LEGEND_TYPES = ['assembly', 'sub_assembly', 'child_part'] as const;
 
 function typeStyleOf(type: string): TypeStyle {
-  return TYPE_STYLE[type] ?? { label: type, Icon: Package, accent: '', badge: 'border-border bg-muted text-muted-foreground', icon: 'text-muted-foreground', dot: 'bg-muted-foreground' };
+  return TYPE_STYLE[type] ?? {
+    label: type, Icon: Package, accent: 'border-l-4 border-l-border', line: 'border-border', tint: '',
+    badge: 'border-border bg-muted text-muted-foreground', icon: 'text-muted-foreground', dot: 'bg-muted-foreground',
+  };
 }
 
 function getItemTypeBadge(type: string): React.ReactElement {
@@ -215,6 +223,32 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
       buildTree,
     ],
   );
+
+  // Search by name or part number: the matches with their ancestors (their place in the BOM), the branches to them opened.
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+  const search = query.trim();
+  const filtered = useMemo(
+    () => (search ? filterTree(treeData, (n) => matchesQuery(search, n.name, n.partNumber)) : null),
+    [treeData, search],
+  );
+  // "/" puts the cursor in the search box, unless one is already typing somewhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); };
+  }, []);
+  // The matched words, marked in a name or a part number.
+  const marked = (text: string): React.ReactNode =>
+    search
+      ? highlightParts(text, search).map(([part, hit], i) => (hit ? <mark key={i} className="rounded-sm bg-yellow-200 px-0.5 text-foreground dark:bg-yellow-500/40">{part}</mark> : part))
+      : text;
 
   // Auto-expand root assemblies on first load
   useEffect(() => {
@@ -461,13 +495,16 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
    * One row of the tree. `guides`: for each ancestor level below the root, whether its line continues past this row (that ancestor has
    * more children below); `isLast`: this row is the last of its parent's children, so its connector ends here (└) instead of going on (├).
    */
-  const renderRow = (item: TreeNode, depth: number, guides: boolean[] = [], isLast = true): React.ReactElement => {
+  const renderRow = (item: TreeNode, depth: number, guides: boolean[] = [], isLast = true, path: TreeNode[] = []): React.ReactElement => {
     const hasChildren    = item.children.length > 0;
     const isExpanded     = expandedItems.has(item.id);
     const isDraggedOver  = dragOverItem === item.id;
     const isBeingDragged = draggedItem?.id === item.id;
     const childType      = getChildType(item.itemType);
     const style          = typeStyleOf(item.itemType);
+    // A line is drawn in the colour of the item it comes down from: a guide column in its ancestor's, the connector in the parent's.
+    const lineOf         = (ancestor: TreeNode | undefined) => typeStyleOf(ancestor?.itemType ?? '').line;
+    const parent         = path[path.length - 1];
 
     return (
       <tr
@@ -493,10 +530,11 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           isBeingDragged ? 'opacity-50' : '',
           isDraggedOver ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',
           isUpdating ? 'cursor-wait opacity-75' : 'cursor-pointer',
+          style.tint,
         ].join(' ')}
       >
         <td className={`p-0 ${style.accent}`}>
-          <div className="flex min-h-10 min-w-0 items-stretch pr-3">
+          <div className="flex min-h-14 min-w-0 items-stretch pr-3">
             {/* Drag handle: the whole row is draggable; the grip shows where to take it. */}
             <span className="flex w-6 shrink-0 items-center justify-center">
               <GripVertical
@@ -509,13 +547,13 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             {/* Tree guides: a line under each ancestor with more children below, then this row's connector (├ or └). */}
             {guides.map((continues, i) => (
               <span key={i} className="relative w-5 shrink-0" aria-hidden="true">
-                {continues && <span className="absolute inset-y-0 left-1/2 border-l border-border" />}
+                {continues && <span className={`absolute inset-y-0 left-1/2 border-l-2 ${lineOf(path[i])}`} />}
               </span>
             ))}
             {depth > 0 && (
               <span className="relative w-5 shrink-0" aria-hidden="true">
-                <span className={`absolute left-1/2 top-0 border-l border-border ${isLast ? 'h-1/2' : 'h-full'}`} />
-                <span className="absolute left-1/2 top-1/2 w-2.5 border-t border-border" />
+                <span className={`absolute left-1/2 top-0 border-l-2 ${lineOf(parent)} ${isLast ? 'h-[calc(50%+1px)]' : 'h-full'}`} />
+                <span className={`absolute left-1/2 top-1/2 w-2.5 border-t-2 ${lineOf(parent)}`} />
               </span>
             )}
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -532,7 +570,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                     >
                       {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     </Button>
-                    {isExpanded && <span className="absolute bottom-0 left-1/2 top-[calc(50%+10px)] border-l border-border" aria-hidden="true" />}
+                    {isExpanded && <span className={`absolute bottom-0 left-1/2 top-[calc(50%+10px)] border-l-2 ${style.line}`} aria-hidden="true" />}
                   </>
                 ) : null}
               </span>
@@ -543,13 +581,13 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                   onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
                 />
               ) : (
-                <span className="flex h-[30px] w-10 shrink-0 items-center justify-center rounded border border-border/60 bg-muted/40" aria-hidden="true">
-                  <style.Icon className={`h-4 w-4 ${style.icon}`} />
+                <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded border border-border/60 bg-muted/40" aria-hidden="true">
+                  <style.Icon className={`h-5 w-5 ${style.icon}`} />
                 </span>
               )}
               <div className="min-w-0 py-1">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate text-[13px] font-medium leading-5 text-foreground" title={item.name}>{item.name}</span>
+                  <span className="truncate text-[13px] font-medium leading-5 text-foreground" title={item.name}>{marked(item.name)}</span>
                   {getItemTypeBadge(item.itemType)}
                   {hasChildren && (
                     <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
@@ -570,7 +608,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             </div>
           </div>
         </td>
-        <td className={`${textCell} font-mono text-[11px] text-muted-foreground`}>{item.partNumber ? item.partNumber : '—'}</td>
+        <td className={`${textCell} font-mono text-[11px] text-muted-foreground`}>{item.partNumber ? marked(item.partNumber) : '—'}</td>
         <td className="px-3 py-1">
           <Badge variant="outline" className="h-4 px-1.5 text-[10px] font-medium">
             {item.bomLevel || getDefaultBomLevel(item.itemType)}
@@ -637,8 +675,10 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   };
 
   // The rows currently visible, with the tree each draws (lib/bom/tree-rows.ts).
-  const visibleRows = (nodes: TreeNode[]): React.ReactElement[] =>
-    visibleTreeRows(nodes, expandedItems).map((r) => renderRow(r.node, r.depth, r.guides, r.isLast));
+  const visibleRows = (nodes: TreeNode[], expanded: ReadonlySet<string>): React.ReactElement[] =>
+    visibleTreeRows(nodes, expanded).map((r) => renderRow(r.node, r.depth, r.guides, r.isLast, r.path));
+  const rowsTree     = filtered ? filtered.nodes : treeData;
+  const rowsExpanded = filtered ? new Set([...expandedItems, ...filtered.expand]) : expandedItems;
 
   // -------------------------------------------------------------------------
   // Loading / empty states
@@ -682,8 +722,39 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
 
   return (
     <>
-      {/* The item types, as the rows colour them, and the whole tree opened or closed at once. */}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      {/* Search by name or part number; the item types, as the rows colour them; the whole tree opened or closed at once. */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-80">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); }}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
+              placeholder="Search by name or part no."
+              aria-label="Search the BOM by name or part number"
+              className="h-8 pl-8 pr-14 text-xs"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => { setQuery(''); searchRef.current?.focus(); }}
+                className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground">/</kbd>
+            )}
+          </div>
+          {filtered && (
+            <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+              {filtered.matches.size} of {items.length} {items.length === 1 ? 'item' : 'items'}
+            </span>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {LEGEND_TYPES.map((t) => (
             <span key={t} className="inline-flex items-center gap-1.5">
@@ -721,7 +792,15 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             </tr>
           </thead>
           <tbody>
-            {visibleRows(treeData)}
+            {visibleRows(rowsTree, rowsExpanded)}
+            {filtered?.matches.size === 0 && (
+              <tr>
+                <td colSpan={11} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  No item matches &ldquo;{search}&rdquo; by name or part number.{' '}
+                  <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setQuery(''); }}>Clear search</button>
+                </td>
+              </tr>
+            )}
             {orphanedItems.length > 0 && (
               <>
                 <tr>
