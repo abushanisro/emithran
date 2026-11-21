@@ -71,6 +71,8 @@ export function familiesAnalysedForHint(hint: string): readonly string[] {
 }
 
 export const CASTING_PROCESS_GROUP = 'Casting';
+/** A hydroformed part: a sheet-metal part (its CAD analysis is sheet metal's), priced by costing/hydroforming. */
+export const HYDROFORMING_PROCESS_GROUP = 'Sheet Metal - Hydroforming';
 
 /**
  * Process groups with no CAD family of their own, and the families they are costed as. A hydroformed part is a sheet-metal part. A Casting part
@@ -78,7 +80,7 @@ export const CASTING_PROCESS_GROUP = 'Casting';
  * catalog holds every feature type the sand catalog has, and slides.
  */
 const COSTED_AS_FAMILIES: Readonly<Record<string, readonly string[]>> = {
-  'Sheet Metal - Hydroforming': ['sheet_metal'],
+  [HYDROFORMING_PROCESS_GROUP]: ['sheet_metal'],
   [CASTING_PROCESS_GROUP]: ['die_cast', 'sand_cast', 'investment_cast'],
   // Insert molding: a molded plastic part, analysed and priced as one, on the insert presses with its inserts loaded (plastic-molding/insert).
   [INSERT_MOLDING_PROCESS_GROUP]: ['plastic_molded'],

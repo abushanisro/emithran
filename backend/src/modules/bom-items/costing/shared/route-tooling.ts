@@ -18,12 +18,17 @@ export interface RouteToolingItem {
 }
 
 /**
- * A tool the engine reports as an investment and a cost per part, with no part count: the count it was amortised over is investment / per part.
- * The per-part figure is rounded to 4 decimals, so the count is exact to that rounding (a tool worth under 0.05 USD a part is not written: the
- * count would be off by more than 0.1%).
+ * A tool the engine reports as an investment and a cost per part. When the engine also reports the part count it amortised over, that count is
+ * written. Otherwise the count is investment / per part: the per-part figure is rounded to 4 decimals, so the count is exact to that rounding (a
+ * tool worth under 0.05 USD a part is not written: the count would be off by more than 0.1%).
  */
-function fromPerPart(key: string, toolingType: string, description: string, specifications: string, investmentUsd: number | null | undefined, perPartUsd: number | null | undefined): RouteToolingItem[] {
-  if (!(investmentUsd != null && investmentUsd > 0 && perPartUsd != null && perPartUsd >= 0.05)) return [];
+function fromPerPart(
+  key: string, toolingType: string, description: string, specifications: string,
+  investmentUsd: number | null | undefined, perPartUsd: number | null | undefined, parts?: number | null,
+): RouteToolingItem[] {
+  if (!(investmentUsd != null && investmentUsd > 0)) return [];
+  if (parts != null && parts >= 1) return [{ key, toolingType, description, specifications, investmentUsd, amortizationParts: Math.round(parts) }];
+  if (!(perPartUsd != null && perPartUsd >= 0.05)) return [];
   return [{ key, toolingType, description, specifications, investmentUsd, amortizationParts: Math.round(investmentUsd / perPartUsd) }];
 }
 
@@ -31,7 +36,7 @@ function fromPerPart(key: string, toolingType: string, description: string, spec
  * The tools of the summary's route: the injection mold (every mold the job wears out, one investment), the die casting die, the coreboxes of the
  * cores (die casting and sand casting), and the wax pattern die of an investment casting.
  */
-export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'family' | 'dieTooling' | 'coreboxTooling' | 'patternTooling' | 'forgingDies' | 'firstArticleInspection' | 'barTubeTooling' | 'rotoBlowTooling'>): RouteToolingItem[] {
+export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'family' | 'dieTooling' | 'coreboxTooling' | 'patternTooling' | 'forgingDies' | 'firstArticleInspection' | 'barTubeTooling' | 'rotoBlowTooling' | 'hydroformingTooling'>): RouteToolingItem[] {
   const items: RouteToolingItem[] = [];
   const die = summary.dieTooling;
   if (die?.ok) {
@@ -49,6 +54,11 @@ export function routeToolingItems(summary: Pick<CostSummaryDto, 'tooling' | 'fam
   if (dies) items.push(...fromPerPart('forging-dies', 'die', `Forging dies (${dies.sets} set${dies.sets === 1 ? '' : 's'})`, dies.detail, dies.costUsd, dies.perPartUsd));
   for (const t of summary.barTubeTooling ?? []) items.push(...fromPerPart(`bar-tube-${t.key}`, 'die', t.description, t.detail, t.costUsd, t.perPartUsd));
   for (const t of summary.rotoBlowTooling ?? []) items.push(...fromPerPart(`roto-blow-${t.key}`, 'mold', t.description, t.detail, t.costUsd, t.perPartUsd));
+  // The hydroform tools the job wears out (its costUsd is that whole investment, over the parts the engine spread it); the blanking die, not
+  // costed, is not written.
+  for (const t of summary.hydroformingTooling ?? []) {
+    items.push(...fromPerPart(`hydroforming-${t.key}`, 'die', t.description, t.detail, t.costUsd, t.perPartUsd, t.amortizationParts));
+  }
   const fai = summary.firstArticleInspection;
   if (fai) items.push(...fromPerPart('first-article-inspection', 'inspection', 'First article inspection (CMM)', fai.detail, fai.costUsd, fai.perPartUsd));
   const t = summary.tooling;

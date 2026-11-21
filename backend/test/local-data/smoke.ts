@@ -78,6 +78,12 @@ async function main(): Promise<void> {
       `USA press ${JSON.stringify(press('USA'))}`);
     must(Number(press('India')?.mhr_usd_per_hour) === 54.02 && Number(press('India')?.usd_labor_rate_per_hr) === 1.73, `India press ${JSON.stringify(press('India'))}`);
   });
+  await check('migration 1110 bound the Hydroform and Offline Blank catalog rows to their hydroforming calculators', async () => {
+    const q = encodeURIComponent('Sheet Metal - Hydroforming');
+    const rows = await (await api(`/process_calculator_mappings?process_group=eq.${q}&select=operation,calculator_name&order=operation`, minter.forService())).json() as { operation: string; calculator_name: string | null }[];
+    must(JSON.stringify(rows.map((r) => [r.operation, r.calculator_name])) === JSON.stringify([['Hydroform', 'Hydroforming - Hydroform'], ['Offline Blank', 'Hydroforming - Offline blank']]),
+      `rows ${JSON.stringify(rows)}`);
+  });
   await check('the carried user directory is readable through migration 932 (same id as the source)', async () => {
     const res = await api('/rpc/directory_find_by_email', minter.forService(), { method: 'POST', body: JSON.stringify({ p_email: 'Alice@Example.com' }) });
     must(res.ok && (await res.json()) === '11111111-1111-4111-8111-111111111111', `HTTP ${res.status}`);

@@ -722,6 +722,14 @@ export interface CostSummaryDto {
   rotoBlow?: RotoBlowBreakdown;
   /** Roto & Blow Molding: the molds and trim tooling the quoted route needs, USD, kept out of the piece cost; costUsd null when its calculator cannot price it. */
   rotoBlowTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
+  /** Sheet Metal - Hydroforming: memory's route rule, the draws, the blank and its nest, the press, the tray, the route quoted and every route. */
+  hydroforming?: HydroformingBreakdown;
+  /**
+   * Sheet Metal - Hydroforming: the hydroform tool and the offline blanking die, USD, kept out of the piece cost. costUsd is the tools the job
+   * wears out (one tool x tools a set x sets), what Apply writes, spread over amortizationParts; toolCostUsd one tool. Both null when not costed
+   * (costUsd and amortizationParts also with no volume).
+   */
+  hydroformingTooling?: { key: string; description: string; detail: string; costUsd: number | null; toolCostUsd: number | null; perPartUsd: number | null; amortizationParts: number | null }[];
   /** Bar and tube: the tools the quoted route needs for this part (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when no source prices one. */
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
@@ -929,6 +937,30 @@ export interface PartAssemblyBreakdown {
   /** The MIG wire on the weld lines (summary currency). */
   wireCost: number;
   /** Every route: its total per weldment (summary currency) when complete, or why it is not a route for the weldment. */
+  options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+}
+
+/** A hydroformed part's Cost Summary section (costing/hydroforming). Lengths in mm, areas in mm², masses in kg, money in the summary's currency. */
+export interface HydroformingBreakdown {
+  /** The quoted route (hydroforming-route.ts HYDROFORMING_ROUTES key: deep-draw, fluid-cell) and its name. */
+  route: string;
+  routeLabel: string;
+  /** Memory's rule: depth over width against fluidCellFormingRatioThreshold, and the route it gives. */
+  rule: { route: string; ratio: number; depthMm: number; widthMm: number; threshold: number; basis: string };
+  draws: number;
+  drawRatiosPct: number[];
+  blank: { method: string; areaMm2: number; addendumMm: number; massKg: number };
+  nest: { method: string; partsPerSheet: number; utilizationPct: number; sheetLengthMm: number; sheetWidthMm: number } | null;
+  press: { name: string; formingCycleTimeS: number } | null;
+  /** Fluid Cell: the parts formed a cycle, the Cost Guide's ask (null: the data's default) and how many fit the tray; null on Deep Draw. */
+  partsPerTray: { value: number; requested: number | null; max: number | null } | null;
+  handAdjustingLengthMm: number;
+  throwPadAreaMm2: number;
+  cappingTools: number;
+  /** Holes pierced with the blank, and those through a formed wall (pierced after forming: a No Cost Feature). */
+  holes: { inFlat: number; afterForming: number };
+  intensifier: boolean;
+  complete: boolean;
   options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
 }
 

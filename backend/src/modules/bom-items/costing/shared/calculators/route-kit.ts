@@ -34,6 +34,18 @@ export interface RouteKitInput {
   processClass: Readonly<Record<string, string>>;
   /** What a step's time is per ("assembly", "weldment"), for its line's breakdown. */
   partName: string;
+  /** The part's measurements, for the fields whose source is `cad` (keyed by the name before " ("); none when the domain has none. */
+  cad?: Readonly<Record<string, CalcSeed | undefined>>;
+  /** The part's material, for the fields whose source is `material` (a column of the material). */
+  material?: SeedProvider;
+}
+
+/** How a step is priced when it is not on every machine of its class, or its line is filed under a route of its process. */
+export interface StepOptions {
+  /** The machines the step may run on (a route's own, say deep draw presses only); every machine of the process's class when absent. */
+  machines?: readonly SandMachine[];
+  /** The line's process route (memory's Hydroform:Hydroform Deep Draw); the process when absent. */
+  processRoute?: string;
 }
 
 /** A calculator run with its result (`sec`: the run's finite Cycle Time, or its declared output), or why it has none. */
@@ -51,8 +63,8 @@ export interface RouteKit {
   calcOf: (process: string) => string;
   /** A process timed on a machine by its calculator, as a step outcome. */
   timed: (process: string, m: SandMachine, engine: Record<string, CalcSeed | undefined>, lookups?: Record<string, CalcSeed | undefined>, extra?: Partial<Extract<StepOutcome, { ok: true }>>) => StepOutcome;
-  /** A process priced on the cheapest of its class's machines that `evaluate` can time. */
-  step: (process: string, evaluate: (m: SandMachine) => StepOutcome, criteria: string[]) => CostedStep;
+  /** A process priced on the cheapest of its class's machines (or `options.machines`) that `evaluate` can time. */
+  step: (process: string, evaluate: (m: SandMachine) => StepOutcome, criteria: string[], options?: StepOptions) => CostedStep;
 }
 
 export function routeKit(inp: RouteKitInput): RouteKit {
@@ -69,6 +81,8 @@ export function routeKit(inp: RouteKitInput): RouteKit {
     if (!calc) return { reasons: [`${calculator} is not in the calculator spec`] };
     const providers: SeedProviders = {
       variable, engine: named(engine), lookup: named(lookups), scenario: named({ batch_size: { value: batchSize, source: 'batch size' } }),
+      ...(inp.cad ? { cad: named(inp.cad) } : {}),
+      ...(inp.material ? { material: inp.material } : {}),
       machine: (key) => {
         const value = machine ? machineValue(machine, key) : null;
         return value == null || !machine ? null : {
@@ -97,11 +111,12 @@ export function routeKit(inp: RouteKitInput): RouteKit {
     const r = run(calcOf(process), m, engine, lookups);
     return 'run' in r ? { ok: true, sec: r.sec, run: r.run, energyCostUsd: 0, notes: [], ...extra } : fail(...r.reasons);
   };
-  const step: RouteKit['step'] = (process, evaluate, criteria) => {
+  const step: RouteKit['step'] = (process, evaluate, criteria, options = {}) => {
     const machineClass = inp.processClass[process];
     return selectAndCost({
-      process, machineClass, machines: inp.machinesByClass[machineClass] ?? [], evaluate, criteria,
+      process, machineClass, machines: options.machines ?? inp.machinesByClass[machineClass] ?? [], evaluate, criteria,
       batchSize, costContext: inp.costContext, ref, partName: inp.partName, processGroup: inp.processGroup,
+      ...(options.processRoute ? { processRoute: options.processRoute } : {}),
     });
   };
   return { variable, run, seed, lookupSeed, calcOf, timed, step };
