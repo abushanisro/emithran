@@ -1,9 +1,18 @@
 'use client';
 
+import { useQueryClient, useQuery, keepPreviousData } from '@tanstack/react-query';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
-import { useFileFormats } from '@/lib/api/hooks/useElectronics';
-import { describeRejection } from '@/lib/electronics/rejections';
+import { toast } from 'sonner';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandGroup,
+  CommandList,
+} from '@/components/ui/command';
 import {
   Dialog,
   DialogContent,
@@ -12,30 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Command,
-  CommandGroup,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import {
   FileText,
   Package,
@@ -50,16 +35,32 @@ import {
   Check,
   X,
   DollarSign,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { apiClient } from '@/lib/api/client';
 import { createBOMItem, updateBOMItem, analyzeForAutoFill, measureForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
-import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
-import { familyToProcessGroupLabel, processGroupOptionLabel, processGroupOptionsFrom, processGroupToFamilyHint, processesForMaterialGroups } from '@/lib/features/process-group';
+import { useFileFormats } from '@/lib/api/hooks/useElectronics';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import type { DrawingAnalysisResult } from '@/lib/api/vave';
+import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
+import { describeRejection } from '@/lib/electronics/rejections';
+import { familyToProcessGroupLabel, processGroupOptionLabel, processGroupOptionsFrom, processGroupToFamilyHint, processesForMaterialGroups } from '@/lib/features/process-group';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
-import { apiClient } from '@/lib/api/client';
-import { useQueryClient, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1456,7 +1457,7 @@ export function BOMItemDialog({
       } else {
         const newItem = await createBOMItem(payload);
         itemId = newItem.id;
-        toast.success(`🎉 "${formData.name}" added to BOM`, {
+        toast.success(`"${formData.name}" added to BOM`, {
           description: 'New item is now part of your Bill of Materials',
           duration: 4000
         });

@@ -1,23 +1,5 @@
 'use client';
 
-import {
-  Shield,
-  Search,
-  FileText,
-  Calendar,
-  User,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Clock,
-  Trash2,
-  MoreVertical,
-  ArrowLeft,
-  ThumbsUp,
-  ThumbsDown,
-  Loader2,
-  Undo2,
-} from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { Fragment, useState, useEffect } from 'react';
 
@@ -51,11 +33,29 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PageSkeleton } from '@/components/ui/loading-skeleton';
-import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Shield,
+  Search,
+  FileText,
+  Calendar,
+  User,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  Trash2,
+  MoreVertical,
+  ArrowLeft,
+  ThumbsUp,
+  ThumbsDown,
+  Loader2,
+  Undo2,
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
 
 export default function QualityControlPage() {
   const params = useParams();

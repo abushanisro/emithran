@@ -351,6 +351,9 @@
    * Three themes: light (the brand's own, default), dark (the marketing site's #080808/#111), brand (navy).
    */
   :root {
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #2dd4bf;
+    --duo-front: #0d9488;
     --background: 0 0% 3%;
     --foreground: 0 0% 98%;
 
@@ -419,6 +422,9 @@
 
   /* Dark: the marketing site's dark sections */
   .dark {
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #2dd4bf;
+    --duo-front: #0d9488;
     --background: 0 0% 3%;
     --foreground: 0 0% 98%;
     --card: 0 0% 7%;
@@ -450,6 +456,9 @@
 
   /* Navy: the brand's navy and teal-navy dark cards */
   .brand {
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #2dd4bf;
+    --duo-front: #14b8a6;
     --background: 218 52% 7%;
     --foreground: 210 40% 96%;
 
@@ -496,6 +505,9 @@
 
   /* Light: the brand's own palette (the default) */
   .light {
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #5eead4;
+    --duo-front: #0f1b2d;
     --background: 210 40% 98%;
     --foreground: 216 50% 12%;
 

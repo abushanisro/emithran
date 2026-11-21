@@ -1,8 +1,8 @@
 'use client';
 
-import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { Plus } from '@/components/ui/icons';
 import { processOperationOptions, type CatalogOperationRow } from '@/lib/processCatalog/process-operation-options';
 
 // "Process" then "Operation", side by side, then Add: an operation the engineer adds to the part by hand. Both lists

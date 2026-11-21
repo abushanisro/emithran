@@ -1,6 +1,5 @@
 'use client';
 
-import { Wand2, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 
@@ -13,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Wand2, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from '@/components/ui/icons';
 import { useVaveIdeas, useUpdateVaveIdea } from '@/lib/api/hooks/useVave';
 import type { VaveIdea } from '@/lib/api/vave';
 

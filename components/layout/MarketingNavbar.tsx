@@ -1,8 +1,8 @@
 'use client'
 
-import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { Menu, X } from '@/components/ui/icons'
 import { marketingUrl, REQUEST_DEMO_URL } from '@/lib/marketing-site'
 
 /**

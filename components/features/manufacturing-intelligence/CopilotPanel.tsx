@@ -1,9 +1,10 @@
 "use client";
 
-import { Bot, Send, RotateCcw, Loader2 } from "lucide-react";
 import { useCallback, useRef, useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Bot, Send, RotateCcw, Loader2 } from '@/components/ui/icons';
+import { Mark } from '@/components/ui/status-mark';
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
@@ -410,7 +411,7 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
     if (trimmed.startsWith("✓")) {
       nodes.push(
         <div key={i++} className="flex items-start gap-1.5 py-0.5">
-          <span className="text-emerald-500 shrink-0 text-[11px] mt-0.5">✓</span>
+          <span className="text-emerald-500 shrink-0 text-[11px] mt-0.5"><Mark kind="ok" inherit /></span>
           <span className="text-[10px] leading-relaxed">{parseInline(trimmed.slice(1).trim(), showSources)}</span>
         </div>
       );

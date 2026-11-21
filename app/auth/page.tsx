@@ -1,12 +1,12 @@
 'use client'
 
-import { ChevronDown, KeyRound, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { MarketingNavbar } from '@/components/layout/MarketingNavbar'
 import { Button, type ButtonProps } from '@/components/ui/button'
+import { ChevronDown, KeyRound, Loader2 } from '@/components/ui/icons'
 import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
 import { SIGN_IN_PATH, ssoSignInPath } from '@/lib/auth/sign-in'
 import { marketingUrl, REQUEST_DEMO_URL } from '@/lib/marketing-site'

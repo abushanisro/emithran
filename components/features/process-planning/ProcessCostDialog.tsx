@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader2, Calculator as CalculatorIcon, Play } from 'lucide-react';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
@@ -14,6 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Loader2, Calculator as CalculatorIcon, Play } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ListSkeleton } from '@/components/ui/loading-skeleton';
@@ -25,11 +25,27 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Mark } from '@/components/ui/status-mark';
 import type { CalculatorField } from '@/lib/api/calculators';
 import { calculatorsApi } from '@/lib/api/calculators';
 import { apiClient } from '@/lib/api/client';
 import { PROCESS_DIALOG_CALCULATOR_QUERY, useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
+import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
+import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
+import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
+import { calculationOfRecord, NO_CALCULATION, runOfCalculator, type LineCalculation } from '@/lib/calculators/calculator-run';
+import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
+import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, showsFeatures, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
+import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
+import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
+import { formatFieldValue } from '@/lib/costing/cycle-fields';
+import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
+import { longestBendLineMm } from '@/lib/features/bend-line-length';
+import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
+import { cachedFeaturesHighlight, checkAgainstInput, highlightableGraph, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
+import { useDebounce } from '@/lib/hooks/useDebounce';
+import { calculatorSwitch, type CalculatorIdentity } from '@/lib/processCatalog/calculator-switch';
 import {
   effectiveProcessGroupOf,
   buildHrRatesIndex,
@@ -40,21 +56,6 @@ import {
   identityMappings,
   type MachineRowForSelection,
 } from '@/lib/processCatalog/hr-rates-process-selection';
-import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
-import { calculatorSwitch, type CalculatorIdentity } from '@/lib/processCatalog/calculator-switch';
-import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
-import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
-import { useDebounce } from '@/lib/hooks/useDebounce';
-import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
-import { calculationOfRecord, NO_CALCULATION, runOfCalculator, type LineCalculation } from '@/lib/calculators/calculator-run';
-import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
-import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, showsFeatures, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
-import { formatFieldValue } from '@/lib/costing/cycle-fields';
-import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
-import { longestBendLineMm } from '@/lib/features/bend-line-length';
-import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
-import { cachedFeaturesHighlight, checkAgainstInput, highlightableGraph, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { findDuplicateOperation, keepsSavedOperation, resolveLineIdentity } from '@/lib/processCatalog/line-identity';
 import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
@@ -62,6 +63,7 @@ import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
 import { ReferenceTable } from './ReferenceTable';
+
 import type { CadEvidence } from './CadEvidencePanel';
 
 // The Deburr calculator's time per mm is each Deslag machine's own perimeter allowance
@@ -3285,7 +3287,7 @@ export function ProcessCostDialog({
                               (see selector.ts's identical warning for a class mismatch). */}
                           {selectedMHR?.location && location && selectedMHR.location.toLowerCase() !== location.toLowerCase() && (
                             <p className="text-xs text-warning">
-                              ⚠ Cross-location manual selection — this machine is from {selectedMHR.location}, not the current Digital Factory ({location}).
+                              <Mark kind="warn" /> Cross-location manual selection — this machine is from {selectedMHR.location}, not the current Digital Factory ({location}).
                             </p>
                           )}
                           {/* A machine is listed but the rate that actually reaches the cost
@@ -3299,7 +3301,7 @@ export function ProcessCostDialog({
                             </p>
                           ) : effectiveMachineRate <= 0 && (
                             <p className="text-xs text-warning">
-                              ⚠ No machine rate applied — cost cannot be calculated from machine time.
+                              <Mark kind="warn" /> No machine rate applied — cost cannot be calculated from machine time.
                             </p>
                           )}
                           </>
@@ -3570,7 +3572,7 @@ export function ProcessCostDialog({
                       incomplete, no rate resolved, or the request itself failed. */}
                   {costPreviewError ? (
                     <p className="text-xs text-destructive mt-1">
-                      ⚠ Not calculated — {costPreviewError}
+                      <Mark kind="warn" /> Not calculated — {costPreviewError}
                     </p>
                   ) : !costPreviewInput ? (
                     <p className="text-xs text-warning mt-1">
@@ -3587,7 +3589,7 @@ export function ProcessCostDialog({
             </div>
 
               {submitError && (
-                <p className="text-xs text-destructive mt-2">⚠ {submitError}</p>
+                <p className="text-xs text-destructive mt-2"><Mark kind="warn" /> {submitError}</p>
               )}
               <DialogFooter className="mt-6">
                 <Button type="button" variant="outline" onClick={() => { onOpenChange(false); }}>
@@ -3978,7 +3980,7 @@ export function ProcessCostDialog({
                       <div className="text-xs">
                         {computedCycleTime.matchesCurrent ? (
                           <span className="text-success font-medium">
-                            ✓ Matches the Cycle Time currently set on this process ({formatStoredCycleSec(computedCycleTime.currentCycleTimeSec)}) — this is the value Direct Process Costs will use.
+                            <Mark kind="ok" /> Matches the Cycle Time currently set on this process ({formatStoredCycleSec(computedCycleTime.currentCycleTimeSec)}) — this is the value Direct Process Costs will use.
                           </span>
                         ) : (
                           <span className="text-warning font-medium">

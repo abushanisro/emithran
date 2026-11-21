@@ -1,8 +1,7 @@
 'use client';
 
-import { FlipHorizontal2, Loader2, Maximize, Ruler, ZoomIn, ZoomOut } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
+import { FlipHorizontal2, Loader2, Maximize, Ruler, ZoomIn, ZoomOut } from '@/components/ui/icons';
 import { ApiError } from '@/lib/api/client';
 import { distanceMm, toScene } from '@/lib/electronics/viewer-model';
 

@@ -1,14 +1,18 @@
-import { useState, useMemo, useEffect } from 'react';
-// Fix TS6133: removed unused imports Info, Network
-import { Plus, Edit2, Trash2, ZoomIn, ZoomOut, Maximize2, AlertTriangle, CheckCircle, XCircle, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { useState, useMemo, useEffect } from 'react';
+
+// Fix TS6133: removed unused imports Info, Network
+import { toast } from 'sonner';
+
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-// Fix TS6133: removed unused import Progress
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Plus, Edit2, Trash2, ZoomIn, ZoomOut, Maximize2, AlertTriangle, CheckCircle, XCircle, FileText } from '@/components/ui/icons';
 import { BOMItemType } from '@/lib/types/bom.types';
+import { cn } from '@/lib/utils';
+
+// Fix TS6133: removed unused import Progress
+
 
 // ---------------------------------------------------------------------------
 // Types

@@ -1,10 +1,10 @@
 'use client';
 
-import { Loader2, X } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { CadFeatureViewer } from '@/components/features/cad-feature-viewer/CadFeatureViewer';
 import { Button } from '@/components/ui/button';
+import { Loader2, X } from '@/components/ui/icons';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import type { FieldHighlight } from '@/lib/features/field-highlight';
 import type { FaceMapEntry } from '@/lib/types/manufacturing';

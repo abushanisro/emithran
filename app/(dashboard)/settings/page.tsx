@@ -1,12 +1,6 @@
 'use client';
 
 import { format } from 'date-fns';
-import {
-  Plus, Copy, Check,
-  Camera, Loader2,
-  Monitor, Sun, Moon, Building2, Trash2,
-  LayoutGrid, Mail, X,
-} from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect, Suspense } from 'react';
@@ -20,6 +14,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Plus, Copy, Check,
+  Camera, Loader2,
+  Monitor, Sun, Moon, Building2, Trash2,
+  LayoutGrid, Mail, X,
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ListSkeleton } from '@/components/ui/loading-skeleton';

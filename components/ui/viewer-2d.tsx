@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Loader2, FileText, AlertCircle, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Loader2, FileText, AlertCircle, Maximize, ZoomIn, ZoomOut } from '@/components/ui/icons';
 
 interface Viewer2DProps {
     fileUrl: string;

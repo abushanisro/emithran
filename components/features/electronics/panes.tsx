@@ -1,7 +1,8 @@
 'use client';
 
-import { GripHorizontal, GripVertical } from 'lucide-react';
 import { PanelResizeHandle } from 'react-resizable-panels';
+
+import { GripHorizontal, GripVertical } from '@/components/ui/icons';
 
 import type { ReactNode } from 'react';
 

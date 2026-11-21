@@ -1,6 +1,5 @@
 'use client';
 
-import { FileText, FolderUp, Loader2, Upload, X } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
@@ -8,6 +7,7 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FileText, FolderUp, Loader2, Upload, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { isAssemblyResult, type StartAssemblyResult, type StartUploadResult, type SuppliedFacts } from '@/lib/api/electronics';

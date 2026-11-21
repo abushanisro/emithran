@@ -1,6 +1,5 @@
 'use client';
 
-import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useCallback } from 'react';
 
@@ -12,6 +11,7 @@ import {
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { ArrowLeft } from '@/components/ui/icons';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { useSupplierEvaluationGroups, useSupplierEvaluationGroup } from '@/lib/api/hooks/useSupplierEvaluationGroups';
 

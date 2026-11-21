@@ -1,6 +1,12 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Package,
   Search,
@@ -14,13 +20,7 @@ import {
   ArrowUpRight,
   Wrench,
   MoreVertical,
-} from 'lucide-react';
-import { useState, useMemo } from 'react';
-import { toast } from 'sonner';
-
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 

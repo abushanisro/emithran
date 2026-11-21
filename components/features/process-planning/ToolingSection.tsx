@@ -1,10 +1,10 @@
 'use client';
 
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Plus, Edit, Trash2, Loader2 } from '@/components/ui/icons';
 import { useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import {
   useToolingCosts,

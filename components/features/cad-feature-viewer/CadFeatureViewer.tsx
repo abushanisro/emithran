@@ -1,18 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { Crosshair, Home, Loader2, Square, SquareDashed } from 'lucide-react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
+import { Crosshair, Home, Loader2, Square, SquareDashed } from '@/components/ui/icons';
 import { SetupAxisArrows } from '@/components/viewer/body-overlays';
 import { fitCameraToBox, type Box3Like } from '@/lib/geometry/camera-fit';
 import type { FaceMapEntry } from '@/lib/types/manufacturing';
+import { storageKey, type LoadedMesh } from '@/lib/viewer/geometry-store';
 import {
   boundaryEdges, boundsOf, boundsOfPositions, buildFaceIndex, subsetPositions, trianglesOfFaces, type Bounds,
 } from '@/lib/viewer/highlight-geometry';
-import { storageKey, type LoadedMesh } from '@/lib/viewer/geometry-store';
 import { viewerGeometryStore } from '@/lib/viewer/viewer-store';
 
 const BODY_COLOR = '#9b9bb4';

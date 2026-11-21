@@ -1,15 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   FileText,
   RefreshCw,
   AlertCircle,
   TrendingUp,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
+
 import { LocationComparisonPanel } from './LocationComparisonPanel';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

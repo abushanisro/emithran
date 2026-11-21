@@ -1,10 +1,10 @@
 "use client";
 
-import { GitCompare, Package } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GitCompare, Package } from '@/components/ui/icons';
 
 
 import { itemCost, itemWeight, safeNum, formatPrice } from "../../utils";

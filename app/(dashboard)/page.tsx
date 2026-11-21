@@ -1,14 +1,15 @@
 'use client';
 
-import { PageHeader } from '@/components/layout/PageHeader';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { StatusBadge } from '@/components/common/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Plus,
   ArrowRight,
@@ -17,11 +18,10 @@ import {
   PiggyBank,
   FolderKanban,
   Users,
-} from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+} from '@/components/ui/icons';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProjects, useVendors, useRawMaterials, useMHRRecords, useLHRCount } from '@/lib/api/hooks';
-import dynamic from 'next/dynamic';
 import { formatProjectMoney, projectCostCurrency, projectSavings, summarizeProjectCosts } from '@/lib/costing/project-costs';
 
 // Lazy load heavy chart components

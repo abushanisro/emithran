@@ -1,8 +1,8 @@
 'use client';
 
-import { Pencil } from 'lucide-react';
 import { useState } from 'react';
 
+import { Pencil } from '@/components/ui/icons';
 import type { CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
 import { useClearCalculatorFieldOverride, useSetCalculatorFieldOverride } from '@/lib/api/hooks/useCalculatorFieldOverrides';
 import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';

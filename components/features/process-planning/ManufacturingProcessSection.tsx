@@ -2,11 +2,11 @@
 
 
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical } from 'lucide-react';
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical } from '@/components/ui/icons';
 import { apiClient } from '@/lib/api/client';
 import {
   useProcessCosts,

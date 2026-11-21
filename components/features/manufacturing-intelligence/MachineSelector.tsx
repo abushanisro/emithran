@@ -8,13 +8,16 @@
  */
 
 import { useState } from 'react';
+
+import { Pencil } from '@/components/ui/icons';
+import { Mark } from '@/components/ui/status-mark';
 import { useMachineOverride } from '@/lib/api/hooks/useBOMItems';
-import { cn } from '@/lib/utils';
 import type {
   CapabilityCheck,
   MachineCandidate,
   MachineSelectionResult,
 } from '@/lib/api/hooks/useBOMItems';
+import { cn } from '@/lib/utils';
 
 const FACTOR_LABEL = { fit: 'Fit', util: 'Load', cost: 'Cost', avail: 'Avail' } as const;
 
@@ -92,7 +95,7 @@ function SelectionWhy({ selection, fmtRate }: { selection: MachineSelectionResul
             <div className="space-y-0.5 pt-1 border-t border-border/30">
               {rejected.map((r) => (
                 <p key={r.machineId ?? r.machineName ?? 'r'} className="text-[10px] text-red-500/80 leading-snug">
-                  ✗ {name(r)} — cannot hold this part: {r.reasons.join('; ')}
+                  <Mark kind="fail" /> {name(r)} — cannot hold this part: {r.reasons.join('; ')}
                 </p>
               ))}
             </div>
@@ -248,7 +251,7 @@ export function MachineSelector({
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
           <span className="text-xs text-foreground">
-            {differsFromLive || selection.overridden ? '✎ ' : '⭐ '}
+            {differsFromLive || selection.overridden ? <Pencil className="mr-1 inline h-3 w-3" /> : <Mark kind="star" className="mr-1" />}
             {recommended.machineName ?? `Class default (${recommended.machineClass.replace(/_/g, ' ')})`}
           </span>
           <span className="text-[10px] text-muted-foreground ml-1.5">{fmtRate(recommended.hourlyRate)}</span>
@@ -259,7 +262,7 @@ export function MachineSelector({
       </div>
 
       {selection.availabilityWarning && (
-        <p className="text-[10px] text-amber-500">⚠ {selection.availabilityWarning}</p>
+        <p className="text-[10px] text-amber-500"><Mark kind="warn" /> {selection.availabilityWarning}</p>
       )}
 
       {/* Alternatives */}
@@ -302,7 +305,7 @@ export function MachineSelector({
           </span>
           <span className="text-muted-foreground">Status</span>
           <span className={cn('text-right', explanation.capabilityCheck.supported ? 'text-emerald-500' : 'text-red-500')}>
-            {explanation.capabilityCheck.supported ? '✓ Supported' : '✗ Not Supported'}
+            {explanation.capabilityCheck.supported ? <><Mark kind="ok" /> Supported</> : <><Mark kind="fail" /> Not Supported</>}
           </span>
         </div>
       )}

@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Loader2, ZoomIn, ZoomOut, Maximize2, RotateCcw } from '@/components/ui/icons';
 
 interface DXFViewerComponentProps {
   fileUrl: string;

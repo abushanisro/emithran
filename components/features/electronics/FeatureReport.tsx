@@ -1,12 +1,12 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, XCircle } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, XCircle } from '@/components/ui/icons';
 import { electronicsKeys, useJob, useUploadFeatures } from '@/lib/api/hooks/useElectronics';
 
 import { BatchInput, FeatureSections, FileTable, FindingsList, ProcessNeeds, QuoteOutcome, UnresolvedList } from './report-parts';

@@ -1,18 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+
+import { BOMItemsFlat, BOMItemDialog, BOMTreeView, BOMItemDetailPanel } from '@/components/features/bom';
+import { AssemblyTreeGenerator } from '@/components/features/bom/AssemblyTreeGenerator';
+import { HierarchicalBOMTree } from '@/components/features/bom/HierarchicalBOMTree';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { PageSkeleton } from '@/components/ui/loading-skeleton';
-import { useProject } from '@/lib/api/hooks/useProjects';
-import { useBOM } from '@/lib/api/hooks/useBOM';
-import { useBOMItems, deleteBOMItem, createBOMItem, type CreateBOMItemDto } from '@/lib/api/hooks/useBOMItems';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   ArrowLeft,
@@ -30,15 +29,17 @@ import {
   Trash2,
   Layers3,
   UploadCloud,
-} from 'lucide-react';
-import { BOMItemsFlat, BOMItemDialog, BOMTreeView, BOMItemDetailPanel } from '@/components/features/bom';
-import { AssemblyTreeGenerator } from '@/components/features/bom/AssemblyTreeGenerator';
-import { HierarchicalBOMTree } from '@/components/features/bom/HierarchicalBOMTree';
+} from '@/components/ui/icons';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { ModelViewer } from '@/components/ui/model-viewer';
-import { type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { bomItemsApi as bomAPI } from '@/lib/api/bom-items';
+import { useBOM } from '@/lib/api/hooks/useBOM';
+import { useBOMItems, deleteBOMItem, createBOMItem, type CreateBOMItemDto } from '@/lib/api/hooks/useBOMItems';
+import { type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { useProject } from '@/lib/api/hooks/useProjects';
 import { BOMItemType } from '@/lib/types/bom.types';
-import { toast } from 'sonner';
 import { addAoaSheet, createWorkbook, downloadWorkbook, readWorkbookFile, worksheetToAoa } from '@/lib/utils/excel-browser';
 
 // ---------------------------------------------------------------------------

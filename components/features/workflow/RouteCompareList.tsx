@@ -1,9 +1,9 @@
 'use client';
 
-import { AlertTriangle, Check, Info } from 'lucide-react';
 import { useId, useRef } from 'react';
 
 import { ConciseNote } from '@/components/ui/concise-note';
+import { AlertTriangle, Check, Info } from '@/components/ui/icons';
 import { fmtMinutes, fmtMoney } from '@/lib/routing/route-format';
 import { groupRouteNodes, maxRouteCost, ROUTE_SORT_MODES, sortRouteNodes, type RouteSortMode } from '@/lib/routing/route-sort';
 import type { RouteNode } from '@/lib/routing/route-tree';

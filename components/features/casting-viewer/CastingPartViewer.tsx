@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { Home, Loader2 } from "lucide-react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { fitCameraToBox, type Box3Like } from "@/lib/geometry/camera-fit";
+import { Home, Loader2 } from '@/components/ui/icons';
 import type { GlbShape } from "@/lib/casting/gating-layout";
 import { vertexColors, vertexThickness, type ThicknessField } from "@/lib/casting/thickness-field";
 import {
@@ -16,6 +15,7 @@ import {
   primitivesOfFaces,
   type Xyz,
 } from "@/lib/casting/viewer-model";
+import { fitCameraToBox, type Box3Like } from "@/lib/geometry/camera-fit";
 
 const BODY_COLOR = "#9b9bb4";
 const FEATURE_COLOR = "#22c55e";

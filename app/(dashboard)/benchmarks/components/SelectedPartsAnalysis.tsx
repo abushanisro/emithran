@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowLeft, Download, Info, TriangleAlert, Zap } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -19,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Download, Info, TriangleAlert, Zap } from '@/components/ui/icons';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 

@@ -1,18 +1,5 @@
 'use client';
 
-import { 
-  FileText, 
-  Download, 
-  Plus, 
-  Edit, 
-  Printer,
-  Settings,
-  ArrowLeft,
-  ChevronDown,
-  Loader2,
-  AlertTriangle,
-  CheckCircle,
-} from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +19,19 @@ import {
 } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
+import { 
+  FileText, 
+  Download, 
+  Plus, 
+  Edit, 
+  Printer,
+  Settings,
+  ArrowLeft,
+  ChevronDown,
+  Loader2,
+  AlertTriangle,
+  CheckCircle,
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ListSkeleton } from '@/components/ui/loading-skeleton';

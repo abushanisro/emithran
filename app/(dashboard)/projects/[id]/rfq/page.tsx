@@ -1,7 +1,6 @@
 'use client';
 
 import { formatDistanceToNow, isAfter } from 'date-fns';
-import { ArrowLeft, FileText, Send, Users, Calendar, Clock, CheckCircle, Mail, Download, Eye, Paperclip, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -13,8 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ArrowLeft, FileText, Send, Users, Calendar, Clock, CheckCircle, Mail, Download, Eye, Paperclip, AlertCircle } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Mark } from '@/components/ui/status-mark';
 import { Textarea } from '@/components/ui/textarea';
 import { apiConfig } from '@/lib/api/config';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
@@ -549,7 +550,7 @@ export default function RFQPage() {
                                             </p>
                                             {(bomItem.file2dPath || bomItem.file3dPath) && (
                                               <p className="text-xs">
-                                                Files: {bomItem.file2dPath ? 'Available' : 'Missing'} 2D | {bomItem.file3dPath ? 'Available' : 'Missing'} 3D
+                                                Files: {bomItem.file2dPath ? <><Mark kind="ok" /> 2D</> : <><Mark kind="fail" /> 2D</>} | {bomItem.file3dPath ? <><Mark kind="ok" /> 3D</> : <><Mark kind="fail" /> 3D</>}
                                               </p>
                                             )}
                                           </div>

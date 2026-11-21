@@ -1,8 +1,5 @@
 'use client';
 
-import {
-  Printer, Download, TrendingUp, Clock, DollarSign, BarChart2, FileOutput,
-} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,6 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Printer, Download, TrendingUp, Clock, DollarSign, BarChart2, FileOutput,
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useVaveIdeas, useVaveShouldCosts } from '@/lib/api/hooks/useVave';
