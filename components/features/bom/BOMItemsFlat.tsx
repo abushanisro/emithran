@@ -473,8 +473,9 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
         }}
         className={[
           'group border-b transition-colors',
-          // Opaque, so the actions shown over the end of the row's details on hover (same colour) cover them cleanly.
-          isDragging ? '' : 'hover:bg-accent',
+          // Gmail's hover: the row lifts (a soft shadow) in an opaque colour, so the actions shown over the end of its details (same colour)
+          // cover them cleanly.
+          isDragging ? '' : 'hover:relative hover:z-[1] hover:bg-accent hover:shadow-[inset_1px_0_0_hsl(var(--border)),inset_-1px_0_0_hsl(var(--border)),0_1px_2px_0_rgb(60_64_67/0.3),0_1px_3px_1px_rgb(60_64_67/0.15)]',
           // The row being dragged stays in place, faded, so you see where it came from.
           isBeingDragged ? 'bg-muted/40 opacity-40' : '',
           dropClass,
@@ -530,7 +531,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                   onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
                 />
               ) : (
-                <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded border border-border/60 bg-muted/40" aria-hidden="true">
+                <span className="flex h-12 w-16 shrink-0 items-center justify-center" aria-hidden="true">
                   <style.Icon className={`h-5 w-5 ${style.icon}`} />
                 </span>
               )}
@@ -570,8 +571,8 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           </div>
         </td>
         {/* Gmail's date: the unit cost, which the row's actions replace on hover. */}
-        <td className="relative whitespace-nowrap py-0 pl-2 pr-3 text-right">
-          <span className={`text-[13px] font-medium tabular-nums ${costHidden}`}>{formatCost(item.unitCost)}</span>
+        <td className="relative whitespace-nowrap py-0 pl-2 pr-4 text-right">
+          <span className={`text-[13px] font-medium tabular-nums ${costHidden}`} title="Unit cost">{formatCost(item.unitCost)}</span>
           <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center justify-end gap-0.5 bg-accent pl-2 pr-2 opacity-0 transition-opacity pointer-coarse:bg-card ${actionsShown}`}>
             {item.file2dPath && (
               <Button variant="ghost" size="icon" className={actionButton} onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing" aria-label="View 2D Drawing">
@@ -630,11 +631,13 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Loading / empty states
   // -------------------------------------------------------------------------
 
-  // Gmail's toolbar: one row on top of the list, the list's own tools at the left and the page's actions at the right.
-  const toolbarClass = 'flex flex-wrap items-center gap-2 border-b px-3 py-2';
+  // Gmail's toolbar: one flat row on top of the list (no box of its own: it is part of the page), the page's add buttons and the list's own
+  // tools at the left, the count and the total cost at the right, in line with the costs below (the same right padding, pr-4).
+  const toolbarClass = 'flex flex-wrap items-center gap-1 border-b py-1.5 pr-4';
   const actionsOnly  = toolbarActions
-    ? <div className={toolbarClass}><div className="ml-auto flex flex-wrap items-center gap-2">{toolbarActions}</div></div>
+    ? <div className={toolbarClass}><div className="flex flex-wrap items-center gap-1">{toolbarActions}</div></div>
     : null;
+  const totalLabel   = formatCost(totalCost);
 
   if (isLoading) {
     return (
@@ -681,74 +684,76 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
 
   return (
     <>
-      {/* Search by name or part number; the whole tree opened or closed at once; the page's add buttons at the right. */}
-      <div className={toolbarClass}>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <div className="relative w-full sm:w-80">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); }}
-              onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
-              placeholder="Search by name or part no."
-              aria-label="Search the BOM by name or part number"
-              className="h-8 pl-8 pr-14 text-xs"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => { setQuery(''); searchRef.current?.focus(); }}
-                className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Clear search"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground">/</kbd>
-            )}
-          </div>
-          {filtered && (
-            <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
-              {filtered.matches.size} of {items.length} {items.length === 1 ? 'item' : 'items'}
-            </span>
+      {/* Gmail's search box: a wide, soft pill, white with a shadow while typing. "/" puts the cursor in it. */}
+      <div className="flex flex-wrap items-center gap-3 pb-3">
+        <div className="relative w-full max-w-2xl">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); }}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
+            placeholder="Search by name or part no."
+            aria-label="Search the BOM by name or part number"
+            className="h-11 rounded-full border-transparent bg-muted pl-11 pr-14 text-sm shadow-none transition-shadow focus-visible:border-transparent focus-visible:bg-card focus-visible:shadow-md focus-visible:ring-0"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => { setQuery(''); searchRef.current?.focus(); }}
+              className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <kbd className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded border bg-card px-1.5 font-mono text-[10px] text-muted-foreground">/</kbd>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={expandAll}>
-            <ChevronDown className="h-3.5 w-3.5" /> Expand all
-          </Button>
-          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={collapseAll}>
-            <ChevronRight className="h-3.5 w-3.5" /> Collapse all
-          </Button>
-        </div>
-        {toolbarActions && <div className="ml-auto flex flex-wrap items-center gap-2">{toolbarActions}</div>}
+        {filtered && (
+          <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+            {filtered.matches.size} of {items.length} {items.length === 1 ? 'item' : 'items'}
+          </span>
+        )}
       </div>
-      {/* The drag image: a card of the item being dragged, drawn off screen for the browser to take under the cursor (handleDragStart). */}
-      <div
-        ref={dragCardRef}
-        aria-hidden="true"
-        className={`pointer-events-none fixed left-0 top-[-1000px] flex w-72 items-center gap-2.5 rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-lg ${
-          draggedItem ? typeStyleOf(draggedItem.itemType).accent : ''
-        }`}
-      >
-        {draggedItem && (() => {
-          const s = typeStyleOf(draggedItem.itemType);
-          return (
-            <>
-              <s.Icon className={`h-4 w-4 shrink-0 ${s.icon}`} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{draggedItem.name}</span>
-                <span className="block truncate font-mono text-[11px] text-muted-foreground">{draggedItem.partNumber ? draggedItem.partNumber : s.label}</span>
-              </span>
-              {getItemTypeBadge(draggedItem.itemType)}
-            </>
-          );
-        })()}
+      {/* The page's add buttons, the whole tree opened or closed at once; the count and total cost at the right (Gmail's "1–50 of 283"). */}
+      <div className={toolbarClass}>
+        {toolbarActions && <div className="flex flex-wrap items-center gap-1">{toolbarActions}</div>}
+        {toolbarActions && <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />}
+        <Button variant="ghost" size="sm" className="h-9 gap-1 rounded-full px-3 text-xs text-muted-foreground hover:bg-foreground/10 hover:text-foreground" onClick={expandAll}>
+          <ChevronDown className="h-3.5 w-3.5" /> Expand all
+        </Button>
+        <Button variant="ghost" size="sm" className="h-9 gap-1 rounded-full px-3 text-xs text-muted-foreground hover:bg-foreground/10 hover:text-foreground" onClick={collapseAll}>
+          <ChevronRight className="h-3.5 w-3.5" /> Collapse all
+        </Button>
+        <span className="ml-auto whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+          {items.length} {items.length === 1 ? 'item' : 'items'} · Total cost <span className="font-semibold text-foreground">{totalLabel}</span>
+        </span>
       </div>
       {/*
-        No height of its own: the list grows with the page (one scroll, the page's). Three columns of fixed share, as Gmail's sender, subject
-        and date, so the list always fits the card's width (no sideways scroll); only a phone-narrow screen scrolls it sideways.
+        The drag image: a card of the item being dragged, drawn off screen for the browser to take under the cursor (handleDragStart). Only
+        while dragging, so no empty box is ever left on the page.
+      */}
+      {draggedItem && (() => {
+        const s = typeStyleOf(draggedItem.itemType);
+        return (
+          <div
+            ref={dragCardRef}
+            aria-hidden="true"
+            className={`pointer-events-none fixed left-0 top-[-1000px] flex w-72 items-center gap-2.5 rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-lg ${s.accent}`}
+          >
+            <s.Icon className={`h-4 w-4 shrink-0 ${s.icon}`} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{draggedItem.name}</span>
+              <span className="block truncate font-mono text-[11px] text-muted-foreground">{(draggedItem.partNumber ?? '') === '' ? s.label : draggedItem.partNumber}</span>
+            </span>
+            {getItemTypeBadge(draggedItem.itemType)}
+          </div>
+        );
+      })()}
+      {/*
+        No height or box of its own: the list is part of the page (one scroll, the page's). Three columns of fixed share, as Gmail's sender,
+        subject and date, so the list always fits the page's width (no sideways scroll); only a phone-narrow screen scrolls it sideways.
       */}
       <div
         className="overflow-x-auto"
@@ -791,10 +796,10 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           {/* The total under the costs; the item types, as the rows colour them, with how many of each. */}
           <tfoot>
             <tr>
-              <td colSpan={2} className="border-t bg-muted/60 px-3 py-2 text-xs">
+              <td colSpan={2} className="border-t py-2.5 pl-3 pr-3 text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span className="font-medium">
-                    Total <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
+                    Total cost <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
                   </span>
                   {LEGEND_TYPES.map((t) => (
                     <span key={t} className="inline-flex items-center gap-1.5 text-muted-foreground">
@@ -805,8 +810,8 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                   ))}
                 </div>
               </td>
-              <td className="whitespace-nowrap border-t bg-muted/60 py-2 pl-2 pr-3 text-right text-xs font-medium tabular-nums">
-                {formatCost(totalCost)}
+              <td className="whitespace-nowrap border-t py-2.5 pl-2 pr-4 text-right text-xs font-semibold tabular-nums">
+                {totalLabel}
               </td>
             </tr>
           </tfoot>
