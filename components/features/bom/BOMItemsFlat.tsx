@@ -22,13 +22,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info } from '@/components/ui/icons';
+import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info, Layers, Layers3, Package } from '@/components/ui/icons';
 
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { visibleTreeRows } from '@/lib/bom/tree-rows';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -96,18 +97,37 @@ function getDefaultBomLevel(itemType: string): string {
   }
 }
 
+/**
+ * Each item type's colour, as the BOM had it before the redesign (assembly green, sub-assembly blue, child part amber), from the theme's
+ * success / info / warning tokens: the row's left accent, the type badge (its text a shade darker in light mode, so it reads on white), the
+ * icon of a part with no file, and the legend's dot. Static class names: Tailwind cannot build them at runtime.
+ */
+interface TypeStyle { label: string; Icon: React.ComponentType<{ className?: string }>; accent: string; badge: string; icon: string; dot: string }
+const TYPE_STYLE: Record<string, TypeStyle> = {
+  assembly: {
+    label: 'Assembly', Icon: Layers, accent: 'shadow-[inset_3px_0_0_hsl(var(--success))]',
+    badge: 'border-success/30 bg-success/10 text-emerald-700 dark:text-emerald-400', icon: 'text-success', dot: 'bg-success',
+  },
+  sub_assembly: {
+    label: 'Sub-Assembly', Icon: Layers3, accent: 'shadow-[inset_3px_0_0_hsl(var(--info))]',
+    badge: 'border-info/30 bg-info/10 text-sky-700 dark:text-sky-400', icon: 'text-info', dot: 'bg-info',
+  },
+  child_part: {
+    label: 'Child Part', Icon: Box, accent: 'shadow-[inset_3px_0_0_hsl(var(--warning))]',
+    badge: 'border-warning/30 bg-warning/10 text-amber-700 dark:text-amber-400', icon: 'text-warning', dot: 'bg-warning',
+  },
+};
+const LEGEND_TYPES = ['assembly', 'sub_assembly', 'child_part'] as const;
+
+function typeStyleOf(type: string): TypeStyle {
+  return TYPE_STYLE[type] ?? { label: type, Icon: Package, accent: '', badge: 'border-border bg-muted text-muted-foreground', icon: 'text-muted-foreground', dot: 'bg-muted-foreground' };
+}
+
 function getItemTypeBadge(type: string): React.ReactElement {
-  const typeConfig: Record<string, { label: string; className: string }> = {
-    assembly:     { label: 'Assembly',     className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
-    sub_assembly: { label: 'Sub-Assembly', className: 'bg-primary/10 text-primary border-primary/20' },
-    child_part:   { label: 'Child Part',   className: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
-  };
-
-  const config = typeConfig[type] ?? { label: type, className: 'bg-muted text-muted-foreground border-muted' };
-
+  const style = typeStyleOf(type);
   return (
-    <Badge variant="outline" className={`font-medium text-xs ${config.className}`}>
-      {config.label}
+    <Badge variant="outline" className={`h-4 shrink-0 px-1.5 text-[10px] font-medium leading-none ${style.badge}`}>
+      {style.label}
     </Badge>
   );
 }
@@ -215,6 +235,13 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // -------------------------------------------------------------------------
   // UI actions
   // -------------------------------------------------------------------------
+
+  // Every item that has children, opened or closed at once.
+  const expandAll = () => {
+    const parents = new Set(items.map(i => i.parentItemId?.trim()).filter((id): id is string => !!id));
+    setExpandedItems(new Set(items.filter(i => parents.has(i.id)).map(i => i.id)));
+  };
+  const collapseAll = () => { setExpandedItems(new Set()); };
 
   const toggleExpand = (itemId: string) => {
     setExpandedItems(prev => {
@@ -426,14 +453,21 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Render helpers
   // -------------------------------------------------------------------------
 
-  const numCell = 'px-3 py-2 text-right tabular-nums whitespace-nowrap';
+  const numCell = 'px-3 py-1 text-right text-xs tabular-nums whitespace-nowrap';
+  const textCell = 'px-3 py-1 text-xs whitespace-nowrap';
+  const actionButton = 'h-7 w-7 text-muted-foreground hover:text-foreground';
 
-  const renderRow = (item: TreeNode, depth: number): React.ReactElement => {
+  /**
+   * One row of the tree. `guides`: for each ancestor level below the root, whether its line continues past this row (that ancestor has
+   * more children below); `isLast`: this row is the last of its parent's children, so its connector ends here (└) instead of going on (├).
+   */
+  const renderRow = (item: TreeNode, depth: number, guides: boolean[] = [], isLast = true): React.ReactElement => {
     const hasChildren    = item.children.length > 0;
     const isExpanded     = expandedItems.has(item.id);
     const isDraggedOver  = dragOverItem === item.id;
     const isBeingDragged = draggedItem?.id === item.id;
     const childType      = getChildType(item.itemType);
+    const style          = typeStyleOf(item.itemType);
 
     return (
       <tr
@@ -461,60 +495,91 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           isUpdating ? 'cursor-wait opacity-75' : 'cursor-pointer',
         ].join(' ')}
       >
-        <td className="px-3 py-2">
-          <div className="flex min-w-0 items-center gap-1" style={{ paddingLeft: `${depth * 20}px` }}>
-            <GripVertical
-              className={`h-4 w-4 shrink-0 cursor-grab active:cursor-grabbing ${
-                isBeingDragged ? 'text-primary' : isDraggedOver ? 'text-success' : 'text-muted-foreground/60 group-hover:text-muted-foreground'
-              }`}
-              aria-hidden="true"
-            />
-            {hasChildren ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0"
-                aria-label={isExpanded ? `Collapse ${item.name}` : `Expand ${item.name}`}
-                onClick={() => toggleExpand(item.id)}
-              >
-                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            ) : (
-              <span className="inline-block h-6 w-6 shrink-0" aria-hidden="true" />
-            )}
-            {(item.file3dPath || item.file2dPath) && (
-              <BOMItemThumbnail
-                item={item}
-                onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
+        <td className={`p-0 ${style.accent}`}>
+          <div className="flex min-h-10 min-w-0 items-stretch pr-3">
+            {/* Drag handle: the whole row is draggable; the grip shows where to take it. */}
+            <span className="flex w-6 shrink-0 items-center justify-center">
+              <GripVertical
+                className={`h-3.5 w-3.5 cursor-grab active:cursor-grabbing transition-opacity ${
+                  isBeingDragged ? 'text-primary' : isDraggedOver ? 'text-success' : 'text-muted-foreground/50 opacity-0 group-hover:opacity-100'
+                }`}
+                aria-hidden="true"
               />
+            </span>
+            {/* Tree guides: a line under each ancestor with more children below, then this row's connector (├ or └). */}
+            {guides.map((continues, i) => (
+              <span key={i} className="relative w-5 shrink-0" aria-hidden="true">
+                {continues && <span className="absolute inset-y-0 left-1/2 border-l border-border" />}
+              </span>
+            ))}
+            {depth > 0 && (
+              <span className="relative w-5 shrink-0" aria-hidden="true">
+                <span className={`absolute left-1/2 top-0 border-l border-border ${isLast ? 'h-1/2' : 'h-full'}`} />
+                <span className="absolute left-1/2 top-1/2 w-2.5 border-t border-border" />
+              </span>
             )}
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="truncate text-sm font-medium text-foreground">{item.name}</span>
-                {getItemTypeBadge(item.itemType)}
-                {isDragging && !isBeingDragged && draggedItem && (
-                  <Badge variant="outline" className="text-xs">Drop to swap ↔</Badge>
-                )}
-                {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
-                  <Badge variant="destructive" className="text-xs">Circular Ref</Badge>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {/* Expand / collapse, with the line down to the first child when open. */}
+              <span className="relative flex w-5 shrink-0 items-center justify-center self-stretch">
+                {hasChildren ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative z-[1] h-5 w-5 rounded-sm"
+                      aria-label={isExpanded ? `Collapse ${item.name}` : `Expand ${item.name}`}
+                      onClick={() => { toggleExpand(item.id); }}
+                    >
+                      {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </Button>
+                    {isExpanded && <span className="absolute bottom-0 left-1/2 top-[calc(50%+10px)] border-l border-border" aria-hidden="true" />}
+                  </>
+                ) : null}
+              </span>
+              {(item.file3dPath || item.file2dPath) ? (
+                <BOMItemThumbnail
+                  item={item}
+                  size="sm"
+                  onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
+                />
+              ) : (
+                <span className="flex h-[30px] w-10 shrink-0 items-center justify-center rounded border border-border/60 bg-muted/40" aria-hidden="true">
+                  <style.Icon className={`h-4 w-4 ${style.icon}`} />
+                </span>
+              )}
+              <div className="min-w-0 py-1">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-[13px] font-medium leading-5 text-foreground" title={item.name}>{item.name}</span>
+                  {getItemTypeBadge(item.itemType)}
+                  {hasChildren && (
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {item.children.length} {item.children.length === 1 ? 'item' : 'items'}
+                    </span>
+                  )}
+                  {isDragging && !isBeingDragged && draggedItem && (
+                    <Badge variant="outline" className="h-4 shrink-0 px-1.5 text-[10px]">Drop to swap ↔</Badge>
+                  )}
+                  {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
+                    <Badge variant="destructive" className="h-4 shrink-0 px-1.5 text-[10px]">Circular Ref</Badge>
+                  )}
+                </div>
+                {item.description && (
+                  <p className="truncate text-[11px] leading-4 text-muted-foreground" title={item.description}>{item.description}</p>
                 )}
               </div>
-              {item.description && (
-                <p className="truncate text-xs text-muted-foreground" title={item.description}>{item.description}</p>
-              )}
             </div>
           </div>
         </td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.partNumber || '—'}</td>
-        <td className="px-3 py-2">
-          <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-medium">
+        <td className={`${textCell} font-mono text-[11px] text-muted-foreground`}>{item.partNumber ? item.partNumber : '—'}</td>
+        <td className="px-3 py-1">
+          <Badge variant="outline" className="h-4 px-1.5 text-[10px] font-medium">
             {item.bomLevel || getDefaultBomLevel(item.itemType)}
           </Badge>
         </td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.materialGrade || '—'}</td>
+        <td className={textCell}>{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</td>
+        <td className={`${textCell} max-w-[220px] truncate`} title={item.materialGrade ? item.materialGrade : undefined}>{item.materialGrade ? item.materialGrade : '—'}</td>
         <td className={numCell}>{item.quantity}</td>
-        <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">{item.unit}</td>
+        <td className={`${textCell} text-muted-foreground`}>{item.unit}</td>
         <td className={numCell}>{item.annualVolume?.toLocaleString() ?? '—'}</td>
         <td className={numCell}>
           {typeof item.unitCost === 'number'
@@ -522,48 +587,48 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             : '—'}
         </td>
         <td className={numCell}>{item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : '—'}</td>
-        <td className="px-3 py-2">
-          <div className="flex items-center justify-end gap-1">
+        <td className="px-2 py-1">
+          <div className="flex items-center justify-end gap-0.5">
             {item.file2dPath && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing" aria-label="View 2D Drawing">
-                <FileText className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className={actionButton} onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing" aria-label="View 2D Drawing">
+                <FileText className="h-3.5 w-3.5" />
               </Button>
             )}
             {item.file3dPath && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '3d')} title="View 3D Model" aria-label="View 3D Model">
-                <Box className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className={actionButton} onClick={() => onViewItem?.(item, '3d')} title="View 3D Model" aria-label="View 3D Model">
+                <Box className="h-3.5 w-3.5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDetailItem(item); }} title="Part details" aria-label="Part details">
-              <Info className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className={actionButton} onClick={() => { setDetailItem(item); }} title="Part details" aria-label="Part details">
+              <Info className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
               title="Manufacturing Intelligence"
               aria-label="Manufacturing Intelligence"
             >
-              <Cpu className="h-4 w-4 text-primary" />
+              <Cpu className="h-3.5 w-3.5 text-primary" />
             </Button>
             {childType && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddChild(item)} title="Add Component" aria-label="Add Component">
-                <Plus className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className={actionButton} onClick={() => { handleAddChild(item); }} title="Add Component" aria-label="Add Component">
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditItem(item)} title="Edit" aria-label="Edit">
-              <Edit2 className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className={actionButton} onClick={() => { onEditItem(item); }} title="Edit" aria-label="Edit">
+              <Edit2 className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={() => handleDeleteClick(item)}
               title="Delete"
               aria-label="Delete"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </td>
@@ -571,12 +636,9 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
     );
   };
 
-  // Flatten the hierarchy into the rows that are currently visible.
-  const visibleRows = (nodes: TreeNode[], depth = 0): React.ReactElement[] =>
-    nodes.flatMap(node => [
-      renderRow(node, depth),
-      ...(expandedItems.has(node.id) && node.children.length > 0 ? visibleRows(node.children, depth + 1) : []),
-    ]);
+  // The rows currently visible, with the tree each draws (lib/bom/tree-rows.ts).
+  const visibleRows = (nodes: TreeNode[]): React.ReactElement[] =>
+    visibleTreeRows(nodes, expandedItems).map((r) => renderRow(r.node, r.depth, r.guides, r.isLast));
 
   // -------------------------------------------------------------------------
   // Loading / empty states
@@ -615,16 +677,37 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   // Main render
   // -------------------------------------------------------------------------
 
-  const th = 'sticky top-0 z-10 bg-muted px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_hsl(var(--border))]';
+  const th = 'border-b bg-muted/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
   const thNum = `${th} text-right`;
 
   return (
     <>
-      <div className="max-h-[70vh] overflow-auto rounded-md border">
+      {/* The item types, as the rows colour them, and the whole tree opened or closed at once. */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {LEGEND_TYPES.map((t) => (
+            <span key={t} className="inline-flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${typeStyleOf(t).dot}`} aria-hidden="true" />
+              {typeStyleOf(t).label}
+              <span className="tabular-nums text-muted-foreground/70">{items.filter((i) => i.itemType === t).length}</span>
+            </span>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={expandAll}>
+            <ChevronDown className="h-3.5 w-3.5" /> Expand all
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={collapseAll}>
+            <ChevronRight className="h-3.5 w-3.5" /> Collapse all
+          </Button>
+        </div>
+      </div>
+      {/* No height of its own: the table grows with the page (one scroll, the page's); it scrolls sideways only on a narrow screen. */}
+      <div className="overflow-x-auto rounded-md border">
         <table role="treegrid" aria-label="BOM items" className="w-full caption-bottom border-collapse text-sm">
           <thead>
             <tr className="text-left">
-              <th scope="col" className={`${th} min-w-[280px] text-left`}>Item</th>
+              <th scope="col" className={`${th} min-w-[320px] text-left`}>Item</th>
               <th scope="col" className={`${th} text-left`}>Part No</th>
               <th scope="col" className={`${th} text-left`}>Level</th>
               <th scope="col" className={`${th} text-left`}>Type</th>
@@ -652,19 +735,19 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
           </tbody>
           <tfoot>
             <tr className="font-medium">
-              <td colSpan={5} className="sticky bottom-0 z-10 bg-muted px-3 py-2 text-sm shadow-[inset_0_1px_0_hsl(var(--border))]">
+              <td colSpan={5} className="border-t bg-muted/60 px-3 py-1.5 text-xs">
                 Total <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
               </td>
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted px-3 py-2 text-right text-sm tabular-nums whitespace-nowrap shadow-[inset_0_1px_0_hsl(var(--border))]">
+              <td className="border-t bg-muted/60" />
+              <td className="border-t bg-muted/60" />
+              <td className="border-t bg-muted/60" />
+              <td className="border-t bg-muted/60 px-3 py-1.5 text-right text-xs tabular-nums whitespace-nowrap">
                 {typeof totalCost === 'number'
                   ? totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : '—'}
               </td>
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
-              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
+              <td className="border-t bg-muted/60" />
+              <td className="border-t bg-muted/60" />
             </tr>
           </tfoot>
         </table>
