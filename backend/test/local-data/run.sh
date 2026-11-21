@@ -167,6 +167,14 @@ SELECT DISTINCT 'Rapid Prototyping', m[1], m[2], 'USA' FROM regexp_matches(pg_re
 INSERT INTO public.mhr_records (process_group, machine_class, machine_name, location)
 SELECT DISTINCT 'Roto & Blow Molding', m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1106_roto_blow_machines_india.sql'),
   '\(\$str\$(roto_blow_molding_[a-z_]+)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
+-- the overhead columns as the real database has them (migrations 001-542): migration 1109 rates the hydroform presses in them
+ALTER TABLE public.mhr_records ADD COLUMN direct_overhead_rate numeric, ADD COLUMN indirect_overhead_rate numeric,
+  ADD COLUMN benchmark_direct_overhead_rate_usd_hr numeric, ADD COLUMN benchmark_indirect_overhead_rate_usd_hr numeric;
+-- the Sheet Metal - Hydroforming machines migration 828 seeds for the USA (no rate on the presses): migration 1109 rates the presses, twins
+-- all 56 in India and fails unless every one is rated. Read from 1109's own twin list: 38 hydroform presses, 18 offline blanking presses.
+INSERT INTO public.mhr_records (process_group, machine_class, machine_name, location, specs)
+SELECT DISTINCT 'Sheet Metal - Hydroforming', m[1], m[2], 'USA', '{}'::jsonb FROM regexp_matches(pg_read_file('/migrations/1109_hydroforming_machines.sql'),
+  '\$str\$IN\$str\$, \$str\$(hydroform[a-z_]*)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
 -- the machine envelope columns as the real database has them (migration 755 fills them for the lathes): migration 1093 fills them for the multi-spindle machines
 ALTER TABLE public.mhr_records ADD COLUMN max_diameter_mm numeric(10,2), ADD COLUMN max_length_mm numeric(10,2);
 -- the taxonomy columns as the real database has them (migration 609): migration 1094 adds the Multi-Spindle Machining > Simultaneous Turning row

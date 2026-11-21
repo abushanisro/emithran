@@ -68,6 +68,16 @@ async function main(): Promise<void> {
       must(rows.length === 5 && rows.every((r) => r.calculator_name?.startsWith(`${group} - `)), `${group} catalog ${JSON.stringify(rows)}`);
     }
   });
+  await check('migration 1109 rated the hydroform presses (Netherlands overheads, 36.30 labour, forming time) and twinned all 56 Hydroforming machines in India', async () => {
+    const q = encodeURIComponent('Sheet Metal - Hydroforming');
+    const rows = await (await api(`/mhr_records?process_group=eq.${q}&select=location,machine_class,machine_name,mhr_usd_per_hour,usd_labor_rate_per_hr,specs`, minter.forService())).json() as
+      { location: string; machine_class: string; machine_name: string; mhr_usd_per_hour: number | string | null; usd_labor_rate_per_hr: number | string | null; specs: Record<string, unknown> | null }[];
+    const press = (location: string) => rows.find((r) => r.location === location && r.machine_name === 'Hydroform Press - Deep Draw - 456 Dia');
+    must(rows.filter((r) => r.location === 'India').length === 56, `India rows ${rows.filter((r) => r.location === 'India').length}`);
+    must(Number(press('USA')?.mhr_usd_per_hour) === 87.9 && Number(press('USA')?.usd_labor_rate_per_hr) === 36.3 && Number(press('USA')?.specs?.machine_forming_cycle_time_s) === 45,
+      `USA press ${JSON.stringify(press('USA'))}`);
+    must(Number(press('India')?.mhr_usd_per_hour) === 54.02 && Number(press('India')?.usd_labor_rate_per_hr) === 1.73, `India press ${JSON.stringify(press('India'))}`);
+  });
   await check('the carried user directory is readable through migration 932 (same id as the source)', async () => {
     const res = await api('/rpc/directory_find_by_email', minter.forService(), { method: 'POST', body: JSON.stringify({ p_email: 'Alice@Example.com' }) });
     must(res.ok && (await res.json()) === '11111111-1111-4111-8111-111111111111', `HTTP ${res.status}`);
