@@ -1,11 +1,11 @@
 'use client';
 
-import { ArrowLeft, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ArrowLeft, FileText } from '@/components/ui/icons';
 
 // The backend has no RFQ template store (no templates endpoint under
 // /rfq), so this page shows an empty state rather than sample templates.

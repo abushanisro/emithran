@@ -1,6 +1,5 @@
 'use client';
 
-import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -14,6 +13,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { DialogTitle } from '@/components/ui/dialog';
+import { Search } from '@/components/ui/icons';
 
 import { navGroups } from './AppSidebar';
 

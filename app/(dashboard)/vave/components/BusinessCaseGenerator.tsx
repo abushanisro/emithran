@@ -1,18 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Printer, Download, TrendingUp, Clock, DollarSign, BarChart2, FileOutput,
-} from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { useVaveIdeas, useVaveShouldCosts } from '@/lib/api/hooks/useVave';
 import type { VaveIdea } from '@/lib/api/vave';
-import { toast } from 'sonner';
 import { escapeHtml } from '@/lib/utils/escape-html';
 
 interface Props {

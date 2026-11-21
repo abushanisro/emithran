@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Eye, EyeOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Eye, EyeOff } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

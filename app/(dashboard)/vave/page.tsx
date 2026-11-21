@@ -1,19 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Lightbulb, Plus, TrendingDown, Layers, Zap, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Lightbulb, Plus, TrendingDown, Layers, Zap, ChevronRight } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { useVaveProjects, useCreateVaveProject } from '@/lib/api/hooks/useVave';
 import type { VaveProject } from '@/lib/api/vave';
+
 import { VaveProjectDetail } from './components/VaveProjectDetail';
 
 const STATUS_LABELS: Record<string, string> = {

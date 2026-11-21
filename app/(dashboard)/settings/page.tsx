@@ -1,28 +1,30 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { format } from 'date-fns';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { toast } from 'sonner';
+
+import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Plus, Copy, Check,
   Camera, Loader2,
   Monitor, Sun, Moon, Building2, Trash2,
   LayoutGrid, Mail, X,
-} from 'lucide-react';
-import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ListSkeleton } from '@/components/ui/loading-skeleton';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { useProfile, useUpdateProfile, useUploadAvatar } from '@/lib/api/hooks/useProfile';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   useFeatureProcessMappings,
   useRoutingRules,
@@ -30,15 +32,14 @@ import {
   useMachineCapabilities,
 } from '@/lib/api/hooks/useManufacturingKnowledge';
 import type { FeatureProcessMapping, ProcessRoutingRule, PartFamilyRoutingTemplate, MachineCapability } from '@/lib/api/hooks/useManufacturingKnowledge';
-import { useAuth } from '@/lib/providers/auth';
-import { useTheme } from 'next-themes';
-import { useDensity } from '@/lib/providers/density-provider';
-import { Switch } from '@/components/ui/switch';
 import {
   useMyOrganization, useCreateOrganization, useUpdateOrganization,
   useDeleteOrganization, useOrgMembers, useInviteMember, useRemoveMember,
   useWorkspaces, useCreateWorkspace, useDeleteWorkspace,
 } from '@/lib/api/hooks/useOrganization';
+import { useProfile, useUpdateProfile, useUploadAvatar } from '@/lib/api/hooks/useProfile';
+import { useAuth } from '@/lib/providers/auth';
+import { useDensity } from '@/lib/providers/density-provider';
 
 const TIMEZONES = [
   'UTC', 'Asia/Kolkata', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Singapore',

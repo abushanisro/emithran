@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2 } from 'lucide-react';
-import { ProcuredPartDialog } from './ProcuredPartDialog';
+import { Plus, Edit, Trash2 } from '@/components/ui/icons';
 import {
   useProcuredPartsCosts,
   useCreateProcuredPartsCost,
   useUpdateProcuredPartsCost,
   useDeleteProcuredPartsCost,
 } from '@/lib/api/hooks/useProcuredPartsCosts';
+
+import { ProcuredPartDialog } from './ProcuredPartDialog';
 
 interface ProcuredPartsSectionProps {
   bomItemId: string;

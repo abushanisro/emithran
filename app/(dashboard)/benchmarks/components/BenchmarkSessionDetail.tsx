@@ -1,33 +1,36 @@
 'use client';
 
+import { useQueries } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, Pencil, Trash2 } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useQueries } from '@tanstack/react-query';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import type { BenchmarkSession } from '@/lib/api/benchmark-sessions';
+import { bomApi } from '@/lib/api/bom';
+import type { BOMsResponse } from '@/lib/api/bom';
+import { apiClient } from '@/lib/api/client';
 import {
   useBenchmarkSession,
   useUpdateBenchmarkSession,
   useDeleteBenchmarkSession,
 } from '@/lib/api/hooks/useBenchmarkSessions';
+import { useProcesses } from '@/lib/api/hooks/useProcesses';
 import { useProjects } from '@/lib/api/hooks/useProjects';
 import { useVendors } from '@/lib/api/hooks/useVendors';
-import { useProcesses } from '@/lib/api/hooks/useProcesses';
-import { ProjectSelection } from './ProjectSelection';
+
 import { BOMSelection } from './BOMSelection';
 import { ComparisonView } from './comparison';
-import type { SelectedProject, SelectedBOM, BOMMetricEntry } from '../types';
+import { ProjectSelection } from './ProjectSelection';
 import { calculateMetrics } from '../utils';
-import type { BenchmarkSession } from '@/lib/api/benchmark-sessions';
-import { bomApi } from '@/lib/api/bom';
-import type { BOMsResponse } from '@/lib/api/bom';
-import { apiClient } from '@/lib/api/client';
+
+import type { SelectedProject, SelectedBOM, BOMMetricEntry } from '../types';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 

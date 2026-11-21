@@ -1,10 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Download, Info, TriangleAlert, Zap } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -19,8 +14,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { BOMMetricEntry, EnrichedBOMItem, HighCostPart } from "../types";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Download, Info, TriangleAlert, Zap } from '@/components/ui/icons';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+
 import { itemCost, itemWeight, safeNum, formatPrice } from "../utils";
+
+import type { BOMMetricEntry, EnrichedBOMItem, HighCostPart } from "../types";
 
 type ResolvedBOMMetricEntry = Omit<BOMMetricEntry, 'items'> & { items: EnrichedBOMItem[] };
 

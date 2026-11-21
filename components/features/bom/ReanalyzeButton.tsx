@@ -1,8 +1,7 @@
 'use client';
 
-import { Loader2, RefreshCw } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
+import { Loader2, RefreshCw } from '@/components/ui/icons';
 import { useReanalyzeBOMItem } from '@/lib/api/hooks/useBOMItems';
 
 /**

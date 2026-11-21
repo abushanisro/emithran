@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   ArrowLeft,
   Save,
@@ -14,12 +14,8 @@ import {
   Zap,
   DollarSign,
   Edit
-} from 'lucide-react';
-import { toast } from 'sonner';
-import {
-  useSupplierNomination
-} from '@/lib/api/hooks/useSupplierNominations';
-// import { useVendors } from '@/lib/api/hooks/useVendors';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import {
   getCapabilityScores,
   initializeCapabilityScores,
@@ -29,19 +25,25 @@ import {
   type BatchCapabilityUpdate
 } from '@/lib/api/capability-scoring';
 import {
+  useSupplierNomination
+} from '@/lib/api/hooks/useSupplierNominations';
+// import { useVendors } from '@/lib/api/hooks/useVendors';
+import {
   Recommendation,
   getRiskLevelColor,
   getRecommendationColor,
   type VendorEvaluation,
   type NominationCriteria
 } from '@/lib/api/supplier-nominations';
-import { VendorRatingEngine } from './VendorRatingEngine';
-import { CostCompetencyAnalysis } from './CostCompetencyAnalysis';
-import { SupplierEvaluationDashboard } from './SupplierEvaluationDashboard';
 import {
   getVendorRatingOverallScores,
   type VendorRatingOverallScores
 } from '@/lib/api/vendor-rating-matrix';
+
+import { CostCompetencyAnalysis } from './CostCompetencyAnalysis';
+import { SupplierEvaluationDashboard } from './SupplierEvaluationDashboard';
+import { VendorRatingEngine } from './VendorRatingEngine';
+
 
 interface DetailedEvaluationViewProps {
   evaluation: VendorEvaluation;

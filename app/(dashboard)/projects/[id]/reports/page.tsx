@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ListSkeleton } from '@/components/ui/loading-skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+
+import BalloonDiagramViewer from '@/components/features/project-reports/BalloonDiagramViewer';
+import InspectionReportTable from '@/components/features/project-reports/InspectionReportTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -17,14 +16,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
 import { 
   FileText, 
   Download, 
@@ -35,10 +26,19 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle,
-} from 'lucide-react';
-
-import BalloonDiagramViewer from '@/components/features/project-reports/BalloonDiagramViewer';
-import InspectionReportTable from '@/components/features/project-reports/InspectionReportTable';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBOMs } from '@/lib/api/hooks/useBOM';
 import {
   useBalloonDiagrams,
   useCreateBalloonDiagram,
@@ -49,7 +49,6 @@ import {
   useDeleteAnnotation,
 } from '@/lib/api/hooks/useProjectReports';
 import { useProjects } from '@/lib/api/hooks/useProjects';
-import { useBOMs } from '@/lib/api/hooks/useBOM';
 
 interface CreateDiagramFormData {
   name: string;

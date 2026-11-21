@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useMemo } from 'react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import {
   Package,
   Users,
@@ -18,7 +18,8 @@ import {
   CheckCircle2,
   ArrowUpRight,
   Loader2
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { useProjects } from '@/lib/api/hooks/useProjects';
 import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
 import {

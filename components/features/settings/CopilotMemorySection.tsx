@@ -1,8 +1,7 @@
 'use client';
 
-import { Loader2, Trash2 } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
+import { Loader2, Trash2 } from '@/components/ui/icons';
 import { useClearCopilotMemory, useCopilotMemory, useRemoveCopilotPreference } from '@/lib/api/copilot-memory';
 
 /**

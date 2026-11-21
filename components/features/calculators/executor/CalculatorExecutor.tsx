@@ -1,18 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, ArrowLeft, Play, AlertCircle, Table2, Eye, ChevronDown, ChevronUp, AlertTriangle, Info, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Calculator, ArrowLeft, Play, AlertCircle, Table2, Eye, ChevronDown, ChevronUp, AlertTriangle, Info, CheckCircle, XCircle, RefreshCw, Lightbulb } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Badge } from '@/components/ui/badge';
-import { useCalculator, useExecuteCalculator } from '@/lib/api/hooks';
+import { Mark } from '@/components/ui/status-mark';
 import { calculatorsApi } from '@/lib/api/calculators';
+import { useCalculator, useExecuteCalculator } from '@/lib/api/hooks';
 
 type CalculatorExecutorProps = {
   calculatorId: string;
@@ -995,7 +997,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
           
           toast.warning(`Calculation completed with ${errorResults.length} error${errorResults.length > 1 ? 's' : ''}. Check results below.`);
         } else {
-          toast.success(`✅ Calculation completed successfully in ${result.durationMs}ms`);
+          toast.success(`Calculation completed successfully in ${result.durationMs}ms`);
           setRetryCount(0); // Reset retry count on success
         }
       } else {
@@ -1005,19 +1007,19 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         // Show categorized error message
         switch (category) {
           case 'network':
-            toast.error(`🌐 ${userMessage}`, { description: suggestion });
+            toast.error(userMessage, { description: suggestion });
             break;
           case 'timeout':
-            toast.error(`⏱️ ${userMessage}`, { description: suggestion });
+            toast.error(userMessage, { description: suggestion });
             break;
           case 'validation':
-            toast.error(`⚠️ ${userMessage}`, { description: suggestion });
+            toast.error(userMessage, { description: suggestion });
             break;
           case 'calculation':
-            toast.error(`🧮 ${userMessage}`, { description: suggestion });
+            toast.error(userMessage, { description: suggestion });
             break;
           default:
-            toast.error(`❌ ${userMessage}`, { description: suggestion });
+            toast.error(userMessage, { description: suggestion });
         }
       }
     } catch (err: any) {
@@ -1103,7 +1105,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
             </p>
             {suggestion && (
               <p className="text-sm text-primary dark:text-primary bg-primary/10 dark:bg-primary/30 p-3 rounded-lg">
-                💡 {suggestion}
+                <Lightbulb className="mr-1 inline h-3.5 w-3.5 align-[-2px]" /> {suggestion}
               </p>
             )}
           </div>
@@ -1570,7 +1572,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                               {calculationSteps.length > 0 && (
                                 <div className="flex gap-2 items-center pt-2 border-t">
                                   <div className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                                    ✓
+                                    <Mark kind="ok" />
                                   </div>
                                   <div className="flex-1 font-mono text-sm bg-green-50 dark:bg-green-950/30 p-2 rounded border border-green-200 font-bold text-green-800 dark:text-green-200">
                                     Preview: {tryEvaluate(substituteNumericalValues(field.defaultValue, fieldValues))} {field.unit || ''}
@@ -1726,7 +1728,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                       <div className="mt-4 pt-3 border-t border-border ">
                                         <div className="flex gap-3 items-center">
                                           <div className="shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                                            ✓
+                                            <Mark kind="ok" />
                                           </div>
                                           <div className="flex-1">
                                             <p className="text-xs text-green-700 dark:text-green-300 mb-1">Final Result:</p>
@@ -1814,7 +1816,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                       <div className="mt-4 pt-3 border-t border-border ">
                                         <div className="flex gap-3 items-center">
                                           <div className="shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                                            ✓
+                                            <Mark kind="ok" />
                                           </div>
                                           <div className="flex-1">
                                             <p className="text-xs text-green-700 dark:text-green-300 mb-1">Final Result:</p>

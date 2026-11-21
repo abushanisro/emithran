@@ -1,9 +1,17 @@
 'use client';
 
-import React from 'react';
-
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useParams, useRouter } from 'next/navigation';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
+
+import { ErrorBoundary } from '@/components/error-boundary';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +28,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Loader2, Search } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -34,21 +44,12 @@ import {
 //   DropdownMenuTrigger,
 // } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Loader2, Search } from 'lucide-react';
 import {
   useBOMs,
   useBOMItems
 } from '@/lib/api/hooks';
-import { ErrorBoundary } from '@/components/error-boundary';
 import { useCreateSupplierEvaluationGroup } from '@/lib/api/hooks/useSupplierEvaluationGroups';
-import { toast } from 'sonner';
+
 
 const evaluationFormSchema = z.object({
   supplierGroupName: z.string().min(1, 'Please enter a supplier group name').max(100, 'Name must be less than 100 characters'),

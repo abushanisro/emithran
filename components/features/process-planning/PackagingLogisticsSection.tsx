@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2 } from 'lucide-react';
-import { LogisticsDialog } from './LogisticsDialog';
+import { Plus, Edit, Trash2 } from '@/components/ui/icons';
 import {
   usePackagingLogisticsCosts,
   useCreatePackagingLogisticsCost,
@@ -12,6 +12,8 @@ import {
   LogisticsType,
   CostBasis,
 } from '@/lib/api/hooks/usePackagingLogisticsCosts';
+
+import { LogisticsDialog } from './LogisticsDialog';
 
 interface PackagingLogisticsSectionProps {
   bomItemId: string;

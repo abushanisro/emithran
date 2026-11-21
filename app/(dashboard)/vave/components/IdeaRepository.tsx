@@ -1,17 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Zap, Loader2, Trash2, Table2, Columns, LayoutGrid, CheckSquare } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Zap, Loader2, Trash2, Table2, Columns, LayoutGrid, CheckSquare, X} from '@/components/ui/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   useVaveIdeas, useVaveBom,
   useBulkCreateVaveIdeas, useUpdateVaveIdea, useDeleteVaveIdea,
 } from '@/lib/api/hooks/useVave';
 import { vaveApi, type VaveIdea, type VaveBomItem } from '@/lib/api/vave';
-import { toast } from 'sonner';
+
 
 interface Props {
   projectId: string;
@@ -632,7 +634,7 @@ export function IdeaRepository({ projectId }: Props) {
             className="ml-1 text-xs text-muted-foreground hover:text-foreground"
             onClick={() => setSelected(new Set())}
           >
-            ✕
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

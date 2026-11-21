@@ -1,11 +1,14 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ArrowLeft, ArrowRight, Package } from "lucide-react";
-import type { SelectedBOM, SelectedProject } from "../types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, ArrowRight, Package } from '@/components/ui/icons';
+import { Mark } from '@/components/ui/status-mark';
+
 import { formatDate } from "../utils";
+
+import type { SelectedBOM, SelectedProject } from "../types";
 
 interface MultiProjectBOM {
   projectId: string;
@@ -149,7 +152,7 @@ export function BOMSelection({
                             </div>
                             {isSelected && (
                               <Badge variant="default" className="text-xs">
-                                ✓
+                                <Mark kind="ok" />
                               </Badge>
                             )}
                           </div>

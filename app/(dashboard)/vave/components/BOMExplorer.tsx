@@ -1,28 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Upload, Trash2, Microscope, Search, ChevronDown, Filter, Sparkles, ChevronRight } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useVaveBom, useBulkImportVaveBom, useDeleteVaveBomItem } from '@/lib/api/hooks/useVave';
-import { useProjects, useBOMs, useBOMItems } from '@/lib/api/hooks';
-import { useProcesses } from '@/lib/api/hooks/useProcesses';
-import type { Process } from '@/lib/api/hooks/useProcesses';
-import type { VaveBomItem, DrawingAnalysisResult } from '@/lib/api/vave';
-import { toast } from 'sonner';
 import {
   BarChart,
   Bar,
@@ -32,6 +10,30 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Upload, Trash2, Microscope, Search, ChevronDown, Filter, Sparkles, ChevronRight } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useProjects, useBOMs, useBOMItems } from '@/lib/api/hooks';
+import { useProcesses } from '@/lib/api/hooks/useProcesses';
+import type { Process } from '@/lib/api/hooks/useProcesses';
+import { useVaveBom, useBulkImportVaveBom, useDeleteVaveBomItem } from '@/lib/api/hooks/useVave';
+import type { VaveBomItem, DrawingAnalysisResult } from '@/lib/api/vave';
+
 
 interface Props {
   projectId: string;

@@ -1,24 +1,33 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+import { BomCostReportWrapper } from '@/components/features/cost-analysis/BomCostReportWrapper';
+import { CostAnalysisEngine } from '@/components/features/cost-analysis/CostAnalysisEngine';
+import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
+import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
+import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
+import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
+import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Viewer2D } from '@/components/ui/viewer-2d';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useProcessPlanningSpecsByBomItem } from '@/lib/api/hooks/useProcessPlanningSpecs';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
-import { Viewer2D } from '@/components/ui/viewer-2d';
 import { apiClient } from '@/lib/api/client';
 import { bomItemsApi } from '@/lib/api/bom-items';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, FileSpreadsheet, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from 'lucide-react';
+import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, FileSpreadsheet, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from '@/components/ui/icons';
+import { Mark } from '@/components/ui/status-mark';
 import { useRouteComparison, useApplyRoute } from '@/lib/api/hooks/useBOMItems';
 import type { RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 
@@ -30,22 +39,15 @@ if (typeof window !== 'undefined') {
     // Could not reset circuit breaker
   }
 }
-import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
-import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
 import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
-import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
-import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
-import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
 import { CostDataProvider } from '@/lib/providers/cost-data-provider';
-import { CostAnalysisEngine } from '@/components/features/cost-analysis/CostAnalysisEngine';
-import { BomCostReportWrapper } from '@/components/features/cost-analysis/BomCostReportWrapper';
 import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
-import { generateEMithranPdf } from '@/lib/utils/generate-emithran-pdf';
-import { generateEMithranImage } from '@/lib/utils/generate-emithran-image';
 import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
-import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { toViewerFeature, FEATURE_GROUP_META } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
+import { generateEMithranImage } from '@/lib/utils/generate-emithran-image';
+import { generateEMithranPdf } from '@/lib/utils/generate-emithran-pdf';
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 
 // ── Dimension Validation Dialog ───────────────────────────────────────────────
 // Shows the actual 3D CAD model with live-extracted measurements (eMithran-style).
@@ -1078,13 +1080,13 @@ function ProcessPlanningPageContent() {
                                     <div>
                                       <p className="text-muted-foreground mb-1">3D Model</p>
                                       <p className="font-medium text-foreground">
-                                        {item.file3dPath ? '✓ Available' : '— Not Available'}
+                                        {item.file3dPath ? <><Mark kind="ok" /> Available</> : '— Not Available'}
                                       </p>
                                     </div>
                                     <div>
                                       <p className="text-muted-foreground mb-1">2D Drawing</p>
                                       <p className="font-medium text-foreground">
-                                        {item.file2dPath ? '✓ Available' : '— Not Available'}
+                                        {item.file2dPath ? <><Mark kind="ok" /> Available</> : '— Not Available'}
                                       </p>
                                     </div>
                                     <div>
@@ -1319,7 +1321,7 @@ function ProcessPlanningPageContent() {
                               {cadWeightMismatch && cadDerivedWeightKg != null && (
                                 <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                   <span className="text-xs bg-amber-100 text-amber-700 px-1 py-0.5 rounded">
-                                    ⚠ CAD: {cadDerivedWeightKg.toFixed(4)} kg ({cadWeightDiffPct}% diff)
+                                    <Mark kind="warn" /> CAD: {cadDerivedWeightKg.toFixed(4)} kg ({cadWeightDiffPct}% diff)
                                   </span>
                                   <button
                                     type="button"
@@ -1490,7 +1492,7 @@ function ProcessPlanningPageContent() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-1">
                             <Badge variant={selectedItem?.file3dPath ? "default" : "secondary"} className="text-xs h-5">
-                              3D {selectedItem?.file3dPath ? '✓' : '✗'}
+                              3D {selectedItem?.file3dPath ? <Mark kind="ok" inherit /> : <Mark kind="fail" inherit />}
                             </Badge>
                             {selectedItem?.file3dPath && (
                               <span className="text-xs text-muted-foreground">
@@ -1500,7 +1502,7 @@ function ProcessPlanningPageContent() {
                           </div>
                           <div className="flex items-center gap-1">
                             <Badge variant={selectedItem?.file2dPath ? "default" : "secondary"} className="text-xs h-5">
-                              2D {selectedItem?.file2dPath ? '✓' : '✗'}
+                              2D {selectedItem?.file2dPath ? <Mark kind="ok" inherit /> : <Mark kind="fail" inherit />}
                             </Badge>
                             {selectedItem?.file2dPath && (
                               <span className="text-xs text-muted-foreground">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { X } from '@/components/ui/icons';
 import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
 import {
   MULTI_SHOT_CYCLE_RULE, MULTI_SHOT_PROCESS_GROUP, shotEntriesOf, shotEntriesPatch, shotEntriesProblem, type MultiShotSummary, type ShotEntry,
@@ -65,7 +66,7 @@ function ShotEntriesForm({ start, onSave, onCancel }: { start: ShotEntry[]; onSa
             <input className={controlClass} type="number" min={1} max={99} value={e.volumePct}
               onChange={(ev) => { setEntries(with_(i, { volumePct: Number(ev.target.value) })); }} onBlur={() => { commit(entries); }} />
           </label>
-          <Button size="sm" variant="ghost" aria-label={`Remove shot ${i + 2}`} onClick={() => { commit(entries.filter((_, j) => j !== i)); }}>✕</Button>
+          <Button size="sm" variant="ghost" aria-label={`Remove shot ${i + 2}`} onClick={() => { commit(entries.filter((_, j) => j !== i)); }}><X className="h-3.5 w-3.5" /></Button>
         </div>
       ))}
       <div className="flex items-center justify-between gap-2">

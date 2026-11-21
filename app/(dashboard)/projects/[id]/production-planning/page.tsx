@@ -1,20 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Factory, Calendar, TrendingUp, Clock, Package, ArrowLeft } from 'lucide-react';
-import { ProductionLotsTable } from '@/components/features/production-planning/ProductionLotsTable';
+import { useState } from 'react';
+
 import { CreateProductionLotModal } from '@/components/features/production-planning/CreateProductionLotModal';
 import { ProductionDashboard } from '@/components/features/production-planning/ProductionDashboard';
+import { ProductionLotsTable } from '@/components/features/production-planning/ProductionLotsTable';
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Factory, Calendar, TrendingUp, Clock, Package, ArrowLeft } from '@/components/ui/icons';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useProductionLots, useProductionDashboard } from '@/lib/api/hooks/useProductionPlanning';
 import { useProject } from '@/lib/api/hooks/useProjects';
-import { useBOMs } from '@/lib/api/hooks/useBOM';
-import Link from 'next/link';
 
 interface ProductionLot {
   id: string;

@@ -1,11 +1,13 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { GitCompare, Package } from "lucide-react";
-import type { BOMMetricEntry, EnrichedBOMItem } from "../../types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GitCompare, Package } from '@/components/ui/icons';
+
 import { itemCost, itemWeight, safeNum, formatPrice } from "../../utils";
+
+import type { BOMMetricEntry, EnrichedBOMItem } from "../../types";
 
 interface Props {
   bomMetrics: BOMMetricEntry[];

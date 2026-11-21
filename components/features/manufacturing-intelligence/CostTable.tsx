@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { columnGroups, columnsFor, formatCell, visibleRows, type ColumnSet, type CostTable as CostTableData, type Display } from "@/lib/costing/cost-table";
 import { cn } from "@/lib/utils";
 

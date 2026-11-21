@@ -1,17 +1,11 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ArrowLeft,
   Download,
@@ -23,8 +17,22 @@ import {
   Users,
   Undo2,
   Plus,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from '@/components/ui/icons';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  getCapabilityScores,
+} from '@/lib/api/capability-scoring';
+import {
+  getCostAnalysis,
+  transformCostAnalysisToComponentData,
+} from '@/lib/api/cost-competency';
 import {
   useSupplierNomination,
   useSupplierNominations,
@@ -33,7 +41,6 @@ import {
   useCompleteSupplierNomination,
   useAddVendorsToNomination,
 } from '@/lib/api/hooks/useSupplierNominations';
-import { VendorSelectionModal } from './VendorSelectionModal';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import {
   Recommendation,
@@ -46,16 +53,11 @@ import {
   type NominationCriteria,
 } from '@/lib/api/supplier-nominations';
 import {
-  getCostAnalysis,
-  transformCostAnalysisToComponentData,
-} from '@/lib/api/cost-competency';
-import {
   getVendorRatingOverallScores,
   type VendorRatingOverallScores,
 } from '@/lib/api/vendor-rating-matrix';
-import {
-  getCapabilityScores,
-} from '@/lib/api/capability-scoring';
+
+import { VendorSelectionModal } from './VendorSelectionModal';
 
 // ---------------------------------------------------------------------------
 // Score calculation helpers

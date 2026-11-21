@@ -1,8 +1,7 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   TrendingUp,
   Package,
@@ -11,7 +10,8 @@ import {
   AlertCircle,
   CheckCircle,
   BarChart3
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { Progress } from '@/components/ui/progress';
 
 interface ProductionDashboardProps {
   dashboardData: any;

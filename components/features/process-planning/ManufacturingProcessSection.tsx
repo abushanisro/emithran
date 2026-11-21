@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
 
-import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { ProcessCostDialog } from './ProcessCostDialog';
+
+import { Button } from '@/components/ui/button';
+import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical } from '@/components/ui/icons';
 import { apiClient } from '@/lib/api/client';
 import {
   useProcessCosts,
@@ -17,6 +17,8 @@ import {
 import type { LineCalculation } from '@/lib/calculators/calculator-run';
 import { featureMetaFromGroup } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
+
+import { ProcessCostDialog } from './ProcessCostDialog';
 
 interface ManufacturingProcessSectionProps {
   bomItemId?: string;

@@ -1,23 +1,26 @@
 'use client';
 
+import { Country, State, City } from 'country-state-city';
+import { format } from 'date-fns';
 import Link from 'next/link';
-import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+
+import { StatusBadge } from '@/components/common/status-badge';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/api/hooks/useProjects';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { StatusBadge } from '@/components/common/status-badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
 import {
   Plus,
@@ -30,9 +33,7 @@ import {
   XCircle,
   Pencil,
   MoreVertical,
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { Country, State, City } from 'country-state-city';
+} from '@/components/ui/icons';
 
 const PROJECT_STATUSES = [
   { value: 'draft', label: 'Draft' },

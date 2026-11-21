@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Wand2, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Wand2, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from '@/components/ui/icons';
 import { useVaveIdeas, useUpdateVaveIdea } from '@/lib/api/hooks/useVave';
 import type { VaveIdea } from '@/lib/api/vave';
-import { toast } from 'sonner';
+
 
 interface Props {
   projectId: string;

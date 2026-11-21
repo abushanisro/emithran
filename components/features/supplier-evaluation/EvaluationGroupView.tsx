@@ -1,25 +1,27 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ListSkeleton } from '@/components/ui/loading-skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, MapPin, Building2, Send, Package, FileText, TrendingUp, Award, Mail, Box, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useVendors } from '@/lib/api/hooks/useVendors';
-import { useCreateRfq, useSendRfq } from '@/lib/api/hooks/useRfq';
-import { useRfqTrackingRecords, useRfqTrackingStats, useInvalidateRfqTracking, useUpdateRfqTrackingStatus, useDeleteRfqTracking, useCreateRfqTracking } from '@/lib/api/hooks/useRfqTracking';
-import { getRfqSummaryText, formatResponseTime, getStatusText, getStatusColor, RfqTrackingStatus } from '@/lib/api/rfq-tracking';
+
+import { VendorRatingEngine } from '@/components/features/supplier-nominations/VendorRatingEngine';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Search, MapPin, Building2, Send, Package, FileText, TrendingUp, Award, Mail, Box, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
+import { Mark } from '@/components/ui/status-mark';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { analyzeTrackingFeature, getFeatureStatusMessage, TrackingFeatureState } from '@/lib/api/features/tracking-feature';
 import { useProcessCosts } from '@/lib/api/hooks/useProcessCosts';
 import type { ProcessCostListResponse, ProcessCostRecord } from '@/lib/api/hooks/useProcessCosts';
 import { useProcesses } from '@/lib/api/hooks/useProcesses';
-import { VendorRatingEngine } from '@/components/features/supplier-nominations/VendorRatingEngine';
+import { useCreateRfq, useSendRfq } from '@/lib/api/hooks/useRfq';
+import { useRfqTrackingRecords, useRfqTrackingStats, useInvalidateRfqTracking, useUpdateRfqTrackingStatus, useDeleteRfqTracking, useCreateRfqTracking } from '@/lib/api/hooks/useRfqTracking';
 import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
+import { useVendors } from '@/lib/api/hooks/useVendors';
+import { getRfqSummaryText, formatResponseTime, getStatusText, getStatusColor, RfqTrackingStatus } from '@/lib/api/rfq-tracking';
 
 interface BOMPart {
   id: string;
@@ -1026,7 +1028,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                         <div className="ml-2">
                                           {vendor.responded ? (
                                             <div className="text-green-400 text-xs">
-                                              <div>✓ Responded</div>
+                                              <div><Mark kind="ok" /> Responded</div>
                                               {vendor.quoteAmount && (
                                                 <div>${vendor.quoteAmount}</div>
                                               )}

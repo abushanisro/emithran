@@ -1,17 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/lib/providers/auth';
-import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { AppSidebar } from './AppSidebar';
-import { Loader2, Menu, Bell, Settings, Building2, LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { MithranAICreditsBar } from './MithranAICreditsBar';
-import { useProfile } from '@/lib/api/hooks/useProfile';
+import { useEffect, useState } from 'react';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,11 +13,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Loader2, Menu, Bell, Settings, Building2, LogOut } from '@/components/ui/icons';
+import { Separator } from '@/components/ui/separator';
+import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { useProfile } from '@/lib/api/hooks/useProfile';
+import { useAuth } from '@/lib/providers/auth';
 
 import { AppBreadcrumb } from './AppBreadcrumb';
+import { AppSidebar } from './AppSidebar';
 import { CommandSearch } from './CommandSearch';
+import { MithranAICreditsBar } from './MithranAICreditsBar';
 import { SessionCountdown } from './SessionCountdown';
 import { SessionIdleProvider } from './SessionIdleProvider';
+
+import type { ReactNode } from 'react';
 
 interface AppLayoutProps {
   children: ReactNode;

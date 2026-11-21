@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
+import React, { useState, useMemo } from 'react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import {
   Package,
   Search,
@@ -16,9 +16,10 @@ import {
   Layers,
   Wrench,
   ArrowUpRight,
-} from 'lucide-react';
-import { useVendors } from '@/lib/api/hooks/useVendors';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { useAllSupplierEvaluationGroups } from '@/lib/api/hooks/useSupplierEvaluationGroups';
+import { useVendors } from '@/lib/api/hooks/useVendors';
 
 export default function SupplierEvaluationPage() {
   const router = useRouter();

@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +13,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Loader2, Calculator as CalculatorIcon, Play, Eye } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { LocationMark } from '@/components/ui/location-mark';
 import {
   Select,
   SelectContent,
@@ -18,21 +24,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Mark } from '@/components/ui/status-mark';
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
+import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useMaterialUsage, type MaterialUsageExplanation } from '@/lib/api/hooks/useMaterialUsage';
+import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
+
+import { isStockDrivenBlank } from '@/lib/costing/material-usage';
+
 import { CalculationTracePanel } from './CalculationTracePanel';
 import { MaterialUsageJustification } from './MaterialUsageJustification';
-import { UsageCalculatorForm } from './UsageCalculatorForm';
 import { ReferenceTable } from './ReferenceTable';
-import { isStockDrivenBlank } from '@/lib/costing/material-usage';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
-import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
+import { UsageCalculatorForm } from './UsageCalculatorForm';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
-import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Static lookup — defined outside component so it is never recreated on re-render
 const CALCULATOR_PROPERTY_MAPPINGS: Record<string, string> = {
@@ -1328,14 +1333,14 @@ export function RawMaterialDialog({
 
               // ── Price matrix ───────────────────────────────────────────────────
               const locationPrices: Array<{ flag: string; label: string; cost: number | undefined; currency: string; symbol: string }> = [
-                { flag: '🇮🇳', label: 'India',     cost: selectedMaterial.costIndia,   currency: 'INR', symbol: '₹'   },
-                { flag: '🇺🇸', label: 'USA',       cost: selectedMaterial.costUsa,     currency: 'USD', symbol: '$'   },
-                { flag: '🇨🇳', label: 'China',     cost: selectedMaterial.costChina,   currency: 'CNY', symbol: '¥'   },
-                { flag: '🇩🇪', label: 'Germany',   cost: selectedMaterial.costGermany, currency: 'EUR', symbol: '€'   },
-                { flag: '🇫🇷', label: 'France',    cost: selectedMaterial.costFrance,  currency: 'EUR', symbol: '€'   },
-                { flag: '🇪🇺', label: 'W. Europe', cost: selectedMaterial.costWEurope, currency: 'EUR', symbol: '€'   },
-                { flag: '🇪🇺', label: 'E. Europe', cost: selectedMaterial.costEEurope, currency: 'EUR', symbol: '€'   },
-                { flag: '🇲🇽', label: 'Mexico',    cost: selectedMaterial.costMexico,  currency: 'MXN', symbol: 'MX$' },
+                { flag: 'IN', label: 'India',     cost: selectedMaterial.costIndia,   currency: 'INR', symbol: '₹'   },
+                { flag: 'US', label: 'USA',       cost: selectedMaterial.costUsa,     currency: 'USD', symbol: '$'   },
+                { flag: 'CN', label: 'China',     cost: selectedMaterial.costChina,   currency: 'CNY', symbol: '¥'   },
+                { flag: 'DE', label: 'Germany',   cost: selectedMaterial.costGermany, currency: 'EUR', symbol: '€'   },
+                { flag: 'FR', label: 'France',    cost: selectedMaterial.costFrance,  currency: 'EUR', symbol: '€'   },
+                { flag: 'EU', label: 'W. Europe', cost: selectedMaterial.costWEurope, currency: 'EUR', symbol: '€'   },
+                { flag: 'EU', label: 'E. Europe', cost: selectedMaterial.costEEurope, currency: 'EUR', symbol: '€'   },
+                { flag: 'MX', label: 'Mexico',    cost: selectedMaterial.costMexico,  currency: 'MXN', symbol: 'MX$' },
               ].filter(p => p.cost && p.cost > 0);
 
               const toUsdPrice = (lc: number, curr: string) =>
@@ -1395,7 +1400,7 @@ export function RawMaterialDialog({
                                     : 'bg-background hover:bg-primary/10 border border-border'
                                 }`}
                               >
-                                <span>{p.flag} {p.label}</span>
+                                <span><LocationMark location={p.label} />{p.label}</span>
                                 <div className="text-right ml-2">
                                   <div className="font-mono tabular-nums">
                                     {locDisplay != null ? `${displaySymbol}${locDisplay.toFixed(2)}` : '—'}
@@ -1655,7 +1660,7 @@ export function RawMaterialDialog({
                     {grossUsageOverridden ? (
                       <div className="rounded border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-0.5">
                         <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-                          ⚠ Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
+                          <Mark kind="warn" /> Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           Calculated value: {(derivedGrossKg ?? 0).toFixed(4)} kg/part

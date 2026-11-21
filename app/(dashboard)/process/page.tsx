@@ -1,10 +1,27 @@
 'use client';
 
-import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Fragment } from 'react';
+import { toast } from 'sonner';
+
+import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
+import { ExchangeRatesCard } from '@/components/features/process/ExchangeRatesCard';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ComboboxWithPresets } from '@/components/ui/combobox-with-presets';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download, Info, ChevronDown, ChevronRight } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Table,
@@ -14,10 +31,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ComboboxWithPresets } from '@/components/ui/combobox-with-presets';
-import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download, Info, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  useProcessCalculatorMappings,
+  useCreateProcessCalculatorMapping,
+  useUpdateProcessCalculatorMapping,
+  useDeleteProcessCalculatorMapping,
+  useImportProcessCalculatorMappings,
+  useClearAllProcessCalculatorMappings,
+  type ProcessCalculatorMapping,
+} from '@/lib/api/hooks/useProcessCalculatorMappings';
 import {
   useProcesses,
   useReferenceTables,
@@ -31,31 +53,10 @@ import {
   type ReferenceDomain,
   type ReferenceTable,
 } from '@/lib/api/hooks/useProcesses';
-import {
-  useProcessCalculatorMappings,
-  useCreateProcessCalculatorMapping,
-  useUpdateProcessCalculatorMapping,
-  useDeleteProcessCalculatorMapping,
-  useImportProcessCalculatorMappings,
-  useClearAllProcessCalculatorMappings,
-  type ProcessCalculatorMapping,
-} from '@/lib/api/hooks/useProcessCalculatorMappings';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
-import { ExchangeRatesCard } from '@/components/features/process/ExchangeRatesCard';
-import { useAuth } from '@/lib/providers/auth';
-import { adaptMappingsToProcessCatalogTree } from '@/lib/processCatalog/process-catalog-tree';
-import { hasOperationDetail } from '@/lib/processCatalog/operation-detail';
 import { catalogOperationTree, type CatalogOperationNode } from '@/lib/features/catalog-operation-tree';
+import { hasOperationDetail } from '@/lib/processCatalog/operation-detail';
+import { adaptMappingsToProcessCatalogTree } from '@/lib/processCatalog/process-catalog-tree';
+import { useAuth } from '@/lib/providers/auth';
 
 // Helper function to convert snake_case to camelCase
 const snakeToCamel = (str: string): string => {

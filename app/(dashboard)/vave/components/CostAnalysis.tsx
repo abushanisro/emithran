@@ -1,20 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, RefreshCw, Calculator, Sparkles, ChevronDown } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, Cell, CartesianGrid, BarChart, PieChart, Pie,
 } from 'recharts';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Loader2, RefreshCw, Calculator, Sparkles, ChevronDown, BarChart3 } from '@/components/ui/icons';
 import { useVaveBom, useVaveShouldCosts, useUpsertShouldCost } from '@/lib/api/hooks/useVave';
 import { vaveApi, type VaveBomItem, type CostAnalysisResult } from '@/lib/api/vave';
-import { toast } from 'sonner';
+
 
 interface Props { projectId: string }
 
@@ -345,7 +347,7 @@ function QFDView({ result }: { result: CostAnalysisResult | null }) {
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
-      <div className="h-8 w-8 opacity-30 text-3xl">📊</div>
+      <BarChart3 className="h-8 w-8 opacity-40" />
       <p className="text-sm">{message}</p>
     </div>
   );

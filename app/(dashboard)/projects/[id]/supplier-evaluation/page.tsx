@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useCallback } from 'react';
+
 import {
   NewEvaluationDialog,
   SupplierEvaluationDashboard,
   EvaluationGroupView
 } from '@/components/features/supplier-evaluation';
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from '@/components/ui/icons';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { useSupplierEvaluationGroups, useSupplierEvaluationGroup } from '@/lib/api/hooks/useSupplierEvaluationGroups';
 

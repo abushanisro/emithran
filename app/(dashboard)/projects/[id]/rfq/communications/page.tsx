@@ -1,7 +1,6 @@
 'use client';
 
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowLeft, Mail, Clock, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -9,6 +8,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Mail, Clock, CheckCircle, AlertCircle, MessageSquare } from '@/components/ui/icons';
 import { useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
 
 // Supplier communications are the RFQs the backend has recorded as sent

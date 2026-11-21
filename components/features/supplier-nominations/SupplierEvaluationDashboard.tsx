@@ -1,13 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TableSkeleton } from '@/components/ui/loading-skeleton';
-import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     BarChart3,
     TrendingUp,
@@ -18,10 +16,14 @@ import {
     Edit2,
     Save,
     X
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { useSupplierNomination, useUpdateVendorEvaluation } from '@/lib/api/hooks/useSupplierNominations';
 import { Recommendation, getRiskLevelColor, getRecommendationColor, type VendorEvaluation } from '@/lib/api/supplier-nominations';
-import { toast } from 'sonner';
+
 
 // Helper functions for score calculation with evaluation data priority
 const getCostScore = (evaluation: VendorEvaluation, evaluationData?: any, realTimeCostScore?: number): number => {

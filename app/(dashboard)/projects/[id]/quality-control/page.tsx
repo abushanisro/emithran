@@ -1,15 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 
-import { PageSkeleton } from '@/components/ui/loading-skeleton';
-import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +14,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -50,8 +47,11 @@ import {
   ThumbsUp,
   ThumbsDown,
   Loader2,
-} from 'lucide-react';
-import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
 
 export default function QualityControlPage() {
   const params = useParams();

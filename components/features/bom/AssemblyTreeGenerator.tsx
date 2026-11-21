@@ -1,11 +1,11 @@
 'use client';
 
-import { AlertTriangle, Box, CheckCircle2, ChevronDown, ChevronRight, Layers, Loader2, RefreshCw, UploadCloud, X, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AlertTriangle, Box, CheckCircle2, ChevronDown, ChevronRight, Layers, Loader2, RefreshCw, UploadCloud, X, XCircle } from '@/components/ui/icons';
 import { useCadUpload, useStartCadUpload } from '@/lib/api/hooks/useCadUploads';
 import { describeFailure, rejectedFileMessage, summarize, visibleRows } from '@/lib/cad-uploads/upload-view';
 import { cn } from '@/lib/utils';

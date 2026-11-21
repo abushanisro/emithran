@@ -1,18 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { ToolingCostDialog } from './ToolingCostDialog';
+import { Button } from '@/components/ui/button';
+import { Plus, Edit, Trash2, Loader2 } from '@/components/ui/icons';
+import { useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import {
   useToolingCosts,
   useCreateToolingCost,
   useUpdateToolingCost,
   useDeleteToolingCost,
 } from '@/lib/api/hooks/useToolingCosts';
-import { useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import { catalogSourceLabel, processLabel } from '@/lib/costing/tooling-catalog';
+
+import { ToolingCostDialog } from './ToolingCostDialog';
 
 interface ToolingSectionProps {
   bomItemId?: string;

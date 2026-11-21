@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from '@/components/ui/icons';
 import { vaveApi } from "@/lib/api/vave";
-import type { BOMMetricEntry } from "../../types";
+
 import { itemCost, formatPrice } from "../../utils";
+
+import type { BOMMetricEntry } from "../../types";
 
 interface Props {
   bomMetrics: BOMMetricEntry[];

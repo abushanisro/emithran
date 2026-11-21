@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -10,31 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-
-
-import { PageSkeleton } from '@/components/ui/loading-skeleton';
-import { RemarksApi } from '@/lib/api/remarks';
-import { RemarkStatus } from '@/types/remarks';
-import { productionPlanningApi } from '@/lib/api/production-planning';
-import { apiClient } from '@/lib/api/client';
-import {
-  useIntegratedDashboard,
-  useProductionMonitoring,
-  useLotMaterials,
-  useProductionAlerts,
-  useUpdateMaterialStatus,
-  useResolveAlert,
-  useRefreshDashboard,
-  useInitializeLotMaterials,
-} from '@/lib/api/hooks/useIntegratedProduction';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   AlertTriangle,
   CheckCircle,
@@ -51,7 +30,11 @@ import {
   AlertCircle,
   ChevronRight,
   ChevronDown
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -59,7 +42,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { apiClient } from '@/lib/api/client';
+import {
+  useIntegratedDashboard,
+  useProductionMonitoring,
+  useLotMaterials,
+  useProductionAlerts,
+  useUpdateMaterialStatus,
+  useResolveAlert,
+  useRefreshDashboard,
+  useInitializeLotMaterials,
+} from '@/lib/api/hooks/useIntegratedProduction';
+import { productionPlanningApi } from '@/lib/api/production-planning';
+import { RemarksApi } from '@/lib/api/remarks';
+import { RemarkStatus } from '@/types/remarks';
 interface BOMItem {
   id: string;
   partNumber: string;

@@ -1,11 +1,12 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, AlertCircle } from '@/components/ui/icons';
 import { useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 

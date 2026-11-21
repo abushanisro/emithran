@@ -1,9 +1,12 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
 import { z } from 'zod';
+
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +23,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Loader2 } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -27,12 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
 import { useUpdateSupplierEvaluationGroup } from '@/lib/api/hooks/useSupplierEvaluationGroups';
-import { toast } from 'sonner';
 import type { SupplierEvaluationGroupSummary } from '@/lib/api/supplier-evaluation-groups';
 
 const editEvaluationFormSchema = z.object({

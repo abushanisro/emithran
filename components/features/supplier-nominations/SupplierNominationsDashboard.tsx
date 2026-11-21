@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useState, useMemo } from 'react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import {
   Plus,
   Search,
@@ -19,9 +19,10 @@ import {
   Layers,
   CheckCircle2,
   ArrowUpRight,
-} from 'lucide-react';
-import { useSupplierNominations, useDeleteSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
+import { useSupplierNominations, useDeleteSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
 import {
   getStatusText,
   getNominationTypeLabel,
@@ -29,6 +30,7 @@ import {
   NominationStatus,
   type SupplierNominationSummary,
 } from '@/lib/api/supplier-nominations';
+
 import { CreateNominationDialog } from './CreateNominationDialog';
 import { EditNominationDialog } from './EditNominationDialog';
 

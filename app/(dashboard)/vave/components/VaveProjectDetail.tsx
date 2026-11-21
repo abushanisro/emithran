@@ -1,21 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, Pencil, Trash2 } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { useVaveProject, useUpdateVaveProject, useDeleteVaveProject } from '@/lib/api/hooks/useVave';
+
 import { BOMExplorer } from './BOMExplorer';
+import { BusinessCaseGenerator } from './BusinessCaseGenerator';
 import { CostAnalysis } from './CostAnalysis';
 import { IdeaRepository } from './IdeaRepository';
 import { PrioritizationMatrix } from './PrioritizationMatrix';
-import { BusinessCaseGenerator } from './BusinessCaseGenerator';
 
 const STATUS_LABELS: Record<string, string> = {
   phase1: 'Phase 1: Data',

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2 } from 'lucide-react';
-import { ChildPartDialog } from './ChildPartDialog';
+import { Plus, Edit, Trash2 } from '@/components/ui/icons';
 import {
   useChildPartCosts,
   useCreateChildPartCost,
@@ -11,7 +12,8 @@ import {
   useDeleteChildPartCost,
 } from '@/lib/api/hooks/useChildPartCost';
 import { useAutoRecalculateCost } from '@/lib/hooks/useAutoRecalculateCost';
-import { toast } from 'sonner';
+
+import { ChildPartDialog } from './ChildPartDialog';
 
 interface ChildPart {
   id: string;

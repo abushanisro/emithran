@@ -1,21 +1,23 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileText, Send, Users, Calendar, Clock, CheckCircle, Mail, Download, Eye, Paperclip, AlertCircle } from 'lucide-react';
+import { formatDistanceToNow, isAfter } from 'date-fns';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useState } from 'react';
+
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, FileText, Send, Users, Calendar, Clock, CheckCircle, Mail, Download, Eye, Paperclip, AlertCircle } from '@/components/ui/icons';
+import { Mark } from '@/components/ui/status-mark';
+import { apiConfig } from '@/lib/api/config';
+import { useBOMs } from '@/lib/api/hooks/useBOM';
+import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useRfqs } from '@/lib/api/hooks/useRfq';
 import { useRfqTrackingStats, useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
 import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
 import { useVendors } from '@/lib/api/hooks/useVendors';
-import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
-import { useBOMs } from '@/lib/api/hooks/useBOM';
-import { apiConfig } from '@/lib/api/config';
-import { formatDistanceToNow, isAfter } from 'date-fns';
-import { useState } from 'react';
 
 export default function RFQPage() {
   const params = useParams();
@@ -583,7 +585,7 @@ export default function RFQPage() {
                                             </p>
                                             {(bomItem.file2dPath || bomItem.file3dPath) && (
                                               <p className="text-xs">
-                                                Files: {bomItem.file2dPath ? '✓ 2D' : '✗ 2D'} | {bomItem.file3dPath ? '✓ 3D' : '✗ 3D'}
+                                                Files: {bomItem.file2dPath ? <><Mark kind="ok" /> 2D</> : <><Mark kind="fail" /> 2D</>} | {bomItem.file3dPath ? <><Mark kind="ok" /> 3D</> : <><Mark kind="fail" /> 3D</>}
                                               </p>
                                             )}
                                           </div>

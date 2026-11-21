@@ -1,29 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  getFactorWeights,
-  getPartWiseCostAnalysis,
-  initializePartWiseCostAnalysis,
-  bulkUpdatePartWiseCostAnalysis,
-  type PartWiseCostAnalysis,
-  type PartWiseCostBaseData,
-  type BulkUpdatePartWiseCostAnalysisData
-} from '@/lib/api/supplier-nominations';
+import { toast } from 'sonner';
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DollarSign,
   TrendingDown,
@@ -34,8 +16,26 @@ import {
   Edit,
   Save,
   Package
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  getFactorWeights,
+  getPartWiseCostAnalysis,
+  initializePartWiseCostAnalysis,
+  bulkUpdatePartWiseCostAnalysis,
+  type PartWiseCostAnalysis,
+  type PartWiseCostBaseData,
+  type BulkUpdatePartWiseCostAnalysisData
+} from '@/lib/api/supplier-nominations';
 import { rankAscending, weightedRankScore } from '@/lib/utils/rank';
 
 export interface CostCompetencyData {

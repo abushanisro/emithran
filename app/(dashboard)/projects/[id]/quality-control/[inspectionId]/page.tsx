@@ -10,27 +10,18 @@ declare global {
 
 
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, useRef } from 'react';
+
 // useBOMItems and useBOMs imported but unused - kept for future use
 // import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 // import { useBOMs } from '@/lib/api/hooks/useBOM';
-import { ListSkeleton } from '@/components/ui/loading-skeleton';
-import { useAuth } from '@/lib/providers/auth';
-import { useQuery } from '@tanstack/react-query';
-import {
-  useSaveDetailedInspectionReport,
-  useDetailedInspectionReport,
-  useUpdateQualityInspection,
-  useQualityInspection
-} from '@/lib/api/hooks/useQualityControl';
-import type { DetailedInspectionReport } from '@/lib/api/hooks/useQualityControl';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Shield,
   FileText,
@@ -45,9 +36,20 @@ import {
   CheckCircle,
   Clock,
   XCircle
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { apiConfig } from '@/lib/api/config';
+import type { DetailedInspectionReport } from '@/lib/api/hooks/useQualityControl';
+import {
+  useSaveDetailedInspectionReport,
+  useDetailedInspectionReport,
+  useUpdateQualityInspection,
+  useQualityInspection
+} from '@/lib/api/hooks/useQualityControl';
+import { useAuth } from '@/lib/providers/auth';
 
 // This page's raw API fetches go same-origin through the BFF, which attaches the session's token.
 const JSON_HEADERS = { 'Content-Type': 'application/json' };

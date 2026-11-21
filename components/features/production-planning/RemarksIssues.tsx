@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
+
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -15,34 +16,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-import { ListSkeleton, PageSkeleton } from '@/components/ui/loading-skeleton';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { RemarksApi } from '@/lib/api/remarks';
-import { CommentsApi } from '@/lib/api/comments';
-import { productionPlanningApi } from '@/lib/api/production-planning';
-import { toast } from 'sonner';
-import {
-  RemarkType,
-  RemarkPriority,
-  RemarkStatus,
-  RemarkScope,
-  getRemarkTypeColor,
-  getRemarkPriorityColor,
-  getRemarkStatusColor,
-  REMARK_TYPE_OPTIONS,
-  REMARK_PRIORITY_OPTIONS,
-  REMARK_SCOPE_OPTIONS
-} from '@/types/remarks';
-import type { Remark } from '@/lib/api/remarks';
 import {
   MessageSquare,
   AlertTriangle,
@@ -57,7 +30,34 @@ import {
   Flag,
   Package,
   Lightbulb
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ListSkeleton, PageSkeleton } from '@/components/ui/loading-skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from '@/components/ui/textarea';
+import { CommentsApi } from '@/lib/api/comments';
+import { productionPlanningApi } from '@/lib/api/production-planning';
+import { RemarksApi } from '@/lib/api/remarks';
+import type { Remark } from '@/lib/api/remarks';
+import {
+  RemarkType,
+  RemarkPriority,
+  RemarkStatus,
+  RemarkScope,
+  getRemarkTypeColor,
+  getRemarkPriorityColor,
+  getRemarkStatusColor,
+  REMARK_TYPE_OPTIONS,
+  REMARK_PRIORITY_OPTIONS,
+  REMARK_SCOPE_OPTIONS
+} from '@/types/remarks';
 interface ProcessOption {
   id: string;
   name: string;

@@ -1,10 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AlertCircle, CheckCircle2, Info } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -12,14 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
-import { validateFormula, getAutocompleteSuggestions } from '@/lib/formula/validator';
 import { FORMULA_FUNCTIONS } from '@/lib/formula/functions';
+import { validateFormula, getAutocompleteSuggestions } from '@/lib/formula/validator';
 import { cn } from '@/lib/utils';
 
 type FormulaEditorProps = {
