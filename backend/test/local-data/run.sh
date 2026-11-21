@@ -115,6 +115,8 @@ CREATE TABLE public.raw_materials (id uuid PRIMARY KEY DEFAULT gen_random_uuid()
 -- the material columns as the real database has them (migration 069 on): migrations 1090 and 1092 fill the bar and tube materials' strengths and specific heat
 ALTER TABLE public.raw_materials ADD COLUMN material_group varchar(255), ADD COLUMN shear_strength_mpa numeric, ADD COLUMN yield_strength_mpa numeric,
   ADD COLUMN uts_mpa numeric, ADD COLUMN specific_heat_rt_j_kg_k numeric, ADD COLUMN updated_at timestamptz DEFAULT now();
+-- the density columns as the real database has them: migration 1102 fills the powder metal powders' density
+ALTER TABLE public.raw_materials ADD COLUMN density numeric(10,4), ADD COLUMN density_kg_m3 numeric(10,2);
 -- the material groups of each process group (migration 879): migration 1090 adds Bar and Tube Fabrication's, and 1094 gives Multi-Spindle Machining
 -- Machining's and fails if Machining has none
 \i /migrations/879_process_material_groups.sql
@@ -143,6 +145,11 @@ ALTER TABLE public.mhr_records ADD COLUMN max_tonnage numeric, ADD COLUMN shot_c
 INSERT INTO public.mhr_records (machine_class, machine_name, location)
 SELECT m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1085_assembly_plastic_molding_machines.sql'),
   '\(\$str\$(assembly_plastic_molding_[a-z_]+)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
+-- the Powder Metal machines migration 862 seeds for the USA: migration 1101 sets their crews, twins each one in India and fails unless all 16
+-- are. Read from 1101's own list (it names each machine twice, for the crew and for the check): 13 presses, 3 sintering furnaces.
+INSERT INTO public.mhr_records (process_group, machine_class, machine_name, location)
+SELECT DISTINCT 'Powder Metal', m[1], m[2], 'USA' FROM regexp_matches(pg_read_file('/migrations/1101_powder_metal_machines.sql'),
+  '\(\$str\$(powder_metal_[a-z_]+)\$str\$, \$str\$([^$]+)\$str\$', 'g') AS m;
 -- the machine envelope columns as the real database has them (migration 755 fills them for the lathes): migration 1093 fills them for the multi-spindle machines
 ALTER TABLE public.mhr_records ADD COLUMN max_diameter_mm numeric(10,2), ADD COLUMN max_length_mm numeric(10,2);
 -- the taxonomy columns as the real database has them (migration 609): migration 1094 adds the Multi-Spindle Machining > Simultaneous Turning row
