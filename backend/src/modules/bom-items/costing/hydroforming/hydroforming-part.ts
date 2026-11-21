@@ -84,6 +84,8 @@ const REFRESH = 'press Refresh analysis so the part is measured for hydroforming
  * current measurement left null is one the cad-engine could not measure on this part (analysing it again gives the same), so it is named as that.
  */
 export function hydroformPart(g: HydroformGeometrySummary | null | undefined): { part: HydroformPart | null; missing: string[] } {
+  // null: the current engine analysed the part and found no sheet to measure (no thickness, no main face, no faces a thickness apart).
+  if (g === null) return { part: null, missing: ['the hydroforming measurements: the cad-engine found no sheet (a thickness and a main face) to measure on this part'] };
   const version = get(g, 'extraction_version') ?? get(g, 'version');
   if (!g || version !== HYDROFORM_EXTRACTION_VERSION) return { part: null, missing: [`the hydroforming measurements: ${REFRESH}`] };
   const plan = obj(get(g, 'plan'));

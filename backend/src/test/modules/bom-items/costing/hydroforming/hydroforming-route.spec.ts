@@ -214,7 +214,9 @@ describe('what cannot be made or measured', () => {
   });
 
   it('a part not measured for hydroforming asks for Refresh analysis; a summary with no route is one named uncosted line', () => {
-    expect(hydroformPart(null).missing[0]).toMatch(/press Refresh analysis/);
+    // Absent: an analysis from before the measurement, so Refresh analysis measures it. null: the current engine found no sheet to measure.
+    expect(hydroformPart(undefined).missing[0]).toMatch(/press Refresh analysis/);
+    expect(hydroformPart(null).missing).toEqual(['the hydroforming measurements: the cad-engine found no sheet (a thickness and a main face) to measure on this part']);
     expect(hydroformPart({ version: 'hf_v0' }).part).toBeNull();
     const none: HydroformingCostResult = { route: null, routes: [], rule: null, part: null, nest: null, note: null, missing: ['the hydroforming measurements: press Refresh analysis'], warnings: [] };
     const s = buildHydroformingCostSummary({ hydroforming: none, materialGrade: 'X', materialCostPerKg: 1, materialSource: 'db', batchSize: 1, warnings: [], ratesSource: 't', scenario: { partsPerTray: null, intensifier: false } });
