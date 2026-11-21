@@ -7,6 +7,7 @@ import {
   HYDROFORMING_ROUTE_CLASSES, HYDROFORMING_ROUTES, sheetMeasure, type HydroformingMaterial, type HydroformingNest, type HydroformingRoute, type HydroformingRouteKey,
   type HydroformingRule,
 } from './hydroforming-route';
+
 import { DatabaseService } from '../../../../common/database/database.service';
 import { CalculatorCatalogService } from '../../services/calculator-catalog.service';
 import { NestingCostService } from '../../services/nesting-cost.service';
@@ -15,6 +16,7 @@ import { lineToLocal } from '../casting/sand/sand-cost';
 import { SandMachineService } from '../casting/sand/sand-machine.service';
 import { readStagedReference } from '../casting/sand/sand-reference.service';
 
+import type { HydroformGraphFeature } from './hydroforming-features';
 import type { DbClient } from '../../../../common/db/postgrest-client';
 import type { CostContext } from '../casting/casting-finishing';
 import type { SandReference } from '../casting/sand/sand-reference';
@@ -34,6 +36,8 @@ export interface HydroformingCostRequest {
   geometry: HydroformGeometrySummary | null | undefined;
   /** The part's volume (mm³): how much of it is the sheet measured (sheetMeasure). */
   partVolumeMm3?: number | null;
+  /** The part's feature graph features (feature_graph_v2.features): what each step's catalog rows name and highlight. */
+  graphFeatures?: readonly HydroformGraphFeature[];
   /** The part's feature_graph.summary: where the blank's nest is cached. */
   summary: Record<string, unknown>;
   forceRoute?: string;
@@ -99,6 +103,24 @@ export class HydroformingCostService {
   ) {}
 
   private cached: SandReference | null = null;
+  private cachedOperations: string[] | null = null;
+
+  /**
+   * Memory's catalog of the Offline Blank and the Hydroform (process_taxonomy_operations, staged from memory/Sheetmetal Hydroforming/
+   * operations): the operation each step performs on each feature. Kept once read; a failed or empty read is not kept (the rows are then
+   * not shown, and costing is unchanged).
+   */
+  private async operationCatalog(client: DbClient): Promise<string[]> {
+    if (this.cachedOperations) return this.cachedOperations;
+    const { data, error } = await client.from('process_taxonomy')
+      .select('process_name, process_taxonomy_operations(raw_compound_string)')
+      .eq('process_group', HYDROFORMING_PROCESS_GROUP).in('process_name', ['Offline Blank', 'Hydroform']);
+    if (error) return [];
+    const rows = data as { process_taxonomy_operations?: { raw_compound_string?: string | null }[] | null }[];
+    const raw = rows.flatMap((r) => (r.process_taxonomy_operations ?? []).map((o) => o.raw_compound_string ?? '').filter(Boolean));
+    if (raw.length) this.cachedOperations = raw;
+    return raw;
+  }
 
   /** The staged memory/Sheetmetal Hydroforming variables and lookup tables (read once; a read error is reported and not cached). */
   async reference(): Promise<{ reference: SandReference | null; missing: string[] }> {
@@ -163,11 +185,12 @@ export class HydroformingCostService {
     if (sheet?.refuse) return none(part, sheet.refuse);
     if (sheet?.warn) warnings.push(sheet.warn);
     const o = req.overrides ?? {};
-    const [{ reference, missing: refMissing }, calculators, machines, toolShop] = await Promise.all([
+    const [{ reference, missing: refMissing }, calculators, machines, toolShop, operations] = await Promise.all([
       this.reference(),
       this.catalog.loadHydroformingCalculators(req.accessToken),
       this.machines.getMachinesByClass(req.client, HYDROFORMING_ROUTE_CLASSES, req.location),
       this.castingReference.getToolShop(),
+      this.operationCatalog(req.client),
     ]);
     if (!reference) return none(part, ...refMissing);
     const spec = loadHydroformingCalculatorSpec();
@@ -185,7 +208,7 @@ export class HydroformingCostService {
     const intensifier = o[HYDROFORMING_KEYS.intensifier] === true || o[HYDROFORMING_KEYS.intensifier] === 'true';
     const { routes, missing } = buildHydroformingRoutes({
       ref: reference, spec, calculators, material: req.material, part, thicknessMm: req.thicknessMm, machinesByClass: machines, costContext: req.costContext,
-      nest, toolShop: toolShop.shop,
+      nest, toolShop: toolShop.shop, catalog: operations, graphFeatures: req.graphFeatures ?? [],
       scenario: {
         batchSize: req.batchSize, route: chosen, partsPerTray: tray != null && tray >= 1 ? Math.floor(tray) : null, intensifier,
         amortizationParts: req.amortizationParts,

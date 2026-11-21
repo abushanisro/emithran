@@ -74,3 +74,7 @@ export function realToolShop(): ToolShop {
 export const MILD_STEEL: HydroformingMaterial = {
   id: 'raw-materials:steel-cr-1010', name: 'Steel, Cold Rolled, AISI 1010', materialType: 'Steel', densityKgM3: 7850, costPerKgUsd: 1.75, utsMpa: 330, shearStrengthMpa: 250,
 };
+
+/** Memory's catalog of the process (memory/Sheetmetal Hydroforming/operations, staged as process_taxonomy_operations): each row once. */
+export const realHydroformingCatalog = (): string[] =>
+  [...new Set(rows(join(DIR, 'operations (6).csv')).map((r) => (typeof r['Process Name'] === 'string' ? r['Process Name'].trim() : '')).filter((s) => s.includes('//')))];

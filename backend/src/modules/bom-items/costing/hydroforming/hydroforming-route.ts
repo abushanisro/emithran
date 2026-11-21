@@ -2,6 +2,7 @@
 // piercing in one stroke), then formed by Hydroform Deep Draw or Hydroform Fluid Cell. Every time comes from a calculator (hydroforming-
 // calculators.json) seeded from the reference data, the part's measurements (hydroforming-part.ts) and the machine; every machine from HR Rates
 // (migrations 828, 1109). Pure: the caller loads the data, nests the blank and converts the currency.
+import { hydroformFeatures, hydroformingCatalogOperations, type HydroformGraphFeature } from './hydroforming-features';
 import { cappingTools, hydroformTooling, isHighStrength, stepRow, type HydroformingTool, type HydroformToolShop } from './hydroforming-tooling';
 import { machineValue, type SandMachine } from '../casting/sand/sand-machines';
 import { fail, routeKit, type RouteKit } from '../shared/calculators/route-kit';
@@ -83,6 +84,10 @@ export interface HydroformingRouteInput {
   costContext: CostContext;
   nest: HydroformingNest | null;
   toolShop: HydroformToolShop | null;
+  /** Memory's catalog of this process (process_taxonomy_operations raw strings): each step's operation on each feature, for the tree. */
+  catalog?: readonly string[];
+  /** The part's feature graph features (feature_graph_v2.features): the Blank, bends and drawn form the catalog rows name. */
+  graphFeatures?: readonly HydroformGraphFeature[];
 }
 
 /**
@@ -225,6 +230,9 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
   // Memory's Offline Blank pierces every hole (Piercing//SimpleHole, //ComplexHole, as pierced on a curved wall too): a hole through a formed
   // wall is pierced in the flat blank with the others, so its cut joins theirs.
   const wallHoles = part.holes.filter((h) => !h.inFlat);
+  // The part's features as memory's catalog names them, for each step's rows (display only).
+  const features = hydroformFeatures(input.graphFeatures ?? [], part);
+  const everyFeature = [...features.forms, ...features.bends, ...features.graphHoles];
   const wallHolePerimeterMm = wallHoles.reduce((sum, h) => sum + h.perimeterMm, 0);
   const addendum = blankAddendum(ref, part);
   // The blank grows by its outline x the addendum. An outline the cad-engine declined (an unfolded blank) adds nothing when there is no
@@ -369,11 +377,16 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
       const load = Number(loadRow?.['Load Time (s)'] ?? 0);
       const unload = Number(unloadRow?.['Load Time (s)'] ?? 0);
       const fct = machineValue(m, 'machine_forming_cycle_time_s') ?? 0;
-      const op = (name: string, sec: number, featureType: string): FeatureOp => ({ name, timeSec: r2(sec * factor), featureType, count: 1 });
+      // Each row names the features it acts on (the Cost tab highlights them): forming makes the form and the bends; the rest handle the part.
+      const op = (name: string, sec: number, featureType: string, featureIds: string[] = everyFeature): FeatureOp =>
+        ({ name, timeSec: r2(sec * factor), featureType, count: 1, ...(featureIds.length ? { featureIds } : {}) });
       const ops = [
         op('Loading', load * draws.draws, 'handling'),
-        op(`${def.formingOp}${deep && draws.draws > 1 ? ` (${draws.draws} draws)` : ''}${!deep && parts > 1 ? ` (${parts} parts a cycle)` : ''}`, fct * perCycle, 'Form'),
-        ...(deep ? [] : [op(`Hand Adjusting (${r2(handLength)} mm)`, handSec, 'StraightBend'), op('Throw pad', pad.sec * perCycle, 'handling')]),
+        op(`${def.formingOp}${deep && draws.draws > 1 ? ` (${draws.draws} draws)` : ''}${!deep && parts > 1 ? ` (${parts} parts a cycle)` : ''}`, fct * perCycle, 'Form', [...features.forms, ...features.bends]),
+        ...(deep ? [] : [
+          ...(handLength > 0 ? [op(`Hand Adjusting (${r2(handLength)} mm)`, handSec, 'StraightBend', features.bends)] : []),
+          op('Throw pad', pad.sec * perCycle, 'handling'),
+        ]),
         op('Clean Tooling', clean.sec * perCycle, 'cleaning'),
         op('Visual Inspection', inspection, 'inspection'),
         op('Unloading', unload * draws.draws, 'handling'),
@@ -385,8 +398,24 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
       : ['At least one part in its holder fits its forming area', 'The part is within its draw depth'];
     const step = kit.step('Hydroform', (m) => timing(m).outcome, criteria, { machines: presses, processRoute: def.label });
     const chosen = step.machine ? timing(step.machine) : null;
-    const pressLine: ProcessLineCost = chosen && !isGap(step.line) ? { ...step.line, featureBreakdown: chosen.ops } : step.line;
-    const lines = [blankStep.line, pressLine];
+    // Memory's catalog rows of each step, naming the part's features (the process tree lists and highlights them).
+    const catalogOps = hydroformingCatalogOperations(input.catalog ?? [], def.label, def.formingOp, features, !deep && handLength > 0);
+    const pressLine: ProcessLineCost = chosen && !isGap(step.line)
+      ? { ...step.line, featureBreakdown: chosen.ops, ...(catalogOps.press.length ? { catalogOperations: catalogOps.press } : {}) }
+      : step.line;
+    const blankLine: ProcessLineCost = isGap(blankStep.line) ? blankStep.line : {
+      ...blankStep.line,
+      // One stroke blanks the outline and pierces every hole.
+      featureBreakdown: [
+        { name: 'Blanking // Blank', timeSec: r2(blankStep.line.cycleTimeMin * 60), featureType: 'Blank', count: 1, ...(features.blank.length ? { featureIds: features.blank } : {}) },
+        ...(part.holes.length ? [{
+          name: `Piercing // ${part.holes.length} hole(s), in the same stroke`, timeSec: 0, featureType: 'SimpleHole', count: part.holes.length,
+          ...(features.graphHoles.length ? { featureIds: features.graphHoles } : {}),
+        }] : []),
+      ],
+      ...(catalogOps.blank.length ? { catalogOperations: catalogOps.blank } : {}),
+    };
+    const lines = [blankLine, pressLine];
     const complete = lines.every((l) => !isGap(l));
     const partsPerTray = chosen?.parts ?? 1;
     const { tools, warnings: toolWarnings } = hydroformTooling({
