@@ -1,14 +1,21 @@
 'use client';
 
-import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Settings,
   CheckCircle,
@@ -25,15 +32,10 @@ import {
   ChevronRight,
   Users,
   Package,
-} from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Select,
   SelectContent,
@@ -41,7 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { Textarea } from '@/components/ui/textarea';
 import { apiClient } from '@/lib/api/client';
 import {
   useProductionProcesses,
@@ -496,10 +498,7 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
                     <CollapsibleContent>
                       <CardContent className="pt-0 space-y-4">
                         {processesLoading ? (
-                          <div className="text-center py-6 text-muted-foreground text-sm">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2" />
-                            Loading tasks…
-                          </div>
+                          <ListSkeleton rows={3} label="Loading tasks…" />
                         ) : section.subTasks.length === 0 ? (
                           <div className="text-center py-6 border-2 border-dashed rounded-lg text-muted-foreground">
                             <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />

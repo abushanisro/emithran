@@ -1,18 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  CheckCircle, 
-  Clock,
-  PlayCircle,
-  Edit,
-  Package,
-  Download
-} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +14,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { 
+  CheckCircle, 
+  Clock,
+  PlayCircle,
+  Edit,
+  Package,
+  Download
+} from '@/components/ui/icons';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { productionPlanningApi } from '@/lib/api/production-planning';
+
 import { buildGanttPrintHtml } from './gantt-print-html';
 
 interface BOMPartRequirement {
@@ -833,10 +836,7 @@ return {
 
             {/* Process Rows */}
             {loading ? (
-              <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-2 text-muted-foreground">Loading processes...</span>
-              </div>
+              <TableSkeleton rows={4} columns={4} label="Loading processes..." />
             ) : displayProcesses.length === 0 ? (
               <div className="flex items-center justify-center p-8">
                 <div className="text-center">

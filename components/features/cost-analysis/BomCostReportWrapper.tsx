@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { FileDown, RefreshCw } from 'lucide-react';
-import { useCostData } from '@/lib/providers/cost-data-provider';
-import { exportService } from '@/lib/services/export-service';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { FileDown, RefreshCw } from '@/components/ui/icons';
+import { Mark } from '@/components/ui/status-mark';
 import { apiClient } from '@/lib/api/client';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { useCostData } from '@/lib/providers/cost-data-provider';
 import type { CostBreakdown } from '@/lib/services/cost-engine';
+import { exportService } from '@/lib/services/export-service';
 
 const UNKNOWN_COST_BREAKDOWN: CostBreakdown = {
   rawMaterialCost: null,
@@ -594,8 +596,8 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                           {grandTotal === null || aggregated.totalCost === null
                             ? 'Total unknown: some items have no cost'
                             : grandTotal === aggregated.totalCost
-                              ? '✓ Matches aggregated total'
-                              : `⚠ Difference: ${formatCurrency(Math.abs(grandTotal - aggregated.totalCost))}`}
+                              ? <><Mark kind="ok" /> Matches aggregated total</>
+                              : <><Mark kind="warn" /> Difference: {formatCurrency(Math.abs(grandTotal - aggregated.totalCost))}</>}
                         </div>
                       </div>
                     </div>

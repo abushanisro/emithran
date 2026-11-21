@@ -1,21 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, Pencil, Trash2 } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { useVaveProject, useUpdateVaveProject, useDeleteVaveProject } from '@/lib/api/hooks/useVave';
+
 import { BOMExplorer } from './BOMExplorer';
+import { BusinessCaseGenerator } from './BusinessCaseGenerator';
 import { CostAnalysis } from './CostAnalysis';
 import { IdeaRepository } from './IdeaRepository';
 import { PrioritizationMatrix } from './PrioritizationMatrix';
-import { BusinessCaseGenerator } from './BusinessCaseGenerator';
 
 const STATUS_LABELS: Record<string, string> = {
   phase1: 'Phase 1: Data',
@@ -26,9 +29,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   phase1: 'bg-primary/10 text-primary border-primary/40',
-  phase2: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  phase2: 'bg-warning/10 text-warning border-warning/40',
   phase3: 'bg-primary/10 text-primary border-primary/40',
-  complete: 'bg-green-100 text-green-700 border-green-200',
+  complete: 'bg-success/10 text-success border-success/40',
 };
 
 interface Props {
@@ -79,7 +82,7 @@ export function VaveProjectDetail({ projectId, sourceProjectId, onBack }: Props)
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="animate-fade-in">
         <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
         <div className="h-64 bg-muted rounded animate-pulse" />
       </div>
@@ -88,7 +91,7 @@ export function VaveProjectDetail({ projectId, sourceProjectId, onBack }: Props)
 
   if (!project) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="animate-fade-in">
         <Button variant="ghost" onClick={onBack} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
@@ -98,41 +101,32 @@ export function VaveProjectDetail({ projectId, sourceProjectId, onBack }: Props)
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-4">
+    <div className="animate-fade-in space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold">{project.name}</h1>
-              {project.productFamily && (
-                <span className="text-sm text-muted-foreground">· {project.productFamily}</span>
-              )}
-              <Badge
-                variant="outline"
-                className={`text-[10px] ${STATUS_COLORS[project.status] ?? ''}`}
-              >
-                {STATUS_LABELS[project.status] ?? project.status}
-              </Badge>
-            </div>
-            {project.description && (
-              <p className="text-xs text-muted-foreground mt-0.5">{project.description}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleEditOpen}>
-            <Pencil className="h-3.5 w-3.5 mr-1.5" />
-            Edit
-          </Button>
-          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Delete
-          </Button>
+      <div className="flex items-start gap-3">
+        <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to projects" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title={project.productFamily ? `${project.name} · ${project.productFamily}` : project.name}
+            {...(project.description ? { description: project.description } : {})}
+          >
+            <Badge
+              variant="outline"
+              className={`text-[10px] ${STATUS_COLORS[project.status] ?? ''}`}
+            >
+              {STATUS_LABELS[project.status] ?? project.status}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={handleEditOpen} className="gap-1.5">
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </PageHeader>
         </div>
       </div>
 
@@ -143,7 +137,7 @@ export function VaveProjectDetail({ projectId, sourceProjectId, onBack }: Props)
         <div><span className="font-semibold">{project.ideaCount ?? 0}</span> <span className="text-muted-foreground">ideas</span></div>
         <div className="w-px h-4 bg-border" />
         <div>
-          <span className="font-semibold text-green-600">
+          <span className="font-semibold text-success">
             ${((project.totalSavings ?? 0) / 1000).toFixed(0)}K
           </span>{' '}
           <span className="text-muted-foreground">identified savings</span>

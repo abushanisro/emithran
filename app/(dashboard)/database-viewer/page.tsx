@@ -1,15 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Database, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
-import { useProjects } from '@/lib/api/hooks/useProjects';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Database, RefreshCw, CheckCircle2, XCircle } from '@/components/ui/icons';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
+import { useProjects } from '@/lib/api/hooks/useProjects';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 
 export default function DatabaseViewerPage() {

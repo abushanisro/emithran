@@ -1,15 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2 } from 'lucide-react';
-import { ProcuredPartDialog } from './ProcuredPartDialog';
+import { Plus, Edit, Trash2 } from '@/components/ui/icons';
 import {
   useProcuredPartsCosts,
   useCreateProcuredPartsCost,
   useUpdateProcuredPartsCost,
   useDeleteProcuredPartsCost,
 } from '@/lib/api/hooks/useProcuredPartsCosts';
+
+import { ProcuredPartDialog } from './ProcuredPartDialog';
+
 
 interface ProcuredPartsSectionProps {
   bomItemId: string;
@@ -167,9 +170,9 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
 
   if (isLoading) {
     return (
-      <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-        <div className="bg-primary py-3 px-4">
-          <h6 className="m-0 font-semibold text-primary-foreground">Procured Parts</h6>
+      <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+        <div className="border-b bg-muted/40 py-3 px-4">
+          <h6 className="m-0 text-sm font-semibold text-foreground">Procured Parts</h6>
         </div>
         <div className="bg-card p-4">
           <p className="text-center text-muted-foreground">Loading...</p>
@@ -179,31 +182,31 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
   }
 
   return (
-    <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-      <div className="bg-primary py-3 px-4">
-        <h6 className="m-0 font-semibold text-primary-foreground">Procured Parts</h6>
+    <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+      <div className="border-b bg-muted/40 py-3 px-4">
+        <h6 className="m-0 text-sm font-semibold text-foreground">Procured Parts</h6>
       </div>
       <div className="bg-card p-4">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-primary text-primary-foreground">
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+              <tr className="bg-muted/40 text-muted-foreground">
+                <th className="p-3 text-left text-xs font-semibold">
                   Part
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Unit Cost ({currencySymbol})
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Quantity
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Scrap %
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Overhead %
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Total Cost ({currencySymbol})
                 </th>
                 <th className="p-3 text-center text-xs font-semibold">
@@ -222,23 +225,23 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
               ) : (
                 <>
                   {procuredParts.map((part) => (
-                    <tr key={part.id} className="hover:bg-secondary/50">
-                      <td className="p-3 border-r border-border text-xs font-medium">
+                    <tr key={part.id} className="hover:bg-muted/40">
+                      <td className="p-3 text-xs font-medium">
                         {part.partName}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {currencySymbol}{(part.unitCost * conversionRate).toFixed(2)}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {part.quantity}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {part.scrapPercentage}%
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {part.overheadPercentage}%
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right font-semibold">
+                      <td className="p-3 text-xs text-right font-semibold">
                         {currencySymbol}{(computePartCost(part) * conversionRate).toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
@@ -265,11 +268,11 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-secondary/30 font-semibold">
-                    <td colSpan={5} className="p-3 text-right border-r border-border text-xs">
+                  <tr className="bg-muted/40 font-semibold">
+                    <td colSpan={5} className="p-3 text-right text-xs">
                       Total:
                     </td>
-                    <td className="p-3 border-r border-border text-xs text-right">
+                    <td className="p-3 text-xs text-right">
                       {currencySymbol}{fmtCurrency(Number(calculateTotal()) * conversionRate)}
                     </td>
                     <td className="p-3"></td>

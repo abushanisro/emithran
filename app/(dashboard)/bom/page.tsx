@@ -1,26 +1,12 @@
 'use client';
 
+import { format } from 'date-fns';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useBOMs, useCreateBOM, useUpdateBOM, useDeleteBOM } from '@/lib/api/hooks/useBOM';
-import { useProjects } from '@/lib/api/hooks/useProjects';
-import { PageHeader } from '@/components/layout/PageHeader';
+
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +17,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import {
+  FileSpreadsheet,
+  Search,
+  Plus,
+  Calendar,
+  ArrowUpDown,
+  ArrowLeft,
+  Download,
+  Edit,
+  Trash2,
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Select,
   SelectContent,
@@ -46,18 +58,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  FileSpreadsheet,
-  Search,
-  Plus,
-  Calendar,
-  ArrowUpDown,
-  ArrowLeft,
-  Download,
-  Edit,
-  Trash2,
-} from 'lucide-react';
-import { format } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
+import { useBOMs, useCreateBOM, useUpdateBOM, useDeleteBOM } from '@/lib/api/hooks/useBOM';
+import { useProjects } from '@/lib/api/hooks/useProjects';
+
 
 function BOMManagementContent() {
   const router = useRouter();
@@ -308,17 +312,16 @@ function BOMManagementContent() {
         </CardHeader>
         <CardContent>
           {filteredBoms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-              <FileSpreadsheet className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                {searchQuery ? 'No BOMs found' : 'No BOMs Yet'}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery
+            <EmptyState
+              icon={FileSpreadsheet}
+              title={searchQuery ? 'No BOMs found' : 'No BOMs Yet'}
+              description={
+                searchQuery
                   ? 'Try adjusting your search query'
-                  : 'Create your first BOM from a project'}
-              </p>
-            </div>
+                  : 'Create your first BOM from a project'
+              }
+              className="rounded-lg border border-dashed"
+            />
           ) : (
             <div className="rounded-md border">
               <Table>
@@ -593,9 +596,7 @@ function BOMManagementContent() {
 export default function BOMManagementPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <PageSkeleton label="Loading BOM management…" />
     }>
       <BOMManagementContent />
     </Suspense>

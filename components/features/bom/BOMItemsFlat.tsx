@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 const BOMItemThumbnail = dynamic(
   () => import('./BOMItemThumbnail').then((m) => m.BOMItemThumbnail),
   { ssr: false, loading: () => null }
 );
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,11 +19,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertical, Cpu } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info } from '@/components/ui/icons';
+
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
-import { toast } from 'sonner';
+
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
+
 import { useQueryClient } from '@tanstack/react-query';
+
 import { BOMItemType } from '@/lib/types/bom.types';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +43,8 @@ interface BOMItemsFlatProps {
   onEditItem: (item: BOMItem) => void;
   onViewItem?: (item: BOMItem, viewType?: '2d' | '3d' | 'intelligence') => void;
   onAddChildItem?: (parentId: string, childType: BOMItemType) => void;
+  /** BOM totals exactly as the server reports them; shown in the fixed footer row. */
+  totalCost?: number;
 }
 
 interface TreeNode extends BOMItem {
@@ -102,16 +112,6 @@ function getItemTypeBadge(type: string): React.ReactElement {
   );
 }
 
-function getBorderColor(type: string, depth: number = 0): string {
-  const intensity = Math.max(500 - depth * 100, 300);
-  switch (type) {
-    case 'assembly':    return depth === 0 ? 'border-l-emerald-500' : `border-l-emerald-${intensity}`;
-    case 'sub_assembly': return depth <= 1 ? 'border-l-blue-500'   : `border-l-blue-${intensity}`;
-    case 'child_part':  return depth <= 2 ? 'border-l-amber-500'   : `border-l-amber-${intensity}`;
-    default: return 'border-l-border';
-  }
-}
-
 function getChildType(parentType: string): BOMItemType | null {
   switch (parentType) {
     case 'assembly':    return BOMItemType.SUB_ASSEMBLY;
@@ -133,7 +133,7 @@ function getErrorMessage(error: unknown): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: BOMItemsFlatProps) {
+export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, totalCost }: BOMItemsFlatProps) {
   const { data, isLoading, refetch } = useBOMItems(bomId);
   const queryClient = useQueryClient();
 
@@ -144,6 +144,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
   const [dragOverItem, setDragOverItem]         = useState<string | null>(null);
   const [isDragging, setIsDragging]             = useState(false);
   const [isUpdating, setIsUpdating]             = useState(false);
+  const [detailItem, setDetailItem]             = useState<BOMItem | null>(null);
 
   const items = data?.items ?? [];
 
@@ -425,7 +426,9 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
   // Render helpers
   // -------------------------------------------------------------------------
 
-  const renderItem = (item: TreeNode, depth: number = 0): React.ReactElement => {
+  const numCell = 'px-3 py-2 text-right tabular-nums whitespace-nowrap';
+
+  const renderRow = (item: TreeNode, depth: number): React.ReactElement => {
     const hasChildren    = item.children.length > 0;
     const isExpanded     = expandedItems.has(item.id);
     const isDraggedOver  = dragOverItem === item.id;
@@ -433,197 +436,147 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
     const childType      = getChildType(item.itemType);
 
     return (
-      <div key={item.id} className="mb-2">
-        <div
-          style={{ marginLeft: `${depth * 20}px` }}
-          draggable
-          onDragStart={e  => handleDragStart(e, item)}
-          onDragEnd={handleDragEnd}
-          onDragOver={e   => handleDragOver(e, item)}
-          onDragLeave={handleDragLeave}
-          onDrop={e       => handleDrop(e, item)}
-          onClick={e      => {
-            if (isDragging) { e.preventDefault(); e.stopPropagation(); return; }
-            // Clicking the card opens Manufacturing Intelligence -- the same
-            // destination as the Cpu button in the action row.
-            //
-            // Anything inside an explicit control keeps its own meaning, so the
-            // check is on the control rather than on each handler: every action
-            // in this card (2D, 3D, Intelligence, Add, Edit, Delete, expand) is
-            // a real <button>, and the thumbnail stops its own click. Excluding
-            // by role here means a control added later is covered without
-            // having to remember to stop propagation in it.
-            if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return;
-            // A child's card is rendered inside its parent's card, so the click would bubble up and open the
-            // parent after the child. The card that was clicked is the only one that handles it.
-            e.stopPropagation();
-            onViewItem?.(item, 'intelligence');
-          }}
-          className={[
-            'rounded-md border bg-card text-card-foreground shadow-xs border-l-4 transition-all duration-200 relative',
-            getBorderColor(item.itemType, depth),
-            isBeingDragged  ? 'opacity-50'                                                              : '',
-            isDraggedOver ? 'ring-2 ring-primary/40 ring-offset-2 bg-primary/10 dark:bg-primary/20' : '',
-            isDragging && !isBeingDragged ? 'hover:ring-2 hover:ring-green-400'                         : '',
-            isUpdating      ? 'cursor-wait opacity-75'                                                   : 'cursor-move',
-          ].join(' ')}
-        >
-          {/* Depth indicator */}
-          {depth > 0 && (
-            <div
-              className="absolute left-0 top-0 bottom-0 w-0.5 bg-border"
-              style={{ left: `-${depth * 20 - 10}px` }}
+      <tr
+        key={item.id}
+        aria-level={depth + 1}
+        aria-expanded={hasChildren ? isExpanded : undefined}
+        draggable
+        onDragStart={e => handleDragStart(e, item)}
+        onDragEnd={handleDragEnd}
+        onDragOver={e => handleDragOver(e, item)}
+        onDragLeave={handleDragLeave}
+        onDrop={e => handleDrop(e, item)}
+        onClick={e => {
+          if (isDragging) { e.preventDefault(); e.stopPropagation(); return; }
+          // Clicking a row opens Manufacturing Intelligence -- the same
+          // destination as the Cpu button. Explicit controls keep their own meaning.
+          if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return;
+          e.stopPropagation();
+          onViewItem?.(item, 'intelligence');
+        }}
+        className={[
+          'group border-b transition-colors hover:bg-muted/50',
+          isBeingDragged ? 'opacity-50' : '',
+          isDraggedOver ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : '',
+          isUpdating ? 'cursor-wait opacity-75' : 'cursor-pointer',
+        ].join(' ')}
+      >
+        <td className="px-3 py-2">
+          <div className="flex min-w-0 items-center gap-1" style={{ paddingLeft: `${depth * 20}px` }}>
+            <GripVertical
+              className={`h-4 w-4 shrink-0 cursor-grab active:cursor-grabbing ${
+                isBeingDragged ? 'text-primary' : isDraggedOver ? 'text-success' : 'text-muted-foreground/60 group-hover:text-muted-foreground'
+              }`}
+              aria-hidden="true"
             />
-          )}
-
-          <div className="p-4">
-            <div className="flex flex-col md:flex-row items-start justify-between gap-3">
-
-              {/* Thumbnail */}
-              {(item.file3dPath || item.file2dPath) && (
-                <BOMItemThumbnail
-                  item={item}
-                  onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
-                />
+            {hasChildren ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                aria-label={isExpanded ? `Collapse ${item.name}` : `Expand ${item.name}`}
+                onClick={() => toggleExpand(item.id)}
+              >
+                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            ) : (
+              <span className="inline-block h-6 w-6 shrink-0" aria-hidden="true" />
+            )}
+            {(item.file3dPath || item.file2dPath) && (
+              <BOMItemThumbnail
+                item={item}
+                onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
+              />
+            )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm font-medium text-foreground">{item.name}</span>
+                {getItemTypeBadge(item.itemType)}
+                {isDragging && !isBeingDragged && draggedItem && (
+                  <Badge variant="outline" className="text-xs">Drop to swap ↔</Badge>
+                )}
+                {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
+                  <Badge variant="destructive" className="text-xs">Circular Ref</Badge>
+                )}
+              </div>
+              {item.description && (
+                <p className="truncate text-xs text-muted-foreground" title={item.description}>{item.description}</p>
               )}
-
-              {/* Left: metadata */}
-              <div className="flex-1 min-w-0 w-full">
-                {/* Header row */}
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <div className="flex items-center gap-1">
-                    <GripVertical className={`h-4 w-4 transition-colors cursor-grab active:cursor-grabbing ${
-                      isBeingDragged ? 'text-primary' : isDraggedOver ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'
-                    }`} />
-                    {hasChildren && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 p-0 rounded-full border"
-                        onClick={() => toggleExpand(item.id)}
-                      >
-                        {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      </Button>
-                    )}
-                  </div>
-
-                  <h3 className="text-base font-semibold text-foreground truncate max-w-[200px] md:max-w-none">
-                    {item.name}
-                  </h3>
-
-                  {getItemTypeBadge(item.itemType)}
-
-                  {isDragging && !isBeingDragged && draggedItem && (
-                    <Badge variant="outline" className="text-xs bg-primary/10 dark:bg-primary/20 border-primary/40">
-                      Drop to Swap Positions ↔
-                    </Badge>
-                  )}
-
-                  {/* Circular reference warning */}
-                  {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
-                    <Badge variant="destructive" className="text-xs">Circular Ref</Badge>
-                  )}
-                </div>
-
-                {/* Detail grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-2 gap-y-1 text-xs">
-                  <div><span className="text-muted-foreground">Part No: </span><span className="font-medium">{item.partNumber || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Qty: </span><span className="font-medium">{item.quantity}</span></div>
-                  <div><span className="text-muted-foreground">UOM: </span><span className="font-medium">{item.unit}</span></div>
-                  <div>
-                    <span className="text-muted-foreground">Level: </span>
-                    <Badge variant="outline" className="h-4 text-[10px] font-medium px-1">
-                      {item.bomLevel || getDefaultBomLevel(item.itemType)}
-                    </Badge>
-                  </div>
-                  <div><span className="text-muted-foreground">Volume: </span><span className="font-medium">{item.annualVolume?.toLocaleString() ?? '—'}</span></div>
-                  <div><span className="text-muted-foreground">Type: </span><span className="font-medium">{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</span></div>
-
-                  <div className="col-span-2 sm:col-span-3 lg:col-span-2">
-                    <span className="text-muted-foreground">Description: </span>
-                    <span className="font-medium" title={item.description || ''}>{item.description || '—'}</span>
-                  </div>
-                  <div><span className="text-muted-foreground">Material: </span><span className="font-medium">{item.materialGrade || '—'}</span></div>
-                  <div>
-                    <span className="text-muted-foreground">Weight: </span>
-                    <span className="font-medium">{item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : '—'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Dimensions: </span>
-                    <span className="font-medium">
-                      {(item.maxLength ?? 0) > 0 || (item.maxWidth ?? 0) > 0 || (item.maxHeight ?? 0) > 0
-                        ? `${item.maxLength || 0}×${item.maxWidth || 0}×${item.maxHeight || 0} mm`
-                        : '—'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Surface: </span>
-                    <span className="font-medium">
-                      {item.surfaceArea && item.surfaceArea > 0 ? `${(item.surfaceArea / 1000).toFixed(1)}k mm²` : '—'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: action buttons */}
-              <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end mt-4 md:mt-0">
-                {item.file2dPath && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onViewItem?.(item, '2d')}
-                    title="View 2D Drawing"
-                  >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                )}
-
-                {item.file3dPath && (
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '3d')} title="View 3D Model">
-                    <Box className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
-                  title="Manufacturing Intelligence"
-                >
-                  <Cpu className="h-4 w-4 text-primary" />
-                </Button>
-                {childType && (
-                  <Button variant="default" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAddChild(item)} title="Add Component">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onEditItem(item)} title="Edit">
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => handleDeleteClick(item)}
-                  title="Delete"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
             </div>
           </div>
-
-          {/* Nested children */}
-          {isExpanded && hasChildren && (
-            <div className="mt-2 space-y-1">
-              {item.children.map(child => renderItem(child, depth + 1))}
-            </div>
-          )}
-        </div>
-      </div>
+        </td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.partNumber || '—'}</td>
+        <td className="px-3 py-2">
+          <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-medium">
+            {item.bomLevel || getDefaultBomLevel(item.itemType)}
+          </Badge>
+        </td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">{item.materialGrade || '—'}</td>
+        <td className={numCell}>{item.quantity}</td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">{item.unit}</td>
+        <td className={numCell}>{item.annualVolume?.toLocaleString() ?? '—'}</td>
+        <td className={numCell}>
+          {typeof item.unitCost === 'number'
+            ? item.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '—'}
+        </td>
+        <td className={numCell}>{item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : '—'}</td>
+        <td className="px-3 py-2">
+          <div className="flex items-center justify-end gap-1">
+            {item.file2dPath && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing" aria-label="View 2D Drawing">
+                <FileText className="h-4 w-4" />
+              </Button>
+            )}
+            {item.file3dPath && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '3d')} title="View 3D Model" aria-label="View 3D Model">
+                <Box className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDetailItem(item); }} title="Part details" aria-label="Part details">
+              <Info className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
+              title="Manufacturing Intelligence"
+              aria-label="Manufacturing Intelligence"
+            >
+              <Cpu className="h-4 w-4 text-primary" />
+            </Button>
+            {childType && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddChild(item)} title="Add Component" aria-label="Add Component">
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditItem(item)} title="Edit" aria-label="Edit">
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => handleDeleteClick(item)}
+              title="Delete"
+              aria-label="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </td>
+      </tr>
     );
   };
+
+  // Flatten the hierarchy into the rows that are currently visible.
+  const visibleRows = (nodes: TreeNode[], depth = 0): React.ReactElement[] =>
+    nodes.flatMap(node => [
+      renderRow(node, depth),
+      ...(expandedItems.has(node.id) && node.children.length > 0 ? visibleRows(node.children, depth + 1) : []),
+    ]);
 
   // -------------------------------------------------------------------------
   // Loading / empty states
@@ -631,21 +584,17 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4" />
-        <p className="text-muted-foreground">Loading BOM items...</p>
-      </div>
+      <TableSkeleton rows={6} columns={5} label="Loading BOM items..." />
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">No items yet</h3>
-        <p className="text-muted-foreground max-w-md mb-4">
-          Start adding items to your BOM by clicking the "Add BOM" button above.
-        </p>
-      </div>
+      <EmptyState
+        title="No items yet"
+        description={'Start adding items to your BOM by clicking the "Add BOM" button above.'}
+        className="rounded-lg border border-dashed"
+      />
     );
   }
 
@@ -666,22 +615,62 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
   // Main render
   // -------------------------------------------------------------------------
 
+  const th = 'sticky top-0 z-10 bg-muted px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground shadow-[inset_0_-1px_0_hsl(var(--border))]';
+  const thNum = `${th} text-right`;
+
   return (
     <>
-      <div className="space-y-2">
-        {treeData.map(item => renderItem(item, 0))}
-
-        {orphanedItems.length > 0 && (
-          <div className="mt-4 p-4 border border-orange-300 rounded-lg bg-orange-50 dark:bg-orange-950/20">
-            <h4 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
-              Orphaned Items (Missing Parent Reference)
-            </h4>
-            <div className="space-y-2">
-              {orphanedItems.map(item => renderItem({ ...item, children: [], depth: 0 }, 0))}
-            </div>
-          </div>
-        )}
+      <div className="max-h-[70vh] overflow-auto rounded-md border">
+        <table role="treegrid" aria-label="BOM items" className="w-full caption-bottom border-collapse text-sm">
+          <thead>
+            <tr className="text-left">
+              <th scope="col" className={`${th} min-w-[280px] text-left`}>Item</th>
+              <th scope="col" className={`${th} text-left`}>Part No</th>
+              <th scope="col" className={`${th} text-left`}>Level</th>
+              <th scope="col" className={`${th} text-left`}>Type</th>
+              <th scope="col" className={`${th} text-left`}>Material</th>
+              <th scope="col" className={thNum}>Qty</th>
+              <th scope="col" className={`${th} text-left`}>UOM</th>
+              <th scope="col" className={thNum}>Annual Vol.</th>
+              <th scope="col" className={thNum}>Unit Cost</th>
+              <th scope="col" className={thNum}>Weight</th>
+              <th scope="col" className={`${th} text-right`}><span className="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows(treeData)}
+            {orphanedItems.length > 0 && (
+              <>
+                <tr>
+                  <td colSpan={11} className="bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                    Orphaned Items (Missing Parent Reference)
+                  </td>
+                </tr>
+                {orphanedItems.map(item => renderRow({ ...item, children: [], depth: 0 }, 0))}
+              </>
+            )}
+          </tbody>
+          <tfoot>
+            <tr className="font-medium">
+              <td colSpan={5} className="sticky bottom-0 z-10 bg-muted px-3 py-2 text-sm shadow-[inset_0_1px_0_hsl(var(--border))]">
+                Total <span className="font-normal text-muted-foreground">· {items.length} {items.length === 1 ? 'item' : 'items'}</span>
+              </td>
+              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
+              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
+              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
+              <td className="sticky bottom-0 z-10 bg-muted px-3 py-2 text-right text-sm tabular-nums whitespace-nowrap shadow-[inset_0_1px_0_hsl(var(--border))]">
+                {typeof totalCost === 'number'
+                  ? totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : '—'}
+              </td>
+              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
+              <td className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_1px_0_hsl(var(--border))]" />
+            </tr>
+          </tfoot>
+        </table>
       </div>
+
+      <PartDetailSheet item={detailItem} onClose={() => { setDetailItem(null); }} />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -703,5 +692,66 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+// ---------------------------------------------------------------------------
+// Part detail sheet: read-only view of fields already on the BOM item
+// ---------------------------------------------------------------------------
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b py-2 text-sm last:border-0">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right font-medium tabular-nums">{value || '—'}</dd>
+    </div>
+  );
+}
+
+function PartDetailSheet({ item, onClose }: { item: BOMItem | null; onClose: () => void }) {
+  const dims =
+    (item?.maxLength ?? 0) > 0 || (item?.maxWidth ?? 0) > 0 || (item?.maxHeight ?? 0) > 0
+      ? `${item?.maxLength || 0}×${item?.maxWidth || 0}×${item?.maxHeight || 0} mm`
+      : '';
+  return (
+    <Sheet open={item !== null} onOpenChange={open => { if (!open) onClose(); }}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        {item && (
+          <>
+            <SheetHeader>
+              <SheetTitle>{item.name}</SheetTitle>
+              <SheetDescription>{item.partNumber || 'No part number'}</SheetDescription>
+            </SheetHeader>
+            <dl className="px-4 pb-4">
+              <DetailRow label="Type" value={getItemTypeBadge(item.itemType)} />
+              <DetailRow label="BOM level" value={(item.bomLevel ?? '') === '' ? getDefaultBomLevel(item.itemType) : item.bomLevel} />
+              <DetailRow label="Make / Buy" value={item.makeBuy === 'buy' ? 'Buy' : 'Make'} />
+              <DetailRow label="Description" value={item.description} />
+              <DetailRow label="Material" value={item.material} />
+              <DetailRow label="Material grade" value={item.materialGrade} />
+              <DetailRow label="Quantity" value={`${item.quantity}${item.unit ? ` ${item.unit}` : ''}`} />
+              <DetailRow label="Annual volume" value={item.annualVolume?.toLocaleString()} />
+              <DetailRow
+                label="Unit cost"
+                value={
+                  typeof item.unitCost === 'number'
+                    ? item.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : ''
+                }
+              />
+              <DetailRow label="Weight" value={item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : ''} />
+              <DetailRow label="Dimensions" value={dims} />
+              <DetailRow
+                label="Surface area"
+                value={item.surfaceArea && item.surfaceArea > 0 ? `${(item.surfaceArea / 1000).toFixed(1)}k mm²` : ''}
+              />
+              <DetailRow label="Revision" value={item.revision} />
+              <DetailRow label="Lead time" value={item.leadTime} />
+              <DetailRow label="Surface finish" value={item.surfaceFinish} />
+              <DetailRow label="Tolerance grade" value={item.toleranceGrade} />
+            </dl>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

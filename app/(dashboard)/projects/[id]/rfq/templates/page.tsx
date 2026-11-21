@@ -1,10 +1,14 @@
 'use client';
 
-import { ArrowLeft, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ArrowLeft, FileText } from '@/components/ui/icons';
 
 // The backend has no RFQ template store (no templates endpoint under
 // /rfq), so this page shows an empty state rather than sample templates.
@@ -13,36 +17,30 @@ export default function RFQTemplatesPage() {
   const projectId = params.id as string;
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-[1800px] mx-auto space-y-6">
-        {/* BREADCRUMB & HEADER */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link
-              href={`/projects/${projectId}/rfq`}
-              className="flex items-center gap-1 hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              Back to RFQ Management
-            </Link>
-            <span>/</span>
-            <span>RFQ Templates</span>
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">
-            RFQ Templates
-          </h1>
+    <div className="animate-fade-in space-y-6">
+      <div className="flex items-start gap-3">
+        <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to RFQ management" asChild>
+          <Link href={`/projects/${projectId}/rfq`}>
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div className="min-w-0 flex-1">
+          <PageHeader title="RFQ Templates" description="Standard templates for RFQ requests" />
         </div>
-
-        <Card className="text-center py-12">
-          <CardContent>
-            <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No RFQ templates yet</h3>
-            <p className="text-muted-foreground">
-              RFQ templates are not stored by the system yet.
-            </p>
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Project sections: shared tab bar, RFQ is the active tab */}
+      <ProjectNav projectId={projectId} />
+
+      <Card>
+        <CardContent>
+          <EmptyState
+            icon={FileText}
+            title="No RFQ templates yet"
+            description="RFQ templates are not stored by the system yet."
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

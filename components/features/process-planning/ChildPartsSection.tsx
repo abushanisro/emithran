@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2 } from 'lucide-react';
-import { ChildPartDialog } from './ChildPartDialog';
+import { Plus, Edit, Trash2 } from '@/components/ui/icons';
 import {
   useChildPartCosts,
   useCreateChildPartCost,
@@ -11,7 +12,9 @@ import {
   useDeleteChildPartCost,
 } from '@/lib/api/hooks/useChildPartCost';
 import { useAutoRecalculateCost } from '@/lib/hooks/useAutoRecalculateCost';
-import { toast } from 'sonner';
+
+import { ChildPartDialog } from './ChildPartDialog';
+
 
 interface ChildPart {
   id: string;
@@ -173,37 +176,37 @@ export function ChildPartsSection({ bomItemId, bomId }: ChildPartsSectionProps) 
   };
 
   return (
-    <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-      <div className="bg-primary py-3 px-4">
-        <h6 className="m-0 font-semibold text-primary-foreground">Child Parts</h6>
+    <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+      <div className="border-b bg-muted/40 py-3 px-4">
+        <h6 className="m-0 text-sm font-semibold text-foreground">Child Parts</h6>
       </div>
       <div className="bg-card p-4">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-primary text-primary-foreground">
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+              <tr className="bg-muted/40 text-muted-foreground">
+                <th className="p-3 text-left text-xs font-semibold">
                   Part Name
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Make/Buy
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Supplier
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Qty
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Unit Cost
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Scrap %
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Cost/Part
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
+                <th className="p-3 text-left text-xs font-semibold">
                   Extended Cost
                 </th>
                 <th className="p-3 text-center text-xs font-semibold">
@@ -221,40 +224,40 @@ export function ChildPartsSection({ bomItemId, bomId }: ChildPartsSectionProps) 
               ) : (
                 <>
                   {childParts.map((part) => (
-                    <tr key={part.id} className="hover:bg-secondary/50">
-                      <td className="p-3 border-r border-border text-xs font-medium">
+                    <tr key={part.id} className="hover:bg-muted/40">
+                      <td className="p-3 text-xs font-medium">
                         <div>{part.estimateName}</div>
                         {part.partNumber && (
                           <div className="text-muted-foreground text-xs">{part.partNumber}</div>
                         )}
                       </td>
-                      <td className="p-3 border-r border-border text-xs">
+                      <td className="p-3 text-xs">
                         <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${part.makeBuy === 'buy'
                             ? 'bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary'
-                            : 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                            : 'bg-success/10 text-success'
                           }`}>
                           {part.makeBuy === 'buy' ? 'Buy' : 'Make'}
                         </span>
                       </td>
-                      <td className="p-3 border-r border-border text-xs">
+                      <td className="p-3 text-xs">
                         {part.supplierLocation}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {part.quantity}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {part.makeBuy === 'buy'
                           ? `$${(part.unitCost || 0).toFixed(2)}`
                           : `$${((part.rawMaterialCost || 0) + (part.processCost || 0)).toFixed(2)}`
                         }
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {part.scrap}%
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right font-semibold text-primary">
+                      <td className="p-3 text-xs text-right font-semibold text-primary">
                         ${part.totalCost.toFixed(2)}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right font-semibold">
+                      <td className="p-3 text-xs text-right font-semibold">
                         ${part.extendedCost.toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
@@ -281,11 +284,11 @@ export function ChildPartsSection({ bomItemId, bomId }: ChildPartsSectionProps) 
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-secondary/30 font-semibold">
-                    <td colSpan={7} className="p-3 text-right border-r border-border text-xs">
+                  <tr className="bg-muted/40 font-semibold">
+                    <td colSpan={7} className="p-3 text-right text-xs">
                       Total Extended Cost:
                     </td>
-                    <td className="p-3 border-r border-border text-xs text-right">
+                    <td className="p-3 text-xs text-right">
                       ${calculateTotal()}
                     </td>
                     <td className="p-3"></td>

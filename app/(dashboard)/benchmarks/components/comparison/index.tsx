@@ -1,18 +1,22 @@
 "use client";
 
 import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Download } from '@/components/ui/icons';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Download } from "lucide-react";
-import type { BOMMetricEntry, SelectedBOM, SelectedProject } from "../../types";
-import { formatPrice } from "../../utils";
+
+
+import { ComplexityTab } from "./ComplexityTab";
+import { MaterialsTab } from "./MaterialsTab";
 import { OverviewTab } from "./OverviewTab";
 import { PartsTab } from "./PartsTab";
-import { MaterialsTab } from "./MaterialsTab";
-import { ComplexityTab } from "./ComplexityTab";
 import { VAVETab } from "./VAVETab";
+import { formatPrice } from "../../utils";
 import { SelectedPartsAnalysis } from "../SelectedPartsAnalysis";
+
+import type { BOMMetricEntry, SelectedBOM, SelectedProject } from "../../types";
 
 interface Props {
   bomMetrics: BOMMetricEntry[];
@@ -75,7 +79,7 @@ export function ComparisonView({
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="animate-fade-in space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

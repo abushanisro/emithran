@@ -1,18 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
-import { ToolingCostDialog } from './ToolingCostDialog';
+import { Button } from '@/components/ui/button';
+import { Plus, Edit, Trash2, Loader2 } from '@/components/ui/icons';
+import { useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import {
   useToolingCosts,
   useCreateToolingCost,
   useUpdateToolingCost,
   useDeleteToolingCost,
 } from '@/lib/api/hooks/useToolingCosts';
-import { useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import { catalogSourceLabel, processLabel } from '@/lib/costing/tooling-catalog';
+
+import { ToolingCostDialog } from './ToolingCostDialog';
 
 interface ToolingSectionProps {
   bomItemId?: string;
@@ -62,9 +64,9 @@ export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, co
 
   if (!bomItemId) {
     return (
-      <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-        <div className="bg-primary py-3 px-4">
-          <h6 className="m-0 font-semibold text-primary-foreground">Tooling & Fixtures</h6>
+      <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+        <div className="border-b bg-muted/40 py-3 px-4">
+          <h6 className="m-0 text-sm font-semibold text-foreground">Tooling & Fixtures</h6>
         </div>
         <div className="bg-card p-8 text-center text-muted-foreground">
           <p className="text-sm">Please select a BOM item to manage tooling & fixtures</p>
@@ -233,14 +235,14 @@ export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, co
   }
 
   return (
-    <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-      <div className="bg-primary py-3 px-4">
+    <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+      <div className="border-b bg-muted/40 py-3 px-4">
         <div className="flex items-center justify-between">
-          <h6 className="m-0 font-semibold text-primary-foreground">
+          <h6 className="m-0 text-sm font-semibold text-foreground">
             Tooling & Fixtures
           </h6>
           <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground">
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
               Total: {currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}
             </Badge>
           </div>
@@ -262,26 +264,26 @@ export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, co
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-primary text-primary-foreground">
-                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 min-w-[150px]">
+                      <tr className="bg-muted/40 text-muted-foreground">
+                        <th className="p-3 text-left text-xs font-semibold min-w-[150px]">
                           Tooling
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
+                        <th className="p-3 text-left text-xs font-semibold w-32">
                           Process
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
+                        <th className="p-3 text-left text-xs font-semibold w-28">
                           Unit Cost ({currencySymbol})
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
+                        <th className="p-3 text-left text-xs font-semibold w-28">
                           Quantity
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
+                        <th className="p-3 text-left text-xs font-semibold w-32">
                           Amortization
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-24">
+                        <th className="p-3 text-left text-xs font-semibold w-24">
                           Usage %
                         </th>
-                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
+                        <th className="p-3 text-left text-xs font-semibold w-32">
                           Total Cost ({currencySymbol})
                         </th>
                         <th className="p-3 text-center text-xs font-semibold w-24">
@@ -304,8 +306,8 @@ export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, co
                             const subProcessLabel = processLabel(row(item).subProcess, []);
                             
                             return (
-                              <tr key={item.id} className="hover:bg-secondary/50">
-                                <td className="p-3 border-r border-border text-xs font-medium">
+                              <tr key={item.id} className="hover:bg-muted/40">
+                                <td className="p-3 text-xs font-medium">
                                   <div>
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium">{item.toolingType?.replace('_', ' ') || 'Tooling'}</span>
@@ -319,7 +321,7 @@ export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, co
                                     )}
                                   </div>
                                 </td>
-                                <td className="p-3 border-r border-border text-xs">
+                                <td className="p-3 text-xs">
                                   <div>
                                     {process ? (
                                       <div>
@@ -333,19 +335,19 @@ export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, co
                                     )}
                                   </div>
                                 </td>
-                                <td className="p-3 border-r border-border text-xs text-right">
+                                <td className="p-3 text-xs text-right">
                                   {currencySymbol}{(item.unitCost * conversionRate).toFixed(2)}
                                 </td>
-                                <td className="p-3 border-r border-border text-xs text-right">
+                                <td className="p-3 text-xs text-right">
                                   {item.quantity.toFixed(2)}
                                 </td>
-                                <td className="p-3 border-r border-border text-xs text-right">
+                                <td className="p-3 text-xs text-right">
                                   {item.amortizationParts ? `${item.amortizationParts.toLocaleString()} pcs` : '—'}
                                 </td>
-                                <td className="p-3 border-r border-border text-xs text-right">
+                                <td className="p-3 text-xs text-right">
                                   {item.usagePercentage}%
                                 </td>
-                                <td className="p-3 border-r border-border text-xs text-right font-semibold">
+                                <td className="p-3 text-xs text-right font-semibold">
                                   {currencySymbol}{(computeToolCost(item) * conversionRate).toFixed(2)}
                                 </td>
                                 <td className="p-3 text-center">
@@ -379,11 +381,11 @@ export function ToolingSection({ bomItemId, bomItem, partProcessGroup = null, co
                             );
                           })}
 
-                          <tr className="bg-secondary/30 font-semibold">
-                            <td colSpan={6} className="p-3 text-right border-r border-border text-xs">
+                          <tr className="bg-muted/40 font-semibold">
+                            <td colSpan={6} className="p-3 text-right text-xs">
                               Total:
                             </td>
-                            <td className="p-3 border-r border-border text-xs text-right">
+                            <td className="p-3 text-xs text-right">
                               {currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}
                             </td>
                             <td className="p-3"></td>

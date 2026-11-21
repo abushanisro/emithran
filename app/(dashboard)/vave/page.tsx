@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Lightbulb, Plus, TrendingDown, Layers, Zap, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Lightbulb, Plus, TrendingDown, Layers, Zap, ChevronRight } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { useVaveProjects, useCreateVaveProject } from '@/lib/api/hooks/useVave';
 import type { VaveProject } from '@/lib/api/vave';
+
 import { VaveProjectDetail } from './components/VaveProjectDetail';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -24,9 +28,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   phase1: 'bg-primary/10 text-primary border-primary/40',
-  phase2: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  phase2: 'bg-warning/10 text-warning border-warning/40',
   phase3: 'bg-primary/10 text-primary border-primary/40',
-  complete: 'bg-green-100 text-green-700 border-green-200',
+  complete: 'bg-success/10 text-success border-success/40',
 };
 
 function formatUSD(value: number): string {
@@ -94,112 +98,82 @@ export default function VavePage() {
     );
   }
 
+  const kpis = [
+    { label: 'Active Projects', icon: Layers, value: String(projectList.length), tone: '' },
+    { label: 'Total Savings Identified', icon: TrendingDown, value: formatUSD(totalSavings), tone: 'text-success' },
+    { label: 'Total Ideas', icon: Zap, value: String(totalIdeas), tone: '' },
+  ];
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Lightbulb className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">VAVE Projects</h1>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            Value Analysis &amp; Value Engineering — AI-accelerated cost reduction
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+    <div className="animate-fade-in space-y-6">
+      <PageHeader
+        title="VAVE Projects"
+        description="Value Analysis & Value Engineering — AI-accelerated cost reduction"
+      >
+        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
           New Project
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Layers className="h-5 w-5 text-primary" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {kpis.map(({ label, icon: Icon, value, tone }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <p className={`mt-1 text-2xl font-semibold tabular-nums tracking-tight ${tone}`}>{value}</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{projectList.length}</p>
-                <p className="text-xs text-muted-foreground">Active Projects</p>
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${tone ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}>
+                <Icon className="h-4 w-4" aria-hidden="true" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <TrendingDown className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{formatUSD(totalSavings)}</p>
-                <p className="text-xs text-muted-foreground">Total Savings Identified</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Zap className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalIdeas}</p>
-                <p className="text-xs text-muted-foreground">Total Ideas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Project cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48 rounded-xl" />
+            <Skeleton key={i} className="h-48 rounded-lg" />
           ))}
         </div>
       ) : projectList.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-            <div className="p-4 bg-muted rounded-full">
-              <Lightbulb className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-lg">No VAVE projects yet</p>
-              <p className="text-muted-foreground text-sm mt-1">
-                Create your first project to start identifying cost savings
-              </p>
-            </div>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Project
-            </Button>
+        <Card>
+          <CardContent>
+            <EmptyState
+              icon={Lightbulb}
+              title="No VAVE projects yet"
+              description="Create your first project to start identifying cost savings"
+            >
+              <Button onClick={() => setCreateOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create First Project
+              </Button>
+            </EmptyState>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projectList.map((project) => (
-            <div key={project.id} className="flex flex-col">
             <Card
-              className="cursor-pointer hover:shadow-md transition-shadow group"
+              key={project.id}
+              className="group cursor-pointer transition-colors hover:border-primary/50"
               onClick={() => { setSelectedProjectId(project.id); setStep('detail'); }}
             >
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate">{project.name}</CardTitle>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="truncate text-base group-hover:text-primary">{project.name}</CardTitle>
                     {project.productFamily && (
                       <CardDescription className="mt-0.5">{project.productFamily}</CardDescription>
                     )}
                   </div>
                   <Badge
                     variant="outline"
-                    className={`shrink-0 ml-2 text-[10px] ${STATUS_COLORS[project.status] ?? ''}`}
+                    className={`shrink-0 text-[10px] ${STATUS_COLORS[project.status] ?? ''}`}
                   >
                     {STATUS_LABELS[project.status] ?? project.status}
                   </Badge>
@@ -207,38 +181,39 @@ export default function VavePage() {
               </CardHeader>
               <CardContent>
                 {project.description && (
-                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                  <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">
                     {project.description}
                   </p>
                 )}
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-lg font-bold">{project.bomCount ?? 0}</p>
-                    <p className="text-[10px] text-muted-foreground">Parts</p>
+                <dl className="mb-3 grid grid-cols-3 divide-x rounded-md border bg-muted/30 text-center">
+                  <div className="py-2">
+                    <dd className="text-lg font-semibold tabular-nums">{project.bomCount ?? 0}</dd>
+                    <dt className="text-[11px] text-muted-foreground">Parts</dt>
                   </div>
-                  <div>
-                    <p className="text-lg font-bold">{project.ideaCount ?? 0}</p>
-                    <p className="text-[10px] text-muted-foreground">Ideas</p>
+                  <div className="py-2">
+                    <dd className="text-lg font-semibold tabular-nums">{project.ideaCount ?? 0}</dd>
+                    <dt className="text-[11px] text-muted-foreground">Ideas</dt>
                   </div>
-                  <div>
-                    <p className="text-lg font-bold text-green-600">
+                  <div className="py-2">
+                    <dd className="text-lg font-semibold tabular-nums text-success">
                       {formatUSD(project.totalSavings ?? 0)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">Savings</p>
+                    </dd>
+                    <dt className="text-[11px] text-muted-foreground">Savings</dt>
                   </div>
+                </dl>
+                <div className="flex justify-end border-t pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 text-xs"
+                    onClick={(e) => { e.stopPropagation(); setSelectedProjectId(project.id); setStep('detail'); }}
+                  >
+                    Open Project
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-3 group-hover:bg-primary/10 transition-colors"
-                  onClick={(e) => { e.stopPropagation(); setSelectedProjectId(project.id); setStep('detail'); }}
-                >
-                  Open Project
-                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
               </CardContent>
             </Card>
-            </div>
           ))}
         </div>
       )}

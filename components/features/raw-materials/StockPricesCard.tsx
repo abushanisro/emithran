@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+
 import { Card } from '@/components/ui/card';
+import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useMaterialStockPrices } from '@/lib/api/hooks/useRawMaterials';
 

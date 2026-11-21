@@ -1,43 +1,30 @@
 ﻿'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
-  AlertCircle, GripVertical, GripHorizontal,
-  Calculator, ShieldCheck, Flame, Loader2, Edit, X,
-  FileSpreadsheet, Search, Database,
-} from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
 
-import { CycleCalculator } from '@/components/costing/CycleCalculator';
-import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
-import { CompositesSection } from '@/components/costing/CompositesSection';
 import { AdditiveSection } from '@/components/costing/AdditiveSection';
-import { BarTubeSection } from '@/components/costing/BarTubeSection';
 import { AssemblySection } from '@/components/costing/AssemblySection';
-import { PartAssemblySection } from '@/components/costing/PartAssemblySection';
-import { InsertMoldingCycle, InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
-import { ConciseNote } from '@/components/ui/concise-note';
-import { TwoModelSection } from '@/components/costing/TwoModelSection';
-import { isTwoModelPart } from '@/lib/costing/two-model-view';
+import { BarTubeSection } from '@/components/costing/BarTubeSection';
+import { CompositesSection } from '@/components/costing/CompositesSection';
+import { CycleCalculator } from '@/components/costing/CycleCalculator';
 import { ForgingSection } from '@/components/costing/ForgingSection';
-import { splitNote } from '@/lib/text/concise-note';
-import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
-import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
-import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
-import { PowderMetalSection, powderMetalUncostedReason } from '@/components/costing/PowderMetalSection';
 import { HydroformingSection } from '@/components/costing/HydroformingSection';
+import { InsertMoldingCycle, InsertMoldingSection } from '@/components/costing/InsertMoldingSection';
+import { MultiShotCycle, MultiShotSection } from '@/components/costing/MultiShotSection';
+import { MultiSpindleSection } from '@/components/costing/MultiSpindleSection';
+import { PartAssemblySection } from '@/components/costing/PartAssemblySection';
+import { PowderMetalSection, powderMetalUncostedReason } from '@/components/costing/PowderMetalSection';
 import { RotoBlowSection } from '@/components/costing/RotoBlowSection';
-import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandCalculatorRuns, SandLineTrace } from '@/components/costing/SandCalculatorRuns';
+import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { SandMetalBalance } from '@/components/costing/SandMetalBalance';
 import { SandMouldingDetail } from '@/components/costing/SandMouldingDetail';
 import { SandSnapshotsPanel } from '@/components/costing/SandSnapshotsPanel';
-import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
-import { MachiningAllowancePanel } from '@/components/features/casting-viewer/MachiningAllowancePanel';
+import { TwoModelSection } from '@/components/costing/TwoModelSection';
 import { GcdToleranceTab } from '@/components/features/manufacturing-intelligence/GcdToleranceTab';
 import { MachineChoicePanel } from '@/components/features/manufacturing-intelligence/MachineChoicePanel';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
@@ -58,10 +45,10 @@ import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/co
 import { applyGate } from '@/lib/analysis/analysis-status';
 import { cueRefreshAnalysis } from '@/lib/analysis/refresh-analysis-cue';
 import { RefreshAnalysisButton } from '@/components/features/analysis/RefreshAnalysisButton';
-import { QuoteValidationNote } from '@/components/features/manufacturing-intelligence/QuoteValidationNote';
+import { MachiningAllowancePanel } from '@/components/features/casting-viewer/MachiningAllowancePanel';
+import { SandCastingFeaturesPanel } from '@/components/features/casting-viewer/SandCastingFeaturesPanel';
+import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { CostTablePanel } from '@/components/features/manufacturing-intelligence/CostTablePanel';
-import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
-import { routeMachineDrift } from '@/lib/costing/applied-route';
 import { cycleFields, formatFieldValue } from '@/lib/costing/cycle-fields';
 import { formatCycleMin, storableCycleSec } from '@/lib/costing/format-cycle';
 import { featureInstances, machiningCostDrivers, operationCosts, type FeatureInstance, type PricedLine } from '@/lib/features/machining-feature-detail';
@@ -110,8 +97,8 @@ import { PlasticDfmFindings } from '@/components/features/manufacturing-intellig
 import { isSupersededPlasticCheck, isSupersededPlasticWarning } from '@/lib/dfm/plastic-superseded';
 import { isPlasticGraph } from '@/lib/plastic/recognised-features';
 import { PullDirectionControl } from '@/components/features/manufacturing-intelligence/PullDirectionControl';
+import { QuoteValidationNote } from '@/components/features/manufacturing-intelligence/QuoteValidationNote';
 import { useBOMItem, useReanalyzeBOMItem, useDFMScores, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useMachineOverride, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem, type DriverImpact, usePlasticDfm, useMachiningDfm, useForgingDfm } from '@/lib/api/hooks/useBOMItems';
-import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
@@ -157,10 +144,11 @@ import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
 import { isBend, isExtrudedHole, isPlainHole, type FeatureGraphEntryLike } from '@/lib/features/feature-graph';
 import { cutLengthHighlight } from '@/lib/features/cut-length-highlight';
 import { CadEvidencePanel, type CadEvidence } from '@/components/features/process-planning/CadEvidencePanel';
-import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, HoleGroup, FeatureNodeV2, DFMScoresResponse } from '@/lib/types/manufacturing';
-import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ConciseNote } from '@/components/ui/concise-note';
+import { ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight, AlertCircle, GripVertical, Calculator, ShieldCheck, Flame, Loader2, Edit, X, FileSpreadsheet, Search, Database, Zap, XCircle, AlertTriangle, Info, CheckCircle2 } from '@/components/ui/icons';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { modelViewerMessage } from '@/lib/cad-uploads/model-viewer-message';
-import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
 import { calculationOfLine, calculationOfRecord, NO_CALCULATION, seedOfCalculation, tracedLineOf, type LineCalculation } from '@/lib/calculators/calculator-run';
 import { additiveSectionTitle } from '@/lib/costing/additive-view';
 import { isHydroformingItem } from '@/lib/costing/hydroforming-view';
@@ -173,6 +161,16 @@ import { normalizeFeatureGraph, buildSummary } from '@/lib/features/feature-grap
 import { costedGrade, partProcessGroup, appliedRouteIsStale, lastApplyError, deriveReadiness, buildRiskFlags } from '@/lib/features/part-status';
 import { IM_MACHINE_CLASSES, cuttingMachineClassesFromRoutes, cuttingMachineClassToRouteId, orderingWarnings } from '@/lib/features/route-machine-classes';
 import { type FeatureMetadata, severityClass, buildFeatureMetadata } from '@/lib/features/feature-metadata';
+import { Mark } from '@/components/ui/status-mark';
+import { useApplyScenario, type ScenarioApplicationResult } from '@/lib/api/hooks/useApplyScenario';
+import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
+import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
+import { routeMachineDrift } from '@/lib/costing/applied-route';
+import { isMultiSpindleItem } from '@/lib/costing/multi-spindle-view';
+import { isTwoModelPart } from '@/lib/costing/two-model-view';
+import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
+import { splitNote } from '@/lib/text/concise-note';
+import type { FeatureGraph, FeatureGraphSummary, CostDriver, DFMWarning, HoleGroup, FeatureNodeV2, DFMScoresResponse } from '@/lib/types/manufacturing';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -215,7 +213,7 @@ const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
 
 
 const RIGHT_TABS = [
-  { key: 'copilot',       label: '✦ Copilot'   },
+  { key: 'copilot',       label: 'Copilot'   },
   { key: 'cost',          label: 'Cost'         },
   { key: 'part_summary',  label: 'Summary'      },
   { key: 'design_guidance', label: 'Validation' },
@@ -1633,7 +1631,7 @@ function CostSummaryTab({
       {cost.warnings.length > 0 && (
         <div className="mt-3 space-y-1">
           {cost.warnings.map((w, i) => (
-            <ConciseNote key={i} className="text-xs text-amber-600 leading-snug" text={`⚠ ${w}`} />
+            <ConciseNote key={i} className="text-xs text-amber-600 leading-snug" text={w} />
           ))}
         </div>
       )}
@@ -1662,10 +1660,7 @@ function RouteComparisonCard({
   const gate = applyGate(analysisStatus.data);
 
   if (isLoading) return (
-    <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-      <div className="h-4 w-4 rounded-full border-2 border-primary/40 border-t-primary/40 animate-spin" />
-      <span className="text-xs">Comparing routes…</span>
-    </div>
+    <ListSkeleton rows={2} label="Comparing routes…" />
   );
   if (!comparison?.routes?.length) return null;
 
@@ -1718,7 +1713,7 @@ function RouteComparisonCard({
           : 'border-transparent cursor-default',
       )}
     >
-      <p className="text-[10px] text-muted-foreground">✓ {label}</p>
+      <p className="text-[10px] text-muted-foreground"><Mark kind="ok" /> {label}</p>
       {highlight && <span className="text-[9px] text-primary/70 shrink-0">show in 3D</span>}
     </button>
   );
@@ -1769,17 +1764,17 @@ function RouteComparisonCard({
             {(summary.bendCount ?? 0) > 0 &&
               detectedRow(`${summary.bendCount} bend line${summary.bendCount === 1 ? '' : 's'}`, bendHL)}
             {tapCount > 0 && (
-              <p className="text-[10px] text-muted-foreground py-0.5">✓ {tapCount} tap{tapCount === 1 ? '' : 's'}</p>
+              <p className="text-[10px] text-muted-foreground py-0.5"><Mark kind="ok" /> {tapCount} tap{tapCount === 1 ? '' : 's'}</p>
             )}
             {(summary.holeCount ?? 0) > 0 &&
               detectedRow(`${summary.holeCount} hole${summary.holeCount === 1 ? '' : 's'}`, holeHL)}
             {(summary.internalProfileCount ?? 0) > 0 &&
               detectedRow(`${summary.internalProfileCount ?? 0} internal profile${summary.internalProfileCount === 1 ? '' : 's'}`, internalProfileHL)}
             {(summary.sharpCornerCount ?? 0) > 0 && (
-              <p className="text-[10px] text-muted-foreground py-0.5">✓ {summary.sharpCornerCount} sharp internal corner{summary.sharpCornerCount === 1 ? '' : 's'}</p>
+              <p className="text-[10px] text-muted-foreground py-0.5"><Mark kind="ok" /> {summary.sharpCornerCount} sharp internal corner{summary.sharpCornerCount === 1 ? '' : 's'}</p>
             )}
             {(summary.smallHoleCount ?? 0) > 0 && (
-              <p className="text-[10px] text-muted-foreground py-0.5">✓ {summary.smallHoleCount} small hole{summary.smallHoleCount === 1 ? '' : 's'}</p>
+              <p className="text-[10px] text-muted-foreground py-0.5"><Mark kind="ok" /> {summary.smallHoleCount} small hole{summary.smallHoleCount === 1 ? '' : 's'}</p>
             )}
             {(summary.extrudedFlangeCount ?? 0) > 0 &&
               detectedRow(`${summary.extrudedFlangeCount ?? 0} hole extrusion${summary.extrudedFlangeCount === 1 ? '' : 's'}`, extrusionHL)}
@@ -1802,7 +1797,7 @@ function RouteComparisonCard({
       )}
       {burringRuleViolation && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-0.5">
-          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">⚠ Manufacturing Rule Violation</p>
+          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400"><Mark kind="warn" /> Manufacturing Rule Violation</p>
           <p className="text-[10px] text-muted-foreground">Detected: {summary?.extrudedFlangeCount} hole extrusion{summary?.extrudedFlangeCount === 1 ? '' : 's'}</p>
           <p className="text-[10px] text-muted-foreground">Expected operation: Hole Extrusion (Burring)</p>
           <p className="text-[10px] text-muted-foreground">Current route: Missing</p>
@@ -1839,13 +1834,13 @@ function RouteComparisonCard({
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-medium">↓ Lowest Cost</span>
                       )}
                       {route.badges.fastest && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">⚡ Fastest</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium inline-flex items-center gap-0.5"><Zap className="h-3 w-3" /> Fastest</span>
                       )}
                       {route.badges.bestQuality && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">★ Best Quality</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium"><Mark kind="star" /> Best Quality</span>
                       )}
                       {isApplied && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 font-semibold">✓ Applied</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 font-semibold"><Mark kind="ok" /> Applied</span>
                       )}
                     </div>
                   </div>
@@ -1945,7 +1940,7 @@ function RouteComparisonCard({
                 <div className="px-3 py-2 border-t border-red-200/30 bg-red-50/10 space-y-0.5">
                   {route.capability.warnings.map((w, i) => (
                     <p key={i} className="text-[11px] text-red-500 flex items-start gap-1.5">
-                      <span className="shrink-0">⚠</span>{w}
+                      <span className="shrink-0"><Mark kind="warn" /></span>{w}
                     </p>
                   ))}
                 </div>
@@ -1953,7 +1948,7 @@ function RouteComparisonCard({
               {!incapable && (route.machineCapabilityWarnings?.length ?? 0) > 0 && (
                 <div className="px-3 py-1.5 border-t border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1">
                   {route.machineCapabilityWarnings!.map((w, i) => (
-                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-400/20">⚠ {w}</span>
+                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-400/20"><Mark kind="warn" /> {w}</span>
                   ))}
                 </div>
               )}
@@ -1998,7 +1993,7 @@ function RouteComparisonCard({
 
         {comparison.comparisonWarnings.map((w, i) => (
           <p key={i} className="text-[11px] text-amber-500/80 flex items-start gap-1.5 px-1">
-            <span className="shrink-0">⚠</span>{w}
+            <span className="shrink-0"><Mark kind="warn" /></span>{w}
           </p>
         ))}
 
@@ -2012,7 +2007,7 @@ function RouteComparisonCard({
               </div>
               <button onClick={() => { onAppliedRouteChange(null); }}
                 className="text-xs text-muted-foreground hover:text-foreground w-6 h-6 flex items-center justify-center rounded hover:bg-muted/40 transition-colors">
-                ✕
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="divide-y divide-border/30">
@@ -2256,10 +2251,10 @@ function ManufacturingFeaturesTab({
             <ComplexityBadge level={bendComplexity} />
           </div>
           {springbackRisk && (
-            <p className="text-[9px] text-amber-600 dark:text-amber-400 py-0.5">⚠ Springback risk — min radius below the material/thickness-specific minimum</p>
+            <p className="text-[9px] text-amber-600 dark:text-amber-400 py-0.5"><Mark kind="warn" /> Springback risk — min radius below the material/thickness-specific minimum</p>
           )}
           {multiRadius && (
-            <p className="text-[9px] text-amber-600 dark:text-amber-400 py-0.5">⚠ Multi-radius — sequential press brake setups required</p>
+            <p className="text-[9px] text-amber-600 dark:text-amber-400 py-0.5"><Mark kind="warn" /> Multi-radius — sequential press brake setups required</p>
           )}
           {uniqueRadii.length > 0 && (
             <div className="pt-1">
@@ -2344,14 +2339,14 @@ function ManufacturingFeaturesTab({
           {hasCostDrivers
             ? summary.costDrivers!.map((cd, i) => (
                 <div key={i} className="flex items-baseline justify-between py-0.5">
-                  <span className="text-[10px] text-muted-foreground">✓ {cd.name}</span>
+                  <span className="text-[10px] text-muted-foreground"><Mark kind="ok" /> {cd.name}</span>
                   <span className="text-[10px] font-medium tabular-nums shrink-0">
                     {fmt(cd.value, 1)} {cd.unit}
                   </span>
                 </div>
               ))
             : derivedDrivers.map((d, i) => (
-                <p key={i} className="text-[10px] text-muted-foreground py-0.5">✓ {d}</p>
+                <p key={i} className="text-[10px] text-muted-foreground py-0.5"><Mark kind="ok" /> {d}</p>
               ))
           }
         </Section>
@@ -2548,11 +2543,58 @@ function HResizeHandle() {
     </PanelResizeHandle>
   );
 }
-function VResizeHandle() {
+
+// Collapsible section for the middle column. The content stays mounted while
+// closed (forceMount + hidden) so a panel keeps its own state when collapsed.
+function MiCollapsible({
+  title, height, defaultOpen = true, maximizeId, maximized, onMaximize, children,
+}: {
+  title: string;
+  height: string;
+  defaultOpen?: boolean;
+  maximizeId?: PanelId;
+  maximized: PanelId | null;
+  onMaximize: (id: PanelId | null) => void;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <PanelResizeHandle className="h-1 bg-border hover:bg-brand-400 transition-colors relative group flex items-center justify-center">
-      <GripHorizontal className="h-4 w-4 text-muted-foreground group-hover:text-primary absolute" />
-    </PanelResizeHandle>
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b">
+      <div className="flex items-center bg-muted/40">
+        <CollapsibleTrigger className="flex flex-1 items-center gap-1.5 px-3 py-2 text-left hover:bg-muted/60 transition-colors">
+          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+          <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{title}</span>
+        </CollapsibleTrigger>
+        {maximizeId && (
+          <button
+            onClick={() => { onMaximize(maximized === maximizeId ? null : maximizeId); }}
+            className="mr-2 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+            title="Maximize"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <CollapsibleContent forceMount className="data-[state=closed]:hidden">
+        <div className={cn('overflow-hidden', height)}>{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// The cost breakdown on its own, for the always-visible right-hand pane.
+function CostSummaryPane({
+  item, fg, batchSize, factory, onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest,
+}: {
+  item: BOMItem; fg: FeatureGraph | null;
+  batchSize: number | undefined; factory: string;
+  onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
+  onShowEvidence?: (evidence: CadEvidence | null) => void;
+  activeEvidenceLabel?: string | null;
+  addProcessRequest?: AddProcessRequest | null;
+}) {
+  return (
+    <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} onShowEvidence={onShowEvidence} activeEvidenceLabel={activeEvidenceLabel} addProcessRequest={addProcessRequest} />
   );
 }
 
@@ -4484,7 +4526,7 @@ function CostGuidePanel({
                               <div className="text-[10px] text-muted-foreground truncate">{m.materialGroup}</div>
                             )}
                           </div>
-                          {isCurrent && <span className="text-emerald-500 text-xs shrink-0">✓</span>}
+                          {isCurrent && <span className="text-emerald-500 text-xs shrink-0"><Mark kind="ok" inherit /></span>}
                         </button>
                       );
                     })}
@@ -4509,7 +4551,7 @@ function CostGuidePanel({
                 </div>
               ) : (
                 <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 mb-1.5 px-0.5">
-                  <span>✓</span>
+                  <span><Mark kind="ok" /></span>
                   <span>Currently costed as <strong>{cgpCostSummary.materialGrade}</strong></span>
                 </div>
               ))}
@@ -5158,7 +5200,7 @@ function SustainabilityTab({ item, batchSize, factory }: { item: BOMItem; batchS
 
       <Section title="Improvement Opportunities">
         {s.opportunities.map((o, i) => (
-          <p key={i} className="text-[10px] text-muted-foreground py-0.5">✓ {o}</p>
+          <p key={i} className="text-[10px] text-muted-foreground py-0.5"><Mark kind="ok" /> {o}</p>
         ))}
       </Section>
 
@@ -6049,7 +6091,7 @@ function PartDetailTab({
       <Section title="Production Readiness">
         <div className="flex items-center gap-1.5 py-0.5">
           <span className={readiness.ready ? 'text-green-500' : 'text-yellow-500'}>
-            {readiness.ready ? '✓' : '⚠'}
+            {readiness.ready ? <Mark kind="ok" inherit /> : <Mark kind="warn" inherit />}
           </span>
           <span className={`text-xs font-medium ${readiness.ready ? 'text-green-500' : 'text-yellow-500'}`}>
             {readiness.label}
@@ -6058,7 +6100,7 @@ function PartDetailTab({
         {flags.length > 0 && (
           <div className="mt-1 space-y-0.5">
             {flags.map((f, i) => (
-              <p key={i} className="text-[10px] text-yellow-500/80">⚠ {f}</p>
+              <p key={i} className="text-[10px] text-yellow-500/80"><Mark kind="warn" /> {f}</p>
             ))}
           </div>
         )}
@@ -6249,8 +6291,8 @@ function ValidationTab({
   const score = fg?.manufacturabilityScore;
 
   const severityIcon = (passed: boolean, severity: string) => {
-    if (passed)                  return <span className="text-emerald-400 text-sm leading-none">✓</span>;
-    if (severity === 'critical') return <span className="text-red-500 text-sm leading-none">✗</span>;
+    if (passed)                  return <span className="text-emerald-400 text-sm leading-none"><Mark kind="ok" inherit /></span>;
+    if (severity === 'critical') return <span className="text-red-500 text-sm leading-none"><Mark kind="fail" inherit /></span>;
     return                              <span className="text-amber-400 text-sm leading-none">!</span>;
   };
 
@@ -6524,10 +6566,10 @@ function ValidationTab({
               {dccNodes.map((n) => {
                 const highlight = resolveDccHighlight(n.v2FeatureIds);
                 const icon = n.status === 'match'
-                  ? <span className="text-emerald-400 text-sm leading-none">✓</span>
+                  ? <span className="text-emerald-400 text-sm leading-none"><Mark kind="ok" inherit /></span>
                   : n.status === 'mismatch'
                     ? (n.severity === 'critical'
-                        ? <span className="text-red-500 text-sm leading-none">✗</span>
+                        ? <span className="text-red-500 text-sm leading-none"><Mark kind="fail" inherit /></span>
                         : <span className="text-amber-400 text-sm leading-none">!</span>)
                     : <span className="text-muted-foreground text-sm leading-none">•</span>;
                 return (
@@ -6575,9 +6617,9 @@ function DesignGuidanceTab({ fg, plastic, machining }: {
   const warnings = (fg?.dfmWarnings ?? []).filter((w) => !plastic || !isSupersededPlasticWarning(w));
 
   const severityConfig = {
-    critical: { icon: '❌', cls: 'border-red-500/30 bg-red-500/10', labelCls: 'text-red-400 bg-red-500/20', textCls: 'text-red-100', mutedCls: 'text-red-300/70', label: 'CRITICAL' },
-    warning:  { icon: '⚠️', cls: 'border-amber-500/30 bg-amber-500/10', labelCls: 'text-amber-400 bg-amber-500/20', textCls: 'text-amber-100', mutedCls: 'text-amber-300/70', label: 'WARNING' },
-    info: { icon: 'ℹ️', cls: 'border-primary/30 bg-primary/10', labelCls: 'text-primary bg-primary/20', textCls: 'text-primary', mutedCls: 'text-primary/70', label: 'INFO' },
+    critical: { icon: <XCircle className="h-4 w-4" />, cls: 'border-red-500/30 bg-red-500/10', labelCls: 'text-red-400 bg-red-500/20', textCls: 'text-red-100', mutedCls: 'text-red-300/70', label: 'CRITICAL' },
+    warning:  { icon: <AlertTriangle className="h-4 w-4" />, cls: 'border-amber-500/30 bg-amber-500/10', labelCls: 'text-amber-400 bg-amber-500/20', textCls: 'text-amber-100', mutedCls: 'text-amber-300/70', label: 'WARNING' },
+    info: { icon: <Info className="h-4 w-4" />, cls: 'border-primary/30 bg-primary/10', labelCls: 'text-primary bg-primary/20', textCls: 'text-primary', mutedCls: 'text-primary/70', label: 'INFO' },
   };
 
   if (!fg) {
@@ -6595,7 +6637,7 @@ function DesignGuidanceTab({ fg, plastic, machining }: {
       {machining && <MachiningDfmFindings itemId={machining.itemId} process={machining.process} features={fg.feature_graph_v2?.features ?? []} onSelectHighlight={machining.onSelectHighlight} />}
       {warnings.length === 0 ? (plastic || machining ? null : (
         <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
-          <span className="text-lg">✅</span>
+          <CheckCircle2 className="h-6 w-6 text-success" />
           <p className="text-xs text-center">No DFM warnings — design looks manufacturable.</p>
         </div>
       )) : (
@@ -6748,7 +6790,7 @@ function DrawingIntelligenceTab({ item }: { item: BOMItem }) {
                     className="text-[9px] font-medium px-1 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 normal-case tracking-normal"
                     title="One or more thread callouts were extracted with low confidence. Verify against the drawing callout table."
                   >
-                    ⚠ Verify
+                    <Mark kind="warn" /> Verify
                   </span>
                 )}
               </>
@@ -7157,8 +7199,10 @@ function AnalysisTabsPanel({
   projectId,
   item, fg, batchSize, productionLife, factory, selectedMachiningFeatureKey, onMachiningFeatureSelect,
   file3dUrl, onFile3dUrlExpired, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
-  onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest,
+  onSelectHighlight, onShowEvidence, activeEvidenceLabel, addProcessRequest, hiddenTabs,
 }: {
+  /** Tabs shown elsewhere in the layout (e.g. the always-visible cost pane); they are left out of this tab bar. */
+  hiddenTabs?: readonly RightTabKey[];
   addProcessRequest?: AddProcessRequest | null;
   projectId: string;
   item: BOMItem; fg: FeatureGraph | null;
@@ -7176,7 +7220,9 @@ function AnalysisTabsPanel({
   onShowEvidence?: (evidence: CadEvidence | null) => void;
   activeEvidenceLabel?: string | null;
 }) {
-  const tab = activeTab;
+  const visibleTabs = RIGHT_TABS.filter(({ key }) => !hiddenTabs?.includes(key));
+  // If the selected tab lives elsewhere, show the first tab that remains here.
+  const tab: RightTabKey = hiddenTabs?.includes(activeTab) ? (visibleTabs[0]?.key ?? activeTab) : activeTab;
   const setTab = onTabChange;
   // Same fix as SustainabilityTab — omitting location silently defaulted to
   // 'USA' (useCostSummary's own fallback), running a second, wasted full
@@ -7193,7 +7239,7 @@ function AnalysisTabsPanel({
     <div className="flex flex-col h-full">
       {/* Tab bar — wraps to 2 rows so all tabs stay visible at any panel width */}
       <div className="flex flex-wrap border-b shrink-0 bg-muted/20">
-        {RIGHT_TABS.map(({ key, label }) => (
+        {visibleTabs.map(({ key, label }) => (
           <button key={key} onClick={() => { setTab(key); }}
             className={`px-2.5 py-1.5 text-[11px] font-medium border-b-2 whitespace-nowrap transition-colors ${
               tab === key ? 'border-primary/40 text-primary dark:text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
@@ -9272,7 +9318,7 @@ export default function ManufacturingIntelligencePage() {
     <div className="border border-primary/60 rounded-md bg-card p-3 text-xs mb-3 shrink-0">
       <div className="flex items-center justify-between mb-2">
         <span className="font-semibold text-foreground text-[11px]">Heatmap Inspector</span>
-        <button onClick={() => { setHeatmapInspector(null); }} className="text-muted-foreground hover:text-foreground/80 text-[10px] leading-none">✕</button>
+        <button onClick={() => { setHeatmapInspector(null); }} className="text-muted-foreground hover:text-foreground/80 text-[10px] leading-none"><X className="h-3 w-3" /></button>
       </div>
 
       {/* Score bar */}
@@ -9576,28 +9622,10 @@ export default function ManufacturingIntelligencePage() {
       {heatmapLegend}
 
       <div className="flex-1 overflow-hidden min-h-0">
-        <PanelGroup id="mi-root" direction="horizontal" className="h-full">
+        <PanelGroup id="mi-root-3col" direction="horizontal" className="h-full">
 
-          {/* LEFT: Cost Guide + 3D Viewer + Process Tree */}
-          <Panel defaultSize={67} minSize={40} className="flex flex-col overflow-hidden">
-            <PanelGroup id="mi-left-col" direction="vertical" className="h-full">
-
-              {/* TOP ROW — 3D viewer + Cost Guide */}
-              <Panel defaultSize={65} minSize={30}>
-                <PanelGroup id="mi-top-row" direction="horizontal" className="h-full">
-
-                  {/* Cost Guide */}
-                  <Panel defaultSize={30} minSize={18} className="flex flex-col border-r overflow-hidden">
-                    <PanelHeader title="Cost Guide" panelId="left" maximized={maximized} onMaximize={maximize} />
-                    <div className="flex-1 overflow-hidden min-h-0">
-                      <CostGuidePanel {...costGuideProps} />
-                    </div>
-                  </Panel>
-
-                  <HResizeHandle />
-
-                  {/* 3D / 2D Viewer */}
-                  <Panel defaultSize={70} minSize={30} className="flex flex-col overflow-hidden">
+          {/* LEFT: CAD viewer */}
+          <Panel defaultSize={38} minSize={22} className="flex flex-col overflow-hidden">
                     <PanelHeader title="Viewer" panelId="center" maximized={maximized} onMaximize={maximize}>
                       <div className="flex items-center gap-2 min-w-0 w-full">
                         {/* filename — truncates if needed */}
@@ -9716,41 +9744,42 @@ export default function ManufacturingIntelligencePage() {
                         )
                       )}
                     </div>
-                  </Panel>
-
-                </PanelGroup>
-              </Panel>
-
-              <VResizeHandle />
-
-              {/* BOTTOM: Process Tree + Geometric Cost Drivers */}
-              <Panel defaultSize={35} minSize={15} className="flex overflow-hidden border-t">
-                <PanelGroup id="mi-bottom-row" direction="horizontal" className="h-full w-full">
-
-                  <Panel defaultSize={55} minSize={25} className="flex flex-col overflow-hidden">
-                    <ProcessTreePanel {...treeProps} />
-                  </Panel>
-
-                  <HResizeHandle />
-
-                  <Panel defaultSize={45} minSize={18} className="flex flex-col overflow-hidden">
-                    <GeometricCostDriversPanel {...driversProps} />
-                  </Panel>
-
-                </PanelGroup>
-              </Panel>
-
-            </PanelGroup>
           </Panel>
 
           <HResizeHandle />
 
-          {/* RIGHT: Analysis — full height */}
-          <Panel defaultSize={33} minSize={18} className="flex flex-col overflow-hidden border-l">
-            <PanelHeader title="Analysis" panelId="right" maximized={maximized} onMaximize={maximize} />
+          {/* MIDDLE: inputs and analysis, each in a collapsible */}
+          <Panel defaultSize={34} minSize={22} className="flex flex-col overflow-hidden border-l">
             <div ref={rightPanelScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
               {heatmapInspectorPanel && <div className="p-2">{heatmapInspectorPanel}</div>}
-              <AnalysisTabsPanel {...analysisProps} />
+              <MiCollapsible title="Inputs & Scenario" height="h-[640px]" maximizeId="left" maximized={maximized} onMaximize={maximize}>
+                <CostGuidePanel {...costGuideProps} />
+              </MiCollapsible>
+              <MiCollapsible title="Process Tree" height="h-[420px]" maximized={maximized} onMaximize={maximize}>
+                <ProcessTreePanel {...treeProps} />
+              </MiCollapsible>
+              <MiCollapsible title="Geometric Cost Drivers" height="h-[420px]" defaultOpen={false} maximized={maximized} onMaximize={maximize}>
+                <GeometricCostDriversPanel {...driversProps} />
+              </MiCollapsible>
+              <MiCollapsible title="Analysis" height="h-[640px]" maximizeId="right" maximized={maximized} onMaximize={maximize}>
+                <AnalysisTabsPanel {...analysisProps} hiddenTabs={['cost']} />
+              </MiCollapsible>
+            </div>
+          </Panel>
+
+          <HResizeHandle />
+
+          {/* RIGHT: cost summary, a pane of its own so it stays in view while the middle scrolls */}
+          <Panel defaultSize={28} minSize={20} className="flex flex-col overflow-hidden border-l bg-card">
+            <div className="flex items-center px-3 py-2 border-b bg-muted/40 shrink-0">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cost Summary</span>
+            </div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+              <CostSummaryPane
+                item={item} fg={fg} batchSize={batchSize} factory={factory}
+                onSelectHighlight={onSelectHighlight} onShowEvidence={setCadEvidence}
+                activeEvidenceLabel={cadEvidence?.fieldLabel ?? null} addProcessRequest={addProcessRequest}
+              />
             </div>
           </Panel>
 

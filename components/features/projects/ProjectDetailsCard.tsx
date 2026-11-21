@@ -1,15 +1,14 @@
 'use client';
 
+import { Country, State, City } from 'country-state-city';
+import { format } from 'date-fns';
 import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Edit2, Check, X, Mail, Plus, Trash2, Users, ChevronDown, Shield, Eye, UserCog, Wrench, PenTool, ShoppingCart, ClipboardCheck, DollarSign, Settings } from 'lucide-react';
-import { format } from 'date-fns';
-import { useProjectTeam, useAddTeamMember, useRemoveTeamMember, useUpdateTeamMember } from '@/lib/api/hooks/useProjectTeam';
-import type { TeamMemberRole } from '@/lib/api/project-team';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +17,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Combobox } from '@/components/ui/combobox';
-import type { ComboboxOption } from '@/components/ui/combobox';
-import { Country, State, City } from 'country-state-city';
+import { Edit2, Check, X, Mail, Plus, Trash2, Users, ChevronDown, Shield, Eye, UserCog, Wrench, PenTool, ShoppingCart, ClipboardCheck, DollarSign, Settings } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useProjectTeam, useAddTeamMember, useRemoveTeamMember, useUpdateTeamMember } from '@/lib/api/hooks/useProjectTeam';
+import type { TeamMemberRole } from '@/lib/api/project-team';
+
 
 /**
  * The backend's project-team-member DTO (backend/src/modules/projects/dto/project-team-member.dto.ts)
@@ -297,17 +299,17 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
   };
 
   return (
-    <Card className="border-l-4 border-l-primary shadow-md">
-      <CardHeader className="bg-primary py-3 px-6">
+    <Card>
+      <CardHeader className="border-b px-6 py-3">
         <div className="flex items-center justify-between">
-          <h6 className="m-0 font-semibold text-primary-foreground text-sm">
+          <h2 className="m-0 text-sm font-semibold">
             Project Details
-          </h6>
+          </h2>
           {!isEditing && onUpdate && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 text-primary-foreground hover:bg-primary-foreground/20"
+              className="h-8"
               onClick={() => setIsEditing(true)}
             >
               <Edit2 className="h-3.5 w-3.5 mr-2" />
@@ -319,7 +321,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 text-primary-foreground hover:bg-primary-foreground/20"
+                className="h-8"
                 onClick={handleCancel}
                 disabled={isSaving}
               >
@@ -327,7 +329,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                 Cancel
               </Button>
               <Button
-                variant="secondary"
+                variant="default"
                 size="sm"
                 className="h-8"
                 onClick={handleSave}
@@ -344,7 +346,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
         {/* Project Name */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
               Name
             </label>
             {isEditing ? (
@@ -355,13 +357,13 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                 placeholder="Enter project name"
               />
             ) : (
-              <div className="text-base font-semibold">{project.name}</div>
+              <div className="text-sm font-semibold">{project.name}</div>
             )}
           </div>
 
           {/* Status */}
           <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
               Status
             </label>
             <Badge
@@ -382,7 +384,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
         {/* Description */}
         <div className="grid grid-cols-1">
           <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
               Description
             </label>
             {isEditing ? (
@@ -393,7 +395,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                 placeholder="Enter project description"
               />
             ) : (
-              <div className="text-base">
+              <div className="text-sm">
                 {project.description || <span className="text-muted-foreground italic">No description</span>}
               </div>
             )}
@@ -404,7 +406,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Country */}
           <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
               Country
             </label>
             {isEditing ? (
@@ -417,7 +419,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                 emptyText="No country found."
               />
             ) : (
-              <div className="text-base">
+              <div className="text-sm">
                 {project.country || <span className="text-muted-foreground italic">Not specified</span>}
               </div>
             )}
@@ -425,7 +427,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
 
           {/* State/Province */}
           <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
               State/Province
             </label>
             {isEditing ? (
@@ -439,7 +441,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                 disabled={!editForm.country || availableStates.length === 0}
               />
             ) : (
-              <div className="text-base">
+              <div className="text-sm">
                 {project.state || <span className="text-muted-foreground italic">Not specified</span>}
               </div>
             )}
@@ -447,7 +449,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
 
           {/* City */}
           <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
               City
             </label>
             {isEditing ? (
@@ -461,7 +463,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                 disabled={!editForm.state || availableCities.length === 0}
               />
             ) : (
-              <div className="text-base">
+              <div className="text-sm">
                 {project.city || <span className="text-muted-foreground italic">Not specified</span>}
               </div>
             )}
@@ -474,20 +476,20 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
             {/* Created Information */}
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
                   Date Created
                 </label>
-                <div className="text-base">{formatDate(project.createdAt)}</div>
+                <div className="text-sm">{formatDate(project.createdAt)}</div>
               </div>
               {project.createdBy && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
                     Created By
                   </label>
                   <div className="flex items-center gap-2">
                     <a
                       href={`mailto:${project.createdBy}`}
-                      className="text-base text-primary hover:underline flex items-center gap-2"
+                      className="text-sm text-primary hover:underline flex items-center gap-2"
                     >
                       <Mail className="h-4 w-4" />
                       {project.createdBy}
@@ -500,20 +502,20 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
             {/* Modified Information */}
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
                   Date Last Modified
                 </label>
-                <div className="text-base">{formatDate(project.updatedAt)}</div>
+                <div className="text-sm">{formatDate(project.updatedAt)}</div>
               </div>
               {project.updatedBy && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5 block">
                     Last Modified By
                   </label>
                   <div className="flex items-center gap-2">
                     <a
                       href={`mailto:${project.updatedBy}`}
-                      className="text-base text-primary hover:underline flex items-center gap-2"
+                      className="text-sm text-primary hover:underline flex items-center gap-2"
                     >
                       <Mail className="h-4 w-4" />
                       {project.updatedBy}
@@ -528,12 +530,12 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
         {/* Project Summary Snapshot */}
         <div className="pt-4 border-t border-border">
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-foreground">Project Summary Snapshot</h3>
+            <h3 className="text-sm font-semibold text-foreground">Project Summary Snapshot</h3>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Industry</label>
-              <div className="text-base">
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Industry</label>
+              <div className="text-sm">
                 {project.industry ? (
                   <span className="capitalize">{project.industry.replace('-', ' ')}</span>
                 ) : (
@@ -542,8 +544,8 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Estimated Annual Volume</label>
-              <div className="text-base">
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estimated Annual Volume</label>
+              <div className="text-sm">
                 {project.estimatedAnnualVolume ? (
                   <span>{project.estimatedAnnualVolume.toLocaleString()} units</span>
                 ) : (
@@ -552,8 +554,8 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Target BOM Cost</label>
-              <div className="text-base">
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Target BOM Cost</label>
+              <div className="text-sm">
                 {project.targetBomCost ? (
                   <span>
                     {project.targetBomCostCurrency || 'USD'} {project.targetBomCost.toLocaleString()}
@@ -595,9 +597,9 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
 
           {/* Project Owner/Admin Display */}
           {ownerMember && (
-            <div className="mb-4 p-4 bg-primary/5 rounded-lg border-2 border-primary/20">
+            <div className="mb-4 rounded-lg border bg-muted/40 p-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center ring-2 ring-primary/30">
+                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
                   <Shield className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
@@ -685,7 +687,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                   return (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border hover:border-primary/50 transition-colors"
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border hover:bg-muted/60 transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1">
                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">

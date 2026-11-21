@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Calculator as CalculatorIcon, Eye, Loader2, Play } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -17,15 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calculator as CalculatorIcon, Eye, Loader2, Play } from 'lucide-react';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import {
   useCalculators,
@@ -35,8 +36,9 @@ import {
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useToolingCatalog, useToolingCatalogDomains } from '@/lib/api/hooks/useToolingCatalogs';
 import type { ToolingCatalogItem } from '@/lib/api/tooling-catalogs';
-import { ReferenceTable } from './ReferenceTable';
 import { catalogItemFields, catalogSourceLine, defaultAmortization, domainForProcessGroup, processLabel } from '@/lib/costing/tooling-catalog';
+
+import { ReferenceTable } from './ReferenceTable';
 
 interface ToolingCostDialogProps {
   open: boolean;
@@ -646,7 +648,7 @@ export function ToolingCostDialog({
                 </div>
                 <div>
                   <span className="text-muted-foreground">Cost per Part:</span>
-                  <div className="font-bold text-green-700">
+                  <div className="font-bold text-success">
                     ${costPerPart.toLocaleString('en-IN', { minimumFractionDigits: 4 })}
                   </div>
                 </div>

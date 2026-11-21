@@ -1,23 +1,27 @@
 'use client';
 
-import { PageHeader } from '@/components/layout/PageHeader';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { StatusBadge } from '@/components/common/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Plus,
   ArrowRight,
   BarChart3,
-  Package,
-  Layers,
-} from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+  Gauge,
+  PiggyBank,
+  FolderKanban,
+  Users,
+} from '@/components/ui/icons';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProjects, useVendors, useRawMaterials, useMHRRecords, useLHRCount } from '@/lib/api/hooks';
-import dynamic from 'next/dynamic';
 import { formatProjectMoney, projectCostCurrency, projectSavings, summarizeProjectCosts } from '@/lib/costing/project-costs';
 
 // Lazy load heavy chart components
@@ -120,6 +124,9 @@ const getManufacturingModules = (projects: any[]) => [
   },
 ];
 
+// Module ids with no top-level page (quality inspections live under a project), so they are listed without a link.
+const MODULES_WITHOUT_PAGE = new Set(['quality-control']);
+
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   active: 'Active',
@@ -213,18 +220,18 @@ export default function DashboardPage() {
   }));
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Manufacturing Control Center"
         description="Comprehensive manufacturing cost analysis and project orchestration"
       >
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Button variant="outline" onClick={() => router.push('/projects')}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Analytics
           </Button>
           <Link href="/projects">
-            <Button className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg">
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
               New Project
             </Button>
@@ -232,311 +239,330 @@ export default function DashboardPage() {
         </div>
       </PageHeader>
 
-      {/* Executive KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-border/50 bg-card">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-primary">{projects.length}</p>
-                <p className="text-sm text-muted-foreground">Total Projects</p>
-                <div className="mt-2 h-12">
-                  <div className="flex items-end justify-center space-x-1 h-full">
-                    {projectTrendData.map((data, i) => (
-                      <div
-                        key={i}
-                        className="bg-primary/60 rounded-sm"
-                        style={{
-                          height: `${Math.max(8, (data.value / Math.max(...projectTrendData.map(d => d.value), 1)) * 48)}px`,
-                          width: '8px',
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
+      {/* Row 1: KPI cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
+              <FolderKanban className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="mt-2 flex items-end justify-between gap-4">
+              <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">{projects.length}</p>
+              <div className="flex h-10 items-end gap-1" aria-hidden="true">
+                {projectTrendData.map((data, i) => (
+                  <div
+                    key={i}
+                    className="w-2 rounded-sm bg-primary/60"
+                    style={{
+                      height: `${Math.max(8, (data.value / Math.max(...projectTrendData.map(d => d.value), 1)) * 40)}px`,
+                    }}
+                  />
+                ))}
               </div>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">Created per week, last 7 weeks</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">System Efficiency</p>
+              <Gauge className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{systemEfficiency.toFixed(1)}%</p>
+            <div className="mt-3 h-1.5 w-full rounded-full bg-secondary">
+              <div
+                className="h-1.5 rounded-full bg-success transition-all duration-300"
+                style={{ width: `${systemEfficiency}%` }}
+              />
+            </div>
+            <div className="mt-3 flex gap-6 text-xs">
+              <p>
+                <span className="font-semibold tabular-nums text-foreground">{totalBomItems}</span>{' '}
+                <span className="text-muted-foreground">BOM Items</span>
+              </p>
+              <p>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {projects.reduce((s, p) => s + (p.bomCount || 0), 0)}
+                </span>{' '}
+                <span className="text-muted-foreground">BOMs</span>
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50 bg-card">
-          <CardContent className="p-6">
-            <div className="text-center space-y-2">
-              <p className="text-3xl font-bold text-green-600">{systemEfficiency.toFixed(1)}%</p>
-              <p className="text-sm text-muted-foreground">System Efficiency</p>
-              <div className="w-full bg-secondary rounded-full h-2">
-                <div
-                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${systemEfficiency}%` }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs mt-2">
-                <div className="text-center">
-                  <p className="font-semibold text-primary">{totalBomItems}</p>
-                  <p className="text-muted-foreground">BOM Items</p>
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-primary">
-                    {projects.reduce((s, p) => s + (p.bomCount || 0), 0)}
-                  </p>
-                  <p className="text-muted-foreground">BOMs</p>
-                </div>
-              </div>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Total Vendors</p>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">{vendorsData?.total || vendors.length}</p>
+            <div className="mt-3 flex gap-5 text-xs">
+              <p>
+                <span className="font-semibold tabular-nums text-foreground">{vendorsData?.total || vendors.filter(v => v.status === 'active').length}</span>{' '}
+                <span className="text-muted-foreground">Active</span>
+              </p>
+              <p>
+                <span className="font-semibold tabular-nums text-foreground">{vendors.filter(v => v.status === 'pending').length}</span>{' '}
+                <span className="text-muted-foreground">Pending</span>
+              </p>
+              <p>
+                <span className="font-semibold tabular-nums text-foreground">{vendors.filter(v => v.status === 'inactive').length}</span>{' '}
+                <span className="text-muted-foreground">Inactive</span>
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50 bg-card">
-          <CardContent className="p-6">
-            <div className="text-center space-y-2">
-              <p className="text-3xl font-bold text-primary">{vendorsData?.total || vendors.length}</p>
-              <p className="text-sm text-muted-foreground">Total Vendors</p>
-              <div className="grid grid-cols-3 gap-1 text-xs mt-2">
-                <div className="text-center">
-                  <p className="font-semibold">{vendorsData?.total || vendors.filter(v => v.status === 'active').length}</p>
-                  <p className="text-muted-foreground">Active</p>
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold">{vendors.filter(v => v.status === 'pending').length}</p>
-                  <p className="text-muted-foreground">Pending</p>
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold">{vendors.filter(v => v.status === 'inactive').length}</p>
-                  <p className="text-muted-foreground">Inactive</p>
-                </div>
-              </div>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Cost Savings</p>
+              <PiggyBank className="h-4 w-4 text-muted-foreground" />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 bg-card">
-          <CardContent className="p-6">
-            <div className="text-center space-y-2">
-              <p className="text-3xl font-bold text-green-600">
+            <div className="mt-2 flex items-baseline gap-2">
+              <p className="text-3xl font-semibold tabular-nums tracking-tight text-success">
                 {savings != null && savings >= 0 ? '+' : ''}{formatProjectMoney(savings)}
               </p>
-              <p className="text-sm text-muted-foreground">Cost Savings</p>
-              <p className="text-lg font-semibold text-green-600">{savingsLabel}</p>
-              <p className="text-xs text-muted-foreground">
-                Target vs Actual BOM Cost
-              </p>
+              <p className="text-sm font-medium tabular-nums text-success">{savingsLabel}</p>
             </div>
+            <p className="mt-3 text-xs text-muted-foreground">Target vs Actual BOM Cost</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Manufacturing Performance Overview */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Manufacturing Performance Analytics</h2>
-            <p className="text-muted-foreground">Real-time performance metrics across all manufacturing modules</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Badge variant="secondary" className="px-3 py-1">
-              {manufacturingModules.length} Active Modules
-            </Badge>
-            <Badge variant="outline" className="px-3 py-1">
-              {totalTarget == null ? '—' : `${(totalTarget / 1000).toFixed(0)}K`} Portfolio Value
-            </Badge>
-          </div>
-        </div>
-
-        <Card className="border-border/50 bg-card">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">
-              Module Performance & Efficiency Analysis
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Active vs Total projects with efficiency trends across manufacturing modules
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ManufacturingPerformanceChart modules={manufacturingModules} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Advanced Analytics Dashboard */}
       {projectsForCharts.length < projects.length && (
         <p className="text-sm text-muted-foreground">Cost charts exclude projects with unresolved costs or non-comparable currencies.</p>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Project Pipeline & Trends */}
-        <div className="space-y-6">
-          <Card className="border-border/50 bg-card">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">Project Trend Analysis</CardTitle>
-                <Badge variant="outline" className="px-3 py-1">Last 30 Days</Badge>
+
+      {/* Row 2: charts and action list */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2">
+          <Card className="md:col-span-2">
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base font-semibold">Module Performance & Efficiency</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Active vs total projects across manufacturing modules
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{manufacturingModules.length} Active Modules</Badge>
+                  <Badge variant="outline">
+                    {totalTarget == null ? '—' : `${(totalTarget / 1000).toFixed(0)}K`} Portfolio Value
+                  </Badge>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">Project creation trends and volume analytics</p>
+            </CardHeader>
+            <CardContent>
+              <ManufacturingPerformanceChart modules={manufacturingModules} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold">Project Trend</CardTitle>
+                <Badge variant="outline">Last 30 Days</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">Project creation trends and volume</p>
             </CardHeader>
             <CardContent>
               <ProjectTrendChart projects={projects} />
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 bg-card">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold">Cost Savings Analysis</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Project-wise cost optimization — target BOM cost vs actual BOM cost
-              </p>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Cost Savings</CardTitle>
+              <p className="text-sm text-muted-foreground">Target BOM cost vs actual BOM cost, by project</p>
             </CardHeader>
             <CardContent>
               <CostSavingsChart projects={projectsForCharts} />
             </CardContent>
           </Card>
+
+          <Card className="md:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Manufacturing Cost Analysis</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Target BOM cost vs actual BOM cost derived from process-planned items
+              </p>
+            </CardHeader>
+            <CardContent>
+              {projects.length > 0 ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 divide-y rounded-lg border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                    <div className="p-4">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Target</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+                        {formatProjectMoney(totalTarget)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">from {projects.filter(p => (p.targetBomCost ?? 0) > 0).length} projects with targets</p>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Actual BOM Cost</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+                        {formatProjectMoney(totalActual)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">{totalBomItems} items across all BOMs</p>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-xs font-medium uppercase tracking-wide text-success">Savings</p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums text-success">
+                        {formatProjectMoney(savings)}
+                      </p>
+                      <p className="mt-1 text-xs text-success">{savingsLabel} reduction</p>
+                    </div>
+                  </div>
+                  <CostChart projects={projectsForCharts} />
+                </div>
+              ) : (
+                <EmptyState
+                  icon={PiggyBank}
+                  title="No cost data yet"
+                  description="Add projects with BOM items to see cost analysis"
+                  className="h-72"
+                >
+                  <Link href="/projects">
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-3 w-3 mr-2" />
+                      Create Project
+                    </Button>
+                  </Link>
+                </EmptyState>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Status & Pipeline Overview */}
-        <div className="space-y-6">
-          <Card className="border-border/50 bg-card">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold">Project Status Distribution</CardTitle>
-              <p className="text-sm text-muted-foreground">Current project status breakdown with percentage distribution</p>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Project Status</CardTitle>
+              <p className="text-sm text-muted-foreground">Current breakdown by status</p>
             </CardHeader>
             <CardContent>
               {statusDistribution.length > 0 ? (
                 <StatusPieChart statusDistribution={statusDistribution} />
               ) : (
-                <div className="h-48 flex items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <div className="h-12 w-12 rounded-full bg-muted/20 flex items-center justify-center mx-auto mb-3">
-                      <div className="w-6 h-6 border-2 border-muted/50 rounded-full" />
-                    </div>
-                    <p className="text-sm">No project status data available</p>
-                  </div>
-                </div>
+                <EmptyState
+                  icon={FolderKanban}
+                  title="No project status data available"
+                  className="h-48 py-0"
+                />
               )}
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 bg-card">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">Active Project Pipeline</CardTitle>
-                <Link href="/projects" className="text-sm text-primary hover:underline flex items-center gap-1">
-                  View all <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Modules</CardTitle>
+              <p className="text-sm text-muted-foreground">Jump to a manufacturing module</p>
             </CardHeader>
-            <CardContent>
-              {projects.length > 0 ? (
-                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                  {projects.slice(0, 4).map((project) => (
-                    <div
-                      key={project.id}
-                      className="p-3 rounded-lg border border-border/50 bg-secondary/20 hover:border-primary/30 hover:bg-primary/5 transition-all duration-200 cursor-pointer"
-                      onClick={() => router.push(`/projects/${project.id}`)}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-sm text-foreground line-clamp-1">{project.name}</p>
-                          <StatusBadge status={project.status} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <span className="text-muted-foreground">Target: </span>
-                            <span className="font-semibold">
-                              {(Number(project.targetBomCost) || 0).toLocaleString('en-US', { style: 'currency', currency: project.targetBomCostCurrency || 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Actual: </span>
-                            <span className="font-semibold">
-                              {formatProjectMoney(project.actualCost, projectCostCurrency(project))}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Layers className="h-3 w-3" />
-                            {project.bomCount ?? 0} BOMs
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Package className="h-3 w-3" />
-                            {project.bomItemCount ?? 0} items
-                          </span>
-                          {(project.targetBomCost ?? 0) > 0 && projectSavings(project) != null && (
-                            <span className="font-semibold text-green-600 ml-auto">
-                              {(projectSavings(project)! / project.targetBomCost! * 100).toFixed(1)}% saved
-                            </span>
-                          )}
-                        </div>
+            <CardContent className="p-2 pt-0">
+              <ul className="divide-y">
+                {manufacturingModules.map((module) => {
+                  const row = (
+                    <>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{module.title}</p>
+                        <p className="text-xs tabular-nums text-muted-foreground">
+                          {module.stats.active} active of {module.stats.total}
+                        </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-2">🚀</div>
-                  <p className="text-muted-foreground text-sm mb-3">Ready to start your first project?</p>
-                  <Link href="/projects">
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Project
-                    </Button>
-                  </Link>
-                </div>
-              )}
+                      {!MODULES_WITHOUT_PAGE.has(module.id) && (
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                    </>
+                  );
+                  return (
+                    <li key={module.id}>
+                      {MODULES_WITHOUT_PAGE.has(module.id) ? (
+                        <div className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5">{row}</div>
+                      ) : (
+                        <Link
+                          href={module.path}
+                          className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-accent"
+                        >
+                          {row}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Cost Analysis Overview */}
-      <Card className="border-border/50 bg-card">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold">Manufacturing Cost Analysis</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Target BOM cost vs actual BOM cost derived from process-planned items
-          </p>
+      {/* Row 3: recent projects */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold">Recent Projects</CardTitle>
+            <Link href="/projects" className="flex items-center gap-1 text-sm text-primary hover:underline">
+              View all <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {projects.length > 0 ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-6 rounded-xl bg-primary/5 border border-primary/20">
-                  <p className="text-sm text-primary mb-1 uppercase tracking-wider font-bold">Total Target</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatProjectMoney(totalTarget)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">from {projects.filter(p => (p.targetBomCost ?? 0) > 0).length} projects with targets</p>
-                </div>
-                <div className="text-center p-6 rounded-xl bg-primary/5 border border-primary/20">
-                  <p className="text-sm text-primary mb-1 uppercase tracking-wider font-bold">Actual BOM Cost</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatProjectMoney(totalActual)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">{totalBomItems} items across all BOMs</p>
-                </div>
-                <div className="text-center p-6 rounded-xl bg-success/5 border border-success/20">
-                  <p className="text-sm text-success mb-1 uppercase tracking-wider font-bold">Savings</p>
-                  <p className="text-2xl font-bold text-success">
-                    {formatProjectMoney(savings)}
-                  </p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">{savingsLabel} reduction</p>
-                </div>
-              </div>
-              <CostChart projects={projectsForCharts} />
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead data-numeric>BOMs</TableHead>
+                  <TableHead data-numeric>Items</TableHead>
+                  <TableHead data-numeric>Target</TableHead>
+                  <TableHead data-numeric>Actual</TableHead>
+                  <TableHead data-numeric>Saved</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.slice(0, 5).map((project) => (
+                  <TableRow
+                    key={project.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                  >
+                    <TableCell className="max-w-64 truncate font-medium">{project.name}</TableCell>
+                    <TableCell><StatusBadge status={project.status} /></TableCell>
+                    <TableCell data-numeric>{project.bomCount ?? 0}</TableCell>
+                    <TableCell data-numeric>{project.bomItemCount ?? 0}</TableCell>
+                    <TableCell data-numeric>
+                      {(Number(project.targetBomCost) || 0).toLocaleString('en-US', { style: 'currency', currency: project.targetBomCostCurrency || 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell data-numeric>
+                      {formatProjectMoney(project.actualCost, projectCostCurrency(project))}
+                    </TableCell>
+                    <TableCell data-numeric className="text-success">
+                      {(project.targetBomCost ?? 0) > 0 && projectSavings(project) != null
+                        ? `${(projectSavings(project)! / project.targetBomCost! * 100).toFixed(1)}%`
+                        : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : (
-            <div className="h-72 flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-950/20 flex items-center justify-center mx-auto mb-4">
-                  <div className="text-2xl font-bold text-green-600">$</div>
-                </div>
-                <p className="text-sm mb-3">Add projects with BOM items to see cost analysis</p>
-                <Link href="/projects">
-                  <Button variant="outline" size="sm" className="rounded-full">
-                    <Plus className="h-3 w-3 mr-2" />
-                    Create Project
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <EmptyState
+              icon={FolderKanban}
+              title="Ready to start your first project?"
+            >
+              <Link href="/projects">
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Project
+                </Button>
+              </Link>
+            </EmptyState>
           )}
         </CardContent>
       </Card>

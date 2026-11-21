@@ -1,10 +1,10 @@
 "use client";
 
-import { Maximize2, Minimize2 } from "lucide-react";
 import { useState } from "react";
 
 import { CostTable } from "@/components/features/manufacturing-intelligence/CostTable";
 import { Button } from "@/components/ui/button";
+import { Maximize2, Minimize2 } from '@/components/ui/icons';
 import { useCostTable } from "@/lib/api/hooks/useCostTable";
 import { notModelled, type Display } from "@/lib/costing/cost-table";
 import { cn } from "@/lib/utils";

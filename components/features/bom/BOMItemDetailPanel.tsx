@@ -1,18 +1,21 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
-import { X, Download, FileText, Maximize2, Upload, Loader2, Box } from 'lucide-react';
-import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { X, Download, FileText, Maximize2, Upload, Loader2, Box } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
-import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { Label } from '@/components/ui/label';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
+import { ModelViewer } from '@/components/ui/model-viewer';
 import { apiClient } from '@/lib/api/client';
 import { apiConfig } from '@/lib/api/config';
-import { toast } from 'sonner';
-import { ModelViewer } from '@/components/ui/model-viewer';
-import dynamic from 'next/dynamic';
+import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
+
+
 
 const DXFViewerComponent = dynamic(
   () => import('@/components/ui/dxf-viewer-component').then((m) => m.DXFViewerComponent),
@@ -234,9 +237,7 @@ interface ManufacturingFeature {
             {activeTab === '3d' && (
               <div className="h-full flex flex-col">
                 {loading && (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
+                  <ListSkeleton rows={4} label="Loading…" className="py-6" />
                 )}
 
                 {!loading && file3dUrl && (
@@ -267,9 +268,7 @@ interface ManufacturingFeature {
             {activeTab === '2d' && (
               <div className={`h-full ${isDxfFile ? 'overflow-hidden' : 'overflow-y-auto p-6 space-y-4'}`}>
                 {loading && (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
+                  <ListSkeleton rows={4} label="Loading…" className="py-6" />
                 )}
 
                 {!loading && file2dUrl && isDxfFile && (

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Plus, 
   Edit, 
@@ -14,7 +14,8 @@ import {
   MapPin,
   Percent,
   Calculator
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 
 interface ParentEstimate {
   id: string;
@@ -50,19 +51,19 @@ export function ParentEstimatesSection() {
   };
 
   return (
-    <Card className="border-l-4 border-l-primary shadow-md">
-      <CardHeader className="bg-primary py-3 px-4">
-        <CardTitle className="text-primary-foreground text-sm font-semibold flex items-center gap-2">
+    <Card className="overflow-hidden shadow-xs">
+      <CardHeader className="border-b bg-muted/40 py-3 px-4">
+        <CardTitle className="text-foreground text-sm font-semibold flex items-center gap-2">
           <Calculator className="h-4 w-4" />
           Parent Estimates Hierarchy
         </CardTitle>
-        <p className="text-primary-foreground/80 text-xs mt-1">
+        <p className="text-muted-foreground text-xs mt-1">
           Parent assemblies where this part is used as a child component
         </p>
       </CardHeader>
       <CardContent className="p-4">
         {parentEstimates.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-border rounded-lg bg-secondary/20">
+          <div className="text-center py-12 border border-dashed border-border rounded-lg bg-muted/20">
             <div className="flex flex-col items-center gap-4">
               <div className="p-3 rounded-full bg-primary/10">
                 <Calculator className="h-8 w-8 text-primary" />

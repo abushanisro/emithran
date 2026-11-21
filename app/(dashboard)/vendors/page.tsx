@@ -1,27 +1,36 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { useVendors, useUploadVendorsCsv, useDeleteAllVendors, useCreateVendor } from '@/lib/api/hooks/useVendors';
-import { Plus, Search, Upload, MapPin, Factory, Award, Filter, Trash2, ExternalLink, TrendingUp, X, ArrowLeft } from 'lucide-react';
-import { toast } from 'sonner';
-import type { VendorQuery, CreateVendorData } from '@/lib/api/vendors';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+
+import { VendorStatusBadge } from '@/components/features/vendors/VendorStatusBadge';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Plus, Search, Upload, MapPin, Factory, Award, Filter, Trash2, ExternalLink, TrendingUp, X, ArrowLeft, MoreVertical } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useCounterAnimation } from '@/hooks/use-counter-animation';
+import { useVendors, useUploadVendorsCsv, useDeleteAllVendors, useCreateVendor } from '@/lib/api/hooks/useVendors';
+import type { VendorQuery, CreateVendorData } from '@/lib/api/vendors';
+import { EQUIPMENT_TYPES, getAllCategories } from '@/lib/constants/equipment-types';
+import { normalizeWebsiteUrl } from '@/lib/utils/website-url';
 
 const IndiaMap = dynamic(() => import('@/components/ui/india-map').then(mod => ({ default: mod.IndiaMap })), { 
   ssr: false,
   loading: () => <div className="h-80 bg-muted animate-pulse rounded-md" />
 });
-import { useCounterAnimation } from '@/hooks/use-counter-animation';
-import { EQUIPMENT_TYPES, getAllCategories } from '@/lib/constants/equipment-types';
-import { normalizeWebsiteUrl } from '@/lib/utils/website-url';
 
 export default function VendorsPage() {
   const router = useRouter();
@@ -63,7 +72,7 @@ export default function VendorsPage() {
   // Build query from filters
   const query: VendorQuery = useMemo(() => {
     // Combine process filters from sidebar checkboxes and process block dropdown
-    let processFilters = [...selectedServices];
+    const processFilters = [...selectedServices];
     if (selectedProcess && selectedProcess !== 'all' && !processFilters.includes(selectedProcess)) {
       processFilters.push(selectedProcess);
     }
@@ -103,8 +112,7 @@ export default function VendorsPage() {
   const animatedInactive = useCounterAnimation(inactiveCount, 1200, !isLoading);
 
   // Check if any filters are active
-  const hasActiveFilters = useMemo(() => {
-    return !!(
+  const hasActiveFilters = useMemo(() => !!(
       searchTerm ||
       selectedServices.length > 0 ||
       selectedIndustries.length > 0 ||
@@ -113,8 +121,7 @@ export default function VendorsPage() {
       (selectedProcess && selectedProcess !== 'all') ||
       (selectedEquipmentType && selectedEquipmentType !== 'all') ||
       minTonnage
-    );
-  }, [searchTerm, selectedServices, selectedIndustries, selectedCertifications, selectedCity, selectedProcess, selectedEquipmentType, minTonnage]);
+    ), [searchTerm, selectedServices, selectedIndustries, selectedCertifications, selectedCity, selectedProcess, selectedEquipmentType, minTonnage]);
 
   // Calculate statistics from all vendors
   const stats = useMemo(() => {
@@ -331,174 +338,160 @@ export default function VendorsPage() {
       : filterOptions.cities;
   }, [newVendorData.state, filterOptions]);
 
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSelectedServices([]);
+    setSelectedIndustries([]);
+    setSelectedCertifications([]);
+    setSelectedCity('all');
+    setSelectedProcess('all');
+    setSelectedEquipmentType('all');
+    setMinTonnage('');
+  };
+
+  const filterGroups = [
+    { label: 'Services', options: filterOptions.services, selected: selectedServices, set: setSelectedServices },
+    { label: 'Industry', options: filterOptions.industries, selected: selectedIndustries, set: setSelectedIndustries },
+    { label: 'Certification', options: filterOptions.certifications, selected: selectedCertifications, set: setSelectedCertifications },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Supplier Database</h1>
-            <p className="text-muted-foreground mt-1">
-              Comprehensive vendor management and filtering
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setUploadDialogOpen(true)}
-            className="gap-2"
+      <div className="flex items-start gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          className="mt-0.5 h-8 w-8 shrink-0"
+          aria-label="Back to dashboard"
+          onClick={() => { router.push('/'); }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title="Supplier Database"
+            description="Comprehensive vendor management and filtering"
           >
-            <Upload className="h-4 w-4" />
-            Import File
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleDeleteAll}
-            disabled={totalAllVendors === 0 || deleteAllMutation.isPending}
-            className="gap-2 text-red-600 hover:text-red-700"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete All
-          </Button>
-          <Button
-            className="gap-2"
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Add Supplier
-          </Button>
+            <Button variant="outline" onClick={() => { setUploadDialogOpen(true); }} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Import File
+            </Button>
+            <Button className="gap-2" onClick={() => { setCreateDialogOpen(true); }}>
+              <Plus className="h-4 w-4" />
+              Add Supplier
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="More actions">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  disabled={totalAllVendors === 0 || deleteAllMutation.isPending}
+                  onSelect={handleDeleteAll}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete All
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </PageHeader>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      {/* Overview */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Total Suppliers */}
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => {
-          setSearchTerm('');
-          setSelectedServices([]);
-          setSelectedIndustries([]);
-          setSelectedCertifications([]);
-          setSelectedCity('all');
-          setSelectedProcess('all');
-          setSelectedEquipmentType('all');
-          setMinTonnage('');
-        }}>
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center justify-center py-4">
-              {/* Animated Total Count */}
-              <div className="relative mb-2">
-                <div
-                  className="text-5xl font-bold text-primary mb-1 transition-all duration-300 animate-in fade-in zoom-in"
-                  style={{
-                    animationDuration: '0.5s',
-                    transform: animatedTotal === total ? 'scale(1)' : 'scale(0.95)',
-                  }}
-                >
-                  {animatedTotal.toLocaleString()}
-                </div>
-                {!isLoading && animatedTotal < total && (
-                  <div className="absolute -top-2 -right-8 animate-in slide-in-from-bottom-2 fade-in">
-                    <TrendingUp className="h-5 w-5 text-green-500 animate-pulse" />
-                  </div>
-                )}
-              </div>
-              <div className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-1">
-                <Factory className="h-3 w-3" />
+        <Card
+          className="cursor-pointer transition-shadow hover:shadow-md"
+          onClick={clearAllFilters}
+        >
+          <CardContent className="space-y-4 p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                <Factory className="h-4 w-4" aria-hidden="true" />
                 Total Suppliers
               </div>
-
-              {/* Status Breakdown */}
-              <div className="w-full space-y-3 border-t pt-4">
-                {/* Progress Bar */}
-                {totalAllVendors > 0 && (
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-linear-to-r from-green-400 to-green-600 transition-all duration-1000 ease-out"
-                      style={{
-                        width: `${(activeCount / totalAllVendors) * 100}%`,
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm group hover:bg-green-500/10 p-1 rounded transition-colors">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                      <span className="text-muted-foreground">Active</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {totalAllVendors > 0 ? Math.round((activeCount / totalAllVendors) * 100) : 0}%
-                      </span>
-                      <Badge variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-100 transition-all duration-300">
-                        {animatedActive}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-sm group hover:bg-muted/50 p-1 rounded transition-colors">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-muted-foreground/30"></div>
-                      <span className="text-muted-foreground">Inactive</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {totalAllVendors > 0 ? Math.round((inactiveCount / totalAllVendors) * 100) : 0}%
-                      </span>
-                      <Badge variant="secondary" className="transition-all duration-300">
-                        {animatedInactive}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Action */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-4 text-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSearchTerm('');
-                  setSelectedServices([]);
-                  setSelectedIndustries([]);
-                  setSelectedCertifications([]);
-                  setSelectedCity('all');
-                  setSelectedProcess('all');
-                  setSelectedEquipmentType('all');
-                  setMinTonnage('');
-                }}
-              >
-                View All Suppliers
-              </Button>
+              {!isLoading && animatedTotal < total && (
+                <TrendingUp className="h-4 w-4 animate-pulse text-success" aria-hidden="true" />
+              )}
             </div>
+            <div className="text-4xl font-semibold tabular-nums tracking-tight text-primary">
+              {animatedTotal.toLocaleString()}
+            </div>
+
+            {totalAllVendors > 0 && (
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-success transition-all duration-1000 ease-out"
+                  style={{ width: `${(activeCount / totalAllVendors) * 100}%` }}
+                />
+              </div>
+            )}
+
+            <dl className="space-y-1.5 border-t pt-3 text-sm">
+              <div className="flex items-center justify-between">
+                <dt className="flex items-center gap-2 text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full bg-success" />
+                  Active
+                </dt>
+                <dd className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {totalAllVendors > 0 ? Math.round((activeCount / totalAllVendors) * 100) : 0}%
+                  </span>
+                  <Badge variant="secondary" className="min-w-10 justify-center bg-success/10 text-success tabular-nums">
+                    {animatedActive}
+                  </Badge>
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="flex items-center gap-2 text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                  Inactive
+                </dt>
+                <dd className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {totalAllVendors > 0 ? Math.round((inactiveCount / totalAllVendors) * 100) : 0}%
+                  </span>
+                  <Badge variant="secondary" className="min-w-10 justify-center tabular-nums">
+                    {animatedInactive}
+                  </Badge>
+                </dd>
+              </div>
+            </dl>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-ml-2 text-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearAllFilters();
+              }}
+            >
+              View All Suppliers
+            </Button>
           </CardContent>
         </Card>
 
         {/* Suppliers by Service */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Factory className="h-4 w-4" />
-                # Suppliers by Service
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {filterOptions.services.length} Services
-              </Badge>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Factory className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              # Suppliers by Service
             </CardTitle>
+            <Badge variant="outline" className="text-xs">
+              {filterOptions.services.length} Services
+            </Badge>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="custom-scrollbar max-h-64 space-y-1 overflow-y-auto pr-2">
               {filterOptions.services.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  No services found
-                </div>
+                <div className="py-8 text-center text-sm text-muted-foreground">No services found</div>
               ) : (
                 filterOptions.services.map((service) => {
                   const totalCount = allVendors.filter(v => v.process?.includes(service)).length;
@@ -509,9 +502,9 @@ export default function VendorsPage() {
                   return (
                     <div
                       key={service}
-                      className={`flex justify-between items-center text-sm p-2 rounded-md cursor-pointer transition-all hover:bg-primary/5 border ${isSelected
-                        ? 'bg-primary/10 border-primary/30'
-                        : 'border-transparent hover:border-primary/20'
+                      className={`flex cursor-pointer items-center justify-between rounded-md border p-2 text-sm transition-colors hover:bg-accent ${isSelected
+                        ? 'border-primary/30 bg-primary/10'
+                        : 'border-transparent'
                         }`}
                       onClick={() => {
                         if (selectedServices.includes(service)) {
@@ -521,29 +514,24 @@ export default function VendorsPage() {
                         }
                       }}
                     >
-                      <div className="flex items-center gap-2 flex-1">
-                        <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-muted-foreground/30'
-                          }`} />
-                        <span className={`text-sm ${isSelected ? 'font-medium text-foreground' : 'text-muted-foreground'
-                          }`}>
+                      <div className="flex flex-1 items-center gap-2">
+                        <div className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                        <span className={isSelected ? 'font-medium text-foreground' : 'text-muted-foreground'}>
                           {service}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* Progress indicator */}
                         {totalCount > 0 && (
-                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
                             <div
                               className="h-full bg-primary transition-all duration-500"
-                              style={{
-                                width: `${(totalCount / (allVendorsData?.total || 1)) * 100}%`,
-                              }}
+                              style={{ width: `${(totalCount / (allVendorsData?.total || 1)) * 100}%` }}
                             />
                           </div>
                         )}
                         <Badge
-                          variant={isSelected ? "default" : "secondary"}
-                          className="min-w-[40px] justify-center"
+                          variant={isSelected ? 'default' : 'secondary'}
+                          className="min-w-10 justify-center tabular-nums"
                         >
                           {displayCount}
                         </Badge>
@@ -559,13 +547,13 @@ export default function VendorsPage() {
         {/* Suppliers by Location */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <MapPin className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               # Suppliers by Location
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-80">
+            <div className="h-64">
               <IndiaMap
                 stateData={Object.fromEntries(stats.byLocation)}
                 className="h-full"
@@ -577,79 +565,39 @@ export default function VendorsPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-4">
         {/* Left Sidebar - Filters */}
         <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Filter className="h-4 w-4" />
+          <CardHeader className="border-b py-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               Filters
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Services Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Services</label>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {filterOptions.services.slice(0, 10).map(service => (
-                  <label key={service} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedServices.includes(service)}
-                      onChange={() => toggleFilter(selectedServices, setSelectedServices, service)}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{service}</span>
-                  </label>
-                ))}
+          <CardContent className="space-y-5 p-5">
+            {filterGroups.map((group) => (
+              <div key={group.label} className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.label}
+                </Label>
+                <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
+                  {group.options.slice(0, 10).map(option => (
+                    <label key={option} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={group.selected.includes(option)}
+                        onCheckedChange={() => { toggleFilter(group.selected, group.set, option); }}
+                      />
+                      <span>{option}</span>
+                    </label>
+                  ))}
+                </div>
+                <Separator />
               </div>
-            </div>
-
-            <Separator />
-
-            {/* Industry Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Industry</label>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {filterOptions.industries.slice(0, 10).map(industry => (
-                  <label key={industry} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedIndustries.includes(industry)}
-                      onChange={() => toggleFilter(selectedIndustries, setSelectedIndustries, industry)}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{industry}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Certification Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Certification</label>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {filterOptions.certifications.slice(0, 10).map(cert => (
-                  <label key={cert} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedCertifications.includes(cert)}
-                      onChange={() => toggleFilter(selectedCertifications, setSelectedCertifications, cert)}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{cert}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
+            ))}
 
             {/* City Filter */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">City</label>
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">City</Label>
               <Select value={selectedCity || 'all'} onValueChange={setSelectedCity}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select city" />
@@ -669,14 +617,7 @@ export default function VendorsPage() {
               size="sm"
               className="w-full"
               onClick={() => {
-                setSelectedServices([]);
-                setSelectedIndustries([]);
-                setSelectedCertifications([]);
-                setSelectedCity('all');
-                setSelectedProcess('all');
-                setSelectedEquipmentType('all');
-                setSearchTerm('');
-                setMinTonnage('');
+                clearAllFilters();
                 setMinBedLength('');
                 setMinBedWidth('');
                 setMinBedHeight('');
@@ -687,33 +628,32 @@ export default function VendorsPage() {
           </CardContent>
         </Card>
 
-        {/* Right Content - Vendors List & Process Block */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* Search Bar */}
+        {/* Right Content */}
+        <div className="space-y-6 lg:col-span-3">
+          {/* Search + equipment filters */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="space-y-5 p-5">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <Input
                   placeholder="Search suppliers by name, code, or location..."
+                  aria-label="Search suppliers"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  onChange={(e) => { setSearchTerm(e.target.value); }}
+                  className="h-10 pl-10"
                 />
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Process Block */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Process Block</CardTitle>
-              <CardDescription>Filter by equipment specifications</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Separator />
+
+              <div>
+                <h3 className="text-sm font-semibold">Process Block</h3>
+                <p className="text-xs text-muted-foreground">Filter by equipment specifications</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Process</label>
+                  <Label className="text-sm font-medium">Process</Label>
                   <Select value={selectedProcess || 'all'} onValueChange={setSelectedProcess}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select process" />
@@ -728,7 +668,7 @@ export default function VendorsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Equipment Type</label>
+                  <Label className="text-sm font-medium">Equipment Type</Label>
                   <Select value={selectedEquipmentType || 'all'} onValueChange={setSelectedEquipmentType}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
@@ -741,7 +681,7 @@ export default function VendorsPage() {
 
                         return (
                           <div key={category}>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
+                            <div className="sticky top-0 bg-muted/50 px-2 py-1.5 text-xs font-semibold text-muted-foreground">
                               {category}
                             </div>
                             {categoryEquipment
@@ -760,57 +700,47 @@ export default function VendorsPage() {
                 </div>
               </div>
 
-              <Separator />
-
               {/* Selection Criteria */}
               <div className="space-y-2">
-                <label className="text-sm font-semibold">Selection Criteria</label>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border rounded-md bg-muted/30">
-                  {/* Tonnage */}
-                  <div>
-                    <label className="text-xs text-muted-foreground">Tonnage (tons)</label>
+                <Label className="text-sm font-semibold">Selection Criteria</Label>
+                <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3 md:grid-cols-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tonnage (tons)</Label>
                     <Input
                       type="number"
                       placeholder="40"
                       value={minTonnage}
-                      onChange={(e) => setMinTonnage(e.target.value)}
+                      onChange={(e) => { setMinTonnage(e.target.value); }}
                       className="h-8 text-sm"
                     />
                   </div>
-
-                  {/* Bed Size - Length */}
-                  <div>
-                    <label className="text-xs text-muted-foreground">Length (mm)</label>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Length (mm)</Label>
                     <Input
                       type="number"
                       placeholder="1000"
                       value={minBedLength}
-                      onChange={(e) => setMinBedLength(e.target.value)}
+                      onChange={(e) => { setMinBedLength(e.target.value); }}
                       className="h-8 text-sm"
                     />
                   </div>
-
-                  {/* Bed Size - Width */}
-                  <div>
-                    <label className="text-xs text-muted-foreground">Width (mm)</label>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Width (mm)</Label>
                     <Input
                       type="number"
                       placeholder="500"
                       value={minBedWidth}
-                      onChange={(e) => setMinBedWidth(e.target.value)}
+                      onChange={(e) => { setMinBedWidth(e.target.value); }}
                       className="h-8 text-sm"
                     />
                   </div>
-
-                  {/* Bed Size - Height */}
-                  <div>
-                    <label className="text-xs text-muted-foreground">Height (mm)</label>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Height (mm)</Label>
                     <Input
                       type="number"
                       placeholder="600"
                       value={minBedHeight}
-                      onChange={(e) => setMinBedHeight(e.target.value)}
+                      onChange={(e) => { setMinBedHeight(e.target.value); }}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -820,96 +750,95 @@ export default function VendorsPage() {
           </Card>
 
           {/* Vendors Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Suppliers List</CardTitle>
-              <CardDescription>
-                {hasActiveFilters
-                  ? `Showing ${vendors.length} of ${total} suppliers`
-                  : 'Apply search or filters to view suppliers'
-                }
-              </CardDescription>
+          <Card className="overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b px-6 py-4">
+              <div className="space-y-0.5">
+                <CardTitle className="text-base">Suppliers List</CardTitle>
+                <CardDescription>
+                  {hasActiveFilters
+                    ? `Showing ${vendors.length} of ${total} suppliers`
+                    : 'Apply search or filters to view suppliers'
+                  }
+                </CardDescription>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {!hasActiveFilters ? (
-                <div className="text-center py-12 space-y-3">
-                  <div className="flex justify-center">
-                    <Search className="h-16 w-16 text-muted-foreground/50" />
-                  </div>
-                  <div className="text-muted-foreground">
-                    <p className="font-medium mb-1">Use search or filters to find suppliers</p>
-                    <p className="text-sm">Enter a search term or select filters from the sidebar to view suppliers</p>
-                  </div>
-                </div>
+                <EmptyState
+                  icon={Search}
+                  title="Use search or filters to find suppliers"
+                  description="Enter a search term or select filters from the sidebar to view suppliers"
+                />
               ) : isLoading ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Loading suppliers...
-                </div>
+                <TableSkeleton rows={6} columns={6} label="Loading suppliers..." />
               ) : vendors.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  No suppliers found matching your filters. Try adjusting or clearing filters.
-                </div>
+                <EmptyState
+                  icon={Search}
+                  title="No suppliers found"
+                  description="No suppliers match your filters. Try adjusting or clearing filters."
+                />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium">Supplier Name</th>
-                        <th className="text-left py-3 px-4 font-medium">Code</th>
-                        <th className="text-left py-3 px-4 font-medium">Location</th>
-                        <th className="text-left py-3 px-4 font-medium">Services</th>
-                        <th className="text-left py-3 px-4 font-medium">Equipment</th>
-                        <th className="text-left py-3 px-4 font-medium">Certifications</th>
-                        <th className="text-left py-3 px-4 font-medium">Status</th>
-                        <th className="text-left py-3 px-4 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vendors.map(vendor => {
-                        const websiteUrl = normalizeWebsiteUrl(vendor.website);
-                        return (
-                        <tr
+                <Table>
+                  <TableHeader className="bg-muted/40">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="px-6">Supplier</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Services</TableHead>
+                      <TableHead>Equipment</TableHead>
+                      <TableHead>Certifications</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-12 text-right">
+                        <span className="sr-only">Actions</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vendors.map(vendor => {
+                      const websiteUrl = normalizeWebsiteUrl(vendor.website);
+                      return (
+                        <TableRow
                           key={vendor.id}
-                          className="border-b hover:bg-primary/5 hover:border-l-2 hover:border-l-primary/40 cursor-pointer transition-colors"
-                          onClick={() => router.push(`/vendors/${vendor.id}`)}
+                          className="cursor-pointer"
+                          onClick={() => { router.push(`/vendors/${vendor.id}`); }}
                         >
-                          <td className="py-3 px-4">
-                            <div className="font-medium">{vendor.name}</div>
+                          <TableCell className="px-6">
+                            <div className="font-medium text-foreground">{vendor.name}</div>
                             {websiteUrl && (
                               <a
                                 href={websiteUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-primary hover:underline flex items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                onClick={(e) => { e.stopPropagation(); }}
                               >
                                 Visit website <ExternalLink className="h-3 w-3" />
                               </a>
                             )}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-muted-foreground">
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
                             {vendor.supplierCode || 'N/A'}
-                          </td>
-                          <td className="py-3 px-4">
+                          </TableCell>
+                          <TableCell>
                             {vendor.city && vendor.state ? (
                               <div className="flex items-center gap-1 text-sm">
-                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <MapPin className="h-3 w-3 shrink-0 text-muted-foreground" />
                                 <span>{vendor.city}, {vendor.state}</span>
                               </div>
                             ) : (
                               <span className="text-sm text-muted-foreground">N/A</span>
                             )}
-                          </td>
-                          <td className="py-3 px-4">
+                          </TableCell>
+                          <TableCell>
                             {vendor.process && vendor.process.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {vendor.process.slice(0, 2).map(service => (
-                                  <Badge key={service} variant="outline" className="text-xs">
+                                  <Badge key={service} variant="outline" className="text-xs font-normal">
                                     {service}
                                   </Badge>
                                 ))}
                                 {vendor.process.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="outline" className="text-xs font-normal">
                                     +{vendor.process.length - 2}
                                   </Badge>
                                 )}
@@ -917,10 +846,10 @@ export default function VendorsPage() {
                             ) : (
                               <span className="text-sm text-muted-foreground">None</span>
                             )}
-                          </td>
-                          <td className="py-3 px-4">
+                          </TableCell>
+                          <TableCell>
                             {vendor.equipmentCount && vendor.equipmentCount > 0 ? (
-                              <div className="flex items-center gap-1 text-sm">
+                              <div className="flex items-center gap-1 text-sm tabular-nums">
                                 <Factory className="h-3 w-3 text-muted-foreground" />
                                 <span>{vendor.equipmentCount}</span>
                               </div>
@@ -932,48 +861,54 @@ export default function VendorsPage() {
                                   e.stopPropagation();
                                   router.push(`/vendors/${vendor.id}?tab=equipment`);
                                 }}
-                                className="gap-1 text-xs"
+                                className="-ml-2 gap-1 text-xs"
                               >
                                 <Plus className="h-3 w-3" />
                                 Add Equipment
                               </Button>
                             )}
-                          </td>
-                          <td className="py-3 px-4">
+                          </TableCell>
+                          <TableCell>
                             {vendor.certifications && vendor.certifications.length > 0 ? (
                               <div className="flex items-center gap-1 text-sm">
-                                <Award className="h-3 w-3 text-muted-foreground" />
+                                <Award className="h-3 w-3 shrink-0 text-muted-foreground" />
                                 <span>{vendor.certifications.slice(0, 2).join(', ')}</span>
                                 {vendor.certifications.length > 2 && <span>...</span>}
                               </div>
                             ) : (
                               <span className="text-sm text-muted-foreground">None</span>
                             )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <Badge variant={vendor.status === 'active' ? 'default' : 'secondary'}>
-                              {vendor.status}
-                            </Badge>
-                          </td>
-                          <td className="py-3 px-4">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/vendors/${vendor.id}`);
-                              }}
-                              className="gap-1"
-                            >
-                              View Details
-                            </Button>
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                          </TableCell>
+                          <TableCell>
+                            <VendorStatusBadge status={vendor.status} />
+                          </TableCell>
+                          <TableCell className="text-right" onClick={(e) => { e.stopPropagation(); }}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label={`Actions for ${vendor.name}`}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => { router.push(`/vendors/${vendor.id}`); }}>
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => { router.push(`/vendors/${vendor.id}?tab=equipment`); }}>
+                                  Add Equipment
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -1035,35 +970,34 @@ export default function VendorsPage() {
           <div className="space-y-4 pt-4">
             {/* Basic Information */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Basic Information</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Basic Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Supplier Name <span className="text-red-500">*</span>
-                  </label>
+                  <Label className="text-sm font-medium">
+                    Supplier Name <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     placeholder="e.g., Acme Manufacturing Co."
                     value={newVendorData.name}
-                    onChange={(e) => setNewVendorData({ ...newVendorData, name: e.target.value })}
+                    onChange={(e) => { setNewVendorData({ ...newVendorData, name: e.target.value }); }}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Supplier Code</label>
+                  <Label className="text-sm font-medium">Supplier Code</Label>
                   <Input
                     placeholder="e.g., SUP-001"
                     value={newVendorData.supplierCode}
-                    onChange={(e) => setNewVendorData({ ...newVendorData, supplierCode: e.target.value })}
+                    onChange={(e) => { setNewVendorData({ ...newVendorData, supplierCode: e.target.value }); }}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Status</label>
+                  <Label className="text-sm font-medium">Status</Label>
                   <Select
                     {...(newVendorData.status !== undefined ? { value: newVendorData.status } : {})}
-                    onValueChange={(value: 'active' | 'inactive' | 'pending') =>
-                      setNewVendorData({ ...newVendorData, status: value })
+                    onValueChange={(value: 'active' | 'inactive' | 'pending') => { setNewVendorData({ ...newVendorData, status: value }); }
                     }
                   >
                     <SelectTrigger>
@@ -1077,11 +1011,10 @@ export default function VendorsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Vendor Type</label>
+                  <Label className="text-sm font-medium">Vendor Type</Label>
                   <Select
                     {...(newVendorData.vendorType !== undefined ? { value: newVendorData.vendorType } : {})}
-                    onValueChange={(value: 'supplier' | 'oem' | 'both') =>
-                      setNewVendorData({ ...newVendorData, vendorType: value })
+                    onValueChange={(value: 'supplier' | 'oem' | 'both') => { setNewVendorData({ ...newVendorData, vendorType: value }); }
                     }
                   >
                     <SelectTrigger>
@@ -1101,32 +1034,32 @@ export default function VendorsPage() {
 
             {/* Contact Information */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Contact Information</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contact Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Website</label>
+                  <Label className="text-sm font-medium">Website</Label>
                   <Input
                     placeholder="https://example.com"
                     value={newVendorData.website}
-                    onChange={(e) => setNewVendorData({ ...newVendorData, website: e.target.value })}
+                    onChange={(e) => { setNewVendorData({ ...newVendorData, website: e.target.value }); }}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Email</label>
+                  <Label className="text-sm font-medium">Email</Label>
                   <Input
                     type="email"
                     placeholder="info@company.com"
                     value={newVendorData.companyEmail}
-                    onChange={(e) => setNewVendorData({ ...newVendorData, companyEmail: e.target.value })}
+                    onChange={(e) => { setNewVendorData({ ...newVendorData, companyEmail: e.target.value }); }}
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Company Phone</label>
+                <Label className="text-sm font-medium">Company Phone</Label>
                 <Input
                   placeholder="+91-XXXXXXXXXX"
                   value={newVendorData.companyPhone}
-                  onChange={(e) => setNewVendorData({ ...newVendorData, companyPhone: e.target.value })}
+                  onChange={(e) => { setNewVendorData({ ...newVendorData, companyPhone: e.target.value }); }}
                 />
               </div>
             </div>
@@ -1135,13 +1068,13 @@ export default function VendorsPage() {
 
             {/* Industries */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Industries</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Industries</h3>
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Input
                     placeholder="e.g., Automotive"
                     value={industryInput}
-                    onChange={(e) => setIndustryInput(e.target.value)}
+                    onChange={(e) => { setIndustryInput(e.target.value); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -1149,7 +1082,7 @@ export default function VendorsPage() {
                       }
                     }}
                   />
-                  <Button type="button" onClick={addIndustry} variant="outline">
+                  <Button type="button" onClick={addIndustry} variant="outline" className="shrink-0">
                     Add
                   </Button>
                 </div>
@@ -1160,7 +1093,7 @@ export default function VendorsPage() {
                         {industry}
                         <X
                           className="h-3 w-3 cursor-pointer"
-                          onClick={() => removeIndustry(industry)}
+                          onClick={() => { removeIndustry(industry); }}
                         />
                       </Badge>
                     ))}
@@ -1173,13 +1106,13 @@ export default function VendorsPage() {
 
             {/* Processes */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Processes</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Processes</h3>
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Input
                     placeholder="e.g., CNC Machining"
                     value={processInput}
-                    onChange={(e) => setProcessInput(e.target.value)}
+                    onChange={(e) => { setProcessInput(e.target.value); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -1198,7 +1131,7 @@ export default function VendorsPage() {
                         {process}
                         <X
                           className="h-3 w-3 cursor-pointer"
-                          onClick={() => removeProcess(process)}
+                          onClick={() => { removeProcess(process); }}
                         />
                       </Badge>
                     ))}
@@ -1211,13 +1144,13 @@ export default function VendorsPage() {
 
             {/* Certifications */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Certifications</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Certifications</h3>
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Input
                     placeholder="e.g., ISO 9001"
                     value={certificationInput}
-                    onChange={(e) => setCertificationInput(e.target.value)}
+                    onChange={(e) => { setCertificationInput(e.target.value); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -1236,7 +1169,7 @@ export default function VendorsPage() {
                         {cert}
                         <X
                           className="h-3 w-3 cursor-pointer"
-                          onClick={() => removeCertification(cert)}
+                          onClick={() => { removeCertification(cert); }}
                         />
                       </Badge>
                     ))}
@@ -1249,18 +1182,18 @@ export default function VendorsPage() {
 
             {/* Location */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Location</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</h3>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Address</label>
+                <Label className="text-sm font-medium">Address</Label>
                 <Input
                   placeholder="e.g., 123 Industrial Ave, Business Park"
                   value={newVendorData.addresses}
-                  onChange={(e) => setNewVendorData({ ...newVendorData, addresses: e.target.value })}
+                  onChange={(e) => { setNewVendorData({ ...newVendorData, addresses: e.target.value }); }}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">State / Province</label>
+                  <Label className="text-sm font-medium">State / Province</Label>
                   {/* Suggestions from the vendor table, free text for anything
                       new. A fixed list cannot hold the real data — 647 vendors
                       include Chinese provinces. */}
@@ -1268,7 +1201,7 @@ export default function VendorsPage() {
                     list="vendor-state-suggestions"
                     placeholder={stateSuggestions.length ? 'Select or type a state / province' : 'Enter state / province'}
                     value={newVendorData.state ?? ''}
-                    onChange={(e) => setNewVendorData({ ...newVendorData, state: e.target.value })}
+                    onChange={(e) => { setNewVendorData({ ...newVendorData, state: e.target.value }); }}
                   />
                   <datalist id="vendor-state-suggestions">
                     {stateSuggestions.map((state) => (
@@ -1277,7 +1210,7 @@ export default function VendorsPage() {
                   </datalist>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">City</label>
+                  <Label className="text-sm font-medium">City</Label>
                   {/* Same contract as State above: suggest what the table
                       already contains, accept anything. The old version showed
                       a dropdown only for the 20 hardcoded states and a bare
@@ -1288,7 +1221,7 @@ export default function VendorsPage() {
                     list="vendor-city-suggestions"
                     placeholder={citySuggestions.length ? 'Select or type a city' : 'Enter city'}
                     value={newVendorData.city ?? ''}
-                    onChange={(e) => setNewVendorData({ ...newVendorData, city: e.target.value })}
+                    onChange={(e) => { setNewVendorData({ ...newVendorData, city: e.target.value }); }}
                   />
                   <datalist id="vendor-city-suggestions">
                     {citySuggestions.map((city) => (
@@ -1297,10 +1230,10 @@ export default function VendorsPage() {
                   </datalist>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Country</label>
+                  <Label className="text-sm font-medium">Country</Label>
                   <Select
                     {...(newVendorData.country !== undefined ? { value: newVendorData.country } : {})}
-                    onValueChange={(value) => setNewVendorData({ ...newVendorData, country: value })}
+                    onValueChange={(value) => { setNewVendorData({ ...newVendorData, country: value }); }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -1320,10 +1253,10 @@ export default function VendorsPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end gap-3 border-t pt-4">
               <Button
                 variant="outline"
-                onClick={() => setCreateDialogOpen(false)}
+                onClick={() => { setCreateDialogOpen(false); }}
                 disabled={createVendorMutation.isPending}
               >
                 Cancel

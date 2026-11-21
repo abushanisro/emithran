@@ -79,6 +79,10 @@
      so mixed-size text (a 9px marker in a text-xs row) sits on a shorter line
      than before. */
   --text-xs--line-height: 1rem;
+  /* text-2xs (11px): the smallest size in the scale, for column headers, chips
+     and eyebrows. Replaces the one-off text-[6px]…text-[11px] values. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
   --text-sm--line-height: 1.25rem;
   --text-base--line-height: 1.5rem;
   --text-lg--line-height: 1.75rem;
@@ -351,6 +355,9 @@
    * Three themes: light (the brand's own, default), dark (the marketing site's #080808/#111), brand (navy).
    */
   :root {
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #2dd4bf;
+    --duo-front: #0d9488;
     --background: 0 0% 3%;
     --foreground: 0 0% 98%;
 
@@ -419,6 +426,9 @@
 
   /* Dark: the marketing site's dark sections */
   .dark {
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #2dd4bf;
+    --duo-front: #0d9488;
     --background: 0 0% 3%;
     --foreground: 0 0% 98%;
     --card: 0 0% 7%;
@@ -450,6 +460,9 @@
 
   /* Navy: the brand's navy and teal-navy dark cards */
   .brand {
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #2dd4bf;
+    --duo-front: #14b8a6;
     --background: 218 52% 7%;
     --foreground: 210 40% 96%;
 
@@ -496,8 +509,12 @@
 
   /* Light: the brand's own palette (the default) */
   .light {
-    --background: 210 40% 98%;
-    --foreground: 216 50% 12%;
+    /* Duotone icon pair (components/ui/duotone-icons.tsx): brand teal + brand navy */
+    --duo-back: #5eead4;
+    --duo-front: #0f1b2d;
+    --radius: 0.5rem;
+    --background: 220 20% 97%;   /* soft grey canvas; cards stay white */
+    --foreground: 224 30% 12%;
 
     --card: 0 0% 100%;
     --card-foreground: 216 50% 12%;
@@ -509,20 +526,20 @@
     --primary: 175 84% 32%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
+    --secondary: 220 16% 95%;
     --secondary-foreground: 216 50% 12%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 19% 35%;   /* slate-600: readable at 9-10px */
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 9% 38%;    /* readable at 9-10px */
 
-    --accent: 162 76% 95%;             /* #f0fdf9 teal tint for hover and selection */
+    --accent: 220 16% 94%;             /* neutral hover and selection */
     --accent-foreground: 216 50% 12%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 27% 84%;             /* visible on white in dense tables */
-    --input: 214 27% 82%;
+    --border: 220 14% 90%;             /* soft hairline on white */
+    --input: 220 13% 85%;
     --ring: 173 66% 50%;
 
     --chart-1: 175 84% 32%;
@@ -532,15 +549,15 @@
     --sidebar-foreground: 216 50% 12%;
     --sidebar-primary: 175 84% 32%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 162 76% 95%;
+    --sidebar-accent: 220 16% 94%;
     --sidebar-accent-foreground: 216 50% 12%;
-    --sidebar-border: 214 27% 88%;
+    --sidebar-border: 220 14% 90%;
     --sidebar-ring: 173 66% 50%;
 
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 2px 16px rgba(0, 0, 0, 0.07);
     --shadow-lg: 0 12px 48px rgba(13, 158, 138, 0.1), 0 2px 16px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.07);
+    --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
     --shadow-glow: 0 4px 24px rgba(45, 212, 191, 0.3);
   }
 }

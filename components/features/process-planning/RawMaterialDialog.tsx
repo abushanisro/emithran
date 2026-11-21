@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +13,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Loader2, Calculator as CalculatorIcon, Play, Eye } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { LocationMark } from '@/components/ui/location-mark';
 import {
   Select,
   SelectContent,
@@ -18,21 +24,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Mark } from '@/components/ui/status-mark';
+
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
-import { useMaterialUsage, type MaterialUsageExplanation } from '@/lib/api/hooks/useMaterialUsage';
-import { CalculationTracePanel } from './CalculationTracePanel';
-import { MaterialUsageJustification } from './MaterialUsageJustification';
-import { UsageCalculatorForm } from './UsageCalculatorForm';
-import { ReferenceTable } from './ReferenceTable';
-import { isStockDrivenBlank } from '@/lib/costing/material-usage';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
-import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMaterialUsage, type MaterialUsageExplanation } from '@/lib/api/hooks/useMaterialUsage';
+import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
+import { isStockDrivenBlank } from '@/lib/costing/material-usage';
+
+import { CalculationTracePanel } from './CalculationTracePanel';
+import { MaterialUsageJustification } from './MaterialUsageJustification';
+import { ReferenceTable } from './ReferenceTable';
+import { UsageCalculatorForm } from './UsageCalculatorForm';
+
 
 // Static lookup — defined outside component so it is never recreated on re-render
 const CALCULATOR_PROPERTY_MAPPINGS: Record<string, string> = {
@@ -1328,14 +1334,14 @@ export function RawMaterialDialog({
 
               // ── Price matrix ───────────────────────────────────────────────────
               const locationPrices: Array<{ flag: string; label: string; cost: number | undefined; currency: string; symbol: string }> = [
-                { flag: '🇮🇳', label: 'India',     cost: selectedMaterial.costIndia,   currency: 'INR', symbol: '₹'   },
-                { flag: '🇺🇸', label: 'USA',       cost: selectedMaterial.costUsa,     currency: 'USD', symbol: '$'   },
-                { flag: '🇨🇳', label: 'China',     cost: selectedMaterial.costChina,   currency: 'CNY', symbol: '¥'   },
-                { flag: '🇩🇪', label: 'Germany',   cost: selectedMaterial.costGermany, currency: 'EUR', symbol: '€'   },
-                { flag: '🇫🇷', label: 'France',    cost: selectedMaterial.costFrance,  currency: 'EUR', symbol: '€'   },
-                { flag: '🇪🇺', label: 'W. Europe', cost: selectedMaterial.costWEurope, currency: 'EUR', symbol: '€'   },
-                { flag: '🇪🇺', label: 'E. Europe', cost: selectedMaterial.costEEurope, currency: 'EUR', symbol: '€'   },
-                { flag: '🇲🇽', label: 'Mexico',    cost: selectedMaterial.costMexico,  currency: 'MXN', symbol: 'MX$' },
+                { flag: 'IN', label: 'India',     cost: selectedMaterial.costIndia,   currency: 'INR', symbol: '₹'   },
+                { flag: 'US', label: 'USA',       cost: selectedMaterial.costUsa,     currency: 'USD', symbol: '$'   },
+                { flag: 'CN', label: 'China',     cost: selectedMaterial.costChina,   currency: 'CNY', symbol: '¥'   },
+                { flag: 'DE', label: 'Germany',   cost: selectedMaterial.costGermany, currency: 'EUR', symbol: '€'   },
+                { flag: 'FR', label: 'France',    cost: selectedMaterial.costFrance,  currency: 'EUR', symbol: '€'   },
+                { flag: 'EU', label: 'W. Europe', cost: selectedMaterial.costWEurope, currency: 'EUR', symbol: '€'   },
+                { flag: 'EU', label: 'E. Europe', cost: selectedMaterial.costEEurope, currency: 'EUR', symbol: '€'   },
+                { flag: 'MX', label: 'Mexico',    cost: selectedMaterial.costMexico,  currency: 'MXN', symbol: 'MX$' },
               ].filter(p => p.cost && p.cost > 0);
 
               const toUsdPrice = (lc: number, curr: string) =>
@@ -1395,7 +1401,7 @@ export function RawMaterialDialog({
                                     : 'bg-background hover:bg-primary/10 border border-border'
                                 }`}
                               >
-                                <span>{p.flag} {p.label}</span>
+                                <span><LocationMark location={p.label} />{p.label}</span>
                                 <div className="text-right ml-2">
                                   <div className="font-mono tabular-nums">
                                     {locDisplay != null ? `${displaySymbol}${locDisplay.toFixed(2)}` : '—'}
@@ -1437,7 +1443,7 @@ export function RawMaterialDialog({
                         </div>
                       )}
                       {country && !hasRegionalCost && (
-                        <div className="text-xs text-amber-600 border-t border-primary/10 pt-1">
+                        <div className="text-xs text-warning border-t border-primary/10 pt-1">
                           No {country}-specific price in database — showing base rate
                         </div>
                       )}
@@ -1451,10 +1457,10 @@ export function RawMaterialDialog({
             {(selectedMaterialId || editData) && (!selectedMaterial ||
               (!selectedMaterial.unitCost && !selectedMaterial.cost)) && (
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-orange-600">
+                <label className="text-sm font-semibold text-warning">
                   Manual Unit Cost <span className="text-xs text-muted-foreground">(Material has no cost data)</span>
                 </label>
-                <div className="p-4 border-2 border-orange-200 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                <div className="p-4 border-2 border-warning/40 bg-warning/10 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="text-sm">{hasDisplayCurrency ? displaySymbol : '…'}</span>
                     <Input
@@ -1478,7 +1484,7 @@ export function RawMaterialDialog({
                     />
                     <span className="text-xs text-muted-foreground">per unit</span>
                   </div>
-                  <div className="text-xs text-orange-600 mt-2">
+                  <div className="text-xs text-warning mt-2">
                     This cost will be used for calculations since the selected material has no cost data.
                   </div>
                 </div>
@@ -1653,9 +1659,9 @@ export function RawMaterialDialog({
                       </>
                     )}
                     {grossUsageOverridden ? (
-                      <div className="rounded border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-0.5">
-                        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-                          ⚠ Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
+                      <div className="rounded border border-warning/40 bg-warning/10 p-2 space-y-0.5">
+                        <p className="text-[11px] font-semibold text-warning">
+                          <Mark kind="warn" /> Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           Calculated value: {(derivedGrossKg ?? 0).toFixed(4)} kg/part
@@ -1671,7 +1677,7 @@ export function RawMaterialDialog({
                         <button
                           type="button"
                           onClick={() => { setGrossUsageOverridden(false); setGrossUsageOverrideReason(''); }}
-                          className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline"
+                          className="text-[11px] text-warning hover:underline"
                         >
                           Clear override — use calculated value
                         </button>
@@ -1735,7 +1741,7 @@ export function RawMaterialDialog({
                   // pattern unresolved) — disclosed honestly, but NOT trusted to
                   // auto-fill anything: for a bent part that box overcounts
                   // capacity (see nestingIsTrustworthy's doc comment).
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  <p className="text-[11px] text-warning">
                     Nesting ran on an unverified fallback ({nestingBlankSpec.sheetWidthMm}×{nestingBlankSpec.sheetLengthMm}mm sheet, {nestingBlankSpec.partsPerSheet} parts/sheet — folded 3D bounding box, not the true flat pattern) — this typically overcounts capacity for a bent part. Not used to fill Gross Usage; enter the real value manually.
                   </p>
                 ) : isSheetMetalItem ? (
@@ -1751,7 +1757,7 @@ export function RawMaterialDialog({
                   <p className="text-[11px] text-muted-foreground">net ÷ (1 − scrap%) — includes material lost in process</p>
                 )}
                 {!grossIsDerived && !isSheetMetalItem && nestingBlankSpec?.stockFormOverrideNote && (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  <p className="text-[11px] text-warning">
                     Selected stock weight unavailable — using the scrap-allowance estimate above. {nestingBlankSpec.stockFormOverrideNote}
                   </p>
                 )}
@@ -1861,7 +1867,7 @@ export function RawMaterialDialog({
                     </div>
 
                     {/* Reclaim value */}
-                    <div className={`flex items-baseline justify-between gap-4 ${b && (b.reclaimValue ?? 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : dim}`}>
+                    <div className={`flex items-baseline justify-between gap-4 ${b && (b.reclaimValue ?? 0) > 0 ? 'text-success' : dim}`}>
                       <span className="shrink-0">− Reclaim value</span>
                       <span className="font-mono text-[11px] flex-1 text-right truncate">
                         {scrapKg} × {reclaimRateDisplay}
@@ -1903,7 +1909,7 @@ export function RawMaterialDialog({
                     <div className={`flex gap-6 pt-0.5 text-[11px] ${b ? 'text-muted-foreground' : dim}`}>
                       <span>
                         Utilization:{' '}
-                        <strong className={!b ? '' : (b.utilRate ?? 0) < 50 ? 'text-destructive' : (b.utilRate ?? 0) < 75 ? 'text-amber-500' : 'text-emerald-500'}>
+                        <strong className={!b ? '' : (b.utilRate ?? 0) < 50 ? 'text-destructive' : (b.utilRate ?? 0) < 75 ? 'text-warning' : 'text-success'}>
                           {b ? `${(b.utilRate ?? 0).toFixed(1)}%` : '—'}
                         </strong>
                       </span>
@@ -2033,11 +2039,11 @@ export function RawMaterialDialog({
                           </Label>
                           <p className="text-xs">
                             {hasRealNesting ? (
-                              <span className="text-emerald-600 dark:text-emerald-400">
+                              <span className="text-success">
                                 Verified CAD flat-pattern outline resolved
                               </span>
                             ) : (
-                              <span className="text-amber-600 dark:text-amber-400">
+                              <span className="text-warning">
                                 Unavailable — no verified flat-pattern outline for this part yet
                               </span>
                             )}
@@ -2228,10 +2234,10 @@ export function RawMaterialDialog({
 
                 {/* Calculator Results */}
                 {calculatorWarnings.length > 0 && (
-                  <Card className="border-amber-400">
+                  <Card className="border-warning/40">
                     <CardContent className="p-3 space-y-1">
                       {calculatorWarnings.map((w, i) => (
-                        <p key={i} className="text-xs text-amber-700 dark:text-amber-400">{w}</p>
+                        <p key={i} className="text-xs text-warning">{w}</p>
                       ))}
                       {calculatorTarget === 'grossUsage' && !nestingIsTrustworthy && (
                         <p className="text-xs text-muted-foreground">

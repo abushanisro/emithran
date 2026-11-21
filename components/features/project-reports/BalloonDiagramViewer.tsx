@@ -1,16 +1,14 @@
 'use client';
 
-import { Suspense, useState, useRef, useEffect, useCallback } from 'react';
-import { Canvas, useLoader } from '@react-three/fiber';
-import type { ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-three/drei';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { Canvas, useLoader } from '@react-three/fiber';
+import { Suspense, useState, useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Home,
   Download,
@@ -21,8 +19,12 @@ import {
   Save,
   Edit,
   Trash2,
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { BalloonDiagram, BalloonDiagramAnnotation } from '@/lib/api/project-reports';
+
+import type { ThreeEvent } from '@react-three/fiber';
 
 interface BalloonDiagramViewerProps {
   diagram: BalloonDiagram;
@@ -101,7 +103,7 @@ function BalloonAnnotation({
                 </div>
               )}
               {annotation.text && (
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-muted-foreground">
                   {annotation.text}
                 </div>
               )}
@@ -117,7 +119,7 @@ function BalloonAnnotation({
         >
           <path
             d="M 16 16 L 4 32"
-            stroke={hover ? '#2563eb' : '#3b82f6'}
+            stroke={hover ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.8)'}
             strokeWidth="2"
             fill="none"
             markerEnd="url(#arrowhead)"
@@ -133,7 +135,7 @@ function BalloonAnnotation({
             >
               <polygon
                 points="0 0, 10 3.5, 0 7"
-                fill={hover ? '#2563eb' : '#3b82f6'}
+                fill={hover ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.8)'}
               />
             </marker>
           </defs>
@@ -290,7 +292,7 @@ export default function BalloonDiagramViewer({
       <Card className="p-8 text-center">
         <Box className="h-12 w-12 mx-auto mb-4 text-gray-400" />
         <h3 className="text-lg font-semibold mb-2">No CAD File</h3>
-        <p className="text-gray-600">Upload a CAD file to create a balloon diagram</p>
+        <p className="text-muted-foreground">Upload a CAD file to create a balloon diagram</p>
       </Card>
     );
   }
@@ -416,7 +418,7 @@ export default function BalloonDiagramViewer({
                 />
               </div>
               
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 <p>Click on the 3D model to place annotations</p>
                 <p>Hover over balloons to see details</p>
               </div>

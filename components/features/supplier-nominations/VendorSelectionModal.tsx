@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Building2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Search, Plus, Building2 } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 
 interface VendorSelectionModalProps {

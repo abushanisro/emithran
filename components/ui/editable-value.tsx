@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Input } from './input';
+
+import { Pencil } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
-import { Pencil } from 'lucide-react';
+
+import { Input } from './input';
 
 interface EditableValueProps {
   value: number;

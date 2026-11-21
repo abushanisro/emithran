@@ -1,9 +1,9 @@
 "use client";
 
-import { Package } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Package } from '@/components/ui/icons';
 import { useMaterialClasses } from "@/lib/api/hooks/useRawMaterials";
 
 import { itemCost, itemWeight, safeNum, formatPrice } from "../../utils";
@@ -177,7 +177,7 @@ export function MaterialsTab({ bomMetrics }: Props) {
                                     Qty: {a.quantities[bIdx]}
                                   </div>
                                   {(a.costs[bIdx] ?? 0) > 0 && (
-                                    <div className="text-xs text-green-600">
+                                    <div className="text-xs text-success">
                                       {formatPrice(a.costs[bIdx] ?? 0)}
                                     </div>
                                   )}

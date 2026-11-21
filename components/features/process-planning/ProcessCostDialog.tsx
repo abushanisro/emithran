@@ -1,15 +1,6 @@
 'use client';
 
-import { Loader2, Calculator as CalculatorIcon, Play } from 'lucide-react';
-import { longestBendLineMm } from '@/lib/features/bend-line-length';
-import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
-import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
-import { formatFieldValue } from '@/lib/costing/cycle-fields';
-import { cachedFeaturesHighlight, checkAgainstInput, highlightableGraph, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
-import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
-import { ReferenceTable } from './ReferenceTable';
-import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
-import type { CadEvidence } from './CadEvidencePanel';
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -22,8 +13,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Loader2, Calculator as CalculatorIcon, Play } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Select,
   SelectContent,
@@ -32,12 +25,27 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Mark } from '@/components/ui/status-mark';
 import type { CalculatorField } from '@/lib/api/calculators';
 import { calculatorsApi } from '@/lib/api/calculators';
 import { apiClient } from '@/lib/api/client';
 import { PROCESS_DIALOG_CALCULATOR_QUERY, useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
-import { findDuplicateOperation, keepsSavedOperation, resolveLineIdentity } from '@/lib/processCatalog/line-identity';
+import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
+import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
+import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
+import { calculationOfRecord, NO_CALCULATION, runOfCalculator, type LineCalculation } from '@/lib/calculators/calculator-run';
+import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
+import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, showsFeatures, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
+import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
+import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
+import { formatFieldValue } from '@/lib/costing/cycle-fields';
+import { formatCycleMin, formatStoredCycleSec, storableCycleSec } from '@/lib/costing/format-cycle';
+import { longestBendLineMm } from '@/lib/features/bend-line-length';
+import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
+import { cachedFeaturesHighlight, checkAgainstInput, highlightableGraph, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
+import { useDebounce } from '@/lib/hooks/useDebounce';
+import { calculatorSwitch, type CalculatorIdentity } from '@/lib/processCatalog/calculator-switch';
 import {
   effectiveProcessGroupOf,
   buildHrRatesIndex,
@@ -48,18 +56,15 @@ import {
   identityMappings,
   type MachineRowForSelection,
 } from '@/lib/processCatalog/hr-rates-process-selection';
-import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
-import { calculatorSwitch, type CalculatorIdentity } from '@/lib/processCatalog/calculator-switch';
-import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
-import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
-import { useDebounce } from '@/lib/hooks/useDebounce';
-import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
-import { calculationOfRecord, NO_CALCULATION, runOfCalculator, type LineCalculation } from '@/lib/calculators/calculator-run';
-import { columnValue, isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
-import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { calculationPanel, evidenceOfRef, isSheetMetalLibraryTable, lookupPanel, opensTable, showsFeatures, recordPanel, smTablePanel, variablePanel, type SourcePanel, type SourceRef } from '@/lib/calculators/input-source';
+import { findDuplicateOperation, keepsSavedOperation, resolveLineIdentity } from '@/lib/processCatalog/line-identity';
 import { effectiveOperation, operationChoices, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
+import { withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
+
+import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
+import { ReferenceTable } from './ReferenceTable';
+
+import type { CadEvidence } from './CadEvidencePanel';
 
 // The Deburr calculator's time per mm is each Deslag machine's own perimeter allowance
 // in the machine library, so its eye opens that table (not an sm_lookup_* table).
@@ -3039,10 +3044,7 @@ export function ProcessCostDialog({
 
               {/* Loading State */}
               {!hasErrors && (isLoadingMHR || isLoadingCatalog || isLoadingCalculators) && (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Loading data...</span>
-                </div>
+                <ListSkeleton rows={4} label="Loading data..." />
               )}
 
               {!hasErrors && !isLoadingMHR && !isLoadingCatalog && !isLoadingCalculators && (
@@ -3138,12 +3140,12 @@ export function ProcessCostDialog({
                           </SelectContent>
                         </Select>
                         {catalogError && (
-                          <p className="text-xs text-red-600 dark:text-red-400">
+                          <p className="text-xs text-destructive">
                             Error loading HR Rates: {(catalogError as Error).message || 'Unknown error'}
                           </p>
                         )}
                         {selectedGroup && !isLoadingCategories && !catalogError && categories.length === 0 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                          <p className="text-xs text-warning">
                             No machine categories on file for &quot;{selectedGroup}&quot;. Add machines for it in HR Rates first.
                           </p>
                         )}
@@ -3173,7 +3175,7 @@ export function ProcessCostDialog({
                               {lineIdentity.source === 'catalog' ? ' (process catalog for this machine class)' : ' (saved on this line)'}
                             </p>
                           ) : (
-                            <p className="text-xs text-amber-600 dark:text-amber-500">{lineIdentity.reason}</p>
+                            <p className="text-xs text-warning">{lineIdentity.reason}</p>
                           )
                         )}
                       </div>
@@ -3284,8 +3286,8 @@ export function ProcessCostDialog({
                               REMAINS possible, but must never look like the local resource
                               (see selector.ts's identical warning for a class mismatch). */}
                           {selectedMHR?.location && location && selectedMHR.location.toLowerCase() !== location.toLowerCase() && (
-                            <p className="text-xs text-amber-600 dark:text-amber-500">
-                              ⚠ Cross-location manual selection — this machine is from {selectedMHR.location}, not the current Digital Factory ({location}).
+                            <p className="text-xs text-warning">
+                              <Mark kind="warn" /> Cross-location manual selection — this machine is from {selectedMHR.location}, not the current Digital Factory ({location}).
                             </p>
                           )}
                           {/* A machine is listed but the rate that actually reaches the cost
@@ -3298,8 +3300,8 @@ export function ProcessCostDialog({
                               Costed on {referenceResource.name} at ${referenceResource.rate.toFixed(2)}/hr: the cost engine&apos;s reference resource, not a machine in HR Rates. Pick a machine above to use its rate instead.
                             </p>
                           ) : effectiveMachineRate <= 0 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-500">
-                              ⚠ No machine rate applied — cost cannot be calculated from machine time.
+                            <p className="text-xs text-warning">
+                              <Mark kind="warn" /> No machine rate applied — cost cannot be calculated from machine time.
                             </p>
                           )}
                           </>
@@ -3403,7 +3405,7 @@ export function ProcessCostDialog({
                             operation.
                           </p>
                         ) : selectedMHR ? (
-                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                          <p className="text-xs text-warning">
                             {selectedMHR.machineName} has no labour rate in HR Rates — labour is not costed for this
                             line. Set it against the machine in memory/ and re-seed.
                           </p>
@@ -3570,14 +3572,14 @@ export function ProcessCostDialog({
                       incomplete, no rate resolved, or the request itself failed. */}
                   {costPreviewError ? (
                     <p className="text-xs text-destructive mt-1">
-                      ⚠ Not calculated — {costPreviewError}
+                      <Mark kind="warn" /> Not calculated — {costPreviewError}
                     </p>
                   ) : !costPreviewInput ? (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                    <p className="text-xs text-warning mt-1">
                       Enter Cycle Time, Batch Size and Parts/Cycle (all greater than zero) to calculate.
                     </p>
                   ) : effectiveMachineRate <= 0 && effectiveLaborRate <= 0 ? (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                    <p className="text-xs text-warning mt-1">
                       No machine or labour rate resolved — select a Machine and Labour Type above, or enter
                       rates manually.
                     </p>
@@ -3587,7 +3589,7 @@ export function ProcessCostDialog({
             </div>
 
               {submitError && (
-                <p className="text-xs text-destructive mt-2">⚠ {submitError}</p>
+                <p className="text-xs text-destructive mt-2"><Mark kind="warn" /> {submitError}</p>
               )}
               <DialogFooter className="mt-6">
                 <Button type="button" variant="outline" onClick={() => { onOpenChange(false); }}>
@@ -3672,8 +3674,8 @@ export function ProcessCostDialog({
                   alternatives are named here so the choice is the engineer's and is
                   visible. */}
               {ambiguousCalculatorChoices.length > 0 && (
-                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 space-y-1">
-                  <p className="text-xs text-amber-700 dark:text-amber-500">
+                <div className="rounded-md border border-warning/40 bg-warning/5 p-2 space-y-1">
+                  <p className="text-xs text-warning">
                     Machine class <span className="font-medium">{selectedMachineClass}</span> is used by{' '}
                     {ambiguousCalculatorChoices.length} different operations, which are priced by different
                     formulas — pick the one this line represents rather than letting the first be assumed:
@@ -3701,7 +3703,7 @@ export function ProcessCostDialog({
                 </div>
               )}
               {calculatorTarget === 'processCalculator' && availableCalculators && availableCalculators.length === 0 && (
-                <p className="text-xs text-amber-600">
+                <p className="text-xs text-warning">
                   No calculator is mapped to machine class{' '}
                   <span className="font-medium">{selectedMachineClass || '(not resolved yet)'}</span>.
                   You can still use general calculators.
@@ -3805,7 +3807,7 @@ export function ProcessCostDialog({
                       })}
 
                     {machiningCalculatorIds.has(selectedCalculatorId) && machiningMissing.length > 0 && (
-                      <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                      <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-amber-900">
                         <div className="font-medium">Not available from this part / the database:</div>
                         <ul className="list-disc pl-4">
                           {machiningMissing.map((m) => <li key={m}>{m}</li>)}
@@ -3839,7 +3841,7 @@ export function ProcessCostDialog({
                               <div>Source: {isEstimated ? 'disclosed estimate from documented model specs' : 'machine capability record'}</div>
                               {isEstimated ? (
                                 <>
-                                  <div className="text-amber-600 dark:text-amber-400 font-medium">Status: Estimated (not verified)</div>
+                                  <div className="text-warning font-medium">Status: Estimated (not verified)</div>
                                   <div>Action: verify against this unit's nameplate/PO before finalizing</div>
                                 </>
                               ) : (
@@ -3977,11 +3979,11 @@ export function ProcessCostDialog({
 
                       <div className="text-xs">
                         {computedCycleTime.matchesCurrent ? (
-                          <span className="text-green-600 dark:text-green-500 font-medium">
-                            ✓ Matches the Cycle Time currently set on this process ({formatStoredCycleSec(computedCycleTime.currentCycleTimeSec)}) — this is the value Direct Process Costs will use.
+                          <span className="text-success font-medium">
+                            <Mark kind="ok" /> Matches the Cycle Time currently set on this process ({formatStoredCycleSec(computedCycleTime.currentCycleTimeSec)}) — this is the value Direct Process Costs will use.
                           </span>
                         ) : (
-                          <span className="text-amber-600 dark:text-amber-500 font-medium">
+                          <span className="text-warning font-medium">
                             This process's saved Cycle Time is currently {formatStoredCycleSec(computedCycleTime.currentCycleTimeSec)} — click "Use as Cycle Time" so Direct Process Costs matches this calculator.
                           </span>
                         )}

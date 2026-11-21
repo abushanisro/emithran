@@ -1,30 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
+
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { RemarksApi } from '@/lib/api/remarks';
-import { CommentsApi } from '@/lib/api/comments';
-import { productionPlanningApi } from '@/lib/api/production-planning';
-import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  RemarkType,
-  RemarkPriority,
-  RemarkStatus,
-  RemarkScope,
-  getRemarkTypeColor,
-  getRemarkPriorityColor,
-  getRemarkStatusColor,
-  REMARK_TYPE_OPTIONS,
-  REMARK_PRIORITY_OPTIONS,
-  REMARK_SCOPE_OPTIONS
-} from '@/types/remarks';
-import type { Remark } from '@/lib/api/remarks';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   MessageSquare,
   AlertTriangle,
@@ -39,16 +30,10 @@ import {
   Flag,
   Package,
   Lightbulb
-} from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ListSkeleton, PageSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Select,
   SelectContent,
@@ -56,7 +41,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import { Textarea } from '@/components/ui/textarea';
+import { CommentsApi } from '@/lib/api/comments';
+import { productionPlanningApi } from '@/lib/api/production-planning';
+import { RemarksApi } from '@/lib/api/remarks';
+import type { Remark } from '@/lib/api/remarks';
+import {
+  RemarkType,
+  RemarkPriority,
+  RemarkStatus,
+  RemarkScope,
+  getRemarkTypeColor,
+  getRemarkPriorityColor,
+  getRemarkStatusColor,
+  REMARK_TYPE_OPTIONS,
+  REMARK_PRIORITY_OPTIONS,
+  REMARK_SCOPE_OPTIONS
+} from '@/types/remarks';
 interface ProcessOption {
   id: string;
   name: string;
@@ -710,9 +711,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
+      <PageSkeleton label="Loading…" />
     );
   }
 
@@ -1349,9 +1348,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
 
                 {/* Comments List */}
                 {loadingComments ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  </div>
+                  <ListSkeleton rows={2} label="Loading comments…" />
                 ) : comments.length > 0 ? (
                   <div className="space-y-4 mb-4 max-h-64 overflow-y-auto">
                     {comments.map((comment) => (

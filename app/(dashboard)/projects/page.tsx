@@ -1,34 +1,39 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Country, State, City } from 'country-state-city';
+import { format } from 'date-fns';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/api/hooks/useProjects';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { useState, useEffect, useMemo } from 'react';
+
 import { StatusBadge } from '@/components/common/status-badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Plus,
   FolderKanban,
-  TrendingUp,
   Clock,
   CheckCircle2,
   Trash2,
-  Calendar,
   ArrowRight,
   Pause,
   XCircle,
-  Pencil
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { Country, State, City } from 'country-state-city';
+  Pencil,
+  MoreVertical,
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/api/hooks/useProjects';
+import { cn } from '@/lib/utils';
 
 const PROJECT_STATUSES = [
   { value: 'draft', label: 'Draft' },
@@ -333,21 +338,30 @@ export default function Projects() {
     completed: projects.filter((p) => p.status === 'completed').length,
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'draft':
-        return <Clock className="h-4 w-4 text-orange-600" />;
-      case 'completed':
-        return <CheckCircle2 className="h-4 w-4 text-primary" />;
-      case 'on_hold':
-        return <Pause className="h-4 w-4 text-yellow-600" />;
-      case 'cancelled':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <FolderKanban className="h-4 w-4" />;
-    }
+  // Project status badge: label + icon, coloured by status. The shared StatusBadge has no entries for
+  // project statuses, so they get their own clear styling here; anything else falls back to it.
+  const renderStatusBadge = (status: string) => {
+    const styles: Record<string, { icon: React.ReactNode; className: string }> = {
+      draft: { icon: <Clock className="h-3 w-3" />, className: 'border-border bg-muted text-muted-foreground' },
+      active: { icon: <CheckCircle2 className="h-3 w-3" />, className: 'border-success/30 bg-success/10 text-success' },
+      completed: { icon: <CheckCircle2 className="h-3 w-3" />, className: 'border-primary/30 bg-primary/10 text-primary' },
+      on_hold: { icon: <Pause className="h-3 w-3" />, className: 'border-warning/30 bg-warning/10 text-warning' },
+      cancelled: { icon: <XCircle className="h-3 w-3" />, className: 'border-destructive/30 bg-destructive/10 text-destructive' },
+    };
+    const style = styles[status];
+    if (!style) return <StatusBadge status={status} />;
+    const label = PROJECT_STATUSES.find((st) => st.value === status)?.label ?? status;
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+          style.className,
+        )}
+      >
+        {style.icon}
+        {label}
+      </span>
+    );
   };
 
   return (
@@ -356,193 +370,179 @@ export default function Projects() {
         title="Projects"
         description="Manage manufacturing and costing projects"
       >
-        <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
-          <Plus className="h-5 w-5" />
+        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
           New Project
         </Button>
       </PageHeader>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-l-4 border-l-primary">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <FolderKanban className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Total Projects</p>
-                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-              </div>
+      {/* Projects section */}
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b px-6 py-4">
+          <CardTitle className="text-lg font-semibold">All Projects</CardTitle>
+          <dl className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-foreground">{stats.total}</dd>
+              <dt>Total</dt>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Active Projects</p>
-                <p className="text-2xl font-bold text-foreground">{stats.active}</p>
-              </div>
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-success">{stats.active}</dd>
+              <dt>Active</dt>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Draft Projects</p>
-                <p className="text-2xl font-bold text-foreground">{stats.draft}</p>
-              </div>
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-foreground">{stats.draft}</dd>
+              <dt>Draft</dt>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Completed</p>
-                <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
-              </div>
+            <div className="flex items-baseline gap-1.5">
+              <dd className="font-semibold tabular-nums text-primary">{stats.completed}</dd>
+              <dt>Completed</dt>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Projects Grid */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">All Projects</CardTitle>
-          <CardDescription>
-            View and manage your manufacturing cost analysis projects
-          </CardDescription>
+          </dl>
         </CardHeader>
-        <CardContent>
+        <CardContent className="bg-muted/30 p-6">
           {isLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-              <p className="text-sm text-muted-foreground mt-4">Loading projects...</p>
-            </div>
+            <TableSkeleton rows={5} columns={5} label="Loading projects..." />
           ) : projects.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-              <FolderKanban className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Projects Yet</h3>
-              <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
-                Create your first manufacturing project to start managing BOMs and costs
-              </p>
+            <EmptyState
+              icon={FolderKanban}
+              title="No Projects Yet"
+              description="Create your first manufacturing project to start managing BOMs and costs"
+              className="rounded-lg border border-dashed bg-card"
+            >
               <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
                 <Plus className="h-5 w-5" />
                 Create First Project
               </Button>
-            </div>
+            </EmptyState>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {projects.map((project) => (
-                <Card
-                  key={project.id}
-                  className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-primary/30 hover:border-l-primary group min-h-[280px] flex flex-col"
-                  onClick={() => router.push(`/projects/${project.id}`)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        {getStatusIcon(project.status)}
-                        <CardTitle className="text-base leading-tight wrap-break-word">
-                          {project.name}
-                        </CardTitle>
+            <ul className="space-y-4">
+              {projects.map((project) => {
+                const location = [project.city, project.state, project.country].filter(Boolean).join(', ');
+                return (
+                  <li
+                    key={project.id}
+                    className="cursor-pointer rounded-lg border bg-card shadow-xs transition-shadow hover:shadow-sm"
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                  >
+                    {/* Project header */}
+                    <div className="flex items-center gap-3 border-b px-5 py-3.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <FolderKanban className="h-4 w-4" aria-hidden="true" />
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                        <Link
+                          href={`/projects/${project.id}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleEditOpen(project);
                           }}
+                          className="truncate text-base font-semibold text-primary hover:underline"
                         >
-                          <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProjectToDelete(project);
-                            setDeleteOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                          {project.name}
+                        </Link>
+                        {project.description && (
+                          <span className="line-clamp-1 text-sm text-muted-foreground">{project.description}</span>
+                        )}
+                      </div>
+                      {renderStatusBadge(project.status)}
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open menu for {project.name}</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                router.push(`/projects/${project.id}`);
+                              }}
+                            >
+                              <ArrowRight className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Open Project
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                handleEditOpen(project);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                              onSelect={() => {
+                                setProjectToDelete(project);
+                                setDeleteOpen(true);
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-                    <StatusBadge status={project.status} />
-                  </CardHeader>
-                  <CardContent className="pb-4 flex-1 flex flex-col">
-                    {project.description && (
-                      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                        {project.description}
-                      </p>
-                    )}
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Industry</span>
-                        <span className="font-semibold">
-                          {project.industry || '-'}
-                        </span>
+
+                    {/* Metrics */}
+                    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-3 lg:grid-cols-5">
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Industry</dt>
+                        <dd className="mt-1 truncate text-xl font-semibold capitalize text-foreground">
+                          {project.industry ? project.industry.replace('-', ' ') : '-'}
+                        </dd>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Annual Volume</span>
-                        <span className="font-semibold">
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Annual Volume</dt>
+                        <dd className="mt-1 truncate text-2xl font-semibold tabular-nums text-primary">
                           {project.estimatedAnnualVolume
                             ? Number(project.estimatedAnnualVolume).toLocaleString()
                             : '-'}
-                        </span>
+                        </dd>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Target BOM Cost</span>
-                        <span className="font-semibold">
-                          {project.targetBomCost && project.targetBomCostCurrency
-                            ? `${project.targetBomCostCurrency} ${Number(project.targetBomCost).toLocaleString()}`
-                            : '-'}
-                        </span>
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Target BOM Cost</dt>
+                        <dd className="mt-1">
+                          {project.targetBomCost && project.targetBomCostCurrency ? (
+                            <span className="block truncate text-2xl font-semibold tabular-nums text-primary">
+                              {`${project.targetBomCostCurrency} ${Number(project.targetBomCost).toLocaleString()}`}
+                            </span>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditOpen(project);
+                              }}
+                            >
+                              Set up
+                            </Button>
+                          )}
+                        </dd>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-                        <Calendar className="h-3 w-3" />
-                        Created {format(new Date(project.createdAt), 'MMM d, yyyy')}
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Location</dt>
+                        <dd className="mt-1 truncate text-xl font-semibold text-foreground" title={location}>
+                          {location || '-'}
+                        </dd>
                       </div>
-                    </div>
-                    <div className="mt-auto pt-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/projects/${project.id}`);
-                        }}
-                      >
-                        Open Project
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      <div className="min-w-0">
+                        <dt className="text-sm text-muted-foreground">Created</dt>
+                        <dd className="mt-1 truncate text-xl font-semibold tabular-nums text-foreground">
+                          {format(new Date(project.createdAt), 'MMM d, yyyy')}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </CardContent>
       </Card>

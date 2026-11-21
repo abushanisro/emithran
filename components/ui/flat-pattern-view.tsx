@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 
 import { ReanalyzeButton } from '@/components/features/bom/ReanalyzeButton';
 import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-pattern-drawing';
+import { Mark } from '@/components/ui/status-mark';
 import { shoelaceAreaMm2 } from '@/lib/geometry/polygon2d';
 import type { FlatPatternBlank } from '@/lib/types/manufacturing';
 
@@ -170,7 +171,7 @@ function SingleFlatPatternView({
               <>
                 <Row label="Independently-computed CAD area" value={`${flatPatternAreaMm2.toFixed(1)} mm²`} />
                 <div className={`flex items-center gap-1.5 mt-1 rounded px-2 py-1 ${areaCheck.diffPct <= 10 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
-                  <span>{areaCheck.diffPct <= 10 ? '✓' : '⚠'}</span>
+                  <span>{areaCheck.diffPct <= 10 ? <Mark kind="ok" inherit /> : <Mark kind="warn" inherit />}</span>
                   <span>
                     {areaCheck.diffPct <= 10 ? 'Matches' : 'Differs from'} the independently-computed CAD flat-pattern area
                     within {areaCheck.diffPct.toFixed(1)}%

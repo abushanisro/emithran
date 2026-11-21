@@ -1,26 +1,24 @@
 'use client';
 
-import { useState, useRef, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { addAoaSheet, createWorkbook, downloadWorkbook } from '@/lib/utils/excel-browser';
-import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
-import {
-  effectiveProcessGroupOf,
-  filterHrRatesRows,
-  buildHrRatesIndex,
-  optionsKeepingSelection,
-} from '@/lib/processCatalog/hr-rates-process-selection';
+import { useState, useRef, useMemo, Fragment } from 'react';
+
+import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Calculator,
+  Upload,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import {
   Select,
   SelectContent,
@@ -29,32 +27,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Plus,
-  Search,
-  FileDown,
-  FileText,
-  Edit,
-  Trash2,
-  Calculator,
-  Upload,
-  Loader2,
-  Eraser,
-  ChevronDown,
-  ChevronRight,
-} from 'lucide-react';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   useMHRRecords,
   useMHRCurrencies,
   useMHRProcessGroups,
   useMHRLocations,
   useDeleteMHR,
-  useDeleteAllMHR,
   useImportMHRFromExcel,
 } from '@/lib/api/hooks';
 import { useFxRatesForCurrencies } from '@/lib/api/hooks/useFx';
+import {
+  filterHrRatesRows,
+  buildHrRatesIndex,
+  optionsKeepingSelection,
+} from '@/lib/processCatalog/hr-rates-process-selection';
 import { getCurrencyForLocation } from '@/lib/utils/currency-locale';
-import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
-import { exportMHRToPDF } from '@/lib/utils/exportMHRToPDF';
+import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
 // Symbol/currency-code lookup is the shared, non-hardcoded one (also used by
 // MHRFormDialog/mhr-database) — never a local fuzzy-match duplicate. The FX
@@ -98,16 +93,6 @@ function mhrTotalRate(
     return { usd: code === 'USD' ? localFallback : null, local: localFallback, symbol, code, fxRate };
   }
   return { usd: null, local: null, symbol, code, fxRate };
-}
-
-// Raw display for the Tier 1 machine_library.json economics/lifecycle
-// columns (migration 573) — these are heterogeneous units (mm, kW, yr,
-// %, bare fractions) with no single shared conversion, so unlike the
-// $/hr columns above this never prefixes a currency symbol or rescales
-// the value; it only formats the number the column already carries.
-function fmtNum(v?: number | null): string {
-  if (v === null || v === undefined) return '-';
-  return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
 export default function HRRatesPage() {
@@ -177,7 +162,6 @@ export default function HRRatesPage() {
     filteredMhrRecords.map(r => getCurrencyForLocation(r.location).currency),
   );
   const deleteMhrMutation = useDeleteMHR();
-  const deleteAllMhrMutation = useDeleteAllMHR();
   const importMhrMutation = useImportMHRFromExcel();
 
   // Rate Table groups by real machine category (mirrors machine_library.json's
@@ -212,69 +196,6 @@ export default function HRRatesPage() {
     }
   };
 
-  const handleMhrExportCsv = () => {
-    if (!filteredMhrRecords.length) return;
-    const headers = [
-      'Machine Name', 'Process Group', 'Machine Class', 'Wage Grade', 'Location', 'Currency', 'Manufacturer', 'Manufacturer Country', 'Machine Price (USD)', 'Automation Level', 'MHR Local/hr', 'LHR Local/hr', 'LHR USD/hr', 'Annual Cost', 'Created At',
-      'Labor Time Standard', 'Avg Utilization', 'Good Part Yield', 'Machine Length (mm)', 'Machine Width (mm)', 'Machine Life (yr)', 'Machine Power (kW)', 'Machine Uptime (%)', 'Annual Maintenance (%)', 'Footprint Allowance Factor', 'Installation (%)',
-    ];
-    const rows = filteredMhrRecords.map(r => {
-      const { symbol, code, fxRate, local: localMhr, usd: usdMhr } = mhrTotalRate(r, fxRates);
-      const usdLhr = r.usdLhrTotal;
-      const localLhr = usdLhr != null ? usdLhr * fxRate : null;
-      const effHrs = r.calculations.effectiveHoursPerYear > 0
-        ? r.calculations.effectiveHoursPerYear
-        : r.workingDaysPerYear * r.shiftsPerDay * r.hoursPerShift * (r.capacityUtilizationRate / 100);
-      // Annual cost needs a confirmed USD rate — a row with only a local
-      // fallback (usdMhr === null) reports '-' rather than guessing.
-      const annualLocal = usdMhr != null
-        ? (r.calculations.totalAnnualCost > 0 ? r.calculations.totalAnnualCost * fxRate : usdMhr * effHrs * fxRate)
-        : null;
-      return [
-        r.machineName, effectiveProcessGroupOf(r), mhrCategoryOf(r),
-        r.wageGrade || '-', r.location, `${symbol} ${code}`, r.manufacturer || '-',
-        r.manufacturerCountry || '-', r.machinePriceUsd != null ? `$${r.machinePriceUsd.toLocaleString()}` : '-',
-        r.automationLevel || '-',
-        localMhr != null ? `${symbol}${localMhr.toFixed(fxRate > 1 ? 0 : 2)}` : '-',
-        localLhr != null ? `${symbol}${localLhr.toFixed(fxRate > 1 ? 0 : 2)}` : '-',
-        usdLhr != null ? `$${usdLhr.toFixed(2)}` : '-',
-        annualLocal != null ? `${symbol}${Math.round(annualLocal).toLocaleString()}` : '-',
-        new Date(r.createdAt).toLocaleDateString(),
-        fmtNum(r.laborTimeStandard), fmtNum(r.avgUtilization), fmtNum(r.goodPartYield),
-        fmtNum(r.machineLengthMm), fmtNum(r.machineWidthMm), fmtNum(r.machineLifeYr),
-        fmtNum(r.machinePowerKw), fmtNum(r.machineUptimePct), fmtNum(r.annualMaintenanceFactorPct),
-        fmtNum(r.footprintAllowanceFactor), fmtNum(r.installationFactorPct),
-      ];
-    });
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    link.download = `mhr-database-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
-
-  const handleMhrExportPdf = () => {
-    if (!filteredMhrRecords.length) return;
-    exportMHRToPDF({ records: filteredMhrRecords, companyName: 'Your Company Name', companyAddress: 'Your Company Address' });
-  };
-
-  const handleMhrDownloadJson = () => {
-    if (!filteredMhrRecords.length) return;
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      totalRecords: filteredMhrRecords.length,
-      exportedCount: filteredMhrRecords.length,
-      records: filteredMhrRecords,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `hr-rates-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   // ─── Excel import (MHR only) ──────────────────────────────────────────────
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -286,44 +207,6 @@ export default function HRRatesPage() {
     } finally {
       setIsImporting(false);
     }
-  };
-
-  // ─── Template download ────────────────────────────────────────────────────
-  const downloadMhrTemplate = async () => {
-    const headers = [
-      'Machine Name', 'Location', 'Process Group', 'Process Category',
-      'Machine Class', 'Automation Level', 'Wage Grade', 'Operators',
-      'Manufacturer', 'Manufacturer Country', 'Machine Price USD',
-      'Shifts Per Day', 'Hours Per Shift', 'Working Days Per Year',
-      'Capacity Utilization (%)', 'Landed Machine Cost (INR)',
-      'Accessories Cost (%)', 'Installation Cost (%)', 'Payback Period Yrs',
-      'Interest Rate (%)', 'Insurance Rate (%)', 'Machine Footprint SQM',
-      'Rent SQM Month (INR)', 'Maintenance Cost (%)', 'Power KWH Per Hour',
-      'Electricity Cost KWH (INR)', 'Admin Overhead (%)', 'Profit Margin (%)',
-      'MHR Hour', 'LHR HR India', 'Labor Rate USD HR',
-      'LHR Base USD HR', 'LHR Burden 38 USD HR', 'LHR Total USD HR',
-      'Setup Time HR', 'Machine Description', 'Commodity Code',
-      'Max Capacity', 'Tolerance MM', 'Surface Finish RA UM',
-      'Material Compatibility', 'Typical Applications', 'Process Notes',
-    ];
-    const sample = [
-      'CNC Lathe 200', 'Pune', 'Machining', 'Turning', 'Standard', 'Semi', 'W5',
-      1, 'Jyoti CNC', 'India', 450000,
-      2, 8, 281,
-      85, 2500000,
-      5, 3, 5,
-      12, 1, 12,
-      3000, 5, 3.5,
-      8.5, 10, 15,
-      1850, 120, 8.5,
-      8.5, '', 17,
-      0.5, 'Two-axis CNC lathe', 'CNC-TURN',
-      'Ø300mm × 800mm', '±0.02', '1.6',
-      'Steel,Aluminium', 'Shafts,Flanges', '',
-    ];
-    const wb = createWorkbook();
-    addAoaSheet(wb, 'MHR', [headers, sample], headers.map(() => 22));
-    await downloadWorkbook(wb, 'MHR_Import_Template.xlsx');
   };
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -359,11 +242,11 @@ export default function HRRatesPage() {
 
       {/* MHR content */}
       <div className="space-y-4 mt-4">
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
+        {/* Toolbar: one centred line, Add MHR last */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="relative w-full min-w-[200px] sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search by machine name..." value={mhrSearch} onChange={e => setMhrSearch(e.target.value)} className="pl-9 h-9" />
+            <Input aria-label="Search machines" placeholder="Search by machine name..." value={mhrSearch} onChange={e => setMhrSearch(e.target.value)} className="pl-9 h-9" />
           </div>
           <Select value={mhrProcessGroupFilter || 'all'} onValueChange={v => setMhrProcessGroupFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="h-9 w-[150px] text-xs">
@@ -412,37 +295,7 @@ export default function HRRatesPage() {
               )}
             </Button>
           )}
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => { void downloadMhrTemplate(); }}>
-              <FileDown className="h-3.5 w-3.5 mr-1.5" />Template
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleMhrExportCsv} disabled={!filteredMhrRecords.length}>
-              <FileDown className="h-3.5 w-3.5 mr-1.5" />CSV
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleMhrExportPdf} disabled={!filteredMhrRecords.length}>
-              <FileText className="h-3.5 w-3.5 mr-1.5" />PDF
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleMhrDownloadJson} disabled={!filteredMhrRecords.length} title="Download all HR rate records as JSON">
-              <FileDown className="h-3.5 w-3.5 mr-1.5" />JSON
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-destructive hover:text-destructive"
-              disabled={!mhrData?.records?.length || deleteAllMhrMutation.isPending}
-              onClick={() => {
-                // Deletes every record, not only the loaded (filtered) ones —
-                // so the loaded count is not shown as the number deleted.
-                const scope = mhrProcessGroupFilter || mhrLocation
-                  ? 'Delete ALL MHR records in every process group and location (not only the ones shown)?'
-                  : `Delete all ${mhrData?.total ?? 0} MHR records?`;
-                if (confirm(`${scope} This cannot be undone.`)) {
-                  deleteAllMhrMutation.mutate();
-                }
-              }}
-            >
-              <Eraser className="h-3.5 w-3.5 mr-1.5" />Clear All
-            </Button>
+          <div className="flex shrink-0 items-center">
             <Button size="sm" onClick={handleMhrCreate}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />Add MHR
             </Button>
@@ -463,7 +316,7 @@ export default function HRRatesPage() {
         <Card>
           <CardContent className="p-0">
             {isMhrLoading ? (
-              <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>
+              <TableSkeleton rows={6} columns={5} label="Loading rates…" />
             ) : filteredMhrRecords.length > 0 ? (
               /* ─ Rate Table (simplified Combined format view) ─ */
               (

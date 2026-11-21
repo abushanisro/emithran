@@ -1,11 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Download, Edit, FileText, Printer } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -14,16 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import type { InspectionReport, InspectionDetail } from '@/lib/api/project-reports';
-import { Download, Edit, FileText, Printer } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 
 interface InspectionReportTableProps {
   report: InspectionReport;
@@ -35,26 +36,26 @@ function BalloonDrawingSection({ report }: { report: InspectionReport }) {
   return (
     <Card className="p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">1.3 BALLOON DRAWING</h2>
+        <h2 className="text-lg font-semibold">1.3 BALLOON DRAWING</h2>
         <Badge variant="outline">Technical Drawing</Badge>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <span className="font-medium">Material:</span>
+            <span className="text-muted-foreground">Material:</span>
             <span className="text-primary font-semibold">{report.material}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <span className="font-medium">Surface Treatment:</span>
+            <span className="text-muted-foreground">Surface Treatment:</span>
             <span className="text-primary font-semibold">{report.surface_treatment}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <span className="font-medium">Part Name:</span>
+            <span className="text-muted-foreground">Part Name:</span>
             <span className="text-primary font-semibold">{report.part_name}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <span className="font-medium">Drawing No.:</span>
+            <span className="text-muted-foreground">Drawing No.:</span>
             <span className="text-primary font-semibold">{report.drawing_no}</span>
           </div>
         </div>
@@ -64,7 +65,7 @@ function BalloonDrawingSection({ report }: { report: InspectionReport }) {
           <ul className="space-y-1 text-sm">
             {report.general_notes.map((note, index) => (
               <li key={index} className="flex items-start">
-                <span className="w-2 h-2 bg-brand-500 rounded-full mt-2 mr-2 shrink-0"></span>
+                <span className="w-2 h-2 bg-primary rounded-full mt-2 mr-2 shrink-0"></span>
                 {note}
               </li>
             ))}
@@ -120,7 +121,7 @@ function InspectionDetailsTable({
     <div className="border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted">
+          <TableRow className="bg-muted/40 hover:bg-transparent">
             <TableHead className="text-center font-semibold">S.No</TableHead>
             <TableHead className="font-semibold">Description</TableHead>
             <TableHead className="text-center font-semibold">Specification (mm)</TableHead>
@@ -145,9 +146,9 @@ function InspectionDetailsTable({
               <TableRow 
                 key={index}
                 className={`
-                  ${statusColor === 'green' ? 'bg-green-50 hover:bg-green-100' : ''}
-                  ${statusColor === 'red' ? 'bg-red-50 hover:bg-red-100' : ''}
-                  ${statusColor === 'yellow' ? 'bg-yellow-50 hover:bg-yellow-100' : ''}
+                  ${statusColor === 'green' ? 'bg-success/5 hover:bg-success/10' : ''}
+                  ${statusColor === 'red' ? 'bg-destructive/5 hover:bg-destructive/10' : ''}
+                  ${statusColor === 'yellow' ? 'bg-warning/5 hover:bg-warning/10' : ''}
                 `}
               >
                 <TableCell className="text-center font-medium">{detail.s_no}</TableCell>
@@ -162,9 +163,9 @@ function InspectionDetailsTable({
                     {detail.measurements[i] ? (
                       <span className={`
                         inline-block px-2 py-1 rounded text-sm font-medium
-                        ${statusColor === 'green' ? 'bg-green-100 text-green-800' : ''}
-                        ${statusColor === 'red' ? 'bg-red-100 text-red-800' : ''}
-                        ${statusColor === 'yellow' ? 'bg-yellow-100 text-yellow-800' : ''}
+                        ${statusColor === 'green' ? 'bg-success/15 text-success' : ''}
+                        ${statusColor === 'red' ? 'bg-destructive/15 text-destructive' : ''}
+                        ${statusColor === 'yellow' ? 'bg-warning/15 text-warning' : ''}
                       `}>
                         {detail.measurements[i].toFixed(2)}
                       </span>
@@ -176,11 +177,11 @@ function InspectionDetailsTable({
                 
                 <TableCell className="text-center">
                   <Badge 
-                    variant={statusColor === 'green' ? 'default' : 'destructive'}
+                    variant="outline"
                     className={`
-                      ${statusColor === 'green' ? 'bg-green-100 text-green-800 hover:bg-green-200' : ''}
-                      ${statusColor === 'red' ? 'bg-red-100 text-red-800 hover:bg-red-200' : ''}
-                      ${statusColor === 'yellow' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : ''}
+                      ${statusColor === 'green' ? 'bg-success/15 text-success hover:bg-success/20' : ''}
+                      ${statusColor === 'red' ? 'bg-destructive/15 text-destructive hover:bg-destructive/20' : ''}
+                      ${statusColor === 'yellow' ? 'bg-warning/15 text-warning hover:bg-warning/20' : ''}
                     `}
                   >
                     {detail.remarks || (statusColor === 'green' ? 'OK' : 'CHECK')}
@@ -322,7 +323,7 @@ export default function InspectionReportTable({
       
       <Card className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">1.4 FINAL INSPECTION REPORT</h2>
+          <h2 className="text-lg font-semibold">1.4 FINAL INSPECTION REPORT</h2>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
@@ -338,39 +339,39 @@ export default function InspectionReportTable({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="font-medium">Company Name:</span>
+              <span className="text-muted-foreground">Company Name:</span>
               <span className="text-primary font-semibold">{report.company_name}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-medium">Part Name:</span>
+              <span className="text-muted-foreground">Part Name:</span>
               <span>{report.part_name}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-medium">Part Number:</span>
+              <span className="text-muted-foreground">Part Number:</span>
               <span>{report.part_number}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-medium">Revision:</span>
+              <span className="text-muted-foreground">Revision:</span>
               <span>{report.revision}</span>
             </div>
           </div>
           
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="font-medium">Inspection Date:</span>
-              <span className="text-green-600 font-semibold">{report.inspection_date}</span>
+              <span className="text-muted-foreground">Inspection Date:</span>
+              <span className="text-success font-semibold">{report.inspection_date}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-medium">Raw Material:</span>
+              <span className="text-muted-foreground">Raw Material:</span>
               <span>{report.raw_material}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-medium">Inspected by:</span>
+              <span className="text-muted-foreground">Inspected by:</span>
               <span className="text-primary font-semibold">{report.inspected_by}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-medium">Approved by:</span>
-              <span className="text-green-600 font-semibold">{report.approved_by}</span>
+              <span className="text-muted-foreground">Approved by:</span>
+              <span className="text-success font-semibold">{report.approved_by}</span>
             </div>
           </div>
         </div>
@@ -378,7 +379,7 @@ export default function InspectionReportTable({
         <Separator className="my-6" />
         
         <div className="mb-4">
-          <h3 className="text-lg font-semibold mb-3">Inspection Details Table</h3>
+          <h3 className="mb-3 text-base font-semibold">Inspection Details Table</h3>
           <InspectionDetailsTable
             inspectionDetails={report.inspection_details}
             {...(isEditable ? { onUpdateDetail: handleUpdateDetail } : {})}
@@ -389,7 +390,7 @@ export default function InspectionReportTable({
         <div className="mt-6 p-4 bg-muted rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Badge variant="outline" className="bg-green-100 text-green-800">
+              <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
                 <FileText className="h-3 w-3 mr-1" />
                 Approved
               </Badge>

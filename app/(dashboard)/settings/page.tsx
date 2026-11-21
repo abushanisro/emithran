@@ -1,43 +1,39 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { format } from 'date-fns';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { toast } from 'sonner';
+
+import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   Plus, Copy, Check,
   Camera, Loader2,
   Monitor, Sun, Moon, Building2, Trash2,
   LayoutGrid, Mail, X,
-} from 'lucide-react';
-import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ListSkeleton } from '@/components/ui/loading-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { useProfile, useUpdateProfile, useUploadAvatar } from '@/lib/api/hooks/useProfile';
-import {
-  useFeatureProcessMappings,
-  useRoutingRules,
-  useRoutingTemplates,
-  useMachineCapabilities,
-} from '@/lib/api/hooks/useManufacturingKnowledge';
-import type { FeatureProcessMapping, ProcessRoutingRule, PartFamilyRoutingTemplate, MachineCapability } from '@/lib/api/hooks/useManufacturingKnowledge';
-import { useAuth } from '@/lib/providers/auth';
-import { useTheme } from 'next-themes';
-import { useDensity } from '@/lib/providers/density-provider';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import {
   useMyOrganization, useCreateOrganization, useUpdateOrganization,
   useDeleteOrganization, useOrgMembers, useInviteMember, useRemoveMember,
   useWorkspaces, useCreateWorkspace, useDeleteWorkspace,
 } from '@/lib/api/hooks/useOrganization';
+import { useProfile, useUpdateProfile, useUploadAvatar } from '@/lib/api/hooks/useProfile';
+import { useAuth } from '@/lib/providers/auth';
+import { useDensity } from '@/lib/providers/density-provider';
 
 const TIMEZONES = [
   'UTC', 'Asia/Kolkata', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Singapore',
@@ -155,7 +151,7 @@ function PreferencesTab() {
                 <button
                   key={value}
                   onClick={() => setTheme(value)}
-                  className={`group relative flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                  className={`group relative flex flex-col gap-3 rounded-lg border-2 p-3 text-left transition-all duration-150 outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50 ${
                     active
                       ? 'border-primary bg-primary/5 shadow-[0_0_0_3px] shadow-primary/10'
                       : 'border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/30'
@@ -200,7 +196,7 @@ function PreferencesTab() {
               <button
                 key={value}
                 onClick={() => setDensity(value)}
-                className={`group flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                className={`group flex flex-col gap-3 rounded-lg border-2 p-3 text-left transition-all duration-150 outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50 ${
                   active
                     ? 'border-primary bg-primary/5 shadow-[0_0_0_3px] shadow-primary/10'
                     : 'border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/30'
@@ -279,9 +275,7 @@ function ProfileTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <ListSkeleton rows={4} label="Loading…" className="py-10" />
     );
   }
 
@@ -300,13 +294,15 @@ function ProfileTab() {
                 <AvatarFallback className="text-xl bg-primary/10 text-primary">{initials}</AvatarFallback>
               </Avatar>
               <button
+                type="button"
+                aria-label="Upload profile photo"
                 onClick={() => fileRef.current?.click()}
                 disabled={avatarUploading}
-                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
               >
                 {avatarUploading
-                  ? <Loader2 className="h-5 w-5 text-foreground animate-spin" />
-                  : <Camera className="h-5 w-5 text-foreground" />}
+                  ? <Loader2 className="h-5 w-5 text-white animate-spin" />
+                  : <Camera className="h-5 w-5 text-white" aria-hidden="true" />}
               </button>
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
             </div>
@@ -503,7 +499,7 @@ function CreateOrgDialog({ open, onClose }: { open: boolean; onClose: () => void
               { label: 'Will the API be used to provide legal, medical, or financial advice to consumers?', value: legalMedical, set: setLegalMedical },
               { label: 'Will you be using the API in any products or services intended for users under age 18?', value: under18, set: setUnder18 },
             ].map(({ label, value, set }) => (
-              <div key={label} className="flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/20 px-4 py-3">
+              <div key={label} className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/20 px-4 py-3">
                 <p className="text-sm leading-snug text-foreground">{label}</p>
                 <div className="flex items-center gap-1 shrink-0">
                   {(['Yes', 'No'] as const).map((opt) => {
@@ -625,7 +621,7 @@ function OrganizationTab() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <ListSkeleton rows={4} label="Loading…" className="py-10" />;
   }
 
   // ── No org yet — minimal create prompt ──
@@ -641,7 +637,7 @@ function OrganizationTab() {
             <Plus className="h-4 w-4" /> New organization
           </Button>
         </div>
-        <div className="rounded-xl border-2 border-dashed border-border p-12 text-center">
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 p-12 text-center">
           <Building2 className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
           <p className="text-sm text-muted-foreground">No organization yet.</p>
         </div>
@@ -654,7 +650,7 @@ function OrganizationTab() {
   return (
     <div className="space-y-8 w-full">
       {/* Header + detail card */}
-      <div className="rounded-xl border border-border bg-card p-6 space-y-6">
+      <div className="rounded-lg border border-border bg-card p-6 space-y-6">
 
         {/* Top row: name + members + edit button */}
         <div className="flex items-start justify-between gap-4">
@@ -718,7 +714,7 @@ function OrganizationTab() {
                 <code className="flex-1 text-xs font-mono select-all">{org.id}</code>
                 <button onClick={copyOrgId} className="shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   {copied
-                    ? <><Check className="h-3.5 w-3.5 text-green-400" /><span className="text-green-400">Copied</span></>
+                    ? <><Check className="h-3.5 w-3.5 text-success" /><span className="text-success">Copied</span></>
                     : <><Copy className="h-3.5 w-3.5" /><span>Copy</span></>}
                 </button>
               </div>
@@ -774,7 +770,7 @@ function OrganizationTab() {
               <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
                 <code className="flex-1 text-xs font-mono select-all">{org.id}</code>
                 <button onClick={copyOrgId} className="shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  {copied ? <><Check className="h-3.5 w-3.5 text-green-400" /><span className="text-green-400">Copied</span></> : <><Copy className="h-3.5 w-3.5" /><span>Copy</span></>}
+                  {copied ? <><Check className="h-3.5 w-3.5 text-success" /><span className="text-success">Copied</span></> : <><Copy className="h-3.5 w-3.5" /><span>Copy</span></>}
                 </button>
               </div>
             </div>
@@ -790,7 +786,7 @@ function OrganizationTab() {
       </div>
 
       {/* Allow default workspace API keys toggle */}
-      <div className="rounded-xl border border-border bg-card p-5 flex items-center justify-between gap-6">
+      <div className="rounded-lg border border-border bg-card p-5 flex items-center justify-between gap-6">
         <div>
           <p className="text-sm font-medium">Allow creating new API keys in default workspace</p>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -812,7 +808,7 @@ function OrganizationTab() {
           </Button>
         </div>
 
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-hidden">
           <div className="grid grid-cols-[1fr_120px_100px_48px] border-b border-border bg-muted/40 px-4 py-2.5">
             {['Member', 'Role', 'Status', ''].map((h) => (
               <span key={h} className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{h}</span>
@@ -831,7 +827,7 @@ function OrganizationTab() {
                     {m.displayName && <p className="text-xs text-muted-foreground truncate">{m.email || m.invitedEmail}</p>}
                   </div>
                   <Badge variant="outline" className="w-fit capitalize text-[11px]">{m.role}</Badge>
-                  <span className={`text-xs font-medium capitalize ${m.status === 'active' ? 'text-green-400' : 'text-amber-400'}`}>
+                  <span className={`text-xs font-medium capitalize ${m.status === 'active' ? 'text-success' : 'text-warning'}`}>
                     {m.status}
                   </span>
                   {m.role !== 'owner' ? (
@@ -850,7 +846,7 @@ function OrganizationTab() {
       </div>
 
       {/* Danger zone */}
-      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
         <h3 className="text-sm font-semibold text-destructive mb-1">Danger zone</h3>
         <p className="text-xs text-muted-foreground mb-4">
           Deleting the organization is permanent. All workspaces, members, and API keys in this organization will be removed.
@@ -937,11 +933,11 @@ function WorkspacesTab() {
     });
   };
 
-  if (orgLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (orgLoading) return <ListSkeleton rows={4} label="Loading…" className="py-10" />;
 
   if (!org) {
     return (
-      <div className="rounded-xl border border-border bg-muted/20 p-8 text-center space-y-3">
+      <div className="rounded-lg border border-border bg-muted/20 p-8 text-center space-y-3">
         <LayoutGrid className="h-10 w-10 mx-auto text-muted-foreground/40" />
         <p className="text-sm font-medium">No organization</p>
         <p className="text-sm text-muted-foreground">Create an organization first to manage workspaces.</p>
@@ -969,7 +965,7 @@ function WorkspacesTab() {
       ) : (
         <div className="space-y-3">
           {workspaces.map((ws) => (
-            <div key={ws.id} className="rounded-xl border border-border bg-card p-4 flex items-center justify-between gap-4">
+            <div key={ws.id} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <LayoutGrid className="h-4 w-4 text-primary" />
@@ -1001,7 +997,7 @@ function WorkspacesTab() {
           ))}
 
           {workspaces.length === 0 && (
-            <div className="rounded-xl border-2 border-dashed border-border p-10 text-center space-y-2">
+            <div className="rounded-lg border border-dashed border-border bg-muted/20 p-10 text-center space-y-2">
               <LayoutGrid className="h-10 w-10 mx-auto text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">No workspaces yet.</p>
             </div>
@@ -1058,354 +1054,9 @@ function WorkspacesTab() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Manufacturing Knowledge Tab
-// ─────────────────────────────────────────────────────────────
-const KB_SUBTABS = ['feature-process', 'routing-rules', 'machines', 'templates', 'feedback'] as const;
-type KbSubtab = typeof KB_SUBTABS[number];
-
-const KB_SUBTAB_LABELS: Record<KbSubtab, string> = {
-  'feature-process': 'Feature → Process',
-  'routing-rules':   'Routing Rules',
-  'machines':        'Machine Capabilities',
-  'templates':       'Routing Templates',
-  'feedback':        'Engineer Feedback',
-};
-
-function ManufacturingKnowledgeTab() {
-  const [activeKbTab, setActiveKbTab] = useState<KbSubtab>('feature-process');
-  const [addFpmOpen, setAddFpmOpen] = useState(false);
-  const [addRuleOpen, setAddRuleOpen] = useState(false);
-  const [addMachineOpen, setAddMachineOpen] = useState(false);
-
-  const [fpmFeatureType, setFpmFeatureType] = useState('');
-  const [fpmPrimaryProcess, setFpmPrimaryProcess] = useState('');
-  const [fpmMachineType, setFpmMachineType] = useState('');
-  const [fpmPrereq, setFpmPrereq] = useState('');
-
-  const [ruleFirst, setRuleFirst] = useState('');
-  const [ruleSecond, setRuleSecond] = useState('');
-  const [ruleConstraint, setRuleConstraint] = useState<'must_precede' | 'must_follow' | 'cannot_coexist'>('must_precede');
-  const [ruleSeverity, setRuleSeverity] = useState<'error' | 'warning'>('error');
-  const [ruleMessage, setRuleMessage] = useState('');
-
-  const [machineName, setMachineName] = useState('');
-  const [machineType, setMachineType] = useState('');
-  const [machineProcesses, setMachineProcesses] = useState('');
-
-  const { data: fpmRows = [], isLoading: fpmLoading } = useFeatureProcessMappings();
-  const { data: ruleRows = [], isLoading: rulesLoading } = useRoutingRules();
-  const { data: machineRows = [], isLoading: machinesLoading } = useMachineCapabilities();
-  const { data: templateRows = [], isLoading: templatesLoading } = useRoutingTemplates();
-
-  const handleAddFpm = () => {
-    if (!fpmFeatureType.trim() || !fpmPrimaryProcess.trim()) return;
-    toast.success('Custom rule added (API integration required)');
-    setAddFpmOpen(false);
-    setFpmFeatureType(''); setFpmPrimaryProcess(''); setFpmMachineType(''); setFpmPrereq('');
-  };
-
-  const handleAddRule = () => {
-    if (!ruleFirst.trim() || !ruleSecond.trim() || !ruleMessage.trim()) return;
-    toast.success('Custom rule added (API integration required)');
-    setAddRuleOpen(false);
-    setRuleFirst(''); setRuleSecond(''); setRuleMessage('');
-  };
-
-  const handleAddMachine = () => {
-    if (!machineName.trim() || !machineType.trim()) return;
-    toast.success('Machine added (API integration required)');
-    setAddMachineOpen(false);
-    setMachineName(''); setMachineType(''); setMachineProcesses('');
-  };
-
-  return (
-    <div className="space-y-6 w-full">
-      <div>
-        <h2 className="text-lg font-semibold">Manufacturing Knowledge</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ground-truth rules used by the AI process planner. System entries are read-only; add custom entries to extend or override.
-        </p>
-      </div>
-
-      {/* Sub-tab nav */}
-      <div className="flex gap-0.5 border-b border-border">
-        {KB_SUBTABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveKbTab(tab)}
-            className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
-              activeKbTab === tab
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {KB_SUBTAB_LABELS[tab]}
-          </button>
-        ))}
-      </div>
-
-      {/* Feature → Process */}
-      {activeKbTab === 'feature-process' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Maps each feature type (hole, pocket, bend…) to its primary process and machine.</p>
-            <Button size="sm" variant="outline" onClick={() => setAddFpmOpen(true)} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> Add Custom Rule
-            </Button>
-          </div>
-          {fpmLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="grid grid-cols-[140px_130px_110px_120px_1fr] border-b border-border bg-muted/40 px-3 py-2">
-                {['Feature Type', 'Primary Process', 'Machine', 'Prerequisite', 'Notes'].map((h) => (
-                  <span key={h} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{h}</span>
-                ))}
-              </div>
-              <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                {fpmRows.map((row: FeatureProcessMapping) => (
-                  <div key={row.id} className="grid grid-cols-[140px_130px_110px_120px_1fr] px-3 py-2 items-center text-xs">
-                    <span className="font-mono font-medium text-foreground">{row.featureType}</span>
-                    <span className="text-foreground">{row.primaryProcess}</span>
-                    <span className="text-muted-foreground">{row.typicalMachineType ?? '—'}</span>
-                    <span className="text-muted-foreground">{row.prerequisiteProcess ?? '—'}</span>
-                    <span className="truncate text-muted-foreground">{row.notes ?? '—'}</span>
-                  </div>
-                ))}
-                {fpmRows.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-3 py-6 text-center">No entries yet. Run the database migration to seed system data.</p>
-                )}
-              </div>
-            </div>
-          )}
-          <Dialog open={addFpmOpen} onOpenChange={setAddFpmOpen}>
-            <DialogContent className="sm:max-w-[420px]">
-              <DialogHeader>
-                <DialogTitle>Add Custom Feature → Process Rule</DialogTitle>
-                <DialogDescription>Override or extend the system defaults for your shop floor.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3 py-2">
-                <div className="space-y-1.5"><Label>Feature type</Label><Input value={fpmFeatureType} onChange={(e) => setFpmFeatureType(e.target.value)} placeholder="e.g. hole, pocket, bend" /></div>
-                <div className="space-y-1.5"><Label>Primary process</Label><Input value={fpmPrimaryProcess} onChange={(e) => setFpmPrimaryProcess(e.target.value)} placeholder="e.g. drilling, end_milling" /></div>
-                <div className="space-y-1.5"><Label>Typical machine type</Label><Input value={fpmMachineType} onChange={(e) => setFpmMachineType(e.target.value)} placeholder="e.g. vmc, lathe, laser" /></div>
-                <div className="space-y-1.5"><Label>Prerequisite process <span className="text-muted-foreground">(optional)</span></Label><Input value={fpmPrereq} onChange={(e) => setFpmPrereq(e.target.value)} placeholder="e.g. drilling (must run first)" /></div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setAddFpmOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddFpm} disabled={!fpmFeatureType.trim() || !fpmPrimaryProcess.trim()}>Add Rule</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-
-      {/* Routing Rules */}
-      {activeKbTab === 'routing-rules' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Sequence validation rules — must_precede, must_follow, cannot_coexist.</p>
-            <Button size="sm" variant="outline" onClick={() => setAddRuleOpen(true)} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> Add Rule
-            </Button>
-          </div>
-          {rulesLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="grid grid-cols-[130px_130px_130px_80px_1fr] border-b border-border bg-muted/40 px-3 py-2">
-                {['First Process', 'Second Process', 'Constraint', 'Severity', 'Message'].map((h) => (
-                  <span key={h} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{h}</span>
-                ))}
-              </div>
-              <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                {ruleRows.map((row: ProcessRoutingRule) => (
-                  <div key={row.id} className="grid grid-cols-[130px_130px_130px_80px_1fr] px-3 py-2 items-center text-xs text-muted-foreground">
-                    <span className="font-mono text-foreground">{row.firstProcess}</span>
-                    <span className="font-mono text-foreground">{row.secondProcess}</span>
-                    <span className="font-mono">{row.constraintType}</span>
-                    <span className={row.severity === 'error' ? 'text-red-400 font-medium' : 'text-amber-400 font-medium'}>{row.severity}</span>
-                    <span className="truncate">{row.message}</span>
-                  </div>
-                ))}
-                {ruleRows.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-3 py-6 text-center">No rules yet. Run the database migration to seed system rules.</p>
-                )}
-              </div>
-            </div>
-          )}
-          <Dialog open={addRuleOpen} onOpenChange={setAddRuleOpen}>
-            <DialogContent className="sm:max-w-[460px]">
-              <DialogHeader>
-                <DialogTitle>Add Custom Routing Rule</DialogTitle>
-                <DialogDescription>Define sequencing constraints for your process routes.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3 py-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label>First process</Label><Input value={ruleFirst} onChange={(e) => setRuleFirst(e.target.value)} placeholder="e.g. drilling" /></div>
-                  <div className="space-y-1.5"><Label>Second process</Label><Input value={ruleSecond} onChange={(e) => setRuleSecond(e.target.value)} placeholder="e.g. tapping" /></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>Constraint</Label>
-                    <Select value={ruleConstraint} onValueChange={(v) => setRuleConstraint(v as any)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="must_precede">must_precede</SelectItem>
-                        <SelectItem value="must_follow">must_follow</SelectItem>
-                        <SelectItem value="cannot_coexist">cannot_coexist</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Severity</Label>
-                    <Select value={ruleSeverity} onValueChange={(v) => setRuleSeverity(v as any)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="error">error</SelectItem>
-                        <SelectItem value="warning">warning</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-1.5"><Label>Message</Label><Input value={ruleMessage} onChange={(e) => setRuleMessage(e.target.value)} placeholder="Human-readable description of the rule" /></div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setAddRuleOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddRule} disabled={!ruleFirst.trim() || !ruleSecond.trim() || !ruleMessage.trim()}>Add Rule</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-
-      {/* Machine Capabilities */}
-      {activeKbTab === 'machines' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Machine type → supported processes, tolerances, material compatibility.</p>
-            <Button size="sm" variant="outline" onClick={() => setAddMachineOpen(true)} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> Add Machine
-            </Button>
-          </div>
-          {machinesLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="grid grid-cols-[160px_120px_1fr] border-b border-border bg-muted/40 px-3 py-2">
-                {['Machine Name', 'Type', 'Supported Processes'].map((h) => (
-                  <span key={h} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{h}</span>
-                ))}
-              </div>
-              <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                {machineRows.map((row: MachineCapability) => (
-                  <div key={row.id} className="grid grid-cols-[160px_120px_1fr] px-3 py-2 items-center text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{row.machineName}</span>
-                    <span className="font-mono">{row.machineType}</span>
-                    <span className="truncate">{(row.supportedProcesses ?? []).join(', ')}</span>
-                  </div>
-                ))}
-                {machineRows.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-3 py-6 text-center">No machines configured. Add your shop floor machines to improve AI machine selection.</p>
-                )}
-              </div>
-            </div>
-          )}
-          <Dialog open={addMachineOpen} onOpenChange={setAddMachineOpen}>
-            <DialogContent className="sm:max-w-[420px]">
-              <DialogHeader>
-                <DialogTitle>Add Machine</DialogTitle>
-                <DialogDescription>Define what processes this machine can perform.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3 py-2">
-                <div className="space-y-1.5"><Label>Machine name</Label><Input value={machineName} onChange={(e) => setMachineName(e.target.value)} placeholder="e.g. Haas VF-2" /></div>
-                <div className="space-y-1.5"><Label>Machine type</Label><Input value={machineType} onChange={(e) => setMachineType(e.target.value)} placeholder="e.g. vmc, lathe, grinder" /></div>
-                <div className="space-y-1.5">
-                  <Label>Supported processes <span className="text-muted-foreground">(comma-separated)</span></Label>
-                  <Input value={machineProcesses} onChange={(e) => setMachineProcesses(e.target.value)} placeholder="e.g. drilling, milling, tapping" />
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setAddMachineOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddMachine} disabled={!machineName.trim() || !machineType.trim()}>Add</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-
-      {/* Routing Templates */}
-      {activeKbTab === 'templates' && (
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">Standard process sequences per part family. The AI uses these as the base route before injecting feature-specific operations.</p>
-          {templatesLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="space-y-3">
-              {(templateRows as PartFamilyRoutingTemplate[]).map((t) => (
-                <div key={t.id} className="rounded-xl border border-border bg-card p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-semibold">{t.templateName}</span>
-                      <span className="ml-2 text-xs text-muted-foreground font-mono">{t.partFamily}</span>
-                    </div>
-                    {t.complexityLevel && <Badge variant="outline" className="text-[10px]">{t.complexityLevel}</Badge>}
-                  </div>
-                  {Array.isArray(t.routingSequence) && (
-                    <div className="space-y-0.5">
-                      {t.routingSequence.map((step: any) => (
-                        <div key={step.step} className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="w-6 text-right font-mono text-foreground/60">{step.step}</span>
-                          <span className="font-mono text-primary/80">{step.process}</span>
-                          <span className="text-muted-foreground/60">[{step.machineType}]</span>
-                          <span>{step.description}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {templateRows.length === 0 && (
-                <div className="rounded-xl border-2 border-dashed border-border p-10 text-center">
-                  <p className="text-sm text-muted-foreground">No templates found. Run the database migration to seed routing templates.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Engineer Feedback */}
-      {activeKbTab === 'feedback' && (
-        <FeedbackSubtab />
-      )}
-    </div>
-  );
-}
-
-function FeedbackSubtab() {
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">Engineer corrections to AI-generated process plans. Used to improve future generation quality.</p>
-      <div className="rounded-xl border border-border bg-card p-6 space-y-3">
-        <p className="text-sm font-medium">How to submit feedback</p>
-        <ol className="space-y-1.5 text-sm text-muted-foreground list-decimal list-inside">
-          <li>Navigate to a BOM item and open the AI Process Plan panel</li>
-          <li>If the AI generated incorrect machine assignments or wrong process order, click "Submit Correction"</li>
-          <li>Enter the correct sequence and the reason for the correction</li>
-          <li>Corrections are stored in the <code className="text-xs font-mono bg-muted px-1 py-0.5 rounded">process_plan_feedback</code> table and used to improve future generations</li>
-        </ol>
-        <div className="rounded-lg border border-border bg-muted/30 p-3 mt-2">
-          <p className="text-xs text-muted-foreground">Per-part feedback history is viewable from the process plan panel on each BOM item page. A global feedback dashboard will be added in V2.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
 // Settings Page — vertical sidebar layout
 // ─────────────────────────────────────────────────────────────
-const VALID_TABS = ['profile', 'preferences', 'organization', 'workspaces', 'manufacturing-knowledge'] as const;
+const VALID_TABS = ['profile', 'preferences', 'organization', 'workspaces'] as const;
 type Tab = typeof VALID_TABS[number];
 
 const NAV_SECTIONS = [
@@ -1423,12 +1074,6 @@ const NAV_SECTIONS = [
       { id: 'workspaces'   as Tab, label: 'Workspaces' },
     ],
   },
-  {
-    label: 'Manufacturing',
-    items: [
-      { id: 'manufacturing-knowledge' as Tab, label: 'Knowledge Base' },
-    ],
-  },
 ];
 
 const TAB_TITLES: Record<Tab, string> = {
@@ -1436,7 +1081,6 @@ const TAB_TITLES: Record<Tab, string> = {
   'preferences':              'Preferences',
   'organization':             'Organization',
   'workspaces':               'Workspaces',
-  'manufacturing-knowledge':  'Manufacturing Knowledge',
 };
 
 function SettingsInner() {
@@ -1454,17 +1098,16 @@ function SettingsInner() {
     'preferences':              <PreferencesTab />,
     'organization':             <OrganizationTab />,
     'workspaces':               <WorkspacesTab />,
-    'manufacturing-knowledge':  <ManufacturingKnowledgeTab />,
   };
 
   return (
-    <div className="animate-fade-in flex gap-0 min-h-full">
-      {/* ── Left vertical nav ── */}
-      <aside className="w-52 shrink-0 pr-6 border-r border-border">
-        <div className="sticky top-0 space-y-6 pt-1">
+    <div className="animate-fade-in flex min-h-full flex-col gap-6 md:flex-row md:gap-0">
+      {/* ── Section navigation ── */}
+      <aside className="shrink-0 border-b border-border pb-4 md:w-56 md:border-b-0 md:border-r md:pb-0 md:pr-6">
+        <nav aria-label="Settings sections" className="space-y-6 pt-1 md:sticky md:top-0">
           {NAV_SECTIONS.map((section) => (
             <div key={section.label}>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-foreground/50 mb-2 px-3">
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {section.label}
               </p>
               <ul className="space-y-0.5">
@@ -1473,11 +1116,13 @@ function SettingsInner() {
                   return (
                     <li key={item.id}>
                       <button
+                        type="button"
                         onClick={() => navigate(item.id)}
-                        className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-colors ${
+                        aria-current={active ? 'page' : undefined}
+                        className={`w-full rounded-md border-l-2 px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                           active
-                            ? 'bg-sidebar-accent text-foreground font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                            ? 'border-primary bg-sidebar-accent font-medium text-foreground'
+                            : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                         }`}
                       >
                         {item.label}
@@ -1488,12 +1133,12 @@ function SettingsInner() {
               </ul>
             </div>
           ))}
-        </div>
+        </nav>
       </aside>
 
-      {/* ── Right content ── */}
-      <main className="flex-1 min-w-0 pl-8">
-        <h1 className="text-2xl font-bold mb-6">{TAB_TITLES[activeTab]}</h1>
+      {/* ── Content ── */}
+      <main className="min-w-0 flex-1 md:pl-8">
+        <PageHeader title={TAB_TITLES[activeTab]} />
         {content[activeTab]}
       </main>
     </div>
@@ -1502,7 +1147,7 @@ function SettingsInner() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+    <Suspense fallback={<ListSkeleton rows={4} label="Loading…" className="py-10" />}>
       <SettingsInner />
     </Suspense>
   );

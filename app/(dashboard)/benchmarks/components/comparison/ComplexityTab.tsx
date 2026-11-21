@@ -1,11 +1,15 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
-import type { BOMMetricEntry } from "../../types";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+
+
 import { safeNum } from "../../utils";
+
+import type { BOMMetricEntry } from "../../types";
 
 interface Props {
   bomMetrics: BOMMetricEntry[];
@@ -164,9 +168,9 @@ export function ComplexityTab({ bomMetrics }: Props) {
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="assemblyParts" stackId="a" fill="#3b82f6" name="Assembly Parts" />
-                <Bar dataKey="subAssemblyParts" stackId="a" fill="#f26822" name="Sub-Assembly Parts" />
-                <Bar dataKey="childParts" stackId="a" fill="#14b8a6" name="Child Parts" />
+                <Bar dataKey="assemblyParts" stackId="a" fill="hsl(var(--chart-4))" name="Assembly Parts" />
+                <Bar dataKey="subAssemblyParts" stackId="a" fill="hsl(var(--chart-3))" name="Sub-Assembly Parts" />
+                <Bar dataKey="childParts" stackId="a" fill="hsl(var(--chart-1))" name="Child Parts" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -266,11 +270,11 @@ export function ComplexityTab({ bomMetrics }: Props) {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <div className="text-muted-foreground">Machined Parts</div>
-                      <div className="text-lg font-semibold text-orange-600">{data.machinedParts}</div>
+                      <div className="text-lg font-semibold text-warning">{data.machinedParts}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Tolerance Critical</div>
-                      <div className="text-lg font-semibold text-red-600">{data.toleranceCritical}</div>
+                      <div className="text-lg font-semibold text-destructive">{data.toleranceCritical}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Complex Geometry</div>

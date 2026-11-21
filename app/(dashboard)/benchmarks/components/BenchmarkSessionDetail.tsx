@@ -1,33 +1,37 @@
 'use client';
 
+import { useQueries } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, Pencil, Trash2 } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useQueries } from '@tanstack/react-query';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import type { BenchmarkSession } from '@/lib/api/benchmark-sessions';
+import { bomApi } from '@/lib/api/bom';
+import type { BOMsResponse } from '@/lib/api/bom';
+import { apiClient } from '@/lib/api/client';
 import {
   useBenchmarkSession,
   useUpdateBenchmarkSession,
   useDeleteBenchmarkSession,
 } from '@/lib/api/hooks/useBenchmarkSessions';
+import { useProcesses } from '@/lib/api/hooks/useProcesses';
 import { useProjects } from '@/lib/api/hooks/useProjects';
 import { useVendors } from '@/lib/api/hooks/useVendors';
-import { useProcesses } from '@/lib/api/hooks/useProcesses';
-import { ProjectSelection } from './ProjectSelection';
+
 import { BOMSelection } from './BOMSelection';
 import { ComparisonView } from './comparison';
-import type { SelectedProject, SelectedBOM, BOMMetricEntry } from '../types';
+import { ProjectSelection } from './ProjectSelection';
 import { calculateMetrics } from '../utils';
-import type { BenchmarkSession } from '@/lib/api/benchmark-sessions';
-import { bomApi } from '@/lib/api/bom';
-import type { BOMsResponse } from '@/lib/api/bom';
-import { apiClient } from '@/lib/api/client';
+
+import type { SelectedProject, SelectedBOM, BOMMetricEntry } from '../types';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -291,7 +295,7 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
 
   if (sessionLoading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="animate-fade-in">
         <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
         <div className="h-64 bg-muted rounded animate-pulse" />
       </div>
@@ -300,7 +304,7 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
 
   if (!session) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="animate-fade-in">
         <Button variant="ghost" onClick={onBack} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
@@ -311,7 +315,7 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
 
   if (!initialized) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="animate-fade-in">
         <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
         <div className="h-64 bg-muted rounded animate-pulse" />
       </div>
@@ -319,43 +323,37 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-4">
+    <div className="animate-fade-in space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold">{session.name}</h1>
-              <Badge
-                variant="outline"
-                className={`text-[10px] ${STATUS_COLORS[session.status]}`}
-              >
-                {STATUS_LABELS[session.status]}
-              </Badge>
-            </div>
-            {session.description && (
-              <p className="text-xs text-muted-foreground mt-0.5">{session.description}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleEditOpen}>
-            <Pencil className="h-3.5 w-3.5 mr-1.5" />
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setDeleteOpen(true)}
+      <div className="flex items-start gap-3">
+        <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to sessions" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title={session.name}
+            {...(session.description ? { description: session.description } : {})}
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Delete
-          </Button>
+            <Badge
+              variant="outline"
+              className={`text-[10px] ${STATUS_COLORS[session.status]}`}
+            >
+              {STATUS_LABELS[session.status]}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={handleEditOpen} className="gap-1.5">
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-destructive hover:text-destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </PageHeader>
         </div>
       </div>
 
@@ -443,7 +441,7 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
 
       {/* Edit dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md" style={{ background: 'hsl(220 18% 10%)' }}>
+        <DialogContent className="sm:max-w-md" style={{ background: 'hsl(var(--popover))' }}>
           <DialogHeader>
             <DialogTitle>Edit Session</DialogTitle>
           </DialogHeader>
@@ -496,7 +494,7 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
 
       {/* Delete confirmation */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-sm" style={{ background: 'hsl(220 18% 10%)' }}>
+        <DialogContent className="sm:max-w-sm" style={{ background: 'hsl(var(--popover))' }}>
           <DialogHeader>
             <DialogTitle>Delete Session?</DialogTitle>
           </DialogHeader>

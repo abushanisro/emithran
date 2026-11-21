@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useState, useMemo } from 'react';
+
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Plus,
   Search,
@@ -18,18 +22,23 @@ import {
   Layers,
   CheckCircle2,
   ArrowUpRight,
-} from 'lucide-react';
-import { useSupplierNominations, useDeleteSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
+  MoreVertical,
+} from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
+import { useSupplierNominations, useDeleteSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
 import {
+  getStatusColor,
   getStatusText,
   getNominationTypeLabel,
   NominationType,
   NominationStatus,
   type SupplierNominationSummary,
 } from '@/lib/api/supplier-nominations';
+
 import { CreateNominationDialog } from './CreateNominationDialog';
 import { EditNominationDialog } from './EditNominationDialog';
+import { toneClasses } from './tone';
 
 interface SupplierNominationsDashboardProps {
   projectId: string;
@@ -107,10 +116,10 @@ export function SupplierNominationsDashboard({
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse border border-border/50 bg-card">
-              <CardContent className="p-6 space-y-4">
+            <Card key={i} className="animate-pulse">
+              <CardContent className="space-y-4 p-5">
                 <div className="h-5 bg-muted rounded w-2/3" />
                 <div className="h-4 bg-muted rounded w-1/3" />
                 <div className="h-20 bg-muted rounded-lg" />
@@ -122,154 +131,121 @@ export function SupplierNominationsDashboard({
     );
   }
 
+  const kpis = [
+    {
+      label: 'Total Nominations',
+      icon: Layers,
+      value: stats.total,
+      hint: stats.inProgress > 0 ? `${stats.inProgress} active` : undefined,
+    },
+    { label: 'Vendors Nominated', icon: Users, value: stats.totalVendors, hint: 'suppliers' },
+    { label: 'Completed / Approved', icon: CheckCircle2, value: stats.completed, hint: 'groups' },
+    { label: 'BOM Parts Nominated', icon: Package, value: stats.totalBomParts, hint: 'parts' },
+  ];
+
   return (
-    <div className="space-y-8">
-      {/* Back Button & Header Row */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start gap-3">
         <Button
-          variant="ghost"
-          size="sm"
+          variant="outline"
+          size="icon"
+          className="mt-0.5 h-8 w-8 shrink-0"
+          aria-label="Back to project"
           onClick={() => router.push(`/projects/${projectId}`)}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Project
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-      </div>
-
-      {/* OEM Executive Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-linear-to-br from-card/90 via-card to-primary/5 p-6 md:p-8 shadow-xs">
-        <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-        <div className="absolute right-1/4 -bottom-12 h-48 w-48 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-              OEM Supplier Nomination Groups
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-              Evaluate and nominate suppliers for OEM and manufacturing partnerships, track BOM part allocations, and finalize vendor awards.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={() => setCreateDialogOpen(true)}
-              size="lg"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md shadow-primary/20 transition-all hover:scale-[1.02]"
-            >
-              <Plus className="h-4 w-4 mr-2" />
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title="Supplier Nomination"
+            description="Evaluate and nominate suppliers, track BOM part allocations and finalise vendor awards"
+          >
+            <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
               Create Nomination
             </Button>
-          </div>
-        </div>
-
-        {/* Currently Selected BOM Info */}
-        {selectedBomId && (
-          <div className="mt-6 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-3.5">
-            <div className="flex items-center gap-3">
-              <Package className="h-5 w-5 text-primary" />
-              <div>
-                <h4 className="font-medium text-foreground text-sm">
-                  BOM Selected: {boms.find(b => b.id === selectedBomId)?.name || 'Unknown BOM'}
-                </h4>
-                <p className="text-xs text-muted-foreground">Ready for part-wise nominations</p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.location.href = window.location.pathname}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear Selection
-            </Button>
-          </div>
-        )}
-
-        {/* KPI Metrics Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border/40">
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Layers className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Nominations</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl font-bold text-foreground">{stats.total}</span>
-                {stats.inProgress > 0 && (
-                  <span className="text-xs font-medium text-amber-500">({stats.inProgress} active)</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Users className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vendors Nominated</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl font-bold text-foreground">{stats.totalVendors}</span>
-                <span className="text-xs text-muted-foreground">suppliers</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Completed / Approved</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl font-bold text-foreground">{stats.completed}</span>
-                <span className="text-xs text-muted-foreground">groups</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500">
-              <Package className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">BOM Parts Nominated</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl font-bold text-foreground">{stats.totalBomParts}</span>
-                <span className="text-xs text-muted-foreground">parts</span>
-              </div>
-            </div>
-          </div>
+          </PageHeader>
         </div>
       </div>
 
-      {/* Filter & Search Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/80 p-4 backdrop-blur-sm">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Project sections: shared tab bar, Nomination is the active tab */}
+      <ProjectNav projectId={projectId} />
+
+      {/* Currently selected BOM */}
+      {selectedBomId && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+          <div className="flex items-center gap-3">
+            <Package className="h-4 w-4 text-primary" aria-hidden="true" />
+            <div>
+              <h4 className="text-sm font-medium text-foreground">
+                BOM Selected: {boms.find(b => b.id === selectedBomId)?.name || 'Unknown BOM'}
+              </h4>
+              <p className="text-xs text-muted-foreground">Ready for part-wise nominations</p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { window.location.href = window.location.pathname; }}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Clear Selection
+          </Button>
+        </div>
+      )}
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map(({ label, icon: Icon, value, hint }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <p className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-semibold tabular-nums tracking-tight">{value}</span>
+                  {hint && (
+                    <span className={`text-xs ${label === 'Total Nominations' ? 'font-medium text-warning' : 'text-muted-foreground'}`}>
+                      {hint}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Toolbar: search and category filter */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
+            aria-label="Search nominations"
             placeholder="Search nominations by name or scope..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-background/80 border-border/80 text-foreground placeholder:text-muted-foreground"
+            onChange={(e) => { setSearchTerm(e.target.value); }}
+            className="h-9 pl-9"
           />
         </div>
 
-        {/* Category Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto p-1 rounded-lg bg-muted/50 border border-border/40">
+        <div role="group" aria-label="Filter by category" className="flex items-center gap-1 overflow-x-auto rounded-md border bg-muted/40 p-0.5">
           {(['all', NominationType.OEM, NominationType.MANUFACTURER, NominationType.HYBRID] as const).map((type) => {
             const isActive = selectedType === type;
             const label = type === 'all' ? 'All Groups' : getNominationTypeLabel(type as NominationType);
             return (
               <button
                 key={type}
-                onClick={() => setSelectedType(type)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                type="button"
+                onClick={() => { setSelectedType(type); }}
+                aria-pressed={isActive}
+                className={`whitespace-nowrap rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive
                     ? 'bg-background text-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {label}
@@ -279,36 +255,30 @@ export function SupplierNominationsDashboard({
         </div>
       </div>
 
-      {/* Nominations Grid */}
+      {/* Nominations grid */}
       {filteredNominations.length === 0 ? (
-        <Card className="border border-dashed border-border/80 bg-card/40 py-16 text-center">
-          <CardContent className="max-w-md mx-auto space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Award className="h-8 w-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-foreground">
-                {searchTerm || selectedType !== 'all' ? 'No matching supplier nominations' : 'No supplier nominations yet'}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {searchTerm || selectedType !== 'all'
+        <Card>
+          <CardContent>
+            <EmptyState
+              icon={Award}
+              title={searchTerm || selectedType !== 'all' ? 'No matching supplier nominations' : 'No supplier nominations yet'}
+              description={
+                searchTerm || selectedType !== 'all'
                   ? 'Try adjusting your search query or category filter.'
-                  : 'Create your first nomination group to evaluate and allocate suppliers to BOM parts.'}
-              </p>
-            </div>
-            {!searchTerm && selectedType === 'all' && (
-              <Button
-                onClick={() => setCreateDialogOpen(true)}
-                className="mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Nomination
-              </Button>
-            )}
+                  : 'Create your first nomination group to evaluate and allocate suppliers to BOM parts.'
+              }
+            >
+              {!searchTerm && selectedType === 'all' && (
+                <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create First Nomination
+                </Button>
+              )}
+            </EmptyState>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredNominations.map((nomination) => (
             <OEMNominationCard
               key={nomination.id}
@@ -349,137 +319,121 @@ function OEMNominationCard({ nomination, onClick, onEdit, onDelete }: OEMNominat
   const statusText = getStatusText(nomination.status);
   const typeLabel = getNominationTypeLabel(nomination.nominationType);
 
-  const isCompleted = nomination.status === NominationStatus.COMPLETED || nomination.status === NominationStatus.APPROVED;
-  const isInProgress = nomination.status === NominationStatus.IN_PROGRESS;
+  const completion = Math.min(100, Math.max(0, nomination.completionPercentage || 0));
 
   return (
     <Card
       onClick={onClick}
-      className="group relative flex flex-col justify-between rounded-xl border border-border/60 bg-card/90 shadow-xs hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer overflow-hidden"
+      className="group relative flex cursor-pointer flex-col overflow-hidden transition-colors hover:border-primary/50"
     >
-      {/* Top accent bar */}
-      <div className="h-1.5 w-full bg-linear-to-r from-primary/80 via-teal-500 to-brand-500 opacity-80 group-hover:opacity-100 transition-opacity" />
-
-      {/* Edit/Delete Action Hover Strip */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 backdrop-blur-sm rounded-lg border border-border/60 p-0.5 shadow-xs">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(nomination);
-          }}
-          title="Edit nomination"
-        >
-          <Edit2 className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(nomination);
-          }}
-          title="Delete nomination"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      <CardContent className="p-6 flex-1 flex flex-col justify-between space-y-5">
-        {/* Title, Badges & Status */}
+      <CardContent className="flex flex-1 flex-col gap-5 p-5">
+        {/* Status, type and action menu */}
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-1.5 pr-12">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
-                isCompleted
-                  ? 'bg-primary/10 text-primary dark:text-primary border-primary/30'
-                  : isInProgress
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-              }`}
-            >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  isCompleted ? 'bg-brand-500' : isInProgress ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                }`}
-              />
-              {statusText}
-            </span>
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${toneClasses(getStatusColor(nomination.status))}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {statusText}
+              </span>
 
-            <Badge variant="secondary" className="text-[11px] font-medium">
-              {typeLabel}
-            </Badge>
-
-            {nomination.bomPartsCount && nomination.bomPartsCount > 0 && (
-              <Badge variant="outline" className="text-[11px] border-primary/40 text-primary bg-primary/5">
-                BOM-Based
+              <Badge variant="secondary" className="text-[11px] font-medium">
+                {typeLabel}
               </Badge>
-            )}
+
+              {nomination.bomPartsCount && nomination.bomPartsCount > 0 && (
+                <Badge variant="outline" className="border-primary/40 bg-primary/5 text-[11px] text-primary">
+                  BOM-Based
+                </Badge>
+              )}
+            </div>
+
+            <div onClick={(e) => { e.stopPropagation(); }}>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="-mr-2 -mt-1 h-8 w-8 text-muted-foreground"
+                    aria-label="Nomination actions"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={onClick}>
+                    <ArrowUpRight className="mr-2 h-4 w-4" />
+                    Open Nomination
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => { onEdit(nomination); }}>
+                    <Edit2 className="mr-2 h-4 w-4" />
+                    Edit nomination
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => { onDelete(nomination); }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete nomination
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-bold text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-1">
-              {nomination.nominationName || 'Unnamed Nomination Group'}
-            </h3>
-          </div>
+          <h3 className="line-clamp-1 text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-primary">
+            {nomination.nominationName || 'Unnamed Nomination Group'}
+          </h3>
         </div>
 
-        {/* OEM Procurement Metrics Box */}
-        <div className="grid grid-cols-2 gap-3 rounded-xl bg-muted/30 border border-border/40 p-3.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Users className="h-4.5 w-4.5" />
-            </div>
+        {/* Metrics */}
+        <dl className="grid grid-cols-2 divide-x rounded-md border bg-muted/30">
+          <div className="flex items-center gap-3 p-3">
+            <Users className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <div>
-              <p className="text-lg font-bold text-foreground leading-none">{nomination.vendorCount || 0}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Vendors</p>
+              <dd className="text-lg font-semibold leading-none tabular-nums text-foreground">{nomination.vendorCount || 0}</dd>
+              <dt className="mt-1 text-[11px] text-muted-foreground">Vendors</dt>
             </div>
           </div>
-
-          <div className="flex items-center gap-3 border-l border-border/40 pl-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-500">
-              <Package className="h-4.5 w-4.5" />
-            </div>
+          <div className="flex items-center gap-3 p-3">
+            <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <div>
-              <p className="text-lg font-bold text-foreground leading-none">{nomination.bomPartsCount || 0}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">BOM Parts</p>
+              <dd className="text-lg font-semibold leading-none tabular-nums text-foreground">{nomination.bomPartsCount || 0}</dd>
+              <dt className="mt-1 text-[11px] text-muted-foreground">BOM Parts</dt>
             </div>
           </div>
-        </div>
+        </dl>
 
-        {/* Completion Bar */}
-        <div className="space-y-1.5 pt-1">
+        {/* Allocation progress */}
+        <div className="space-y-1.5">
           <div className="flex justify-between text-[11px]">
             <span className="font-medium text-muted-foreground">Allocation Progress</span>
-            <span className="font-semibold text-foreground">{nomination.completionPercentage || 0}%</span>
+            <span className="font-semibold tabular-nums text-foreground">{nomination.completionPercentage || 0}%</span>
           </div>
-          <div className="w-full bg-muted/70 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-linear-to-r from-primary to-teal-500 h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, Math.max(0, nomination.completionPercentage || 0))}%` }}
-            />
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={completion} aria-valuemin={0} aria-valuemax={100}>
+            <div className="h-1.5 rounded-full bg-primary transition-all duration-500" style={{ width: `${completion}%` }} />
           </div>
         </div>
 
-        {/* Footer Actions & Metadata */}
-        <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-2">
+        {/* Footer */}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3">
           <span className="text-[11px] text-muted-foreground">
             Created {new Date(nomination.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
 
           <Button
             size="sm"
-            className="h-8 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-xs font-semibold px-3 transition-all group-hover:translate-x-0.5"
+            variant="outline"
+            className="h-8 gap-1 text-xs"
             onClick={(e) => {
               e.stopPropagation();
               onClick();
             }}
           >
             Open Nomination
-            <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       </CardContent>

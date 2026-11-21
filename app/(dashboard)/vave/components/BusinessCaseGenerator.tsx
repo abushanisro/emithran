@@ -1,18 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Printer, Download, TrendingUp, Clock, DollarSign, BarChart2, FileOutput,
-} from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { useVaveIdeas, useVaveShouldCosts } from '@/lib/api/hooks/useVave';
 import type { VaveIdea } from '@/lib/api/vave';
-import { toast } from 'sonner';
 import { escapeHtml } from '@/lib/utils/escape-html';
 
 interface Props {
@@ -54,16 +55,16 @@ function truncate(s: string, n: number) {
 }
 
 const QUADRANT_COLORS: Record<string, { bar: string; text: string; border: string; bg: string }> = {
-  QuickWin:  { bar: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10' },
+  QuickWin:  { bar: 'bg-success/100', text: 'text-success', border: 'border-success/40', bg: 'bg-success/10' },
   Strategic: { bar: 'bg-brand-500', text: 'text-primary', border: 'border-primary/40', bg: 'bg-primary/10' },
-  FillIn:    { bar: 'bg-amber-500',   text: 'text-amber-400',   border: 'border-amber-500/40',   bg: 'bg-amber-500/10' },
+  FillIn:    { bar: 'bg-warning/100',   text: 'text-warning',   border: 'border-warning/40',   bg: 'bg-warning/10' },
   Avoid:     { bar: 'bg-muted-foreground', text: 'text-muted-foreground', border: 'border-border', bg: 'bg-muted/40' },
 };
 
 const FRAMEWORK_COLORS: Record<string, { bar: string; text: string }> = {
   SCAMPER: { bar: 'bg-primary',            text: 'text-primary' },
   TRIZ:    { bar: 'bg-brand-500',         text: 'text-primary' },
-  FAST:    { bar: 'bg-amber-500',          text: 'text-amber-400' },
+  FAST:    { bar: 'bg-warning/100',          text: 'text-warning' },
   Manual:  { bar: 'bg-muted-foreground',   text: 'text-muted-foreground' },
 };
 
@@ -135,7 +136,7 @@ function A3Report({
             {totalSpend > 0 && (
               <p>Total annual spend on selected parts: <span className="text-foreground font-semibold">{formatUSD(totalSpend)}</span></p>
             )}
-            <p>Est. annual savings opportunity: <span className="text-emerald-400 font-semibold">{formatUSD(annualSavings)}</span></p>
+            <p>Est. annual savings opportunity: <span className="text-success font-semibold">{formatUSD(annualSavings)}</span></p>
             <p>Required investment: <span className="text-primary font-semibold">{formatUSD(investment)}</span></p>
           </div>
         </div>
@@ -146,10 +147,10 @@ function A3Report({
         <div className="px-4 py-3 border-r border-border">
           <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1.5">Target</p>
           <div className="text-xs text-muted-foreground space-y-1">
-            <p>Achieve <span className="text-emerald-400 font-semibold">{formatUSD(annualSavings)}</span>/yr savings</p>
+            <p>Achieve <span className="text-success font-semibold">{formatUSD(annualSavings)}</span>/yr savings</p>
             <p>Payback in <span className="text-foreground font-semibold">{paybackMonths != null ? `${paybackMonths.toFixed(1)} months` : 'N/A'}</span></p>
             <p>Implementation span: <span className="text-foreground font-semibold">{maxTimeline} months</span></p>
-            <p>NPV ({years}yr @ {discountRatePct}%): <span className={`font-semibold ${npv >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>{formatUSD(npv)}</span></p>
+            <p>NPV ({years}yr @ {discountRatePct}%): <span className={`font-semibold ${npv >= 0 ? 'text-success' : 'text-destructive'}`}>{formatUSD(npv)}</span></p>
           </div>
         </div>
         <div className="px-4 py-3">
@@ -200,7 +201,7 @@ function A3Report({
                   <td className="px-4 py-2">
                     <Badge variant="outline" className="text-[9px] h-4 px-1">{idea.framework}</Badge>
                   </td>
-                  <td className="px-4 py-2 text-right font-semibold text-emerald-400">{formatUSD(idea.estSavingsUsd)}</td>
+                  <td className="px-4 py-2 text-right font-semibold text-success">{formatUSD(idea.estSavingsUsd)}</td>
                   <td className="px-4 py-2 text-right text-muted-foreground">{formatUSD(idea.estInvestmentUsd)}</td>
                   <td className="px-4 py-2 text-center">
                     <Badge variant="secondary" className="text-[9px] h-4 px-1">{idea.complexity}</Badge>
@@ -208,7 +209,7 @@ function A3Report({
                   <td className="px-4 py-2 text-center">
                     <span className={`text-[10px] font-medium ${
                       idea.risk === 'High' ? 'text-destructive' :
-                      idea.risk === 'Medium' ? 'text-amber-400' : 'text-emerald-400'
+                      idea.risk === 'Medium' ? 'text-warning' : 'text-success'
                     }`}>{idea.risk}</span>
                   </td>
                   <td className="px-4 py-2 text-center text-muted-foreground">
@@ -227,9 +228,9 @@ function A3Report({
           <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Financial Summary</p>
           <div className="space-y-1.5 text-xs">
             {[
-              { label: 'NPV', value: formatUSD(npv), color: npv >= 0 ? 'text-emerald-400' : 'text-destructive' },
+              { label: 'NPV', value: formatUSD(npv), color: npv >= 0 ? 'text-success' : 'text-destructive' },
               { label: 'IRR', value: irr != null ? `${irr.toFixed(1)}%` : 'N/A', color: 'text-primary' },
-              { label: 'Payback', value: paybackMonths != null ? `${paybackMonths.toFixed(1)} months` : 'N/A', color: 'text-amber-400' },
+              { label: 'Payback', value: paybackMonths != null ? `${paybackMonths.toFixed(1)} months` : 'N/A', color: 'text-warning' },
               { label: `ROI (${years}yr)`, value: roi != null ? `${roi.toFixed(1)}%` : 'N/A', color: 'text-foreground' },
               { label: 'Discount Rate', value: `${discountRatePct}%`, color: 'text-muted-foreground' },
               { label: 'Analysis Period', value: `${years} years`, color: 'text-muted-foreground' },
@@ -245,10 +246,10 @@ function A3Report({
           <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Implementation Notes</p>
           <div className="space-y-1.5 text-xs text-muted-foreground">
             <p>• Approval required: <span className="text-foreground">Engineering + Finance sign-off</span></p>
-            <p>• ECO required: <span className={`font-semibold ${ecoRequired ? 'text-amber-400' : 'text-emerald-400'}`}>{ecoRequired ? 'Yes — L3/High-risk changes' : 'No'}</span></p>
+            <p>• ECO required: <span className={`font-semibold ${ecoRequired ? 'text-warning' : 'text-success'}`}>{ecoRequired ? 'Yes — L3/High-risk changes' : 'No'}</span></p>
             <p>• Risk level: <span className={`font-semibold ${
               highRiskCount > ideas.length / 2 ? 'text-destructive' :
-              highRiskCount > 0 ? 'text-amber-400' : 'text-emerald-400'
+              highRiskCount > 0 ? 'text-warning' : 'text-success'
             }`}>{highRiskCount > ideas.length / 2 ? 'High' : highRiskCount > 0 ? 'Medium' : 'Low'}</span></p>
             <p>• High-risk ideas: <span className="text-foreground">{highRiskCount}</span> of {ideas.length}</p>
             <p>• Frameworks used: <span className="text-foreground">{frameworks.join(', ')}</span></p>
@@ -275,8 +276,8 @@ function ImplementationGantt({ ideas }: { ideas: VaveIdea[] }) {
   // Phase markers
   const phases = [
     { label: 'Design Review', month: 2,                        color: 'text-primary' },
-    { label: 'ECO',           month: Math.round(maxMonths / 2), color: 'text-amber-400' },
-    { label: 'Production',    month: maxMonths,                 color: 'text-emerald-400' },
+    { label: 'ECO',           month: Math.round(maxMonths / 2), color: 'text-warning' },
+    { label: 'Production',    month: maxMonths,                 color: 'text-success' },
   ].filter((p, i, arr) => arr.findIndex((x) => x.month === p.month) === i); // deduplicate
 
   return (
@@ -651,7 +652,7 @@ export function BusinessCaseGenerator({ projectId }: Props) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-medium line-clamp-1">{idea.title}</p>
-                        <span className="text-sm font-bold text-emerald-400 shrink-0">
+                        <span className="text-sm font-bold text-success shrink-0">
                           {formatUSD(idea.estSavingsUsd)}
                         </span>
                       </div>
@@ -712,13 +713,13 @@ export function BusinessCaseGenerator({ projectId }: Props) {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Card className="bg-emerald-500/10 border-emerald-500/30">
+            <Card className="bg-success/10 border-success/30">
               <CardContent className="pt-3 pb-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="h-4 w-4 text-emerald-400" />
+                  <TrendingUp className="h-4 w-4 text-success" />
                   <span className="text-xs text-muted-foreground">Annual Savings</span>
                 </div>
-                <p className="text-xl font-bold text-emerald-400">{formatUSD(annualSavings)}</p>
+                <p className="text-xl font-bold text-success">{formatUSD(annualSavings)}</p>
               </CardContent>
             </Card>
             <Card className="bg-primary/10 border-primary/30">
@@ -730,24 +731,24 @@ export function BusinessCaseGenerator({ projectId }: Props) {
                 <p className="text-xl font-bold text-primary">{formatUSD(investment)}</p>
               </CardContent>
             </Card>
-            <Card className="bg-amber-500/10 border-amber-500/30">
+            <Card className="bg-warning/10 border-warning/30">
               <CardContent className="pt-3 pb-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Clock className="h-4 w-4 text-amber-400" />
+                  <Clock className="h-4 w-4 text-warning" />
                   <span className="text-xs text-muted-foreground">Payback Period</span>
                 </div>
-                <p className="text-xl font-bold text-amber-400">
+                <p className="text-xl font-bold text-warning">
                   {paybackMonths != null ? `${paybackMonths.toFixed(1)} mo` : '—'}
                 </p>
               </CardContent>
             </Card>
-            <Card className={npv >= 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-destructive/10 border-destructive/30'}>
+            <Card className={npv >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}>
               <CardContent className="pt-3 pb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <BarChart2 className="h-4 w-4 text-primary" />
                   <span className="text-xs text-muted-foreground">NPV ({years}yr @ {discountRatePct}%)</span>
                 </div>
-                <p className={`text-xl font-bold ${npv >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>
+                <p className={`text-xl font-bold ${npv >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {formatUSD(npv)}
                 </p>
               </CardContent>

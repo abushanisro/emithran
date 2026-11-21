@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useCallback } from 'react';
+
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import {
   NewEvaluationDialog,
   SupplierEvaluationDashboard,
   EvaluationGroupView
 } from '@/components/features/supplier-evaluation';
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from '@/components/ui/icons';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { useSupplierEvaluationGroups, useSupplierEvaluationGroup } from '@/lib/api/hooks/useSupplierEvaluationGroups';
 
 export default function SupplierEvaluationPage() {
@@ -69,18 +72,18 @@ export default function SupplierEvaluationPage() {
     if (isLoadingEvaluationGroup) {
       return (
         <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setCurrentView('dashboard')}>
+          <div className="flex items-start gap-3">
+            <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to evaluations" onClick={() => setCurrentView('dashboard')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <PageHeader
+            <div className="min-w-0 flex-1">
+              <PageHeader
               title="Loading Evaluation Group..."
               description="Fetching BOM parts and evaluation data"
-            />
+              />
+            </div>
           </div>
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
+          <TableSkeleton rows={5} columns={4} label="Loading evaluation group…" />
         </div>
       );
     }
@@ -112,15 +115,20 @@ export default function SupplierEvaluationPage() {
   if (currentView === 'dashboard') {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(`/projects/${projectId}`)}>
+        <div className="flex items-start gap-3">
+          <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to project" onClick={() => router.push(`/projects/${projectId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <PageHeader
+          <div className="min-w-0 flex-1">
+            <PageHeader
             title="Supplier Evaluation"
             description="Process-based supplier matching and evaluation groups"
-          />
+            />
+          </div>
         </div>
+
+        {/* Project sections: shared tab bar, Supplier Evaluation is the active tab */}
+        <ProjectNav projectId={projectId} />
 
         <SupplierEvaluationDashboard
           projectId={projectId}
@@ -149,14 +157,16 @@ export default function SupplierEvaluationPage() {
   // Default fallback - should not reach here with dashboard view
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push(`/projects/${projectId}`)}>
+      <div className="flex items-start gap-3">
+        <Button variant="outline" size="icon" className="mt-0.5 h-8 w-8 shrink-0" aria-label="Back to project" onClick={() => router.push(`/projects/${projectId}`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <PageHeader
+        <div className="min-w-0 flex-1">
+          <PageHeader
           title="Supplier Evaluation"
           description="Something went wrong"
-        />
+          />
+        </div>
       </div>
       <div className="text-center py-12">
         <p>Unknown view state. Please refresh the page.</p>

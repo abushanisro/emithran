@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2 } from 'lucide-react';
-import { LogisticsDialog } from './LogisticsDialog';
+import { Plus, Edit, Trash2 } from '@/components/ui/icons';
 import {
   usePackagingLogisticsCosts,
   useCreatePackagingLogisticsCost,
@@ -12,6 +12,9 @@ import {
   LogisticsType,
   CostBasis,
 } from '@/lib/api/hooks/usePackagingLogisticsCosts';
+
+import { LogisticsDialog } from './LogisticsDialog';
+
 
 interface PackagingLogisticsSectionProps {
   bomItemId: string;
@@ -181,9 +184,9 @@ export function PackagingLogisticsSection({ bomItemId, compact, currencySymbol =
 
   if (isLoading) {
     return (
-      <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-        <div className="bg-primary py-3 px-4">
-          <h6 className="m-0 font-semibold text-primary-foreground">Packaging & Logistics</h6>
+      <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+        <div className="border-b bg-muted/40 py-3 px-4">
+          <h6 className="m-0 text-sm font-semibold text-foreground">Packaging & Logistics</h6>
         </div>
         <div className="bg-card p-4">
           <p className="text-center text-muted-foreground">Loading...</p>
@@ -193,37 +196,37 @@ export function PackagingLogisticsSection({ bomItemId, compact, currencySymbol =
   }
 
   return (
-    <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-      <div className="bg-primary py-3 px-4">
-        <h6 className="m-0 font-semibold text-primary-foreground">Packaging & Logistics</h6>
+    <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+      <div className="border-b bg-muted/40 py-3 px-4">
+        <h6 className="m-0 text-sm font-semibold text-foreground">Packaging & Logistics</h6>
       </div>
       <div className="bg-card p-4">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-primary text-primary-foreground">
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 min-w-[120px]">
+              <tr className="bg-muted/40 text-muted-foreground">
+                <th className="p-3 text-left text-xs font-semibold min-w-[120px]">
                   Cost Name
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 min-w-[120px]">
+                <th className="p-3 text-left text-xs font-semibold min-w-[120px]">
                   Logistics Type
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 min-w-[120px]">
+                <th className="p-3 text-left text-xs font-semibold min-w-[120px]">
                   Mode of Transport
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 min-w-[120px]">
+                <th className="p-3 text-left text-xs font-semibold min-w-[120px]">
                   Calculator
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
+                <th className="p-3 text-left text-xs font-semibold w-28">
                   Cost Basis
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
+                <th className="p-3 text-left text-xs font-semibold w-28">
                   Unit Cost ({currencySymbol})
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-24">
+                <th className="p-3 text-left text-xs font-semibold w-24">
                   Quantity
                 </th>
-                <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
+                <th className="p-3 text-left text-xs font-semibold w-32">
                   Total Cost ({currencySymbol})
                 </th>
                 <th className="p-3 text-center text-xs font-semibold w-24">
@@ -242,29 +245,29 @@ export function PackagingLogisticsSection({ bomItemId, compact, currencySymbol =
               ) : (
                 <>
                   {logisticsItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-secondary/50">
-                      <td className="p-3 border-r border-border text-xs font-medium">
+                    <tr key={item.id} className="hover:bg-muted/40">
+                      <td className="p-3 text-xs font-medium">
                         {item.costName}
                       </td>
-                      <td className="p-3 border-r border-border text-xs">
+                      <td className="p-3 text-xs">
                         {formatLogisticsType(item.logisticsType)}
                       </td>
-                      <td className="p-3 border-r border-border text-xs">
+                      <td className="p-3 text-xs">
                         {item.modeOfTransport || '-'}
                       </td>
-                      <td className="p-3 border-r border-border text-xs">
+                      <td className="p-3 text-xs">
                         {item.calculatorName || '-'}
                       </td>
-                      <td className="p-3 border-r border-border text-xs">
+                      <td className="p-3 text-xs">
                         {formatCostBasis(item.costBasis)}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {currencySymbol}{(item.unitCost * conversionRate).toFixed(2)}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right">
+                      <td className="p-3 text-xs text-right">
                         {item.quantity}
                       </td>
-                      <td className="p-3 border-r border-border text-xs text-right font-semibold">
+                      <td className="p-3 text-xs text-right font-semibold">
                         {currencySymbol}{(item.totalCost * conversionRate).toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
@@ -292,11 +295,11 @@ export function PackagingLogisticsSection({ bomItemId, compact, currencySymbol =
                     </tr>
                   ))}
 
-                  <tr className="bg-secondary/30 font-semibold">
-                    <td colSpan={7} className="p-3 text-right border-r border-border text-xs">
+                  <tr className="bg-muted/40 font-semibold">
+                    <td colSpan={7} className="p-3 text-right text-xs">
                       Total:
                     </td>
-                    <td className="p-3 border-r border-border text-xs text-right">
+                    <td className="p-3 text-xs text-right">
                       {currencySymbol}{fmtCurrency(Number(calculateTotal()) * conversionRate)}
                     </td>
                     <td className="p-3"></td>

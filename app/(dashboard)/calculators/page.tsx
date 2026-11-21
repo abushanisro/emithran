@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Search, Trash2, Edit2, X, Check, ArrowLeft, Download } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { useState, useEffect, useMemo } from 'react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Plus, Search, Trash2, Edit2, X, Check, ArrowLeft, Download, Sigma } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCalculators, useCreateCalculator, useDeleteCalculator, useUpdateCalculator } from '@/lib/api/hooks';
 import { calculatorProcessGroups, processGroupTabs } from '@/lib/calculators/process-group-tabs';
@@ -275,22 +277,22 @@ export default function CalculatorsPage() {
           ))}
         </div>
       ) : calculators.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">
-            {searchQuery ? 'No calculators found' : 'No calculators'}
-          </p>
+        <EmptyState
+          icon={Sigma}
+          title={searchQuery ? 'No calculators found' : 'No calculators'}
+          description={searchQuery ? 'Try adjusting your search query' : undefined}
+        >
           {!searchQuery && (
             <Button
               onClick={handleCreateCalculator}
               variant="outline"
               size="sm"
-              className="mt-4"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Calculator
             </Button>
           )}
-        </div>
+        </EmptyState>
       ) : (
         <div className="space-y-8">
           {groupOrder.map((groupName) => [groupName, groupedCalculators[groupName] ?? []] as const).map(([groupName, groupCalcs]) => (

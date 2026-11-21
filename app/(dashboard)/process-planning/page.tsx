@@ -1,21 +1,23 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+
 import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
-import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
-import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
+import { ChildPartsSection } from '@/components/features/process-planning/ChildPartsSection';
 import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
 import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
-import { ChildPartsSection } from '@/components/features/process-planning/ChildPartsSection';
-import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
 import { ParentEstimatesSection } from '@/components/features/process-planning/ParentEstimatesSection';
-import { Button } from '@/components/ui/button';
+import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
+import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
+import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { useBOMs } from '@/lib/api/hooks/useBOM';
-import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
 import { apiClient } from '@/lib/api/client';
+import { useBOMs } from '@/lib/api/hooks/useBOM';
+import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 
 export default function ProcessPlanningPage() {
   const [selectedBomId, setSelectedBomId] = useState<string>('');
@@ -105,28 +107,20 @@ export default function ProcessPlanningPage() {
   // Show loading state
   if (isLoadingBOMs || (selectedBomId && isLoadingItems)) {
     return (
-      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-muted-foreground">
-            {isLoadingBOMs ? 'Loading BOMs...' : 'Loading Items...'}
-          </span>
-        </div>
+      <div>
+        <PageSkeleton label={isLoadingBOMs ? 'Loading BOMs...' : 'Loading Items...'} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-[1800px] mx-auto space-y-6">
+    <div className="animate-fade-in">
+      <div className="space-y-6">
         {/* PAGE HEADER */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Process Planning & Costing</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Simplified workflow for creating manufacturing process routes
-            </p>
-          </div>
+        <PageHeader
+          title="Process Planning & Costing"
+          description="Simplified workflow for creating manufacturing process routes"
+        >
           {selectedPartNumber && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Current Part:</span>
@@ -135,7 +129,7 @@ export default function ProcessPlanningPage() {
               </Badge>
             </div>
           )}
-        </div>
+        </PageHeader>
 
         {/* BOM SELECTION CARD WITH FILTERS */}
         <BOMSelectionCard
@@ -156,9 +150,9 @@ export default function ProcessPlanningPage() {
         {selectedPartNumber && selectedPart && (
           <>
             {/* Selected Part Details Card */}
-            <div className="card border-l-4 border-l-green-500 shadow-md rounded-lg overflow-hidden">
-              <div className="bg-green-500 py-2 px-4">
-                <h6 className="m-0 font-semibold text-white text-xs">
+            <div className="rounded-lg border bg-card shadow-xs overflow-hidden">
+              <div className="border-b bg-muted/40 py-2.5 px-4">
+                <h6 className="m-0 text-sm font-semibold text-foreground">
                   Creating Process Plan For
                 </h6>
               </div>
@@ -300,7 +294,7 @@ export default function ProcessPlanningPage() {
             <ToolingSection bomItemId={selectedPart.id} bomItem={selectedPart} />
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-between p-4 bg-card border-l-4 border-l-primary rounded-lg shadow-md">
+            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold">Complete Process Plan</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -317,7 +311,7 @@ export default function ProcessPlanningPage() {
 
         {/* Empty State - No Part Selected */}
         {!selectedPartNumber && selectedBomId && (
-          <div className="text-center py-12 bg-card border-2 border-dashed border-border rounded-lg">
+          <div className="text-center py-12 bg-card border border-dashed border-border rounded-lg">
             <p className="text-muted-foreground mb-2 text-sm font-semibold">
               No Part Selected
             </p>
@@ -329,7 +323,7 @@ export default function ProcessPlanningPage() {
 
         {/* Empty State - No BOM Selected */}
         {!selectedBomId && (
-          <div className="text-center py-12 bg-card border-2 border-dashed border-border rounded-lg">
+          <div className="text-center py-12 bg-card border border-dashed border-border rounded-lg">
             <p className="text-muted-foreground mb-2 text-sm font-semibold">
               No BOM Selected
             </p>

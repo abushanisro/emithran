@@ -1,14 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Factory, Calendar, TrendingUp, Clock, Package } from 'lucide-react';
-import { ProductionLotsTable } from '@/components/features/production-planning/ProductionLotsTable';
+
 import { CreateProductionLotModal } from '@/components/features/production-planning/CreateProductionLotModal';
 import { ProductionDashboard } from '@/components/features/production-planning/ProductionDashboard';
+import { ProductionLotsTable } from '@/components/features/production-planning/ProductionLotsTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Factory, Calendar, TrendingUp, Clock, Package } from '@/components/ui/icons';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProductionLots, useProductionDashboard } from '@/lib/api/hooks/useProductionPlanning';
 
 export default function ProductionPlanningPage() {

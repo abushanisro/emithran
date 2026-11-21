@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Eye, Plus, Trash2, Pencil } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Save, Eye, Plus, Trash2, Pencil, X} from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import type { Calculator, CalculatorField, FieldType, DataSource } from '@/lib/api/calculators';
 import {
   useCalculator,
   useUpdateCalculator,
@@ -16,11 +19,11 @@ import {
   useUpdateField,
   useDeleteField
 } from '@/lib/api/hooks';
-import type { Calculator, CalculatorField, FieldType, DataSource } from '@/lib/api/calculators';
 import { processesApi, type Process } from '@/lib/api/processes';
-import { FormulaEditor } from './FormulaEditor';
-import { DatabaseFieldExtractor } from './DatabaseFieldExtractor';
 import { cn } from '@/lib/utils';
+
+import { DatabaseFieldExtractor } from './DatabaseFieldExtractor';
+import { FormulaEditor } from './FormulaEditor';
 
 type CalculatorBuilderProps = {
   calculatorId: string;
@@ -563,12 +566,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center space-y-4">
-          <div className="h-12 w-12 animate-spin mx-auto border-4 border-primary border-t-transparent rounded-full" />
-          <p className="text-muted-foreground">Loading calculator...</p>
-        </div>
-      </div>
+      <PageSkeleton label="Loading calculator..." />
     );
   }
 
@@ -996,7 +994,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                   onClick={() => setBomFieldSelection({ fieldIndex: null, isOpen: false, selectedFields: new Set() })}
                   className="text-muted-foreground hover:text-foreground"
                 >
-                  ✕
+                  <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
               

@@ -1,12 +1,15 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { GitCompare, Search, FolderOpen } from "lucide-react";
-import type { SelectedProject } from "../types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { GitCompare, Search, FolderOpen } from '@/components/ui/icons';
+import { Input } from "@/components/ui/input";
+import { Mark } from '@/components/ui/status-mark';
+
 import { formatPrice, formatDate } from "../utils";
+
+import type { SelectedProject } from "../types";
 
 interface Props {
   projects: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -136,7 +139,7 @@ export function ProjectSelection({
                     {multiProjectMode && isSelected && (
                       <div className="absolute top-2 right-2">
                         <Badge variant="default" className="text-xs px-2 py-0">
-                          ✓
+                          <Mark kind="ok" />
                         </Badge>
                       </div>
                     )}

@@ -1,15 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { CardDescription, CardTitle } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GlareCard } from '@/components/ui/glare-card';
+import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import {
   CheckCircle2,
   Clock,
-  AlertCircle,
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 
 interface ModuleCardProps {
   title: string;
@@ -27,109 +27,55 @@ function ModuleCard({
   borderColor: _borderColor,
   status,
   itemCount: _itemCount,
-  imageOutside = false,
+  imageOutside: _imageOutside = false,
   onClick,
 }: ModuleCardProps) {
   const isDisabled = status === 'coming-soon';
 
 
-  // Get module image based on title
-  const getModuleImage = (title: string) => {
-    switch (title) {
-      case 'BOM Management':
-        return 'https://cdn.sanity.io/images/fdrwu6gi/production/664383895bf3dedc7e57d62eeaae2fd994c6c591-1600x1600.png?w=1200&fm=webp';
-      case 'Process Planning & Costing':
-        return 'https://static.vecteezy.com/system/resources/thumbnails/070/672/980/small/businessman-interacting-with-digital-workflow-diagram-representing-business-processes-optimization-and-strategic-planning-on-a-touchscreen-interface-photo.jpeg';
-      case 'Supplier Evaluation':
-        return 'https://barkersprocurement.com/wp-content/uploads/2023/06/Why-Supplier-Evaluation-is-Crucial-To-Your-Business-1110x630.png';
-      case 'Supplier Nomination':
-        return 'https://thumbs.dreamstime.com/b/hands-typing-keyboard-abstract-words-concepts-related-to-cost-reduction-budgeting-savings-financial-close-up-view-433957574.jpg';
-      case 'Production Planning':
-        return 'https://st2.depositphotos.com/1439888/11370/i/450/depositphotos_113705422-stock-photo-production-panning-concept-on-the.jpg';
-      case 'Quality Control':
-        return 'https://t3.ftcdn.net/jpg/04/38/61/36/360_F_438613643_ErB3cBJ3eI38XbJE5cJZcOttEcTtfLik.jpg';
-      case 'Delivery':
-        return 'https://png.pngtree.com/thumb_back/fh260/background/20250415/pngtree-logistic-and-transportation-concept-showing-a-world-map-network-with-freight-image_17184384.jpg';
-      case 'Benchmark Analysis':
-        return 'https://thumbs.dreamstime.com/b/benchmark-businessman-hologram-concept-benchmark-businessman-hologram-concept-futuristic-177138441.jpg';
-      case 'Electronics':
-        return '/images/modules/electronics.png';
-      case 'VAVE':
-        return 'https://gidelkocal.com/wp-content/uploads/2023/10/3-value-engineering-examples-in-construction2.png';
-      default:
-        return null;
-    }
-  };
-
-  const moduleImage = getModuleImage(title);
-
   return (
-    <div className="w-full flex flex-col">
-      {/* Image outside card */}
-      {moduleImage && imageOutside && (
-        <img
-          src={moduleImage}
-          alt={title}
-          className="w-full h-32 object-cover rounded-t-xl"
-        />
-      )}
-      <GlareCard
-        className={`p-3 ${imageOutside && moduleImage ? 'rounded-t-none' : ''} ${!isDisabled ? 'cursor-pointer hover:bg-muted/30 transition-colors' : 'cursor-not-allowed opacity-60'}`}
+    <div className="flex w-full">
+      <Card
+        className={cn(
+          'flex w-full flex-col justify-between gap-3 p-4 transition-colors',
+          isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-muted/40',
+        )}
         onClick={() => {
           if (!isDisabled && onClick) {
             onClick();
           }
         }}
       >
-        <div className="flex flex-col space-y-2">
-          {/* Header with Badge - only show if coming soon */}
-          {status === 'coming-soon' && (
-            <Badge variant="outline" className="text-xs text-muted-foreground border-border/50 w-fit">
-              Coming Soon
-            </Badge>
-          )}
-
-          {/* Module Image (inside card, for non-outside images) */}
-          {moduleImage && !imageOutside && (
-            <div className="rounded-md overflow-hidden h-20 bg-secondary/50">
-              <img
-                src={moduleImage}
-                alt={title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-
-          {/* Content */}
-          <div className="space-y-1">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1 text-foreground">
-              {title}
-              {status === 'active' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
-              {status === 'available' && <Clock className="h-3 w-3 text-primary" />}
-              {status === 'coming-soon' && <AlertCircle className="h-3 w-3 text-muted-foreground" />}
-            </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground line-clamp-2 leading-tight">
-              {description}
-            </CardDescription>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
+            {status === 'active' && <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-label="Active" />}
+            {status === 'available' && <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Available" />}
+            {status === 'coming-soon' && (
+              <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">
+                Coming Soon
+              </Badge>
+            )}
           </div>
-
-          {/* Button */}
-          <Button
-            size="sm"
-            className="w-auto px-3 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 hover:border-primary/50 h-7 text-xs mx-auto"
-            variant="outline"
-            disabled={isDisabled}
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent card click when button is clicked
-              if (!isDisabled && onClick) {
-                onClick();
-              }
-            }}
-          >
-            {isDisabled ? 'Coming Soon' : 'Open Module'}
-          </Button>
+          <CardDescription className="line-clamp-2 text-xs leading-snug text-muted-foreground">
+            {description}
+          </CardDescription>
         </div>
-      </GlareCard>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 w-fit text-xs"
+          disabled={isDisabled}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent card click when button is clicked
+            if (!isDisabled && onClick) {
+              onClick();
+            }
+          }}
+        >
+          {isDisabled ? 'Coming Soon' : 'Open Module'}
+        </Button>
+      </Card>
     </div>
   );
 }
@@ -230,10 +176,10 @@ export function ProjectModules({ projectId, bomCount, firstBomId: _firstBomId }:
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold mb-2">Project Modules</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-base font-semibold tracking-tight">Project Modules</h2>
+        <p className="text-sm text-muted-foreground">
           Select a module to manage different aspects of your manufacturing cost project
         </p>
       </div>

@@ -1,20 +1,23 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+
+import { StatusBadge } from '@/components/common/status-badge';
+import { ProjectDetailsCard } from '@/components/features/projects/ProjectDetailsCard';
+import { ProjectModules } from '@/components/features/projects/ProjectModules';
+import { ProjectNav } from '@/components/features/projects/ProjectNav';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { StatusBadge } from '@/components/common/status-badge';
 import {
   ArrowLeft,
   ClipboardList,
   DollarSign,
   FileSpreadsheet,
   TrendingUp,
-} from 'lucide-react';
+} from '@/components/ui/icons';
+import { PageSkeleton } from '@/components/ui/loading-skeleton';
 import { useProject, useBOMs, useUpdateProject } from '@/lib/api/hooks';
-import { ProjectModules } from '@/components/features/projects/ProjectModules';
-import { ProjectDetailsCard } from '@/components/features/projects/ProjectDetailsCard';
 import { formatProjectMoney, projectCostCurrency } from '@/lib/costing/project-costs';
 
 export default function ProjectDetail() {
@@ -62,9 +65,7 @@ export default function ProjectDetail() {
   // Loading state
   if (projectLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <PageSkeleton label="Loading project…" />
     );
   }
 
@@ -115,83 +116,69 @@ export default function ProjectDetail() {
     );
   }
 
+  const stats = [
+    {
+      label: 'Target Cost',
+      icon: DollarSign,
+      value: project.targetPrice ? `$${Number(project.targetPrice).toLocaleString()}` : '-',
+    },
+    {
+      label: 'Should Cost',
+      icon: TrendingUp,
+      value: formatProjectMoney(project.actualCost, projectCostCurrency(project)),
+    },
+    { label: 'Active BOMs', icon: FileSpreadsheet, value: String(sourcingLists.length) },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/projects')}>
+      {/* Project header */}
+      <div className="flex items-start gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          className="mt-0.5 h-8 w-8 shrink-0"
+          aria-label="Back to projects"
+          onClick={() => router.push('/projects')}
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <PageHeader
-          title={project.name}
-          description={project.description || 'Project overview and cost management'}
-        />
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title={project.name}
+            description={project.description || 'Project overview and cost management'}
+          >
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <span className="text-xs font-medium text-muted-foreground">Status</span>
+              <StatusBadge status={project.status} />
+            </div>
+          </PageHeader>
+        </div>
       </div>
 
-      {/* Project Details Card */}
+      {/* Workflow tabs: shared project tab bar, same links as before plus Overview */}
+      <ProjectNav projectId={id} className="-mb-2" />
+
+      {/* Cost overview */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {stats.map(({ label, icon: Icon, value }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <p className="mt-1 truncate text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+              </div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Project details */}
       <ProjectDetailsCard project={project} onUpdate={handleUpdateProject} />
-
-      {/* Cost Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-primary">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <ClipboardList className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Project Status</p>
-                <StatusBadge status={project.status} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Target Cost</p>
-                <p className="text-xl font-bold text-foreground">
-                  {project.targetPrice ? `$${Number(project.targetPrice).toLocaleString()}` : '-'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Should Cost</p>
-                <p className="text-xl font-bold text-foreground">
-                  {formatProjectMoney(project.actualCost, projectCostCurrency(project))}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                <FileSpreadsheet className="h-6 w-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Active BOMs</p>
-                <p className="text-xl font-bold text-foreground">{sourcingLists.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Project Modules */}
       <ProjectModules projectId={id} bomCount={sourcingLists.length} {...(firstBomId !== undefined ? { firstBomId } : {})} />

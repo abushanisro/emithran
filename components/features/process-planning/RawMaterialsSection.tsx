@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Loader2, Eye, Database, FlaskConical, TrendingUp } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Eye, Database, FlaskConical, TrendingUp } from '@/components/ui/icons';
 import { useCostSummary, type BlankSpecDto } from '@/lib/api/hooks/useBOMItems';
 import {
   useRawMaterialCosts,
@@ -10,6 +11,7 @@ import {
   useUpdateRawMaterialCost,
   useDeleteRawMaterialCost,
 } from '@/lib/api/hooks/useRawMaterialCosts';
+
 import { RawMaterialDialog } from './RawMaterialDialog';
 
 interface RawMaterialsSectionProps {
@@ -41,7 +43,7 @@ function BRow({ label, value, sub, highlight, icon }: {
 }) {
   const ico =
     icon === 'db' ? <Database className="h-2.5 w-2.5 text-primary inline mr-1" /> :
-    icon === 'formula' ? <FlaskConical className="h-2.5 w-2.5 text-amber-500 inline mr-1" /> : null;
+    icon === 'formula' ? <FlaskConical className="h-2.5 w-2.5 text-warning inline mr-1" /> : null;
   return (
     <div className={`flex items-start justify-between py-0.5 ${highlight ? 'font-semibold text-foreground border-t border-border mt-0.5 pt-1' : 'text-muted-foreground'}`}>
       <span className="text-[10px] leading-tight pr-2">
@@ -314,9 +316,9 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
       <div className="py-4 text-center text-sm text-muted-foreground">Select a BOM item to manage materials</div>
     );
     return (
-      <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-        <div className="bg-primary py-3 px-4">
-          <h6 className="m-0 font-semibold text-primary-foreground">Raw Materials</h6>
+      <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+        <div className="border-b bg-muted/40 py-3 px-4">
+          <h6 className="m-0 text-sm font-semibold text-foreground">Raw Materials</h6>
         </div>
         <div className="bg-card p-8 text-center text-muted-foreground">
           <p className="text-sm">Please select a BOM item to manage raw materials</p>
@@ -414,23 +416,23 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-primary text-primary-foreground">
-                  <th className="px-2 py-2 text-left text-[11px] font-semibold border-r border-primary-foreground/20">Material</th>
+                <tr className="bg-muted/40 text-muted-foreground">
+                  <th className="px-2 py-2 text-left text-[11px] font-semibold">Material</th>
                   {compact ? null : <>
-                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-20">$/unit</th>
-                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-20">Gross (kg)</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold w-20">$/unit</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold w-20">Gross (kg)</th>
                   </>}
-                  <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-20">Net (kg)</th>
+                  <th className="px-2 py-2 text-right text-[11px] font-semibold w-20">Net (kg)</th>
                   {compact ? null : <>
-                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-16">Scrap%</th>
-                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-16">OH%</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold w-16">Scrap%</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold w-16">OH%</th>
                   </>}
-                  <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-24">Total ({currencySymbol})</th>
+                  <th className="px-2 py-2 text-right text-[11px] font-semibold w-24">Total ({currencySymbol})</th>
                   {compact ? null : <>
-                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-16">
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold w-16">
                       <span className="flex items-center justify-end gap-0.5"><TrendingUp className="h-3 w-3" />Util%</span>
                     </th>
-                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-20">{currencySymbol}/kg net</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold w-20">{currencySymbol}/kg net</th>
                   </>}
                   <th className="px-2 py-2 text-center text-[11px] font-semibold w-16">Act.</th>
                 </tr>
@@ -450,18 +452,18 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
                       const effPerKg  = Number(material.effectiveCostPerUnit)    || 0;
                       return (
                         <React.Fragment key={material.id}>
-                          <tr className="hover:bg-secondary/50">
-                            <td className="px-2 py-2 border-r border-border text-xs font-medium truncate max-w-[120px]" title={material.materialName}>{material.materialName}</td>
+                          <tr className="hover:bg-muted/40">
+                            <td className="px-2 py-2 text-xs font-medium truncate max-w-[120px]" title={material.materialName}>{material.materialName}</td>
                             {compact ? null : <>
-                              <td className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{currencySymbol}{((material.unitCost || 0) * conversionRate).toFixed(3)}</td>
-                              <td className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{fmtUsage(material.grossUsage)}</td>
+                              <td className="px-2 py-2 text-xs text-right tabular-nums">{currencySymbol}{((material.unitCost || 0) * conversionRate).toFixed(3)}</td>
+                              <td className="px-2 py-2 text-xs text-right tabular-nums">{fmtUsage(material.grossUsage)}</td>
                             </>}
-                            <td className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{fmtUsage(material.netUsage)}</td>
+                            <td className="px-2 py-2 text-xs text-right tabular-nums">{fmtUsage(material.netUsage)}</td>
                             {compact ? null : <>
-                              <td className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{material.scrap || 0}%</td>
-                              <td className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{material.overhead || 0}%</td>
+                              <td className="px-2 py-2 text-xs text-right tabular-nums">{material.scrap || 0}%</td>
+                              <td className="px-2 py-2 text-xs text-right tabular-nums">{material.overhead || 0}%</td>
                             </>}
-                            <td className="px-2 py-2 border-r border-border text-xs text-right font-semibold tabular-nums">
+                            <td className="px-2 py-2 text-xs text-right font-semibold tabular-nums">
                               <div className="flex items-center justify-end gap-1">
                                 <span>{currencySymbol}{(computeMatCost(material) * conversionRate).toFixed(4)}</span>
                                 <button
@@ -474,14 +476,14 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
                               </div>
                             </td>
                             {compact ? null : <>
-                              <td className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">
+                              <td className="px-2 py-2 text-xs text-right tabular-nums">
                                 {utilRate > 0 ? (
-                                  <span className={utilRate < 50 ? 'text-destructive font-medium' : utilRate < 75 ? 'text-amber-500' : 'text-emerald-600'}>
+                                  <span className={utilRate < 50 ? 'text-destructive font-medium' : utilRate < 75 ? 'text-warning' : 'text-success'}>
                                     {utilRate.toFixed(1)}%
                                   </span>
                                 ) : '—'}
                               </td>
-                              <td className="px-2 py-2 border-r border-border text-xs text-right tabular-nums text-muted-foreground">
+                              <td className="px-2 py-2 text-xs text-right tabular-nums text-muted-foreground">
                                 {effPerKg > 0 ? `${currencySymbol}${(effPerKg * conversionRate).toFixed(3)}` : '—'}
                               </td>
                             </>}
@@ -510,9 +512,9 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
                       );
                     })}
 
-                    <tr className="bg-secondary/30 font-semibold">
-                      <td colSpan={compact ? 2 : 8} className="px-2 py-2 text-right border-r border-border text-xs">Total:</td>
-                      <td colSpan={compact ? 1 : 2} className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}</td>
+                    <tr className="bg-muted/40 font-semibold">
+                      <td colSpan={compact ? 2 : 8} className="px-2 py-2 text-right text-xs">Total:</td>
+                      <td colSpan={compact ? 1 : 2} className="px-2 py-2 text-xs text-right tabular-nums">{currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}</td>
                       <td className="px-2 py-2" />
                     </tr>
                   </>
@@ -559,9 +561,9 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
   }
 
   return (
-    <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
-      <div className="bg-primary py-3 px-4">
-        <h6 className="m-0 font-semibold text-primary-foreground">Raw Materials</h6>
+    <div className="rounded-lg border bg-card shadow-xs mb-4 mt-4 overflow-hidden">
+      <div className="border-b bg-muted/40 py-3 px-4">
+        <h6 className="m-0 text-sm font-semibold text-foreground">Raw Materials</h6>
       </div>
       <div className="bg-card p-4">{tableContent}</div>
       {dialog}

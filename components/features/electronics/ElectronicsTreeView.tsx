@@ -1,9 +1,9 @@
 'use client';
 
-import { Cable, CircuitBoard, FolderTree, Layers } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { Badge } from '@/components/ui/badge';
+import { Cable, CircuitBoard, FolderTree, Layers } from '@/components/ui/icons';
 import type { DesignView } from '@/lib/api/electronics';
 import { buildDesignTree, itemTypeLabel, levelLabel, statusLabel, typeLabel, type DesignNode } from '@/lib/electronics/design-view';
 

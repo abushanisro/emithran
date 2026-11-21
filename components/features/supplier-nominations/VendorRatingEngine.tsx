@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Calculator,
   Edit,
   Save,
   X
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from '@/components/ui/icons';
 import {
   getVendorRatingMatrix,
   initializeVendorRatingMatrix,
@@ -428,8 +429,8 @@ const handleSave = async () => {
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">Non-Conformities</div>
             <div className="flex gap-2 mt-1">
-              <Badge className="bg-green-500/20 text-green-400">Minor: {getCurrentOverallScores().totalMinorNC}</Badge>
-              <Badge className="bg-red-500/20 text-red-400">Major: {getCurrentOverallScores().totalMajorNC}</Badge>
+              <Badge className="bg-success/10 text-success">Minor: {getCurrentOverallScores().totalMinorNC}</Badge>
+              <Badge className="bg-destructive/10 text-destructive">Major: {getCurrentOverallScores().totalMajorNC}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -455,7 +456,7 @@ const handleSave = async () => {
             ) : (
               <div className="mt-3">
                 <div className="flex items-center gap-2 mb-3">
-                  <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                  <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/30">
                     {Object.keys(editingValues).length} unsaved changes
                   </Badge>
                 </div>
@@ -474,7 +475,7 @@ const handleSave = async () => {
                     onClick={handleSave}
                     disabled={isSaving || Object.keys(editingValues).length === 0}
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                    className="bg-success hover:bg-success/90 text-success-foreground flex items-center gap-2"
                   >
                     {isSaving ? (
                       <>
@@ -529,7 +530,7 @@ const handleSave = async () => {
                 </div>
                 
                 <div className="text-center">
-                  <div className="text-lg font-semibold text-orange-400">
+                  <div className="text-lg font-semibold text-warning">
                     {overallScores.totalMinorNC + overallScores.totalMajorNC}
                   </div>
                   <div className="text-muted-foreground">Total NCs</div>
@@ -549,8 +550,8 @@ const handleSave = async () => {
               Vendor Rating Assessment Matrix
             </div>
             {hasPendingChanges && (
-              <div className="flex items-center gap-2 text-amber-300 text-sm">
-                <div className="w-2 h-2 bg-amber-300 rounded-full animate-pulse"></div>
+              <div className="flex items-center gap-2 text-warning text-sm">
+                <div className="w-2 h-2 bg-warning rounded-full animate-pulse"></div>
                 Unsaved changes
               </div>
             )}
@@ -648,7 +649,7 @@ const handleSave = async () => {
                       </tr>
                     ))}
                   
-                  <tr className="bg-yellow-200 border-t-2 border-border">
+                  <tr className="bg-warning/20 border-t-2 border-border">
                     <td colSpan={3} className="p-3 text-black font-bold text-center">Overall Score</td>
                     <td className="p-3 text-black font-bold text-center">{getCurrentOverallScores().sectionWiseCapability.toFixed(1)}%</td>
                     <td className="p-3 text-black font-bold text-center">{getCurrentOverallScores().riskMitigation.toFixed(1)}%</td>
