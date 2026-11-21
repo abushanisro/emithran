@@ -796,7 +796,8 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
       >
         <table role="treegrid" aria-label="BOM items" className="w-full min-w-[720px] table-fixed border-collapse text-sm">
           <colgroup>
-            <col className="w-[44%]" />
+            {/* The item (tree, thumbnail, name, type): wide enough for a long part name two levels down, so the details start close to it. */}
+            <col className="w-[42%]" />
             <col />
             <col className="w-32" />
           </colgroup>
