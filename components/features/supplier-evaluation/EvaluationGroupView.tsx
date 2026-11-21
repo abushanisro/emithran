@@ -525,28 +525,28 @@ We look forward to your competitive proposal and establishing a successful partn
               </div>
               
               <Tabs value={activeBomTab} onValueChange={setActiveBomTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 bg-muted rounded-lg p-1 h-10">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger
                     value="rfq"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     RFQ Tracking
                   </TabsTrigger>
                   <TabsTrigger
                     value="overview"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     BOM & Vendor
                   </TabsTrigger>
                   <TabsTrigger
                     value="cost-analysis"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     Cost Analysis
                   </TabsTrigger>
                   <TabsTrigger
                     value="evaluation"
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    className="text-sm"
                   >
                     Supplier Analysis
                   </TabsTrigger>
