@@ -72,7 +72,11 @@ export class CalculatorsServiceV2 {
       `,
         { count: 'exact' },
       )
+      // A total order: the calculators one migration creates share its transaction's created_at (27 rows at one instant), and pages of
+      // rows tied on the sort key are not stable, so a client reading every page got some calculators twice and others never. The id
+      // breaks the ties.
       .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
       .range(from, to);
 
     // Apply filters
