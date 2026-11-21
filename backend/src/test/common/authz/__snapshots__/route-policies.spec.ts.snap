@@ -4,6 +4,7 @@ exports[`route authorization inventory matches the reviewed route-policy table 1
 "org:member      DELETE /api/v1/balloon-diagrams/:diagramId/annotations/:annotationId  ProjectReportsController.deleteAnnotation
 org:member      DELETE /api/v1/balloon-diagrams/:id  ProjectReportsController.deleteBalloonDiagram
 org:member      DELETE /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.remove
+org:viewer      DELETE /api/v1/bom-item-stars/:bomItemId  BomItemStarsController.unstar
 org:member      DELETE /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.deleteSpecifications
 org:member      DELETE /api/v1/bom-items/:id  BOMItemsController.remove
 org:member      DELETE /api/v1/bom-items/:id/calculator-field-overrides  CalculatorFieldOverridesController.clear
@@ -73,6 +74,7 @@ authenticated   GET /api/v1/auth/session  SessionController.status
 org:viewer      GET /api/v1/balloon-diagrams/:id  ProjectReportsController.getBalloonDiagram
 org:viewer      GET /api/v1/benchmark-sessions  BenchmarkSessionsController.findAll
 org:viewer      GET /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.findOne
+org:viewer      GET /api/v1/bom-item-stars  BomItemStarsController.list
 org:viewer      GET /api/v1/bom-items  BOMItemsController.findAll
 org:viewer      GET /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.getSpecificationsByBomItem
 org:viewer      GET /api/v1/bom-items/:id  BOMItemsController.findOne
@@ -433,6 +435,7 @@ org:member      POST /api/v1/vendors/services  VendorsController.createService
 org:member      PUT /api/v1/balloon-diagrams/:diagramId/annotations/:annotationId  ProjectReportsController.updateAnnotation
 org:member      PUT /api/v1/balloon-diagrams/:id  ProjectReportsController.updateBalloonDiagram
 org:member      PUT /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.update
+org:viewer      PUT /api/v1/bom-item-stars/:bomItemId  BomItemStarsController.star
 org:member      PUT /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.updateSpecifications
 org:member      PUT /api/v1/bom-items/:id  BOMItemsController.update
 org:member      PUT /api/v1/bom-items/:id/calculator-field-overrides  CalculatorFieldOverridesController.set

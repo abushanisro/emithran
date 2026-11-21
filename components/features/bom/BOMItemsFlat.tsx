@@ -23,13 +23,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info, Layers, Layers3, Package, Search, X } from '@/components/ui/icons';
+import { Edit2, Trash2, Plus, ChevronDown, ChevronRight, FileText, Box, GripVertical, Cpu, Info, Layers, Layers3, Package, Search, StarGlyph, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useStarredBOMItems, useToggleBOMItemStar } from '@/lib/api/hooks/useBOMItemStars';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { dropIntent, type DropIntent } from '@/lib/bom/drop-intent';
 import { rowFacts } from '@/lib/bom/row-summary';
@@ -238,9 +239,17 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const search = query.trim();
+  // Each person's own stars, as Gmail's: a star on every row, and "Starred" narrows the list to the starred items (each with its place in
+  // the BOM), together with the search when there is one.
+  const { data: starredIds } = useStarredBOMItems(bomId);
+  const starred = useMemo(() => new Set(starredIds ?? []), [starredIds]);
+  const toggleStar = useToggleBOMItemStar(bomId);
+  const [starredOnly, setStarredOnly] = useState(false);
   const filtered = useMemo(
-    () => (search ? filterTree(treeData, (n) => matchesQuery(search, n.name, n.partNumber)) : null),
-    [treeData, search],
+    () => (search || starredOnly
+      ? filterTree(treeData, (n) => (!search || matchesQuery(search, n.name, n.partNumber)) && (!starredOnly || starred.has(n.id)))
+      : null),
+    [treeData, search, starredOnly, starred],
   );
   // "/" puts the cursor in the search box, unless one is already typing somewhere.
   useEffect(() => {
@@ -441,6 +450,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
     const childType      = getChildType(item.itemType);
     const style          = typeStyleOf(item.itemType);
     const facts          = rowFacts(item, levelOf(item));
+    const isStarred      = starred.has(item.id);
     // Every line takes the colour of the items it leads to: this row's connector its own type's (a child part's yellow, a sub-assembly's
     // blue), a line running past it the colour of the branch it joins (path[i + 1], the ancestor whose next sibling it reaches), and the
     // line down from an open parent its children's.
@@ -493,6 +503,22 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
                 }`}
                 aria-hidden="true"
               />
+            </span>
+            {/* Gmail's star: grey outline, yellow and filled when starred; the person's own mark. */}
+            <span className="flex w-7 shrink-0 items-center justify-center">
+              <button
+                type="button"
+                aria-pressed={isStarred}
+                aria-label={isStarred ? `Unstar ${item.name}` : `Star ${item.name}`}
+                title={isStarred ? 'Starred' : 'Not starred'}
+                onClick={(e) => { e.stopPropagation(); toggleStar.mutate({ bomItemId: item.id, starred: !isStarred }); }}
+                className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <StarGlyph
+                  className={`h-[18px] w-[18px] ${isStarred ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground/50 group-hover:text-muted-foreground'}`}
+                  aria-hidden="true"
+                />
+              </button>
             </span>
             {/* Tree guides: a line under each ancestor with more children below, then this row's connector (├ or └). */}
             {guides.map((continues, i) => (
@@ -726,6 +752,18 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
         <Button variant="ghost" size="sm" className="h-9 gap-1 rounded-full px-3 text-xs text-muted-foreground hover:bg-foreground/10 hover:text-foreground" onClick={collapseAll}>
           <ChevronRight className="h-3.5 w-3.5" /> Collapse all
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-pressed={starredOnly}
+          className={`h-9 gap-1 rounded-full px-3 text-xs ${
+            starredOnly ? 'bg-yellow-400/15 text-yellow-800 hover:bg-yellow-400/25 dark:text-yellow-300' : 'text-muted-foreground hover:bg-foreground/10 hover:text-foreground'
+          }`}
+          onClick={() => { setStarredOnly((on) => !on); }}
+        >
+          <StarGlyph className={`h-3.5 w-3.5 ${starredOnly ? 'fill-yellow-400 text-yellow-500' : ''}`} aria-hidden="true" /> Starred
+          <span className="tabular-nums opacity-70">{starred.size}</span>
+        </Button>
         <span className="ml-auto whitespace-nowrap text-xs tabular-nums text-muted-foreground">
           {items.length} {items.length === 1 ? 'item' : 'items'} · Total cost <span className="font-semibold text-foreground">{totalLabel}</span>
         </span>
@@ -777,8 +815,17 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem, to
             {filtered?.matches.size === 0 && (
               <tr>
                 <td colSpan={3} className="px-3 py-6 text-center text-xs text-muted-foreground">
-                  No item matches &ldquo;{search}&rdquo; by name or part number.{' '}
-                  <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setQuery(''); }}>Clear search</button>
+                  {search ? (
+                    <>
+                      No {starredOnly ? 'starred ' : ''}item matches &ldquo;{search}&rdquo; by name or part number.{' '}
+                      <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setQuery(''); }}>Clear search</button>
+                    </>
+                  ) : (
+                    <>
+                      No starred items yet: click the star on a row to star it.{' '}
+                      <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setStarredOnly(false); }}>Show all items</button>
+                    </>
+                  )}
                 </td>
               </tr>
             )}
