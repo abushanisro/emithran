@@ -41,9 +41,13 @@ ADDITIVE = "additive"
 # section swept along a centreline by bar_tube/feature_extractor.py. Reached only through the explicit family_hint: a straight round tube is, by its
 # geometry alone, a turned part.
 BAR_TUBE = "bar_tube"
+# Blow molding and rotational molding (a hollow shell): measured by roto_blow/feature_extractor.py (its wall, inside, spout, parting line,
+# envelope). Reached only through the explicit family_hint: a molded shell is, by its geometry alone, a plastic molded part.
+ROTO_BLOW = "roto_blow"
 
 ALL_FAMILIES: FrozenSet[str] = frozenset({
     SHEET_METAL, MILLED, TURNED, MILL_TURN, PLASTIC_MOLDED, DIE_CAST, SAND_CAST, INVESTMENT_CAST, FORGED, POWDER_METAL, COMPOSITE, ADDITIVE, BAR_TUBE,
+    ROTO_BLOW,
 })
 
 # 2-Model Machining (a finished part machined from a cast blank, memory/"2 Mold Molding"): a hint, not a family. The part is analysed as

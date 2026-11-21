@@ -32,6 +32,8 @@ export const FAMILY_HINT_TO_PROCESS_GROUP: Record<string, string> = {
   additive: 'Additive Manufacturing',
   // A length of bar, tube or profile (cad-engine bar_tube): costed by the bar and tube engine (backend costing/bar-tube).
   bar_tube: 'Bar and Tube Fabrication',
+  // A blow molded or rotomolded hollow shell (cad-engine roto_blow): costed by the Roto & Blow Molding engine (backend costing/roto-blow).
+  roto_blow: 'Roto & Blow Molding',
   // An assembly's own work, costed from its BOM children (backend costing/assembly): a costed group with no CAD extractor.
   assembly: 'Assembly',
   // A weldment's welding, costed from its BOM children and the Cost Guide's weld table (backend costing/part-assembly): no CAD extractor either.

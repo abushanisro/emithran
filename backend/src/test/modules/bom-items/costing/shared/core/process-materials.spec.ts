@@ -54,7 +54,7 @@ describe('the grade a process prices (Apply never fails on a material the proces
   it('every engine that matches its grade by exact name in its own group is covered', () => {
     expect(PROCESS_OWN_MATERIAL_GROUP).toEqual({
       die_cast: 'Die Casting', sand_cast: 'Sand Casting', investment_cast: 'Casting Investment', forged: 'Forging', powder_metal: 'Powder Metal',
-      composite: 'Composites', additive: 'Additive Manufacturing', bar_tube: 'Bar and Tube Fabrication', plastic_molded: 'Plastic & Rubber',
+      composite: 'Composites', additive: 'Additive Manufacturing', bar_tube: 'Bar and Tube Fabrication', roto_blow: 'Roto & Blow Molding', plastic_molded: 'Plastic & Rubber',
     });
   });
 });

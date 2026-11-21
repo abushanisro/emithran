@@ -613,6 +613,24 @@ export class AutoFillService {
             }])),
           } : null,
         } : {}),
+        // A blow molded or rotomolded shell (cad-engine roto_blow/feature_extractor.py): its envelope, wall, the air it closes in, spouts, parting
+        // line and perimeter, holes and voids. The Roto & Blow Molding cost prices both routes and the operations its features take from it.
+        ...(family.family === 'roto_blow' ? {
+          rotoBlowGeometry: cadMI?.features?.extraction_version ? {
+            extractionVersion: cadMI.features.extraction_version,
+            envelopeMm: cadMI.features.envelope_mm ?? null,
+            partVolumeMm3: cadMI.features.part_volume_mm3 ?? null,
+            surfaceAreaMm2: cadMI.features.surface_area_mm2 ?? null,
+            wall: cadMI.features.wall ?? null,
+            hollow: cadMI.features.hollow ?? null,
+            inside: cadMI.features.inside ?? null,
+            partingLineMm: cadMI.features.parting_line_mm ?? null,
+            perimeterMm: cadMI.features.perimeter_mm ?? null,
+            spouts: cadMI.features.spouts ?? null,
+            holes: cadMI.features.holes ?? null,
+            voids: cadMI.features.voids ?? null,
+          } : null,
+        } : {}),
         // A bar, tube or profile (cad-engine bar_tube/feature_extractor.py): its stock form and section, the centreline's developed length, the
         // bends, the holes and openings through the wall, the end cuts and the end forms. The bar and tube cost prices its stock and routes from it.
         ...(family.family === 'bar_tube' ? {

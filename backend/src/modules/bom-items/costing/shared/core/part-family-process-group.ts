@@ -30,6 +30,8 @@ export const CAD_FAMILY_TO_PROCESS_GROUP: Readonly<Record<string, string>> = {
   additive: 'Additive Manufacturing',
   // A length of bar, tube or profile, cut, punched, formed and bent (cad-engine bar_tube/feature_extractor.py: section, centreline, ends).
   bar_tube: 'Bar and Tube Fabrication',
+  // A blow molded or rotomolded hollow shell (cad-engine roto_blow/feature_extractor.py: wall, inside, spout, parting line, envelope).
+  roto_blow: 'Roto & Blow Molding',
   // An assembly's own work: its BOM children loaded and joined (costing/assembly). An assembly has no model of its own to analyse.
   assembly: 'Assembly',
   // A weldment's welding (memory/Part Assembly): its BOM children (or the part itself) loaded and welded by the Cost Guide's weld table

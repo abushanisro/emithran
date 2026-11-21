@@ -718,6 +718,10 @@ export interface CostSummaryDto {
   barTube?: BarTubeBreakdown;
   /** Multi-Spindle Machining: the bar, the machine and its station plan (the slowest station sets the cycle), the route quoted and every route. */
   multiSpindle?: MultiSpindleBreakdown;
+  /** Roto & Blow Molding: the shell (envelope, wall, inside, spout), its features' operations, parts per shot or arm, the route quoted and every route. */
+  rotoBlow?: RotoBlowBreakdown;
+  /** Roto & Blow Molding: the molds and trim tooling the quoted route needs, USD, kept out of the piece cost; costUsd null when its calculator cannot price it. */
+  rotoBlowTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Bar and tube: the tools the quoted route needs for this part (extrusion die, bend die sets), USD, kept out of the piece cost; costUsd null when no source prices one. */
   barTubeTooling?: Array<{ key: string; description: string; detail: string; costUsd: number | null; perPartUsd: number | null }>;
   /** Assembly: its components and joints, the route quoted and every route. The components' own costs are not in the summary (the BOM roll-up adds them). */
@@ -926,6 +930,29 @@ export interface PartAssemblyBreakdown {
   wireCost: number;
   /** Every route: its total per weldment (summary currency) when complete, or why it is not a route for the weldment. */
   options: { route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }[];
+}
+
+export interface RotoBlowBreakdown {
+  /** The quoted route (roto-blow-route.ts ROTO_BLOW_ROUTES key: blow, roto) and its name. */
+  route: string;
+  routeLabel: string;
+  /** The part's envelope across the parting plane (long, short) and along the pull (mm). */
+  envelopeMm: number[];
+  wallMm: number;
+  /** The air the shell closes in (mm³). */
+  insideVolumeMm3: number;
+  partingLineMm: number | null;
+  spouts: Array<{ id: string; diameterMm: number }>;
+  /** Parts per shot (blow: cavities x stations) or per carousel arm (roto); null when no machine takes the part. */
+  partsPerCycle: number | null;
+  coolingTimeS: number | null;
+  materialMassKg: number;
+  partMassKg: number;
+  /** Every feature's operation on the quoted route (roto-blow-features.ts) and why. */
+  features: Array<{ id: string; featureType: string; operation: string; process: string; reason: string }>;
+  complete: boolean;
+  /** Both routes: the total per part (summary currency) when complete, or why it is not a route for the part. */
+  options: Array<{ route: string; label: string; complete: boolean; totalCost: number | null; reason: string | null }>;
 }
 
 export interface BarTubeBreakdown {

@@ -4,6 +4,7 @@
 // of it, so the process prices its closest own material instead and says so; the part's own grade is not changed.
 import { ADDITIVE, RAPID_PROTOTYPING } from '../../additive/additive-domain';
 import { BAR_TUBE_PROCESS_GROUP } from '../../bar-tube/bar-tube-route';
+import { ROTO_BLOW_PROCESS_GROUP } from '../../roto-blow/roto-blow-route';
 import { CASTING_MATERIAL_GROUP } from '../../casting/casting-reference.service';
 import { INVESTMENT_PROCESS_GROUP } from '../../casting/investment/investment-reference';
 import { COMPOSITES_PROCESS_GROUP } from '../../composites/composites-route';
@@ -23,6 +24,7 @@ export const PROCESS_OWN_MATERIAL_GROUP: Readonly<Record<string, string>> = {
   composite: COMPOSITES_PROCESS_GROUP,
   additive: ADDITIVE.materialGroup,
   bar_tube: BAR_TUBE_PROCESS_GROUP,
+  roto_blow: ROTO_BLOW_PROCESS_GROUP,
   plastic_molded: 'Plastic & Rubber',
 };
 
