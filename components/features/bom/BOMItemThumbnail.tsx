@@ -31,6 +31,11 @@ type FileCategory = 'stl' | 'obj' | 'step' | 'image' | 'pdf' | 'unknown';
 export interface BOMItemThumbnailProps {
   item: BOMItem;
   onClick: () => void;
+  /**
+   * md: 120 x 90 (the default). sm: 40 x 30, for a dense table row; the 3D badge and the fit button are left out, and the capture is still
+   * drawn at 120 x 90, so the picture stays sharp.
+   */
+  size?: 'sm' | 'md';
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +171,8 @@ function STLScene({ url, onCapture, onError }: STLCaptureProps) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
+export function BOMItemThumbnail({ item, onClick, size = 'md' }: BOMItemThumbnailProps) {
+  const compact = size === 'sm';
   const containerRef = useRef<HTMLDivElement>(null);
   // The thumbnail stored on the item comes first: drawing one means
   // downloading the whole 3D model, which is the costliest thing this list
@@ -265,7 +271,8 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
     // Manufacturing Intelligence, and the thumbnail means "open the viewer".
     <div
       ref={containerRef}
-      className="relative shrink-0 w-[120px] h-[90px] rounded-md overflow-hidden cursor-pointer group"
+      className={`relative shrink-0 overflow-hidden cursor-pointer group ${compact ? 'h-[30px] w-10 rounded' : 'w-[120px] h-[90px] rounded-md'}`}
+      title={compact ? `${item.name}: open the viewer` : undefined}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       {/* Skeleton during load */}
@@ -308,8 +315,8 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
       {/* Fallback for non-previewable files (STEP, IGES, PDF, etc.) */}
       {phase === 'done' && !dataUrl && resolvedCategory.current !== 'image' && (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-muted/60 rounded-md border border-border/40 group-hover:ring-2 group-hover:ring-primary/50 transition-all">
-          <Box className="h-7 w-7 text-primary/50" />
-          <span className="text-[9px] font-mono uppercase text-muted-foreground">
+          <Box className={compact ? 'h-3.5 w-3.5 text-primary/50' : 'h-7 w-7 text-primary/50'} />
+          <span className={compact ? 'sr-only' : 'text-[9px] font-mono uppercase text-muted-foreground'}>
             {resolvedCategory.current === 'step' ? 'STEP'
               : resolvedCategory.current === 'obj' ? 'OBJ'
               : resolvedCategory.current === 'pdf' ? 'PDF'
@@ -321,19 +328,19 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
       {/* Error state */}
       {phase === 'error' && (
         <div className="w-full h-full flex items-center justify-center bg-muted rounded-md border border-border/40">
-          <Box className="h-8 w-8 text-muted-foreground" />
+          <Box className={compact ? 'h-3.5 w-3.5 text-muted-foreground' : 'h-8 w-8 text-muted-foreground'} />
         </div>
       )}
 
       {/* 3D badge */}
-      {phase === 'done' && is3d && (
+      {phase === 'done' && is3d && !compact && (
         <Badge className="absolute bottom-1 left-1 h-4 px-1 text-[9px] bg-primary/80 text-primary-foreground pointer-events-none">
           3D
         </Badge>
       )}
 
       {/* Fit / expand button — appears on hover */}
-      {phase === 'done' && (
+      {phase === 'done' && !compact && (
         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={onClick}
