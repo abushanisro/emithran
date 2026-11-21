@@ -5,7 +5,6 @@
 import { cappingTools, hydroformTooling, isHighStrength, stepRow, type HydroformingTool, type HydroformToolShop } from './hydroforming-tooling';
 import { machineValue, type SandMachine } from '../casting/sand/sand-machines';
 import { fail, routeKit, type RouteKit } from '../shared/calculators/route-kit';
-import { noCostFeatureLine } from '../shared/core/engine-kernel';
 import { HYDROFORMING_PROCESS_GROUP } from '../shared/core/part-family-process-group';
 
 import type { HydroformPart } from './hydroforming-part';
@@ -105,6 +104,8 @@ export interface HydroformingRoute {
     costUsd: number; grossKg: number; blankKg: number; partKg: number; blankAreaMm2: number; addendumMm: number;
     run: ReferenceCalcRun | null; blankRun: ReferenceCalcRun | null;
   };
+  /** The force the offline press blanks and pierces with (the blank's outline and every hole); null when not known (no shear strength or outline). */
+  blankingForceKn: number | null;
   draws: number;
   drawRatiosPct: number[];
   partsPerTray: number;
@@ -199,6 +200,10 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
 
   const seed = (value: number, source: string): CalcSeed => ({ value, source });
   const handLength = manualFormLength(ref, part);
+  // Memory's Offline Blank pierces every hole (Piercing//SimpleHole, //ComplexHole, as pierced on a curved wall too): a hole through a formed
+  // wall is pierced in the flat blank with the others, so its cut joins theirs.
+  const wallHoles = part.holes.filter((h) => !h.inFlat);
+  const wallHolePerimeterMm = wallHoles.reduce((sum, h) => sum + h.perimeterMm, 0);
   const addendum = blankAddendum(ref, part);
   // The blank grows by its outline x the addendum. An outline the cad-engine declined (an unfolded blank) adds nothing when there is no
   // addendum to grow it by; with an addendum it is missing, and the Blank calculator says so.
@@ -210,7 +215,9 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
     plan_width_mm: seed(part.planWidthMm, "the part's plan along the press axis, short side (mm)"),
     manual_form_length_mm: seed(handLength, 'the curved flanges the press cannot form (mm)'),
     blank_perimeter_mm: perimeter,
-    pierced_hole_perimeter_mm: seed(part.blank.piercedHolePerimeterMm, 'the holes pierced in the flat (mm)'),
+    pierced_hole_perimeter_mm: seed(part.blank.piercedHolePerimeterMm + wallHolePerimeterMm, wallHoles.length
+      ? `every hole, pierced in the flat blank: ${r2(part.blank.piercedHolePerimeterMm)} mm in the flat + ${r2(wallHolePerimeterMm)} mm of ${wallHoles.length} through a formed wall (mm)`
+      : 'the holes pierced in the flat (mm)'),
     thickness_mm: seed(input.thicknessMm, 'the sheet thickness (mm)'),
     blank_area_mm2: seed(part.blank.areaMm2, `the measured blank (${part.blank.method}, mm²)`),
   };
@@ -241,6 +248,10 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
   const warnings: string[] = [];
   if (nest.note) warnings.push(nest.note);
   if (addendum.mm > 0) warnings.push(`The blank carries ${r2(addendum.mm)} mm of addendum on each side (${addendum.source}), trimmed after drawing.`);
+  if (wallHoles.length) {
+    warnings.push(`${wallHoles.length} hole(s) through a formed wall are pierced in the flat blank with the others, as memory's Offline Blank pierces every hole; `
+      + 'one whose position tolerance is under toleranceLooseThresholdHole would be trimmed after forming, which is not modelled.');
+  }
 
   // ── Offline Blank: one stroke blanks and pierces, on a press with the force and the room for the strip ──────────────────────────────
   const shear = material.shearStrengthMpa;
@@ -275,7 +286,6 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
   const hand = kit.run(HYDRO_CALC.hand, null, {});
   const inspection = ref.number('defaultInspectionTime') ?? 0;
   const factor = ref.number('cycleTimeAdjustmentFactor') ?? 1;
-  const holesOffFlat = part.holes.filter((h) => !h.inFlat);
   const requested = scenario.partsPerTray ?? ref.number('defaultNumPartPerFluidCellTray') ?? 1;
   const capping = cappingTools(ref, part);
 
@@ -354,13 +364,7 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
     const step = kit.step('Hydroform', (m) => timing(m).outcome, criteria, { machines: presses, processRoute: def.label });
     const chosen = step.machine ? timing(step.machine) : null;
     const pressLine: ProcessLineCost = chosen && !isGap(step.line) ? { ...step.line, featureBreakdown: chosen.ops } : step.line;
-    const noCost = holesOffFlat.length
-      ? [noCostFeatureLine({
-        reason: `${holesOffFlat.length} hole(s) through a formed wall: pierced after forming, which is not an operation of ${HYDROFORMING_PROCESS_GROUP}`,
-        processGroup: HYDROFORMING_PROCESS_GROUP,
-      })]
-      : [];
-    const lines = [blankStep.line, pressLine, ...noCost];
+    const lines = [blankStep.line, pressLine];
     const complete = lines.every((l) => !isGap(l));
     const partsPerTray = chosen?.parts ?? 1;
     const { tools, warnings: toolWarnings } = hydroformTooling({
@@ -372,7 +376,7 @@ export function buildHydroformingRoutes(input: HydroformingRouteInput): { routes
     return {
       key: def.key, label: def.label, lines,
       material: { costUsd: materialUsd, grossKg: nest.grossKgPerPart, blankKg, partKg, blankAreaMm2, addendumMm: addendum.mm, run: materialRun.run, blankRun: blankRun.run },
-      draws: draws?.draws ?? 0, drawRatiosPct: draws?.ratiosPct ?? [], partsPerTray, partsThatFit: deep ? null : chosen?.partsThatFit ?? null,
+      blankingForceKn: forceKn, draws: draws?.draws ?? 0, drawRatiosPct: draws?.ratiosPct ?? [], partsPerTray, partsThatFit: deep ? null : chosen?.partsThatFit ?? null,
       press: step.machine ? { name: step.machine.name, formingCycleTimeS: machineValue(step.machine, 'machine_forming_cycle_time_s') ?? 0 } : null,
       handAdjustingLengthMm: deep ? 0 : handLength, throwPadAreaMm2: !deep && 'run' in pad ? pad.run.outputs['Pad Area'] ?? 0 : 0,
       cappingTools: capping, tooling: tools,

@@ -110,12 +110,12 @@ export function HydroformingSection({ hydroforming: h, tooling, overrides, onCha
               </span>
             </div>
           )}
-          {(h.holes.inFlat > 0 || h.holes.afterForming > 0) && (
-            <div className={rowClass} title="Holes in the flat are pierced with the blank; a hole through a formed wall is pierced after forming, not an operation of this process (a $0 No Cost Feature).">
+          {h.holes.pierced > 0 && (
+            <div className={rowClass} title="Memory's Offline Blank pierces every hole with the blank, a hole in a wall the forming then shapes too. A hole with a position tolerance under toleranceLooseThresholdHole would be trimmed after forming (not modelled).">
               <span className={labelClass}>Holes</span>
               <span className="flex-1 tabular-nums">
-                {h.holes.inFlat} pierced with the blank{h.cappingTools > 0 ? ` (${h.cappingTools} capped)` : ''}
-                {h.holes.afterForming > 0 && <span className="block text-amber-600 dark:text-amber-400">{h.holes.afterForming} through a formed wall: not costed</span>}
+                {h.holes.pierced} pierced with the blank{h.cappingTools > 0 ? ` (${h.cappingTools} capped)` : ''}
+                {h.holes.inFormedWalls > 0 && <span className="block text-muted-foreground">{h.holes.inFormedWalls} of them in a formed wall</span>}
               </span>
             </div>
           )}
