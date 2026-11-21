@@ -384,4 +384,6 @@ export const Zap: LucideIcon = duo(LucideZap, 'Zap');
 export const ZoomIn: LucideIcon = duo(LucideZoomIn, 'ZoomIn');
 export const ZoomOut: LucideIcon = duo(LucideZoomOut, 'ZoomOut');
 export const Star: LucideIcon = duo(LucideStar, 'Star');
+/** The star toggle's glyph (a control: a plain stroke, filled when on), as Gmail's star on each message. */
+export const StarGlyph: LucideIcon = LucideStar;
 export const Smile: LucideIcon = duo(LucideSmile, 'Smile');

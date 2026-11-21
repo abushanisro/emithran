@@ -587,6 +587,38 @@
         ],
         "type": "object"
       },
+      "BomItemStarDto": {
+        "properties": {
+          "bomItemId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "starred": {
+            "description": "Whether the caller has the item starred after the call.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bomItemId",
+          "starred"
+        ],
+        "type": "object"
+      },
+      "BomItemStarsDto": {
+        "properties": {
+          "bomItemIds": {
+            "description": "The items of the BOM the caller starred (the caller's own stars only).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "bomItemIds"
+        ],
+        "type": "object"
+      },
       "BomPartDto": {
         "properties": {
           "bomItemId": {
@@ -12823,6 +12855,117 @@
         "summary": "Update a benchmark session",
         "tags": [
           "Benchmark Sessions"
+        ]
+      }
+    },
+    "/api/v1/bom-item-stars": {
+      "get": {
+        "operationId": "BomItemStarsController_list_v1",
+        "parameters": [
+          {
+            "description": "The BOM whose starred items to list.",
+            "in": "query",
+            "name": "bomId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomItemStarsDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The items of a BOM the caller starred.",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
+    "/api/v1/bom-item-stars/{bomItemId}": {
+      "delete": {
+        "operationId": "BomItemStarsController_unstar_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bomItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomItemStarDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the caller's star from a BOM item (an item without one changes nothing).",
+        "tags": [
+          "BOM Items"
+        ]
+      },
+      "put": {
+        "operationId": "BomItemStarsController_star_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bomItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomItemStarDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "description": "No such item, or not one the caller can see."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Star a BOM item for the caller (starring a starred item changes nothing).",
+        "tags": [
+          "BOM Items"
         ]
       }
     },
