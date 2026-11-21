@@ -197,11 +197,23 @@ describe('the cost summary and the route comparison', () => {
 });
 
 describe('bending: each bend on the cheapest method that can make it', () => {
-  it('2 D bends of the 25 x 1.5 tube are rotary drawn over a mandrel (tool key B1: wall factor 20, D of bend 2), on the 1 inch Pines', () => {
+  it('2 D bends of the 25 x 1.5 tube are rotary drawn over a mandrel (tool key B1: wall factor 20, D of bend 2), on the preferred 75 mm bender', () => {
     const saw = routeOf('saw', { ...TUBE, bends: [{ clrMm: 50, angleDeg: 90 }, { clrMm: 50, angleDeg: 45, clockAngleDeg: 90 }] });
     expect(saw.complete).toBe(true);
     expect(saw.bendPlan.map((b) => [b.method, b.toolKey, b.mandrel])).toEqual([['Rotary Draw Bending', 'B1', true], ['Rotary Draw Bending', 'B1', true]]);
-    expect(saw.lines.find((l) => l.process === 'Rotary Draw Bending')!.machineName).toBe('Pines Model 1');
+    // usePreferredMachines is true: memory marks the three Rotary Draw Benders preferred and the Pines models not, so the cheapest preferred
+    // bender that takes the tube is used, not Pines Model 1 (which costs no more).
+    expect(saw.lines.find((l) => l.process === 'Rotary Draw Bending')?.machineName).toBe('Rotary Draw Bender - 75mm Max Tube Diameter');
+  });
+
+  it('usePreferredMachines decides it: switched off, the cheapest capable bender is used (Pines Model 1, no dearer than the preferred one)', () => {
+    const part = { ...TUBE, bends: [{ clrMm: 50, angleDeg: 90 }] };
+    const bend = (ref: BarTubeRouteInput['ref']) => buildBarTubeRoutes(input(part, { ref })).routes.find((x) => x.key === 'saw')
+      ?.lines.find((l) => l.process === 'Rotary Draw Bending');
+    const preferred = bend(realBarTubeReference());
+    const cheapest = bend(realBarTubeReference().withOverrides(new Map([['usePreferredMachines', 'false']])));
+    expect([preferred?.machineName, cheapest?.machineName]).toEqual(['Rotary Draw Bender - 75mm Max Tube Diameter', 'Pines Model 1']);
+    expect(cheapest?.totalCost).toBeLessThanOrEqual(preferred?.totalCost ?? 0);
   });
 
   it('a bend tighter than bending_difficulty_factor lists (0.4 D) has no method: a named gap with each method\'s reason', () => {

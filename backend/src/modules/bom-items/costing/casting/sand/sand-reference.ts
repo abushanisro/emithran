@@ -94,6 +94,15 @@ export class SandReference {
     return v == null || v.trim() === '' ? null : v;
   }
 
+  /**
+   * A variable as a yes/no: the data writes its switches as `true` / `false` (usePreferredMachines, enableScrapMaterialCredit, ...); 1 / 0 read
+   * the same. Null when absent or anything else. A switch is never read with `number`, which gives null for `true`.
+   */
+  flag(name: string): boolean | null {
+    const v = this.text(name)?.trim().toLowerCase();
+    return v === 'true' || v === '1' ? true : v === 'false' || v === '0' ? false : null;
+  }
+
   /** The unit type the source gives a variable (Length, Time, ...), as staged. */
   unit(name: string): string | null {
     return this.variables.get(name)?.unit ?? null;
@@ -124,13 +133,25 @@ export class SandReference {
   }
 }
 
-/** Builds the reference from the staged rows (variables by key, lookup tables by their staged key). */
+/** A number written with thousands separators, as some tables are staged ("999,999,999.00", "4,545,454,545.00"): nothing else matches. */
+const THOUSANDS = /^\s*-?\d{1,3}(,\d{3})+(\.\d+)?\s*$/;
+
+/**
+ * A lookup cell as the number it is written as: a cell with thousands separators loses them (a table's open-ended last row is such a
+ * number, and `Number("999,999,999.00")` is not a number, so the row never matched); every other cell is kept as staged.
+ */
+export const plainCell = (v: unknown): unknown => (typeof v === 'string' && THOUSANDS.test(v) ? v.replace(/[\s,]/g, '') : v);
+
+/** Builds the reference from the staged rows (variables by key, lookup tables by their staged key, each cell as plainCell reads it). */
 export function resolveSandReference(rows: { variables: readonly StagedVariable[]; lookups: readonly StagedLookup[] }): SandReference {
   const variables = new Map(rows.variables.map((v) => [v.key, { value: v.value ?? null, unit: v.unit_type ?? null }] as const));
   const tables = new Map<string, readonly Row[]>();
   for (const l of rows.lookups) {
     const staged = Array.isArray(l.raw) ? l.raw : (l.raw as { rows?: unknown } | null | undefined)?.rows;
-    if (Array.isArray(staged)) tables.set(lookupName(l.key), staged as Row[]);
+    if (!Array.isArray(staged)) continue;
+    tables.set(lookupName(l.key), (staged as unknown[]).map((row) => (row != null && typeof row === 'object' && !Array.isArray(row)
+      ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, plainCell(v)]))
+      : row) as Row));
   }
   return new SandReference(variables, tables);
 }

@@ -297,7 +297,8 @@ export function selectAndCost(input: {
     return { m, outcome, costed };
   });
   const capable = evaluated.filter((e) => e.costed);
-  const preferOnly = input.ref.number('usePreferredMachines') === 1 && capable.some((e) => e.m.preferred);
+  // The data writes the switch as true/false (every memory domain: true), so it is read as a flag: read as a number it was never on.
+  const preferOnly = input.ref.flag('usePreferredMachines') === true && capable.some((e) => e.m.preferred);
   const pool = preferOnly ? capable.filter((e) => e.m.preferred) : capable;
   const best = [...pool].sort((a, b) => a.costed!.totalCost - b.costed!.totalCost || a.m.name.localeCompare(b.m.name))[0];
   const evals: ChoiceEval[] = evaluated.map((e) => ({
