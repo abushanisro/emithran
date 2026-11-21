@@ -2,7 +2,7 @@
 // its cost summary priced on that route (the same lines, the same totals, the same code path as the quote, so the comparison cannot disagree
 // with it). Apply saves a route's lines as the item's process records. Pure.
 import { MULTI_SPINDLE_ROUTES, type MultiSpindleRouteKey } from './multi-spindle-route';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
@@ -17,7 +17,9 @@ export function multiSpindleRouteFor(key: MultiSpindleRouteKey, summary: CostSum
   const label = MULTI_SPINDLE_ROUTES.find((r) => r.key === key)!.label;
   const isThis = ms?.route === key;
   const option = ms?.options.find((o) => o.route === key);
-  const feasible = isThis && !!option?.complete && summary.totalCost != null;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && !!option?.complete && summary.totalCost != null;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const why = !ms ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith('Multi-Spindle Machining cannot be costed')) ?? 'the part could not be costed'
     : !isThis ? option?.reason ?? 'not a route for this part'
@@ -40,7 +42,7 @@ export function multiSpindleRouteFor(key: MultiSpindleRouteKey, summary: CostSum
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

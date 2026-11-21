@@ -956,10 +956,12 @@ function CostSummaryTab({
       {/* ── DIRECT PROCESS COSTS ── engine rows shown only when no stored records exist ── */}
       <SectionHeader label="Direct Process Costs" />
 
-      {/* Stale process costs warning — stored records exist but no material is applied */}
+      {/* Stale process costs warning — stored records exist but no material is applied: removed, or never chosen (no material grade) */}
       {!materialSettled && hasStoredProcs && (
         <div className="rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 mb-2 text-xs text-amber-600 dark:text-amber-400">
-          Process costs below were computed from a material that was removed — they are excluded from the total. Remove them or add a material to recalculate.
+          {costedGrade(item).trim()
+            ? 'Process costs below were computed from a material that was removed — they are excluded from the total. Remove them or add a material to recalculate.'
+            : 'The part has no material grade, so the process costs below are excluded from the total. Choose a material grade and Apply to price the part.'}
         </div>
       )}
 

@@ -1,7 +1,7 @@
 // A part whose Process is the generic "Casting" is priced by every casting process (die, sand, investment) and quoted on the cheapest one that
 // is fully costed: the piece cost plus the tooling its route needs, per part. Pure: the caller prices each family with its own engine.
 import type { CostSummaryDto } from '../../dto/cost-breakdown.dto';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 import { CAD_FAMILY_TO_PROCESS_GROUP } from '../shared/core/part-family-process-group';
 
 export interface CastingFamilyOption {
@@ -16,7 +16,8 @@ export interface CastingFamilyOption {
   detail: string | null;
 }
 
-type Priced = Pick<CostSummaryDto, 'processLines' | 'totalCost' | 'dieCastingProcess' | 'dieTooling' | 'coreboxTooling' | 'patternTooling' | 'usdToDisplayRate'>;
+type Priced = Pick<CostSummaryDto, 'processLines' | 'totalCost' | 'dieCastingProcess' | 'dieTooling' | 'coreboxTooling' | 'patternTooling' | 'usdToDisplayRate'
+  | 'scenarioReady' | 'missingInputs'> & Partial<Pick<CostSummaryDto, 'warnings'>>;
 
 /** One family's summary as an option: its tools (USD on the summary) are added per part in the summary's currency. */
 export function castingFamilyOption(family: string, summary: Priced): CastingFamilyOption {
@@ -24,7 +25,8 @@ export function castingFamilyOption(family: string, summary: Priced): CastingFam
   const gap = findRouteDataGaps(summary.processLines)[0];
   const die = summary.dieCastingProcess;
   const infeasible = die?.chosenBy === 'none_feasible' ? die.options.map((o) => `${o.process}: ${o.detail}`).join('; ') : null;
-  const detail = infeasible ?? (gap ? `${gap.process}: ${gap.reason}` : summary.processLines.length === 0 ? 'no step was costed' : null);
+  // A summary that priced nothing says which input it lacks (the material grade), not "no step was costed".
+  const detail = unpricedReason(summary) ?? infeasible ?? (gap ? `${gap.process}: ${gap.reason}` : summary.processLines.length === 0 ? 'no step was costed' : null);
   if (detail) return { family, process, costed: false, total: null, detail };
   const toolingUsd = (summary.dieTooling?.perPartUsd ?? 0) + (summary.coreboxTooling?.perPartUsd ?? 0) + (summary.patternTooling?.perPartUsd ?? 0);
   return { family, process, costed: true, total: summary.totalCost + toolingUsd * (summary.usdToDisplayRate ?? 1), detail: null };

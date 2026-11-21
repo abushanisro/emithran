@@ -2,7 +2,7 @@
 // same lines, the same totals, the same code path as the quote, so the comparison cannot disagree with it). Apply saves a route's lines as
 // the weldment's process records. Pure.
 import { PART_ASSEMBLY_ROUTES, type PartAssemblyRouteKey } from './part-assembly-route';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
@@ -16,7 +16,9 @@ export function partAssemblyRouteFor(key: PartAssemblyRouteKey, summary: CostSum
   const pa = summary.partAssembly;
   const label = PART_ASSEMBLY_ROUTES.find((r) => r.key === key)?.label ?? key;
   const isThis = pa?.route === key;
-  const feasible = isThis && pa.complete;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && pa.complete;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const option = pa?.options.find((o) => o.route === key);
   const why = !pa?.route ? gaps.at(0)?.reason ?? summary.warnings.find((w) => w.startsWith('Part Assembly cannot be costed')) ?? 'the weldment could not be costed'
@@ -41,7 +43,7 @@ export function partAssemblyRouteFor(key: PartAssemblyRouteKey, summary: CostSum
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

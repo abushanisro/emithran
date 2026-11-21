@@ -3,7 +3,7 @@
 // records. Pure.
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 import { COMPOSITES_ROUTES, type CompositesRouteKey } from './composites-route';
 
 /** The route id of a composites route ("composites-hand_layup"). */
@@ -15,7 +15,9 @@ export function compositesRouteFor(key: CompositesRouteKey, summary: CostSummary
   const composites = summary.composites;
   const label = COMPOSITES_ROUTES.find((r) => r.key === key)!.label;
   const isThis = composites?.route === key;
-  const feasible = isThis && composites!.complete && summary.totalCost != null;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && composites!.complete && summary.totalCost != null;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const option = composites?.options.find((o) => o.route === key);
   const why = !composites ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith('Composites cannot be costed')) ?? 'the part could not be costed'
@@ -39,7 +41,7 @@ export function compositesRouteFor(key: CompositesRouteKey, summary: CostSummary
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

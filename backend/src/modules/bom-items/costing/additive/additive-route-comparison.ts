@@ -4,7 +4,7 @@
 // Apply saves a route's lines as the item's process records. Pure.
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 import { ADDITIVE_DOMAINS, type AdditiveDomain, type AdditiveRouteKey } from './additive-domain';
 import { notCostedPrefix } from './additive-cost-summary';
 
@@ -17,7 +17,9 @@ export function additiveRouteFor(domain: AdditiveDomain, key: AdditiveRouteKey, 
   const additive = summary.additive;
   const label = domain.routes.find((r) => r.key === key)!.label;
   const isThis = additive?.route === key;
-  const feasible = isThis && additive!.complete && summary.totalCost != null;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && additive!.complete && summary.totalCost != null;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const option = additive?.options.find((o) => o.route === key);
   const why = !additive ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith(notCostedPrefix(domain))) ?? 'the part could not be costed'
@@ -41,7 +43,7 @@ export function additiveRouteFor(domain: AdditiveDomain, key: AdditiveRouteKey, 
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

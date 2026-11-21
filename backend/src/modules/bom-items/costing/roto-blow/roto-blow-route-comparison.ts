@@ -3,7 +3,7 @@
 // saves a route's lines as the item's process records. Pure.
 import type { CostSummaryResponseDto } from '../../dto/cost-breakdown.dto';
 import type { RouteResultDto } from '../../dto/route-comparison.dto';
-import { findRouteDataGaps } from '../shared/core/engine-kernel';
+import { findRouteDataGaps, unpricedReason } from '../shared/core/engine-kernel';
 import { ROTO_BLOW_NOT_COSTED } from './roto-blow-cost-summary';
 import { ROTO_BLOW_ROUTES, type RotoBlowRouteKey } from './roto-blow-route';
 
@@ -16,7 +16,9 @@ export function rotoBlowRouteFor(key: RotoBlowRouteKey, summary: CostSummaryResp
   const rb = summary.rotoBlow;
   const label = ROTO_BLOW_ROUTES.find((r) => r.key === key)!.label;
   const isThis = rb?.route === key;
-  const feasible = isThis && rb!.complete && summary.totalCost != null;
+  // Priced on a summary that priced nothing (no material grade): not feasible, and the missing input is the reason.
+  const unpriced = unpricedReason(summary);
+  const feasible = !unpriced && isThis && rb!.complete && summary.totalCost != null;
   const gaps = isThis ? findRouteDataGaps(summary.processLines) : [];
   const option = rb?.options.find((o) => o.route === key);
   const why = !rb ? gaps[0]?.reason ?? summary.warnings.find((w) => w.startsWith(ROTO_BLOW_NOT_COSTED)) ?? 'the part could not be costed'
@@ -40,7 +42,7 @@ export function rotoBlowRouteFor(key: RotoBlowRouteKey, summary: CostSummaryResp
     badges: { lowestCost: false, fastest: false, bestQuality: false },
     capability: {
       cuttingCapable: feasible, pressBrakeCapable: feasible, overallCapable: feasible, confidence: 'high',
-      estimatedTonnage: null, reasonCodes: [], warnings: feasible ? [] : [why],
+      estimatedTonnage: null, reasonCodes: unpriced ? ['INPUT_MISSING'] : [], warnings: feasible ? [] : [unpriced ?? why],
     },
     warnings: isThis ? summary.warnings : [],
     ratesSource: summary.ratesSource,

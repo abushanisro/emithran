@@ -1674,7 +1674,10 @@ export type CapabilityReasonCode =
   | "CLASS_THICKNESS_LIMIT"
   | "THICKNESS_EXCEEDED"
   | "BED_LENGTH_EXCEEDED"
-  | "BED_WIDTH_EXCEEDED";
+  | "BED_WIDTH_EXCEEDED"
+  | "TONNAGE_EXCEEDED"
+  /** An input the quote needs is missing (the material grade): the route was not priced. */
+  | "INPUT_MISSING";
 
 export interface RouteCapability {
   cuttingCapable: boolean;

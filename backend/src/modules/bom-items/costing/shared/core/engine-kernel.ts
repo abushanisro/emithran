@@ -432,6 +432,22 @@ export function isRouteDataComplete(lines: readonly RouteDataGapLine[]): boolean
   return findRouteDataGaps(lines).length === 0;
 }
 
+/** What each input the quote cannot be priced without says when the part lacks it (the unpriced summary's missingInputs). */
+const MISSING_INPUT_REASON: Readonly<Partial<Record<string, string>>> = {
+  materialGrade: 'the part has no material grade (choose one in Material Grade, then Apply)',
+};
+
+/**
+ * Why `summary` priced nothing at all: an input the quote needs is missing (scenarioReady false; bom-item-costing unpricedSummary), such as
+ * the material grade. Null when it was priced. A route priced on such a summary is not feasible and not a route the part cannot take: its
+ * reason is the missing input (capability reason code INPUT_MISSING), never "the part could not be costed".
+ */
+export function unpricedReason(summary: { scenarioReady?: boolean; missingInputs?: readonly string[]; warnings?: readonly string[] }): string | null {
+  if (summary.scenarioReady !== false) return null;
+  const named = (summary.missingInputs ?? []).map((k) => MISSING_INPUT_REASON[k]).find((r) => r !== undefined);
+  return named ?? summary.warnings?.[0] ?? 'an input the quote needs is missing';
+}
+
 // ── Route recommendation ──────────────────────────────────────────────────────
 //
 // The one place the platform states which candidate route it would choose.
